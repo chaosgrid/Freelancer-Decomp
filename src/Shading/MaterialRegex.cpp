@@ -23,7 +23,7 @@ namespace
         const unsigned int Offset = (Program[Node + 1] << 8) | Program[Node + 2];
         if (Offset == 0)
             return GNullNode;
-        return Program[Node] == 7 ? Node - (int)Offset
+        return Program[Node] == kRegexBack ? Node - (int)Offset
                                   : Node + (int)Offset;
     }
 
@@ -90,7 +90,7 @@ namespace
                 Node = Next;
                 Next = NextRegexNode(Program, Node);
             }
-            const int Offset = Program[Node] == 7 ? Node - Target : Target - Node;
+            const int Offset = Program[Node] == kRegexBack ? Node - Target : Target - Node;
             Program[Node + 1] = (unsigned char)(Offset >> 8);
             Program[Node + 2] = (unsigned char)Offset;
         }
@@ -98,14 +98,14 @@ namespace
         // 06ed0510: only branch nodes have an operand tail to patch.
         void PatchOperandTail(int Node, int Target)
         {
-            if (Node != GNullNode && Node != GDummyNode && Program[Node] == 6)
+            if (Node != GNullNode && Node != GDummyNode && Program[Node] == kRegexBranch)
                 PatchTail(Node + 3, Target);
         }
 
         // 06ecfc30: parentheses, newline/pipe alternatives and closing nodes.
         int CompileExpression(bool bParenthesized, unsigned int& Flags)
         {
-            Flags = 1;
+            Flags = kRegexHasWidth;
             int Group = 0;
             int Result = GNullNode;
             if (bParenthesized)
@@ -113,7 +113,7 @@ namespace
                 if (GroupNumber >= 10)
                     return GNullNode;
                 Group = GroupNumber++;
-                Result = EmitNode((unsigned char)(20 + Group));
+                Result = EmitNode((unsigned char)(kRegexOpen + Group));
             }
             unsigned int BranchFlags;
             int Branch = CompileBranch(BranchFlags);
@@ -125,9 +125,9 @@ namespace
                 Result = Branch;
             for (;;)
             {
-                if ((BranchFlags & 1) == 0)
-                    Flags &= ~1u;
-                Flags |= BranchFlags & 4;
+                if ((BranchFlags & kRegexHasWidth) == 0)
+                    Flags &= ~(unsigned int)kRegexHasWidth;
+                Flags |= BranchFlags & kRegexStartsProgram;
                 if (*Parse != '|' && *Parse != '\n')
                     break;
                 ++Parse;
@@ -136,7 +136,7 @@ namespace
                     return GNullNode;
                 PatchTail(Result, Branch);
             }
-            const int End = EmitNode((unsigned char)(bParenthesized ? 30 + Group : 0));
+            const int End = EmitNode((unsigned char)(bParenthesized ? kRegexClose + Group : kRegexEnd));
             PatchTail(Result, End);
             for (int Node = Result; Node != GNullNode; Node = NextRegexNode(Program, Node))
                 PatchOperandTail(Node, End);
@@ -155,7 +155,7 @@ namespace
         int CompileBranch(unsigned int& Flags)
         {
             Flags = 0;
-            const int Result = EmitNode(6);
+            const int Result = EmitNode(kRegexBranch);
             int Previous = GNullNode;
             while (*Parse != '\0' && *Parse != ')' && *Parse != '\n' && *Parse != '|')
             {
@@ -163,15 +163,15 @@ namespace
                 const int Piece = CompilePiece(PieceFlags);
                 if (Piece == GNullNode)
                     return GNullNode;
-                Flags |= PieceFlags & 1;
+                Flags |= PieceFlags & kRegexHasWidth;
                 if (Previous == GNullNode)
-                    Flags |= PieceFlags & 4;
+                    Flags |= PieceFlags & kRegexStartsProgram;
                 else
                     PatchTail(Previous, Piece);
                 Previous = Piece;
             }
             if (Previous == GNullNode)
-                EmitNode(9);
+                EmitNode(kRegexNothing);
             return Result;
         }
 
@@ -188,47 +188,47 @@ namespace
                 Flags = AtomFlags;
                 return Result;
             }
-            if ((AtomFlags & 1) == 0 && Quantifier != '?')
+            if ((AtomFlags & kRegexHasWidth) == 0 && Quantifier != '?')
                 return GNullNode;
-            Flags = Quantifier == '+' ? 1 : 4;
+            Flags = Quantifier == '+' ? kRegexHasWidth : kRegexStartsProgram;
             if (Quantifier == '*')
             {
-                if ((AtomFlags & 2) != 0)
-                    InsertNode(10, Result);
+                if ((AtomFlags & kRegexSimple) != 0)
+                    InsertNode(kRegexStar, Result);
                 else
                 {
-                    InsertNode(6, Result);
-                    const int Back = EmitNode(7);
+                    InsertNode(kRegexBranch, Result);
+                    const int Back = EmitNode(kRegexBack);
                     PatchOperandTail(Result, Back);
                     PatchOperandTail(Result, Result);
-                    const int Branch = EmitNode(6);
+                    const int Branch = EmitNode(kRegexBranch);
                     PatchTail(Result, Branch);
-                    const int Nothing = EmitNode(9);
+                    const int Nothing = EmitNode(kRegexNothing);
                     PatchTail(Result, Nothing);
                 }
             }
             else if (Quantifier == '+')
             {
-                if ((AtomFlags & 2) != 0)
-                    InsertNode(11, Result);
+                if ((AtomFlags & kRegexSimple) != 0)
+                    InsertNode(kRegexPlus, Result);
                 else
                 {
-                    const int Branch = EmitNode(6);
+                    const int Branch = EmitNode(kRegexBranch);
                     PatchTail(Result, Branch);
-                    const int Back = EmitNode(7);
+                    const int Back = EmitNode(kRegexBack);
                     PatchTail(Back, Result);
-                    const int Alternate = EmitNode(6);
+                    const int Alternate = EmitNode(kRegexBranch);
                     PatchTail(Branch, Alternate);
-                    const int Nothing = EmitNode(9);
+                    const int Nothing = EmitNode(kRegexNothing);
                     PatchTail(Result, Nothing);
                 }
             }
             else
             {
-                InsertNode(6, Result);
-                const int Branch = EmitNode(6);
+                InsertNode(kRegexBranch, Result);
+                const int Branch = EmitNode(kRegexBranch);
                 PatchTail(Result, Branch);
-                const int Nothing = EmitNode(9);
+                const int Nothing = EmitNode(kRegexNothing);
                 PatchTail(Result, Nothing);
                 PatchOperandTail(Result, Nothing);
             }
@@ -243,21 +243,21 @@ namespace
             const char Character = *Parse++;
             switch (Character)
             {
-            case '^': return EmitNode(1);
-            case '$': return EmitNode(2);
-            case '.': Flags = 3; return EmitNode(3);
+            case '^': return EmitNode(kRegexBol);
+            case '$': return EmitNode(kRegexEol);
+            case '.': Flags = kRegexHasWidth | kRegexSimple; return EmitNode(kRegexAny);
             case '(':
             {
                 unsigned int GroupFlags;
                 const int Group = CompileExpression(true, GroupFlags);
                 if (Group != GNullNode)
-                    Flags |= GroupFlags & 5;
+                    Flags |= GroupFlags & (kRegexHasWidth | kRegexStartsProgram);
                 return Group;
             }
             case '[':
             {
                 const bool bNegated = *Parse == '^';
-                const int Result = EmitNode(bNegated ? 5 : 4);
+                const int Result = EmitNode(bNegated ? kRegexAnyBut : kRegexAnyOf);
                 if (bNegated)
                     ++Parse;
                 if (*Parse == ']' || *Parse == '-')
@@ -307,7 +307,7 @@ namespace
                 if (*Parse != ']')
                     return GNullNode;
                 ++Parse;
-                Flags = 3;
+                Flags = kRegexHasWidth | kRegexSimple;
                 return Result;
             }
             case '\0': case '\n': case ')': case '*': case '+': case '?': case '|':
@@ -321,19 +321,19 @@ namespace
                 if (*Parse == '<')
                 {
                     ++Parse;
-                    return EmitNode(12);
+                    return EmitNode(kRegexWordStart);
                 }
                 if (*Parse == '>')
                 {
                     ++Parse;
-                    return EmitNode(13);
+                    return EmitNode(kRegexWordEnd);
                 }
                 ++Parse;
                 break;
             default: break;
             }
             --Parse;
-            const int Result = EmitNode(8);
+            const int Result = EmitNode(kRegexExactly);
             const char* Previous = nullptr;
             for (;;)
             {
@@ -370,7 +370,7 @@ namespace
                 }
             }
             EmitByte(0);
-            Flags = Previous == nullptr ? 3 : 1;
+            Flags = Previous == nullptr ? (kRegexHasWidth | kRegexSimple) : kRegexHasWidth;
             return Result;
         }
     };
@@ -390,16 +390,16 @@ namespace
             const char* Operand = (const char*)(Program + Node + 3);
             switch (Program[Node])
             {
-            case 3: Scan += std::strlen(Scan); break;
-            case 4:
+            case kRegexAny: Scan += std::strlen(Scan); break;
+            case kRegexAnyOf:
                 while (*Scan != '\0' && std::strchr(Operand, *Scan) != nullptr)
                     ++Scan;
                 break;
-            case 5:
+            case kRegexAnyBut:
                 while (*Scan != '\0' && std::strchr(Operand, *Scan) == nullptr)
                     ++Scan;
                 break;
-            case 8:
+            case kRegexExactly:
                 while (*Scan == *Operand)
                     ++Scan;
                 break;
@@ -421,20 +421,20 @@ namespace
                 const char* Operand = (const char*)(Program + Node + 3);
                 switch (Opcode)
                 {
-                case 0: return true;
-                case 1: if (Input != Begin) return false; break;
-                case 2: if (*Input != '\0') return false; break;
-                case 3: if (*Input == '\0') return false; ++Input; break;
-                case 4:
+                case kRegexEnd: return true;
+                case kRegexBol: if (Input != Begin) return false; break;
+                case kRegexEol: if (*Input != '\0') return false; break;
+                case kRegexAny: if (*Input == '\0') return false; ++Input; break;
+                case kRegexAnyOf:
                     if (*Input == '\0' || std::strchr(Operand, *Input) == nullptr)
                         return false;
                     ++Input; break;
-                case 5:
+                case kRegexAnyBut:
                     if (*Input == '\0' || std::strchr(Operand, *Input) != nullptr)
                         return false;
                     ++Input; break;
-                case 6:
-                    if (Program[Next] != 6)
+                case kRegexBranch:
+                    if (Program[Next] != kRegexBranch)
                         Next = Node + 3;
                     else
                     {
@@ -445,12 +445,12 @@ namespace
                                 return true;
                             Input = Saved;
                             Node = NextRegexNode(Program, Node);
-                        } while (Node != GNullNode && Program[Node] == 6);
+                        } while (Node != GNullNode && Program[Node] == kRegexBranch);
                         return false;
                     }
                     break;
-                case 7: case 9: break;
-                case 8:
+                case kRegexBack: case kRegexNothing: break;
+                case kRegexExactly:
                 {
                     if (*Operand != *Input)
                         return false;
@@ -460,12 +460,12 @@ namespace
                     Input += Length;
                     break;
                 }
-                case 10: case 11:
+                case kRegexStar: case kRegexPlus:
                 {
-                    const char NextCharacter = Program[Next] == 8
+                    const char NextCharacter = Program[Next] == kRegexExactly
                         ? (char)Program[Next + 3] : '\0';
                     int Count = Repeat(Node + 3);
-                    const int Minimum = Opcode == 10 ? 0 : 1;
+                    const int Minimum = Opcode == kRegexStar ? 0 : 1;
                     for (; Count >= Minimum; --Count)
                     {
                         if ((NextCharacter == '\0' || *Input == NextCharacter) && Match(Next))
@@ -474,31 +474,31 @@ namespace
                     }
                     return false;
                 }
-                case 12:
+                case kRegexWordStart:
                     if (std::isalnum(*Input) == 0 && *Input != '_')
                         return false;
                     if (Input > Begin && (std::isalnum(Input[-1]) != 0 || Input[-1] == '_'))
                         return false;
                     break;
-                case 13:
+                case kRegexWordEnd:
                     if (std::isalnum(*Input) != 0 || *Input == '_')
                         return false;
                     break;
                 default:
-                    if (Opcode >= 21 && Opcode <= 29)
+                    if (Opcode >= kRegexOpen + 1 && Opcode <= kRegexOpen + 9)
                     {
                         if (!Match(Next))
                             return false;
-                        if (Starts[Opcode - 20] == nullptr)
-                            Starts[Opcode - 20] = Saved;
+                        if (Starts[Opcode - kRegexOpen] == nullptr)
+                            Starts[Opcode - kRegexOpen] = Saved;
                         return true;
                     }
-                    if (Opcode >= 31 && Opcode <= 39)
+                    if (Opcode >= kRegexClose + 1 && Opcode <= kRegexClose + 9)
                     {
                         if (!Match(Next))
                             return false;
-                        if (Ends[Opcode - 30] == nullptr)
-                            Ends[Opcode - 30] = Saved;
+                        if (Ends[Opcode - kRegexClose] == nullptr)
+                            Ends[Opcode - kRegexClose] = Saved;
                         return true;
                     }
                     return false;
@@ -532,7 +532,7 @@ std::unique_ptr<FMaterialRegex> FMaterialRegex::Compile(const char* Pattern)
     if (Pattern == nullptr)
         return nullptr;
     FRegexCompiler Count = { Pattern, nullptr };
-    Count.EmitByte(0x9c);
+    Count.EmitByte(kRegexMagic);
     unsigned int Flags;
     if (Count.CompileExpression(false, Flags) == GNullNode || Count.Size >= 0x7fff)
         return nullptr;
@@ -548,22 +548,22 @@ std::unique_ptr<FMaterialRegex> FMaterialRegex::Compile(const char* Pattern)
         return nullptr;
     }
     FRegexCompiler Emit = { Pattern, Result->Program.data() };
-    Emit.EmitByte(0x9c);
+    Emit.EmitByte(kRegexMagic);
     if (Emit.CompileExpression(false, Flags) == GNullNode)
         return nullptr;
     const unsigned char* Program = Result->Program.data();
-    if (Program[NextRegexNode(Program, 1)] == 0)
+    if (Program[NextRegexNode(Program, 1)] == kRegexEnd)
     {
         int Node = 4;
-        if (Program[Node] == 8)
+        if (Program[Node] == kRegexExactly)
             Result->StartCharacter = Program[Node + 3];
-        else if (Program[Node] == 1)
+        else if (Program[Node] == kRegexBol)
             Result->bAnchored = true;
-        if ((Flags & 4) != 0)
+        if ((Flags & kRegexStartsProgram) != 0)
         {
             while (Node != GNullNode)
             {
-                if (Program[Node] == 8)
+                if (Program[Node] == kRegexExactly)
                 {
                     const int Length = (int)std::strlen((const char*)(Program + Node + 3));
                     if (Length >= Result->MustLength)
@@ -582,7 +582,7 @@ std::unique_ptr<FMaterialRegex> FMaterialRegex::Compile(const char* Pattern)
 // 06ed0540: mandatory-substring precheck, anchored/start-character/general search.
 bool FMaterialRegex::Search(const FMaterialRegex* Expression, const char* Text)
 {
-    if (Expression == nullptr || Text == nullptr || Expression->Program[0] != 0x9c)
+    if (Expression == nullptr || Text == nullptr || Expression->Program[0] != kRegexMagic)
         return false;
     if (Expression->MustOffset != -1)
     {

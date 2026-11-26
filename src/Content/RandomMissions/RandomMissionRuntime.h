@@ -31,6 +31,27 @@ class INI_Reader;
 // TARGET_SYSTEM 14. Readers: FUN_06f84540, FUN_06f99010.
 extern FRmNamedValue const GRmTextParamNames[15];
 
+// The text parameters (GRmTextParamNames, the retail strings) the offers' GetTextParam fills
+// into a FmtStr.
+enum ERmTextParam
+{
+    RmTextParamNone = 0,                    // FSTRING_PARAM_NONE
+    RmTextParamOfferGroup = 1,              // OFFER_GROUP
+    RmTextParamHostileGroup = 2,            // HOSTILE_GROUP
+    RmTextParamBigSolar = 3,                // BIG_SOLAR
+    RmTextParamOtherSolar = 4,              // OTHER_SOLAR
+    RmTextParamCriticalLoot = 5,            // CRITICAL_LOOT
+    RmTextParamTargetFullName = 6,          // TARGET_FULL_NAME
+    RmTextParamRewardMoney = 7,             // REWARD_MONEY
+    RmTextParamFactionReward = 8,           // FACTION_REWARD
+    RmTextParamFactionHit = 9,              // FACTION_HIT
+    RmTextParamTimeToReturnToBattle = 10,   // TIME_TO_RETURN_TO_BATTLE
+    RmTextParamMissionDifficulty = 11,      // MISSION_DIFFICULTY
+    RmTextParamOfferBase = 12,              // OFFER_BASE
+    RmTextParamTargetZone = 13,             // TARGET_ZONE
+    RmTextParamTargetSystem = 14,           // TARGET_SYSTEM
+};
+
 // .data PTR_DAT_06fce780, 17 rows: comm_sequence trigger names.
 // Reader: FUN_06f98df0.
 extern FRmNamedValue const GRmCommTriggerNames[17];

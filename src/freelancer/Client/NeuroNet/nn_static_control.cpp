@@ -197,7 +197,7 @@ void NnStaticControl::SetPosition(Vector const* NewPosition)
     RequestedPosition.z = NewPosition->z;
 
     float Placed[3];
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         Vector Attach;
         GetAttachPosition(&Attach); // slot 41
@@ -218,7 +218,7 @@ void NnStaticControl::SetPosition(Vector const* NewPosition)
     if (HasInstance(this))
     {
         Vector Instance;
-        if ((PositionFlags & 1) != 0)
+        if ((PositionFlags & kWinPositionAddOffset) != 0)
         {
             Instance.x = Position.x + Offset.x;
             Instance.y = Position.y + Offset.y;
@@ -267,7 +267,7 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
     // LAB_00587fc0 (RET 8).
     Win3DReparent(this, NewParent); // FUN_0059dd00
     Win3DRegister(this);            // FUN_0059dbf0
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
 
     INI_Reader* const Ini = static_cast<INI_Reader*>(Data);
     if (Ini != nullptr)
@@ -575,7 +575,7 @@ void NnStaticControl::Draw()
                 SetIdentityTransform(Scaled);
                 StaticMathEngine()->Scale(*reinterpret_cast<Matrix*>(Scaled),
                                           *reinterpret_cast<Matrix const*>(Scaled), Scale);
-                DALib::Renderer->RenderInstance(ViewCamera, MeshHolder.EngineInstance, 1.0f, 0x30u,
+                DALib::Renderer->RenderInstance(ViewCamera, MeshHolder.EngineInstance, 1.0f, kDrawRotateOffset | kDrawConjugate,
                                        reinterpret_cast<Transform const*>(Scaled), nullptr);
             }
             else
@@ -671,10 +671,10 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_00589050 (RET 0xc).
     switch (Msg)
     {
-    case 0x0c:
+    case kWinPropLit:
         Field_0x347 = (A != 0) ? 1 : 0;
         return 0;
-    case 0x0d:
+    case kStaticPropSetRoll:
         // Roll (+0x32c): the instance turned back and forth on columns 0/1; the new angle is
         // also the start roll (+0x340).
         if (HasInstance(this))
@@ -682,27 +682,27 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         CurRoll = FloatFromBits(A);
         StartYpr[2] = FloatFromBits(A);
         return 0;
-    case 0x0e:
+    case kStaticPropGetRoll:
         return BitsFromFloat(CurRoll);
-    case 0x0f:
+    case kStaticPropSetPitch:
         // Pitch (+0x330) on columns 1/2; also the start pitch (+0x33c).
         if (HasInstance(this))
             TurnInstanceAngle(this, 1, 2, CurPitch, FloatFromBits(A));
         CurPitch = FloatFromBits(A);
         StartYpr[1] = FloatFromBits(A);
         return 0;
-    case 0x10:
+    case kStaticPropGetPitch:
         return BitsFromFloat(CurPitch);
-    case 0x11:
+    case kStaticPropSetYaw:
         // Yaw (+0x334) on columns 2/0; also the start yaw (+0x338).
         if (HasInstance(this))
             TurnInstanceAngle(this, 2, 0, CurYaw, FloatFromBits(A));
         CurYaw = FloatFromBits(A);
         StartYpr[0] = FloatFromBits(A);
         return 0;
-    case 0x12:
+    case kStaticPropGetYaw:
         return BitsFromFloat(CurYaw);
-    case 0x17:
+    case kStaticPropSetInstance:
     {
         // A new engine instance handed in.
         ClientUiMeshHolderRelease(&MeshHolder);
@@ -717,12 +717,12 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             PlaceInstanceAtOffset(this);
         return 0;
     }
-    case 0x18:
+    case kStaticPropColours:
         bUseColours = 1;
         memcpy(MeshColour, reinterpret_cast<void const*>(A), sizeof(MeshColour));
         memcpy(WireColour, reinterpret_cast<void const*>(B), sizeof(WireColour));
         return 0;
-    case 0x19:
+    case kWinPropRenderFlags:
         // Two flags per word: A = (no_mesh_render, no_wire_render), B = (no_z_enable,
         // no_coloring), low word first.
         bNoMeshRender = ((A & 0xffff) != 0) ? 1 : 0;
@@ -730,7 +730,7 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         bNoZEnable = ((B & 0xffff) != 0) ? 1 : 0;
         bNoColoring = ((B >> 16) != 0) ? 1 : 0;
         return 0;
-    case 0x1c:
+    case kStaticPropEnableRotation:
     {
         bEnableRotation = (A == 1) ? 1 : 0;
         if (bEnableRotation != 0)
@@ -739,7 +739,7 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         SetOrientation(&Identity); // slot 7
         return 0;
     }
-    case 0x4d:
+    case kStaticPropForceRadius:
         // A widened as unsigned.
         ForceRadius = static_cast<float>(static_cast<unsigned long long>(static_cast<unsigned>(A)));
         return 0;

@@ -279,14 +279,26 @@ static_assert(sizeof(SSPBadLandsObjCollisionInfo) == 0xc, "SSPBadLandsObjCollisi
 // takes a std::list of them. Defined once, in common_archetype.h.
 struct CollisionGroupDesc;
 
+// The status byte PlayerDB::login returns and IServerImpl::Login sends in
+// FLPACKET_SERVER_LOGINRESPONSE (SendServerLoginResponse's Status); the client's LoginMgr
+// keeps it. The others the login path produces (2, 6) are not named.
+enum ELoginStatus : unsigned char
+{
+    kLoginBanned = 0,           // PlayerData::login_account: the account is banned (FUN_06d48e80)
+    kLoginAlreadyLoggedIn = 1,  // PlayerDB::login: the account name is already in a slot
+    kLoginAccepted = 3,
+    kLoginAccountLocked = 7,    // PlayerData::login_account: CAccount::m_bLocked
+};
+
 // InvincibilityReason — SPRequestInvincibility's 3rd argument. rpclocal writes it as one
-// byte; the ABI passes a dword. TODO: enumerators unrecovered. Server.dll's
-// SPRequestInvincibility (0x11380) branches on 2 (scans the player's system for nearby
-// objects) and 5 (dispatches directly), hence the numeric names. The fixed underlying type
-// admits every byte value decoded from the wire.
+// byte; the ABI passes a dword. Server.dll's SPRequestInvincibility (0x11380) honours
+// turning it on for 2 (the ship is in a dockable solar's dock queue: the client sends it while
+// a docking is pending) and 5 (the client's script / static camera scenes) only. The other
+// values are unrecovered. The fixed underlying type admits every byte value decoded from the
+// wire.
 enum InvincibilityReason : int {
-    INVINCIBILITY_REASON_2 = 2,
-    INVINCIBILITY_REASON_5 = 5,
+    INVINCIBILITY_DOCKING = 2,
+    INVINCIBILITY_CAMERA = 5,
 };
 
 // CommResult enum

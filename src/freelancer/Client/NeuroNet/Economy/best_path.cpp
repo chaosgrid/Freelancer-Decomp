@@ -14,6 +14,7 @@
 #include "common_cobject.h"         // CObject, CEqObj::DockingBaseId
 #include "common_goods.h"           // BaseWatcher
 #include "common_iface.h"           // IObjRW, ObjRwFromWatchable
+#include "common_server.h"          // ENnObjectiveState
 #include "common_universe.h"        // Universe::get_base
 #include "dacom.h"                  // FDUMP
 #include "Space/HUD/hud_contact_list.h"       // G_bHudContactListRefreshRequested (DAT_0067494c)
@@ -95,7 +96,7 @@ namespace
     {
         for (FmtStr::Val const* Token = Waypoint->Marker.Head; Token != nullptr; Token = Token->Next)
         {
-            if (Token->TypeTag == 0x42 || Token->TypeTag == 0x52)
+            if (Token->TypeTag == FmtStr::TagBase || Token->TypeTag == FmtStr::TagRepInstance)
                 return Token;
         }
         return nullptr;
@@ -106,7 +107,7 @@ namespace
     IObjRW* ResolveObjectToken(FmtStr::Val const* Token)
     {
         unsigned const Data = Token->Value;
-        if (Token->TypeTag == 0x52)
+        if (Token->TypeTag == FmtStr::TagRepInstance)
             return ClientObjDb_FindEqObjByVibeId(Data, 0);
         return ResolveBaseObject(Data);
     }
@@ -154,7 +155,7 @@ int BestPathFirstWaypointNotKind3()
     for (int Index = 0; Index < Count; ++Index)
     {
         FBestPathWaypoint const* const Waypoint = BestPathGetWaypoint(Index);
-        if (Waypoint->ObjectiveState != 3)
+        if (Waypoint->ObjectiveState != kNnObjectiveComplete)
             return Index;
     }
     return -1;
@@ -182,7 +183,7 @@ unsigned BestPathWaypointHash(int Index)
     for (FmtStr::Val const* Token = Waypoint->Marker.Head; Token != nullptr; Token = Token->Next)
     {
         Hash = (Hash << 1) | (Hash >> 31);
-        if (Token->TypeTag != 0x52 && Token->TypeTag != 0x4e)
+        if (Token->TypeTag != FmtStr::TagRepInstance && Token->TypeTag != FmtStr::TagNavMarker)
             Hash += Token->Value; // the raw payload dword, whatever the tag (0x21 adds the pointer)
     }
     return Hash;
@@ -216,7 +217,7 @@ bool BestPathWaypointResolvePosition(FBestPathWaypoint const* Waypoint, Vector* 
     // Otherwise the first 'N' (0x4e) token's data block {+0x00 system, +0x08 position}.
     for (FmtStr::Val const* Token = Waypoint->Marker.Head; Token != nullptr; Token = Token->Next)
     {
-        if (Token->TypeTag == 0x4e)
+        if (Token->TypeTag == FmtStr::TagNavMarker)
         {
             FmtStr::NavMarker const* const Block = Token->Marker;
             *OutSystem = Block->Data[0];
@@ -242,13 +243,13 @@ void BestPathObjectivesChanged()
         // FUN_004c4ff0 cannot fail for Index < Count; retail would read through the null
         // anyway.
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index);
-        if ((Waypoint->ObjectiveState & 0x80u) != 0)
+        if ((Waypoint->ObjectiveState & kObjectiveRequestReset) != 0)
             StoryStarReset();                    // FUN_004b9bb0, inlined
-        if ((Waypoint->ObjectiveState & 0x20u) != 0)
+        if ((Waypoint->ObjectiveState & kObjectiveRequestHistory) != 0)
             StoryStarAddHistory(&Waypoint->Marker);  // FUN_004ba2a0
-        if ((Waypoint->ObjectiveState & 0x10u) != 0)
+        if ((Waypoint->ObjectiveState & kObjectiveRequestPending) != 0)
             StoryStarPushPending(&Waypoint->Marker); // FUN_004b9f90
-        Waypoint->ObjectiveState &= 0xfu;
+        Waypoint->ObjectiveState &= kObjectiveStateMask;
     }
 }
 

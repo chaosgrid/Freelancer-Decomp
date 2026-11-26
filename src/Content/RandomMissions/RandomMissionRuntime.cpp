@@ -79,56 +79,56 @@ StateMachineMessage* FRmPlayerLeftMessage::clone() const
 // =======================================================================================
 
 FRmNamedValue const GRmTextParamNames[15] = {
-    {"FSTRING_PARAM_NONE", 0},
-    {"OFFER_GROUP", 1},
-    {"HOSTILE_GROUP", 2},
-    {"BIG_SOLAR", 3},
-    {"OTHER_SOLAR", 4},
-    {"CRITICAL_LOOT", 5},
-    {"TARGET_FULL_NAME", 6},
-    {"REWARD_MONEY", 7},
-    {"FACTION_REWARD", 8},
-    {"FACTION_HIT", 9},
-    {"TIME_TO_RETURN_TO_BATTLE", 10},
-    {"MISSION_DIFFICULTY", 11},
-    {"OFFER_BASE", 12},
-    {"TARGET_ZONE", 13},
-    {"TARGET_SYSTEM", 14},
+    {"FSTRING_PARAM_NONE", RmTextParamNone},
+    {"OFFER_GROUP", RmTextParamOfferGroup},
+    {"HOSTILE_GROUP", RmTextParamHostileGroup},
+    {"BIG_SOLAR", RmTextParamBigSolar},
+    {"OTHER_SOLAR", RmTextParamOtherSolar},
+    {"CRITICAL_LOOT", RmTextParamCriticalLoot},
+    {"TARGET_FULL_NAME", RmTextParamTargetFullName},
+    {"REWARD_MONEY", RmTextParamRewardMoney},
+    {"FACTION_REWARD", RmTextParamFactionReward},
+    {"FACTION_HIT", RmTextParamFactionHit},
+    {"TIME_TO_RETURN_TO_BATTLE", RmTextParamTimeToReturnToBattle},
+    {"MISSION_DIFFICULTY", RmTextParamMissionDifficulty},
+    {"OFFER_BASE", RmTextParamOfferBase},
+    {"TARGET_ZONE", RmTextParamTargetZone},
+    {"TARGET_SYSTEM", RmTextParamTargetSystem},
 };
 
 FRmNamedValue const GRmCommTriggerNames[17] = {
     {"NONE", 0},
-    {"IN_SPACE_IN_SYSTEM", 1},
-    {"IN_SPACE_NOT_IN_SYSTEM", 2},
-    {"LEFT_COMBAT_AREA", 11},
-    {"REENTERED_COMBAT_AREA", 12},
-    {"GLOBAL_SUCCESS", 13},
-    {"GLOBAL_FAIL_COMBAT_RANGE", 14},
-    {"GLOBAL_FAIL_DESTROYED_CRITICAL_LOOT", 15},
-    {"GLOBAL_FAIL_OTHER", 16},
-    {"PLAYER_IN_PRE_BATTLE_SPAWN_RANGE", 3},
-    {"SUCCESS_KILLED_ALL_GOING_TO_MAIN", 4},
-    {"SUCCESS_NOT_KILLED_ALL_GOING_TO_MAIN", 5},
-    {"PLAYER_IN_MAIN_BATTLE_SOLAR_SPAWN_RANGE", 6},
-    {"PLAYER_IN_MAIN_BATTLE_SHIP_SPAWN_RANGE", 7},
-    {"FIRST_FRIENDLY_SPAWN", 8},
-    {"FIRST_BIG_SHIP_SPAWN", 10},
-    {"FIRST_DEFENSIVE_SHIP_SPAWN", 9},
+    {"IN_SPACE_IN_SYSTEM", RmCommInSpaceInSystem},
+    {"IN_SPACE_NOT_IN_SYSTEM", RmCommInSpaceNotInSystem},
+    {"LEFT_COMBAT_AREA", RmCommLeftCombatArea},
+    {"REENTERED_COMBAT_AREA", RmCommReenteredCombatArea},
+    {"GLOBAL_SUCCESS", RmCommGlobalSuccess},
+    {"GLOBAL_FAIL_COMBAT_RANGE", RmCommGlobalFailCombatRange},
+    {"GLOBAL_FAIL_DESTROYED_CRITICAL_LOOT", RmCommGlobalFailDestroyedCriticalLoot},
+    {"GLOBAL_FAIL_OTHER", RmCommGlobalFailOther},
+    {"PLAYER_IN_PRE_BATTLE_SPAWN_RANGE", RmCommPreBattleSpawnRange},
+    {"SUCCESS_KILLED_ALL_GOING_TO_MAIN", RmCommKilledAllGoingToMain},
+    {"SUCCESS_NOT_KILLED_ALL_GOING_TO_MAIN", RmCommNotKilledAllGoingToMain},
+    {"PLAYER_IN_MAIN_BATTLE_SOLAR_SPAWN_RANGE", RmCommMainBattleSolarSpawnRange},
+    {"PLAYER_IN_MAIN_BATTLE_SHIP_SPAWN_RANGE", RmCommMainBattleShipSpawnRange},
+    {"FIRST_FRIENDLY_SPAWN", RmCommFirstFriendlySpawn},
+    {"FIRST_BIG_SHIP_SPAWN", RmCommFirstBigShipSpawn},
+    {"FIRST_DEFENSIVE_SHIP_SPAWN", RmCommFirstDefensiveShipSpawn},
 };
 
 FRmNamedValue const GRmCommTargetNames[12] = {
-    {"NONE", 0},
-    {"BASE", 1},
-    {"BIG_SOLAR", 2},
-    {"BIG_SHIP", 3},
-    {"DEFENSIVE_SHIP", 4},
-    {"FRIENDLY_SHIP", 5},
-    {"PLAYER", 6},
-    {"ALL_PLAYERS", 7},
-    {"PLAYERS_IN_RANGE", 8},
-    {"PLAYERS_OUT_OF_RANGE", 9},
-    {"PLAYERS_IN_SYSTEM", 10},
-    {"PLAYERS_OUT_OF_SYSTEM", 11},
+    {"NONE", RmTargetNone},
+    {"BASE", RmTargetBase},
+    {"BIG_SOLAR", RmTargetBigSolar},
+    {"BIG_SHIP", RmTargetBigShip},
+    {"DEFENSIVE_SHIP", RmTargetDefensiveShip},
+    {"FRIENDLY_SHIP", RmTargetFriendlyShip},
+    {"PLAYER", RmTargetPlayer},
+    {"ALL_PLAYERS", RmTargetAllPlayers},
+    {"PLAYERS_IN_RANGE", RmTargetPlayersInRange},
+    {"PLAYERS_OUT_OF_RANGE", RmTargetPlayersOutOfRange},
+    {"PLAYERS_IN_SYSTEM", RmTargetPlayersInSystem},
+    {"PLAYERS_OUT_OF_SYSTEM", RmTargetPlayersOutOfSystem},
 };
 
 // =======================================================================================
@@ -213,33 +213,33 @@ bool FRmOffer::GetTextParam(int Param, FmtStr* Out)
 {
     switch (Param)
     {
-    case 1:     // OFFER_GROUP
+    case RmTextParamOfferGroup:
     {
         unsigned int const Group = static_cast<unsigned int>(OfferGroup);
         Out->append_rep_group(Group);
         return true;
     }
-    case 2:     // HOSTILE_GROUP
+    case RmTextParamHostileGroup:
         Out->append_rep_group(HostileGroup);
         return true;
-    case 7:     // REWARD_MONEY
+    case RmTextParamRewardMoney:
         Out->append_int(static_cast<unsigned int>(Reward));
         return true;
-    case 8:     // FACTION_REWARD: x 100.0f (DAT_06fb8574) on x87, exact in double
+    case RmTextParamFactionReward:     // x 100.0f (DAT_06fb8574) on x87, exact in double
         Out->append_int(static_cast<unsigned int>(
             static_cast<int>(static_cast<double>(RepReward) * 100.0)));
         return true;
-    case 9:     // FACTION_HIT
+    case RmTextParamFactionHit:
         Out->append_int(static_cast<unsigned int>(
             static_cast<int>(static_cast<double>(RepHit) * 100.0)));
         return true;
-    case 11:    // MISSION_DIFFICULTY
+    case RmTextParamMissionDifficulty:
         Out->append_int(static_cast<unsigned int>(static_cast<int>(Difficulty)));
         return true;
-    case 12:    // OFFER_BASE
+    case RmTextParamOfferBase:
         Out->append_base(OfferBase);
         return true;
-    case 14:    // TARGET_SYSTEM
+    case RmTextParamTargetSystem:
     {
         unsigned int NameId = static_cast<unsigned int>(Param);    // the argument slot
         pub::System::GetName(System->SystemId, NameId);
@@ -521,12 +521,12 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
 
     switch (Param)
     {
-    case 3:
+    case RmTextParamBigSolar:
     {
         for (std::list<FRmSolarSpawn>::const_iterator Solar = Solars.Solars.begin();
              Solar != Solars.Solars.end(); ++Solar)
         {
-            if (Solar->SolarType == 0)
+            if (Solar->SolarType == kRmSolarBig)
             {
                 Out->append_installation(Solar->Arch->StringId);
                 return true;
@@ -534,14 +534,14 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
         }
         return false;
     }
-    case 4:
+    case RmTextParamOtherSolar:
     {
         int Count = 0;
         FRmKillableSolar const* Arch = nullptr;
         for (std::list<FRmSolarSpawn>::const_iterator Solar = Solars.Solars.begin();
              Solar != Solars.Solars.end(); ++Solar)
         {
-            if (Solar->SolarType == 1 || Solar->SolarType == 2)
+            if (Solar->SolarType == kRmSolarDefensive || Solar->SolarType == kRmSolarKillableNeutral)
             {
                 Arch = Solar->Arch;
                 ++Count;
@@ -557,7 +557,7 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
         Out->append_installation(Arch->StringId);
         return true;
     }
-    case 5:
+    case RmTextParamCriticalLoot:
     {
         FRmCriticalLoot const* Loot = nullptr;
         int Count = 0;
@@ -588,7 +588,7 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
         Out->append_loot(Loot->Name);
         return true;
     }
-    case 6:
+    case RmTextParamTargetFullName:
     {
         int First = 0;
         int Second = 0;
@@ -608,7 +608,7 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
         Out->append_string(static_cast<unsigned int>(Second));
         return true;
     }
-    case 13:
+    case RmTextParamTargetZone:
     {
         Vector Position;
         if (TargetShips.bActive)

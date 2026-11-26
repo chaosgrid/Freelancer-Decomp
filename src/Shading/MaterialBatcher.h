@@ -30,7 +30,7 @@ struct FBatchRecord
     unsigned long Flags;         // +0xE0
     void* RecordTag;               // +0xE4
     void* RecordTagContext;               // +0xE8
-    void* SortDepth;             // +0xEC float bits, used when Flags & 0x20
+    void* SortDepth;             // +0xEC float bits, used when kMaterialSubmitSortDepth is set
 
     FBatchRecord();
 };

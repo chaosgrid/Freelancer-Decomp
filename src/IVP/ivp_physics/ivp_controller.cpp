@@ -50,7 +50,7 @@ void IVP_Controller_Detach_From_All_Cores(IVP_Controller* Controller, int SkipFi
         return;
     }
 
-    if (static_cast<int8_t>(SimUnit->State & 0xFF) < 8)
+    if (static_cast<int8_t>(SimUnit->State & 0xFF) < IVP_MT_NOT_SIM)
     {
         SimUnit->update_cores_last_motion_time(); // FUN_063494f0
     }
@@ -75,7 +75,7 @@ void IVP_Controller_Wake_Or_Refresh_Associated_Sim_Unit(IVP_Controller* Controll
     IVP_Core* FirstCore = Cores->ElementAt(0);
     IVP_Simulation_Unit* SimUnit = FirstCore->OwningSimUnit;
 
-    if (static_cast<int8_t>(SimUnit->State & 0xFF) < 8)
+    if (static_cast<int8_t>(SimUnit->State & 0xFF) < IVP_MT_NOT_SIM)
     {
         SimUnit->update_cores_last_motion_time(); // FUN_063494f0
     }

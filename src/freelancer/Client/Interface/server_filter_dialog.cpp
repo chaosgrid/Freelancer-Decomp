@@ -101,7 +101,7 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
                                               nullptr, &CheckOffset, nullptr, &CheckHalfExtents,
                                               0, 0, 0, 0, Desc.ToolTipIds,
                                               Desc.ToolTipIds);
-    Check->SetProperty(0x35, 1, 0);
+    Check->SetProperty(kButtonPropGlow, 1, 0);
 
     _snprintf(Name, 0x2000, "FilterLabel%d", G_ServerFilterRowCounter);
     Label = static_cast<RichTextWin*>(WinFactoryCreate(Name, "RichTextWin", Dialog, nullptr));
@@ -129,7 +129,7 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
 
     Label->GetToolTipHoverInfo()->IdsAlt = Desc.ToolTipIds;
     Label->SetToolTipEnabled(true);
-    Label->SetAlignMode(2);
+    Label->SetAlignMode(kRichAlignMiddle);
 
     if (Desc.bHasData == 0)
     {
@@ -168,7 +168,7 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
         Data->SetDrawFrame(true);
         Data->SetFrameColor(
             reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
-        Data->SetAlignMode(2);
+        Data->SetAlignMode(kRichAlignMiddle);
     }
 
     G_ServerFilterRowCounter = G_ServerFilterRowCounter + 1;
@@ -182,15 +182,15 @@ void ServerFilterDialog::ReadControls()
     if (Target == nullptr)
         return;
     int State = 0;
-    Rows[0].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+    Rows[0].Check->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterPing = static_cast<unsigned char>(State == 0);
-    Rows[1].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+    Rows[1].Check->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterKnown = static_cast<unsigned char>(State == 0);
-    Rows[2].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+    Rows[2].Check->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterVersion = static_cast<unsigned char>(State == 0);
-    Rows[3].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+    Rows[3].Check->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterPassword = static_cast<unsigned char>(State == 0);
-    Rows[4].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+    Rows[4].Check->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterLan = static_cast<unsigned char>(State == 0);
 
     // The ping box's first 15 characters into the maximum; the minimum back to 0.
@@ -205,11 +205,11 @@ void ServerFilterDialog::WriteControls()
     // FUN_005630f0. Property 0x30 with the enable byte (the toggle turns a zero into state 1).
     if (Target == nullptr)
         return;
-    Rows[0].Check->SetProperty(0x30, Target->bFilterPing, 0);
-    Rows[1].Check->SetProperty(0x30, Target->bFilterKnown, 0);
-    Rows[2].Check->SetProperty(0x30, Target->bFilterVersion, 0);
-    Rows[3].Check->SetProperty(0x30, Target->bFilterPassword, 0);
-    Rows[4].Check->SetProperty(0x30, Target->bFilterLan, 0);
+    Rows[0].Check->SetProperty(kTogglePropSetState, Target->bFilterPing, 0);
+    Rows[1].Check->SetProperty(kTogglePropSetState, Target->bFilterKnown, 0);
+    Rows[2].Check->SetProperty(kTogglePropSetState, Target->bFilterVersion, 0);
+    Rows[3].Check->SetProperty(kTogglePropSetState, Target->bFilterPassword, 0);
+    Rows[4].Check->SetProperty(kTogglePropSetState, Target->bFilterLan, 0);
 
     wchar_t Text[0x10];
     _ultow(Target->PingMax, Text, 10);
@@ -318,8 +318,8 @@ bool ServerFilterDialog::MouseEvent(FWin3DMouseEvent const* Event)
 
 bool ServerFilterDialog::KeyEvent(unsigned Key, unsigned char* Modifiers)
 {
-    // FUN_00563530. Escape (without modifier bit 1) cancels: the copy back, then the close.
-    if ((*Modifiers & 2) != 0 || Key != 0x1b)
+    // FUN_00563530. Escape (on its release, not the press) cancels: the copy back, then the close.
+    if ((*Modifiers & kWin3DKeyPressed) != 0 || Key != VK_ESCAPE)
         return false;
     *Target = Backup;
     Close();
@@ -368,7 +368,7 @@ intptr_t ServerFilterDialog::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         }
     }
-    else if (Msg == 0x30)
+    else if (Msg == kWinNotifyToggled)
     {
         // A toggle changed.
         ReadControls();

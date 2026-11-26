@@ -52,6 +52,27 @@ struct FCharacterCreateSelection
 };
 extern FCharacterCreateSelection G_CharacterCreateSelection;
 
+// PageCharacterSelect::LeaveDirection: where the page goes once its leave slide has run.
+enum ECharacterSelectLeave
+{
+    kCharSelectLeaveBack = -2,       // shut the server connection, main menu state
+    kCharSelectLeaveMainMenu = -1,
+    kCharSelectLeaveNone = 0,
+    kCharSelectLeaveLoad = 1,        // bLoadRequested
+    kCharSelectLeaveNew = 2          // the character create page
+};
+
+// The button commands PageCharacterSelect::ProcessMessage receives with kWinMsgCommand; the
+// leave direction each starts is in the comment.
+enum ECharacterSelectCommand
+{
+    kCharSelectCmdMainMenu = 0x3e9,   // LeaveDirection -1
+    kCharSelectCmdBack = 0x3ea,       // -2
+    kCharSelectCmdNew = 0x3001,       // 2
+    kCharSelectCmdDelete = 0x3002,    // opens the confirm box
+    kCharSelectCmdLoad = 0x3003       // 1
+};
+
 class PageCharacterSelect : public UIPage::MasterWin
 {
 public:

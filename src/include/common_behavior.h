@@ -157,6 +157,40 @@ bool TimerTableMissileWithinReaction04(SystemManagerTimerTable const* Self);   /
 bool TimerTableMissileWithinReaction08(SystemManagerTimerTable const* Self);   // FUN_062e8970
 
 // ============================================================================
+// Behavior::Flags28 (+0x28) bits.
+enum EBehaviorFlags28
+{
+    // Set by Behavior_ReleaseDirectiveTarget (FUN_062d21c0) and by the behaviors' own
+    // disengage paths (`Flags28 |= 1; OnDisengage(); Flags28 &= ~2`); cleared by OnEngage
+    // (FUN_062d20d0). A behavior that sees it on its next OnUpdate finishes with result 2.
+    kBehaviorFlagDisengageRequested = 0x1,
+    // Set by the slot-10 (OnApplyDirective) overrides that accept a directive; cleared by
+    // cancel_notify (LAB_062c2f50) and when a behavior finishes.
+    kBehaviorFlagDirectiveAccepted = 0x2,
+};
+
+// Behavior::UpdateResult (+0x10), the value OnUpdate stores and returns and GetStatus
+// (slot 9) reports. IBehaviorManager::UpdateBehaviorTick reads it as the active behavior's
+// status: 0 forbids a re-evaluation of the current behavior, 2 and 3 force one (and on the
+// player's own ship drop back to DefaultBehaviorIndex), anything else leaves its verdict alone.
+enum EBehaviorUpdateResult
+{
+    kBehaviorUpdateBusy = 0,      // mid-maneuver: no re-evaluation
+    kBehaviorUpdateRunning = 1,   // the ctor / OnEngage value; the normal running result
+    kBehaviorUpdateFinished = 2,  // directive completed (arrived, disengaged, ...)
+    kBehaviorUpdateAborted = 3,   // cannot run: no owner, target gone, timeout
+};
+
+// The Mask argument of Behavior::SetAvoidanceAllowed / PathfindManager::SetAvoidanceAllowed
+// (FUN_062d21d0 / FUN_062dd3d0): which of the pathfinder's two latches the Value is stored in.
+// Every caller passes both.
+enum EAvoidanceMask
+{
+    kAvoidanceObstacleNudge = 0x1,   // PathfindManager::bObstacleNudgeAllowed
+    kAvoidancePoint = 0x2,           // PathfindManager::bAvoidPointAllowed
+};
+
+// ============================================================================
 // Behavior -- root of the family.
 // ============================================================================
 // The interface IBehaviorManager fans its per-tick ship commands out over. Every slot is

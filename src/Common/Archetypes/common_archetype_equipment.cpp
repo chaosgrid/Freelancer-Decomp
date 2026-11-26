@@ -412,7 +412,7 @@ namespace Archetype
         : Equipment(InCompanion)
     {
         // Listing 0x94460: ObjectType LOOT. LoadEquipment inlines this ctor.
-        ObjectType = 0x10000000;
+        ObjectType = OBJ_LOOT;
     }
 
     AClassType LootCrate::get_class_type() const
@@ -737,7 +737,7 @@ namespace Archetype
 
     ShieldGenerator::ShieldGenerator(ICliObj* InCompanion)
         : AttachedEquipment(InCompanion)
-        , HpType(5)
+        , HpType(HpTypeShieldGenerator)
         , RegenerationRate(0.0f)
         , MaxCapacity(0.0f)
         , ConstantPowerDraw(0.0f)
@@ -849,7 +849,7 @@ namespace Archetype
             unsigned Value = 0;
             if (!TryLookupHpType(Reader.get_value_string(0), &Value))
             {
-                HpType = 7;
+                HpType = HpTypeEliteShieldGenerator;
                 return true;
             }
             HpType = Value;
@@ -1311,7 +1311,7 @@ namespace Archetype
         , LootAppearance(nullptr)
         , PodAppearance(nullptr)
     {
-        ObjectType = 0x10000000;
+        ObjectType = OBJ_LOOT;
     }
 
     bool Commodity::read(INI_Reader& Reader)

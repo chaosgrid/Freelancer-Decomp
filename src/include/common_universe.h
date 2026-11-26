@@ -68,6 +68,19 @@ namespace Archetype
     COMMON_API Explosion* __cdecl GetExplosion(ID_String const& Name);
 }
 
+// The bits of the visit byte of a system, zone or solar ([Object] "visit", the player's visit
+// map, Universe::*::GetVisit): what the player knows of it. The client knowledge map ORs the
+// object's own byte with the player's map. Bits 0x20 (ZONE::SetVisit) and 0x40 / 0x80 are
+// not named.
+enum EVisitFlag
+{
+    kVisitShown = 0x01,        // visited / known: shown on the nav map
+    kVisitExtraInfo = 0x02,    // the base infocard's extra text (Entry->ExtraIds)
+    kVisitCommodities = 0x04,  // the infocard's commodity list
+    kVisitEquipment = 0x08,    // the infocard's equipment list (for a zone: its info)
+    kVisitShips = 0x10,        // the infocard's ship list
+};
+
 namespace Universe
 {
     struct IZone;
@@ -241,6 +254,21 @@ namespace Universe
         bool bAutosaveForbidden;       // +0x6c
     };
 
+    // Bits of the zone's property flags (ZONE::PropertyFlags, IZone::GetProperties). The ini
+    // reader sets Damage / Drag / Interference / Music / Spacedust from the keys of that name;
+    // the mask names are the zone keywords of the mission condition Cnd_InZone (OBJECT_ZONE,
+    // EXCLUSION_ZONE, NEBULA_ZONE, DUST_ZONE).
+    enum EZoneProperty : unsigned
+    {
+        kZonePropObjectZone = 0x7fc0,
+        kZonePropNebula = 0x8000,
+        kZonePropExclusionZone = 0x30000,
+        kZonePropDamage = 0x40000,
+        kZonePropDrag = 0x80000,
+        kZonePropInterference = 0x100000,
+        kZonePropSpacedust = 0x200000,
+        kZonePropMusic = 0x400000,
+    };
     // FUN_063362d0 table PTR_s_sphere_063edb80: name -> int (stricmp); 0 = invalid / miss.
     // IZone slot +0x18 returns it from Shape (+0x3c). Consumer:
     // CmnAsteroid::CAsteroidField::load's "exclude_dynamic_asteroids" key.

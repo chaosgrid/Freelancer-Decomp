@@ -29,6 +29,29 @@ enum FORMATION_RTYPE
     FORMATION_RTYPE_NOT_FOUND = -3
 };
 
+// DirectiveGotoOp::GotoKind (+0x0C), mirrored into GotoBehavior::GotoKind (+0x2f4):
+// GotoBehavior::OnApplyDirective (LAB_062fe670) switches on it; Content's [ObjList] Goto
+// directives write object / point / spline. The ctor leaves 3, which no directive carries.
+enum EGotoKind
+{
+    kGotoKindObject = 0,   // watch the object DirectiveGotoOp::TargetId names
+    kGotoKindPoint = 1,    // fly to DirectiveGotoOp::Destination
+    kGotoKindSpline = 2,   // follow the spline of DirectiveGotoOp::SplineP0..P3
+    kGotoKindNone = 3,     // the ctor value; OnApplyDirective rejects it
+};
+
+// pub::AI::Personality::FormationUseStruct::FormationExitMode (+0x44), the [FormationBlock]
+// formation_exit_mode keyword Content's pilot-personality loader maps (default 5);
+// BaseFollowerBehavior::UpdateTickPayload switches on it.
+enum EFormationExitMode
+{
+    kFormationExitBreakAwayFromCenter = 0,             // BREAK_AWAY_FROM_CENTER
+    kFormationExitBreakAwayFromCenterAfterburner = 1,  // BREAK_AWAY_FROM_CENTER_AFTERBURNER
+    kFormationExitBrakeReverse = 2,                    // BRAKE_REVERSE
+    kFormationExitOutrun = 3,                          // OUTRUN
+    kFormationExitNothing = 5,                         // NOTHING
+};
+
 namespace pub { namespace AI {
 
 // ============================================================================
@@ -355,6 +378,12 @@ public:
     // [GunBlock] (Content 06f3b470)
     struct COMMON_API GunUseStruct
     {
+        // The values of FireStyle, the "fire_style" keywords.
+        enum EFireStyle
+        {
+            kFireStyleMultiple = 0,
+            kFireStyleSingle = 1,
+        };
         int32_t FireStyle;                                // +0x00  0    "fire_style": 0 MULTIPLE, 1 anything else
         float   GunFireIntervalTime;                      // +0x04  0.0
         float   GunFireIntervalVariancePercent;           // +0x08  0.5
@@ -518,6 +547,57 @@ public:
     // fields hold 0..4 (EASIEST..HARDEST, unknown text -> 2).
     struct COMMON_API JobStruct
     {
+        // The bits of LootPreference, the "loot_preference" keywords LT_COMMODITIES /
+        // LT_EQUIPMENT / LT_POTIONS (LT_ALL sets all three, LT_NONE none).
+        enum ELootPreference
+        {
+            kLootPrefCommodities = 1,
+            kLootPrefEquipment = 2,
+            kLootPrefPotions = 4,
+            kLootPrefAll = 7,
+        };
+
+        // The values of FAttackPreference::ShipClass, named as the [JobBlock] class keywords
+        // (Content's table): 12 ends the record list.
+        enum EAttackClass
+        {
+            kAttackClassFighter = 0,
+            kAttackClassFreighter = 1,
+            kAttackClassTransport = 2,
+            kAttackClassGunboat = 3,
+            kAttackClassCruiser = 4,
+            kAttackClassCapital = 5,
+            kAttackClassTradelane = 6,
+            kAttackClassJumpgate = 7,
+            kAttackClassWeaponsPlatform = 8,
+            kAttackClassDestroyableDepot = 9,
+            kAttackClassSolar = 10,
+            kAttackClassAnything = 11,
+            kAttackClassEnd = 12,
+        };
+
+        // FAttackPreference::WeaponFlags, the weapon keywords of "attack_preference".
+        enum EAttackWeapon
+        {
+            kAttackWeaponGuns = 1,
+            kAttackWeaponGuided = 2,
+            kAttackWeaponUnguided = 4,
+            kAttackWeaponTorpedo = 8,
+        };
+
+        // AttackSubtargetOrder entries, named as the "attack_subtarget_order" keywords; 7 ends the
+        // list.
+        enum EAttackSubtarget
+        {
+            kAttackSubtargetGuns = 0,
+            kAttackSubtargetTurrets = 1,
+            kAttackSubtargetLaunchers = 2,
+            kAttackSubtargetTowers = 3,
+            kAttackSubtargetEngines = 4,
+            kAttackSubtargetHull = 5,
+            kAttackSubtargetAnything = 6,
+            kAttackSubtargetEnd = 7,
+        };
         // One "attack_preference" / "attack_order" record (Content 06f3c9d8): ship class
         // (11 = ANYTHING; 12 terminates the list), range and weapon-type mask (1 GUNS,
         // 2 GUIDED, 4 UNGUIDED, 8 TORPEDO). The type name is the port's.
@@ -547,7 +627,7 @@ public:
         uint8_t  bWaitForLeaderTarget;      // +0x0CC  never written by the ctor; the port zeroes it
         float    MaximumLeaderTargetDistance; // +0x0D0  5000.0
         int32_t  FieldTargeting;            // +0x0D4  3   NEVER/LOW_DENSITY/HIGH_DENSITY/ALWAYS
-        int32_t  LootPreference;            // +0x0D8  0   LT_* mask (1 commodities, 2 equipment, 4 potions)
+        int32_t  LootPreference;            // +0x0D8  0   ELootPreference mask
         int32_t  LootFleeThreshold;         // +0x0DC  2
         // +0x0E0 / +0x0E4: the faction's "scan_for_cargo" archetype ids (Content NpcShip
         // 06f33ae1); LootBehavior matches a commodity's good id against them.
@@ -1138,6 +1218,20 @@ static_assert(sizeof(SetPersonalityParams) == 0x3F4, "SetPersonalityParams size"
 // "StayInRange" parser fills them.
 struct COMMON_API SetZoneBehaviorParams : public BaseOp
 {
+    // The values of InvertMode.
+    enum EInvertMode
+    {
+        kInvertNormal = 0,
+        kInvertInverted = 1,
+        kInvertClearUserZone = 2,
+    };
+    // The values of Mode (also PathfindManager::UserZone::Mode).
+    enum EZoneMode
+    {
+        kZoneSphere = 0,   // sphere at TargetPoint / Radius
+        kZoneBox = 1,      // oriented box BoxMin..BoxMax
+        kZoneObject = 2,   // sphere around the live position of the object TargetId names
+    };
     int32_t Mode;                  // +0x0C  0 sphere (TargetPoint, Radius), 1 box (BoxMin..BoxMax),
                                    //        2 live object (TargetId, Radius).
                                    //        Not written by the retail default ctor.
@@ -1194,49 +1288,63 @@ static_assert(sizeof(SetZoneBehaviorParams) == 0x40, "SetZoneBehaviorParams size
 // Ten slots, one per exported virtual: there is no virtual destructor.
 struct ContentCallback
 {
-    // Values seen at call sites: 0, 2, 4 (TargetManager::SetAttackState, 062ee280).
-    // TODO: meanings unknown; the names are placeholders.
+    // Values the engine sends: 0, 2, 4 (TargetManager::SetAttackState, 062ee280). Content's
+    // Gcs handler also accepts 1 as a second "no engage" and 3 as a second "combat over".
     enum CSNType // Combat State Notification type
     {
-        CSNType0 = 0,
-        CSNType2 = 2,
-        CSNType4 = 4,
+        CSNEngage = 0,       // a hostile target was acquired (Gcs engage comm)
+        CSNNoEngage = 2,     // Gcs no-engage comm
+        CSNCombatOver = 4,   // all clear (Gcs combat-over comm)
     };
 
-    // TODO (all enums below): enumerators are placeholders, no values recovered.
+    // FollowBehavior reports the leader crossing the follow range (UpdateInterceptEngageState).
     enum FollowStatusType
     {
-        FollowStatus0 = 0,
-        FollowStatus1 = 1,
-        FollowStatus2 = 2,
+        FollowEnterRange = 1,   // the leader came within FollowDistance (+ FollowRangeBias)
+        FollowLeaveRange = 2,   // the leader left it
     };
 
+    // GuideBehavior's guide events; the retail voice-line names (Content NpcShip's
+    // lead_object_event) are the bc_* strings noted per value.
     enum LeadProgressType
     {
-        LeadProgress0 = 0,
-        LeadProgress1 = 1,
-        LeadProgress2 = 2,
+        LeadGotoPos = 1,           // "bc_goto_pos": leading, caught up and on course
+        LeadGotoFlat = 2,          // "bc_goto_flat": leading, steady
+        LeadGotoNeg = 3,           // "bc_goto_neg": leading, fell behind
+        LeadSelf = 4,              // the "leader is me" shortcut (timer only, no line)
+        LeadFollowPos = 5,         // following, caught up and pointing the right way (timer only)
+        LeadFollowPosAppOff = 6,   // "bc_follow_pos_app_off": caught up but pointing away
+        LeadFollowFlat = 7,        // "bc_follow_flat"
+        LeadFollowNeg = 8,         // "bc_follow_neg": fell behind
     };
 
+    // GotoBehavior's tether zone transitions ("bc_enter_near_teth", "bc_enter_far_teth",
+    // "bc_exit_far_teth").
     enum TetherStatusType
     {
-        TetherStatus0 = 0,
-        TetherStatus1 = 1,
-        TetherStatus2 = 2,
+        TetherEnterNear = 1,
+        TetherEnterFar = 2,
+        TetherExitFar = 3,
     };
 
+    // FleeBehavior::FleeReason; Content's MakeFleeReasonName picks the voice line
+    // gcs_combat_fleereason_tough / _damaged / _noweapons / _other.
     enum FleeReason
     {
-        FleeReason0 = 0,
-        FleeReason1 = 1,
-        FleeReason2 = 2,
+        FleeReasonTough = 0,           // the aggression ratio is above the threat threshold
+        FleeReasonLeaderFleeing = 1,   // follows a fleeing leader
+        FleeReasonDamaged = 2,         // hull below FleeWhenHullDamagedPercent
+        FleeReasonNoWeapons = 3,
+        FleeReasonOther = 4,           // the ctor value
     };
 
+    // What request_flee_destination answers and FleeBehavior::FleeDestType holds.
     enum FleeDestinationType
     {
-        FleeDest0 = 0,
-        FleeDest1 = 1,
-        FleeDest2 = 2,
+        FleeDestNone = 0,     // nothing answered yet
+        FleeDestObject = 1,   // fly to the object OutParam names under the Goto behavior (kGotoKindObject)
+        FleeDestDock = 2,     // dock with the object OutParam names under the Dock behavior
+        FleeDestPoint = 3,    // fly to OutPosition under the Goto behavior (kGotoKindPoint); also the callback-less fallback
     };
 
     enum InformationType
@@ -1246,13 +1354,15 @@ struct ContentCallback
         InfoType2 = 2,
     };
 
-    // 3 is what the base get_creation_type returns.
+    // What created the ship (Content's ENpcCreationKind mapped by FContentNpcShip::
+    // get_creation_type); 3 is what the base get_creation_type returns. Gun groups skip a
+    // Mission ship as a candidate unless the shooter may engage it.
     enum CreationType
     {
-        CreationType0 = 0,
-        CreationType1 = 1,
-        CreationType2 = 2,
-        CreationType3 = 3,
+        CreationEncounter = 0,
+        CreationRandomMission = 1,
+        CreationMission = 2,
+        CreationNone = 3,
     };
 
     SHARED_INLINE_API virtual void follow_event(uint ObjectId1, uint ObjectId2, FollowStatusType Status, float Distance) {}                                                           // +0x00
@@ -1264,7 +1374,7 @@ struct ContentCallback
     SHARED_INLINE_API virtual void scan_state_change(bool bScanning) {}                                                                                                                 // +0x18
     SHARED_INLINE_API virtual void combat_state_notification(CSNType Type, uint Param1, uint Param2) {}                                                                                 // +0x1c
     SHARED_INLINE_API virtual void combat_drift_event() {}                                                                                                                              // +0x20
-    SHARED_INLINE_API virtual CreationType get_creation_type() { return CreationType3; }                                                                                                // +0x24
+    SHARED_INLINE_API virtual CreationType get_creation_type() { return CreationNone; }                                                                                                // +0x24
 };
 
 // ============================================================================

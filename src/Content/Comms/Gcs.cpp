@@ -196,7 +196,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
     Result.Data[0] = '\0';
     switch (Kind)
     {
-    case 0:
+    case kGcsObjectReferenceBusiness:
     {
         // By guide type (2 trader; 3, 4, 7 patrol; others nothing), plural with formation
         // wingmen, then the faction's legality ("_leg" DAT_06fb759c, "_ill" DAT_06fb7594).
@@ -224,7 +224,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
         AppendTString64(&Result, Props->Legality == FactionLegalityLawful ? "_leg" : "_ill");
         return Result;
     }
-    case 1:
+    case kGcsObjectReferenceFormationDesig:
     {
         if (static_cast<FContentShipBase*>(Object)->IsNpcShip())
         {
@@ -238,7 +238,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
         Result = "gcs_refer_formationdesig_01";
         return Result;
     }
-    case 2:
+    case kGcsObjectReferenceNumber:
     {
         if (static_cast<FContentShipBase*>(Object)->IsNpcShip())
         {
@@ -258,7 +258,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
         FormatTString64(&Result, "gcs_misc_number_%d", (Player->PlayerId - 1) % 20 + 1);
         return Result;
     }
-    case 3:
+    case kGcsObjectReferenceRolledNumber:
     {
         // The NPC's rolled value (the call's result is not read); a player gets 1
         // (FUN_06f49bc0 is called, its result dropped).
@@ -697,10 +697,10 @@ FGcsLineLaunchClearance::FGcsLineLaunchClearance(FSystemInfo* InSystem, unsigned
     TextIds.reserve(9);
 
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     PushText("gcs_misc_thisis+");
 
     // The dock's own place (FUN_06eeb730 inlined): an empty name's id is still added.
@@ -760,11 +760,11 @@ FGcsLineDockRequest::FGcsLineDockRequest(FSystemInfo* InSystem, unsigned int InS
 
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
     // Retail repeats kind 2 here (not 3).
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_to");
     PushText(MakeObjectLocationName(Listener).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_request", "+", VoiceId).Data); // DAT_06fb62ec
@@ -890,10 +890,10 @@ FGcsLineDockNowCleared::FGcsLineDockNowCleared(FSystemInfo* InSystem, unsigned i
     PermutationIds = IDS_COMM_ORDER_7;
     TextIds.reserve(7);
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_nowcleared", "+", VoiceId).Data);
     AddText(MakeDockApproachName(DockType, "-"));
 }
@@ -982,7 +982,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
         ShipPrefix.Data[0] = '\0';
         pub::TranslateShipToMsgIdPrefix(Ship->ShipArchId, ShipPrefix);
         AddText(ShipPrefix);
-        AddText(MakeObjectReferenceName(0, Ship, nullptr));
+        AddText(MakeObjectReferenceName(kGcsObjectReferenceBusiness, Ship, nullptr));
         AddText(MakeVoiceLineName(MakeTString64("gcs_dhail_nopermission").Data, "-", VoiceId));
         return;
     }
@@ -998,7 +998,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
         ShipPrefix.Data[0] = '\0';
         pub::TranslateShipToMsgIdPrefix(Ship->ShipArchId, ShipPrefix);
         PushText(ShipPrefix.Data);
-        PushText(MakeObjectReferenceName(0, Ship, nullptr).Data);
+        PushText(MakeObjectReferenceName(kGcsObjectReferenceBusiness, Ship, nullptr).Data);
         PushText("gcs_misc_thisis+");
         PushText(MakeObjectLocationName(Speaker).Data);             // FUN_06eeb730 inlined
         PushText(MakeVoiceLineName("gcs_dockhail_dock_hailmethod", "-", VoiceId).Data);
@@ -1017,7 +1017,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     ShipPrefix.Data[0] = '\0';
     pub::TranslateShipToMsgIdPrefix(Ship->ShipArchId, ShipPrefix);
     PushText(ShipPrefix.Data);
-    PushText(MakeObjectReferenceName(0, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceBusiness, Ship, nullptr).Data);
     PushText(MakeVoiceLineName("gcs_dockhail_dock_idreq", "-", VoiceId).Data);
 }
 
@@ -1033,8 +1033,8 @@ FGcsLineDockHailReceived::FGcsLineDockHailReceived(FSystemInfo* InSystem, unsign
     TextIds.reserve(5);
     PushText(MakeVoiceLineName("gcs_dockhail_dock_transreceived", "+", VoiceId).Data);
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, "-").Data);          // DAT_06fb6064
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, "-").Data);          // DAT_06fb6064
     PushText(MakeVoiceLineName("gcs_dockhail_dock_whereheaded", "+", VoiceId).Data);
 }
 
@@ -1053,8 +1053,8 @@ FGcsLineHaileeDataSubmit::FGcsLineHaileeDataSubmit(FSystemInfo* InSystem, unsign
     PushText("gcs_misc_thisis+");
     // Retail calls GetFactionProps directly here; same outcome as FUN_06eeb190.
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, "-").Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, "-").Data);
     PushText(MakeVoiceLineName("gcs_dockhail_hailee_datasubmit", "-", VoiceId).Data);
 }
 
@@ -1265,8 +1265,8 @@ FGcsLinePlayerHailIdentify::FGcsLinePlayerHailIdentify(FSystemInfo* InSystem,
     PushText("gcs_misc_thisis+");
     // Retail calls GetFactionProps directly here; same outcome.
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, "-").Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, "-").Data);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1320,10 +1320,10 @@ FGcsLineCombatTakingLead::FGcsLineCombatTakingLead(FSystemInfo* InSystem, unsign
     PermutationIds = IDS_COMM_ORDER_6;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_takinglead").Data, "-", VoiceId).Data);
 }
 
@@ -1502,13 +1502,13 @@ FGcsLineCombatEngaging::FGcsLineCombatEngaging(FSystemInfo* InSystem, unsigned i
         System = nullptr;
         return;
     }
-    PushText(MakeObjectReferenceName(1, Target, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Target, nullptr).Data);
     if (TextIds.back() == 0)
     {
         System = nullptr;
         return;
     }
-    PushText(MakeObjectReferenceName(2, Target, "-").Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Target, "-").Data);
     if (TextIds.back() == 0)
         System = nullptr;
 }
@@ -1589,8 +1589,8 @@ FGcsLineCombatAskForHelp::FGcsLineCombatAskForHelp(FSystemInfo* InSystem,
     TextIds.reserve(4);
     // Retail calls GetFactionProps directly here; same outcome.
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, "-").Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, "-").Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_askforhelp").Data, "-", VoiceId).Data);
 }
 
@@ -1625,12 +1625,12 @@ FGcsLineCombatOfferHelp::FGcsLineCombatOfferHelp(FSystemInfo* InSystem, unsigned
     TextIds.reserve(9);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(SpeakerShip).Data);
-    PushText(MakeObjectReferenceName(1, SpeakerShip, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, SpeakerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, SpeakerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, SpeakerShip, nullptr).Data);
     PushText("gcs_misc_to");
     PushText(MakeShortFactionName(ListenerShip).Data);
-    PushText(MakeObjectReferenceName(1, ListenerShip, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, ListenerShip, "-").Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, ListenerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, ListenerShip, "-").Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_offerhelp").Data, "-", VoiceId).Data);
 }
 
@@ -1765,14 +1765,14 @@ FGcsLineScanAnnounce::FGcsLineScanAnnounce(FSystemInfo* InSystem, unsigned int I
     TextIds.reserve(11);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(SpeakerShip).Data);
-    PushText(MakeObjectReferenceName(1, SpeakerShip, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, SpeakerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, SpeakerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, SpeakerShip, nullptr).Data);
     PushText("gcs_misc_to");
     PushText(MakeShortFactionName(ListenerShip).Data);
-    PushText(MakeObjectReferenceName(1, ListenerShip, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, ListenerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, ListenerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, ListenerShip, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, ListenerShip, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, ListenerShip, nullptr).Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_scan_announce").Data, "-", VoiceId).Data);
 }
 
@@ -1893,10 +1893,10 @@ FGcsLineFidgetStatusQuery::FGcsLineFidgetStatusQuery(FSystemInfo* InSystem,
                  .Data);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_fidget_whatstatus").Data, "-", VoiceId).Data);
 }
 
@@ -1914,10 +1914,10 @@ FGcsLineFidgetStatusReport::FGcsLineFidgetStatusReport(FSystemInfo* InSystem,
     PermutationIds = IDS_COMM_ORDER_6;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     // Retail reuses the local that held the ship pointer for the health (status not tested),
     // so a failing call leaves the pointer's bits.
     unsigned int const ShipBits =
@@ -1971,10 +1971,10 @@ FGcsLineFidgetWaypointQuery::FGcsLineFidgetWaypointQuery(FSystemInfo* InSystem,
     TextIds.reserve(7);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(Ship).Data);
-    PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
-    PushText(MakeObjectReferenceName(2, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceFormationDesig, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceNumber, Ship, nullptr).Data);
     PushText("gcs_misc_dash");
-    PushText(MakeObjectReferenceName(3, Ship, nullptr).Data);
+    PushText(MakeObjectReferenceName(kGcsObjectReferenceRolledNumber, Ship, nullptr).Data);
     PushText(MakeVoiceLineName(MakeTString64("gcs_fidget_patrol_wpremainquery").Data, "-",
                                VoiceId)
                  .Data);
@@ -2262,7 +2262,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         else
         {
             // The attacker is no ship: type & 0xfdff and a ship victim.
-            if ((TypeA & 0xfdff) == 0)
+            if ((TypeA & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0)
                 return;
             if ((TypeB & OBJ_SHIP_MASK) == 0)
                 return;
@@ -2742,7 +2742,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
         // Trade.
         switch (Kind)
         {
-        case 0:
+        case kGcsFidgetSimple:
         {
             unsigned int const Good = static_cast<FTradeGuide*>(GetShipGuide(Ship))->GetTradeGood();
             if (Good != 0 && (rand() * 2) / 32768 == 0)
@@ -2751,7 +2751,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
                 Line = new FGcsLineFidgetTradeSimple(System, ShipId, 0);
             break;
         }
-        case 1:
+        case kGcsFidgetFormationStatus:
         {
             // The members are freed after the line is appended or deleted.
             std::vector<FContentShipBase*> Members;
@@ -2766,7 +2766,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
                 System = nullptr;
             return;
         }
-        case 2:
+        case kGcsFidgetRumor:
             Line = new FGcsLineFidgetTradeRumor(System, ShipId, 0);
             break;
         default:
@@ -2778,10 +2778,10 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
         // Patrol.
         switch (Kind)
         {
-        case 0:
+        case kGcsFidgetSimple:
             Line = new FGcsLineFidgetPatrolSimple(System, ShipId, 0);
             break;
-        case 1:
+        case kGcsFidgetFormationStatus:
         {
             std::vector<FContentShipBase*> Members;
             CollectSystemFormationMembers(&Members,
@@ -2806,7 +2806,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
             }
             return;
         }
-        case 2:
+        case kGcsFidgetRumor:
             Line = new FGcsLineFidgetPatrolRumor(System, ShipId, 0);
             break;
         default:
@@ -2818,10 +2818,10 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
         // Wander.
         switch (Kind)
         {
-        case 0:
+        case kGcsFidgetSimple:
             Line = new FGcsLineFidgetPatrolSimple(System, ShipId, 0);
             break;
-        case 1:
+        case kGcsFidgetFormationStatus:
         {
             std::vector<FContentShipBase*> Members;
             CollectSystemFormationMembers(&Members,
@@ -2835,7 +2835,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
                 System = nullptr;
             return;
         }
-        case 2:
+        case kGcsFidgetRumor:
             Line = new FGcsLineFidgetPatrolRumor(System, ShipId, 0);
             break;
         default:
@@ -2979,16 +2979,16 @@ FGcsDockConversation::FGcsDockConversation(FGcsDockGrantedEvent const* Event)
     FGcsLine* Answer = nullptr;
     switch (Response)
     {
-    case 0:
+    case DOCK_HOST_RESPONSE_DENIED_HOSTILE:
         Answer = new FGcsLineDockHostile(System, Speaker, Listener);
         break;
-    case 2:
+    case DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL:
         Answer = new FGcsLineDockDenied(System, Speaker, Listener, DockType);
         break;
-    case 3:
+    case DOCK_HOST_RESPONSE_BUSY:
         Answer = new FGcsLineDockStandby(System, Speaker, Listener);
         break;
-    case 4:
+    case DOCK_HOST_RESPONSE_PROCEED:
         Answer = new FGcsLineDockGranted(System, Speaker, Listener, DockType, DockIndex);
         break;
     default:
@@ -3338,7 +3338,7 @@ float FGcsConversationManager::QueueConversation(FGcsEvent const* Event)
     }
     Conversation->Start();
     Conversations.push_back(Conversation);
-    if (Type == 7)
+    if (Type == GCS_EVENT_KILLED)
     {
         // The first line's duration (slot +0x10) is the result instead of 1.0.
         return Conversations.back()->Lines.front()->GetDuration();
@@ -3356,9 +3356,9 @@ FGcsHandler* __cdecl GetGcsHandler(int const* Type)
     // second insert of {*Type, 0}, which returns the existing node.
     switch (*Type)
     {
-    case 0:
-    case 1:
-    case 2:
+    case kGcsHandlerDockHail:
+    case kGcsHandlerCombat:
+    case kGcsHandlerFidget:
         break;
     default:
         return nullptr;
@@ -3369,9 +3369,9 @@ FGcsHandler* __cdecl GetGcsHandler(int const* Type)
         return It->second;
 
     FGcsHandler* Handler = nullptr;
-    if (*Type == 2)
+    if (*Type == kGcsHandlerFidget)
         Handler = new FGcsFidgetHandler();
-    else if (*Type == 1)
+    else if (*Type == kGcsHandlerCombat)
         Handler = new FGcsCombatHandler();
     else
         Handler = new FGcsDockHailHandler();
@@ -3435,7 +3435,7 @@ FGcsDockHailHandler::~FGcsDockHailHandler()
 int FGcsDockHailHandler::GetType() const
 {
     // LAB_06ea1450.
-    return 0;
+    return kGcsHandlerDockHail;
 }
 
 void FGcsDockHailHandler::SuppressHail(unsigned int const* Ship, void* const* Phantom,
@@ -3549,7 +3549,7 @@ void FGcsDockHailHandler::OnSystemLoaded(unsigned int const* SystemId)
         Matrix Orientation;
         pub::SpaceObj::GetLocation(Objects[Index], Position, Orientation);
         void* Phantom = nullptr;
-        pub::Phantom::Create(*SystemId, 2500.0f, Position, 0x7f0000, Phantom);
+        pub::Phantom::Create(*SystemId, 2500.0f, Position, OBJ_SHIP_MASK, Phantom);
         pub::Phantom::SetActive(Phantom, true);
 
         // An existing key gets the new object.
@@ -3630,8 +3630,8 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
         float const Amount = *reinterpret_cast<float const*>(&Words[6]);
         if (!(Amount > 0.0f))
             return;
-        int const Kind = static_cast<int>(Words[5]);
-        if (Kind < 2 || (Kind > 5 && Kind != 7))
+        DamageCause const Kind = static_cast<DamageCause>(Words[5]);
+        if (Kind < DamageCause::Gun || (Kind > DamageCause::MissileTorpedo && Kind != DamageCause::Mine))
             return;
         FSystemInfo* const System = FindSystemInfo(&Words[1]);
         unsigned int VictimType = 0;
@@ -3700,7 +3700,7 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
         FSystemInfo* const System = FindSystemInfo(&Words[3]);
         switch (Words[0])
         {
-        case 0:
+        case pub::AI::ContentCallback::CSNEngage:
         {
             if (!IsGcsCommAllowed(GCS_EVENT_ENGAGE, System, Words[1], Words[2]))
                 return;
@@ -3714,7 +3714,7 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
             return;
         }
         case 1:
-        case 2:
+        case pub::AI::ContentCallback::CSNNoEngage:
         {
             // Only a ship (type & 0x7f0000; GetType's status not tested).
             if (!IsGcsCommAllowed(GCS_EVENT_NO_ENGAGE, System, Words[1], Words[2]))
@@ -3734,7 +3734,7 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
             return;
         }
         case 3:
-        case 4:
+        case pub::AI::ContentCallback::CSNCombatOver:
         {
             if (!IsGcsCommAllowed(GCS_EVENT_COMBAT_OVER, System, Words[1], Words[2]))
                 return;
@@ -3849,7 +3849,7 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
 int FGcsCombatHandler::GetType() const
 {
     // LAB_06ee9e10.
-    return 1;
+    return kGcsHandlerCombat;
 }
 
 namespace
@@ -3996,16 +3996,16 @@ void FGcsFidgetHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
         FGcsFidgetEvent Event;
         Event.System = System;
         Event.Ship = Speaker;
-        Event.Kind = 0;
+        Event.Kind = kGcsFidgetSimple;
         if (IsRandBelow(0.033333335f))
         {
-            Event.Kind = 2;
+            Event.Kind = kGcsFidgetRumor;
         }
         else
         {
-            Event.Kind = 1;
+            Event.Kind = kGcsFidgetFormationStatus;
             if (!IsRandBelow(0.2f))
-                Event.Kind = 0;
+                Event.Kind = kGcsFidgetSimple;
         }
         GGcsConversations.QueueConversation(&Event);
     }
@@ -4014,7 +4014,7 @@ void FGcsFidgetHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
 int FGcsFidgetHandler::GetType() const
 {
     // LAB_06ee9660.
-    return 2;
+    return kGcsHandlerFidget;
 }
 
 // =======================================================================================

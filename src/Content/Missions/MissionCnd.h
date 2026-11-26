@@ -129,6 +129,13 @@ public:
     unsigned int SourceObjId;   // +0x44 FUN_06f15940(+0x0c)
 };
 
+// CndCmpToPlane::Side, the "inside" / "outside" of the script line.
+enum ECndPlaneSide
+{
+    kCndPlaneInside = 0,
+    kCndPlaneOutside = 1
+};
+
 // Cnd_CmpToPlane: new(0x58), ctor inline (06ebbb9f), vtable 06fb5688, event 0x20.
 class CndCmpToPlane : public Cnd
 {
@@ -428,6 +435,13 @@ public:
     TString<0x30> ShipLabel;   // +0x10 s1
     int Count;                 // +0x44 (OnActivate 0; not set by the ctor)
     int Needed;                // +0x48 (ctor -1) optional i2
+};
+
+// CndMsnResponse::Response, the "accept" / "reject" of the script line.
+enum ECndMsnResponse
+{
+    kCndMsnResponseAccept = 0,
+    kCndMsnResponseReject = 1
 };
 
 // Cnd_MsnResponse: new(0x10), ctor inline (06ebc4df), vtable 06fb535c, event 0x2c.
@@ -741,6 +755,14 @@ public:
 
     unsigned int WatchedTriggerId; // +0x0c ID_String CreateID(s0)
     unsigned int WantedState;      // +0x10 ID_String CreateID(s1): ACTIVE/INACTIVE/COMPLETE/ON/OFF
+};
+
+// CndWatchVibe::Compare, the fourth value of the script line.
+enum ECndVibeCompare
+{
+    kCndVibeLess = 0,      // "lt"
+    kCndVibeGreater = 1,   // "gt"
+    kCndVibeEqual = 2      // "eq"
 };
 
 // Cnd_WatchVibe: new(0x84), ctor FUN_06ec43e0, vtable 06fb5a5c, event 0x20.

@@ -227,7 +227,7 @@ void FContentPlayerState::RecalculateRank()
     int ReputationId = Reputation;
     pub::Reputation::SetRank(ReputationId, static_cast<float>(TableRank));
 
-    if (MissionNumber != 0x2a)
+    if (MissionNumber != kStoryChapterComplete)
         return;
 
     int PlayerRank = 0;
@@ -403,7 +403,7 @@ void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int Miss
         case 27:
         case 28:
         case 31:
-        case 42:
+        case kStoryChapterComplete:
         {
             int Rank;
             pub::Player::GetRank(State->PlayerId, Rank);

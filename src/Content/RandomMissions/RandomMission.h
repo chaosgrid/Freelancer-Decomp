@@ -119,6 +119,15 @@ inline void RmRefRelease(FRmOffer* Object)
 // FUN_06ef04f0 / FUN_06ef0520). A zone is excluded from new missions while listed.
 extern std::vector<unsigned int> GRmObjectiveZones;
 
+// FRandomMissionLoader::CreateMission's result (callers FUN_06f4dxxx / LootProps 06f04286).
+enum ERmCreateResult
+{
+    kRmCreateOk = 0,
+    kRmCreateNoEnemyGroup = 1,   // no hostile group for the objective
+    kRmCreateNoOffer = 2,        // FinalizeMission found no offer
+    kRmCreateNoObjective = 3     // no objective zone
+};
+
 // ---------------------------------------------------------------------------------------
 // Request of FRandomMissionLoader::CreateMission (4 dwords).
 // ---------------------------------------------------------------------------------------

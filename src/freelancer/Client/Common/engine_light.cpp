@@ -10,6 +10,7 @@
 #include "common_ini.h"
 #include "common_misc.h"
 #include "Core/game_options.h"
+#include "render/slots.h"          // Render::EPipelineState
 #include "DALib.h"
 #include "dacom.h"
 #include "Core/globals.h"
@@ -42,7 +43,7 @@ namespace
         if (G_PipelineLightState != -1)
             return;
         G_PipelineLightState = 1;
-        DALib::Pipeline->GetPipelineState(7, &G_PipelineLightState);
+        DALib::Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &G_PipelineLightState);
     }
 
     // The tail every setter shares: when the pipeline owns hardware lights and this one is
@@ -50,7 +51,7 @@ namespace
     // nothing else.
     void PushLightUpdate(FEngineLight* Light)
     {
-        if (G_PipelineLightState != 0 || (Light->Flags & 4u) == 0)
+        if (G_PipelineLightState != 0 || (Light->Flags & kLightFlagRegistered) == 0)
             return;
         DALib::Pipeline->UpdateLight(&Light->D3d);
     }
@@ -155,11 +156,11 @@ namespace
     void DestructLightBody(FEngineLight* Light)
     {
         unsigned char const Was = Light->Flags;
-        if ((Was & 4u) != 0) // registered
+        if ((Was & kLightFlagRegistered) != 0) // registered
         {
-            if ((Was & 0x10u) != 0) // linked into the global list
+            if ((Was & kLightFlagLinked) != 0) // linked into the global list
             {
-                Light->Flags = static_cast<unsigned char>(Light->Flags & 0xefu);
+                Light->Flags = static_cast<unsigned char>(Light->Flags & ~kLightFlagLinked);
                 UnlinkFromList(Light);
             }
 
@@ -168,7 +169,8 @@ namespace
                 DALib::Pipeline->RemoveLight(&Light->D3d);
             else
                 DALib::Pipeline->DestroyLight(&Light->D3d);
-            Light->Flags = static_cast<unsigned char>(Light->Flags & 0xfbu); // clear "registered"
+            // Clear "registered".
+            Light->Flags = static_cast<unsigned char>(Light->Flags & ~kLightFlagRegistered);
         }
     }
 
@@ -232,11 +234,11 @@ void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source)
 {
     // FUN_00411120 (thiscall, RET 4). No null tests.
     unsigned char const Was = Light->Flags;
-    Light->Flags = static_cast<unsigned char>(Was | 0x20u);
-    if ((Was & 4u) == 0)
+    Light->Flags = static_cast<unsigned char>(Was | kLightFlagHasD3d);
+    if ((Was & kLightFlagRegistered) == 0)
     {
         // Not registered yet: the incoming type still gets to set both fields.
-        Light->Flags = static_cast<unsigned char>((Was & 0xfeu) | 0x20u);
+        Light->Flags = static_cast<unsigned char>((Was & ~kLightFlagDynamic) | kLightFlagHasD3d);
         StoreType(Light, static_cast<int>(Source->Type), true);
     }
 
@@ -320,13 +322,13 @@ bool EngineLightRegister(FEngineLight* Light)
     // FUN_00410dd0 (thiscall): bit 3 is set and returned (always 1). No test of the light or
     // the pipeline.
     unsigned char const Was = Light->Flags;
-    if ((Was & 4u) == 0)
+    if ((Was & kLightFlagRegistered) == 0)
     {
-        Light->Flags = static_cast<unsigned char>(Was | 4u);
+        Light->Flags = static_cast<unsigned char>(Was | kLightFlagRegistered);
         if (G_PipelineLightState == 0)
             DALib::Pipeline->AddLight(&Light->D3d);
     }
-    Light->Flags = static_cast<unsigned char>(Light->Flags | 8u);
+    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagEnabled);
     return ((Light->Flags >> 3) & 1u) != 0;
 }
 
@@ -396,10 +398,10 @@ void EngineLightUnregister(FEngineLight* Light)
     // FUN_00410e20 (thiscall). Retail's relink arm after the unlink is dead (the bit was just
     // cleared). No null test.
     unsigned char const Was = Light->Flags;
-    Light->Flags = static_cast<unsigned char>(Was & 0xf7u); // clear "enabled"
-    if ((Was & 0x10u) != 0)
+    Light->Flags = static_cast<unsigned char>(Was & ~kLightFlagEnabled); // clear "enabled"
+    if ((Was & kLightFlagLinked) != 0)
     {
-        Light->Flags = static_cast<unsigned char>(Light->Flags & 0xefu);
+        Light->Flags = static_cast<unsigned char>(Light->Flags & ~kLightFlagLinked);
         UnlinkFromList(Light);
     }
 }
@@ -422,7 +424,8 @@ void EngineLightSetType(FEngineLight* Light, int LightType, bool bDynamic)
 {
     // FUN_004110c0 (thiscall, RET 8): the argument's bit 0 into Flags bit 0, then the type
     // switch. No null test.
-    Light->Flags = static_cast<unsigned char>((Light->Flags & 0xfeu) | (bDynamic ? 1u : 0u));
+    Light->Flags = static_cast<unsigned char>((Light->Flags & ~kLightFlagDynamic) |
+                                              (bDynamic ? kLightFlagDynamic : 0u));
     StoreType(Light, LightType, true);
 }
 
@@ -606,7 +609,7 @@ void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
         if (Graph != nullptr)
         {
             Light->AmbientCurve = Graph;
-            Light->Flags = static_cast<unsigned char>(Light->Flags | 2u);
+            Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
             return;
         }
         MessageBoxA(nullptr, GraphName, "Error: unknown graph name", 0);
@@ -630,7 +633,7 @@ void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
               0x360, GraphName);
     }
     Light->ZoneCurve = Graph;
-    Light->Flags = static_cast<unsigned char>(Light->Flags | 2u);
+    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
 }
 
 void EngineLightSetColorCurve(FEngineLight* Light, char const* GraphName, float Period)
@@ -649,7 +652,7 @@ void EngineLightSetColorCurve(FEngineLight* Light, char const* GraphName, float 
     }
     Light->ColorCurve = Graph;
     Light->ColorCurvePeriod = Period;
-    Light->Flags = static_cast<unsigned char>(Light->Flags | 2u);
+    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
 }
 
 bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Value)
@@ -759,7 +762,7 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         if (Graph != nullptr)
         {
             Light->AmbientCurve = Graph;
-            Light->Flags = static_cast<unsigned char>(Light->Flags | 2u);
+            Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
             return true;
         }
         MessageBoxA(nullptr, Value, "Error: unknown graph name", 0);
@@ -791,10 +794,10 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
 bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, float ExtraRadius)
 {
     // FUN_00410a40 (thiscall, RET 8). No null test.
-    if ((Light->Flags & 8u) == 0)
+    if ((Light->Flags & kLightFlagEnabled) == 0)
         return false;
 
-    if (Light->Type == kLightDirectional && (Light->Flags & 2u) == 0)
+    if (Light->Type == kLightDirectional && (Light->Flags & kLightFlagHasCurve) == 0)
         return true;
 
     // Kept on the x87 stack (double here); true only when strictly greater (ordered).
@@ -856,7 +859,7 @@ Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float 
     int const Type = Light->Type;
     bool const bTowardPoint =
         (Type == kLightPoint) ||
-        (((Light->Flags & 2u) != 0) && (Type == kLightDirectional || Type == kLightSpot));
+        (((Light->Flags & kLightFlagHasCurve) != 0) && (Type == kLightDirectional || Type == kLightSpot));
 
     if (Point != nullptr && (bTowardPoint || OutDist != nullptr))
     {
@@ -889,7 +892,7 @@ bool EngineLightSample(FEngineLight* Light, float const* Point, float* OutDir3,
                        float* InOutAmbient3, float* OutColor3)
 {
     // FUN_00410960.
-    if ((Light->Flags & 8u) == 0)
+    if ((Light->Flags & kLightFlagEnabled) == 0)
         return false;
 
     // Retail reuses the Point argument slot for the distance.
@@ -965,9 +968,9 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
     // FUN_004104e0 (thiscall, RET 0xc). No argument is tested.
     bool bLit = false;
     Vector Dir = {};
-    if ((Light->Flags & 8u) != 0)
+    if ((Light->Flags & kLightFlagEnabled) != 0)
     {
-        if ((Light->Flags & 0x20u) != 0)
+        if ((Light->Flags & kLightFlagHasD3d) != 0)
         {
             EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
             bLit = true;
@@ -977,7 +980,8 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
             float Dist = -1.0f;
             EngineLightComputeDirection(Light, &Dir, Pos3, &Dist);
 
-            if ((Light->Flags & 2u) != 0 && (Light->Type == kLightDirectional || Light->Type == kLightSpot))
+            if ((Light->Flags & kLightFlagHasCurve) != 0 &&
+                (Light->Type == kLightDirectional || Light->Type == kLightSpot))
             {
                 if (Light->Type != kLightPoint)
                 {
@@ -1037,13 +1041,13 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
 
     // Bit 4 (list link) follows bLit.
     unsigned char const OldFlags = Light->Flags;
-    bool const bWasLinked = (OldFlags & 0x10u) != 0;
+    bool const bWasLinked = (OldFlags & kLightFlagLinked) != 0;
     if (bWasLinked != bLit)
     {
         unsigned char const NewFlags = static_cast<unsigned char>(
-            (((static_cast<unsigned>(bLit) << 4) ^ OldFlags) & 0x10u) ^ OldFlags);
+            (((static_cast<unsigned>(bLit) << 4) ^ OldFlags) & kLightFlagLinked) ^ OldFlags);
         Light->Flags = NewFlags;
-        if ((NewFlags & 0x10u) != 0)
+        if ((NewFlags & kLightFlagLinked) != 0)
         {
             LinkIntoRegisteredList(Light);
             return bLit;
@@ -1061,7 +1065,7 @@ void EngineLightClearRegisteredList()
     {
         // Unconditional in retail.
         DALib::Pipeline->SetLightEnable(&Light->D3d, 0);
-        Light->Flags = static_cast<unsigned char>(Light->Flags & 0xefu);
+        Light->Flags = static_cast<unsigned char>(Light->Flags & ~kLightFlagLinked);
         Light = ListNext(Light);
     }
     G_LightListHead = nullptr;
@@ -1181,7 +1185,7 @@ bool GameLightEnable(FEngineLight* Light)
 void GameLightDisable(FEngineLight* Light)
 {
     FGameLight* const Game = reinterpret_cast<FGameLight*>(Light);
-    if ((Light->Flags & 8u) == 0)
+    if ((Light->Flags & kLightFlagEnabled) == 0)
         return;
     EngineLightUnregister(Light);
     FGameLight* const Prev = Game->ListPrev;
@@ -1514,7 +1518,7 @@ void GameLightTick(FGameLight* Light, float Dt)
 {
     // FUN_00537860 (thiscall, RET 4). No null test on the light: both callers (the list walk
     // FUN_00538390 through vtable slot 3 and the equip light's tick) hand a live one.
-    if ((Light->Flags & 8u) == 0)
+    if ((Light->Flags & kLightFlagEnabled) == 0)
         return;
     if (Light->EngineIndex == 0xffffffffu)
     {

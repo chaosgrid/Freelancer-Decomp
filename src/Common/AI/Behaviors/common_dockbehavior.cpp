@@ -12,6 +12,7 @@
 #include "common_csys.h"           // Transform, Acquire3DMathEngine -- SetContext's hpmount offset
 #include "x86math.h"               // I3DMathEngine::TransposeTransform, Vector, Matrix
 #include "common_cobject.h"        // CObject, CShip::request_exit_tradelane -- Disengage
+#include "common_server.h"         // DOCK_HOST_RESPONSE
 
 #include <cmath>
 #include <cstdint>
@@ -82,7 +83,7 @@ DockBehavior::~DockBehavior()
 // Slot 5, LAB_062c35c0. RET 4: the manager's float argument is not read.
 int DockBehavior::SetModeFromFlags()
 {
-    int Mode = (Flags28 & 0x2) ? 1 : 2;
+    int Mode = (Flags28 & kBehaviorFlagDirectiveAccepted) ? 1 : 2;
     if (Flag29 != 0)
         Mode = 3;
     Readiness = Mode;
@@ -122,7 +123,7 @@ void DockBehavior::slide_strafe_burst(StrafeDir Dir)
 bool DockBehavior::IsClearanceState() const
 {
     int Mode = ModeState320;
-    return Mode != 6 && Mode != 7 && Mode != 8 && Mode != 10;
+    return Mode != 6 && Mode != 7 && Mode != kDockStateSpline && Mode != 10;
 }
 
 // Slots 24/26, LAB_062c2fe0.
@@ -137,10 +138,10 @@ void* DockBehavior::GetWatchedRawBlock() const
 // Slot 7, LAB_062c3b70.
 int DockBehavior::Update()
 {
-    if (Flags28 & 0x1)
+    if (Flags28 & kBehaviorFlagDisengageRequested)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // No owner, no watched object, or a watched pointer of exactly 8 -> result 3.
@@ -148,8 +149,8 @@ int DockBehavior::Update()
     if (OwnerContext == nullptr || Watched == nullptr ||
         reinterpret_cast<char const*>(Watched) - 8 == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     IObjRW* const Owner = OwnerContext;
@@ -168,7 +169,7 @@ int DockBehavior::Update()
         else if (Flag39b == 0)
         {
             Flag39b = 1;
-            static_cast<IObjAffect*>(Owner)->slot_6c(1, 0);
+            static_cast<IObjAffect*>(Owner)->slot_6c(kShipVoiceTradeLaneDisrupted, 0);
         }
     }
 
@@ -183,10 +184,10 @@ int DockBehavior::Update()
         {
             // The target is moving: release both Ideas.
             Face.Commit();
-            Move.SetField44(0);     // FUN_062d88b0
+            Move.SetField44(kMoveStopThrottleCut);     // FUN_062d88b0
             Move.Commit();
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
     }
 
@@ -214,9 +215,9 @@ bool DockBehavior::CopyDockOp(pub::AI::DirectiveDockOp* Out) const
 // secondary base (outer - 0x2c).
 bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
 {
-    if (Param1 == 0)
+    if (Param1 == kRequestEventDock)
     {
-        if (Param2 == 3)
+        if (Param2 == DOCK_HOST_RESPONSE_BUSY)
             return true;
 
         DockPortIndex = Param3;   // outer+0x43c
@@ -227,7 +228,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
 
         if (bInvalidBlock || Param3 == -1)
         {
-            EnterState(0xd);
+            EnterState(kDockStateFailed);
             Flag39a = 0;
             return false;
         }
@@ -237,17 +238,17 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
         if (StateFlags32c & (OBJ_JUMP_GATE | OBJ_JUMP_HOLE))
             EnterState(6);
         else
-            EnterState(2);
+            EnterState(kDockStateApproach);
         return false;
     }
 
-    if (Param1 == 2)
+    if (Param1 == kRequestEventTradelane)
     {
         if (Param2 == 4)
         {
             if (Param3 == -1)
             {
-                EnterState(0xd);
+                EnterState(kDockStateFailed);
                 Flag39a = 0;
                 return false;
             }
@@ -257,7 +258,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
         }
         if (Param2 == 1)
         {
-            EnterState(0xd);
+            EnterState(kDockStateFailed);
             Flag39a = 0;
             return false;
         }
@@ -280,7 +281,7 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // Each Idea's slot 0 gets (owner, SysMgr, Param2); retail passes the still-live
     // Param2, not a reload of BehaviorMgr (same value).
     Move.SetContext(OwnerContext, SysMgr, Param2);
-    Move.SetMode(0);                                          // FUN_062d5980
+    Move.SetMode(kMoveModeEngine);                                          // FUN_062d5980
     GotoDirective.Idea.SetContext(OwnerContext, SysMgr, Param2);
     Face.SetContext(OwnerContext, SysMgr, Param2);
 
@@ -291,7 +292,7 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     DestPointOffset.x = 0.0f;
     DestPointOffset.y = 0.0f;
     DestPointOffset.z = 0.0f;
-    Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
 
     // get_hardpoint (IObjInspect +0xc0) returns non-zero when there is no such hardpoint;
     // then the +0x430 offset is zeroed.
@@ -347,7 +348,7 @@ void DockBehavior::RecomputeApproach()
         (Watched == nullptr) || (reinterpret_cast<char const*>(Watched) - 8 == nullptr);
     if (bInvalidBlock)
     {
-        EnterState(0xd);
+        EnterState(kDockStateFailed);
         return;
     }
 
@@ -363,7 +364,7 @@ void DockBehavior::RecomputeApproach()
             static_cast<double>(Behavior_GetCoastDistance(OwnerContext, Speed)) * 1.4f);
     }
 
-    SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);   // FUN_062d21d0
 
     // Bit 7 of the low byte set.
     if (static_cast<signed char>(StateFlags32c) < 0)
@@ -397,7 +398,7 @@ void DockBehavior::RecomputeApproach()
     // continues the approach (state 1); farther or unordered aborts (0xd).
     float const kApproachRangeSq = 10000.0f * 10000.0f;   // DAT_063fc518 == 1e8f exactly
 
-    int NextState = 1;
+    int NextState = kDockStateGoto;
     IObjInspect const* const ThreatObject = ObjInspectOf(OwnerContext);
     if (ThreatObject->is_player())
     {
@@ -416,8 +417,8 @@ void DockBehavior::RecomputeApproach()
         double const DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
         if (!(DistSq < kApproachRangeSq))
         {
-            ObjAffectOf(OwnerContext)->slot_6c(0, 0);
-            NextState = 0xd;
+            ObjAffectOf(OwnerContext)->slot_6c(kShipVoiceDockTooFar, 0);
+            NextState = kDockStateFailed;
         }
     }
     EnterState(NextState);
@@ -436,15 +437,15 @@ void DockBehavior::RecomputeApproach()
 void DockBehavior::Disengage()
 {
     // With ModeState320 == 0 retail takes a short, separate tail (LAB_062c3afc).
-    if (ModeState320 == 0)
+    if (ModeState320 == kDockStateIdle)
     {
         if (ApproachClearedFlag334 == 0)
             return;
 
-        TerminalType = 0;
+        TerminalType = TERM_NONE;
         RequestedDockPortIndex = -1;
         ApproachClearedFlag334 = 0;
-        CancelOwnerRequest(0);
+        CancelOwnerRequest(kRequestEventDock);
         return;
     }
 
@@ -459,7 +460,7 @@ void DockBehavior::Disengage()
 
     if (static_cast<signed char>(StateFlags32c) < 0)
     {
-        Move.SetField44(2);                                    // FUN_062d88b0
+        Move.SetField44(kMoveStopFlyThrough);                                    // FUN_062d88b0
 
         // request_exit_tradelane is called on a possibly-null CShip, as retail.
         if (AbortFlag398 != 0 && Flag399 == 0)
@@ -472,20 +473,20 @@ void DockBehavior::Disengage()
         }
 
         if (Flag39a != 0)
-            CancelOwnerRequest(2);
+            CancelOwnerRequest(kRequestEventTradelane);
     }
     else
     {
         SystemManager* const Sys = SysMgr;
-        int const Level = (Sys->SelfTarget.Iface->is_player() && ModeState320 == 1) ? 2 : 0;
+        int const Level = (Sys->SelfTarget.Iface->is_player() && ModeState320 == kDockStateGoto) ? kMoveStopFlyThrough : kMoveStopThrottleCut;
         Move.SetField44(Level);                                // FUN_062d88b0
 
-        if ((Flags28 & 0x1) == 0)
+        if ((Flags28 & kBehaviorFlagDisengageRequested) == 0)
         {
-            TerminalType = 0;
+            TerminalType = TERM_NONE;
             RequestedDockPortIndex = -1;
             ApproachClearedFlag334 = 0;
-            CancelOwnerRequest(0);
+            CancelOwnerRequest(kRequestEventDock);
         }
     }
 
@@ -495,10 +496,10 @@ void DockBehavior::Disengage()
     GotoDirective.Idea.Commit();
     Face.Commit();
     Move.Commit();
-    SetAvoidanceAllowed(1, 3);                                             // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                             // FUN_062d21d0
     SysMgr->GunGroups.SetShieldActive(1);         // FUN_062e9a60
     Behavior::OnDisengage();                                               // FUN_062d20f0
-    ModeState320 = 0;
+    ModeState320 = kDockStateIdle;
 }
 
 // The three IObjAffect request_cancel (+0x60) sites in Disengage. Id is the watched object's
@@ -531,7 +532,7 @@ int DockBehavior::CheckClearanceProgress()
 
     unsigned int Type = 0;   // retail leaves this unset; get_type always writes it
     Candidate->get_type(Type);
-    if ((Type & 0x600de0) != 0)
+    if ((Type & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0)
     {
         if ((Type & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) == 0)
         {
@@ -600,13 +601,13 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
 
     if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
     {
-        Op.GotoKind = 1;
+        Op.GotoKind = kGotoKindPoint;
         Op.Destination = DestPoint3cc;
     }
     else
     {
         // The watched object (target - 8) is not null-tested.
-        Op.GotoKind = 0;
+        Op.GotoKind = kGotoKindObject;
         Watchable const* const Watched = Watcher324.target();
         void const* const Obj = Watched != nullptr
             ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
@@ -624,7 +625,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
     unsigned char const* const Payload =
         *reinterpret_cast<unsigned char const* const*>(static_cast<char const*>(Message) + 4);
 
-    if (TypeCode == 4)
+    if (TypeCode == FBehaviorManagerEvent::kEventTradelane)
     {
         // No null test on the payload or on the watched object.
         if (Payload[0] != 0)
@@ -639,11 +640,11 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         if (ObjInspectOf(Obj)->get_id() != *reinterpret_cast<unsigned int const*>(Payload + 0x10))
             return;
         Flag399 = 1;
-        EnterState(0xc);
+        EnterState(kDockStateDone);
         return;
     }
 
-    if (TypeCode == 3)
+    if (TypeCode == FBehaviorManagerEvent::kEventObjectLeftSystem)
     {
         // A null payload is ignored; no Flag399 store on this path.
         if (Payload == nullptr)
@@ -652,7 +653,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
             Sys->SelfTarget.Iface->get_id())
             return;
-        EnterState(0xc);
+        EnterState(kDockStateDone);
     }
 }
 
@@ -662,7 +663,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
 // approach speed caps 10.0f and 18.0f (.data:DAT_063ebdb8), otherwise 1000.0f.
 void DockBehavior::EnterState(int NewState)
 {
-    if (NewState != 1 && ModeState320 == 1)
+    if (NewState != kDockStateGoto && ModeState320 == kDockStateGoto)
     {
         // No null test on the pilot in retail.
         static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
@@ -677,7 +678,7 @@ void DockBehavior::EnterState(int NewState)
 
     switch (NewState)
     {
-    case 1:
+    case kDockStateGoto:
     {
         // Manager+0x17c is BehaviorDispatchTable[2], the Goto behavior; no null test.
         GotoDirective.NavPilotPtr = BehaviorMgr->BehaviorDispatchTable[2];
@@ -702,12 +703,12 @@ void DockBehavior::EnterState(int NewState)
 
         if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
-            Op.GotoKind = 1;
+            Op.GotoKind = kGotoKindPoint;
             Op.Destination = DestPoint3cc;
         }
         else
         {
-            Op.GotoKind = 0;
+            Op.GotoKind = kGotoKindObject;
             // The watched object is not null-tested, as retail.
             Op.TargetId = static_cast<int32_t>(
                 ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_id());
@@ -721,9 +722,9 @@ void DockBehavior::EnterState(int NewState)
         Pilot->Flag36c = 0;
         return;
     }
-    case 2:
+    case kDockStateApproach:
     {
-        SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
+        SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);   // FUN_062d21d0
 
         if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
@@ -811,15 +812,15 @@ void DockBehavior::EnterState(int NewState)
         }
 
         // LAB_062c4151, reached from both branches.
-        Move.SetMode(0);                           // FUN_062d5980
+        Move.SetMode(kMoveModeEngine);                           // FUN_062d5980
         Move.SetRange3c(64.0f);                    // bind_to_dc fold, .rdata:DAT_0639f480
         Move.SetPosition(InterceptPoint39c);       // FUN_062d5840
         Face.SetPosition(InterceptPoint39c);       // FUN_062d7560
-        Move.SetField44(0);                        // FUN_062d88b0
+        Move.SetField44(kMoveStopThrottleCut);                        // FUN_062d88b0
         return;
     }
-    case 4:
-        Move.SetField44(0);                        // FUN_062d88b0
+    case kDockStateAwaitReply:
+        Move.SetField44(kMoveStopThrottleCut);                        // FUN_062d88b0
         Move.Commit();
         Face.Commit();
         return;
@@ -830,7 +831,7 @@ void DockBehavior::EnterState(int NewState)
             Face.SetPosition(DestPoint3cc);           // FUN_062d7560
             Move.SetPosition(DestPoint3cc);           // FUN_062d5840
             Move.SetRange3c(10.0f);                   // bind_to_dc fold
-            Move.SetField44(2);                       // FUN_062d88b0
+            Move.SetField44(kMoveStopFlyThrough);                       // FUN_062d88b0
             MaxApproachSpeed46c = 10.0f;
             return;
         }
@@ -840,19 +841,19 @@ void DockBehavior::EnterState(int NewState)
         Face.SetBasis(Orient3a8);                     // FUN_062d75c0
         Move.SetPosition(InterceptPoint39c);          // FUN_062d5840
         Move.SetRange3c(10.0f);                       // bind_to_dc fold, .data:DAT_063ebdbc
-        Move.SetMode(1);                              // FUN_062d5980
+        Move.SetMode(kMoveModeTradelane);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         // FUN_062d5a80 copies three dwords into MoveIdea::Offset4c.
         Move.Offset4c = HpMountOffset;
         return;
     case 7:
-        SetAvoidanceAllowed(0, 3);
-        Move.SetField44(2);                           // FUN_062d88b0
+        SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);
+        Move.SetField44(kMoveStopFlyThrough);                           // FUN_062d88b0
         Move.Offset4c = HpMountOffset; // FUN_062d5a80
         if (CombatFlag344 != 0)
         {
             Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
-            Move.SetMode(0);                          // FUN_062d5980
+            Move.SetMode(kMoveModeEngine);                          // FUN_062d5980
             Move.SetPosition(SavedPosition3fc);       // FUN_062d5840
             Move.SetRange3c(25.0f);                   // bind_to_dc fold, .data:DAT_063ebdc4
             return;
@@ -860,17 +861,17 @@ void DockBehavior::EnterState(int NewState)
         Face.SetBasis(OrientMatrix3d8);               // FUN_062d75c0
         Move.SetPosition(DestPoint3cc);               // FUN_062d5840
         Move.SetRange3c(15.0f);                       // bind_to_dc fold, .data:DAT_063ebdc0
-        Move.SetMode(1);                              // FUN_062d5980
+        Move.SetMode(kMoveModeTradelane);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         return;
-    case 8:
+    case kDockStateSpline:
         BuildFinalApproachSpline();                         // FUN_062c56d0
-        SetAvoidanceAllowed(0, 3);
-        SplineMove.SetStopStyle(2);                          // FUN_062da400
+        SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);
+        SplineMove.SetStopStyle(kMoveStopFlyThrough);                          // FUN_062da400
         return;
     case 9:
     {
-        SetAvoidanceAllowed(0, 3);
+        SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);
         Move.SetPosition(SavedPosition3fc);           // FUN_062d5840
         Move.Offset4c = HpMountOffset; // FUN_062d5a80
         // Float radius times double DAT_0639f518 (0.6), rounded once.
@@ -880,52 +881,52 @@ void DockBehavior::EnterState(int NewState)
         if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             Face.SetDirection(Facing38c);             // FUN_062d7590
-            Move.SetField44(2);                       // FUN_062d88b0
+            Move.SetField44(kMoveStopFlyThrough);                       // FUN_062d88b0
             return;
         }
         if ((StateFlags32c & OBJ_JUMP_HOLE) != 0)
         {
-            Move.SetMode(0);                          // FUN_062d5980
+            Move.SetMode(kMoveModeEngine);                          // FUN_062d5980
             // FUN_062d5a70 writes MoveIdea+0x59, not the +0x58 SetEnabled() writes.
             Move.SetField59(0);
             Move.SetAngle38(BitsToFloat(0x3eb2b8c3u)); // set_origin_h fold
-            Move.SetField44(2);                       // FUN_062d88b0
+            Move.SetField44(kMoveStopFlyThrough);                       // FUN_062d88b0
             Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
             return;
         }
         // No null test on BehaviorMgr.
         BehaviorMgr->lock_maneuvers(true);
-        Move.SetField44(0);                           // FUN_062d88b0
+        Move.SetField44(kMoveStopThrottleCut);                           // FUN_062d88b0
         if (CombatFlag344 != 0)
         {
             Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
-            Move.SetMode(0);                          // FUN_062d5980
+            Move.SetMode(kMoveModeEngine);                          // FUN_062d5980
             return;
         }
         // +0x40c is a 3x3 Matrix: FUN_062d75c0 copies nine dwords.
         Face.SetBasis(Orient40c);
-        Move.SetMode(1);                              // FUN_062d5980
+        Move.SetMode(kMoveModeTradelane);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         if ((StateFlags32c & OBJ_DOCKING_RING) != 0)
             break;
         SysMgr->GunGroups.SetShieldActive(0);   // FUN_062e9a60
         return;
     }
-    case 0xb:
+    case kDockStateCooldown:
         StateTimer340 = 0.0f;
         return;
-    case 0xc:
-        Flags28 = static_cast<unsigned char>(Flags28 | 1);
+    case kDockStateDone:
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
         Disengage();
-        Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        BehaviorMgr->SetDirectiveResult(7, 0);   // FUN_062d29a0
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_DOCK, 0);   // FUN_062d29a0
         return;
-    case 0xd:
+    case kDockStateFailed:
         // Same sequence, result 2.
-        Flags28 = static_cast<unsigned char>(Flags28 | 1);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
         Disengage();
-        Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        BehaviorMgr->SetDirectiveResult(7, 2);   // FUN_062d29a0
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_DOCK, 2);   // FUN_062d29a0
         return;
     default:
         // States 3, 5, 0xa and out-of-range values only get the writes above.
@@ -1014,31 +1015,31 @@ void DockBehavior::RefreshApproachState()
 int DockBehavior::UpdateApproachTail()
 {
     // Retail keeps the result in a stack local preset to 1 and stores it on every exit.
-    UpdateResult = 1;
+    UpdateResult = kBehaviorUpdateRunning;
     AdvancePreamble();  // FUN_062c47f0
 
-    if (ModeState320 == 1)
+    if (ModeState320 == kDockStateGoto)
     {
         // Hand the tick delta to the Goto pilot, then its slot 7; anything but 2 leaves
         // through the default case. NavPilotPtr is never null-tested.
         Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
         Pilot->DeltaTime = DeltaTime;
-        if (Pilot->OnUpdate() != 2)
+        if (Pilot->OnUpdate() != kBehaviorUpdateFinished)
             return UpdateResult;
 
         if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
-            EnterState(2);
-            UpdateResult = 1;
+            EnterState(kDockStateApproach);
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
-        EnterState(3);
-        UpdateResult = 1;
+        EnterState(kDockStateRequest);
+        UpdateResult = kBehaviorUpdateRunning;
         return UpdateResult;
     }
 
     bool bAborted = false;
-    if (ModeState320 != 0xc)
+    if (ModeState320 != kDockStateDone)
     {
         // Aborts on not-greater or unordered. The watched object is not null-tested.
         float Health = 1.0f;
@@ -1052,12 +1053,12 @@ int DockBehavior::UpdateApproachTail()
             static_cast<void const*>(ProxWatcher450.Watcher.target()));
         if (bAborted ||
             ((ProxWatched != nullptr) && (ProxWatched != reinterpret_cast<void*>(8)) &&
-             ((ProxWatcher450.Flags14 & 2) == 0)))
+             ((ProxWatcher450.Flags14 & kProxZoneNear) == 0)))
         {
-            Move.SetField44(0);     // FUN_062d88b0
+            Move.SetField44(kMoveStopThrottleCut);     // FUN_062d88b0
             Move.Commit();
             Face.Commit();
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
     }
@@ -1066,21 +1067,21 @@ int DockBehavior::UpdateApproachTail()
     {
         Disengage();
         RecomputeApproach();
-        UpdateResult = 1;
+        UpdateResult = kBehaviorUpdateRunning;
         return UpdateResult;
     }
 
     switch (ModeState320)
     {
-    case 2:
+    case kDockStateApproach:
     {
         // In retail's order; OwnerContext is not null-tested.
         if ((LaneNextRing == nullptr) &&
             !ObjInspectOf(OwnerContext)->is_player() &&
             (static_cast<char>(StateFlags32c) < 0))
         {
-            EnterState(0xc);
-            UpdateResult = 1;
+            EnterState(kDockStateDone);
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
 
@@ -1111,30 +1112,30 @@ int DockBehavior::UpdateApproachTail()
                 break;
         }
 
-        EnterState(((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) == 0) ? 6 : 3);
-        UpdateResult = 1;
+        EnterState(((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) == 0) ? 6 : kDockStateRequest);
+        UpdateResult = kBehaviorUpdateRunning;
         return UpdateResult;
     }
-    case 3:
+    case kDockStateRequest:
     {
         // The slot-0x5c mode and target id are filled in only on the sign-bit branch.
-        int SlotMode = 0;
+        int SlotMode = kRequestEventDock;
         int TargetQuery = 0;
         if (static_cast<char>(StateFlags32c) < 0)
         {
             SavedPosition3fc = DestPoint3cc;
             // LaneNextRing is not null-tested.
             TargetQuery = static_cast<int>(ObjInspectOf(LaneNextRing)->get_id());
-            SlotMode = 2;
+            SlotMode = kRequestEventTradelane;
         }
         if (ApproachClearedFlag334 != 0)
         {
             EnterState(6);
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
 
-        EnterState(4);
+        EnterState(kDockStateAwaitReply);
         Flag39a = 1;
 
         // The docking object is not null-tested.
@@ -1148,14 +1149,14 @@ int DockBehavior::UpdateApproachTail()
             SlotMode, reinterpret_cast<unsigned const*>(&EngineQuery),
             reinterpret_cast<unsigned const*>(&TargetQuery), 0,
             static_cast<IObjAffect::RequestCB*>(this));
-        UpdateResult = 1;
+        UpdateResult = kBehaviorUpdateRunning;
         return UpdateResult;
     }
     case 6:
         if ((StateFlags32c & OBJ_JUMP_HOLE) != 0)
         {
             EnterState(9);
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
         {
@@ -1163,14 +1164,14 @@ int DockBehavior::UpdateApproachTail()
             int FaceResult = Face.Update(DeltaTime);
             if (((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0) && (FaceResult == 1))
             {
-                EnterState(8);
-                UpdateResult = 1;
+                EnterState(kDockStateSpline);
+                UpdateResult = kBehaviorUpdateRunning;
                 return UpdateResult;
             }
             if (MoveResult != 1)
                 break;
             EnterState((CombatFlag344 != 0) ? 9 : 7);
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
     case 7:
@@ -1180,22 +1181,22 @@ int DockBehavior::UpdateApproachTail()
             EnterState(9);
         [[fallthrough]];
     case 10:
-        UpdateResult = 0;
+        UpdateResult = kBehaviorUpdateBusy;
         return UpdateResult;
-    case 8:
+    case kDockStateSpline:
     {
         if (SplineMove.Update(DeltaTime) == 1)
         {
             SplineMove.Commit();
             EnterState(9);
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
         // FUN_062da3f0 against .rdata:DAT_0639f534 (pi/16); unordered builds the spline.
         if (!(SplineMove.GetFaceAngle() < 0.19634955f))
         {
             BuildFinalApproachSpline();       // FUN_062c56d0
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
         break;
@@ -1203,7 +1204,7 @@ int DockBehavior::UpdateApproachTail()
     case 9:
     {
         // Retail stores 0 into the result first; exits that do not set it again return 0.
-        UpdateResult = 0;
+        UpdateResult = kBehaviorUpdateBusy;
         (void)Face.Update(DeltaTime);
         int MoveResult = Move.Update(DeltaTime);
 
@@ -1234,13 +1235,13 @@ int DockBehavior::UpdateApproachTail()
                     static_cast<IObjInspect const*>(EngineObj),
                     static_cast<IObjInspect const*>(LaneNextRing), false, 0.0f) != 0)
             {
-                EnterState(0xd);
+                EnterState(kDockStateFailed);
                 return UpdateResult;
             }
             // FUN_062d4520 on BehaviorMgr.
             BehaviorMgr->QueueNotification(
                 OwnerContext, 0, 0.0f);
-            Move.SetField44(2);   // FUN_062d88b0
+            Move.SetField44(kMoveStopFlyThrough);   // FUN_062d88b0
             EnterState(10);
             AbortFlag398 = 1;
             Flag39a = 1;
@@ -1251,16 +1252,16 @@ int DockBehavior::UpdateApproachTail()
             break;
         if (TerminalType != TERM_MOOR_SMALL && TerminalType != TERM_MOOR_MEDIUM && TerminalType != TERM_MOOR_LARGE)
         {
-            EnterState(0xb);
+            EnterState(kDockStateCooldown);
             return UpdateResult;
         }
         Move.Commit();
         Face.Commit();
         (void)ObjAffectOf(OwnerContext)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
-        EnterState(0xc);
+        EnterState(kDockStateDone);
         return UpdateResult;
     }
-    case 0xb:
+    case kDockStateCooldown:
     {
         StateTimer340 += DeltaTime;
         float Threshold = 3.0f;
@@ -1275,14 +1276,14 @@ int DockBehavior::UpdateApproachTail()
         {
             Disengage();
             RecomputeApproach();
-            UpdateResult = 1;
+            UpdateResult = kBehaviorUpdateRunning;
             return UpdateResult;
         }
         break;
     }
-    case 0xc:
-    case 0xd:
-        UpdateResult = 2;
+    case kDockStateDone:
+    case kDockStateFailed:
+        UpdateResult = kBehaviorUpdateFinished;
         break;
     default:
         break;
@@ -1303,7 +1304,7 @@ bool DockBehavior::CheckCanProceed()
     SystemManager* const Sys = SysMgr;
     switch (ModeState320)
     {
-    case 3:
+    case kDockStateRequest:
     case 6:
     {
         if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) == 0)
@@ -1324,11 +1325,11 @@ bool DockBehavior::CheckCanProceed()
         // in retail and not reproduced.
         break;
     }
-    case 8:
+    case kDockStateSpline:
         if (Flag39a == 0 && ApproachClearedFlag334 == 0)
             return false;
         break;
-    case 2:
+    case kDockStateApproach:
         break;
     default:
         return true;
@@ -1382,11 +1383,11 @@ void DockBehavior::AdvancePreamble()
     if (HeaderBlockFromWatched(ProxWatcher450.Watcher.target()) != nullptr)
     {
         if (!(ProxWatcherComputeSpeedCap(reinterpret_cast<unsigned char*>(&ProxWatcher450),
-                                         OwnerContext, SysMgr, 1, 1.0f) >
+                                         OwnerContext, SysMgr, ThrustEquipEngine, 1.0f) >
               static_cast<double>(LinearCap)))
         {
             LinearCap = static_cast<float>(ProxWatcherComputeSpeedCap(
-                reinterpret_cast<unsigned char*>(&ProxWatcher450), OwnerContext, SysMgr, 1, 1.0f));
+                reinterpret_cast<unsigned char*>(&ProxWatcher450), OwnerContext, SysMgr, ThrustEquipEngine, 1.0f));
         }
     }
 
@@ -1516,7 +1517,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     SystemManagerTimerTable* const ObjDb = &SysMgr->Timers;
     // REP MOVSD of the whole op, vptr included.
     std::memcpy(static_cast<void*>(&DockOp), DirectiveOp, sizeof(DockOp));
-    ModeState320 = 0;
+    ModeState320 = kDockStateIdle;
     StateFlags32c = 0;
     IObjRW* const Dock = static_cast<IObjRW*>(
         ObjDb->FindVerifiedObject((unsigned const*)&DockOp.DockObjectId));
@@ -1524,7 +1525,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()));
     if (Watched == nullptr)
     {
-        Flags28 = static_cast<unsigned char>((Flags28 & 0xfd) | 0x1);
+        Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
         return true;
     }
 
@@ -1546,7 +1547,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     }
     else
     {
-        TerminalType = 0;
+        TerminalType = TERM_NONE;
         RequestedDockPortIndex = -1;
     }
 
@@ -1582,7 +1583,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
         if (ProxWatcher450.CruiseSpeedRatio < 1.0f)
             ProxWatcher450.CruiseSpeedRatio = 1.0f;
     }
-    Flags28 = static_cast<unsigned char>((Flags28 & 0xfe) | 0x2);
+    Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDisengageRequested) | kBehaviorFlagDirectiveAccepted);
     return true;
 }
 

@@ -63,7 +63,7 @@ LoadingProgressBar::LoadingProgressBar()
     Bar = nullptr;
     Text = nullptr;
     G_LoadingScreenStarted = 0;
-    Flags = static_cast<unsigned char>(Flags & 0xfe);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DActive);
     Field32c = 0;
     Fraction = 0.0f;
 }
@@ -102,12 +102,12 @@ void LoadingProgressBar::Update()
     if (G_LoadingScreenStarted != 0)
     {
         SetHiddenWithChildren(false);
-        Flags = static_cast<unsigned char>(Flags | 1);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive);
     }
     else
     {
         SetHiddenWithChildren(true);
-        Flags = static_cast<unsigned char>(Flags & 0xfe);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DActive);
     }
     Win3D::Update();
 }
@@ -118,7 +118,7 @@ void LoadingProgressBar::UpdateInactive()
     if (G_LoadingScreenStarted != 0)
     {
         SetHiddenWithChildren(false);
-        Flags = static_cast<unsigned char>(Flags | 1);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive);
     }
     Win3D::UpdateInactive();
 }

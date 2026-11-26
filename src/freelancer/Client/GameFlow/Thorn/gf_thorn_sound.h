@@ -29,6 +29,20 @@
 
 struct ISoundSource;
 
+// The Mask bits of ISoundControl::SetAudioProps / GetAudioProps (FThornSound LAB_00457760 /
+// LAB_00457810): bit i selects Props8[i].
+enum EThornAudioProp
+{
+    kThornAudioAttenuation = 0x01,
+    kThornAudioPan = 0x02,
+    kThornAudioMinDistance = 0x04,
+    kThornAudioMaxDistance = 0x08,
+    kThornAudioConeInsideAngle = 0x10,
+    kThornAudioConeOutsideAngle = 0x20,
+    kThornAudioConeOutsideAttenuation = 0x40,
+    kThornAudioReverbMix = 0x80
+};
+
 struct FThornSound : FThornComponent
 {
     // FUN_00456d80 (thiscall, RET 0xc).

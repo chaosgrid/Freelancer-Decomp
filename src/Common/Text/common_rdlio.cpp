@@ -311,7 +311,7 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                 }
                 else if (!bExplicitValue)
                 {
-                    ApplyDefaultBit(0xffffff00u);
+                    ApplyDefaultBit(kTextAttrColorMask);
                     bApply = false;
                 }
                 else if (!iswdigit(Value[0]))
@@ -342,7 +342,7 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                 if (bApply)
                 {
                     AttrsIn = (AttrsIn & 0xffu) | (ColorValue << 8);
-                    Mask |= 0xffffff00u;
+                    Mask |= kTextAttrColorMask;
                 }
             }
             else if (wcsncmp(Name, L"font", NameLen) == 0)
@@ -355,13 +355,13 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                     unsigned char const FontByte = (unsigned char)ParseRdlxNumber(Value, ValueLen);
                     unsigned char const OldByte0 = (unsigned char)(AttrsIn & 0xffu);
                     unsigned char const Byte0 =
-                        (unsigned char)((unsigned char)(FontByte * 8 - 1) ^ (~OldByte0 & 7));
+                        (unsigned char)((unsigned char)(FontByte * 8 - 1) ^ (~OldByte0 & kTextAttrStyleMask));
                     AttrsIn = (AttrsIn & ~0xffu) | Byte0;
-                    Mask |= 0xf8u;
+                    Mask |= kTextAttrFontMask;
                 }
                 else
                 {
-                    ApplyDefaultBit(0xf8u);
+                    ApplyDefaultBit(kTextAttrFontMask);
                 }
             }
             else if (wcsncmp(Name, L"bold", NameLen) == 0)
@@ -370,13 +370,13 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                 {
                     bool bSet = ParseRdlxBool(Value, ValueLen);
                     unsigned int Byte0 = AttrsIn & 0xffu;
-                    Byte0 = bSet ? (Byte0 | 1u) : (Byte0 & ~1u);
+                    Byte0 = bSet ? (Byte0 | kTextAttrBold) : (Byte0 & ~kTextAttrBold);
                     AttrsIn = (AttrsIn & ~0xffu) | Byte0;
-                    Mask |= 1u;
+                    Mask |= kTextAttrBold;
                 }
                 else
                 {
-                    ApplyDefaultBit(1u);
+                    ApplyDefaultBit(kTextAttrBold);
                 }
             }
             else if (wcsncmp(Name, L"italic", NameLen) == 0)
@@ -385,13 +385,13 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                 {
                     bool bSet = ParseRdlxBool(Value, ValueLen);
                     unsigned int Byte0 = AttrsIn & 0xffu;
-                    Byte0 = bSet ? (Byte0 | 2u) : (Byte0 & ~2u);
+                    Byte0 = bSet ? (Byte0 | kTextAttrItalic) : (Byte0 & ~kTextAttrItalic);
                     AttrsIn = (AttrsIn & ~0xffu) | Byte0;
-                    Mask |= 2u;
+                    Mask |= kTextAttrItalic;
                 }
                 else
                 {
-                    ApplyDefaultBit(2u);
+                    ApplyDefaultBit(kTextAttrItalic);
                 }
             }
             else if (wcsncmp(Name, L"underline", NameLen) == 0)
@@ -400,13 +400,13 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                 {
                     bool bSet = ParseRdlxBool(Value, ValueLen);
                     unsigned int Byte0 = AttrsIn & 0xffu;
-                    Byte0 = bSet ? (Byte0 | 4u) : (Byte0 & ~4u);
+                    Byte0 = bSet ? (Byte0 | kTextAttrUnderline) : (Byte0 & ~kTextAttrUnderline);
                     AttrsIn = (AttrsIn & ~0xffu) | Byte0;
-                    Mask |= 4u;
+                    Mask |= kTextAttrUnderline;
                 }
                 else
                 {
-                    ApplyDefaultBit(4u);
+                    ApplyDefaultBit(kTextAttrUnderline);
                 }
             }
         }
@@ -588,6 +588,16 @@ namespace
     };
     static_assert(sizeof(FRdlRecordHeader) == 8, "FRdlRecordHeader must be 8 bytes");
 
+    // FRdlRecordHeader::Type of the record kinds the reader and the writer handle.
+    enum ERdlRecordType
+    {
+        kRdlRecordTra = 1,
+        kRdlRecordText = 2,
+        kRdlRecordPosition = 4,
+        kRdlRecordParagraph = 5,
+        kRdlRecordStyle = 6,
+    };
+
     // The fixed-size records. Type 2 (text) is a header plus Length bytes of NUL-terminated
     // UTF-16; type 5 (paragraph) is a bare header.
 #pragma pack(push, 1)
@@ -640,7 +650,7 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
             const unsigned char* Payload = Cur + 8;
             switch (Header->Type)
             {
-            case 1:
+            case kRdlRecordTra:
             {
                 const FRdlTraRecord* const Tra = (const FRdlTraRecord*)Cur;
                 TextRenderAttributes Attrs;
@@ -650,14 +660,14 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
-            case 2:
+            case kRdlRecordText:
             {
                 TextNode Node;
                 Node.set_text((const wchar_t*)Payload, -1);
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
-            case 4:
+            case kRdlRecordPosition:
             {
                 const FRdlPositionRecord* const Pos = (const FRdlPositionRecord*)Cur;
                 PositionNode Node;
@@ -668,13 +678,13 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
-            case 5:
+            case kRdlRecordParagraph:
             {
                 ParagraphNode Node;
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
-            case 6:
+            case kRdlRecordStyle:
             {
                 StyleNode Node(((const FRdlStyleRecord*)Cur)->StyleId);
                 RdlxAppendNode(Rdl, Node);
@@ -727,7 +737,7 @@ bool BinaryRDLReader::extract_text_from_buffer(wchar_t* Dest, unsigned int MaxSi
         unsigned int Length = Header->Length;
         if (Length != 0)
         {
-            if (Type == 2)
+            if (Type == kRdlRecordText)
             {
                 const wchar_t* Src = (const wchar_t*)(Cur + 8);
                 size_t SrcLen = wcslen(Src);
@@ -739,7 +749,7 @@ bool BinaryRDLReader::extract_text_from_buffer(wchar_t* Dest, unsigned int MaxSi
                 wcsncpy(OutBuf + Written, Src, Count);
                 Written = Written + Count - 1;
             }
-            else if (Type != 1 && Type != 3 && Type != 4 && Type != 5)
+            else if (Type != kRdlRecordTra && Type != 3 && Type != kRdlRecordPosition && Type != kRdlRecordParagraph)
             {
                 Ok = false;
             }
@@ -794,7 +804,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 return false;
             }
             FRdlTraRecord* const Tra = (FRdlTraRecord*)Rec;
-            Tra->Header.Type = 1;
+            Tra->Header.Type = kRdlRecordTra;
             Tra->Header.Length = 8;
             Tra->Attrs = AsTra->Attrs.Packed;
             Tra->Mask = AsTra->Mask;
@@ -808,7 +818,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 return false;
             }
             FRdlPositionRecord* const Pos = (FRdlPositionRecord*)Rec;
-            Pos->Header.Type = 4;
+            Pos->Header.Type = kRdlRecordPosition;
             Pos->Header.Length = 9;
             Pos->Flags = (AsPos->bRelV ? 2 : 0) | (AsPos->bRelH ? 1 : 0);
             Pos->PosV = AsPos->PosV;
@@ -824,7 +834,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 return false;
             }
             Header->Length = RecLen;
-            Header->Type = 2;
+            Header->Type = kRdlRecordText;
             memcpy(Rec + 8, AsTextPtr->TextPtr, RecLen - 2);
             *(wchar_t*)(Rec + 8 + RecLen - 2) = 0;
             Written += RecLen + 8;
@@ -837,7 +847,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 OutSize = Written;
                 return false;
             }
-            Header->Type = 2;
+            Header->Type = kRdlRecordText;
             Header->Length = RecLen;
             // The string's terminator is copied too (RecLen includes it).
             const wchar_t* Src = AsText->Text.c_str();
@@ -851,7 +861,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 OutSize = Written;
                 return false;
             }
-            Header->Type = 5;
+            Header->Type = kRdlRecordParagraph;
             Header->Length = 0;
             Written += 8;
         }
@@ -864,7 +874,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
             }
             FRdlStyleRecord* const StyleRec = (FRdlStyleRecord*)Rec;
             StyleRec->Header.Length = 2;
-            StyleRec->Header.Type = 6;
+            StyleRec->Header.Type = kRdlRecordStyle;
             StyleRec->StyleId = AsStyle->get_style_id();
             Written += sizeof(FRdlStyleRecord);
         }

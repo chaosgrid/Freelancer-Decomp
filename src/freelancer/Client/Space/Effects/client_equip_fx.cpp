@@ -11,6 +11,7 @@
 #include "Space/Effects/cli_projectile_fx.h"
 #include "Space/Effects/cli_tractor_beam.h" // CliTractorBeamCreate / CliTractorBeamInit (FUN_0052fa10)
 #include "Space/Effects/effect_base.h"
+#include "Space/Effects/effect_type_info.h" // EFT_FLASHLIGHT
 #include "Common/engine_light.h"
 #include "Space/Effects/particle_effect.h"
 #include "DALib.h"
@@ -287,7 +288,7 @@ namespace
     }
 
     // FUN_004fd9d0 -- nothing else of the tail is written here; FUN_004fda00 fills it.
-    FCliEquipLight::FCliEquipLight(unsigned char bPlayerOwnedParam) : FEffectBase(0x2e)
+    FCliEquipLight::FCliEquipLight(unsigned char bPlayerOwnedParam) : FEffectBase(EFT_FLASHLIGHT)
     {
         FCliEquipLight* const Self = this;
         Self->bPlayerOwned = bPlayerOwnedParam;
@@ -493,7 +494,7 @@ namespace
     unsigned char FCliEquipLight::IsAlive()
     {
         FCliEquipLight* const Self = this;
-        return static_cast<unsigned char>(Self->Flags08 & 1u);
+        return static_cast<unsigned char>(Self->Flags08 & kEffectFlagLive);
     }
 
     // Slot 5 -- LAB_004fdcf0 (both arguments unread): bit 0 cleared, its old value back.
@@ -501,8 +502,8 @@ namespace
     {
         FCliEquipLight* const Self = this;
         unsigned char const Flags = Self->Flags08;
-        Self->Flags08 = static_cast<unsigned char>(Flags & 0xfeu);
-        return static_cast<unsigned char>(Flags & 1u);
+        Self->Flags08 = static_cast<unsigned char>(Flags & ~kEffectFlagLive);
+        return static_cast<unsigned char>(Flags & kEffectFlagLive);
     }
 
     // Slot 6 -- FUN_004fdd00: the blink. Returns 1.
@@ -609,7 +610,7 @@ namespace
             FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
             ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
             FGameLight const* const Light = static_cast<FGameLight const*>(Companion[3]);
-            if ((Effect != nullptr && (Effect->Flags08 & 2u) == 0) ||
+            if ((Effect != nullptr && (Effect->Flags08 & kEffectFlagDeactivated) == 0) ||
                 (Sound != nullptr && Sound->IsActive() != 0) ||
                 (Light != nullptr && Light->Anim.Keys == nullptr))
             {
@@ -622,7 +623,7 @@ namespace
         {
             // Nothing while any of the same three still runs, otherwise a fresh light.
             FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
-            if (Effect != nullptr && (Effect->Flags08 & 2u) == 0)
+            if (Effect != nullptr && (Effect->Flags08 & kEffectFlagDeactivated) == 0)
                 return;
             ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
             if (Sound != nullptr && Sound->IsActive() != 0)
@@ -791,7 +792,7 @@ namespace
         // FUN_0052eb60: code 0xa on the player's live host (class 0x103) queues
         // "shield_destroyed" (FUN_00489e80 with DAT_0067545c, 0); every code then goes to
         // FUN_00531b20 with both arguments.
-        if (Code == EquipDestroying && CliEquipHostIsLivePlayer(Host, 0x103u))
+        if (Code == EquipDestroying && CliEquipHostIsLivePlayer(Host, CObject::ClassEqObj))
             NnVoiceEnqueue(G_ShieldDestroyedId, 0);
         FClientEquip::notify(Code, Param);
     }
@@ -1033,7 +1034,7 @@ namespace
             // A host already exploding -> nothing.
             if (Host->IsExploding())
                 break;
-            if (CliEquipHostIsLivePlayer(Host, 0x503u))
+            if (CliEquipHostIsLivePlayer(Host, CObject::ClassShip))
                 NnVoiceEnqueue(G_ShieldFailedId, 0);
             const float* const Frame = (const float*)CliShieldWorldFrame(Equip);
             // With a generator companion: the owner's velocity (read before the id test), then
@@ -1057,7 +1058,7 @@ namespace
             break;
         }
         case ShieldCanReactivate:
-            if (CliEquipHostIsLivePlayer(Host, 0x503u))
+            if (CliEquipHostIsLivePlayer(Host, CObject::ClassShip))
                 NnVoiceEnqueue(G_ShieldRestoredId, 0);
             break;
         default:
@@ -1106,7 +1107,7 @@ namespace
         // The munition's class & 7 object (no null test before the archetype read).
         CObject* const MunObject = Munition->Object;
         CObject* Shot7 = nullptr;
-        if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & 7u) == 7u)
+        if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & CObject::ClassProjectile) == CObject::ClassProjectile)
             Shot7 = MunObject;
         Archetype::Munition const* const MunArch =
             static_cast<Archetype::Munition const*>(Shot7->Archetype);
@@ -2173,7 +2174,7 @@ namespace
         switch (Code)
         {
         case EquipDestroying:
-            if (CliEquipHostIsLivePlayer(Host, 0x503u))
+            if (CliEquipHostIsLivePlayer(Host, CObject::ClassShip))
                 NnVoiceEnqueue(G_ThrusterDestroyedId, 0);
             CliEffectListRemove(&Host->EffectList, Companion);
             break;
@@ -2753,7 +2754,7 @@ namespace
             }
             CliEngineClearNozzles(this);
             CliEngineReleaseSoundEmitters(this);
-            if (CliEquipHostIsLivePlayer(Host, 0x503u))
+            if (CliEquipHostIsLivePlayer(Host, CObject::ClassShip))
                 NnVoiceEnqueue(G_EngineDestroyedId, 0);
             break;
         }

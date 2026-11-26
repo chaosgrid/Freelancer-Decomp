@@ -22,7 +22,7 @@
 
 void CClientImpl::SendServerLoginResponse(unsigned int ClientId, const unsigned char& Status) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 2, &Packet) == 0)
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_LOGINRESPONSE), &Packet) == 0)
     {
         static_cast<FRpcLoginResponsePacket*>(Packet)->Value = Status;
         PushToClient(ClientId, Packet->AsRaw());
@@ -31,7 +31,7 @@ void CClientImpl::SendServerLoginResponse(unsigned int ClientId, const unsigned 
 
 void CClientImpl::SendServerSetShipArch(unsigned int ClientId, unsigned int ShipArchId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x23, &Packet) == 0)
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETSHIPARCH), &Packet) == 0)
     {
         static_cast<FRpcSetShipArchPacket*>(Packet)->Value = ShipArchId;
         PushToClient(ClientId, Packet->AsRaw());
@@ -153,7 +153,7 @@ static void RpcServerCharacterRecordFromInfo(FRpcServerCharacterRecord* Record,
 // deterministic. Then +0x20 = SaveFailureCount.
 void CClientImpl::SendServerCharacterInfo(unsigned int ClientId, const CCharacterSet& Characters) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 3, &Packet) != 0) return;
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CHARACTERINFO), &Packet) != 0) return;
     FRpcServerCharacterInfoPacket* Typed = static_cast<FRpcServerCharacterInfoPacket*>(Packet);
     const CCharacterSet* Source = &Characters;
     const CCharacterSet::CharacterInfo* Previous = nullptr;
@@ -179,7 +179,7 @@ void CClientImpl::SendServerCharacterInfo(unsigned int ClientId, const CCharacte
 // DamageList assignment is 06b3e690.
 void CClientImpl::SendServerDamageObject(unsigned int ClientId, unsigned int ObjectId, const DamageList& Damage) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 5, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_DAMAGEOBJECT), &Packet) == 0) {
         FRpcServerDamageObjectPacket* Typed = static_cast<FRpcServerDamageObjectPacket*>(Packet);
         Typed->ObjectId = ObjectId;
         Typed->Damage = Damage;
@@ -191,7 +191,7 @@ void CClientImpl::SendServerDamageObject(unsigned int ClientId, unsigned int Obj
 // not through the FPU.
 void CClientImpl::SendServerCharSelectVerified(unsigned int ClientId, const FServerCharSelectVerifiedInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 8, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CHARSELECTVERIFIED), &Packet) == 0) {
         FRpcServerCharSelectVerifiedPacket* Typed =
             static_cast<FRpcServerCharSelectVerifiedPacket*>(Packet);
         Typed->RepInstance = static_cast<unsigned int>(Info.VibeHandle);
@@ -203,7 +203,7 @@ void CClientImpl::SendServerCharSelectVerified(unsigned int ClientId, const FSer
 // RC 06b34120, IClient +0x70: SETSTARTROOM.
 void CClientImpl::SendServerSetStartRoom(unsigned int ClientId, unsigned int BaseId, unsigned int RoomId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0xd, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETSTARTROOM), &Packet) == 0) {
         FRpcServerSetStartRoomPacket* Typed = static_cast<FRpcServerSetStartRoomPacket*>(Packet);
         Typed->Field_0x00 = BaseId;
         Typed->Field_0x04 = RoomId;
@@ -214,7 +214,7 @@ void CClientImpl::SendServerSetStartRoom(unsigned int ClientId, unsigned int Bas
 // RC 06b34c00, IClient +0xdc: DESTROYOBJECT from {dword, byte}.
 void CClientImpl::SendServerDestroyObject(unsigned int ClientId, const FServerDestroyObjectInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 6, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_DESTROYOBJECT), &Packet) == 0) {
         FRpcServerDestroyObjectPacket* Typed = static_cast<FRpcServerDestroyObjectPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
         Typed->DestroyType = Info.DestroyType;
@@ -226,7 +226,7 @@ void CClientImpl::SendServerDestroyObject(unsigned int ClientId, const FServerDe
 // byte +0x24.
 void CClientImpl::SendServerActivateObject(unsigned int ClientId, const FPayloadServerActivateObject& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0xa, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_ACTIVATEOBJECT), &Packet) == 0) {
         FRpcServerActivateObjectPacket* Typed = static_cast<FRpcServerActivateObjectPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
         Typed->ActivateParam = Info.ActivateParam;
@@ -238,7 +238,7 @@ void CClientImpl::SendServerActivateObject(unsigned int ClientId, const FPayload
 // RC 06b36450, IClient +0xec: LAND; native store order [0], [8], [4].
 void CClientImpl::SendServerLand(unsigned int ClientId, const FServerLandInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0xb, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_LAND), &Packet) == 0) {
         FRpcServerLandPacket* Typed = static_cast<FRpcServerLandPacket*>(Packet);
         Typed->Field_0x00 = Info.ShipId;
         Typed->Field_0x08 = Info.BaseId;
@@ -251,7 +251,7 @@ void CClientImpl::SendServerLand(unsigned int ClientId, const FServerLandInfo& I
 // Position +0x1c}; both blocks move as integer dwords, Position first.
 void CClientImpl::SendServerLaunch(unsigned int ClientId, const FServerLaunchInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 7, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_LAUNCH), &Packet) == 0) {
         FRpcServerLaunchPacket* Typed = static_cast<FRpcServerLaunchPacket*>(Packet);
         Typed->ShipId = Info.ShipId;
         Typed->LaunchObjId = Info.LaunchObjId;
@@ -267,7 +267,7 @@ void CClientImpl::SendServerLaunch(unsigned int ClientId, const FServerLaunchInf
 // RC 06b34170, IClient +0x74: GFDESTROYCHARACTER 0x15; +0x20 = RoomId, +0x24 = Key.
 void CClientImpl::SendServerGFDestroyCharacter(unsigned int ClientId, unsigned int RoomId, unsigned int Key) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x15, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFDESTROYCHARACTER), &Packet) == 0) {
         FRpcServerGfDestroyCharacterPacket* Typed =
             static_cast<FRpcServerGfDestroyCharacterPacket*>(Packet);
         Typed->Field_0x00 = RoomId;
@@ -279,7 +279,7 @@ void CClientImpl::SendServerGFDestroyCharacter(unsigned int ClientId, unsigned i
 // RC 06b34210, IClient +0x7c: GFCOMPLETECHARLIST 0x0f; +0x20 = RoomId.
 void CClientImpl::SendServerGFCompleteCharList(unsigned int ClientId, unsigned int RoomId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0xf, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETECHARLIST), &Packet) == 0) {
         static_cast<FRpcServerGfCompleteCharListPacket*>(Packet)->Value = RoomId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -288,7 +288,7 @@ void CClientImpl::SendServerGFCompleteCharList(unsigned int ClientId, unsigned i
 // RC 06b34250, IClient +0x80: GFSCRIPTBEHAVIOR 0x1a; set helper 06b3d130 (new(Size) + copy).
 void CClientImpl::SendServerGFScriptBehavior(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x1a, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFSCRIPTBEHAVIOR), &Packet) == 0) {
         static_cast<FRpcServerGfScriptBehaviorPacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -297,7 +297,7 @@ void CClientImpl::SendServerGFScriptBehavior(unsigned int ClientId, const unsign
 // RC 06b342a0, IClient +0x84: GFDESTROYSCRIPTBEHAVIOR 0x17; +0x20 = RoomId, +0x24 = BehaviorId.
 void CClientImpl::SendServerGFDestroyScriptBehavior(unsigned int ClientId, unsigned int RoomId, unsigned int BehaviorId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x17, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR), &Packet) == 0) {
         FRpcServerGfDestroyScriptBehaviorPacket* Typed =
             static_cast<FRpcServerGfDestroyScriptBehaviorPacket*>(Packet);
         Typed->Field_0x00 = RoomId;
@@ -309,7 +309,7 @@ void CClientImpl::SendServerGFDestroyScriptBehavior(unsigned int ClientId, unsig
 // RC 06b342f0, IClient +0x88: GFCOMPLETESCRIPTBEHAVIORLIST 0x11; +0x20 = RoomId.
 void CClientImpl::SendServerGFCompleteScriptBehaviorList(unsigned int ClientId, unsigned int RoomId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x11, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST), &Packet) == 0) {
         static_cast<FRpcServerGfCompleteScriptBehaviorListPacket*>(Packet)->Value = RoomId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -319,7 +319,7 @@ void CClientImpl::SendServerGFCompleteScriptBehaviorList(unsigned int ClientId, 
 // Size +0x24).
 void CClientImpl::SendServerGFUpdateAmbientScript(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x1f, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT), &Packet) == 0) {
         static_cast<FRpcServerGfUpdateAmbientScriptPacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -329,7 +329,7 @@ void CClientImpl::SendServerGFUpdateAmbientScript(unsigned int ClientId, const u
 // then +0x20 = RoomId.
 void CClientImpl::SendServerGFDestroyAmbientScript(unsigned int ClientId, unsigned int RoomId, unsigned int Key) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x19, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT), &Packet) == 0) {
         FRpcServerGfDestroyAmbientScriptPacket* Typed =
             static_cast<FRpcServerGfDestroyAmbientScriptPacket*>(Packet);
         Typed->Field_0x04 = Key;
@@ -341,7 +341,7 @@ void CClientImpl::SendServerGFDestroyAmbientScript(unsigned int ClientId, unsign
 // RC 06b343d0, IClient +0x94: GFCOMPLETEAMBIENTSCRIPTLIST 0x13; +0x20 = RoomId.
 void CClientImpl::SendServerGFCompleteAmbientScriptList(unsigned int ClientId, unsigned int RoomId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x13, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST), &Packet) == 0) {
         static_cast<FRpcServerGfCompleteAmbientScriptListPacket*>(Packet)->Value = RoomId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -351,7 +351,7 @@ void CClientImpl::SendServerGFCompleteAmbientScriptList(unsigned int ClientId, u
 // then +0x20 = BaseId.
 void CClientImpl::SendServerGFDestroyMissionComputer(unsigned int ClientId, unsigned int BaseId, unsigned int Key) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x16, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER), &Packet) == 0) {
         FRpcServerGfDestroyMissionComputerPacket* Typed =
             static_cast<FRpcServerGfDestroyMissionComputerPacket*>(Packet);
         Typed->Field_0x04 = Key;
@@ -363,7 +363,7 @@ void CClientImpl::SendServerGFDestroyMissionComputer(unsigned int ClientId, unsi
 // RC 06b34460, IClient +0x9c: GFUPDATEMISSIONCOMPUTER 0x1d; set helper 06b3d9b0.
 void CClientImpl::SendServerGFUpdateMissionComputer(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x1d, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER), &Packet) == 0) {
         static_cast<FRpcServerGfUpdateMissionComputerPacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -372,7 +372,7 @@ void CClientImpl::SendServerGFUpdateMissionComputer(unsigned int ClientId, const
 // RC 06b344b0, IClient +0xa0: GFCOMPLETEMISSIONCOMPUTERLIST 0x10; +0x20 = BaseId.
 void CClientImpl::SendServerGFCompleteMissionComputerList(unsigned int ClientId, unsigned int BaseId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x10, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST), &Packet) == 0) {
         static_cast<FRpcServerGfCompleteMissionComputerListPacket*>(Packet)->Value = BaseId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -381,7 +381,7 @@ void CClientImpl::SendServerGFCompleteMissionComputerList(unsigned int ClientId,
 // RC 06b34580, IClient +0xac: GFDESTROYNEWSBROADCAST 0x14; +0x20 = BaseId, +0x24 = Key.
 void CClientImpl::SendServerGFDestroyNewsBroadcast(unsigned int ClientId, unsigned int BaseId, unsigned int Key) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x14, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFDESTROYNEWSBROADCAST), &Packet) == 0) {
         FRpcServerGfDestroyNewsBroadcastPacket* Typed =
             static_cast<FRpcServerGfDestroyNewsBroadcastPacket*>(Packet);
         Typed->Field_0x00 = BaseId;
@@ -393,7 +393,7 @@ void CClientImpl::SendServerGFDestroyNewsBroadcast(unsigned int ClientId, unsign
 // RC 06b345d0, IClient +0xb0: GFUPDATENEWSBROADCAST 0x1e; set helper 06b3e200.
 void CClientImpl::SendServerGFUpdateNewsBroadcast(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x1e, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFUPDATENEWSBROADCAST), &Packet) == 0) {
         static_cast<FRpcServerGfUpdateNewsBroadcastPacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -402,7 +402,7 @@ void CClientImpl::SendServerGFUpdateNewsBroadcast(unsigned int ClientId, const u
 // RC 06b34620, IClient +0xb4: GFCOMPLETENEWSBROADCASTLIST 0x0e; +0x20 = BaseId.
 void CClientImpl::SendServerGFCompleteNewsBroadcastList(unsigned int ClientId, unsigned int BaseId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0xe, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST), &Packet) == 0) {
         static_cast<FRpcServerGfCompleteNewsBroadcastListPacket*>(Packet)->Value = BaseId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -424,7 +424,7 @@ void FRpcServerCreateShipPacket::SetDisplayName(const wchar_t* Name) {
 // and its attitude towards Info's second group.
 void CClientImpl::SendServerCreateShip(unsigned int ClientId, const CShipCreateInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 4, &Packet) != 0) return;
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATESHIP), &Packet) != 0) return;
     FRpcServerCreateShipPacket* Typed = static_cast<FRpcServerCreateShipPacket*>(Packet);
     RpcServerCreateObjectFill(&Info, &Typed->Object);
     Typed->bUsingTradelane = Info.bUsingTradelane;
@@ -471,7 +471,7 @@ void CClientImpl::SendServerCreateShip(unsigned int ClientId, const CShipCreateI
 // successful allocation and destroyed by 06b3a450 on every exit.
 void CClientImpl::SendServerSetEquipment(unsigned int ClientId, const EquipDescVector& Equipment) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x24, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETEQUIPMENT), &Packet) == 0) {
         FRpcServerEquipHandle Handle;
         RpcServerEquipHandleFromVector(&Equipment, &Handle, true);
         static_cast<FRpcServerSetEquipmentPacket*>(Packet)->AssignEquipment(Handle);
@@ -483,7 +483,7 @@ void CClientImpl::SendServerSetEquipment(unsigned int ClientId, const EquipDescV
 // bAll = 1; only the packet setter differs (06b3c770).
 void CClientImpl::SendServerSetCargo(unsigned int ClientId, const EquipDescVector& Cargo) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x25, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETCARGO), &Packet) == 0) {
         FRpcServerEquipHandle Handle;
         RpcServerEquipHandleFromVector(&Cargo, &Handle, true);
         static_cast<FRpcServerSetCargoPacket*>(Packet)->AssignEquipment(Handle);
@@ -496,7 +496,7 @@ void CClientImpl::SendServerSetCargo(unsigned int ClientId, const EquipDescVecto
 // 06b3cd50.
 void CClientImpl::SendServerSetAddItem(unsigned int ClientId, int AddResult, const EquipDesc& Item) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2e, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETADDITEM), &Packet) == 0) {
         FRpcServerSetAddItemPacket* Typed = static_cast<FRpcServerSetAddItemPacket*>(Packet);
         Typed->ArchId = Item.ArchId;
         Typed->Id = Item.Id;
@@ -518,7 +518,7 @@ void CClientImpl::SendServerSetAddItem(unsigned int ClientId, int AddResult, con
 void CClientImpl::SendServerSetMissionObjectiveState(const unsigned int& ClientId,
                                                      const FServerMissionObjectiveStateInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x33, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE), &Packet) == 0) {
         FRpcServerSetMissionObjectiveStatePacket* Typed =
             static_cast<FRpcServerSetMissionObjectiveStatePacket*>(Packet);
         Typed->MissionId = Info.MissionId;
@@ -533,16 +533,16 @@ void CClientImpl::SendServerSetMissionObjectiveState(const unsigned int& ClientI
 // 06b44240.
 void CClientImpl::SendServerRequestSpaceScript(unsigned int ClientId, const FServerRequestSpaceScriptInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x32, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REQUESTSPACESCRIPT), &Packet) == 0) {
         FRpcServerRequestSpaceScriptPacket* Typed =
             static_cast<FRpcServerRequestSpaceScriptPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
         Typed->Position[0] = Info.PosXBits;
         Typed->Position[1] = Info.PosYBits;
         Typed->Position[2] = Info.PosZBits;
-        if (Info.CameraMode == 1u) {
+        if (Info.CameraMode == kRequestSpaceScriptCameraKeepTransform) {
             Typed->Mode = 1;
-        } else if (Info.CameraMode == 2u) {
+        } else if (Info.CameraMode == kRequestSpaceScriptCameraIdentity) {
             Typed->Mode = 0;
         }
         Typed->SetName(Info.Name, static_cast<unsigned int>(std::strlen(Info.Name)));
@@ -556,7 +556,7 @@ void CClientImpl::SendServerRequestSpaceScript(unsigned int ClientId, const FSer
 void CClientImpl::SendServerReplaceMissionObjective(const unsigned int& ClientId,
                                                     const FServerReplaceMissionObjectiveInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x34, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE), &Packet) == 0) {
         FRpcServerReplaceMissionObjectivePacket* Typed =
             static_cast<FRpcServerReplaceMissionObjectivePacket*>(Packet);
         Typed->MissionId = Info.MissionId;
@@ -575,7 +575,7 @@ void CClientImpl::SendServerReplaceMissionObjective(const unsigned int& ClientId
 void CClientImpl::SendServerSetMissionObjectives(const unsigned int& ClientId,
                                                  const FServerSetMissionObjectivesInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x35, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETMISSIONOBJECTIVES), &Packet) == 0) {
         FRpcServerSetMissionObjectivesPacket* Typed =
             static_cast<FRpcServerSetMissionObjectivesPacket*>(Packet);
         Typed->MissionId = Info.MissionId;
@@ -608,7 +608,7 @@ void CClientImpl::SendServerSetMissionObjectives(const unsigned int& ClientId,
 // ItemId (the low word zero-extended), +0x24 = Count.
 void CClientImpl::SendServerSetRemoveItem(unsigned int ClientId, int RemoveResult, unsigned short ItemId, int Count) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2f, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETREMOVEITEM), &Packet) == 0) {
         FRpcServerSetRemoveItemPacket* Typed = static_cast<FRpcServerSetRemoveItemPacket*>(Packet);
         Typed->Field_0x08 = static_cast<unsigned int>(RemoveResult);
         Typed->Field_0x00 = ItemId;
@@ -621,7 +621,7 @@ void CClientImpl::SendServerSetRemoveItem(unsigned int ClientId, int RemoveResul
 // SendServerGFScriptBehavior except the opcode.
 void CClientImpl::SendServerGFUpdateChar(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x26, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFUPDATECHAR), &Packet) == 0) {
         static_cast<FRpcServerGfUpdateCharPacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -631,7 +631,7 @@ void CClientImpl::SendServerGFUpdateChar(unsigned int ClientId, const unsigned c
 // 06b3dcc0. Same body as SendServerGFScriptBehavior except the opcode.
 void CClientImpl::SendServerGFMissionVendorAcceptance(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x20, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE), &Packet) == 0) {
         static_cast<FRpcServerGfMissionVendorAcceptancePacket*>(Packet)->SetData(Data, Size);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -641,7 +641,7 @@ void CClientImpl::SendServerGFMissionVendorAcceptance(unsigned int ClientId, con
 // dwords, integer moves.
 void CClientImpl::SendServerExplodeAsteroidMine(unsigned int ClientId, const FMineExplosion& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x31, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_EXPLODEASTEROIDMINE), &Packet) == 0) {
         FRpcServerExplodeAsteroidMinePacket* Typed =
             static_cast<FRpcServerExplodeAsteroidMinePacket*>(Packet);
         Typed->MineId = Info.MineId;
@@ -656,7 +656,7 @@ void CClientImpl::SendServerExplodeAsteroidMine(unsigned int ClientId, const FMi
 // stack temps first; every move is an integer one, so the direct copies are equivalent.
 void CClientImpl::SendServerSystemSwitchIn(unsigned int ClientId, const FPayloadServerSystemSwitchIn& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x22, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SYSTEM_SWITCH_IN), &Packet) == 0) {
         FRpcServerSystemSwitchInPacket* Typed = static_cast<FRpcServerSystemSwitchInPacket*>(Packet);
         Typed->ShipId = Info.ShipId;
         Typed->JumpObjTypeBits = Info.JumpObjTypeBits;
@@ -669,7 +669,7 @@ void CClientImpl::SendServerSystemSwitchIn(unsigned int ClientId, const FPayload
 // RC 06b346b0, IClient +0x100: ITEMTRACTORED 0x38.
 void CClientImpl::SendServerItemTractored(unsigned int ClientId, const FPayloadServerItemTractored& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x38, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_ITEMTRACTORED), &Packet) == 0) {
         FRpcServerItemTractoredPacket* Typed = static_cast<FRpcServerItemTractoredPacket*>(Packet);
         Typed->LootId = Info.LootId;
         Typed->ShipId = Info.ShipId;
@@ -683,7 +683,7 @@ void CClientImpl::SendServerItemTractored(unsigned int ClientId, const FPayloadS
 // +0x20 = [Info], +0x28 = [Info+8].
 void CClientImpl::SendServerRepairObject(unsigned int ClientId, const FServerRepairObjectInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x3c, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REPAIROBJECT), &Packet) == 0) {
         FRpcServerRepairObjectPacket* Typed = static_cast<FRpcServerRepairObjectPacket*>(Packet);
         Typed->EquipId = Info.EquipId;
         Typed->ObjectId = Info.ObjectId;
@@ -695,7 +695,7 @@ void CClientImpl::SendServerRepairObject(unsigned int ClientId, const FServerRep
 // RC 06b36320, IClient +0xe4: SYSTEM_SWITCH_OUT.
 void CClientImpl::SendServerSystemSwitchOut(unsigned int ClientId, const FServerSystemSwitchOutInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x21, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SYSTEM_SWITCH_OUT), &Packet) == 0) {
         FRpcServerSystemSwitchOutPacket* Typed = static_cast<FRpcServerSystemSwitchOutPacket*>(Packet);
         Typed->Field_0x00 = Info.ShipId;
         Typed->Field_0x04 = Info.GateId;
@@ -707,7 +707,7 @@ void CClientImpl::SendServerSystemSwitchOut(unsigned int ClientId, const FServer
 // low byte of bSuccess into +0x20 (raw).
 void CClientImpl::SendServerRequestCreateShipResp(unsigned int ClientId, bool bSuccess, unsigned int ShipId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x27, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REQUESTCREATESHIPRESP), &Packet) == 0) {
         FRpcServerRequestCreateShipRespPacket* Typed =
             static_cast<FRpcServerRequestCreateShipRespPacket*>(Packet);
         Typed->ShipId = ShipId;
@@ -719,7 +719,7 @@ void CClientImpl::SendServerRequestCreateShipResp(unsigned int ClientId, bool bS
 // RC 06b34a30, IClient +0x10c: ADJUSTATTITUDE; the float moves through the x87 stack.
 void CClientImpl::SendServerAdjustAttitude(unsigned int ClientId, const FPayloadServerAdjustAttitude& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2a, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_ADJUSTATTITUDE), &Packet) == 0) {
         FRpcServerAdjustAttitudePacket* Typed = static_cast<FRpcServerAdjustAttitudePacket*>(Packet);
         Typed->VibeHandle = Info.VibeHandle;
         RpcServerX87CopyFloat(&Typed->Attitude, &Info.Attitude);
@@ -731,7 +731,7 @@ void CClientImpl::SendServerAdjustAttitude(unsigned int ClientId, const FPayload
 // Client id by reference.
 void CClientImpl::SendServerCreateGuided(const unsigned int& ClientId, const FServerCreateGuidedInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x37, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATEGUIDED), &Packet) == 0) {
         FRpcServerCreateGuidedPacket* Typed = static_cast<FRpcServerCreateGuidedPacket*>(Packet);
         Typed->OwnerPlayer = Info.OwnerPlayer;
         Typed->ArchetypeNickname = Info.ArchetypeNickname;
@@ -755,7 +755,7 @@ void CClientImpl::SendServerCreateGuided(const unsigned int& ClientId, const FSe
 // reference.
 void CClientImpl::SendServerCreateCounter(const unsigned int& ClientId, const FServerCreateProjectileInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2d, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATECOUNTER), &Packet) == 0) {
         FRpcServerCreateCounterPacket* Typed = static_cast<FRpcServerCreateCounterPacket*>(Packet);
         Typed->ArchetypeNickname = Info.ArchetypeNickname;
         Typed->ObjId = Info.ObjId;
@@ -782,7 +782,7 @@ void CClientImpl::SendServerCreateCounter(const unsigned int& ClientId, const FS
 // RC 06b36cd0, IClient +0x134: SETCASH. Client id by reference.
 void CClientImpl::SendServerSetCash(const unsigned int& ClientId, int Cash) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x30, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETCASH), &Packet) == 0) {
         static_cast<FRpcServerSetCashPacket*>(Packet)->Value = static_cast<unsigned int>(Cash);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -791,7 +791,7 @@ void CClientImpl::SendServerSetCash(const unsigned int& ClientId, int Cash) {
 // RC 06b36d10, IClient +0x138: SETNUMKILLS. Client id by reference.
 void CClientImpl::SendServerSetNumKills(const unsigned int& ClientId, int NumKills) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x3e, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETNUMKILLS), &Packet) == 0) {
         static_cast<FRpcServerSetNumKillsPacket*>(Packet)->Value = static_cast<unsigned int>(NumKills);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -800,7 +800,7 @@ void CClientImpl::SendServerSetNumKills(const unsigned int& ClientId, int NumKil
 // RC 06b36d50, IClient +0x13c: SETMISSIONSUCCESSES. Client id by reference.
 void CClientImpl::SendServerSetMissionSuccesses(const unsigned int& ClientId, int NumSuccesses) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x3f, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETMISSIONSUCCESSES), &Packet) == 0) {
         static_cast<FRpcServerSetMissionSuccessesPacket*>(Packet)->Value =
             static_cast<unsigned int>(NumSuccesses);
         PushToClient(ClientId, Packet->AsRaw());
@@ -810,7 +810,7 @@ void CClientImpl::SendServerSetMissionSuccesses(const unsigned int& ClientId, in
 // RC 06b35ef0, IClient +0x1b4: SCANNOTIFY. +0x20 = ScannerId, +0x24 = GoodId.
 void CClientImpl::SendServerScanNotify(unsigned int ClientId, unsigned int ScannerId, unsigned int GoodId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x39, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SCANNOTIFY), &Packet) == 0) {
         FRpcServerScanNotifyPacket* Typed = static_cast<FRpcServerScanNotifyPacket*>(Packet);
         Typed->Field_0x00 = ScannerId;
         Typed->Field_0x04 = GoodId;
@@ -824,7 +824,7 @@ void CClientImpl::SendServerScanNotify(unsigned int ClientId, unsigned int Scann
 // (x and y swapped, 06b3669c).
 void CClientImpl::SendServerCreateLoot(unsigned int ClientId, const FServerCreateLootRequest& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x28, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATELOOT), &Packet) == 0) {
         const FServerCreateLootRequest* Request = &Info;
         FRpcServerCreateLootPacket* Typed = static_cast<FRpcServerCreateLootPacket*>(Packet);
         Typed->OwnerId = Request->OwnerId;
@@ -860,7 +860,7 @@ void CClientImpl::SendServerCreateLoot(unsigned int ClientId, const FServerCreat
 // +0x2c, AngularVelocity = info +0x38, +0x64 = info +0x44.
 void CClientImpl::SendServerCreateMine(unsigned int ClientId, const FServerCreateProjectileInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2c, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATEMINE), &Packet) == 0) {
         FRpcServerCreateMinePacket* Typed = static_cast<FRpcServerCreateMinePacket*>(Packet);
         Typed->ObjId = Info.ObjId;
         Typed->ArchetypeNickname = Info.ArchetypeNickname;
@@ -881,7 +881,7 @@ void CClientImpl::SendServerCreateMine(unsigned int ClientId, const FServerCreat
 // packet (06b3f6c0) and freed after the send; Attitude = [Info+4] as an integer.
 void CClientImpl::SendServerSetReputation(unsigned int ClientId, const FServerSetReputationInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x29, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETREPUTATION), &Packet) == 0) {
         FRpcServerSetReputationPacket* Typed = static_cast<FRpcServerSetReputationPacket*>(Packet);
         Typed->Target = static_cast<unsigned int>(Info.VibeHandle);
         Typed->Affiliation = Info.Affiliation;
@@ -915,7 +915,7 @@ void CClientImpl::SendServerSetReputation(unsigned int ClientId, const FServerSe
 // [Info+0x10]) and deep-copied (06b43da0).
 void CClientImpl::SendServerSetGroupFeelings(unsigned int ClientId, const FServerSetGroupFeelingsInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x2b, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETGROUPFEELINGS), &Packet) == 0) {
         FRpcServerSetGroupFeelingsPacket* Typed = static_cast<FRpcServerSetGroupFeelingsPacket*>(Packet);
         Typed->SetName(Info.Name, static_cast<unsigned int>(std::strlen(Info.Name)) + 1u);
         std::list< ::Reputation::Relation*> Local;
@@ -939,7 +939,7 @@ void CClientImpl::SendServerSetGroupFeelings(unsigned int ClientId, const FServe
 void CClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& ClientId, unsigned int ObjectId,
                                                     const EquipDescVector& Cargo, unsigned char Flag) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x3d, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE), &Packet) == 0) {
         FRpcServerRemoteObjectCargoUpdatePacket* Typed =
             static_cast<FRpcServerRemoteObjectCargoUpdatePacket*>(Packet);
         Typed->Flag = Flag;
@@ -959,7 +959,7 @@ void CClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& ClientId
 // RC 06b33e70, 0x49 SETHULLSTATUS, by value; the float moves through x87 into +0x20.
 void CClientImpl::SendServerSetHullStatus(unsigned int ClientId, float HullStatus) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x49, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETHULLSTATUS), &Packet) == 0) {
         RpcServerX87CopyFloat(&static_cast<FRpcSetHullStatusPacket*>(Packet)->Value, &HullStatus);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -968,7 +968,7 @@ void CClientImpl::SendServerSetHullStatus(unsigned int ClientId, float HullStatu
 // RC 06b34540, 0x5a GFMISSIONVENDORWHYEMPTY, by value: the low byte of Reason.
 void CClientImpl::SendServerGFMissionVendorWhyEmpty(unsigned int ClientId, unsigned int Reason) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x5a, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY), &Packet) == 0) {
         static_cast<FRpcServerGfMissionVendorWhyEmptyPacket*>(Packet)->Value =
             static_cast<unsigned char>(Reason);
         PushToClient(ClientId, Packet->AsRaw());
@@ -979,7 +979,7 @@ void CClientImpl::SendServerGFMissionVendorWhyEmpty(unsigned int ClientId, unsig
 void CClientImpl::SendServerSetGuidedTarget(unsigned int ClientId, unsigned int GuidedId, unsigned int TargetId,
                                             unsigned short TargetSubObjId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4a, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETGUIDEDTARGET), &Packet) == 0) {
         FRpcServerSetGuidedTargetPacket* Typed = static_cast<FRpcServerSetGuidedTargetPacket*>(Packet);
         Typed->GuidedId = GuidedId;
         Typed->TargetId = TargetId;
@@ -991,7 +991,7 @@ void CClientImpl::SendServerSetGuidedTarget(unsigned int ClientId, unsigned int 
 // RC 06b34710, 0x51 USE_ITEM, by value.
 void CClientImpl::SendServerUseItem(unsigned int ClientId, const FPayloadServerUseItem& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x51, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_USE_ITEM), &Packet) == 0) {
         FRpcServerUseItemPacket* Typed = static_cast<FRpcServerUseItemPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
         Typed->EquipId = Info.EquipId;
@@ -1003,7 +1003,7 @@ void CClientImpl::SendServerUseItem(unsigned int ClientId, const FPayloadServerU
 // RC 06b34bc0, 0x56 SENDNNMESSAGE, by value.
 void CClientImpl::SendServerSendNNMessage(unsigned int ClientId, unsigned int MessageId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x56, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SENDNNMESSAGE), &Packet) == 0) {
         static_cast<FRpcServerSendNNMessagePacket*>(Packet)->Value = MessageId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1013,7 +1013,7 @@ void CClientImpl::SendServerSendNNMessage(unsigned int ClientId, unsigned int Me
 // allocation not null-tested.
 void CClientImpl::SendServerSetMissionMessage(const unsigned int& ClientId, const CSetMissionMessage& Message) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x45, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SET_MISSION_MESSAGE), &Packet) == 0) {
         FRpcServerSetMissionMessagePacket* Typed = static_cast<FRpcServerSetMissionMessagePacket*>(Packet);
         Typed->TextSize = RpcGetFlattenedFmtStrSize(Message.Text);
         Typed->TextData = static_cast<unsigned char*>(::operator new(Typed->TextSize, std::nothrow));
@@ -1026,7 +1026,7 @@ void CClientImpl::SendServerSetMissionMessage(const unsigned int& ClientId, cons
 // RC 06b36760, 0x5b MISSIONSAVEA, by value.
 void CClientImpl::SendServerMissionSaveA(unsigned int ClientId, unsigned long MissionId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x5b, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISSIONSAVEA), &Packet) == 0) {
         static_cast<FRpcServerMissionSaveAPacket*>(Packet)->Value = MissionId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1035,7 +1035,7 @@ void CClientImpl::SendServerMissionSaveA(unsigned int ClientId, unsigned long Mi
 // RC 06b367a0, 0x46 MARKOBJ, BY REF: ObjectId, low byte of MarkType.
 void CClientImpl::SendServerMarkObj(const unsigned int& ClientId, unsigned int ObjectId, int MarkType) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x46, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MARKOBJ), &Packet) == 0) {
         FRpcServerMarkObjPacket* Typed = static_cast<FRpcServerMarkObjPacket*>(Packet);
         Typed->ObjectId = ObjectId;
         Typed->MarkType = static_cast<unsigned char>(MarkType);
@@ -1047,7 +1047,7 @@ void CClientImpl::SendServerMarkObj(const unsigned int& ClientId, unsigned int O
 void CClientImpl::SendServerCfgInterfaceNotification(const unsigned int& ClientId,
                                                      const FPayloadServerCfgInterfaceNotification& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x47, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CFGINTERFACENOTIFICATION), &Packet) == 0) {
         FRpcServerCfgInterfaceNotificationPacket* Typed =
             static_cast<FRpcServerCfgInterfaceNotificationPacket*>(Packet);
         Typed->NotifType = Info.NotifType;
@@ -1060,7 +1060,7 @@ void CClientImpl::SendServerCfgInterfaceNotification(const unsigned int& ClientI
 // RC 06b36d90, 0x40 SETMISSIONFAILURES, BY REF.
 void CClientImpl::SendServerSetMissionFailures(const unsigned int& ClientId, int NumFailures) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x40, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETMISSIONFAILURES), &Packet) == 0) {
         static_cast<FRpcServerSetMissionFailuresPacket*>(Packet)->Value =
             static_cast<unsigned int>(NumFailures);
         PushToClient(ClientId, Packet->AsRaw());
@@ -1071,7 +1071,7 @@ void CClientImpl::SendServerSetMissionFailures(const unsigned int& ClientId, int
 void CClientImpl::SendServerRequestReturned(const unsigned int& ClientId, unsigned int ShipId, int RequestType,
                                             int Response, int Extra) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x44, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REQUEST_RETURNED), &Packet) == 0) {
         FRpcServerRequestReturnedPacket* Typed = static_cast<FRpcServerRequestReturnedPacket*>(Packet);
         Typed->ObjectId = ShipId;
         Typed->RequestType = static_cast<unsigned char>(RequestType);
@@ -1086,7 +1086,7 @@ void CClientImpl::SendServerRequestReturned(const unsigned int& ClientId, unsign
 void CClientImpl::SendServerObjectCargoUpdate(const unsigned int& ClientId, unsigned int ObjectId,
                                               const EquipDesc& Item) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x55, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_OBJECTCARGOUPDATE), &Packet) == 0) {
         FRpcServerObjectCargoUpdatePacket* Typed = static_cast<FRpcServerObjectCargoUpdatePacket*>(Packet);
         Typed->ObjectId = ObjectId;
         Typed->EquipId = Item.Id;
@@ -1101,7 +1101,7 @@ void CClientImpl::SendServerObjectCargoUpdate(const unsigned int& ClientId, unsi
 // RC 06b37c30, 0x41 BURNFUSE, BY REF: every field an integer move (the two floats included).
 void CClientImpl::SendServerBurnFuse(const unsigned int& ClientId, const FServerBurnFuseInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x41, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_BURNFUSE), &Packet) == 0) {
         FRpcServerBurnFusePacket* Typed = static_cast<FRpcServerBurnFusePacket*>(Packet);
         Typed->SourceId = Info.SourceId;
         Typed->ObjectId = Info.ObjectId;
@@ -1117,7 +1117,7 @@ void CClientImpl::SendServerBurnFuse(const unsigned int& ClientId, const FServer
 // RC 06b36950, 0x4b SET_CAMERA, BY REF: the nine dwords of Info by integer moves.
 void CClientImpl::SendServerSetCamera(const unsigned int& ClientId, const FPayloadServerSetCamera& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4b, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SET_CAMERA), &Packet) == 0) {
         FRpcServerSetCameraPacket* Typed = static_cast<FRpcServerSetCameraPacket*>(Packet);
         std::memcpy(&Typed->Position.x, &Info.Position.x, 4u);
         std::memcpy(&Typed->Position.y, &Info.Position.y, 4u);
@@ -1135,7 +1135,7 @@ void CClientImpl::SendServerSetCamera(const unsigned int& ClientId, const FPaylo
 // RC 06b369e0, 0x4c REVERT_CAMERA, BY REF: header only.
 void CClientImpl::SendServerRevertCamera(const unsigned int& ClientId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4c, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_REVERT_CAMERA), &Packet) == 0) {
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1143,7 +1143,7 @@ void CClientImpl::SendServerRevertCamera(const unsigned int& ClientId) {
 // RC 06b36910, 0x43 SET_STORY_CUE, BY REF: the cue id is read through CueId too.
 void CClientImpl::SendServerSetStoryCue(const unsigned int& ClientId, const unsigned int& CueId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x43, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SET_STORY_CUE), &Packet) == 0) {
         static_cast<FRpcServerSetStoryCuePacket*>(Packet)->Value = CueId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1152,7 +1152,7 @@ void CClientImpl::SendServerSetStoryCue(const unsigned int& ClientId, const unsi
 // RC 06b380c0, 0x53 FORMATION_UPDATE, by value: LeaderId, then Offset (Vector) by integer moves.
 void CClientImpl::SendServerFormationUpdate(unsigned int ClientId, unsigned int LeaderId, const Vector& Offset) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x53, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_FORMATION_UPDATE), &Packet) == 0) {
         FRpcServerFormationUpdatePacket* Typed = static_cast<FRpcServerFormationUpdatePacket*>(Packet);
         Typed->LeaderId = LeaderId;
         std::memcpy(&Typed->Offset.x, &Offset.x, 4u);
@@ -1167,7 +1167,7 @@ void CClientImpl::SendServerSetMusic(unsigned int ClientId, unsigned int SpaceMu
                                      unsigned int BattleMusic, unsigned int OverrideMusic, bool bFlag,
                                      float Fade) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x57, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SET_MUSIC), &Packet) == 0) {
         FRpcServerSetMusicPacket* Typed = static_cast<FRpcServerSetMusicPacket*>(Packet);
         Typed->SpaceMusic = SpaceMusic;
         Typed->DangerMusic = DangerMusic;
@@ -1182,7 +1182,7 @@ void CClientImpl::SendServerSetMusic(unsigned int ClientId, unsigned int SpaceMu
 // RC 06b381a0, 0x58 CANCEL_MUSIC, by value: header only.
 void CClientImpl::SendServerCancelMusic(unsigned int ClientId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x58, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CANCEL_MUSIC), &Packet) == 0) {
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1190,7 +1190,7 @@ void CClientImpl::SendServerCancelMusic(unsigned int ClientId) {
 // RC 06b381d0, 0x59 PLAY_SOUND_EFFECT, by value.
 void CClientImpl::SendServerPlaySoundEffect(unsigned int ClientId, unsigned int SoundId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x59, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_PLAY_SOUND_EFFECT), &Packet) == 0) {
         static_cast<FRpcServerPlaySoundEffectPacket*>(Packet)->Value = SoundId;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1200,7 +1200,7 @@ void CClientImpl::SendServerPlaySoundEffect(unsigned int ClientId, unsigned int 
 // setter 06b42f40, +0x28 = BaseHint::Kind, CleanUp (vtable +0xc) before the send.
 void CClientImpl::SendServerLoadHint(const unsigned int& ClientId, BaseHint* Hint) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4d, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_LOADHINT), &Packet) == 0) {
         FRpcServerLoadHintPacket* Typed = static_cast<FRpcServerLoadHintPacket*>(Packet);
         unsigned char* Serialized = nullptr;
         const unsigned int SerializedSize = Hint->Serialize(&Serialized);
@@ -1214,7 +1214,7 @@ void CClientImpl::SendServerLoadHint(const unsigned int& ClientId, BaseHint* Hin
 // RC 06b35f40, 0x4e SETDIRECTIVE, BY REF: copied field by field (padding bytes not copied).
 void CClientImpl::SendServerSetDirective(const unsigned int& ClientId, const FPayloadServerSetDirective& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4e, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETDIRECTIVE), &Packet) == 0) {
         static_cast<FRpcServerSetDirectivePacket*>(Packet)->SetDirective(Info);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1224,7 +1224,7 @@ void CClientImpl::SendServerSetDirective(const unsigned int& ClientId, const FPa
 void CClientImpl::SendServerPlayerListAdd(unsigned int ClientId, const wchar_t* Name, unsigned int PlayerId,
                                           bool bAlreadyPresent) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x52, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_PLAYERLIST), &Packet) == 0) {
         FRpcServerPlayerListPacket* Typed = static_cast<FRpcServerPlayerListPacket*>(Packet);
         Typed->Kind = kPlayerListKindEntry;
         Typed->bAlreadyPresent = static_cast<unsigned char>(bAlreadyPresent);
@@ -1236,7 +1236,7 @@ void CClientImpl::SendServerPlayerListAdd(unsigned int ClientId, const wchar_t* 
 // RC 06b38020, 0x52 PLAYERLIST Kind 2, by value.
 void CClientImpl::SendServerPlayerListRemove(unsigned int ClientId, unsigned int PlayerId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x52, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_PLAYERLIST), &Packet) == 0) {
         FRpcServerPlayerListPacket* Typed = static_cast<FRpcServerPlayerListPacket*>(Packet);
         Typed->Kind = kPlayerListKindDrop;
         Typed->SetEntry(nullptr, PlayerId);
@@ -1247,7 +1247,7 @@ void CClientImpl::SendServerPlayerListRemove(unsigned int ClientId, unsigned int
 // RC 06b38070, 0x52 PLAYERLIST Kind 0, by value.
 void CClientImpl::SendServerPlayerListClear(unsigned int ClientId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x52, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_PLAYERLIST), &Packet) == 0) {
         FRpcServerPlayerListPacket* Typed = static_cast<FRpcServerPlayerListPacket*>(Packet);
         Typed->Kind = kPlayerListKindClear;
         Typed->SetEntry(nullptr, 0u);
@@ -1258,7 +1258,7 @@ void CClientImpl::SendServerPlayerListClear(unsigned int ClientId) {
 // RC 06b33eb0, 0x48 SETCOLLISIONGROUPS, by value; list assignment 06b3a360.
 void CClientImpl::SendServerSetCollisionGroups(unsigned int ClientId, const std::list<CollisionGroupDesc>& Groups) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x48, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SETCOLLISIONGROUPS), &Packet) == 0) {
         static_cast<FRpcServerSetCollisionGroupsPacket*>(Packet)->SetGroups(Groups);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1279,7 +1279,7 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
                                      const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                      float Duration, bool bReceiverIsOwnShip) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x4f, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_SENDCOMM), &Packet) == 0) {
         FRpcServerSendCommPacket* Typed = static_cast<FRpcServerSendCommPacket*>(Packet);
         Typed->SenderId = SenderId;
         Typed->ReceiverId = ReceiverId;
@@ -1332,7 +1332,7 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
 // RC 06b37cb0: +0x28 (0x08) = ObjectId, +0x34 (0x01) = GroupId.
 void CClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int ClientId, unsigned int ObjectId, unsigned int GroupId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         Typed->SetObjectId(ObjectId);
         Typed->SetGroupId(GroupId);
@@ -1343,7 +1343,7 @@ void CClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int ClientId, unsi
 // RC 06b37d50: +0x38 = MissionId, +0x3c = MissionSetBy (0x02).
 void CClientImpl::SendServerMiscObjUpdateMission(unsigned int ClientId, unsigned int MissionId, unsigned int MissionSetBy) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         static_cast<FRpcServerMiscObjUpdatePacket*>(Packet)->SetMission(MissionId, MissionSetBy);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1352,7 +1352,7 @@ void CClientImpl::SendServerMiscObjUpdateMission(unsigned int ClientId, unsigned
 // RC 06b37ef0: the text (0x10) assigned from Motd, no null test.
 void CClientImpl::SendServerMiscObjUpdateMotd(unsigned int ClientId, const std::wstring& Motd) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         static_cast<FRpcServerMiscObjUpdatePacket*>(Packet)->SetText(Motd);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1362,7 +1362,7 @@ void CClientImpl::SendServerMiscObjUpdateMotd(unsigned int ClientId, const std::
 void CClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int ClientId, unsigned int ObjectId,
                                                      unsigned int Affiliation) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         Typed->SetObjectId(ObjectId);
         Typed->SetAffiliation(Affiliation);
@@ -1373,7 +1373,7 @@ void CClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int ClientId, unsi
 // RC 06b37da0: +0x24 (0x04) = PlayerId, the low word of Rank into +0x2c (0x40).
 void CClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned int PlayerId, int Rank) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         Typed->SetPlayerId(PlayerId);
         Typed->SetRank(static_cast<unsigned short>(Rank));
@@ -1384,7 +1384,7 @@ void CClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned in
 // RC 06b37e50: +0x24 (0x04) = PlayerId, +0x34 (0x01) = GroupId.
 void CClientImpl::SendServerMiscObjUpdatePlayerGroup(unsigned int ClientId, unsigned int PlayerId, unsigned int GroupId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         Typed->SetPlayerId(PlayerId);
         Typed->SetGroupId(GroupId);
@@ -1395,7 +1395,7 @@ void CClientImpl::SendServerMiscObjUpdatePlayerGroup(unsigned int ClientId, unsi
 // RC 06b37ea0: +0x24 (0x04) = PlayerId, +0x30 (0x80) = SystemId.
 void CClientImpl::SendServerMiscObjUpdateSystem(unsigned int ClientId, unsigned int PlayerId, unsigned int SystemId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         Typed->SetPlayerId(PlayerId);
         Typed->SetSystemId(SystemId);
@@ -1407,7 +1407,7 @@ void CClientImpl::SendServerMiscObjUpdateSystem(unsigned int ClientId, unsigned 
 // the id setter 06b45a60; no null test.
 void CClientImpl::SendServerMiscObjUpdateFormation(unsigned int ClientId, const std::vector<unsigned int>& MemberIds) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE), &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
         for (std::vector<unsigned int>::const_iterator It = MemberIds.begin(); It != MemberIds.end(); ++It) {
             Typed->AddId(*It);
@@ -1421,7 +1421,7 @@ void CClientImpl::SendServerMiscObjUpdateFormation(unsigned int ClientId, const 
 // +0xa0/+0xa4 and NameB +0xa8/+0xac (allocations not null-tested).
 void CClientImpl::SendServerCreateSolar(unsigned int ClientId, const CSolarCreateInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(2, 0x42, &Packet) == 0) {
+    if (Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CREATESOLAR), &Packet) == 0) {
         FRpcServerCreateSolarPacket* Typed = static_cast<FRpcServerCreateSolarPacket*>(Packet);
         RpcServerCreateObjectFill(&Info, &Typed->Fields);
         Typed->bDestructible = Info.bDestructible;

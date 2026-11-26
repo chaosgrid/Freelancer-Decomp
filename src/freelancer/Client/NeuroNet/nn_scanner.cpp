@@ -82,7 +82,7 @@ bool NnScanner::Create(Win3D* NewParent, void* Data)
             FullCargoBar = nullptr;
         }
 
-        SetMode(4, true); // FUN_0047f240, the commodity filter
+        SetMode(kNnFilterCommodity, true); // FUN_0047f240, the commodity filter
     }
 
     // FUN_005760d0 on the +0x974 face, whatever Create returned.
@@ -160,7 +160,7 @@ void NnScanner::Update()
 
     // The damage bars hidden (no null test).
     for (int Row = 0; Row < kNnInventoryRows; ++Row)
-        ItemDamage[Row]->Flags = static_cast<unsigned char>(ItemDamage[Row]->Flags & 0xfc);
+        ItemDamage[Row]->Flags = static_cast<unsigned char>(ItemDamage[Row]->Flags & ~(kWin3DActive | kWin3DVisible));
 
     if (SelectedIndex == -1)
         bShowShipInfoCard = 1;
@@ -171,7 +171,7 @@ bool NnScanner::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     // LAB_004b7180 (RET 0xc).
     if (Msg == kWinMsgHide)
     {
-        PlayOrRewindUiSoundSlot(0xe);
+        PlayOrRewindUiSoundSlot(kUiSoundEndScan);
         Close();
         return true;
     }
@@ -189,7 +189,7 @@ intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 1;
         }
     }
-    else if (Msg == 0x49)
+    else if (Msg == kScannerPropSetCargo)
     {
         // The clear runs first, so A == &ScannedCargo leaves the list empty, as in retail.
         Ship.ShipArchId = static_cast<unsigned>(B);
@@ -201,7 +201,7 @@ intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     else if (Msg == 0x4a)
     {
-        Flags = static_cast<unsigned char>(Flags | 3);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
     }
 
     return NnInventory::SetProperty(Msg, A, B);
@@ -220,7 +220,7 @@ bool NnScanner::OnEvent(unsigned MsgId)
         return false;
     if (MsgId != USER_CANCEL)
         return false;
-    PlayOrRewindUiSoundSlot(0xe);
+    PlayOrRewindUiSoundSlot(kUiSoundEndScan);
     Close(); // FUN_0047ad20
     return true;
 }
@@ -244,8 +244,8 @@ void OpenNnScanner(EquipDescList const* Cargo, unsigned ShipArchId)
     Vector const Position = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
     Window->SetPosition(&Position);
 
-    Window->SetProperty(0x49, reinterpret_cast<uintptr_t>(Cargo), ShipArchId);
+    Window->SetProperty(kScannerPropSetCargo, reinterpret_cast<uintptr_t>(Cargo), ShipArchId);
     Window->SetProperty(0x4a, 0, 0);
 
-    PlayOrRewindUiSoundSlot(0xd);
+    PlayOrRewindUiSoundSlot(kUiSoundBeginScan);
 }

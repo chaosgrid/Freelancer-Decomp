@@ -107,10 +107,10 @@ bool PageAccountSelect::Create(Win3D* NewParent, void* /*Payload*/)
     AccountId->SetMaxLength(0x28);                                                    // FUN_0057bdb0
     AccountId->SetDrawFrame(true);                                                    // FUN_00579860
     AccountId->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba)); // FUN_00579870
-    AccountId->SetAlignMode(2);                                                       // FUN_00579a60
+    AccountId->SetAlignMode(kRichAlignMiddle);                                                       // FUN_00579a60
     AccountId->AddFilterChars(kAccountIdChars, 0x12);                                 // FUN_0057c860
     AccountId->SetReplacementChar(L'-');                                              // FUN_0057c920
-    AccountId->SetCaseMode(1);                                                        // FUN_0057c840
+    AccountId->SetCaseMode(kRichCaseUpper);                                                        // FUN_0057c840
     AccountId->SetFilterIsAllowList(true);                                            // FUN_0057c850
 
     // The explanation shows the +0xf4 list by reference.
@@ -197,7 +197,7 @@ void PageAccountSelect::Update()
         }
 
         if (SlideT > -0.8 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b); // FUN_00564570(0x1b)
+            PlayUiSoundSlot(kUiSoundMotionSwish); // FUN_00564570(0x1b)
     }
 
     // Leaving: the frame time is not capped here.
@@ -236,13 +236,13 @@ bool PageAccountSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
     // FUN_00573010.
     if (Msg == kWinMsgCommand)
     {
-        PlayOrRewindUiSoundSlot(0); // FUN_005645c0(0)
-        if (A == 0x3e9) // "Back"
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem); // FUN_005645c0(0)
+        if (A == kAccountCmdBack)
         {
             BeginLeave(-1);
             return true;
         }
-        if (A != 0x3ea) // "SelectServer"
+        if (A != kAccountCmdSelectServer)
             return false;
         return SubmitTypedKey();
     }
@@ -305,7 +305,7 @@ void PageAccountSelect::BeginLeave(int Direction)
     SelectServer->SetSkipUpload(true);
     HideWin3D(AccountId);
     HideWin3D(Explain);
-    PlayUiSoundSlot(0x1b);           // FUN_00564570(0x1b)
+    PlayUiSoundSlot(kUiSoundMotionSwish);           // FUN_00564570(0x1b)
     SetToolTipsEnabled(false);       // FUN_00573370(0)
     LeaveDirection = Direction;
 }

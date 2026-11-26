@@ -184,6 +184,16 @@ static_assert(offsetof(FCliGunFxCompanion, LightAnimName) == 0x60, "anim name @ 
 
 class FClientEquippedObj; // client_gameobj.h
 
+// FCliEquipFirePacket::ActivateSubOp for the activate-item command (FUN_00534460).
+enum EActivateSubOp
+{
+    kActivateSubOpDeactivate = 0, // the hardpoint's equipment off
+    kActivateSubOpActivate = 1,   // on
+    kActivateSubOpToggle = 2,
+    kActivateSubOpExclusive = 3,  // on, and every other of the same type off (next / previous item)
+    kActivateSubOpSyncType = 4    // every equipment of the type takes this one's active state
+};
+
 // Client equip-update packet (10 dwords) — FUN_00534460 / FUN_00544d70 / FUN_00544e70.
 struct FCliEquipFirePacket
 {

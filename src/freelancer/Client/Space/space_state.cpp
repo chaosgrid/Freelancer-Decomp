@@ -113,7 +113,7 @@ namespace
     bool GetDockCameraCsys(IObjRW const* Port, int PortIndex, float* Csys12)
     {
         char Name[0x40];
-        sprintf_s(Name, "%s%c", "HPDockCam", PortIndex + 0x41);
+        sprintf_s(Name, "%s%c", "HPDockCam", PortIndex + 'A');
         return Port->get_hardpoint(Name, reinterpret_cast<Vector*>(Csys12 + 9),
                                    reinterpret_cast<Matrix*>(Csys12)) == 0;
     }
@@ -126,7 +126,7 @@ namespace
             // Once the ship is no longer excluded from control bit 4
             // the launch is over -- +0xba9 drops and, unless +0xba8 holds it, the camera goes
             // back to "player" (attach target 0).
-            CEqObj* const EqObj = PlayerEqObj(0x503u);
+            CEqObj* const EqObj = PlayerEqObj(CObject::ClassShip);
             if (EqObj != nullptr && !EqObj->is_control_excluded(4u))
             {
                 State->bSpaceReady = 0;
@@ -144,7 +144,7 @@ namespace
                 Watched != nullptr ? reinterpret_cast<unsigned char const*>(Watched) - 8
                                    : nullptr;
             // The camera must be watching exactly the player's ship.
-            CEqObj* const EqObj = PlayerEqObj(0x503u);
+            CEqObj* const EqObj = PlayerEqObj(CObject::ClassShip);
             if (EqObj != nullptr && WatchedObjRW == GetPlayerObjRW())
             {
                 IObjRW const* Port = nullptr;
@@ -156,13 +156,13 @@ namespace
                     // IServer slot 57, no test on the server.
                     static_cast<IServer*>(GetLocalServerInterface())
                         ->SPRequestInvincibility(static_cast<CSimple*>(EqObj)->Id, true,
-                                                 INVINCIBILITY_REASON_2,
+                                                 INVINCIBILITY_DOCKING,
                                                  GetPlayerConnectionId());
                     // The port's type (skipped without a port) tested for 0x120.
                     unsigned PortType = 0;
                     if (Port != nullptr)
                         Port->get_type(PortType);
-                    if ((PortType & 0x120u) != 0)
+                    if ((PortType & (OBJ_DOCKING_RING | OBJ_STATION)) != 0)
                     {
                         float Csys[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
@@ -416,7 +416,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
             App->PlayerPreference = 1;
             if (App->bCameraReady != 0)
                 SwitchSpaceCameraMode("third_person", nullptr);
-            SetGameSessionFlags(8, false); // FUN_004c8120(8, 0)
+            SetGameSessionFlags(kSessionFirstPerson, false); // FUN_004c8120(8, 0)
             return true;
         }
         if (App->PlayerPreference == 1)
@@ -424,7 +424,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
             App->PlayerPreference = 0;
             if (App->bCameraReady != 0)
                 SwitchSpaceCameraMode("first_person", nullptr);
-            SetGameSessionFlags(8, true); // FUN_004c8120(8, 1)
+            SetGameSessionFlags(kSessionFirstPerson, true); // FUN_004c8120(8, 1)
             return true;
         }
         // Any other preference -- consumed, nothing done.
@@ -500,7 +500,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
             return false;
         if (App->bDockingPending == 0)
             return false;
-        CEqObj* const EqObj = PlayerEqObj(0x503u);
+        CEqObj* const EqObj = PlayerEqObj(CObject::ClassShip);
         if (EqObj == nullptr)
             return false;
         IBehaviorManager* const Manager = EqObj->get_behavior_interface();
@@ -580,7 +580,7 @@ void SpaceAppArmDeathCamera()
 
     // The client ObjDB's spatial bucket (slot 0xc, mask 0xfdff).
     ISpatialPartition* const Bucket =
-        static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(0xfdff));
+        static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
     bool bCrowded = false;
     if (Bucket != nullptr)
     {
@@ -638,7 +638,7 @@ void SpaceAppArmDeathCamera()
 
     // The player's object narrowed with mask 0x103 (a CEqObj); control exclusion 3 set unless
     // it already is.
-    CEqObj* const EqObj = PlayerEqObj(0x103u);
+    CEqObj* const EqObj = PlayerEqObj(CObject::ClassEqObj);
     if (EqObj != nullptr && !EqObj->is_control_excluded(3u))
         EqObj->set_control_exclusion(3u);
 
@@ -898,7 +898,9 @@ bool InitSpaceState(SpaceApp* State, int Param)
 
     // Registered on the Event::Handler face (FUN_005760d0), in this order.
     {
-        const unsigned EventIds[7] = {0xc3, 0xc4, 0xf, 0x31, 0x39, 0x38, 0xbf};
+        const unsigned EventIds[7] = {USER_NEXT_OBJECT, USER_PREV_OBJECT, USER_CANCEL,
+                                      USER_COCKPIT_CAMERA_MODE, USER_REARVIEW_CAMERA_MODE_OFF,
+                                      USER_REARVIEW_CAMERA_MODE, USER_AUTO_TURRET};
         for (int Index = 0; Index < 7; ++Index)
             State->Events.RegisterEvent(EventIds[Index]);
     }
@@ -910,7 +912,7 @@ bool InitSpaceState(SpaceApp* State, int Param)
     // Session flag 8 (FUN_004c8110) -> first person; otherwise the preference stays (the
     // ctor's 1, or the last choice).
     State->bSpaceReady = 1;
-    if (TestGameSessionFlags(8))
+    if (TestGameSessionFlags(kSessionFirstPerson))
         State->PlayerPreference = 0;
 
     if (State->ActiveCamera == nullptr)
@@ -1143,7 +1145,7 @@ void DestroySpaceState(SpaceApp* State)
     State->bDockingActive = 0;  // +0xbab
 
     // The player's ship CEqObj; when control exclusion 7 is set it is cleared (0).
-    CEqObj* const EqObj = PlayerEqObj(0x503u);
+    CEqObj* const EqObj = PlayerEqObj(CObject::ClassShip);
     if (EqObj != nullptr && EqObj->is_control_excluded(7u))
         EqObj->set_control_exclusion(0u);
 

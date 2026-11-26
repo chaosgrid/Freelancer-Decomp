@@ -103,7 +103,7 @@ void GameCameraConstruct(FGameCamera* Cam)
     if (Cam->Watched.target() != nullptr)
         Cam->Watched.set(nullptr);
 
-    Cam->Flags = static_cast<unsigned char>(Cam->Flags & 0xfc);
+    Cam->Flags = static_cast<unsigned char>(Cam->Flags & ~(kGameCameraClearColour | kGameCameraClearDepth));
 
     Cam->bFlagF4 = 0;
     Cam->bFlagF5 = 0;
@@ -181,7 +181,7 @@ void GameCameraBeginFrame(FGameCamera* Cam)
     const float DeltaSeconds = static_cast<float>(GetClientFrameTimeCapped());
     UpdateLetterbox(Space, DeltaSeconds);
 
-    if ((Cam->Flags & 3) != 0)
+    if ((Cam->Flags & (kGameCameraClearColour | kGameCameraClearDepth)) != 0)
         GameCameraClear(Cam);
 
     Win3DSetViewport(AsCamera(Space), kGamecamCpp, 0x85);
@@ -197,7 +197,7 @@ void GameCameraClear(FGameCamera* Cam)
     float Green = 0.0f;
     float Blue = 0.0f;
 
-    if ((Cam->Flags & 1) != 0)
+    if ((Cam->Flags & kGameCameraClearColour) != 0)
     {
         // The colour bytes scaled by 1/255 (double 0x005c89c8).
         Red = static_cast<float>(Cam->ClearColor[0] * (1.0 / 255.0));
@@ -219,7 +219,7 @@ void GameCameraClear(FGameCamera* Cam)
         ClearBits = kWin3DClearColour;
     }
 
-    if ((Cam->Flags & 2) != 0)
+    if ((Cam->Flags & kGameCameraClearDepth) != 0)
         ClearBits = ClearBits | kWin3DClearDepth;
 
     if (ClearBits == 0)
@@ -230,7 +230,7 @@ void GameCameraClear(FGameCamera* Cam)
     ClearWin3DBuffers(ClearBits);
 
     // After a black full-surface clear, the camera's own viewport gets the real colour.
-    if ((Cam->Flags & 1) != 0 && bBarsBlackened)
+    if ((Cam->Flags & kGameCameraClearColour) != 0 && bBarsBlackened)
     {
         Win3DSetViewport(AsCamera(SpaceCameraOf(Cam)), kGamecamCpp, 0xc0);
         Win3DSetPipelineClearColor(Red, Green, Blue, 1.0f);
@@ -394,8 +394,8 @@ bool HudCameraActivate(FHudCamera* Cam, const int* ViewRect4)
     RegisterAcceleratorGroup("IDR_COCKPIT");
 
     // The nine ids in this order, each registered on the face at +0xf8.
-    static const unsigned kCockpitEvents[9] = {0x5c, 0x2a, 0x2b, 0x2c, 0x2d,
-                                               0x2e, 0x2f, 0xc7, 0xc8};
+    static const unsigned kCockpitEvents[9] = {USER_RADIO, USER_X_ROTATE, USER_X_UNROTATE, USER_Y_ROTATE, USER_Y_UNROTATE,
+                                               USER_Z_ROTATE, USER_Z_UNROTATE, USER_FIRE_WEAPONS, USER_TURN_SHIP};
     FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
     for (unsigned Index = 0; Index < 9; ++Index)
         HudRegisterCommandHandler(Face, kCockpitEvents[Index]);
@@ -553,7 +553,7 @@ namespace
         // 20000 of the player.
         {
             ISpatialPartition* const Bucket =
-                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(0xfdff));
+                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
             Geometry::Sphere Query;
             Query.Center = PlayerPos;
             Query.Radius = kSolarQueryRadius;
@@ -645,7 +645,7 @@ namespace
             RadarRange = static_cast<CEScanner*>(Scanner)->GetRadarRange();
 
         // Every ship Gameobj (ManagerKind 1).
-        int Kind = 1;
+        int Kind = static_cast<int>(EClientGameobjKind::Ship);
         for (FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind); Go != nullptr; Go = Go->ListNext)
         {
             // Already counted (+0xa4), or the player.
@@ -721,7 +721,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
     // control 4, or a NeuroNet window is up. Retail asks the exclusion even with no ship.
     if (G_bHudFireHeld != 0)
     {
-        if (!KeyMapIsCommandHeld(0xc7u) || Ship->is_control_excluded(4u) || G_bNnScreenUp)
+        if (!KeyMapIsCommandHeld(USER_FIRE_WEAPONS) || Ship->is_control_excluded(4u) || G_bNnScreenUp)
             G_bHudFireHeld = 0;
     }
 
@@ -744,7 +744,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
     // Firing while the latch is up.
     if (G_bHudFireHeld != 0)
     {
-        Win3DBroadcast(0x3006u, 0u, 0u);
+        Win3DBroadcast(kWinMsgConfirmAnswer, 0u, 0u);
 
         // The watched object's +4 is the adjustor whose slot 0x34 fires (FUN_00534870), called
         // directly here as in cli_projectile_fx.
@@ -952,19 +952,19 @@ void HudCameraUpdateShake(FHudCamera* Cam)
         reinterpret_cast<IObjInspect*>(const_cast<unsigned char*>(Held - 8))));
 
     // +0x18c bit 0, a hull hit (set by slot 105 FUN_00545ed0).
-    if ((Ship->ShipFlags & 0x1u) != 0)
+    if ((Ship->ShipFlags & kShipFlagHullHit) != 0)
     {
         G_CameraShakeAmount = 0.02f;
-        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfeu);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & ~kShipFlagHullHit);
     }
 
     // Bit 1, a shield hit: raises the amplitude to 0.005f (.rdata 0x005d3e44) unless already
     // strictly greater.
-    if ((Ship->ShipFlags & 0x2u) != 0)
+    if ((Ship->ShipFlags & kShipFlagShieldHit) != 0)
     {
         if (!(G_CameraShakeAmount > 0.005f))
             G_CameraShakeAmount = 0.005f;
-        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfdu);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & ~kShipFlagShieldHit);
     }
 
     // In a jump with a jump effect: the effect's amplitude unless the current one is strictly

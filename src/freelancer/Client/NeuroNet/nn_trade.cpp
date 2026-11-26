@@ -604,7 +604,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardInfo->SetNormSize(0.23f, 0.205f);             // FUN_00579cc0
     Vector const PlayerInfoAt = {-0.124f, 0.0325f, 0.0f};
     PlayerCardInfo->SetAttachOffset(&PlayerInfoAt);          // FUN_00579c40
-    PlayerCardInfo->Flags &= 0xfc;
+    PlayerCardInfo->Flags &= ~(kWin3DActive | kWin3DVisible);
 
     // The other player's info card, the same, a little further right.
     Vector const TargetFrameAt = {0.01f, -0.007f, 0.0f};
@@ -644,7 +644,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetCardInfo->SetNormSize(0.23f, 0.205f);
     Vector const TargetInfoAt = {-0.117f, 0.0325f, 0.0f};
     TargetCardInfo->SetAttachOffset(&TargetInfoAt);
-    TargetCardInfo->Flags &= 0xfc;
+    TargetCardInfo->Flags &= ~(kWin3DActive | kWin3DVisible);
 
     FormatTradeWidgetName("TradeClose");
     TradeClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr, nullptr,
@@ -665,8 +665,8 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                      "hp_center_thumb_top", "hp_center_thumb_down", 5, 0, 1);
 
     // Closed, then browsing; drawn above the other windows.
-    SetMode(1);
-    SetMode(2);
+    SetMode(kTradePanelListsOnly);
+    SetMode(kTradePanelOffers);
     DrawLayer = 1;
 
     // The status and target panels are collapsed while trading; what they were is kept for the
@@ -745,7 +745,7 @@ bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
     // FUN_004c2c70 (RET 8). Only the quantity panel takes keys, and only with modifier bit 0
     // (key down) or bit 1.
     bool bHandled = false;
-    if (Mode != 3)
+    if (Mode != kTradePanelQuantity)
         return false;
     unsigned char const Mods = *Modifiers;
     unsigned char const bDown = static_cast<unsigned char>(Mods & 1);
@@ -753,7 +753,7 @@ bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
         return false;
 
     int const Code = static_cast<int>(Key);
-    if (Code == 8)
+    if (Code == VK_BACK)
     {
         // Backspace drops the last digit.
         if (bDown != 0)
@@ -833,14 +833,14 @@ void NnTrade::SetMode(int NewMode)
 {
     // FUN_004c1ae0 (RET 4).
     int Previous = Mode;
-    if (NewMode == 4)
+    if (NewMode == kTradePanelQuantityRecheck)
     {
-        Previous = 4;
-        NewMode = 3;
+        Previous = kTradePanelQuantityRecheck;
+        NewMode = kTradePanelQuantity;
     }
     Mode = NewMode;
 
-    if (NewMode == 1)
+    if (NewMode == kTradePanelListsOnly)
     {
         // Everything but the lists hidden.
         TitleFrame->SetProperty(kWinPropHide, 1, 0);
@@ -861,7 +861,7 @@ void NnTrade::SetMode(int NewMode)
         return;
     }
 
-    if (NewMode == 2)
+    if (NewMode == kTradePanelOffers)
     {
         // The arrow, the title, the offer list and "accept trade".
         TitleFrame->SetProperty(kWinPropHide, 1, 0);
@@ -883,7 +883,7 @@ void NnTrade::SetMode(int NewMode)
         return;
     }
 
-    if (NewMode != 3)
+    if (NewMode != kTradePanelQuantity)
         return;
 
     // The quantity panel replaces the offer list.
@@ -960,7 +960,7 @@ void NnTrade::SetMode(int NewMode)
 
     // Re-entered (4) with a value that no longer fits: the voice line; a fresh panel forgets
     // the typed digits.
-    if (Previous == 4)
+    if (Previous == kTradePanelQuantityRecheck)
     {
         if (QuantityBar->Value > Most)
             NnVoiceEnqueue(G_InsufficientCargoSpaceVoiceId, 0); // FUN_00489e80(DAT_00672458, 0)
@@ -984,7 +984,7 @@ void NnTrade::SetMode(int NewMode)
     SelectedLine = nullptr;
     SelectedItem = nullptr;
     Owner->Refresh(-1);
-    SetMode(2);
+    SetMode(kTradePanelOffers);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1021,8 +1021,8 @@ void NnTrade::AddTargetItem(EquipDesc const* Item)
     }
 
     // An open quantity panel re-checks its limits.
-    if (Mode == 3)
-        SetMode(4);
+    if (Mode == kTradePanelQuantity)
+        SetMode(kTradePanelQuantityRecheck);
 }
 
 void NnTrade::RemoveTargetItem(EquipDesc const* Item)
@@ -1068,8 +1068,8 @@ void NnTrade::RemoveTargetItem(EquipDesc const* Item)
         }
     }
 
-    if (Mode == 3)
-        SetMode(4);
+    if (Mode == kTradePanelQuantity)
+        SetMode(kTradePanelQuantityRecheck);
 }
 
 void NnTrade::SetTarget(unsigned ObjectId)
@@ -1171,12 +1171,12 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
             LoadIdsIntoRdl(static_cast<unsigned>(IdsInfo), Card); // FUN_0057da40
             PlayerCardInfo->ClearContent();                      // FUN_0057b370
             PlayerCardInfo->AppendContent(Card);                 // FUN_0057b3e0
-            PlayerCardInfo->Flags |= 3;
+            PlayerCardInfo->Flags |= kWin3DActive | kWin3DVisible;
             PlayerCardInfo->ShowScrollBarV(true);                // FUN_00579bd0
         }
         else
         {
-            PlayerCardInfo->Flags &= 0xfc;
+            PlayerCardInfo->Flags &= ~(kWin3DActive | kWin3DVisible);
             PlayerCardInfo->ShowScrollBarV(false);
         }
     }
@@ -1203,12 +1203,12 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
             LoadIdsIntoRdl(static_cast<unsigned>(IdsInfo), Card);
             TargetCardInfo->ClearContent();
             TargetCardInfo->AppendContent(Card);
-            TargetCardInfo->Flags |= 3;
+            TargetCardInfo->Flags |= kWin3DActive | kWin3DVisible;
             TargetCardInfo->ShowScrollBarV(true);
         }
         else
         {
-            TargetCardInfo->Flags &= 0xfc;
+            TargetCardInfo->Flags &= ~(kWin3DActive | kWin3DVisible);
             TargetCardInfo->ShowScrollBarV(false);
         }
     }
@@ -1239,7 +1239,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Control == Line->InfoCard)
             return 0;
         unsigned char const Bit2 =
-            static_cast<unsigned char>(static_cast<NnButtonControl*>(Control)->GetButtonBits() & 0x04);
+            static_cast<unsigned char>(static_cast<NnButtonControl*>(Control)->GetButtonBits() & kButtonLitWhilePressed);
         unsigned char Flags = Line->IconFrame->GetButtonBits();
         Line->IconFrame->SetButtonBits(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
         Flags = Line->InfoFrame->GetButtonBits();
@@ -1253,11 +1253,11 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         else
         {
-            Line->IconFrame->SetButtonBits(static_cast<unsigned char>(Line->IconFrame->GetButtonBits() & 0xfe));
-            Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(Line->InfoFrame->GetButtonBits() & 0xfe));
+            Line->IconFrame->SetButtonBits(static_cast<unsigned char>(Line->IconFrame->GetButtonBits() & ~kButtonHovered));
+            Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(Line->InfoFrame->GetButtonBits() & ~kButtonHovered));
             Layer = 0;
         }
-        if ((Line->IconFrame->GetButtonBits() & 0x40) != 0)
+        if ((Line->IconFrame->GetButtonBits() & kButtonSelected) != 0)
             Layer = 2;
         Line->IconFrame->DrawLayer = Layer;
         Line->IconMesh->DrawLayer = Layer;
@@ -1465,7 +1465,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         SelectedLine = nullptr;
         SelectedItem = nullptr;
         Owner->Refresh(-1);
-        SetMode(2);
+        SetMode(kTradePanelOffers);
         return 0;
     }
 
@@ -1476,7 +1476,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         SelectedLine = nullptr;
         SelectedItem = nullptr;
         Owner->Refresh(-1);
-        SetMode(2);
+        SetMode(kTradePanelOffers);
         return 0;
     }
 
@@ -1512,7 +1512,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             SelectedItem = Line->Item;
             SetTradeMark(SelectedItem, 1);
             List->Refresh(-1);
-            SetMode(3);
+            SetMode(kTradePanelQuantity);
             return 0;
         }
     }

@@ -55,20 +55,49 @@ namespace
     // The {state, value} tables below are retail's .rdata, terminator included.
     // DAT_005db0d8 -- RS: LIGHTING (0x89) 0, SPECULARENABLE (0x1d) 0, ALPHABLENDENABLE (0x1b) 1,
     // SRCBLEND (0x13) SRCALPHA, DESTBLEND (0x14) INVSRCALPHA.
-    unsigned long const kRsPanelBoth[] = {0x89, 0, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
+    unsigned long const kRsPanelBoth[] = {D3DRS_LIGHTING, 0, D3DRS_SPECULARENABLE, 0,
+                                          D3DRS_ALPHABLENDENABLE, 1,
+                                          D3DRS_SRCBLEND, D3DBLEND_SRCALPHA,
+                                          D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
     // DAT_005db108 stage0 / DAT_005db140 stage1 / DAT_005db178 stage2 -- TSS COLOROP, COLORARG1,
     // COLORARG2, ALPHAOP, ALPHAARG1, ALPHAARG2.
-    unsigned long const kTssStage0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    unsigned long const kTssStage1[] = {1, 5, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
-    unsigned long const kTssStage2[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    unsigned long const kTssStage0[] = {D3DTSS_COLOROP, D3DTOP_MODULATE,
+                                        D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                        D3DTSS_COLORARG2, D3DTA_DIFFUSE,
+                                        D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+                                        D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                        D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    unsigned long const kTssStage1[] = {D3DTSS_COLOROP, D3DTOP_MODULATE2X,
+                                        D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                        D3DTSS_COLORARG2, D3DTA_CURRENT,
+                                        D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+                                        D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                        D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    unsigned long const kTssStage2[] = {D3DTSS_COLOROP, D3DTOP_DISABLE,
+                                        D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                        D3DTSS_COLORARG2, D3DTA_CURRENT,
+                                        D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+                                        D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                        D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
     // DAT_005e09c8 used by FUN_00551500
-    unsigned long const kRsCloudsDraw[] = {0x8d, 1, 0x91, 1, 0};
+    unsigned long const kRsCloudsDraw[] = {D3DRS_COLORVERTEX, 1,
+                                           D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1, 0};
     // DAT_005e09e0 -- restore after DrawClouds: only 0x8d (the table is {0x8d, 0, 0}).
-    unsigned long const kRsCloudsRestore[] = {0x8d, 0, 0};
+    unsigned long const kRsCloudsRestore[] = {D3DRS_COLORVERTEX, 0, 0};
     // DAT_005e09f0 / DAT_005e0a28 -- TSS stage0/1 tables used by FUN_00551500
-    unsigned long const kTssClouds0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    unsigned long const kTssClouds1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    unsigned long const kTssClouds0[] = {D3DTSS_COLOROP, D3DTOP_MODULATE,
+                                         D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                         D3DTSS_COLORARG2, D3DTA_DIFFUSE,
+                                         D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+                                         D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                         D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    unsigned long const kTssClouds1[] = {D3DTSS_COLOROP, D3DTOP_DISABLE,
+                                         D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                         D3DTSS_COLORARG2, D3DTA_CURRENT,
+                                         D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+                                         D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                         D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
     // FUN_00552420 (thiscall on the format id) — ids 10..14 (the DXT formats) have alpha.
     unsigned char TextureFormatHasAlpha(int FormatId)
@@ -81,11 +110,11 @@ namespace
     // FUN_00552440 — XYZ/XYZRHW size from FVF low byte.
     int FvfPositionBytes(unsigned char FvfLow)
     {
-        if ((FvfLow & 0xc) == 0xc)
+        if ((FvfLow & D3DFVF_XYZB4) == D3DFVF_XYZB4)
             return 0x1c;
-        if ((FvfLow & 4) == 4)
+        if ((FvfLow & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
             return 0x10;
-        if ((FvfLow & 2) == 2)
+        if ((FvfLow & D3DFVF_XYZ) == D3DFVF_XYZ)
             return 0xc;
         return 0;
     }
@@ -94,7 +123,7 @@ namespace
     int FvfDiffuseNormalBytes(unsigned char FvfLow)
     {
         int Bytes = 0;
-        if ((FvfLow & 0x40) != 0)
+        if ((FvfLow & D3DFVF_DIFFUSE) != 0)
             Bytes = 4;
         if (static_cast<char>(FvfLow) < 0)
             Bytes += 4;
@@ -321,9 +350,9 @@ namespace
         if (This->DetailShape != nullptr && This->Shape != nullptr)
         {
             Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(This->Shape, 0));
-            Pipe->SetTextureStageState(0, 0xb, 0);
+            Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
             Pipe->SetTextureStageTexture(1, TexShapeGetGpuHandle(This->DetailShape, 0));
-            Pipe->SetTextureStageState(1, 0xb, 1);
+            Pipe->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
             PipelineApplyTssTable(Pipe, 0, kTssStage0);
             PipelineApplyTssTable(Pipe, 1, kTssStage1);
             PipelineApplyTssTable(Pipe, 2, kTssStage2);
@@ -334,7 +363,7 @@ namespace
         if (This->Shape != nullptr)
         {
             Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(This->Shape, 0));
-            Pipe->SetTextureStageState(0, 0xb, 0);
+            Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
             PipelineApplyTssTable(Pipe, 0, kTssStage0);
             PipelineApplyTssTable(Pipe, 1, kTssStage2);
             PipelineApplyRsTable(Pipe, kRsPanelBoth);
@@ -1284,7 +1313,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     Pipe->SetRenderState(D3DRS_LIGHTING, 0);
     int Saved16 = 0;
     Pipe->GetRenderState(D3DRS_CULLMODE, &Saved16);
-    Pipe->SetRenderState(D3DRS_CULLMODE, 1);
+    Pipe->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
     Pipe->SetRenderState(D3DRS_ZENABLE, 1);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
     Pipe->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
@@ -1302,13 +1331,13 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     // Retail quirk: without alpha both stores name SRCBLEND (0x13); DESTBLEND is never set.
     if (bAlpha != 0)
     {
-        Pipe->SetRenderState(D3DRS_SRCBLEND, 5);
-        Pipe->SetRenderState(D3DRS_DESTBLEND, 6);
+        Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        Pipe->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
     }
     else
     {
-        Pipe->SetRenderState(D3DRS_SRCBLEND, 2);
-        Pipe->SetRenderState(D3DRS_SRCBLEND, 4);
+        Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+        Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_INVSRCCOLOR);
     }
 
     Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(Shape0, 0));
@@ -1470,12 +1499,12 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         if (bLocked == 0)
         {
             bLocked = 1;
-            if (DALib::VertexBuffer->LockVertexMemory(0x142, static_cast<unsigned int>(VertTotal),
+            if (DALib::VertexBuffer->LockVertexMemory(D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1, static_cast<unsigned int>(VertTotal),
                                                        &Desc) == GR_OK)
             {
                 unsigned const Fvf = static_cast<unsigned>(Desc.Listing.Fvf);
                 unsigned char* const Base = (unsigned char*)Desc.Vertices;
-                int const NormalBytes = (Fvf & 0x10) != 0 ? 0xc : 0;
+                int const NormalBytes = (Fvf & D3DFVF_NORMAL) != 0 ? 0xc : 0;
                 int const DiffBytes = FvfDiffuseNormalBytes(static_cast<unsigned char>(Fvf));
                 int const PosBytes = FvfPositionBytes(static_cast<unsigned char>(Fvf)) + NormalBytes;
                 int const Stride = FvfTexcoordBlockBytes(Fvf) + (PosBytes + DiffBytes);
@@ -1543,7 +1572,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
                               static_cast<unsigned int>(VertCount), nullptr);
     }
 
-    Pipe->SetRenderState(D3DRS_ALPHAFUNC, 5);
+    Pipe->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
     Pipe->SetRenderState(D3DRS_ALPHAREF, Saved18);
     Pipe->SetRenderState(D3DRS_LIGHTING, Saved89);
     Pipe->SetRenderState(D3DRS_CULLMODE, Saved16);

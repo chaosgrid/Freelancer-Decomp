@@ -886,7 +886,7 @@ SERVER_API int __cdecl Activate(const unsigned int& obj_id, bool activate, int p
     if (!Server_FindLiveObject(obj_id, Obj, Owner)) return -2;
     unsigned int Flags;
     Obj->get_type(Flags);
-    if (!activate && (Flags & 0x400u) != 0) return 0;
+    if (!activate && (Flags & OBJ_AIRLOCK_GATE) != 0) return 0;
     return Owner->activate_object(Obj, activate, static_cast<unsigned int>(param)) ? 0 : -3; // FUN_06d0d8a0
 }
 
@@ -910,7 +910,7 @@ SERVER_API int __cdecl RequestSpaceScript(const unsigned int& obj_id_ref, const 
 
 // SpaceObj::GetEmptyPos -- retail .text:06cf9bd0 (ordinal 0x19bd0, cdecl). Negative or
 // NaN radius/clearance -> -4. Each outer pass scans up to 0x400 objects within R (falling
-// back to a scan with radius -1.0f and mode 2 when nothing is found), then tries up to 10
+// back to a scan with radius -1.0f and type mask 2, the planets, when nothing is found), then tries up to 10
 // random offsets of radius R placed by selection_type; an offset collides when
 // (distance - object radius) - clearance <= 0. After 10 collisions R doubles and the
 // outer pass repeats. An invalid selection_type returns the current result (-4 on the
@@ -936,16 +936,16 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
             System = SysDB_LookupSystem(system_id_ref);
             if (System != nullptr)
                 Count = System->scan_objects(Ids, 0x400, &base_transform.Translation,
-                                             NoRadius, 2);
+                                             NoRadius, OBJ_PLANET);
         }
         int Attempts = 0;
         for (;;) {
             unsigned int const Selection = static_cast<unsigned int>(selection_type);
-            if (Selection > 3u) return Result;
+            if (Selection > POS_SEL_3D_VOLUME) return Result;
             Vector Offset;
             double const Step = 3.0517578125e-05;                        // .rdata:06d656b8 (float 2^-15)
             double const TwoPi = 6.2831854820251465;                     // .rdata:06d66b80
-            if (Selection == 3u) {
+            if (Selection == POS_SEL_3D_VOLUME) {
                 double const U1 = static_cast<double>(rand()) * Step;
                 double const U2 = static_cast<double>(rand()) * Step;
                 Offset.x = static_cast<float>(static_cast<double>(rand()) * Step *
@@ -956,11 +956,11 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
                 double const Angle = static_cast<double>(rand()) * Step * TwoPi;
                 float const C = static_cast<float>(std::cos(Angle) * static_cast<double>(Radius));
                 float const S = static_cast<float>(std::sin(Angle) * static_cast<double>(Radius));
-                if (Selection == 0u) {
+                if (Selection == POS_SEL_XY_PLANE) {
                     Offset.x = C;
                     Offset.y = S;
                     Offset.z = 0.0f;
-                } else if (Selection == 1u) {
+                } else if (Selection == POS_SEL_YZ_PLANE) {
                     Offset.x = 0.0f;
                     Offset.y = C;
                     Offset.z = S;
@@ -986,7 +986,7 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
                     if (Probe != nullptr) {
                         CObject* const Raw = Probe->Object;
                         if (Raw != nullptr &&
-                            (static_cast<unsigned int>(Raw->ObjectClass) & 3u) == 3u)
+                            (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                             Bits = static_cast<CSimple*>(Raw)->TypeBits;
                     }
                 }
@@ -998,7 +998,7 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
                 if ((Id & 0x3fffffffu) != 0) {
                     GameObject* const Obj = Server_LookupLiveObject(Id);
                     if (Obj != nullptr) {
-                        if ((Bits & 2u) != 0) {
+                        if ((Bits & OBJ_PLANET) != 0) {
                             Other = Obj->get_position();
                             Obj->get_atmosphere_range(OtherRadius);
                         } else {
@@ -1053,7 +1053,7 @@ SERVER_API int __cdecl IsPosEmpty(const unsigned int& system_id_ref, const Vecto
         SearchRadius = -1.0f;                                            // .rdata:06d66b14
         System = SysDB_LookupSystem(system_id_ref);                      // looked up again
         if (System != nullptr) {
-            Count2 = System->scan_objects(Ids, 0x400, &pos, SearchRadius, 2);
+            Count2 = System->scan_objects(Ids, 0x400, &pos, SearchRadius, OBJ_PLANET);
             for (unsigned int Index = 0; Index < Count2; ++Index) {
                 Vector Other;
                 Other.x = 0.0f;
@@ -1171,7 +1171,7 @@ SERVER_API int __cdecl Relocate(const unsigned int& obj_id, const unsigned int& 
     }
     if (TargetSystem == OwnSystem) {
         CObject* Raw = Obj->Object;
-        if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 1u) != 1u)
+        if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassObject) != CObject::ClassObject)
             Raw = nullptr;
         Raw->beam_object(pos, orient, false);
         return 0;
@@ -1226,7 +1226,7 @@ SERVER_API int __cdecl DockRequest(const unsigned int& obj_id, const unsigned in
     if (!Obj) return 0;
     // The third argument is the address of four zero bytes.
     static unsigned const ZeroSecondId = 0;   // .rdata:06d66b04
-    return Obj->request_event(0, &target_id, &ZeroSecondId, 1, nullptr);
+    return Obj->request_event(kRequestEventDock, &target_id, &ZeroSecondId, 1, nullptr);
 }
 
 // SpaceObj::Dock -- retail .text:06cfa6e0 (ordinal 0x1a6e0, cdecl). Neither the Ship nor
@@ -1282,7 +1282,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
                 Target->get_type(Block.TargetType);
                 Block.bHasPort = (dock_port != -1) ? 1 : 0;
                 FBehaviorManagerEvent Event;
-                Event.Type = 5;
+                Event.Type = FBehaviorManagerEvent::kEventDockRequest;
                 Event.Data = &Block;
                 Manager->OnEvent(&Event);
             }
@@ -1319,7 +1319,7 @@ SERVER_API int __cdecl InstantDock(const unsigned int& ship_id, const unsigned i
     if (HostEq == nullptr) return -2;
 
     unsigned int const Flags = HostEq->get_type_bits();
-    if (Flags == (Flags & 0xc40u)) {
+    if (Flags == (Flags & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE))) {
         Owner->complete_dock(ShipRw, HostEq);                            // FUN_06d0c970
         return -2;
     }
@@ -1328,7 +1328,7 @@ SERVER_API int __cdecl InstantDock(const unsigned int& ship_id, const unsigned i
     Archetype::EqObj const* const Arch =
         static_cast<Archetype::EqObj const*>(HostCeq->Archetype);
     unsigned int const Kind = Arch->DockingSpheres[dock_port].Type;
-    bool const bLand = !(Kind == 3 || Kind == 4 || Kind == 5);
+    bool const bLand = !(Kind == TERM_MOOR_SMALL || Kind == TERM_MOOR_MEDIUM || Kind == TERM_MOOR_LARGE);
     Owner->queue_dock(ShipRw, HostEq, &HostCeq->DockingPointBaseId, &bLand); // FUN_06d0d370
     return -2;
 }

@@ -37,12 +37,12 @@ struct FShadingPropertyValue
             Type = NewType;
             return;
         }
-        if (Type == 5 || Type == 7)
+        if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
         {
             if (Payload0 != 0)
                 HeapFree(GetProcessHeap(), 0, (void*)Payload0);
         }
-        else if (Type == 6)
+        else if (Type == kMaterialParamComponent)
         {
             IDAComponent* Component = (IDAComponent*)Payload0;
             Payload0 = 0; // Clear before and after the foreign Release callback.
@@ -57,12 +57,12 @@ struct FShadingPropertyValue
     {
         // FUN_06eb1660: only ProcessHeap strings (5/7) and COM values (6)
         // have ownership.  The tag itself deliberately remains unchanged.
-        if (Type == 5 || Type == 7)
+        if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
         {
             if (Payload0 != 0)
                 HeapFree(GetProcessHeap(), 0, (void*)Payload0);
         }
-        else if (Type == 6)
+        else if (Type == kMaterialParamComponent)
         {
             IDAComponent* Component = (IDAComponent*)Payload0;
             Payload0 = 0; // Clear before and after the foreign Release callback.
@@ -79,28 +79,28 @@ struct FShadingPropertyValue
 
         switch (NewType)
         {
-        case 1:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             Payload0 = (unsigned long)Source;
             break;
-        case 2:
+        case kMaterialParamFloat:
             Payload0 = *(const unsigned long*)Source;
             break;
-        case 3:
+        case kMaterialParamVector3:
             Payload2 = ((const unsigned long*)Source)[2];
             Payload1 = ((const unsigned long*)Source)[1];
             Payload0 = ((const unsigned long*)Source)[0];
             break;
-        case 4:
+        case kMaterialParamVector4:
             Payload3 = ((const unsigned long*)Source)[3];
             Payload2 = ((const unsigned long*)Source)[2];
             Payload1 = ((const unsigned long*)Source)[1];
             Payload0 = ((const unsigned long*)Source)[0];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
         {
             // Replace an old string even when the type stays the same.
             if (Payload0 != 0)
@@ -117,7 +117,7 @@ struct FShadingPropertyValue
             }
             break;
         }
-        case 6:
+        case kMaterialParamComponent:
         {
             IDAComponent* Previous = (IDAComponent*)Payload0;
             // Source is a const view; component reference management needs its mutable face.
@@ -155,6 +155,43 @@ static_assert(sizeof(FShadingPropertyRecord) == 0x4C, "retail property record st
 static const char kIidImaData[] = "IMAData";
 static const char kIidImaInstance[] = "IMAInstance";
 
+
+// Index into the pixel-format tables (ITextureLibrary2::GetGroupPixelFormat,
+// IRenderPipeline::GetTextureFormat); DAT_06ed51d8 maps it to the D3DFMT / FourCC value.
+enum ETextureFormatIndex
+{
+    kTextureFormatUnknown = 0,
+    kTextureFormatP8 = 1, // 8-bit palettized: uploads carry a palette
+    kTextureFormatR8G8B8 = 2,
+    kTextureFormatR5G6B5 = 3,
+    kTextureFormatX1R5G5B5 = 4,
+    kTextureFormatA4R4G4B4 = 5,
+    kTextureFormatA1R5G5B5 = 6,
+    kTextureFormatA8R8G8B8 = 7,
+    kTextureFormatX8R8G8B8 = 8,
+    kTextureFormatDxt1 = 10,
+    kTextureFormatDxt2 = 11,
+    kTextureFormatDxt3 = 12,
+    kTextureFormatDxt4 = 13,
+    kTextureFormatDxt5 = 14,
+};
+
+// Wrap mode of a texture playback (ITextureLibrary2::SetWrapMode / GetWrapMode): what happens
+// when the elapsed time leaves [0, duration].
+enum ETexturePlaybackWrap
+{
+    kTextureWrapClamp = 0,    // elapsed time stops at the ends
+    kTextureWrapLoop = 1,     // elapsed time wraps around (fmod by the duration)
+    kTextureWrapPingPong = 2, // the playback direction reverses at the ends
+};
+
+// Frame argument of ITextureLibrary2::GetFrame / GetTextureFrame / SetFrameHandle / SetFrameRect
+// when it is not a frame index.
+enum ETextureFrameSelector
+{
+    kTextureFrameCurrent = -1, // the playback's current frame (GetFrame)
+    kTextureFrameLast = -2,    // the last frame of the record
+};
 
 // Texture groups, records, frames and playback state share one library object.
 struct ITextureLibrary2 : IDAComponent
@@ -294,6 +331,14 @@ struct FMaterialLibraryRecord
     IMaterial* Material;
 };
 
+// Key of a material map rule (IMaterialLibrary::AddMapRule; the "name" selector of the
+// [MaterialMap] ini lines gives 0, everything else 1).
+enum EMaterialMapRuleKey
+{
+    kMapRuleName = 0, // the pattern matches the material name
+    kMapRuleType = 1, // the pattern matches the material type
+};
+
 struct IMaterialLibrary : IDAComponent
 {
     // 3 +0x0C 06ecd1d0: prepend a compiled mapping rule; Key 0 matches
@@ -358,6 +403,23 @@ struct IMaterialBatcherEvents : IDAComponent
     virtual void DACOM_API EndFlush(unsigned char Clear) = 0;                           // 4 +0x10
     virtual void DACOM_API BeginRecord(void* Material, void* FieldA, void* FieldB) = 0; // 5 +0x14
     virtual void DACOM_API EndRecord(void* Material, void* FieldA, void* FieldB) = 0;   // 6 +0x18
+};
+
+// Kind of a batching rule (IMaterialBatcher2::AddRule; the "type" and "name" keys of the
+// [BatchedMaterials] ini section).
+enum EBatchRuleKind
+{
+    kBatchRuleType = 1, // the pattern matches the material type
+    kBatchRuleName = 2, // the pattern matches the material name
+};
+
+// Sort order of a batcher bin (IMaterialBatcher2::SetBinSortKind, ini key Bin1SortOrder).
+enum EBatchSortOrder
+{
+    kBatchSortAscending = 2,           // records by ascending sort key
+    kBatchSortDescending = 3,          // records by descending sort key
+    kBatchSortAscendingTriangles = 4,  // as kBatchSortAscending, then the triangles of every record by ascending depth
+    kBatchSortDescendingTriangles = 5, // as kBatchSortDescending, then the triangles of every record by descending depth
 };
 
 // Queues geometry in two ordered bins and drives flush callbacks.

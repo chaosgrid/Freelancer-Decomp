@@ -293,9 +293,9 @@ static unsigned long MaterialAddressModeBits(unsigned long Flags, int Which)
 // The pair index a type-9 parameter works on (inlined twice): 0 = U, 1 = V.
 static int MaterialAddressModeWhich(unsigned long Flags)
 {
-    if ((Flags & 0x20000) != 0)
+    if ((Flags & kMaterialParamFlagAddressU) != 0)
         return 0;
-    if ((Flags & 0x40000) != 0)
+    if ((Flags & kMaterialParamFlagAddressV) != 0)
         return 1;
     return 0;
 }
@@ -326,7 +326,7 @@ FMaterialParamValue::~FMaterialParamValue()
 
 void FMaterialParamValue::Clear()
 {
-    if (Type == 5 || Type == 7)
+    if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
     {
         if (Value[0] != 0)
         {
@@ -336,7 +336,7 @@ void FMaterialParamValue::Clear()
         Value[0] = 0;
         return;
     }
-    if (Type == 6)
+    if (Type == kMaterialParamComponent)
     {
         IDAComponent* const Com = (IDAComponent*)(DwordToPointer(Value[0]));
         Value[0] = 0;
@@ -384,26 +384,26 @@ FMaterialParamValue& FMaterialParamValue::operator=(const FMaterialParamValue& S
     Type = Src.Type;
     switch (Src.Type)
     {
-    case 1:
-    case 2:
-    case 8:
-    case 9:
+    case kMaterialParamInteger:
+    case kMaterialParamFloat:
+    case kMaterialParamWrapMode:
+    case kMaterialParamAddressMode:
     case 10:
         Value[0] = Src.Value[0];
         break;
-    case 4:
+    case kMaterialParamVector4:
         Value[3] = Src.Value[3];
         // fall through
-    case 3:
+    case kMaterialParamVector3:
         Value[2] = Src.Value[2];
         Value[1] = Src.Value[1];
         Value[0] = Src.Value[0];
         break;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
         DupString((const char*)(DwordToPointer(Src.Value[0])));
         break;
-    case 6:
+    case kMaterialParamComponent:
         SwapCom((IDAComponent*)(DwordToPointer(Src.Value[0])));
         break;
     default:
@@ -420,28 +420,28 @@ void FMaterialParamValue::Set(int InType, unsigned long Arg)
     const unsigned long* const Source = (const unsigned long*)(DwordToPointer(Arg));
     switch (InType)
     {
-    case 1:
-    case 8:
-    case 9:
+    case kMaterialParamInteger:
+    case kMaterialParamWrapMode:
+    case kMaterialParamAddressMode:
     case 10:
         Value[0] = Arg;
         break;
-    case 2:
+    case kMaterialParamFloat:
         Value[0] = Source[0];
         break;
-    case 4:
+    case kMaterialParamVector4:
         Value[3] = Source[3];
         // fall through
-    case 3:
+    case kMaterialParamVector3:
         Value[2] = Source[2];
         Value[1] = Source[1];
         Value[0] = Source[0];
         break;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
         DupString((const char*)(DwordToPointer(Arg)));
         break;
-    case 6:
+    case kMaterialParamComponent:
         SwapCom((IDAComponent*)(DwordToPointer(Arg)));
         break;
     default:
@@ -584,7 +584,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::Initialize(IDAComponent* Outer)
     unsigned long Index = 0;
     while (Index < Count)
     {
-        if (Table[Index].Value.Type == 7)
+        if (Table[Index].Value.Type == kMaterialParamTextureName)
             TextureRowCount += 1;
         Index += 1;
     }
@@ -608,27 +608,27 @@ GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
     while (Index < Count)
     {
         FMaterialParamDesc* const Entry = &Table[Index];
-        if ((Entry->Flags & 1) == 0)
+        if ((Entry->Flags & kMaterialParamFlagNotSaved) == 0)
         {
             FMaterialParamValue Cell(Entry->Value.Type);
             GENRESULT Result = GR_OK;
             switch (Cell.Type)
             {
-            case 1:
+            case kMaterialParamInteger:
                 // FUN_066003a0's body, inlined.
                 Result = MaterialFsReadDword(Fs, Entry->Key, &Cell.Value[0]);
                 break;
-            case 2:
+            case kMaterialParamFloat:
                 Result = MaterialFsReadFloat(Fs, Entry->Key,
                                              (float*)(&Cell.Value[0]));
                 break;
-            case 3:
-            case 4:
+            case kMaterialParamVector3:
+            case kMaterialParamVector4:
                 Result = MaterialFsReadFloats(Fs, Entry->Key, (unsigned long)(Cell.Type),
                                               (float*)(&Cell.Value[0]), nullptr);
                 break;
-            case 5:
-            case 7:
+            case kMaterialParamString:
+            case kMaterialParamTextureName:
             {
                 char* Text;
                 Result = MaterialFsReadBlock(Fs, Entry->Key, 0, &Text);
@@ -639,7 +639,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
                 }
                 break;
             }
-            case 8:
+            case kMaterialParamWrapMode:
             {
                 unsigned long Raw;
                 Result = MaterialFsReadDword(Fs, Entry->Key, &Raw);
@@ -647,7 +647,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
                     Cell.Value[0] = (Raw >> 4) & 0xF;
                 break;
             }
-            case 9:
+            case kMaterialParamAddressMode:
             {
                 unsigned long Raw;
                 Result = MaterialFsReadDword(Fs, Entry->Key, &Raw);
@@ -677,7 +677,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
     while (Index < Count)
     {
         const FMaterialParamDesc* const Entry = &Table[Index];
-        if ((Entry->Flags & 1) == 0)
+        if ((Entry->Flags & kMaterialParamFlagNotSaved) == 0)
         {
             FMaterialParamValue Cell(Entry->Value.Type);
             const unsigned long* const Address =
@@ -690,26 +690,26 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
             {
                 switch (Cell.Type)
                 {
-                case 1:
-                case 2:
-                case 8:
-                case 9:
+                case kMaterialParamInteger:
+                case kMaterialParamFloat:
+                case kMaterialParamWrapMode:
+                case kMaterialParamAddressMode:
                 case 10:
                     Cell.Value[0] = Address[0];
                     break;
-                case 4:
+                case kMaterialParamVector4:
                     Cell.Value[3] = Address[3];
                     // fall through
-                case 3:
+                case kMaterialParamVector3:
                     Cell.Value[2] = Address[2];
                     Cell.Value[1] = Address[1];
                     Cell.Value[0] = Address[0];
                     break;
-                case 5:
-                case 7:
+                case kMaterialParamString:
+                case kMaterialParamTextureName:
                     Cell.DupString((const char*)(DwordToPointer(Address[0])));
                     break;
-                case 6:
+                case kMaterialParamComponent:
                     Cell.SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
                     break;
                 default:
@@ -719,25 +719,25 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                 GENRESULT WriteResult = GR_OK;
                 switch (Cell.Type)
                 {
-                case 1:
-                case 2:
+                case kMaterialParamInteger:
+                case kMaterialParamFloat:
                     WriteResult = MaterialFsWriteDword(Fs, Entry->Key, &Cell.Value[0]);
                     break;
-                case 3:
-                case 4:
+                case kMaterialParamVector3:
+                case kMaterialParamVector4:
                     WriteResult = MaterialFsWriteFloats(Fs, Entry->Key,
                                                         (unsigned long)(Cell.Type),
                                                         &Cell.Value[0]);
                     break;
-                case 5:
-                case 7:
+                case kMaterialParamString:
+                case kMaterialParamTextureName:
                 {
                     const char* const Text = (const char*)(DwordToPointer(Cell.Value[0]));
                     WriteResult = MaterialFsWriteBlock(
                         Fs, Entry->Key, (unsigned long)(std::strlen(Text) + 1), Text);
                     break;
                 }
-                case 8:
+                case kMaterialParamWrapMode:
                 {
                     // The stored dword is read back (result ignored) and only its bits 4..7
                     // replaced.
@@ -747,7 +747,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                     WriteResult = MaterialFsWriteDword(Fs, Entry->Key, &Raw);
                     break;
                 }
-                case 9:
+                case kMaterialParamAddressMode:
                 {
                     // Retail quirk: pair 0 (U) writes bits 0..1 AND then falls into the pair-1
                     // code writing bits 2..3 as well; pair 1 writes bits 2..3.
@@ -792,7 +792,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::ResolveTextures(float /*Delta*/)
         if (Row->Handle == -1)
             Row->Frame = 0;
         else if (Row->bSingleFrame == 0)
-            TextureLib->GetFrame(Row->Handle, -1, &Row->Frame);
+            TextureLib->GetFrame(Row->Handle, kTextureFrameCurrent, &Row->Frame);
         Index += 1;
     }
     return GR_OK;
@@ -812,14 +812,14 @@ GENRESULT DACOM_API FEyeMaterialImpl::Bind(void* Context)
 {
     Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors);
     if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
-        Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
+        Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
     return GR_OK;
 }
 
 GENRESULT DACOM_API FEyeMaterialImpl::Teardown(void* Context)
 {
     if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
-        Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
+        Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
@@ -830,7 +830,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
 {
     FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
     GENRESULT Result;
-    if ((Flags & 0x100) != 0)
+    if ((Flags & kMaterialSubmitUseBuffers) != 0)
     {
         // IRPDraw +0xC with the IB scratch bias.
         Result = Draw->DrawIndexedPrimitive(PrimType, Start, Count, Ctx->IbScratch->Bias + IbStart,
@@ -860,15 +860,15 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
     // The vertex stride from the locked FVF.
     const unsigned long Fvf = Lock.Listing.Fvf;
     unsigned long PositionBytes = 0;
-    if ((Fvf & 0xC) == 0xC)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         PositionBytes = 0x1C;
-    else if ((Fvf & 4) == 4)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         PositionBytes = 0x10;
-    else if ((Fvf & 2) == 2)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
         PositionBytes = 0xC;
-    const unsigned long NormalBytes = (Fvf & 0x10) != 0 ? 0xCu : 0u;
-    unsigned long ColorBytes = (Fvf & 0x40) != 0 ? 4u : 0u;
-    if ((Fvf & 0x80) != 0)
+    const unsigned long NormalBytes = (Fvf & D3DFVF_NORMAL) != 0 ? 0xCu : 0u;
+    unsigned long ColorBytes = (Fvf & D3DFVF_DIFFUSE) != 0 ? 4u : 0u;
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         ColorBytes += 4;
     unsigned long TexBytes = 0;
     unsigned long TexCount = (Fvf >> 8) & 0xF;
@@ -878,16 +878,16 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
         // x86 masks the shift count to five bits.
         switch ((Fvf >> (Shift & 31u)) & 3u)
         {
-        case 0:
+        case D3DFVF_TEXTUREFORMAT2:
             TexBytes += 8;
             break;
-        case 1:
+        case D3DFVF_TEXTUREFORMAT3:
             TexBytes += 0xC;
             break;
-        case 2:
+        case D3DFVF_TEXTUREFORMAT4:
             TexBytes += 0x10;
             break;
-        case 3:
+        case D3DFVF_TEXTUREFORMAT1:
             TexBytes += 4;
             break;
         }
@@ -983,26 +983,26 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, voi
         return GR_GENERIC;
     switch (Out->Type)
     {
-    case 1:
-    case 2:
-    case 8:
-    case 9:
+    case kMaterialParamInteger:
+    case kMaterialParamFloat:
+    case kMaterialParamWrapMode:
+    case kMaterialParamAddressMode:
     case 10:
         Out->Value[0] = Address[0];
         break;
-    case 4:
+    case kMaterialParamVector4:
         Out->Value[3] = Address[3];
         // fall through
-    case 3:
+    case kMaterialParamVector3:
         Out->Value[2] = Address[2];
         Out->Value[1] = Address[1];
         Out->Value[0] = Address[0];
         break;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
         Out->DupString((const char*)(DwordToPointer(Address[0])));
         break;
-    case 6:
+    case kMaterialParamComponent:
         Out->SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
         break;
     default:
@@ -1049,7 +1049,7 @@ GENRESULT FEyeMaterialImpl::UpdateTranslucency()
     if (Result < 0)
         return Result;
     bOneBitAlpha = PixelFormatGetDesc(Format)->Alpha.Bits == 1 ? 1 : 0;
-    if ((Format < 10 || Format > 14) &&
+    if ((Format < kTextureFormatDxt1 || Format > kTextureFormatDxt5) &&
         (unsigned char)(PixelFormatGetDesc(Format)->HasAlpha) == 0)
     {
         bTranslucent = 0;
@@ -1119,11 +1119,11 @@ bool __thiscall FEyeMaterialImpl::ValueWithinDeclaredRange(unsigned long /*Index
     if (Cell->Type != Desc->Value.Type)
         return false;
     int Components = 0;
-    if (Desc->Value.Type == 2)
+    if (Desc->Value.Type == kMaterialParamFloat)
         Components = 1;
-    else if (Desc->Value.Type == 3)
+    else if (Desc->Value.Type == kMaterialParamVector3)
         Components = 3;
-    else if (Desc->Value.Type == 4)
+    else if (Desc->Value.Type == kMaterialParamVector4)
         Components = 4;
     else
         return true;
@@ -1152,23 +1152,23 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
     {
         switch (Cell->Type)
         {
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             Address[0] = Cell->Value[0];
             break;
-        case 4:
+        case kMaterialParamVector4:
             Address[3] = Cell->Value[3];
             // fall through
-        case 3:
+        case kMaterialParamVector3:
             Address[2] = Cell->Value[2];
             Address[1] = Cell->Value[1];
             Address[0] = Cell->Value[0];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
         {
             char** const Text = (char**)(Address);
             if (*Text != nullptr)
@@ -1185,7 +1185,7 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
             }
             break;
         }
-        case 6:
+        case kMaterialParamComponent:
         {
             IDAComponent** const Slot = (IDAComponent**)(Address);
             IDAComponent* const Old = *Slot;
@@ -1309,14 +1309,41 @@ namespace
     };
 
     // .rdata:0660146c -- stage 0 texture-stage states.
-    const FStateValue G_EyeStage0States[] = {{D3DTSS_COLOROP, 4}, {D3DTSS_COLORARG1, 2}, {D3DTSS_COLORARG2, 0}, {D3DTSS_ALPHAOP, 4}, {D3DTSS_ALPHAARG1, 2}, {D3DTSS_ALPHAARG2, 0}, {0, 0}};
+    const FStateValue G_EyeStage0States[] = {
+        {D3DTSS_COLOROP, D3DTOP_MODULATE},
+        {D3DTSS_COLORARG1, D3DTA_TEXTURE},
+        {D3DTSS_COLORARG2, D3DTA_DIFFUSE},
+        {D3DTSS_ALPHAOP, D3DTOP_MODULATE},
+        {D3DTSS_ALPHAARG1, D3DTA_TEXTURE},
+        {D3DTSS_ALPHAARG2, D3DTA_DIFFUSE},
+        {0, 0}
+    };
     // .rdata:066014a4 -- stage 1.
-    const FStateValue G_EyeStage1States[] = {{D3DTSS_COLOROP, 1}, {D3DTSS_COLORARG1, 2}, {D3DTSS_COLORARG2, 1}, {D3DTSS_ALPHAOP, 1}, {D3DTSS_ALPHAARG1, 2}, {D3DTSS_ALPHAARG2, 1}, {0, 0}};
+    const FStateValue G_EyeStage1States[] = {
+        {D3DTSS_COLOROP, D3DTOP_DISABLE},
+        {D3DTSS_COLORARG1, D3DTA_TEXTURE},
+        {D3DTSS_COLORARG2, D3DTA_CURRENT},
+        {D3DTSS_ALPHAOP, D3DTOP_DISABLE},
+        {D3DTSS_ALPHAARG1, D3DTA_TEXTURE},
+        {D3DTSS_ALPHAARG2, D3DTA_CURRENT},
+        {0, 0}
+    };
     // .rdata:0660143c -- render states when translucent.
-    const FStateValue G_EyeBlendStates[] = {{D3DRS_LIGHTING, 1}, {D3DRS_SPECULARENABLE, 0}, {D3DRS_ALPHABLENDENABLE, 1}, {D3DRS_SRCBLEND, 5}, {D3DRS_DESTBLEND, 6},
-                                            {0, 0}};
+    const FStateValue G_EyeBlendStates[] = {
+        {D3DRS_LIGHTING, TRUE},
+        {D3DRS_SPECULARENABLE, FALSE},
+        {D3DRS_ALPHABLENDENABLE, TRUE},
+        {D3DRS_SRCBLEND, D3DBLEND_SRCALPHA},
+        {D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA},
+        {0, 0}
+    };
     // .rdata:0660141c -- render states when opaque.
-    const FStateValue G_EyeOpaqueStates[] = {{D3DRS_LIGHTING, 1}, {D3DRS_SPECULARENABLE, 0}, {D3DRS_ALPHABLENDENABLE, 0}, {0, 0}};
+    const FStateValue G_EyeOpaqueStates[] = {
+        {D3DRS_LIGHTING, TRUE},
+        {D3DRS_SPECULARENABLE, FALSE},
+        {D3DRS_ALPHABLENDENABLE, FALSE},
+        {0, 0}
+    };
 }
 
 static bool EyeUvClampPair(const FUvDeformRecord* Record, const Vector* In, float* OutU,
@@ -1368,7 +1395,7 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
     FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
     Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors); // +0xAC
     if (ContextHasDiffuseStream(Ctx))
-        Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
+        Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
 
     // The first texture row on stage 0: its wrap mode less 4 (0 below 4), the address modes
     // plus 1.
@@ -1421,7 +1448,7 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
         0.0f, 1.0f, V,    0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f};
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
     Pipeline->SetTextureStageTransform(0, Transform);
     Binding->EyeUvTransformCount += 1;
     return GR_OK;
@@ -1431,9 +1458,9 @@ GENRESULT DACOM_API FEyeMaterial::Teardown(void* Context)
 {
     if (Context == nullptr)
         return GR_OK;
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
-        Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
+        Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
@@ -1456,19 +1483,19 @@ unsigned long __thiscall FEyeMaterial::GetParameterTable(void** OutBase)
     {
         const unsigned long Ones = PointerToDword(G_ParamOnes);
         const unsigned long Zeros = PointerToDword(G_ParamZeros);
-        Table[0].Init(3, 0, "Ac", "Ambient Color", G_ParamNoDescription, Ones, Zeros, Ones);
-        Table[1].Init(3, 0, "Dc", "Diffuse Color", G_ParamNoDescription, Ones, Zeros, Ones);
-        Table[2].Init(3, 0, "Ec", "Emissive Color", G_ParamNoDescription, Zeros, Zeros, Ones);
-        Table[3].Init(3, 0, "Sc", "Specular Color", G_ParamNoDescription, Zeros, Zeros, Ones);
-        Table[4].Init(2, 0, "Sp", "Specular Power", G_ParamNoDescription, Zeros, Zeros, Ones);
-        Table[5].Init(2, 0, "Oc", "Opacity ", G_ParamNoDescription, Ones, Zeros, Ones);
-        Table[6].Init(7, 0, "Dt_name", "Texture Name", G_ParamNoDescription,
+        Table[0].Init(kMaterialParamVector3, 0, "Ac", "Ambient Color", G_ParamNoDescription, Ones, Zeros, Ones);
+        Table[1].Init(kMaterialParamVector3, 0, "Dc", "Diffuse Color", G_ParamNoDescription, Ones, Zeros, Ones);
+        Table[2].Init(kMaterialParamVector3, 0, "Ec", "Emissive Color", G_ParamNoDescription, Zeros, Zeros, Ones);
+        Table[3].Init(kMaterialParamVector3, 0, "Sc", "Specular Color", G_ParamNoDescription, Zeros, Zeros, Ones);
+        Table[4].Init(kMaterialParamFloat, 0, "Sp", "Specular Power", G_ParamNoDescription, Zeros, Zeros, Ones);
+        Table[5].Init(kMaterialParamFloat, 0, "Oc", "Opacity ", G_ParamNoDescription, Ones, Zeros, Ones);
+        Table[6].Init(kMaterialParamTextureName, 0, "Dt_name", "Texture Name", G_ParamNoDescription,
                       PointerToDword(G_TextureNameNone), 0, 0);
-        Table[7].Init(8, 0, "Dt_flags", "Texture Wrap Mode", G_ParamNoDescription, 4, 0, 0);
-        Table[8].Init(9, 0x20000, "Dt_flags", "Texture U Address Mode", G_ParamNoDescription, 2,
+        Table[7].Init(kMaterialParamWrapMode, 0, "Dt_flags", "Texture Wrap Mode", G_ParamNoDescription, 4, 0, 0);
+        Table[8].Init(kMaterialParamAddressMode, kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode", G_ParamNoDescription, 2,
                       0, 0);
         // The last one goes through the FUN_065ffc50 constructor.
-        Table[9].Init(9, 0x40000, "Dt_flags", "Texture V Address Mode", G_ParamNoDescription, 2,
+        Table[9].Init(kMaterialParamAddressMode, kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode", G_ParamNoDescription, 2,
                       0, 0);
     }
     if (OutBase != nullptr)
@@ -1481,25 +1508,25 @@ void* __thiscall FEyeMaterial::GetParameterAddress(unsigned long Index)
     // 6..9 are offsets from the row pointer itself (no null test).
     switch (Index)
     {
-    case 0:
+    case kEyeMaterialAmbient:
         return Colors.Ambient;
-    case 1:
+    case kEyeMaterialDiffuse:
         return Colors.Diffuse;
-    case 2:
+    case kEyeMaterialEmissive:
         return Colors.Emissive;
-    case 3:
+    case kEyeMaterialSpecular:
         return Colors.Specular;
-    case 4:
+    case kEyeMaterialSpecularPower:
         return &Colors.Power;
-    case 5:
+    case kEyeMaterialOpacity:
         return &Colors.Diffuse[3];
-    case 6:
+    case kEyeMaterialTextureName:
         return &TextureRows[0].Name;
-    case 7:
+    case kEyeMaterialTextureWrap:
         return &TextureRows[0].WrapMode;
-    case 8:
+    case kEyeMaterialTextureAddressU:
         return &TextureRows[0].AddressU;
-    case 9:
+    case kEyeMaterialTextureAddressV:
         return &TextureRows[0].AddressV;
     default:
         return nullptr;
@@ -1537,7 +1564,7 @@ GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Ou
 {
     // LAB_065fe070. The desc is {0x14, name, outer, inner-out}.
     FAGGDESC14* const Aggregate = (FAGGDESC14*)(Desc);
-    if (Aggregate->Size != 0x14 || std::strcmp(Aggregate->NameAt4, Name) != 0)
+    if (Aggregate->Size != sizeof(FAGGDESC14) || std::strcmp(Aggregate->NameAt4, Name) != 0)
     {
         *Out = nullptr;
         return GR_INTERFACE_UNSUPPORTED;
@@ -1572,7 +1599,7 @@ GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Ou
 void BindEyeMaterials(IMaterialLibrary* MaterialLib)
 {
     RegisterEyeMaterialFactory();
-    MaterialLib->AddMapRule(0, G_EyeMaterialPattern,
+    MaterialLib->AddMapRule(kMapRuleName, G_EyeMaterialPattern,
                                                        G_EyeMaterialName);
 }
 

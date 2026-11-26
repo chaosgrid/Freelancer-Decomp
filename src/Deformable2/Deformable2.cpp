@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "Deformable2.h"
+#include "render/slots.h"
 #include "EyeMaterial.h"     // RegisterEyeMaterialFactory (FUN_065fdfd0)
 #include "common_misc.h"   // ICamera (GetViewTransform +0x40, ClassifySphere +0x3C)
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
@@ -122,7 +123,7 @@ unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)
     FLodHolder* const Holder = Part->Lod;
     const Transform* const View = Camera->GetViewTransform();
     int bHaveView = 1;
-    G_Pipeline->GetPipelineState(7, &bHaveView);
+    G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &bHaveView);
     if (VMeshPart == nullptr)
         return 1;
     if (G_VmeshPaletteSkinning != 0 && Holder->BindCursor > 0)

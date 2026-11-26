@@ -29,7 +29,7 @@
 // RTTI-attested (see common_systemmanager.h).
 // ============================================================================
 PotionHelper::PotionHelper()
-    : State(0)                  // +0x04
+    : State(kPotionStateArmed)  // +0x04
     , Type(0)                   // not written by retail's ctor (see header)
     , EquipId(SUBOBJ_ID_NONE)   // +0x0C
     , Count(0)                  // +0x10
@@ -86,27 +86,27 @@ void PotionHelper::Update(float Dt, IObjRW* Object)
 
     switch (State)
     {
-    case 0:
+    case kPotionStateArmed:
         if (Count <= 0)
             return;
         if (!(GetRatio(Object) <= UseAtRatio))
             return;
         Timer = 0.0f;
-        State = 1;
+        State = kPotionStatePreUseDelay;
         return;
-    case 1:
+    case kPotionStatePreUseDelay:
         // Only greater-or-equal falls through (unordered returns).
         if (!(Elapsed >= PreUseDelay))
             return;
         static_cast<IObjAffect*>(Object)->use_item(EquipId, 1, -1);   // IObjAffect slot 22
         Timer = 0.0f;
-        State = 2;
+        State = kPotionStatePostUseDelay;
         return;
-    case 2:
+    case kPotionStatePostUseDelay:
         if (!(Elapsed >= PostUseDelay))
             return;
         Timer = 0.0f;
-        State = 0;
+        State = kPotionStateArmed;
         return;
     default:
         return;

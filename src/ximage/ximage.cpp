@@ -272,6 +272,7 @@ namespace
             {
                 const char* Iid;
                 unsigned long ByteOffset;
+                enum : unsigned long { kIndirect = 0x80000000u }; // ByteOffset bit: follow the pointer at the offset
             };
             static const FQiEntry Table[] = {
                 {Iids::BigImage2, 0}, // 06f830e4 / 06f830e8
@@ -287,8 +288,8 @@ namespace
                     unsigned char* Base = (unsigned char*)(this);
                     const unsigned long Offset = Table[Index].ByteOffset;
                     IDAComponent* Face = nullptr;
-                    if ((Offset & 0x80000000u) != 0)
-                        Face = *(IDAComponent**)(Base + (Offset & 0x7FFFFFFFu));
+                    if ((Offset & FQiEntry::kIndirect) != 0)
+                        Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
                     else
                         Face = (IDAComponent*)(Base + Offset);
                     Face->AddRef();

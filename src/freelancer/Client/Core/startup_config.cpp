@@ -51,8 +51,8 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     Options->color_bpp = -1;
     Options->depth_bpp = -1;
     Options->stencil_bpp = 0;
-    Options->width = 0x400;
-    Options->height = 0x300;
+    Options->width = 1024;
+    Options->height = 768;
     Options->interval = 1;
     Options->buffer_count = 2;
     Options->border = 1;
@@ -221,36 +221,36 @@ bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLin
             const int Size = MsvcrtAtoi(Tail);
             if (Size > 800)
             {
-                if (Size == 0x400)
+                if (Size == 1024)
                 {
-                    Mode->width = 0x400;
-                    Mode->height = 0x300;
+                    Mode->width = 1024;
+                    Mode->height = 768;
                 }
                 else
                 {
-                    Mode->width = 0x280;
-                    Mode->height = 0x1e0;
+                    Mode->width = 640;
+                    Mode->height = 480;
                 }
             }
             else if (Size == 800)
             {
-                Mode->width = 0x320;
-                Mode->height = 0x258;
+                Mode->width = 800;
+                Mode->height = 600;
             }
-            else if (Size == 0x140)
+            else if (Size == 320)
             {
-                Mode->width = 0x140;
-                Mode->height = 0xf0;
+                Mode->width = 320;
+                Mode->height = 240;
             }
-            else if (Size == 0x200)
+            else if (Size == 512)
             {
-                Mode->width = 0x200;
-                Mode->height = 0x180;
+                Mode->width = 512;
+                Mode->height = 384;
             }
             else
             {
-                Mode->width = 0x280;
-                Mode->height = 0x1e0;
+                Mode->width = 640;
+                Mode->height = 480;
             }
             break;
         }

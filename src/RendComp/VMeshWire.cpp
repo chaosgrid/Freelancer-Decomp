@@ -96,7 +96,7 @@ public:
                                    Blob->Count);
         G_IndexBuffer->SelectIb(ScratchIb, Blob->IbBias + Listing.BaseVertex, 0, 0);
         IRPDraw* Draw = G_Draw;
-        return Draw->DrawIndexedPrimitive(2, 0, Blob->NumVertices, StartIndex, Blob->Count);
+        return Draw->DrawIndexedPrimitive(D3DPT_LINELIST, 0, Blob->NumVertices, StartIndex, Blob->Count);
     }
 
     // FUN_06c2f7e0 (thiscall in retail): the VMeshData header for the blob's CRC, or 0.
@@ -262,12 +262,12 @@ int DACOM_API FVMeshWire::CreateArchetype(ArchetypeIndex Archetype, IFileSystem*
     FFileSystemDesc Desc;
     std::memset(&Desc, 0, sizeof(Desc));
     Desc.ComponentName = "FileSystem";
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.Path = "VWireData";
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.FindHandle = 0xFFFFFFFF;
     void* Blob = nullptr;
     int bRead = 0;

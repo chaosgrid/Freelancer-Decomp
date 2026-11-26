@@ -35,6 +35,23 @@ struct FPlayerStatsRepEntry
 };
 static_assert(sizeof(FPlayerStatsRepEntry) == 8, "player-stats reputation entry is 8 bytes");
 
+// Why the buy limit of GetMaxBuyCount / NnDealer::Update is 0 (the *OutReason value; 0 = none).
+enum EBuyLimitReason
+{
+    kBuyReasonNone = 0,
+    kBuyReasonHoldFull = 1,           // no cargo room
+    kBuyReasonNoCredits = 2,
+    kBuyReasonNoShip = 3,
+    kBuyReasonShipHoldFull = 4,       // the ship dealer: the selected item does not fit the hold
+    kBuyReasonRankTooLow = 5,         // single player: the player's rank is below the good's
+    kBuyReasonFeelingTooLow = 6,      // the base's feeling is below the good's required feeling
+    kBuyReasonNoHardpoint = 7,        // the partner's ship has no hardpoint for the good
+    kBuyReasonNoFreeHardpoint = 8,
+    kBuyReasonNanobotLimit = 9,       // the ship's nanobot cap
+    kBuyReasonShieldBatteryLimit = 10, // the ship's shield battery cap
+    kBuyReasonAmmoLimit = 11          // MAX_PLAYER_AMMO
+};
+
 class NnDealer : public NnInventory
 {
 public:

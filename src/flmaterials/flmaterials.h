@@ -141,6 +141,21 @@ protected:
 };
 static_assert(sizeof(FMaterialImpl) == 0x68, "the common material part is 0x68 bytes");
 
+// FGenericPropertyMaterial parameter ids (the rows of its property schema).
+enum EGenericPropertyParam
+{
+    kGenericPropertyAmbient = 0,
+    kGenericPropertyDiffuse = 1,
+    kGenericPropertyEmissive = 2,
+    kGenericPropertySpecular = 3,
+    kGenericPropertySpecularPower = 4,
+    kGenericPropertyOpacity = 5,
+    kGenericPropertyTextureName = 6,
+    kGenericPropertyTextureWrap = 7,
+    kGenericPropertyTextureAddressU = 8,
+    kGenericPropertyTextureAddressV = 9,
+};
+
 // The seven classes whose GetParameterAddress is retail's shared 066f7f70 map.
 class FGenericPropertyMaterial : public FMaterialImpl
 {
@@ -183,6 +198,22 @@ public:
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f3ff0
     const char* __thiscall ClassName() override;
     unsigned long __thiscall GetParameterTable(void** OutBase) override;           // 066f37d0
+};
+
+// FColorizeMaterial parameter ids: the generic rows, then the "flcopt" options dword.
+enum EColorizeParam
+{
+    kColorizeAmbient = 0,
+    kColorizeDiffuse = 1,
+    kColorizeEmissive = 2,
+    kColorizeSpecular = 3,
+    kColorizeSpecularPower = 4,
+    kColorizeOpacity = 5,
+    kColorizeTextureName = 6,
+    kColorizeTextureWrap = 7,
+    kColorizeTextureAddressU = 8,
+    kColorizeTextureAddressV = 9,
+    kColorizeOptions = 10,
 };
 
 // "ColorizeMaterial" (object vtable 067017c0).
@@ -284,6 +315,20 @@ public:
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f8010
     const char* __thiscall ClassName() override;
     unsigned long __thiscall GetParameterTable(void** OutBase) override;           // 066f7c10
+};
+
+// FNomadMaterial parameter ids: diffuse colour, diffuse texture, then the "nt" texture.
+enum ENomadParam
+{
+    kNomadDiffuse = 0,
+    kNomadDiffuseTextureName = 1,
+    kNomadDiffuseTextureWrap = 2,
+    kNomadDiffuseTextureAddressU = 3,
+    kNomadDiffuseTextureAddressV = 4,
+    kNomadNomadTextureName = 5,
+    kNomadNomadTextureWrap = 6,
+    kNomadNomadTextureAddressU = 7,
+    kNomadNomadTextureAddressV = 8,
 };
 
 // "NomadMaterial" / "NomadMaterialNoBendy" (object vtable 06702160).

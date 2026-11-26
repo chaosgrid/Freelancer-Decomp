@@ -104,29 +104,29 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         bool const bCanSkip = G_GfScriptManager.CanSkipAll();
         if (bCanSkip && bDocked)
         {
-            ButtonAction[1] = 2;
-            ButtonAction[2] = 3;
-            ButtonAction[3] = 4;
-            ButtonAction[4] = 5;
+            ButtonAction[1] = kPauseActionSave;
+            ButtonAction[2] = kPauseActionLoad;
+            ButtonAction[3] = kPauseActionOptions;
+            ButtonAction[4] = kPauseActionMainMenu;
             Count = 5;
         }
         else
         {
-            ButtonAction[1] = 3;
-            ButtonAction[2] = 4;
-            ButtonAction[3] = 5;
+            ButtonAction[1] = kPauseActionLoad;
+            ButtonAction[2] = kPauseActionOptions;
+            ButtonAction[3] = kPauseActionMainMenu;
             Count = 4;
         }
     }
     else
     {
-        ButtonAction[1] = 6;
+        ButtonAction[1] = kPauseActionExitGame;
         ButtonAction[2] = 7;
-        ButtonAction[3] = 4;
-        ButtonAction[4] = 5;
+        ButtonAction[3] = kPauseActionOptions;
+        ButtonAction[4] = kPauseActionMainMenu;
         Count = 5;
     }
-    ButtonAction[0] = 1;
+    ButtonAction[0] = kPauseActionResume;
 
     // Row origin / step: 0.149 / 0.0825, or 0.128375 / 0.09625 for four rows.
     float RowOrigin = NnFloatBits(0x3e189375);
@@ -188,12 +188,12 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         unsigned ToolTipIds = 0;
         switch (ButtonAction[Index])
         {
-        case 1: CaptionIds = 0x71d; ToolTipIds = 0x33a; break;
-        case 2: CaptionIds = 0x71e; ToolTipIds = 0x33b; break;
-        case 3: CaptionIds = 0x71f; ToolTipIds = 0x33c; break;
-        case 4: CaptionIds = 0x720; ToolTipIds = 0x33d; break;
-        case 5: CaptionIds = 0x721; ToolTipIds = 0x33e; break;
-        case 6: CaptionIds = 0x752; ToolTipIds = 0x33f; break;
+        case kPauseActionResume: CaptionIds = 0x71d; ToolTipIds = 0x33a; break;
+        case kPauseActionSave: CaptionIds = 0x71e; ToolTipIds = 0x33b; break;
+        case kPauseActionLoad: CaptionIds = 0x71f; ToolTipIds = 0x33c; break;
+        case kPauseActionOptions: CaptionIds = 0x720; ToolTipIds = 0x33d; break;
+        case kPauseActionMainMenu: CaptionIds = 0x721; ToolTipIds = 0x33e; break;
+        case kPauseActionExitGame: CaptionIds = 0x752; ToolTipIds = 0x33f; break;
         case 7: CaptionIds = 0x725; ToolTipIds = 0x340; break;
         default: continue;
         }
@@ -302,20 +302,20 @@ void NnPause::DoAction(int Action)
     switch (Action)
     {
     case 0:
-    case 1:
+    case kPauseActionResume:
         ResumeAndDelete();
         return;
-    case 2:
-    case 3:
+    case kPauseActionSave:
+    case kPauseActionLoad:
     {
         // Save / load. The window is deleted before the load/save one opens.
         SetClientServerTickPause(true);
         ResumeAndDelete();
-        OpenNnLoadSave(Action == 2 ? 2 : 1);
+        OpenNnLoadSave(Action == kPauseActionSave ? kNnLoadSaveModeSave : kNnLoadSaveModeLoad);
         SetClientServerTickPause(false);
         return;
     }
-    case 4:
+    case kPauseActionOptions:
     {
         SetClientServerTickPause(true);
         ResumeAndDelete();
@@ -326,12 +326,12 @@ void NnPause::DoAction(int Action)
         SetClientServerTickPause(false);
         return;
     }
-    case 5:
+    case kPauseActionMainMenu:
         // "Quit?"; the answer comes back through slot 23 (0x3006).
         GetIdsStringWWithRawFallback(0x75b, Text, 0x400);
         NnConfirmOpen(this, Text, nullptr);
         return;
-    case 6:
+    case kPauseActionExitGame:
         MenuNavSetIntroModeRequest(2); // DAT_0067c200
         HudPostCommand(USER_EXIT_GAME, 0);
         ResumeAndDelete();

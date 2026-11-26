@@ -35,18 +35,18 @@ static const D3DRENDERSTATETYPE kRsZFunc = D3DRS_ZFUNC;
 static const D3DRENDERSTATETYPE kRsCullMode = D3DRS_CULLMODE;
 static const D3DRENDERSTATETYPE kRsAlphaTestEnable = D3DRS_ALPHATESTENABLE;
 
-static const unsigned long kTssColorOp = 1;
-static const unsigned long kTssColorArg1 = 2;
-static const unsigned long kTssColorArg2 = 3;
-static const unsigned long kTssAlphaOp = 4;
-static const unsigned long kTssAlphaArg1 = 5;
-static const unsigned long kTssAlphaArg2 = 6;
-static const unsigned long kTssTexCoordIndex = 0xB;
-static const unsigned long kTssAddressU = 0xD;
-static const unsigned long kTssAddressV = 0xE;
+static const unsigned long kTssColorOp = D3DTSS_COLOROP;
+static const unsigned long kTssColorArg1 = D3DTSS_COLORARG1;
+static const unsigned long kTssColorArg2 = D3DTSS_COLORARG2;
+static const unsigned long kTssAlphaOp = D3DTSS_ALPHAOP;
+static const unsigned long kTssAlphaArg1 = D3DTSS_ALPHAARG1;
+static const unsigned long kTssAlphaArg2 = D3DTSS_ALPHAARG2;
+static const unsigned long kTssTexCoordIndex = D3DTSS_TEXCOORDINDEX;
+static const unsigned long kTssAddressU = D3DTSS_ADDRESSU;
+static const unsigned long kTssAddressV = D3DTSS_ADDRESSV;
 
 // DAT_06ed4848 dword[4]: NONE stays, CW↔CCW. Indexed by D3DRS_CULLMODE (0x16).
-static const unsigned long kCullFlip[4] = {0, 1, 3, 2};
+static const unsigned long kCullFlip[4] = {0, D3DCULL_NONE, D3DCULL_CCW, D3DCULL_CW};
 
 // FShadingPropertyValue / FShadingPropertyRecord (FUN_06eb28f0, stride 0x4C) live in
 // render/shading.h because freelancer.exe's SwappedMaterial reads them.
@@ -69,25 +69,26 @@ inline GENRESULT PipeGetTextureFormat(IRenderPipeline* Pipeline, unsigned long H
 static const unsigned long kPixelFormatAlphaBits[15] = {
     0, 0, 0, 0, 0, 4, 1, 8, 0, 0, 1, 0, 0, 0, 0};
 static const unsigned char kPixelFormatHasAlpha[15] = {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1};
-static const int kDxtFormatIndexMin = 10;
-static const int kDxtFormatIndexMax = 14;
+static const int kDxtFormatIndexMin = kTextureFormatDxt1;
+static const int kDxtFormatIndexMax = kTextureFormatDxt5;
 static const int kPixelFormatFourCcCount = 22;
 // DAT_06ed51d8 — FUN_06ed0b50 / FUN_06ed0b80 (ids 9…21).
 static const unsigned long kPixelFormatFourCc[22] = {
-    0, 0x29, 0x14, 0x17, 0x18, 0x1A, 0x19, 0x15, 0x16, 0, 0x31545844u, 0x32545844u,
-    0x33545844u, 0x34545844u, 0x35545844u, 0x504F4144u, 0x544F4144u, 0x41414144u,
-    0x4C414144u, 0x31414144u, 0x34414144u, 0x38414144u};
+    D3DFMT_UNKNOWN, D3DFMT_P8, D3DFMT_R8G8B8, D3DFMT_R5G6B5, D3DFMT_X1R5G5B5, D3DFMT_A4R4G4B4,
+    D3DFMT_A1R5G5B5, D3DFMT_A8R8G8B8, D3DFMT_X8R8G8B8, D3DFMT_UNKNOWN, D3DFMT_DXT1, D3DFMT_DXT2,
+    D3DFMT_DXT3, D3DFMT_DXT4, D3DFMT_DXT5, 0x504F4144u, 0x544F4144u, 0x41414144u, 0x4C414144u,
+    0x31414144u, 0x34414144u, 0x38414144u};
 
 inline unsigned long PixelFormatAlphaBits(int FormatIndex)
 {
-    if (FormatIndex < 0 || FormatIndex > 14)
+    if (FormatIndex < 0 || FormatIndex > kTextureFormatDxt5)
         return kPixelFormatAlphaBits[0];
     return kPixelFormatAlphaBits[FormatIndex];
 }
 
 inline unsigned char PixelFormatHasAlpha(int FormatIndex)
 {
-    if (FormatIndex < 0 || FormatIndex > 14)
+    if (FormatIndex < 0 || FormatIndex > kTextureFormatDxt5)
         return kPixelFormatHasAlpha[0];
     return kPixelFormatHasAlpha[FormatIndex];
 }
@@ -139,11 +140,11 @@ inline GENRESULT RpDrawIndexed(void* Draw, unsigned long Prim, unsigned long Min
 inline unsigned long FvfPosSize(unsigned long Fvf)
 {
     const unsigned char Bits = (unsigned char)Fvf;
-    if ((Bits & 0xC) == 0xC)
+    if ((Bits & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         return 0x1C;
-    if ((Bits & 4) == 4)
+    if ((Bits & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         return 0x10;
-    if ((Bits & 2) == 2)
+    if ((Bits & D3DFVF_XYZ) == D3DFVF_XYZ)
         return 0xC;
     return 0;
 }
@@ -152,9 +153,9 @@ inline unsigned long FvfPosSize(unsigned long Fvf)
 inline unsigned long FvfColorSize(unsigned long Fvf)
 {
     unsigned long Size = 0;
-    if ((Fvf & 0x40) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         Size = 4;
-    if ((Fvf & 0x80) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         Size += 4;
     return Size;
 }
@@ -169,16 +170,16 @@ inline unsigned long FvfTexSize(unsigned long Fvf)
     {
         switch ((Fvf >> (Shift & 0x1F)) & 3)
         {
-        case 0:
+        case D3DFVF_TEXTUREFORMAT2:
             Size += 8;
             break;
-        case 1:
+        case D3DFVF_TEXTUREFORMAT3:
             Size += 0xC;
             break;
-        case 2:
+        case D3DFVF_TEXTUREFORMAT4:
             Size += 0x10;
             break;
-        case 3:
+        case D3DFVF_TEXTUREFORMAT1:
             Size += 4;
             break;
         }
@@ -190,7 +191,7 @@ inline unsigned long FvfTexSize(unsigned long Fvf)
 
 inline unsigned long FvfNormalSize(unsigned long Fvf)
 {
-    if ((Fvf & 0x10) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
         return 0xC;
     return 0;
 }
@@ -307,13 +308,13 @@ inline void InitializeShadingFileDesc(FFileSystemDesc* Desc, const char* Path,
                                       const char* ComponentName = "FileSystem")
 {
     std::memset(Desc, 0, sizeof(*Desc));
-    Desc->Size = 0x34;
+    Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc->ComponentName = ComponentName;
     Desc->Path = Path;
-    Desc->Access = 0x80000000;
-    Desc->ShareMode = 1;
-    Desc->Creation = 3;
-    Desc->Flags = 0x08000080;
+    Desc->Access = GENERIC_READ;
+    Desc->ShareMode = FILE_SHARE_READ;
+    Desc->Creation = OPEN_EXISTING;
+    Desc->Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
@@ -351,8 +352,8 @@ inline bool WriteNamedBytes(void* FileSystem, const char* Name, const void* Buff
     FFileSystemDesc Desc;
     InitializeShadingFileDesc(&Desc, Name);
     Desc.Implementation = "UTF";
-    Desc.Access = 0xC0000000;
-    Desc.Creation = 2;
+    Desc.Access = GENERIC_READ | GENERIC_WRITE;
+    Desc.Creation = CREATE_ALWAYS;
     const int Handle = FileSystemOpenByDesc(FileSystem, &Desc);
     if (Handle == -1)
         return false;
@@ -445,7 +446,7 @@ struct FTextureEntry
 
 struct FMaterialMapRule
 {
-    int Key = 1;
+    int Key = kMapRuleType;
     bool bNamePattern = false;
     std::unique_ptr<FMaterialRegex> Expression;
     std::string Pattern;

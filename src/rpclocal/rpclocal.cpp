@@ -207,8 +207,8 @@ static void RpcSendToServer(IServerImpl* Self, unsigned int Channel, unsigned in
                             const unsigned int* Args, unsigned int ArgCount, FRpcMarshalFn MarshalOverride) {
     FRpcMarshalFn Marshal = MarshalOverride;
     if (Marshal == nullptr) {
-        if (Channel == 3u) {
-            Marshal = RpcFindServerCodec(3u, Opcode)->Marshal;
+        if (Channel == kPacketChannelClient) {
+            Marshal = RpcFindServerCodec(kPacketChannelClient, Opcode)->Marshal;
         } else {
             Marshal = RpcFindPayloadCodec(Channel, Opcode)->Marshal;
         }
@@ -240,54 +240,54 @@ static void RpcSendToServer(IServerImpl* Self, unsigned int Channel, unsigned in
 // zero, because the IServerImpl senders write fewer fields than their IClient twins.
 static void RpcSendTradeToServer(IServerImpl* Self, unsigned int SubType, unsigned int A1, unsigned int A2) {
     const unsigned int Args[3] = { SubType, A1, A2 };
-    RpcSendToServer(Self, 1u, 0x12u, Args, 3u, nullptr);
+    RpcSendToServer(Self, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), Args, 3u, nullptr);
 }
 
 // === Slots 0-8: combat and ship control (channel 1) ===
 void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info) {
     // retail 0x06d8ddd0: ch1 op 0x02 FLPACKET_COMMON_FIREWEAPON
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x02u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON), Args, 2u);
 }
 void IServerImpl::ActivateEquip(unsigned int player_id, const XActivateEquip& info) {
     // retail 0x06d8e6c0: ch1 op 0x08 FLPACKET_COMMON_ACTIVATEEQUIP
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x08u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP), Args, 2u);
 }
 void IServerImpl::ActivateCruise(unsigned int player_id, const XActivateCruise& info) {
     // retail 0x06d8e7c0: ch1 op 0x0e FLPACKET_COMMON_ACTIVATECRUISE
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x0eu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE), Args, 2u);
 }
 void IServerImpl::ActivateThrusters(unsigned int player_id, const XActivateThrusters& info) {
     // retail 0x06d8e810: ch1 op 0x15 FLPACKET_COMMON_ACTIVATETHRUSTERS
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x15u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS), Args, 2u);
 }
 void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info) {
     // retail 0x06d8ea30: ch1 op 0x04 FLPACKET_COMMON_SETTARGET
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x04u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SETTARGET), Args, 2u);
 }
 void IServerImpl::TractorObjects(unsigned int player_id, const XTractorObjects& info) {
     // retail 0x06d8e860: ch1 op 0x1d FLPACKET_COMMON_TRACTOROBJECTS
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x1du, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS), Args, 2u);
 }
 void IServerImpl::GoTradelane(unsigned int player_id, const XGoTradelane& info) {
     // retail 0x06d8e710: ch1 op 0x0f FLPACKET_COMMON_GOTRADELANE
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x0fu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE), Args, 2u);
 }
 void IServerImpl::StopTradelane(unsigned int session_id, unsigned int ship_id, unsigned int entrance_ring_id, unsigned int exit_ring_id) {
     // retail 0x06d8e770: ch1 op 0x10. Serializes the three arguments after the session id.
     const unsigned int Args[4] = { session_id, ship_id, entrance_ring_id, exit_ring_id };
-    RpcSendToServer(this, 1u, 0x10u, Args, 4u, RpcMarshalAs<MarshalServerStopTradelane>);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_STOPTRADELANE), Args, 4u, RpcMarshalAs<MarshalServerStopTradelane>);
 }
 void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info) {
     // retail 0x06d8ea90: ch1 op 0x14 FLPACKET_COMMON_JETTISONCARGO
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x14u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO), Args, 2u);
 }
 
 // === Slots 9-12: core lifecycle (NOT serialized -- direct Server.dll calls) ===
@@ -458,65 +458,65 @@ void IServerImpl::GetServerStats(ServerStats& /*Stats*/) {
 void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
     // retail 0x06d8cc70: ch3 op 0x01 FLPACKET_CLIENT_LOGIN
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x01u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_LOGIN), Args, 2u);
 }
 void IServerImpl::CharacterInfoReq(unsigned int session_id, bool bSendEmpty) {
     // retail 0x06d8cd00: ch3 op 0x05, payload 0 -- the flag is not serialized
     const unsigned int Args[2] = { session_id, bSendEmpty ? 1u : 0u };
-    RpcSendToServer(this, 3u, 0x05u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTCHARINFO), Args, 2u);
 }
 void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int session_id) {
     // retail 0x06d8cd60: ch3 op 0x06, serializes the CHARACTER_ID string
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&char_id), session_id };
-    RpcSendToServer(this, 3u, 0x06u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SELECTCHARACTER), Args, 2u);
 }
 void IServerImpl::NewCharacterInfoReq(unsigned int session_id) {
     // retail 0x06d8cdc0: ch3 op 0x38, payload 0
     const unsigned int Args[1] = { session_id };
-    RpcSendToServer(this, 3u, 0x38u, Args, 1u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTNEWCHARINFO), Args, 1u);
 }
 void IServerImpl::CreateNewCharacter(const SCreateCharacterInfo& info, unsigned int session_id) {
     // retail 0x06d8cdf0: ch3 op 0x39, wcsncpy of info.Name plus the four dwords at +0x30
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x39u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_CREATENEWCHAR), Args, 2u);
 }
 void IServerImpl::DestroyCharacter(const CHARACTER_ID& char_id, unsigned int session_id) {
     // retail 0x06d8ce90: ch3 op 0x3a
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&char_id), session_id };
-    RpcSendToServer(this, 3u, 0x3au, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DESTROYCHAR), Args, 2u);
 }
 void IServerImpl::CharacterSkipAutosave(unsigned int session_id) {
     // retail 0x06d8cd30: ch3 op 0x42, payload 0
     const unsigned int Args[1] = { session_id };
-    RpcSendToServer(this, 3u, 0x42u, Args, 1u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SKIP_AUTOSAVE), Args, 1u);
 }
 
 // === Slots 25-32: ship and equipment requests ===
 void IServerImpl::ReqShipArch(unsigned int arch_id, unsigned int session_id) {
     // retail 0x06d8ced0: ch3 op 0x15, serializes arch_id only
     const unsigned int Args[2] = { arch_id, session_id };
-    RpcSendToServer(this, 3u, 0x15u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQSHIPARCH), Args, 2u);
 }
 void IServerImpl::ReqHullStatus(float hull_status, unsigned int session_id) {
     // retail 0x06d8cf10: ch3 op 0x3b, one dword -- a float, read back with FLD
     const unsigned int Args[2] = { RpcFloatBits(hull_status), session_id };
-    RpcSendToServer(this, 3u, 0x3bu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQHULLSTATUS), Args, 2u);
 }
 void IServerImpl::ReqCollisionGroups(const std::list<CollisionGroupDesc>& groups, unsigned int session_id) {
     // retail 0x06d8cf50: ch3 op 0x36; FUN_06d8f710 deep-copies the list node by node
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&groups), session_id };
-    RpcSendToServer(this, 3u, 0x36u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCOLLISIONGROUPS), Args, 2u);
 }
 void IServerImpl::ReqEquipment(const EquipDescList& equipment, unsigned int session_id) {
     // retail 0x06d8cf90: ch3 op 0x16; walks the list and copies 0x18 bytes per element
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&equipment), session_id };
-    RpcSendToServer(this, 3u, 0x16u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQEQUIPMENT), Args, 2u);
 }
 void IServerImpl::ReqCargo(const EquipDescList& cargo, unsigned int session_id) {
     // retail 0x06d8d0e0: ch3 op 0x17. This is the REAL slot 29 -- the old "Connect2"
     // entry here was a fabricated duplicate of Connect.
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&cargo), session_id };
-    RpcSendToServer(this, 3u, 0x17u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCARGO), Args, 2u);
 }
 void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int count, float health,
                 unsigned char b_mounted, unsigned int session_id) {
@@ -525,12 +525,12 @@ void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int co
         arch_id, reinterpret_cast<unsigned int>(hardpoint), (unsigned int)count,
         RpcFloatBits(health), static_cast<unsigned int>(b_mounted), session_id
     };
-    RpcSendToServer(this, 3u, 0x18u, Args, 6u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQADDITEM), Args, 6u);
 }
 void IServerImpl::ReqRemoveItem(unsigned short equip_id, int count, unsigned int session_id) {
     // retail 0x06d8d2b0: ch3 op 0x19
     const unsigned int Args[3] = { (unsigned int)equip_id, (unsigned int)count, session_id };
-    RpcSendToServer(this, 3u, 0x19u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQREMOVEITEM), Args, 3u);
 }
 void IServerImpl::ReqModifyItem(unsigned short equip_id, const char* hardpoint, int count, float health,
                    unsigned char b_mounted, unsigned int session_id) {
@@ -539,114 +539,114 @@ void IServerImpl::ReqModifyItem(unsigned short equip_id, const char* hardpoint, 
         (unsigned int)equip_id, reinterpret_cast<unsigned int>(hardpoint), (unsigned int)count,
         RpcFloatBits(health), static_cast<unsigned int>(b_mounted), session_id
     };
-    RpcSendToServer(this, 3u, 0x1au, Args, 6u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQMODIFYITEM), Args, 6u);
 }
 
 // === Slots 33-34: cash (int, not float) ===
 void IServerImpl::ReqSetCash(int cash, unsigned int session_id) {
     // retail 0x06d8d380: ch3 op 0x1b
     const unsigned int Args[2] = { (unsigned int)cash, session_id };
-    RpcSendToServer(this, 3u, 0x1bu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQSETCASH), Args, 2u);
 }
 void IServerImpl::ReqChangeCash(int delta, unsigned int session_id) {
     // retail 0x06d8d3c0: ch3 op 0x1c
     const unsigned int Args[2] = { (unsigned int)delta, session_id };
-    RpcSendToServer(this, 3u, 0x1cu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCHANGECASH), Args, 2u);
 }
 
 // === Slots 35-40: base and location ===
 void IServerImpl::BaseEnter(unsigned int base_id, unsigned int session_id) {
     // retail 0x06d8d480: ch3 op 0x07, serializes base_id only
     const unsigned int Args[2] = { base_id, session_id };
-    RpcSendToServer(this, 3u, 0x07u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ENTERBASE), Args, 2u);
 }
 void IServerImpl::BaseExit(unsigned int base_id, unsigned int session_id) {
     // retail 0x06d8d4c0: ch3 op 0x0d
     const unsigned int Args[2] = { base_id, session_id };
-    RpcSendToServer(this, 3u, 0x0du, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_EXITBASE), Args, 2u);
 }
 void IServerImpl::LocationEnter(unsigned int location_id, unsigned int session_id) {
     // retail 0x06d8d400: ch3 op 0x0e
     const unsigned int Args[2] = { location_id, session_id };
-    RpcSendToServer(this, 3u, 0x0eu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ENTERLOCATION), Args, 2u);
 }
 void IServerImpl::LocationExit(unsigned int location_id, unsigned int session_id) {
     // retail 0x06d8d440: ch3 op 0x0f
     const unsigned int Args[2] = { location_id, session_id };
-    RpcSendToServer(this, 3u, 0x0fu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_EXITLOCATION), Args, 2u);
 }
 void IServerImpl::BaseInfoRequest(unsigned int base_id, unsigned int session_id, bool b_full) {
     // retail 0x06d8d500: ch3 op 0x08, serializes base_id and b_full
     const unsigned int Args[3] = { base_id, session_id, b_full ? 1u : 0u };
-    RpcSendToServer(this, 3u, 0x08u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTBASEINFO), Args, 3u);
 }
 void IServerImpl::LocationInfoRequest(unsigned int location_id, unsigned int session_id, bool b_full) {
     // retail 0x06d8d550: ch3 op 0x09
     const unsigned int Args[3] = { location_id, session_id, b_full ? 1u : 0u };
-    RpcSendToServer(this, 3u, 0x09u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTLOCATIONINFO), Args, 3u);
 }
 
 // === Slots 41-46: GF events ===
 void IServerImpl::GFObjSelect(unsigned int object_id, unsigned int session_id) {
     // retail 0x06d8da40: ch3 op 0x13, serializes object_id only
     const unsigned int Args[2] = { object_id, session_id };
-    RpcSendToServer(this, 3u, 0x13u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFSELECTOBJECT), Args, 2u);
 }
 void IServerImpl::GFGoodVaporized(const SGFGoodVaporizedInfo& info, unsigned int session_id) {
     // retail 0x06d8d650: ch3 op 0x3c, the struct's first three dwords
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x3cu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODVAPORIZED), Args, 2u);
 }
 void IServerImpl::MissionResponse(unsigned int OfferId, unsigned long OfferKind, unsigned char bAccepted, unsigned int SessionId) {
     // retail 0x06d8da80: ch3 op 0x14
     const unsigned int Args[4] = {
         OfferId, static_cast<unsigned int>(OfferKind), bAccepted, SessionId
     };
-    RpcSendToServer(this, 3u, 0x14u, Args, 4u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MISSIONRESPONSE), Args, 4u);
 }
 void IServerImpl::TradeResponse(const unsigned char* data, int size, unsigned int session_id) {
     // retail 0x06d8dad0: ch3 op 0x27, the blob is copied into the packet
     const unsigned int Args[3] = {
         reinterpret_cast<unsigned int>(data), (unsigned int)size, session_id
     };
-    RpcSendToServer(this, 3u, 0x27u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_TRADERESPONSE), Args, 3u);
 }
 void IServerImpl::GFGoodBuy(const SGFGoodBuyInfo& info, unsigned int session_id) {
     // retail 0x06d8d5a0: ch3 op 0x12, the struct's first four dwords
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x12u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODBUY), Args, 2u);
 }
 void IServerImpl::GFGoodSell(const SGFGoodSellInfo& info, unsigned int session_id) {
     // retail 0x06d8d600: ch3 op 0x11, the struct's first three dwords
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x11u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODSELL), Args, 2u);
 }
 
 // === Slots 47-51: system and launch ===
 void IServerImpl::SystemSwitchOutComplete(unsigned int ship_object_id, unsigned int session_id) {
     // retail 0x06d8d6a0: ch3 op 0x0b
     const unsigned int Args[2] = { ship_object_id, session_id };
-    RpcSendToServer(this, 3u, 0x0bu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE), Args, 2u);
 }
 void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
     // retail 0x06d8da00: ch3 op 0x04
     const unsigned int Args[2] = { ship_id, session_id };
-    RpcSendToServer(this, 3u, 0x04u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTLAUNCH), Args, 2u);
 }
 void IServerImpl::LaunchComplete(unsigned int base_obj_id, unsigned int ship_id) {
     // retail 0x06d8d8e0: ch3 op 0x3e, serializes BOTH arguments
     const unsigned int Args[2] = { base_obj_id, ship_id };
-    RpcSendToServer(this, 3u, 0x3eu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_LAUNCHCOMPLETE), Args, 2u);
 }
 void IServerImpl::JumpInComplete(unsigned int system_id, unsigned int ship_id) {
     // retail 0x06d8d930: ch3 op 0x43, serializes BOTH arguments
     const unsigned int Args[2] = { system_id, ship_id };
-    RpcSendToServer(this, 3u, 0x43u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_JUMPINCOMPLETE), Args, 2u);
 }
 void IServerImpl::Hail(unsigned int ship_id, unsigned int target_id, unsigned int system_id) {
     // retail 0x06d8d980: ch3 op 0x3f, serializes all three
     const unsigned int Args[3] = { ship_id, target_id, system_id };
-    RpcSendToServer(this, 3u, 0x3fu, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_HAIL), Args, 3u);
 }
 
 // === Slots 52-55: SP collisions ===
@@ -654,29 +654,29 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session
     // retail 0x06d8dc30: ch1 op 0x01 FLPACKET_COMMON_UPDATEOBJECT. The argument struct
     // is NOT the one the IClient sender reads, so this type marshals its own way.
     const unsigned int Args[2] = { session_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x01u, Args, 2u, RpcMarshalAs<MarshalServerObjUpdate>);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT), Args, 2u, RpcMarshalAs<MarshalServerObjUpdate>);
 }
 void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& info, unsigned int session_id) {
     // retail 0x06d8d6e0: ch3 op 0x03
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x03u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MUNCOLLISION), Args, 2u);
 }
 void IServerImpl::SPBadLandsObjCollision(const SSPBadLandsObjCollisionInfo& info, unsigned int session_id) {
     // retail 0x06d8d760: ch3 op 0x3d
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x3du, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_BADLANDSOBJCOLLISION), Args, 2u);
 }
 void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& info, unsigned int session_id) {
     // retail 0x06d8d7b0: ch3 op 0x0c
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x0cu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_OBJCOLLISION), Args, 2u);
 }
 
 // === Slots 56-59: SP requests ===
 void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_id) {
     // retail 0x06d8ec20: ch3 op 0x40
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
-    RpcSendToServer(this, 3u, 0x40u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_USE_ITEM), Args, 2u);
 }
 void IServerImpl::SPRequestInvincibility(unsigned int ship_id, unsigned char b_invincible,
                             InvincibilityReason reason, unsigned int session_id) {
@@ -684,7 +684,7 @@ void IServerImpl::SPRequestInvincibility(unsigned int ship_id, unsigned char b_i
     const unsigned int Args[4] = {
         ship_id, b_invincible, (unsigned int)reason, session_id
     };
-    RpcSendToServer(this, 3u, 0x44u, Args, 4u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQINVINCIBILITY), Args, 4u);
 }
 void IServerImpl::SaveGame(const CHARACTER_ID& char_id, const wchar_t* description, unsigned int session_id) {
     // retail 0x06d8db10: ch3 op 0x1e
@@ -692,12 +692,12 @@ void IServerImpl::SaveGame(const CHARACTER_ID& char_id, const wchar_t* descripti
         reinterpret_cast<unsigned int>(&char_id),
         reinterpret_cast<unsigned int>(description), session_id
     };
-    RpcSendToServer(this, 3u, 0x1eu, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SAVEGAME), Args, 3u);
 }
 void IServerImpl::MissionSaveB(unsigned int session_id, unsigned long mission_id) {
     // retail 0x06d8db70: ch3 op 0x45, serializes mission_id only
     const unsigned int Args[2] = { session_id, (unsigned int)mission_id };
-    RpcSendToServer(this, 3u, 0x45u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MISSIONSAVEB), Args, 2u);
 }
 
 // === Slots 60-63: events and mining ===
@@ -707,7 +707,7 @@ void IServerImpl::RequestEvent(int event_type, unsigned int ship_id, unsigned in
     const unsigned int Args[6] = {
         (unsigned int)event_type, ship_id, target_id, second_id, (unsigned int)b_flag, session_id
     };
-    RpcSendToServer(this, 3u, 0x31u, Args, 6u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_EVENT), Args, 6u);
 }
 void IServerImpl::RequestCancel(int event_type, unsigned int ship_id, unsigned int target_id, unsigned long arg3,
                    unsigned int session_id) {
@@ -715,7 +715,7 @@ void IServerImpl::RequestCancel(int event_type, unsigned int ship_id, unsigned i
     const unsigned int Args[5] = {
         (unsigned int)event_type, ship_id, target_id, (unsigned int)arg3, session_id
     };
-    RpcSendToServer(this, 3u, 0x32u, Args, 5u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_CANCEL), Args, 5u);
 }
 void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, unsigned int loot_id,
                   unsigned int secondary_loot, unsigned int quantity, unsigned int session_id) {
@@ -724,19 +724,19 @@ void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, u
         system_id, reinterpret_cast<unsigned int>(&position), loot_id,
         secondary_loot, quantity, session_id
     };
-    RpcSendToServer(this, 3u, 0x20u, Args, 6u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MINEASTEROID), Args, 6u);
 }
 void IServerImpl::CommComplete(unsigned int sender_id, unsigned int receiver_id, unsigned int msg_id, CommResult result) {
     // retail 0x06d8dd70: ch3 op 0x37
     const unsigned int Args[4] = { sender_id, receiver_id, msg_id, (unsigned int)result };
-    RpcSendToServer(this, 3u, 0x37u, Args, 4u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_COMMCOMPLETE), Args, 4u);
 }
 
 // === Slots 64-66 ===
 void IServerImpl::RequestCreateShip(unsigned int session_id) {
     // retail 0x06d8d9d0: ch3 op 0x10, payload 0
     const unsigned int Args[1] = { session_id };
-    RpcSendToServer(this, 3u, 0x10u, Args, 1u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTCREATESHIP), Args, 1u);
 }
 void IServerImpl::SPScanCargo(const unsigned int& scanner_id, const unsigned int& target_id, unsigned int session_id) {
     // retail 0x06d8ebd0: ch3 op 0x2b, serializes *scanner_id and *target_id
@@ -744,29 +744,29 @@ void IServerImpl::SPScanCargo(const unsigned int& scanner_id, const unsigned int
         reinterpret_cast<unsigned int>(&scanner_id),
         reinterpret_cast<unsigned int>(&target_id), session_id
     };
-    RpcSendToServer(this, 3u, 0x2bu, Args, 3u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_CARGOSCAN), Args, 3u);
 }
 void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info) {
     // retail 0x06d8e670: ch3 op 0x2f -- the session comes FIRST in this one
     const unsigned int Args[2] = { session_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 3u, 0x2fu, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SETMANEUVER), Args, 2u);
 }
 
 // === Slots 67-70: interface and mission ===
 void IServerImpl::InterfaceItemUsed(unsigned int session_id, unsigned int item_id) {
     // retail 0x06d8d820: ch3 op 0x35, serializes item_id only
     const unsigned int Args[2] = { session_id, item_id };
-    RpcSendToServer(this, 3u, 0x35u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_INTERFACEITEMUSED), Args, 2u);
 }
 void IServerImpl::AbortMission(unsigned int session_id, unsigned int mission_id) {
     // retail 0x06d8d8a0: ch3 op 0x41, serializes mission_id only
     const unsigned int Args[2] = { session_id, mission_id };
-    RpcSendToServer(this, 3u, 0x41u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ABORT_MISSION), Args, 2u);
 }
 void IServerImpl::RTCDone(unsigned int session_id, unsigned int rtc_id) {
     // retail 0x06d8d860: ch3 op 0x47, serializes rtc_id only
     const unsigned int Args[2] = { session_id, rtc_id };
-    RpcSendToServer(this, 3u, 0x47u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_RTCDONE), Args, 2u);
 }
 void IServerImpl::SetWeaponGroup(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8dfb0: ch1 op 0x11. The one buffer-family member that stores the
@@ -775,7 +775,7 @@ void IServerImpl::SetWeaponGroup(unsigned int session_id, unsigned char* data, i
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x11u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP), Args, 3u);
 }
 
 // === Slots 71-78: buffer-parameter methods (channel 1) ===
@@ -789,106 +789,106 @@ void IServerImpl::SetVisitedState(unsigned int session_id, unsigned char* data, 
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x13u, Args, 3u, MarshalServerBufferCopy);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_VISITED_STATE), Args, 3u, MarshalServerBufferCopy);
 }
 void IServerImpl::RequestBestPath(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e080: ch1 op 0x16, copies in both directions
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x16u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_BEST_PATH), Args, 3u);
 }
 void IServerImpl::RequestPlayerStats(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e100: ch1 op 0x18, copies in both directions
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x18u, Args, 3u);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_PLAYER_STATS), Args, 3u);
 }
 void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int button) {
     // retail 0x06d8e180: ch1 op 0x1b -- one dword at payload+0x10 and nothing else
     const unsigned int Args[2] = { session_id, button };
-    RpcSendToServer(this, 1u, 0x1bu, Args, 2u, RpcMarshalAs<MarshalServerPopUpDialog>);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_POP_UP_DIALOG), Args, 2u, RpcMarshalAs<MarshalServerPopUpDialog>);
 }
 void IServerImpl::RequestGroupPositions(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e1c0: ch1 op 0x17, operator_new + REP MOVS
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x17u, Args, 3u, MarshalServerBufferCopy);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS), Args, 3u, MarshalServerBufferCopy);
 }
 void IServerImpl::SetMissionLog(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e240: ch1 op 0x19, operator_new + REP MOVS
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x19u, Args, 3u, MarshalServerBufferCopy);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_MISSION_LOG), Args, 3u, MarshalServerBufferCopy);
 }
 void IServerImpl::SetInterfaceState(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e2c0: ch1 op 0x1c, operator_new + REP MOVS
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x1cu, Args, 3u, MarshalServerBufferCopy);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_INTERFACE_STATE), Args, 3u, MarshalServerBufferCopy);
 }
 void IServerImpl::RequestRankLevel(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e340: ch1 op 0x1a, operator_new + REP MOVS
     const unsigned int Args[3] = {
         session_id, reinterpret_cast<unsigned int>(data), (unsigned int)size
     };
-    RpcSendToServer(this, 1u, 0x1au, Args, 3u, MarshalServerBufferCopy);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_RANK_LEVEL), Args, 3u, MarshalServerBufferCopy);
 }
 
 // === Slots 79-86: trade (all ch1 op 0x12, distinguished by the bitmask at packet+0x20) ===
 void IServerImpl::InitiateTrade(unsigned int session_id, unsigned int target_session_id) {
     // retail 0x06d8e3c0: subtype 0x01 at packet+0x20, target id at packet+0x28
     (void)session_id;
-    RpcSendTradeToServer(this, 0x01u, target_session_id, 0u);
+    RpcSendTradeToServer(this, kPlayerTradeInitiateTrade, target_session_id, 0u);
 }
 void IServerImpl::TerminateTrade(unsigned int session_id, int reason) {
     // retail 0x06d8e410: subtype 0x02, reason at packet+0x24 (MarshalPlayerTrade's A1).
     (void)session_id;
-    RpcSendTradeToServer(this, 0x02u, (unsigned int)reason, 0u);
+    RpcSendTradeToServer(this, kPlayerTradeTerminateTrade, (unsigned int)reason, 0u);
 }
 void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
     // retail 0x06d8e460: subtype 0x40, the flag BYTE at packet+0x30 and nothing at
     // +0x28 -- the IClient sender writes a target id there, this one does not.
     (void)session_id;
-    RpcSendTradeToServer(this, 0x40u, 0u, b_accepted ? 1u : 0u);
+    RpcSendTradeToServer(this, kPlayerTradeAcceptTrade, 0u, b_accepted ? 1u : 0u);
 }
 void IServerImpl::SetTradeMoney(unsigned int session_id, unsigned long money) {
     // retail 0x06d8e4b0: subtype 0x04, money at packet+0x2c, nothing at +0x28.
     (void)session_id;
-    RpcSendTradeToServer(this, 0x04u, 0u, (unsigned int)money);
+    RpcSendTradeToServer(this, kPlayerTradeSetTradeMoney, 0u, (unsigned int)money);
 }
 void IServerImpl::AddTradeEquip(unsigned int session_id, const EquipDesc& equip) {
     // retail 0x06d8e500: subtype 0x08. Reads EquipDesc ArchId (+0x04), Count (+0x14),
     // Health (+0x10, FLD/FSTP) and the word Id (+0x02).
     (void)session_id;
-    RpcSendTradeToServer(this, 0x08u, 0u, reinterpret_cast<unsigned int>(&equip));
+    RpcSendTradeToServer(this, kPlayerTradeAddTradeEquip, 0u, reinterpret_cast<unsigned int>(&equip));
 }
 void IServerImpl::DelTradeEquip(unsigned int session_id, const EquipDesc& equip) {
     // retail 0x06d8e570: subtype 0x10, the same three minus the float at +0x3c.
     (void)session_id;
-    RpcSendTradeToServer(this, 0x10u, 0u, reinterpret_cast<unsigned int>(&equip));
+    RpcSendTradeToServer(this, kPlayerTradeDelTradeEquip, 0u, reinterpret_cast<unsigned int>(&equip));
 }
 void IServerImpl::RequestTrade(unsigned int session_id, unsigned int target_session_id) {
     // retail 0x06d8e5d0: subtype 0x20, target id at packet+0x28
     (void)session_id;
-    RpcSendTradeToServer(this, 0x20u, target_session_id, 0u);
+    RpcSendTradeToServer(this, kPlayerTradeRequestTrade, target_session_id, 0u);
 }
 void IServerImpl::StopTradeRequest(unsigned int session_id) {
     // retail 0x06d8e620: subtype 0x80; its one argument goes to packet+0x28 -- the only
     // place in the module where a session id reaches the wire. The receiver passes it on
     // instead of its own session id.
-    RpcSendTradeToServer(this, 0x80u, session_id, 0u);
+    RpcSendTradeToServer(this, kPlayerTradeStopTradeRequest, session_id, 0u);
 }
 
 // === Slots 87-92: tail ===
 void IServerImpl::ReqDifficultyScale(float scale, unsigned int session_id) {
     // retail 0x06d8dbf0: ch3 op 0x46, one dword -- a float, read back with FLD
     const unsigned int Args[2] = { RpcFloatBits(scale), session_id };
-    RpcSendToServer(this, 3u, 0x46u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQDIFFICULTYSCALE), Args, 2u);
 }
 // Retail 0x06d8cda0: always zero, never forwarded to Server.dll.
 unsigned int IServerImpl::GetServerID() {
@@ -912,7 +912,7 @@ void IServerImpl::Dock(const unsigned int& base_id, const unsigned int& session_
         reinterpret_cast<unsigned int>(&base_id),
         reinterpret_cast<unsigned int>(&session_id)
     };
-    RpcSendToServer(this, 3u, 0x24u, Args, 2u);
+    RpcSendToServer(this, kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DOCK), Args, 2u);
 }
 // Retail 0x06d8f460: tail jump to FUN_06d86150, queuing the packet pointer server-bound.
 // Retail quirk: with no connection (before Connect, after Shutdown) the packet is dropped
@@ -930,7 +930,7 @@ void IServerImpl::SubmitChat(CHAT_ID sender_id, unsigned long size, const void* 
         sender_id.Id, (unsigned int)size, reinterpret_cast<unsigned int>(msg_data),
         target_id.Id, (unsigned int)system_id
     };
-    RpcSendToServer(this, 1u, 0x05u, Args, 5u, RpcMarshalAs<MarshalServerChatMsg>);
+    RpcSendToServer(this, kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_CHATMSG), Args, 5u, RpcMarshalAs<MarshalServerChatMsg>);
 }
 
 // === Internal packet handling ===

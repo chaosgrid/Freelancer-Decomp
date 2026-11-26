@@ -1722,7 +1722,7 @@ namespace
                 continue;
             }
             const uint16_t SideTypeWord = (Side == 0) ? Cp->Status1 : Cp->Status2;
-            if (static_cast<uint8_t>(SideTypeWord & 0xffu) == 3)
+            if (static_cast<uint8_t>(SideTypeWord & 0xffu) == IVP_SYNAPSE_BALL)
             {
                 continue;
             }

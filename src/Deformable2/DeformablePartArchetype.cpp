@@ -199,7 +199,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                                 Child->CloseFile((unsigned long)FaceHandle);
                             }
                         }
-                        Group->Kind = 4;
+                        Group->Kind = D3DPT_TRIANGLELIST;
                         RebaseFaceIndices(Group);
                         IndexNode.Close();
                         MaterialNode.Close();
@@ -223,7 +223,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
 // FUN_065f7c70. No tests.
 void FFaceGroup::Construct()
 {
-    Kind = 4;
+    Kind = D3DPT_TRIANGLELIST;
     MaterialCrc = 0;
     Material = nullptr;
     UvBinding = nullptr;
@@ -616,7 +616,7 @@ static void BuildBoneVertexLists(FMeshArchetype* Arch, FLodHolder* Holder, IFile
     }
 }
 
-static const unsigned long G_ParseTagUtf = 0x112;
+static const unsigned long G_ParseTagUtf = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1;
 
 // FUN_065f89e0 (thiscall on the mesh: Holder, Fs).
 bool FMeshArchetype::LoadTables(FLodHolder* Holder, IFileSystem* Fs)
@@ -872,7 +872,7 @@ void FMeshArchetype::FillStreamDesc(FRpVertexSrcDesc* Out)
 {
     std::memset(Out, 0, sizeof(FRpVertexSrcDesc));
     Out->SrcFvf = ParseTag;
-    Out->Flags = 6;
+    Out->Flags = kRpVertexSrcInterleaved | kRpVertexSrcIndexed;
     Out->SrcCount = PointIndexCount;
     Out->Position.Base = (const unsigned char*)Vertices;
     Out->Position.ByteSize = 0xC;

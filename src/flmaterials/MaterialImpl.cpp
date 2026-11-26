@@ -34,54 +34,126 @@ namespace
     const char* const kWire2File = "E:\\FL\\Scratch\\Source\\FLMaterials\\WireMaterial2.cpp";
 
     // RS/TSS table: start state/type in [0].
-    const unsigned long kGlassTss0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    const unsigned long kGlassTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
-    const unsigned long kGlassRs[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0};
+    const unsigned long kGlassTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    const unsigned long kGlassTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kGlassRs[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
 
-    const unsigned long kHudIconRsOpaque[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0};
-    const unsigned long kHudIconRsBlend[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
+    const unsigned long kHudIconRsOpaque[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
+    const unsigned long kHudIconRsBlend[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
     // HUDAnim DAT_067030fc has the same values as Glass stage 1.
-    const unsigned long kHudAnimTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kHudAnimTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
-    const unsigned long kNomadRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kNomadTss0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    const unsigned long kNomadTssTail[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kNomadRs[] = {
+        D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kNomadTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    const unsigned long kNomadTssTail[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
-    const unsigned long kWireRsBlend[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kWireRsPlain[] = {0x89, 0, 0x1D, 0, 0x1B, 0, 0};
-    const unsigned long kWireTss0[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kWireRsBlend[] = {
+        D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kWireRsPlain[] = {
+        D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
+    const unsigned long kWireTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
-    const unsigned long kWire2Rs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kWire2Tss0[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kWire2Rs[] = {
+        D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kWire2Tss0[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
-    const unsigned long kCloakTss[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
-    const unsigned long kCloakRsBlend[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kCloakRsPlain[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0};
+    const unsigned long kCloakTss[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kCloakRsBlend[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kCloakRsPlain[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
 
-    const unsigned long kEngineGlowTss[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
-    const unsigned long kEngineGlowRs[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0};
+    const unsigned long kEngineGlowTss[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kEngineGlowRs[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
 
-    const unsigned long kExclusionTss0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    const unsigned long kExclusionTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
-    const unsigned long kExclusionRs[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
+    const unsigned long kExclusionTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    const unsigned long kExclusionTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kExclusionRs[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
 
-    const unsigned long kPlanetTss0[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0};
-    const unsigned long kPlanetTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
-    const unsigned long kPlanetRsBlend[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kPlanetRsPlain[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0};
+    const unsigned long kPlanetTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0};
+    const unsigned long kPlanetTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kPlanetRsBlend[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kPlanetRsPlain[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0};
 
     unsigned char G_EnvMapGlassGuard = 0;
     unsigned long G_EnvMapGlassCrc = 0;
     void FlmDestroyEnvMapGlassCrc() {} // 066f6320: RET, registered at first CRC use.
 
-    const unsigned long kEnvMapTss0[] = {1, 5, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
-    const unsigned long kEnvMapTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kEnvMapTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kEnvMapTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
-    const unsigned long kShadowTss1[] = {1, 4, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
+    const unsigned long kShadowTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
     // DAT_0670402C = 0x3F4CCCCD; DAT_067016D8 = double 1.0; DAT_06702818 ≈ 0.99.
     // Raw PE DAT_06704098 (22 D3D/FourCC IDs), DAT_067040f0 (15 records).
-    const unsigned long GFlmPixelFormatIds[22] = {0x0ul, 0x29ul, 0x14ul, 0x17ul, 0x18ul, 0x1aul, 0x19ul, 0x15ul, 0x16ul, 0x0ul, 0x31545844ul, 0x32545844ul, 0x33545844ul, 0x34545844ul, 0x35545844ul, 0x504f4144ul, 0x544f4144ul, 0x41414144ul, 0x4c414144ul, 0x31414144ul, 0x34414144ul, 0x38414144ul};
+    const unsigned long GFlmPixelFormatIds[22] = {
+        D3DFMT_UNKNOWN, D3DFMT_P8, D3DFMT_R8G8B8, D3DFMT_R5G6B5, D3DFMT_X1R5G5B5, D3DFMT_A4R4G4B4,
+        D3DFMT_A1R5G5B5, D3DFMT_A8R8G8B8, D3DFMT_X8R8G8B8, D3DFMT_UNKNOWN, D3DFMT_DXT1, D3DFMT_DXT2,
+        D3DFMT_DXT3, D3DFMT_DXT4, D3DFMT_DXT5, 0x504f4144ul, 0x544f4144ul, 0x41414144ul,
+        0x4c414144ul, 0x31414144ul, 0x34414144ul, 0x38414144ul};
     const unsigned long GFlmPixelFormatDescriptors[15][19] = {
         {0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul},
         {0x1ul, 0x8ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul, 0x0ul},
@@ -121,7 +193,7 @@ namespace
     // FUN_067006b0: signed Index>14 returns descriptor 0; else stride 0x4c.
     const unsigned long* FlmPixelFormatDescriptor(int Index)
     {
-        return GFlmPixelFormatDescriptors[Index > 14 ? 0 : Index];
+        return GFlmPixelFormatDescriptors[Index > kTextureFormatDxt5 ? 0 : Index];
     }
 
     const float kGlassRaiseThreshold = 0.8f;
@@ -211,7 +283,7 @@ namespace
             for (unsigned long Index = 0; Index < Count; ++Index)
             {
                 const FFlmMaterialParamDesc& Seed = Seeds[Index];
-                const bool bVector = Seed.Type0 >= 2 && Seed.Type0 <= 4;
+                const bool bVector = Seed.Type0 >= kMaterialParamFloat && Seed.Type0 <= kMaterialParamVector4;
                 const void* Value0 = bVector ? Seed.Value0 : (const void*)(Seed.Value0[0]);
                 const void* Value1 = bVector ? Seed.Value1 : (const void*)(Seed.Value1[0]);
                 const void* Value2 = bVector ? Seed.Value2 : (const void*)(Seed.Value2[0]);
@@ -286,8 +358,8 @@ namespace
             FlmReleaseTypedValue(&Entry.Type0);
             Entry.Value0[3] = White[3];
             Entry.Value0[0] = White[0];
-            const bool bReleaseSecond = Entry.Type1 != 4;
-            Entry.Type0 = 4;
+            const bool bReleaseSecond = Entry.Type1 != kMaterialParamVector4;
+            Entry.Type0 = kMaterialParamVector4;
             Entry.Value0[2] = White[2];
             Entry.Value0[1] = White[1];
             if (bReleaseSecond)
@@ -295,10 +367,10 @@ namespace
             // Wire 067026bc / Wire2 06702858: four zero words.
             Entry.Value1[3] = 0;
             Entry.Value1[0] = 0;
-            Entry.Type1 = 4;
+            Entry.Type1 = kMaterialParamVector4;
             Entry.Value1[2] = 0;
             Entry.Value1[1] = 0;
-            FlmSetDescriptorSubBlockValue(&Entry.Type2, 4, White);
+            FlmSetDescriptorSubBlockValue(&Entry.Type2, kMaterialParamVector4, White);
         }
         return &Entry;
     }
@@ -307,34 +379,54 @@ namespace
     {
         const unsigned long kF0 = 0x00000000ul; // 0.0f
         const unsigned long kF1 = 0x3f800000ul; // 1.0f
-        // Type 7 is a string, 8 a wrap nibble, 9 a packed address-mode field whose Path
-        // holds the EntryFlags (0x20000 U, 0x40000 V). Entries 9 and 10 are built by
+        // Address-mode entries carry their U / V flag in Path.
+        // Entries 9 and 10 are built by
         // FUN_066f3de0.
         static const FFlmMaterialParamDesc kParams[11] = {
             {0, "Ac", "Ambient Color", "",
-             4, {kF1, kF1, kF1, kF1}, 4, {kF0, kF0, kF0, kF0}, 4, {kF1, kF1, kF1, kF1}},
+             kMaterialParamVector4, {kF1, kF1, kF1, kF1},
+             kMaterialParamVector4, {kF0, kF0, kF0, kF0},
+             kMaterialParamVector4, {kF1, kF1, kF1, kF1}},
             {0, "Dc", "Diffuse Color", "",
-             3, {kF1, kF1, kF1, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
+             kMaterialParamVector3, {kF1, kF1, kF1, 0},
+             kMaterialParamVector3, {kF0, kF0, kF0, 0},
+             kMaterialParamVector3, {kF1, kF1, kF1, 0}},
             {0, "Ec", "Emissive Color", "",
-             3, {kF0, kF0, kF0, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
+             kMaterialParamVector3, {kF0, kF0, kF0, 0},
+             kMaterialParamVector3, {kF0, kF0, kF0, 0},
+             kMaterialParamVector3, {kF1, kF1, kF1, 0}},
             {0, "Sc", "Specular Color", "",
-             3, {kF0, kF0, kF0, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
+             kMaterialParamVector3, {kF0, kF0, kF0, 0},
+             kMaterialParamVector3, {kF0, kF0, kF0, 0},
+             kMaterialParamVector3, {kF1, kF1, kF1, 0}},
             {0, "Sp", "Specular Power", "",
-             2, {kF0, 0, 0, 0}, 2, {kF0, 0, 0, 0}, 2, {kF1, 0, 0, 0}},
+             kMaterialParamFloat, {kF0, 0, 0, 0},
+             kMaterialParamFloat, {kF0, 0, 0, 0},
+             kMaterialParamFloat, {kF1, 0, 0, 0}},
             {0, "Oc", "Opacity ", "",
-             2, {kF1, 0, 0, 0}, 2, {kF0, 0, 0, 0}, 2, {kF1, 0, 0, 0}},
+             kMaterialParamFloat, {kF1, 0, 0, 0},
+             kMaterialParamFloat, {kF0, 0, 0, 0},
+             kMaterialParamFloat, {kF1, 0, 0, 0}},
             {0, "Dt_name", "Texture Name", "",
-             7, {(unsigned long)("(None)"), 0, 0, 0},
-             7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
+             kMaterialParamTextureName, {(unsigned long)("(None)"), 0, 0, 0},
+             kMaterialParamTextureName, {0, 0, 0, 0}, kMaterialParamTextureName, {0, 0, 0, 0}},
             {0, "Dt_flags", "Texture Wrap Mode", "",
-             8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
-            {0x20000ul, "Dt_flags", "Texture U Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            {0x40000ul, "Dt_flags", "Texture V Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
+             kMaterialParamWrapMode, {4, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
             // No +4 tag; "flcopt" sits at +0xC.
             {0, nullptr, "Colorize Options", "flcopt",
-             1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}},
+             kMaterialParamInteger, {0, 0, 0, 0},
+             kMaterialParamInteger, {0, 0, 0, 0},
+             kMaterialParamInteger, {0, 0, 0, 0}},
         };
         static_assert(sizeof(FFlmMaterialParamDesc) == kFlmParamDescSize,
                       "FFlmMaterialParamDesc must match the confirmed 0x4C stride");
@@ -357,32 +449,38 @@ namespace
         const unsigned long kOne = 0x3f800000ul;
         static const FFlmMaterialParamDesc kParams[10] = {
             {0, "Ac", "Ambient Color", "",
-             3, {kOne, kOne, kOne, 0}, 3, {kZero, kZero, kZero, 0},
-             3, {kOne, kOne, kOne, 0}},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}, kMaterialParamVector3, {kZero, kZero, kZero, 0},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}},
             {0, "Dc", "Diffuse Color", "",
-             3, {kOne, kOne, kOne, 0}, 3, {kZero, kZero, kZero, 0},
-             3, {kOne, kOne, kOne, 0}},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}, kMaterialParamVector3, {kZero, kZero, kZero, 0},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}},
             {0, "Ec", "Emissive Color", "",
-             3, {kZero, kZero, kZero, 0}, 3, {kZero, kZero, kZero, 0},
-             3, {kOne, kOne, kOne, 0}},
+             kMaterialParamVector3, {kZero, kZero, kZero, 0}, kMaterialParamVector3, {kZero, kZero, kZero, 0},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}},
             {0, "Sc", "Specular Color", "",
-             3, {kZero, kZero, kZero, 0}, 3, {kZero, kZero, kZero, 0},
-             3, {kOne, kOne, kOne, 0}},
+             kMaterialParamVector3, {kZero, kZero, kZero, 0}, kMaterialParamVector3, {kZero, kZero, kZero, 0},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}},
             {0, "Sp", "Specular Power", "",
-             2, {kZero, 0, 0, 0}, 2, {kZero, 0, 0, 0},
-             2, {kOne, 0, 0, 0}},
+             kMaterialParamFloat, {kZero, 0, 0, 0}, kMaterialParamFloat, {kZero, 0, 0, 0},
+             kMaterialParamFloat, {kOne, 0, 0, 0}},
             {0, "Oc", "Opacity ", "",
-             2, {kOne, 0, 0, 0}, 2, {kZero, 0, 0, 0},
-             2, {kOne, 0, 0, 0}},
+             kMaterialParamFloat, {kOne, 0, 0, 0}, kMaterialParamFloat, {kZero, 0, 0, 0},
+             kMaterialParamFloat, {kOne, 0, 0, 0}},
             {0, "Dt_name", "Texture Name", "",
-             7, {(unsigned long)("(None)"), 0, 0, 0},
-             7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
+             kMaterialParamTextureName, {(unsigned long)("(None)"), 0, 0, 0},
+             kMaterialParamTextureName, {0, 0, 0, 0}, kMaterialParamTextureName, {0, 0, 0, 0}},
             {0, "Dt_flags", "Texture Wrap Mode", "",
-             8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
-            {0x20000ul, "Dt_flags", "Texture U Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            {0x40000ul, "Dt_flags", "Texture V Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
+             kMaterialParamWrapMode, {4, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
         };
         // One table per material class, as in retail: EngineGlow 066f5370, Exclusion 066f66e0,
         // Glass 066f7190 (/ 06705300), HUDIcon 066f7c10, PlanetWater 066f9890, HUDAnim 066ffb70.
@@ -397,26 +495,38 @@ namespace
         const unsigned long kOne = 0x3f800000ul;
         static const FFlmMaterialParamDesc kParams[9] = {
             {0, "Dc", "Diffuse Color", "",
-             3, {kOne, kOne, kOne, 0}, 3, {kZero, kZero, kZero, 0},
-             3, {kOne, kOne, kOne, 0}},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}, kMaterialParamVector3, {kZero, kZero, kZero, 0},
+             kMaterialParamVector3, {kOne, kOne, kOne, 0}},
             {0, "Dt_name", "Diffuse Name", "",
-             7, {(unsigned long)("(None)"), 0, 0, 0},
-             7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
+             kMaterialParamTextureName, {(unsigned long)("(None)"), 0, 0, 0},
+             kMaterialParamTextureName, {0, 0, 0, 0}, kMaterialParamTextureName, {0, 0, 0, 0}},
             {0, "Dt_flags", "Diffuse Wrap Mode", "",
-             8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
-            {0x20000ul, "Dt_flags", "Diffuse U Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            {0x40000ul, "Dt_flags", "Diffuse V Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
+             kMaterialParamWrapMode, {4, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressU, "Dt_flags", "Diffuse U Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressV, "Dt_flags", "Diffuse V Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
             {0, "nt_name", "NomadTexture Name", "",
-             7, {(unsigned long)("NomadRGB1_NomadAlpha1"), 0, 0, 0},
-             7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
+             kMaterialParamTextureName, {(unsigned long)("NomadRGB1_NomadAlpha1"), 0, 0, 0},
+             kMaterialParamTextureName, {0, 0, 0, 0}, kMaterialParamTextureName, {0, 0, 0, 0}},
             {0, "nt_flags", "NomadTexture Wrap Mode", "",
-             8, {5, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
-            {0x20000ul, "nt_flags", "NomadTexture U Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            {0x40000ul, "nt_flags", "NomadTexture V Address Mode", "",
-             9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
+             kMaterialParamWrapMode, {5, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0},
+             kMaterialParamWrapMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressU, "nt_flags", "NomadTexture U Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
+            {kMaterialParamFlagAddressV, "nt_flags", "NomadTexture V Address Mode", "",
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0},
+             kMaterialParamAddressMode, {0, 0, 0, 0}},
         };
         static FFlmOwnedParameterTable<9> Table;
         Table.InitializeDefaults(kParams);
@@ -429,7 +539,7 @@ namespace
     void FlmReleaseTypedValue(unsigned long* Slot)
     {
         const unsigned long OldType = Slot[0];
-        if (OldType == 5 || OldType == 7)
+        if (OldType == kMaterialParamString || OldType == kMaterialParamTextureName)
         {
             if (Slot[1] != 0)
             {
@@ -438,7 +548,7 @@ namespace
             }
             return;
         }
-        if (OldType == 6)
+        if (OldType == kMaterialParamComponent)
         {
             IDAComponent* Old = (IDAComponent*)(Slot[1]);
             Slot[1] = 0;
@@ -528,29 +638,29 @@ namespace
         Dest->Type = NewType;
         switch (NewType)
         {
-        case 3:
+        case kMaterialParamVector3:
             Dest->Payload2 = Src->Payload2;
             Dest->Payload1 = Src->Payload1;
             Dest->Payload0 = Src->Payload0;
             break;
-        case 4:
+        case kMaterialParamVector4:
             Dest->Payload3 = Src->Payload3;
             Dest->Payload2 = Src->Payload2;
             Dest->Payload1 = Src->Payload1;
             Dest->Payload0 = Src->Payload0;
             break;
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             Dest->Payload0 = Src->Payload0;
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignString((unsigned long*)Dest, (const char*)Src->Payload0);
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterface((unsigned long*)Dest, (IDAComponent*)Src->Payload0);
             break;
         default:
@@ -571,31 +681,31 @@ namespace
         const int* Values = (const int*)(ValuePtr);
         switch (NewType)
         {
-        case 1:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             SubBlock[1] = (unsigned long)(ValuePtr);
             break;
-        case 2:
+        case kMaterialParamFloat:
             SubBlock[1] = (unsigned long)(Values[0]);
             break;
-        case 3:
+        case kMaterialParamVector3:
             SubBlock[3] = (unsigned long)(Values[2]);
             SubBlock[2] = (unsigned long)(Values[1]);
             SubBlock[1] = (unsigned long)(Values[0]);
             break;
-        case 4:
+        case kMaterialParamVector4:
             SubBlock[4] = (unsigned long)(Values[3]);
             SubBlock[3] = (unsigned long)(Values[2]);
             SubBlock[2] = (unsigned long)(Values[1]);
             SubBlock[1] = (unsigned long)(Values[0]);
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignString(SubBlock, (const char*)(ValuePtr));
             break;
-        case 6:
+        case kMaterialParamComponent:
             // COM ownership requires a mutable face from this const payload parameter.
             FlmAssignInterface(SubBlock,
                               reinterpret_cast<IDAComponent*>(const_cast<void*>(ValuePtr)));
@@ -644,13 +754,13 @@ namespace
                                 const char* ComponentName = "FileSystem")
     {
         std::memset(Desc, 0, sizeof(*Desc));
-        Desc->Size = 0x34;
+        Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc->ComponentName = ComponentName;
         Desc->Path = Path;
-        Desc->Access = 0x80000000; // GENERIC_READ
-        Desc->ShareMode = 1;       // FILE_SHARE_READ
-        Desc->Creation = 3;        // OPEN_EXISTING
-        Desc->Flags = 0x08000080;
+        Desc->Access = GENERIC_READ;
+        Desc->ShareMode = FILE_SHARE_READ;
+        Desc->Creation = OPEN_EXISTING;
+        Desc->Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
         Desc->FindHandle = 0xFFFFFFFF;
         return Desc;
     }
@@ -693,23 +803,23 @@ namespace
         unsigned long ReadSize = 0;
         switch (Type)
         {
-        case 1:
-        case 2:
-        case 8:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
         case 10:
             ReadSize = 4;
             break;
-        case 3:
+        case kMaterialParamVector3:
             ReadSize = 0xC;
             break;
-        case 4:
+        case kMaterialParamVector4:
             ReadSize = 0x10;
             break;
         default:
             return false; // 5/7 (string) handled below; 9 goes through FlmReadPackedWord / FlmUnpackTwoBitField
         }
 
-        if (Type == 5 || Type == 7)
+        if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
         {
             const unsigned long Handle = FsOpen(FileSystem, Path);
             if (Handle == (unsigned long)(-1))
@@ -793,14 +903,14 @@ namespace
     void FlmBuildFileSystemDescForWrite(FFileSystemDesc* Desc, const char* Path)
     {
         std::memset(Desc, 0, sizeof(*Desc));
-        Desc->Size = 0x34;
+        Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc->ComponentName = "FileSystem";
         Desc->Path = Path;
         Desc->Implementation = "UTF";
-        Desc->Access = 0xC0000000;
-        Desc->ShareMode = 1;
-        Desc->Creation = 2;
-        Desc->Flags = 0x08000080;
+        Desc->Access = GENERIC_READ | GENERIC_WRITE;
+        Desc->ShareMode = FILE_SHARE_READ;
+        Desc->Creation = CREATE_ALWAYS;
+        Desc->Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
         Desc->FindHandle = 0xFFFFFFFF;
     }
 
@@ -849,19 +959,19 @@ namespace
         FFlmScopedTypedValue Value;
         const unsigned long Type = *(const unsigned long*)(Entry + 0x10);
         Value.Words[0] = Type;
-        if (Type == 9)
+        if (Type == kMaterialParamAddressMode)
         {
             const char* Path = *(const char* const*)(Entry + 4);
             unsigned long RawValue;
             if (FlmReadPackedWord((IFileSystem*)FileSystem, Path, &RawValue) < 0)
                 return false;
             const unsigned long Flags = *(const unsigned long*)Entry;
-            const int FieldIndex = (Flags & 0x20000) == 0 && (Flags & 0x40000) != 0 ? 1 : 0;
+            const int FieldIndex = (Flags & kMaterialParamFlagAddressU) == 0 && (Flags & kMaterialParamFlagAddressV) != 0 ? 1 : 0;
             Value.Words[1] = FlmUnpackTwoBitField(RawValue, FieldIndex);
             Material->StoreParameterValue(Index, Entry, Value.Words);
             return true;
         }
-        if (Type >= 1 && Type <= 8 && Type != 6)
+        if (Type >= kMaterialParamInteger && Type <= kMaterialParamWrapMode && Type != kMaterialParamComponent)
         {
             const char* Path = *(const char* const*)(Entry + 4);
             FFileSystemDesc Desc;
@@ -870,7 +980,7 @@ namespace
             const unsigned long Handle = Fs->OpenByDesc(&Desc);
             if (Handle == (unsigned long)-1)
                 return false;
-            if (Type == 5 || Type == 7)
+            if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
             {
                 const unsigned long Size = Fs->GetSize(Handle, 0);
                 char* Buffer = new (std::nothrow) char[Size];
@@ -888,12 +998,12 @@ namespace
             }
             else
             {
-                const unsigned long Size = Type == 3 ? 12ul : Type == 4 ? 16ul : 4ul;
+                const unsigned long Size = Type == kMaterialParamVector3 ? 12ul : Type == kMaterialParamVector4 ? 16ul : 4ul;
                 const bool bOk = FsRead(Fs, Handle, Value.Words + 1, Size);
                 Fs->CloseFile(Handle);
                 if (!bOk)
                     return false;
-                if (Type == 8)
+                if (Type == kMaterialParamWrapMode)
                     Value.Words[1] = (Value.Words[1] >> 4) & 0xful;
             }
         }
@@ -912,27 +1022,27 @@ namespace
             return false;
         switch (Type)
         {
-        case 4: Value.Words[4] = Raw[3]; [[fallthrough]];
-        case 3:
+        case kMaterialParamVector4: Value.Words[4] = Raw[3]; [[fallthrough]];
+        case kMaterialParamVector3:
             Value.Words[3] = Raw[2];
             Value.Words[2] = Raw[1];
             [[fallthrough]];
-        case 1: case 2: case 8: case 9: case 10:
+        case kMaterialParamInteger: case kMaterialParamFloat: case kMaterialParamWrapMode: case kMaterialParamAddressMode: case 10:
             Value.Words[1] = Raw[0];
             break;
-        case 5: case 7:
+        case kMaterialParamString: case kMaterialParamTextureName:
             FlmAssignString(Value.Words, (const char*)(Raw[0]));
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterface(Value.Words, (IDAComponent*)(Raw[0]));
             break;
         default:
             break;
         }
         const char* Path = *(const char* const*)(Entry + 4);
-        if (Type == 6 || Type == 0 || Type > 9)
+        if (Type == kMaterialParamComponent || Type == 0 || Type > kMaterialParamAddressMode)
             return true;
-        if (Type == 8)
+        if (Type == kMaterialParamWrapMode)
         {
             unsigned long Packed = 0;
             const unsigned long Handle = FsOpen(FileSystem, Path);
@@ -948,12 +1058,12 @@ namespace
             const char* WritePath = *(const char* const*)(Entry + 4);
             return (long)(FlmWriteSmallConfigValue(FileSystem, WritePath, &Packed)) >= 0;
         }
-        if (Type == 9)
+        if (Type == kMaterialParamAddressMode)
         {
             unsigned long Packed = 0;
             FlmReadPackedWord((IFileSystem*)(FileSystem), Path, &Packed);
             const unsigned long Flags = *(const unsigned long*)(Entry);
-            const int FieldIndex = (Flags & 0x20000) == 0 && (Flags & 0x40000) != 0 ? 1 : 0;
+            const int FieldIndex = (Flags & kMaterialParamFlagAddressU) == 0 && (Flags & kMaterialParamFlagAddressV) != 0 ? 1 : 0;
             FlmPackTwoBitField(&Packed, Value.Words[1], FieldIndex);
             // 066f28cb / 066f2924 reread the path after filesystem callbacks.
             const char* WritePath = *(const char* const*)(Entry + 4);
@@ -961,11 +1071,11 @@ namespace
         }
         const void* Buffer = Value.Words + 1;
         unsigned long Size = 4;
-        if (Type == 3)
+        if (Type == kMaterialParamVector3)
             Size = 12;
-        else if (Type == 4)
+        else if (Type == kMaterialParamVector4)
             Size = 16;
-        else if (Type == 5 || Type == 7)
+        else if (Type == kMaterialParamString || Type == kMaterialParamTextureName)
         {
             Buffer = (const char*)(Value.Words[1]);
             Size = (unsigned long)(std::strlen((const char*)(Buffer))) + 1;
@@ -1022,11 +1132,11 @@ namespace
 
     int FvfXyzSize(unsigned long Fvf)
     {
-        if ((Fvf & 0xC) == 0xC)
+        if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
             return 0x1C;
-        if ((Fvf & 4) == 4)
+        if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
             return 0x10;
-        if ((Fvf & 2) == 2)
+        if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
             return 0xC;
         return 0;
     }
@@ -1034,16 +1144,16 @@ namespace
     int FvfColorSize(unsigned long Fvf)
     {
         int Size = 0;
-        if ((Fvf & 0x40) != 0)
+        if ((Fvf & D3DFVF_DIFFUSE) != 0)
             Size += 4;
-        if ((Fvf & 0x80) != 0)
+        if ((Fvf & D3DFVF_SPECULAR) != 0)
             Size += 4;
         return Size;
     }
 
     int FvfNormalSize(unsigned long Fvf)
     {
-        return ((Fvf & 0x10) != 0) ? 0xC : 0;
+        return ((Fvf & D3DFVF_NORMAL) != 0) ? 0xC : 0;
     }
 
     int FvfTexSize(unsigned long Fvf)
@@ -1054,11 +1164,11 @@ namespace
         while (Count != 0)
         {
             const unsigned long Lane = (Fvf >> (Shift & 31)) & 3;
-            if (Lane == 0)
+            if (Lane == D3DFVF_TEXTUREFORMAT2)
                 Size += 8;
-            else if (Lane == 1)
+            else if (Lane == D3DFVF_TEXTUREFORMAT3)
                 Size += 0xC;
-            else if (Lane == 2)
+            else if (Lane == D3DFVF_TEXTUREFORMAT4)
                 Size += 0x10;
             else
                 Size += 4;
@@ -1076,10 +1186,10 @@ namespace
     unsigned long NomadLockFvf(unsigned long Stage)
     {
         if ((long)(Stage) > 1)
-            return 0x242;
+            return D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX2;
         if ((long)(Stage) > 0)
-            return 0x142;
-        return 0x42;
+            return D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
+        return D3DFVF_XYZ | D3DFVF_DIFFUSE;
     }
 
     double NomadFadeFromValue(float Value)
@@ -1218,7 +1328,7 @@ namespace
                        FNomadCursor& PositionOut, FNomadCursor& ColorOut, FNomadCursor* TextureOut,
                        const unsigned long& Stage, unsigned long Color, float Phase, const Vector* Light)
     {
-        if ((Mesh->Flags & 4) != 0)
+        if ((Mesh->Flags & kRpVertexSrcIndexed) != 0)
         {
             const unsigned long PosStride = Mesh->Position.Stride;
             const unsigned char* PosBase = Mesh->Position.Base;
@@ -1370,10 +1480,10 @@ namespace
         VbMgr->UnlockVertexMemory(&LockOut);
 
         FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
-        DepthWrite.Pipeline->SetRenderState(DepthWrite.State, 0);
+        DepthWrite.Pipeline->SetRenderState(DepthWrite.State, FALSE);
         DepthWrite.bActive = true;
         FFlmRenderStateRestore CullMode(Pipeline, D3DRS_CULLMODE);
-        CullMode.Pipeline->SetRenderState(CullMode.State, 1);
+        CullMode.Pipeline->SetRenderState(CullMode.State, D3DCULL_NONE);
         CullMode.bActive = true;
         Pipeline->DrawIndexedPrimitiveVb(Prim, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
                                         Count, Submit->Indices + IbStart, IndexSpan, 0);
@@ -1405,11 +1515,11 @@ namespace
         {
             // x86 masks the shift count to five bits.
             const unsigned long Lane = (GrantedFvf >> (Shift & 31)) & 3;
-            if (Lane == 0)
+            if (Lane == D3DFVF_TEXTUREFORMAT2)
                 TextureBytes += 8;
-            else if (Lane == 1)
+            else if (Lane == D3DFVF_TEXTUREFORMAT3)
                 TextureBytes += 12;
-            else if (Lane == 2)
+            else if (Lane == D3DFVF_TEXTUREFORMAT4)
                 TextureBytes += 16;
             else
                 TextureBytes += 4;
@@ -1435,7 +1545,7 @@ namespace
                               unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
         FNomadContext* Submit = (FNomadContext*)(Context);
-        if ((Flags & 0x100) != 0)
+        if ((Flags & kMaterialSubmitUseBuffers) != 0)
         {
             const uintptr_t IbBase = *(const uintptr_t*)(
                 (const unsigned char*)(Submit->IbWrapper) + 4);
@@ -1462,7 +1572,9 @@ namespace
     }
 
     // Restore the shared material render-state table after the draw.
-    const unsigned long kEnvGlassDrawTailRs[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
+    const unsigned long kEnvGlassDrawTailRs[] = {
+        D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
 
     // FUN_066f9ea0: normal and EH paths restore 0x17 before 0x0e.
     GENRESULT SubmitPlanetWaterGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
@@ -1470,10 +1582,10 @@ namespace
                                 unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
         FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
-        Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+        Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
         DepthWrite.bActive = true;
         FFlmRenderStateRestore DepthFunction(Pipeline, D3DRS_ZFUNC);
-        Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+        Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         DepthFunction.bActive = true;
         const GENRESULT Result = FlmMeshDrawPass(Pipeline, RpDraw, VbMgr, Context, Prim, Start,
                                                 Count, IbStart, IndexSpan, Flags);
@@ -1499,7 +1611,7 @@ namespace
                             unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                             unsigned long Flags)
     {
-        if (HudAnimFlag == 0 || (Flags & 0x100) == 0)
+        if (HudAnimFlag == 0 || (Flags & kMaterialSubmitUseBuffers) == 0)
             return GR_OK;
         return FlmMeshDrawPass(Pipeline, RpDraw, VbMgr, Context, Prim, Start, Count, IbStart,
                               IndexSpan, Flags);
@@ -1522,10 +1634,10 @@ namespace
     // The caller owns the QI pointer before the call, including negative QI outputs.
     bool MeshSelectAndAdvanceCursor(IMesh* Mesh, unsigned long* Cursor)
     {
-        if (Mesh->OpenFaceGroup((int)(*Cursor), 1) != 0)
+        if (Mesh->OpenFaceGroup((int)(*Cursor), kMeshOpenRead) != 0)
         {
             *Cursor = 0;
-            if (Mesh->OpenFaceGroup(0, 1) < 0)
+            if (Mesh->OpenFaceGroup(0, kMeshOpenRead) < 0)
                 return false;
         }
         ++*Cursor;
@@ -1549,12 +1661,12 @@ namespace
         void* UnusedD;
         void* UnusedCount;
         void* IndexCount;
-        Mesh->GetFaceGroupData(0x100, (void**)(&Arrays.Values),
+        Mesh->GetFaceGroupData(kMeshChannelEdgeAngles, (void**)(&Arrays.Values),
             &UnusedB, &UnusedC, &UnusedD);
-        Mesh->GetFaceGroupIndices(0x100, (void**)(&Arrays.ValueIndices), &UnusedCount);
-        Mesh->GetFaceGroupData(0x80, (void**)(&Arrays.Positions),
+        Mesh->GetFaceGroupIndices(kMeshChannelEdgeAngles, (void**)(&Arrays.ValueIndices), &UnusedCount);
+        Mesh->GetFaceGroupData(kMeshChannelEdgeIndices, (void**)(&Arrays.Positions),
             &UnusedB, &UnusedC, &UnusedD);
-        Mesh->GetFaceGroupIndices(0x80, (void**)(&Arrays.PositionIndices), &IndexCount);
+        Mesh->GetFaceGroupIndices(kMeshChannelEdgeIndices, (void**)(&Arrays.PositionIndices), &IndexCount);
         Arrays.IndexCount = (unsigned long)((uintptr_t)(IndexCount));
     }
 
@@ -1570,18 +1682,18 @@ namespace
     GENRESULT WireDrawEdges(IRenderPipeline* Pipeline, IVertexBufferManager* VertexBufferManager,
                            IMesh* Mesh, const unsigned long& Color0, const unsigned long& Color1, bool bWire2)
     {
-        if (Mesh->OpenFaceGroupChannels(0x180) == -8)
+        if (Mesh->OpenFaceGroupChannels(kMeshChannelEdgeIndices | kMeshChannelEdgeAngles) == -8)
         {
             Mesh->CloseFaceGroup();
             return GR_OK;
         }
-        Mesh->LockFaceGroupChannels(0x180);
+        Mesh->LockFaceGroupChannels(kMeshChannelEdgeIndices | kMeshChannelEdgeAngles);
         FMeshEdgeArrays Arrays;
         MeshFetchEdgeArrays(Mesh, Arrays);
         FVertexMemoryLock LockOut;
         IVertexBufferManager* Manager = VertexBufferManager;
         const unsigned long ReservationCount = bWire2 ? Arrays.IndexCount * 6 : Arrays.IndexCount;
-        if (Manager->LockVertexMemory(0x42, ReservationCount, &LockOut) >= 0)
+        if (Manager->LockVertexMemory(D3DFVF_XYZ | D3DFVF_DIFFUSE, ReservationCount, &LockOut) >= 0)
         {
             const unsigned long Stride = (unsigned long)(FvfStride(LockOut.Listing.Fvf));
             const unsigned long ColorOffset = (unsigned long)(
@@ -1641,7 +1753,7 @@ namespace
             }
             Manager->UnlockVertexMemory(&LockOut);
             if (ValidVertexCount > 0)
-                PipelineDrawPrimitiveVb(Pipeline, bWire2 ? 4 : 2, LockOut.Listing.VertexBuffer,
+                PipelineDrawPrimitiveVb(Pipeline, bWire2 ? D3DPT_TRIANGLELIST : D3DPT_LINELIST, LockOut.Listing.VertexBuffer,
                     LockOut.Listing.BaseVertex, ValidVertexCount, nullptr);
             if (bWire2)
                 ++G_Wire2DrawAttemptCount;
@@ -1692,7 +1804,7 @@ namespace
         {
             if (StartArg == 0)
             {
-                FScopedWireRenderState Lighting(Pipeline, D3DRS_LIGHTING, 1);
+                FScopedWireRenderState Lighting(Pipeline, D3DRS_LIGHTING, TRUE);
                 FScopedWireRenderState Color(Pipeline, D3DRS_AMBIENT, WireColor);
                 ((IVMeshWire*)WireReference.Object)->Draw();
             }
@@ -1740,10 +1852,10 @@ namespace
             return ((IMaterial*)(Submit->Candidate))->Submit(Context, Prim, Start, Count,
                                                                       IbStart, IndexSpan, Flags);
 
-        Pipeline->SetRenderState(D3DRS_CULLMODE, 3);
+        Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
         const GENRESULT Pass1 = FlmMeshDrawPass(Pipeline, RpDraw, VbMgr, Context, Prim, Start,
                                                Count, IbStart, IndexSpan, Flags);
-        Pipeline->SetRenderState(D3DRS_CULLMODE, 2);
+        Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
         // The retail common tail returns Count even on a failed first pass.
         if (Pass1 < 0)
             return (GENRESULT)(Count);
@@ -1764,9 +1876,9 @@ namespace
                 PipelineApplyTssTable(Pipeline, Stage, kEnvMapTss0);
                 PipelineApplyTssTable(Pipeline, Stage + 1, kEnvMapTss1);
                 Pipeline->SetTextureStageTexture((int)(Stage), (void*)(EnvMapResolvedHandle));
-                Pipeline->SetTextureStageState((int)(Stage), D3DTSS_TEXCOORDINDEX, 0x30000);
-                Pipeline->SetRenderState(D3DRS_LOCALVIEWER, 1);
-                Pipeline->SetRenderState(D3DRS_NORMALIZENORMALS, 1);
+                Pipeline->SetTextureStageState((int)(Stage), D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEREFLECTIONVECTOR);
+                Pipeline->SetRenderState(D3DRS_LOCALVIEWER, TRUE);
+                Pipeline->SetRenderState(D3DRS_NORMALIZENORMALS, TRUE);
             }
         }
         PipelineApplyRsTable(Pipeline, kEnvGlassDrawTailRs);
@@ -1825,10 +1937,10 @@ namespace
         const unsigned long IndexSpan = IndexSpanArg;
         const unsigned long Flags = FlagsArg;
 
-        PipelineSetRenderState(Pipeline, D3DRS_CULLMODE, 3);
+        PipelineSetRenderState(Pipeline, D3DRS_CULLMODE, D3DCULL_CCW);
         const GENRESULT Pass1 = FlmMeshDrawPass(Pipeline, RpDraw, VbMgr, Context, Prim, Start,
                                                 Count, IbStart, IndexSpan, Flags);
-        PipelineSetRenderState(Pipeline, D3DRS_CULLMODE, 2);
+        PipelineSetRenderState(Pipeline, D3DRS_CULLMODE, D3DCULL_CW);
         if (Pass1 < 0)
             return Pass1;
 
@@ -2384,7 +2496,7 @@ GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
     // 066f3330: per-vertex colour is reset only when the context enabled it. The pipeline (+0x4)
     // is never null-tested in flmaterials.dll: a failed QI in Initialize fails the creation.
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
@@ -2417,8 +2529,8 @@ GENRESULT DACOM_API FEnvMapMaterial::Teardown(void* Context)
     // EnvMap restores its dynamic stage state using the retained texture handle.
     if (EnvMapTextureRecord_ != 0)
     {
-        PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 0);
-        PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 0);
+        PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, FALSE);
+        PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, FALSE);
         PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXCOORDINDEX, 0);
         PipelineSetTextureStageState(Pipeline_, 1, D3DTSS_TEXCOORDINDEX, 1);
     }
@@ -2429,7 +2541,7 @@ GENRESULT DACOM_API FEnvMapMaterial::Teardown(void* Context)
 GENRESULT DACOM_API FNomadMaterial::Teardown(void* /*Context*/)
 {
     // 066f8bd0: unconditional.
-    PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
+    PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
@@ -2437,7 +2549,7 @@ GENRESULT DACOM_API FPlanetWaterMaterial::Teardown(void* Context)
 {
     // 066f9e50.
     if (MatAnim_ != nullptr)
-        PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+        PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     return FMaterialImpl::Teardown(Context);
 }
 
@@ -2447,9 +2559,9 @@ GENRESULT DACOM_API FHudAnimMaterial::Teardown(void* Context)
     if (HudAnimFlag_ != 0)
     {
         if (MatAnim_ != nullptr)
-            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
         if (ContextWantsColorVertex(Context))
-            PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
+            PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, FALSE);
     }
     return GR_OK;
 }
@@ -2543,7 +2655,7 @@ GENRESULT DACOM_API FCloakMaterial::Submit(void* Context, unsigned long PrimType
         return GR_OK;
     unsigned long ForwardFlags = Flags;
     if (bAlphaBlend_ != 0)
-        ForwardFlags |= 0x400;
+        ForwardFlags |= kMaterialSubmitNoAlphaTest;
     return SubmitCandidateGeometry(Context, PrimType, Start, Count, IbStart, IndexSpan,
                                   ForwardFlags);
 }
@@ -2629,7 +2741,7 @@ GENRESULT DACOM_API FColorizeMaterial::GetRenderFlags(unsigned long* Out)
     // 066f4a90: >= 1.0 and unordered skip the extra bit.
     unsigned long Mask = 8;
     if (bAlphaBlend_ != 0 || (double)(ColorizeExtraW_) < 1.0)
-        Mask |= 2;
+        Mask |= kMaterialRenderTranslucent;
     *Out = Mask;
     return GR_OK;
 }
@@ -2747,29 +2859,29 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterValue(unsigned long Index, void* 
     // 066f1c29 reloads the output type after virtual Slot28 returns.
     switch (Result->Type)
     {
-    case 3:
+    case kMaterialParamVector3:
         Result->Payload2 = RawWords[2];
         Result->Payload1 = RawWords[1];
         Result->Payload0 = RawWords[0];
         return GR_OK;
-    case 4:
+    case kMaterialParamVector4:
         Result->Payload3 = RawWords[3];
         Result->Payload2 = RawWords[2];
         Result->Payload1 = RawWords[1];
         Result->Payload0 = RawWords[0];
         return GR_OK;
-    case 1:
-    case 2:
-    case 8:
-    case 9:
+    case kMaterialParamInteger:
+    case kMaterialParamFloat:
+    case kMaterialParamWrapMode:
+    case kMaterialParamAddressMode:
     case 10:
         Result->Payload0 = RawWords[0];
         return GR_OK;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
         FlmAssignString((unsigned long*)Result, (const char*)RawWords[0]);
         return GR_OK;
-    case 6:
+    case kMaterialParamComponent:
         FlmAssignInterface((unsigned long*)Result, (IDAComponent*)RawWords[0]);
         return GR_OK;
     default:
@@ -2956,11 +3068,11 @@ bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, voi
         return false;
 
     unsigned long ComponentCount = 0;
-    if (EntryType == 2)
+    if (EntryType == kMaterialParamFloat)
         ComponentCount = 1;
-    else if (EntryType == 3)
+    else if (EntryType == kMaterialParamVector3)
         ComponentCount = 3;
-    else if (EntryType == 4)
+    else if (EntryType == kMaterialParamVector4)
         ComponentCount = 4;
     else
         return true; // non-range types: retail always accepts
@@ -2992,29 +3104,29 @@ GENRESULT __thiscall FWireMaterial::StoreParameterValue(unsigned long Index, voi
         unsigned long* DestWords = (unsigned long*)(Raw);
         switch (SrcWords[0])
         {
-        case 3:
+        case kMaterialParamVector3:
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 4:
+        case kMaterialParamVector4:
             DestWords[3] = SrcWords[4];
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             DestWords[0] = SrcWords[1];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
                                   (IDAComponent*)(SrcWords[1]));
             break;
@@ -3072,29 +3184,29 @@ GENRESULT __thiscall FWire2Material::StoreParameterValue(unsigned long Index, vo
         unsigned long* DestWords = (unsigned long*)(Raw);
         switch (SrcWords[0])
         {
-        case 3:
+        case kMaterialParamVector3:
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 4:
+        case kMaterialParamVector4:
             DestWords[3] = SrcWords[4];
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             DestWords[0] = SrcWords[1];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
                                   (IDAComponent*)(SrcWords[1]));
             break;
@@ -3140,17 +3252,17 @@ GENRESULT __thiscall FColorizeMaterial::StoreParameterValue(unsigned long Index,
 {
     // 066f4ad0: separate colour and option-flag storage.
     const unsigned long* SrcWords = (const unsigned long*)(Value);
-    if (Index == 0)
+    if (Index == kColorizeAmbient)
     {
         MaterialBlock_[4] = *(const float*)(&SrcWords[1]);
         MaterialBlock_[5] = *(const float*)(&SrcWords[2]);
         MaterialBlock_[6] = *(const float*)(&SrcWords[3]);
         MaterialBlock_[7] = 1.0f;
-        if (SrcWords[0] == 4)
+        if (SrcWords[0] == kMaterialParamVector4)
             ColorizeExtraW_ = *(const float*)(&SrcWords[4]);
         return GR_OK;
     }
-    if (Index == 0xA)
+    if (Index == kColorizeOptions)
     {
         // this+0x6C, a raw dword copy.
         ColorizeOptionsFlags_ = SrcWords[1];
@@ -3163,29 +3275,29 @@ GENRESULT __thiscall FColorizeMaterial::StoreParameterValue(unsigned long Index,
         unsigned long* DestWords = (unsigned long*)(Raw);
         switch (SrcWords[0])
         {
-        case 3:
+        case kMaterialParamVector3:
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 4:
+        case kMaterialParamVector4:
             DestWords[3] = SrcWords[4];
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             DestWords[0] = SrcWords[1];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw), (IDAComponent*)(SrcWords[1]));
             break;
         default:
@@ -3217,29 +3329,29 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
         unsigned long* DestWords = (unsigned long*)(Raw);
         switch (SrcWords[0])
         {
-        case 3:
+        case kMaterialParamVector3:
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 4:
+        case kMaterialParamVector4:
             DestWords[3] = SrcWords[4];
             DestWords[2] = SrcWords[3];
             DestWords[1] = SrcWords[2];
             DestWords[0] = SrcWords[1];
             break;
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             DestWords[0] = SrcWords[1];
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
-        case 6:
+        case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
                                   (IDAComponent*)(SrcWords[1]));
             break;
@@ -3279,7 +3391,7 @@ void FMaterialImpl::RecomputeOpacityFlags()
         return;
     const unsigned long* ActualDescriptor = FlmPixelFormatDescriptor(ActualFormat);
     bOneBitAlpha_ = ActualDescriptor[0x38 / 4] == 1 ? 1 : 0;
-    if ((ActualFormat >= 10 && ActualFormat <= 14) ||
+    if ((ActualFormat >= kTextureFormatDxt1 && ActualFormat <= kTextureFormatDxt5) ||
         (FlmPixelFormatDescriptor(ActualFormat)[0x48 / 4] & 0xff) != 0)
         bAlphaBlend_ = bOneBitAlpha_ == 0 ? 1 : 0;
     else
@@ -3411,17 +3523,17 @@ void* __thiscall FColorizeMaterial::GetParameterAddress(unsigned long Index)
     void* Result = nullptr;
     switch (Index)
     {
-    case 0: Result = &MaterialBlock_[4]; break;   // this+0x30 ("Diffuse" slot)
-    case 1: Result = &MaterialBlock_[0]; break;   // this+0x20 ("Ambient" slot)
-    case 2: Result = &MaterialBlock_[12]; break;  // this+0x50 (Emissive)
-    case 3: Result = &MaterialBlock_[8]; break;   // this+0x40 (Specular Color)
-    case 4: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
-    case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C (Ambient alpha / Opacity)
-    case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-    case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-    case 10: Result = &ColorizeOptionsFlags_; break; // this+0x6C
+    case kColorizeAmbient: Result = &MaterialBlock_[4]; break;   // this+0x30
+    case kColorizeDiffuse: Result = &MaterialBlock_[0]; break;   // this+0x20
+    case kColorizeEmissive: Result = &MaterialBlock_[12]; break;  // this+0x50 (Emissive)
+    case kColorizeSpecular: Result = &MaterialBlock_[8]; break;   // this+0x40 (Specular Color)
+    case kColorizeSpecularPower: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
+    case kColorizeOpacity: Result = &MaterialBlock_[3]; break;   // this+0x2C (Ambient alpha / Opacity)
+    case kColorizeTextureName: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
+    case kColorizeTextureWrap: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case kColorizeTextureAddressU: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case kColorizeTextureAddressV: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    case kColorizeOptions: Result = &ColorizeOptionsFlags_; break; // this+0x6C
     default: Result = nullptr; break;
     }
     return Result;
@@ -3432,15 +3544,15 @@ void* __thiscall FNomadMaterial::GetParameterAddress(unsigned long Index)
     void* Result = nullptr;
     switch (Index)
     {
-    case 0: Result = &NomadDiffuseColor_[0]; break;
-    case 1: Result = TextureBlock_; break;
-    case 2: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-    case 3: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-    case 4: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-    case 5: Result = (void*)((uintptr_t)(TextureBlock_) + 0x2c); break;
-    case 6: Result = (void*)((uintptr_t)(TextureBlock_) + 0x48); break;
-    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x4c); break;
-    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x50); break;
+    case kNomadDiffuse: Result = &NomadDiffuseColor_[0]; break;
+    case kNomadDiffuseTextureName: Result = TextureBlock_; break;
+    case kNomadDiffuseTextureWrap: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case kNomadDiffuseTextureAddressU: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case kNomadDiffuseTextureAddressV: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    case kNomadNomadTextureName: Result = (void*)((uintptr_t)(TextureBlock_) + 0x2c); break;
+    case kNomadNomadTextureWrap: Result = (void*)((uintptr_t)(TextureBlock_) + 0x48); break;
+    case kNomadNomadTextureAddressU: Result = (void*)((uintptr_t)(TextureBlock_) + 0x4c); break;
+    case kNomadNomadTextureAddressV: Result = (void*)((uintptr_t)(TextureBlock_) + 0x50); break;
     default: Result = nullptr; break;
     }
     return Result;
@@ -3452,16 +3564,16 @@ void* __thiscall FGenericPropertyMaterial::GetParameterAddress(unsigned long Ind
     void* Result = nullptr;
     switch (Index)
     {
-    case 0: Result = &MaterialBlock_[4]; break;   // this+0x30
-    case 1: Result = &MaterialBlock_[0]; break;   // this+0x20
-    case 2: Result = &MaterialBlock_[12]; break;  // this+0x50
-    case 3: Result = &MaterialBlock_[8]; break;   // this+0x40
-    case 4: Result = &MaterialBlock_[16]; break;  // this+0x60
-    case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C
-    case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-    case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    case kGenericPropertyAmbient: Result = &MaterialBlock_[4]; break;   // this+0x30
+    case kGenericPropertyDiffuse: Result = &MaterialBlock_[0]; break;   // this+0x20
+    case kGenericPropertyEmissive: Result = &MaterialBlock_[12]; break;  // this+0x50
+    case kGenericPropertySpecular: Result = &MaterialBlock_[8]; break;   // this+0x40
+    case kGenericPropertySpecularPower: Result = &MaterialBlock_[16]; break;  // this+0x60
+    case kGenericPropertyOpacity: Result = &MaterialBlock_[3]; break;   // this+0x2C
+    case kGenericPropertyTextureName: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
+    case kGenericPropertyTextureWrap: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case kGenericPropertyTextureAddressU: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case kGenericPropertyTextureAddressV: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
     default: Result = nullptr; break;
     }
     return Result;
@@ -3507,7 +3619,7 @@ GENRESULT DACOM_API FGlassMaterial::Bind(void* Context)
     }
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kGlassTss0);
@@ -3520,7 +3632,7 @@ GENRESULT DACOM_API FNomadMaterial::Bind(void* /*Context*/)
 {
     StageCounter_ = 0;
     PipelineApplyRsTable(Pipeline_, kNomadRs);
-    PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+    PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     PipelineSetTextureStageTexture(Pipeline_, StageCounter_, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(StageCounter_, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, StageCounter_, kNomadTss0);
@@ -3531,12 +3643,12 @@ GENRESULT DACOM_API FNomadMaterial::Bind(void* /*Context*/)
         const unsigned long* Second = TextureBlock_ + (0x2C / 4);
         PipelineSetTextureStageTexture(Pipeline_, StageCounter_, TextureHandleAt(Second));
         ApplyTssFromTextureBlock(StageCounter_, Second);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLOROP, 7);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLORARG1, 2);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLORARG2, 1);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAOP, 4);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAARG1, 2);
-        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAARG2, 1);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLOROP, D3DTOP_ADD);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLORARG2, D3DTA_CURRENT);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+        PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
         StageCounter_ += 1;
     }
     PipelineApplyTssTable(Pipeline_, StageCounter_, kNomadTssTail);
@@ -3576,7 +3688,7 @@ GENRESULT DACOM_API FHudAnimMaterial::Bind(void* Context)
         return GR_OK;
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kGlassTss0); // DAT_067030c4
@@ -3587,7 +3699,7 @@ GENRESULT DACOM_API FHudAnimMaterial::Bind(void* Context)
         float UvTransform[16];
         if (MatAnim_->FillUvMatrix(UvTransform) != 0)
         {
-            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
             PipelineSetTextureStageTransform(Pipeline_, 0, UvTransform);
         }
     }
@@ -3730,7 +3842,7 @@ GENRESULT DACOM_API FWire2Material::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     return GR_OK;
 }
 
@@ -3840,9 +3952,9 @@ GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
         PipelineApplyTssTable(Pipeline_, Stage, kEnvMapTss0);
         PipelineApplyTssTable(Pipeline_, Stage + 1, kEnvMapTss1);
         PipelineSetTextureStageTexture(Pipeline_, Stage, EnvMapResolvedHandle_);
-        PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_TEXCOORDINDEX, 0x30000);
-        PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 1);
-        PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 1);
+        PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEREFLECTIONVECTOR);
+        PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, TRUE);
+        PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, TRUE);
     }
     return GR_OK;
 }
@@ -3920,10 +4032,10 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
         for (unsigned long Index = 0; kShadowTss1[Index] != 0; Index += 2)
             TablePipeline->SetTextureStageState(1, kShadowTss1[Index], kShadowTss1[Index + 1]);
     }
-    Pipeline_->SetTextureStageState(Stage, D3DTSS_ADDRESSU, 3);
-    Pipeline_->SetTextureStageState(Stage, D3DTSS_ADDRESSV, 3);
-    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXCOORDINDEX, 0x20000);
-    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, 0x103);
+    Pipeline_->SetTextureStageState(Stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+    Pipeline_->SetTextureStageState(Stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3 | D3DTTFF_PROJECTED);
     FNomadContext* Submit = (FNomadContext*)(Context);
     GENRESULT Result = (GENRESULT)(-1);
     if (Submit != nullptr && Submit->Candidate != nullptr)
@@ -3938,10 +4050,10 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
     }
     if (ShadowLayerCount_ > 1)
     {
-        Pipeline_->SetRenderState(D3DRS_LIGHTING, 0);
-        Pipeline_->SetRenderState(D3DRS_ZFUNC, 4);
+        Pipeline_->SetRenderState(D3DRS_LIGHTING, FALSE);
+        Pipeline_->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         bool bDrawn = false;
-        if ((Flags & 0x100) != 0)
+        if ((Flags & kMaterialSubmitUseBuffers) != 0)
         {
             const unsigned long IbBase = static_cast<const FIbScratch*>(Submit->IbWrapper)->Bias;
             Result = RpDraw_->DrawIndexedPrimitive(Prim, Start, Count,
@@ -3981,9 +4093,9 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
         }
     }
     Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXCOORDINDEX, Stage);
-    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     Pipeline_->SetRenderState(D3DRS_ZFUNC, SavedZFunc);
-    Pipeline_->SetRenderState(D3DRS_LIGHTING, 1);
+    Pipeline_->SetRenderState(D3DRS_LIGHTING, TRUE);
     return Result;
 }
 
@@ -4035,7 +4147,7 @@ GENRESULT DACOM_API FEngineGlowMaterial::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     PipelineApplyTssTable(Pipeline_, 0, kEngineGlowTss);
     PipelineApplyRsTable(Pipeline_, kEngineGlowRs);
     SetMaterialBlock(Pipeline_, MaterialBlock_);
@@ -4084,10 +4196,10 @@ GENRESULT FBackdropMaterial::DrawBackdrop(void* Context, unsigned long Prim, uns
 
     // 066f2ef9: capture each pipeline anew; arm only after the corresponding force.
     FFlmRenderStateRestore Depth(Pipeline_, D3DRS_ZENABLE);
-    Depth.Pipeline->SetRenderState(Depth.State, 0);
+    Depth.Pipeline->SetRenderState(Depth.State, FALSE);
     Depth.bActive = true;
     FFlmRenderStateRestore DepthWrite(Pipeline_, D3DRS_ZWRITEENABLE);
-    DepthWrite.Pipeline->SetRenderState(DepthWrite.State, 0);
+    DepthWrite.Pipeline->SetRenderState(DepthWrite.State, FALSE);
     DepthWrite.bActive = true;
     FFlmRenderStateRestore DepthFunction(Pipeline_, D3DRS_ZFUNC);
     DepthFunction.Pipeline->SetRenderState(DepthFunction.State, 8);
@@ -4113,7 +4225,7 @@ GENRESULT DACOM_API FPlanetWaterMaterial::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, TRUE);
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kPlanetTss0);
@@ -4129,7 +4241,7 @@ GENRESULT DACOM_API FPlanetWaterMaterial::Bind(void* Context)
         std::memset(UvTransform, 0, sizeof(UvTransform));
         if (MatAnim_->FillUvMatrix(UvTransform) != 0)
         {
-            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
             PipelineSetTextureStageTransform(Pipeline_, 0, UvTransform);
         }
     }

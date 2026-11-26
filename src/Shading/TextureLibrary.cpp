@@ -6,6 +6,7 @@
 
 #include "TextureLibrary.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
+#include "render/slots.h"
 
 #include <cmath>
 #include <cstdarg>
@@ -27,6 +28,7 @@ namespace
     static const unsigned long kFourCcDaa1 = 0x31414144u;
     static const unsigned long kFourCcDaa4 = 0x34414144u;
     static const unsigned long kFourCcDaa8 = 0x38414144u;
+    static const unsigned long kDdsdPitch = 0x8; // DDSD_PITCH in the DDS header flags
 
     // DAT_06ed57c4 stride 0x34. FUN_06ebea90 pairs (value, mask=-1 if set).
     struct FTextureFormatMap
@@ -262,7 +264,7 @@ namespace
     const FTextureFormatDescriptor* TextureFormatDescriptor(int FormatId)
     {
         // FUN_06ed0ba0: signed upper bound only; negative ids are not guarded.
-        return &GTextureFormatDescriptors[FormatId > 14 ? 0 : FormatId];
+        return &GTextureFormatDescriptors[FormatId > kTextureFormatDxt5 ? 0 : FormatId];
     }
 
     void PixelFormatMatchFields(int FormatId, unsigned long* Out)
@@ -278,7 +280,7 @@ namespace
     bool FormatMapRowMatches(const FTextureFormatMap& Row, int SrcId)
     {
         // FUN_06ebf110. Id==1 uses constant 8 on the first four pairs; else DAT_06ed5230.
-        if (SrcId == 1)
+        if (SrcId == kTextureFormatP8)
         {
             if ((Row.Mask[0] & 8) != Row.Value[0])
                 return false;
@@ -347,16 +349,25 @@ namespace
         return false;
     }
 
+    // TGA header: image type (byte 2, bit 3 = run-length coded) and image descriptor (byte 17).
+    enum ETgaImageType
+    {
+        kTgaColorMapped = 1,
+        kTgaGrayscale = 3,
+    };
+    static const unsigned char kTgaOriginTop = 0x20;       // image descriptor bit 5: rows are stored top to bottom
+    static const unsigned char kTgaOriginRight = 0x10;     // image descriptor bit 4: columns are stored right to left
+
     bool GetTgaSourceFormat(const unsigned char* Blob, unsigned long* OutFormat)
     {
         const unsigned char Type = Blob[2] & 7;
-        if (Type == 1 && Blob[1] == 1)
+        if (Type == kTgaColorMapped && Blob[1] == 1)
             return MatchSourcePixelFormat(OutFormat, 8, 0, 0, 0, 0);
         if (Blob[16] == 16)
             return MatchSourcePixelFormat(OutFormat, 16, 5, 5, 5, 0);
-        if (Type == 3)
+        if (Type == kTgaGrayscale)
             return MatchSourcePixelFormat(OutFormat, 8, 8, 0, 0, 0);
-        const unsigned char Bits = Type == 1 ? Blob[7] : Blob[16];
+        const unsigned char Bits = Type == kTgaColorMapped ? Blob[7] : Blob[16];
         return Bits == 32 ? MatchSourcePixelFormat(OutFormat, 32, 8, 8, 8, 8)
                           : MatchSourcePixelFormat(OutFormat, 24, 8, 8, 8, 0);
     }
@@ -377,7 +388,7 @@ namespace
             return false;
         GetTgaSourceFormat(Blob, OutFormat);
         const unsigned char Type = Blob[2] & 7;
-        if (Type == 1)
+        if (Type == kTgaColorMapped)
         {
             const unsigned int EntryBytes = Blob[7] >> 3;
             const unsigned char* SourcePalette = Blob + Blob[0] + 18;
@@ -394,11 +405,11 @@ namespace
         unsigned char* Pixels = new unsigned char[Height * Pitch];
         *OutPixels = Pixels;
         const unsigned char* Source = Blob + Blob[0] + 18;
-        if (Type == 1)
+        if (Type == kTgaColorMapped)
             Source += ((short)ReadU16(Blob, 3) +
                        (short)ReadU16(Blob, 5)) * 3;
-        const bool bBit5 = (Blob[17] & 0x20) != 0;
-        const bool bBit4 = (Blob[17] & 0x10) != 0;
+        const bool bBit5 = (Blob[17] & kTgaOriginTop) != 0;
+        const bool bBit4 = (Blob[17] & kTgaOriginRight) != 0;
         if (!bBit5 && !bBit4)
             std::memcpy(Pixels, Source, Height * Pitch);
         else if (!bBit4)
@@ -406,7 +417,7 @@ namespace
             for (int Row = 0; Row < Height; ++Row)
                 std::memcpy(Pixels + (Height - Row - 1) * Pitch, Source + Row * Pitch, Pitch);
         }
-        else if (*OutFormat == 1)
+        else if (*OutFormat == kTextureFormatP8)
         {
             // Bit5 SET takes the same-row branch; CLEAR also reverses rows.
             for (int Row = 0; Row < Height; ++Row)
@@ -471,7 +482,7 @@ namespace
         Entry->FrameCount = (unsigned int)Source->Frames.size();
         Entry->ElapsedTime = 0.0;
         Entry->TotalDuration = 0.0;
-        Entry->WrapMode = 1;
+        Entry->WrapMode = kTextureWrapLoop;
         const float Rate = Source->TileRate;
         if (std::fabs(Rate) > 1e-5f)
             Entry->TotalDuration = PlaybackDuration(Entry->FrameCount, Rate);
@@ -548,7 +559,7 @@ namespace
         float Seconds = 0.0f;
         switch (Entry->WrapMode)
         {
-        case 0:
+        case kTextureWrapClamp:
             __asm
             {
                 mov ecx, Elapsed
@@ -575,7 +586,7 @@ namespace
                 fstp Seconds
             }
             break;
-        case 1:
+        case kTextureWrapLoop:
         {
             double RoundedNext;
             __asm
@@ -589,7 +600,7 @@ namespace
             Seconds = (float)std::fmod(RoundedNext, *Duration);
             break;
         }
-        case 2:
+        case kTextureWrapPingPong:
         {
             double RoundedNext;
             int Reflection = 0;
@@ -795,9 +806,9 @@ FTextureLibrary::FTextureLibrary()
 GENRESULT FTextureLibrary::RefreshDeviceAbilities()
 {
     // FUN_06ec0b80: refresh all three out fields regardless of HRESULT.
-    Pipeline->QueryDeviceAbility(5, &bSquareTexturesOnly);
-    Pipeline->QueryDeviceAbility(6, &MaxTextureWidth);
-    Pipeline->QueryDeviceAbility(7, &MaxTextureHeight);
+    Pipeline->QueryDeviceAbility(Render::TextureSquareOnly, &bSquareTexturesOnly);
+    Pipeline->QueryDeviceAbility(Render::TextureMaxWidth, &MaxTextureWidth);
+    Pipeline->QueryDeviceAbility(Render::TextureMaxHeight, &MaxTextureHeight);
     bCapabilitiesCached = true;
     return GR_OK;
 }
@@ -904,13 +915,13 @@ namespace
     FFileSystemDesc MakeTextureDescriptor(const char* Name)
     {
         FFileSystemDesc Desc = {};
-        Desc.Size = 0x34;
+        Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc.ComponentName = "FileSystem";
         Desc.Path = Name;
         Desc.Access = GENERIC_READ;
         Desc.ShareMode = FILE_SHARE_READ;
         Desc.Creation = OPEN_EXISTING;
-        Desc.Flags = 0x08000080;
+        Desc.Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
         Desc.FindHandle = 0xffffffff;
         return Desc;
     }
@@ -1184,7 +1195,7 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
     }
     unsigned long SourceFormat = D3dFormatToTextureFormat(Info.Format);
     const unsigned long* Header = (const unsigned long*)Map.View;
-    const bool bPitch = (Header[2] & 8) != 0;
+    const bool bPitch = (Header[2] & kDdsdPitch) != 0;
     unsigned long MinimumBlock = 1;
     if (!bPitch)
     {
@@ -1415,7 +1426,7 @@ GENRESULT FTextureLibrary::LoadTgaTexture(IFileSystem* FileSystem, const char* N
         const unsigned long Pitch = ((TextureFormatDescriptor(UploadFormat)->BitsPerPixel + 7) >> 3) * Width;
         unsigned int Format = UploadFormat;
         const GENRESULT Result = Pipeline->SetTextureLevelData(Handle, Level, Width, Height, Pitch,
-            &Format, Pixels, nullptr, UploadFormat == 1 ? Palette : nullptr);
+            &Format, Pixels, nullptr, UploadFormat == kTextureFormatP8 ? Palette : nullptr);
         delete[] Pixels;
         if (Result < 0)
             TextureTgaWarning(0x125, "load_tga_mips: %s: dx couldnt load mip %d !", Name, Skip);
@@ -1623,7 +1634,7 @@ static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Fram
         return GR_GENERIC;
     }
     unsigned int Selected = Frame;
-    if (Selected == 0xffffffffu)
+    if (Selected == (unsigned int)kTextureFrameCurrent)
         Selected = Count <= 1 ? 0 : Playback->CurrentFrame;
     else if (Selected >= Count)
         Selected = Count - 1;
@@ -1651,7 +1662,7 @@ GENRESULT DACOM_API FTextureLibrary::GetTextureFrame(void* Tex, int Frame, unsig
     {
         const unsigned int Count = (unsigned int)Source->Frames.size();
         unsigned int Selected = (unsigned int)Frame;
-        if (Selected == 0xfffffffeu)
+        if (Selected == (unsigned int)kTextureFrameLast)
             Selected = Count - 1;
         if (Selected < Count)
         {
@@ -1900,7 +1911,7 @@ static FTextureFrame* FindMutableFrame(FTextureEntry* Entry, int Index)
         return nullptr;
     const unsigned int Count = (unsigned int)Entry->Frames.size();
     unsigned int Selected = (unsigned int)Index;
-    if (Selected == 0xfffffffeu)
+    if (Selected == (unsigned int)kTextureFrameLast)
         Selected = Count - 1;
     if (Selected >= Count)
         return nullptr;

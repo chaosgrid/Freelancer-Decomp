@@ -82,6 +82,34 @@ static const unsigned long G_MixKindScalar = 1;
 static const unsigned long G_MixKindVec3 = 3;
 static const unsigned long G_MixKindQuat = 4;
 static const unsigned long G_MixKindPosQuat = 7;
+// FTypedChannel::GetType() / the creation switch of NewTypedChannelWithOwner: scalar, vector,
+// quaternion, position + orientation, and the bare base class (no sampled value).
+static const unsigned long G_TypedTypeScalar = 1;
+static const unsigned long G_TypedTypeVector = 2;
+static const unsigned long G_TypedTypeQuat = 4;
+static const unsigned long G_TypedTypePosQuat = 6;
+static const unsigned long G_TypedTypeBase = 8;
+// FAnimBindOut::Kind / FTypedChannel::Kind: what the channel is bound to.
+static const unsigned long G_BindKindJoint = 0;
+static const unsigned long G_BindKindObject = 1;
+static const unsigned long G_BindKindRoot = 2;
+// FTypedChannel::LoopFlags (header[1]): bit 1 loop, bit 2 ping-pong; the mixer reads bits 3..5
+// as the axis of a pose blend that survives (FMixerStack::Evaluate) and bit 7 on attach.
+static const unsigned long G_LoopFlagLoop = 0x2;
+static const unsigned long G_LoopFlagPingPong = 0x4;
+static const unsigned long G_LoopFlagPoseAxisX = 0x8;
+static const unsigned long G_LoopFlagPoseAxisY = 0x10;
+static const unsigned long G_LoopFlagPoseAxisZ = 0x20;
+static const unsigned long G_LoopFlagKeepOutgoing = 0x80;
+// FTypedChannel::PlayState bit 0: the channel is playing (IChannel::Play sets it, StopGraph
+// and the mixer pass clear it).
+static const unsigned long G_PlayStatePlaying = 0x1;
+// IChannel::Play flags: bit 0 plays backwards (the remaining bits become LoopFlags).
+static const unsigned long G_PlayFlagReverse = 0x1;
+// FTypedChannel::Collect's Mode: sample the first key time (T0) and / or the last (T1)
+// themselves as well as the keys between them.
+static const unsigned long G_CollectIncludeStart = 0x1;
+static const unsigned long G_CollectIncludeEnd = 0x2;
 static const float G_ShortToUnit = 3.051851e-05f;
 static const unsigned long G_MixerTypeLeaf = 0;
 static const unsigned long G_MixerTypeBlend = 1;

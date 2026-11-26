@@ -173,6 +173,16 @@ public:
     virtual void Draw(const wchar_t* Text) = 0;
 };
 
+// _IMEUI_APPEARANCE::SymbolPosition: where the IME on/off symbol is drawn (ImeUiToolbar's layout switch).
+enum EImeSymbolPosition
+{
+    kImeSymbolBesideInput = 0, // right of the input box, or left of it when the screen edge is too close
+    kImeSymbolTopLeft = 1,
+    kImeSymbolTopRight = 2,
+    kImeSymbolBottomRight = 3,
+    kImeSymbolBottomLeft = 4,
+};
+
 struct _IMEUI_APPEARANCE
 {
     unsigned SymbolOnColor;                 // +0x00, resource 1

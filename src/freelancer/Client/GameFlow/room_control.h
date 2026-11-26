@@ -31,6 +31,14 @@ namespace Archetype
 // The engine-instance handle a RoomObject answers with when it has none (FUN_00450870 -1).
 static const InstanceIndex kRoomObjectNoInstance = InvalidInstanceIndex;
 
+// FRoomObject::RenderMode (FUN_0044af60): how the object is drawn.
+enum ERoomRenderMode
+{
+    kRoomRenderMesh = 0,        // renderer slot 7 (with the "envmapbasic" override when bEnvMap)
+    kRoomRenderStarsphere = 1,  // appearance slot 10 (DrawStarsphere)
+    kRoomRenderBackdrop = 2     // appearance slot 9 (DrawBackdrop)
+};
+
 // RoomObject (RTTI .?AVRoomObject@@) -- the base of every object a room draws. The ctor
 // FUN_005593d0(Owner) appends it to DAT_00679a10 and the dtor FUN_005594b0 releases its
 // material entries and takes it out again. FUN_0044b570 walks that list three times, once per

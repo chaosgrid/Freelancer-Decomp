@@ -602,7 +602,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         }
         else if (Leaving == kMenuStateOptions)
         {
-            if (GOptionsChild_67c20c == nullptr || (GOptionsChild_67c20c->Flags & 1) == 0)
+            if (GOptionsChild_67c20c == nullptr || (GOptionsChild_67c20c->Flags & kWin3DActive) == 0)
             {
                 Nav->CurrentState = kMenuStateMainMenu;
                 if (GOptionsChild_67c20c != nullptr)

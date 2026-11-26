@@ -119,14 +119,14 @@ int EvadeBehavior::PickDodgeStyle()
 
     double Bound = P.EvadeDodgeStyleWeightWaggle;
     if (R < Bound)
-        return 0;
+        return kDodgeStyleWaggle;
     Bound = Bound + P.EvadeDodgeStyleWeightWaggleRandom;
     if (R < Bound)
-        return 1;
+        return kDodgeStyleWaggleRandom;
     Bound = Bound + P.EvadeDodgeStyleWeightSlide;
     if (R < Bound)
-        return 2;
-    return 3;
+        return kDodgeStyleSlide;
+    return kDodgeStyleCorkscrew;
 }
 
 // ----------------------------------------------------------------------------
@@ -136,7 +136,7 @@ void EvadeBehavior::OnEngage()
 {
     Behavior::OnEngage();                                              // FUN_062d20d0
     EvadeMode = 0;
-    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
     Elapsed2b0 = 0.0f;
 
     Dodge.Picker.SetWatchObject(WatchedObject(Watcher2a0));         // FUN_062d88e0
@@ -177,7 +177,7 @@ void EvadeBehavior::OnEngage()
 
     int const Style = PickDodgeStyle();                             // FUN_062c8690
     Dodge.DodgeStyle = Style;                                       // .text:062d8920 +0xb4
-    if (Style == 2)
+    if (Style == kDodgeStyleSlide)
     {
         // Double .rdata:0639f8e0 through FCOS, negated, rounded to float.
         ConeCos2b8 = -X87CosF(1.0471975803375244);
@@ -192,11 +192,11 @@ void EvadeBehavior::OnEngage()
                                              B.EvadeBreakStyleWeightReverse);
         double const R = static_cast<double>(std::rand()) * Sum * GRandScale;
         if (R < B.EvadeBreakStyleWeightReverse)
-            Fate = 2;
+            Fate = kBreakStyleReverse;
         else if (R < static_cast<double>(B.EvadeBreakStyleWeightOutrun) + B.EvadeBreakStyleWeightReverse)
-            Fate = 0;
+            Fate = kBreakStyleOutrun;
         else
-            Fate = 1;
+            Fate = kBreakStyleSideways;
     }
     BreakAway.BreakStyle = Fate;                                    // .text:063275d0 +0x34
     BreakAway.AttemptReverseTime = B.EvadeBreakAttemptReverseTime;  // .text:062a33d0 +0x4c <- 0x1610
@@ -344,51 +344,51 @@ int EvadeBehavior::OnUpdate()
     {
         if (!IsWatching(Watcher2a0) || !WatchedOutsideCone(Watcher2a0, OwnerContext, ConeCos2bc))
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
     }
 
     int const OldMode = EvadeMode;
     if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers))
     {
-        EvadeMode = 4;
+        EvadeMode = kEvadeModeMissile;
     }
     else if (SysMgr->Timers.IsTimer2Active())                 // FUN_062e8860
     {
-        EvadeMode = 3;
+        EvadeMode = kEvadeModeBreakReverse;
     }
     // Strictly less (unordered fails).
     else if (Flag2b6 == 0 && Elapsed2b0 < DodgeTime2a8)
     {
-        EvadeMode = 1;
+        EvadeMode = kEvadeModeDodge;
     }
     else
     {
         if (Flag2b7 != 0)
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
         // Strictly greater, the sum unrounded.
         if (!(static_cast<double>(BreakTime2ac) + DodgeTime2a8 > Elapsed2b0))
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
-        EvadeMode = 2;
+        EvadeMode = kEvadeModeBreak;
     }
 
     if (OldMode != EvadeMode)
     {
-        if (EvadeMode == 1)
+        if (EvadeMode == kEvadeModeDodge)
         {
             if (Pers.FormationParams.bBreakApartFormationOnEvadeDodge != 0)   // Sys+0x17fd
                 SysMgr->FormationLeaders.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeDodgeTime);
             if (Pers.FormationParams.bRegroupFormationOnEvadeDodge != 0)      // Sys+0x1804
                 SysMgr->FormationLeaders.NotifyFormationLeader2();
         }
-        if (EvadeMode == 2)
+        if (EvadeMode == kEvadeModeBreak)
         {
             if (Pers.FormationParams.bBreakApartFormationOnEvadeBreak != 0)   // Sys+0x1805
                 SysMgr->FormationLeaders.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeBreakTime);
@@ -402,7 +402,7 @@ int EvadeBehavior::OnUpdate()
 
     switch (EvadeMode)
     {
-    case 1:
+    case kEvadeModeDodge:
     {
         if (IsWatching(Watcher2a0) && !WatchedOutsideCone(Watcher2a0, OwnerContext, ConeCos2b8))
         {
@@ -418,9 +418,9 @@ int EvadeBehavior::OnUpdate()
             Zero2.y = 0.0f;
             Zero2.z = 0.0f;
             Sys->Thrust.SetNudgeDirection(Zero2);
-            Sys->Thrust.SetThrottle(1.0f, 0);
-            UpdateResult = 0;
-            return 0;
+            Sys->Thrust.SetThrottle(1.0f, kThrottleModeEngine);
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
         if (Flag2b5 != 0)
@@ -451,67 +451,67 @@ int EvadeBehavior::OnUpdate()
             Afterburner.Update(DeltaTime);
         else
             Afterburner.Commit();
-        UpdateResult = 0;
-        return 0;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
 
-    case 2:
+    case kEvadeModeBreak:
     {
         int const R = BreakAway.Update(DeltaTime);
         if (R != 0)
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
         UpdateResult = R;
         return R;
     }
 
-    case 3:
+    case kEvadeModeBreakReverse:
     {
         if (IsWatching(Watcher2a0) && !WatchedOutsideCone(Watcher2a0, OwnerContext, 0.7f))  // 0x3f333333
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
-        BreakAway.BreakStyle = 2;                                   // .text:063275d0
+        BreakAway.BreakStyle = kBreakStyleReverse;                                   // .text:063275d0
         int const R = BreakAway.Update(DeltaTime);
         if (R != 0)
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
         UpdateResult = R;
         return R;
     }
 
-    case 4:
+    case kEvadeModeMissile:
     {
         // The missile the timer table tracks (Timers+0xe8, Sys+0x11c); the dodge mode comes from
         // the Personality::MissileReaction range it falls inside.
         void* const MissileRaw = *reinterpret_cast<void* const*>(Sys->Timers.BestCandidateWatcherBytes);
         int Mode;
         if (TimerTableMissileWithinReaction00(&Sys->Timers))        // FUN_062e8910
-            Mode = 1;
+            Mode = kDodgeMissileBreak;
         else if (TimerTableMissileWithinReaction04(&Sys->Timers))   // FUN_062e8940
-            Mode = 2;
+            Mode = kDodgeMissileSlide;
         else if (TimerTableMissileWithinReaction08(&Sys->Timers))   // FUN_062e8970
-            Mode = 0;
+            Mode = kDodgeMissileAfterburn;
         else
         {
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
         DodgeMissile.SetWatchObject(ObjRwFromWatchable(MissileRaw));    // FUN_062d9ae0
         DodgeMissile.Mode1c = Mode;                                 // .text:0631d950
         DodgeMissile.Update(DeltaTime);
-        UpdateResult = 1;
-        return 1;
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;
     }
 
     default:
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 }
 
@@ -534,7 +534,7 @@ bool EvadeBehavior::OnApplyDirective(void* DirectiveOp)
     Watcher2a0.set(Target != nullptr
                        ? reinterpret_cast<Watchable const*>(static_cast<char*>(Target) + 8)
                        : nullptr);
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     return true;
 }
 

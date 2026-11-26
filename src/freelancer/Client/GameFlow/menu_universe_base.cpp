@@ -524,7 +524,7 @@ namespace
         {
             unsigned char VisitFlags = 0;
             GetPlayerVisitFlagsRetail(SolarId, &VisitFlags, 0, 0);
-            VisitFlags = static_cast<unsigned char>(VisitFlags | 0x1e);
+            VisitFlags = static_cast<unsigned char>(VisitFlags | kVisitExtraInfo | kVisitCommodities | kVisitEquipment | kVisitShips);
             SetPlayerVisitFlagsRetail(SolarId, VisitFlags, true);
         }
 

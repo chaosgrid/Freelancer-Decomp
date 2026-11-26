@@ -96,8 +96,8 @@ FEncounterShip::FEncounterShip()
 // FUN_06ef5b50.
 FEncounterFormation::FEncounterFormation(INI_Reader* Reader)
     : bFeelingToFormation(0)
-    , RerollFrequency(2)
-    , FeelingMask(7)
+    , RerollFrequency(kEncounterRerollEvery)
+    , FeelingMask(kEncounterFeelingAny)
     , Field_0x0c(-1)
     , FeelingValue(-1)
     , Faction(0xffffffffu)
@@ -228,13 +228,13 @@ void FEncounterFormation::ParseFeeling(INI_Reader* Reader)
         // A null value counts as "every"; an unknown one changes nothing.
         char const* Value = Reader->get_value_string(0);
         if (Value == nullptr)
-            RerollFrequency = 2;
+            RerollFrequency = kEncounterRerollEvery;
         else if (strcmp(Value, "synch") == 0)
-            RerollFrequency = 1;
+            RerollFrequency = kEncounterRerollSynch;
         else if (strcmp(Value, "every") == 0)
-            RerollFrequency = 2;
+            RerollFrequency = kEncounterRerollEvery;
         else if (strcmp(Value, "once") == 0)
-            RerollFrequency = 0;
+            RerollFrequency = kEncounterRerollOnce;
         return;
     }
     if (!Reader->is_value("feeling_to_formation"))
@@ -243,14 +243,14 @@ void FEncounterFormation::ParseFeeling(INI_Reader* Reader)
     bFeelingToFormation = 1;
     char const* Feeling = Reader->get_value_string(0);
     if (strcmp(Feeling, "friendly") == 0)
-        FeelingMask = 1;
+        FeelingMask = kEncounterFeelingFriendly;
     else if (strcmp(Feeling, "hostile") == 0)
-        FeelingMask = 4;
+        FeelingMask = kEncounterFeelingHostile;
     else if (strcmp(Feeling, "same") == 0)
-        FeelingMask = 8;
+        FeelingMask = kEncounterFeelingSame;
     else if (strcmp(Feeling, "any") == 0)
-        FeelingMask = 7;
-    RerollFrequency = 2;
+        FeelingMask = kEncounterFeelingAny;
+    RerollFrequency = kEncounterRerollEvery;
     FeelingValue = Reader->get_value_int(1);
 }
 
@@ -585,7 +585,7 @@ bool FEncounterParameters::PickFaction(FEncounterFormation* Formation)
              It != Choices.Items.end(); ++It)
         {
             bool bMatch;
-            if (Mask == 8)
+            if (Mask == kEncounterFeelingSame)
                 bMatch = It->first == OtherFaction;                         // "same"
             else
                 bMatch = (Mask & GetFactionFeelingMask(It->first, OtherFaction)) != 0;   // FUN_06f350f0
@@ -645,13 +645,13 @@ bool FEncounterParameters::Refresh(float Time)
         bool bPick;
         switch (Formation->RerollFrequency)
         {
-        case 0:
+        case kEncounterRerollOnce:
             bPick = bFirst;
             break;
-        case 1:
+        case kEncounterRerollSynch:
             bPick = bReroll;
             break;
-        case 2:
+        case kEncounterRerollEvery:
             bPick = true;
             break;
         default:
@@ -669,13 +669,13 @@ bool FEncounterParameters::Refresh(float Time)
         bool bPick;
         switch (Formation->RerollFrequency)
         {
-        case 0:
+        case kEncounterRerollOnce:
             bPick = bFirst;
             break;
-        case 1:
+        case kEncounterRerollSynch:
             bPick = bReroll;
             break;
-        case 2:
+        case kEncounterRerollEvery:
             bPick = true;
             break;
         default:
@@ -850,7 +850,7 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
                     if (Request->bArrival)
                     {
                         // The dock hail handler keeps quiet about each new ship for 30 s.
-                        int const HandlerType = 0;
+                        int const HandlerType = kGcsHandlerDockHail;
                         void* const AnyPhantom = nullptr;                   // DAT_06fb7834
                         FGcsDockHailHandler* Handler =
                             static_cast<FGcsDockHailHandler*>(GetGcsHandler(&HandlerType));   // FUN_06ee93f0

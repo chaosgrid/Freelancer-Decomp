@@ -48,7 +48,6 @@ namespace
     const float kSeeTargetAngle = 0.05235988f;
     const float kTargetPointHold = 2.0f;
     const float kSeekerLeadSpeed = 1.0e9f;
-    const unsigned kJointTypeRev = 2;
 
     const unsigned kWatchableOffset = 0x9c;   // offsetof(CSimple, SelfWatchable)
 

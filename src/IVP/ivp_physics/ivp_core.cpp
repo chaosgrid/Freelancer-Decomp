@@ -82,7 +82,7 @@ namespace
 // IVP_Core_StopMovementWithoutCollisionRecheck: Halts movement, zeros accumulators and velocities for static cores
 void __fastcall IVP_Core_StopMovementWithoutCollisionRecheck(IVP_Core* Core)
 {
-    Core->MovementState = (Core->MovementState & 0xFFFFFF08) | 8;
+    Core->MovementState = (Core->MovementState & 0xFFFFFF08) | IVP_MT_NOT_SIM;
 
     Core->RotSpeedChange.x = 0.0f;
     Core->RotSpeedChange.y = 0.0f;
@@ -183,15 +183,15 @@ void IVP_Core::refresh_contact_points()
     int32_t ObjectMovement;
     if ((static_cast<uint8_t>(Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
-        MovementState = (MovementState & 0xffffff08u) | 0x8u;
+        MovementState = (MovementState & 0xffffff08u) | IVP_MT_NOT_SIM;
         ObjectMovement = 0x10;
     }
     else
     {
         // Signed compare of the low byte.
-        if (IVP_SignedLowByte(MovementState) > 8)
+        if (IVP_SignedLowByte(MovementState) > IVP_MT_NOT_SIM)
         {
-            MovementState = (MovementState & 0xffffff08u) | 0x8u;
+            MovementState = (MovementState & 0xffffff08u) | IVP_MT_NOT_SIM;
         }
         ObjectMovement = static_cast<int8_t>(MovementState & 0xffu); // re-read, sign-extended
     }
@@ -285,7 +285,7 @@ void IVP_Core::remove_object(IVP_Real_Object* Object)
     {
         // FUN_06346f20 compares MovementState's low byte against 8 SIGNED (0x80-0xFF
         // count as "< 8").
-        if (static_cast<int8_t>(MovementState & 0xFF) < 8)
+        if (static_cast<int8_t>(MovementState & 0xFF) < IVP_MT_NOT_SIM)
         {
             freeze_simulation_core(); // :06346f87 FUN_06347040 (its object loop is empty here)
         }
@@ -353,12 +353,12 @@ IVP_Core::IVP_Core(IVP_Real_Object* Owner, const IVP_U_Quat* InitialOrientation,
     IVP_Simulation_Unit* Unit = new (std::nothrow) IVP_Simulation_Unit(); // operator_new(0x24) + FUN_06348e10
     OwningSimUnit = Unit;
     Unit->Cores.Add(this);                // FUN_06348ec0
-    OwningSimUnit->State = (OwningSimUnit->State & 0xFFFFFF08u) | 8u;
+    OwningSimUnit->State = (OwningSimUnit->State & 0xFFFFFF08u) | IVP_MT_NOT_SIM;
 
     // Step 4: register with the environment's standard gravity controller
     // (IVP_Environment+0x00, FUN_06349180).
     register_controller(Environment->standard_gravity_controller);
-    MovementState = (MovementState & 0xFFFFFF08u) | 8u; // after the register
+    MovementState = (MovementState & 0xFFFFFF08u) | IVP_MT_NOT_SIM; // after the register
 
     // Step 5 (FUN_06347660): Flags bits [3:2] from FlagsHi, then FUN_06349400 on
     // Environment->+0x08 with OwningSimUnit, unconditionally.
@@ -452,7 +452,7 @@ void IVP_Core::synchronize_simulation_time_snapshot(float DeltaTime, float InvDe
 // FUN_06347170 (no null tests, as retail).
 void IVP_Core::mark_active_and_sync_objects()
 {
-    MovementState = (MovementState & 0xFFFFFF01u) | 1u;
+    MovementState = (MovementState & 0xFFFFFF01u) | IVP_MT_MOVING;
 
     const IVP_Time Now = Environment->current_time;
     const double DeltaTime = Environment->delta_time;            // env+0xac
@@ -471,7 +471,7 @@ void IVP_Core::mark_active_and_sync_objects()
     for (int32_t Index = static_cast<int32_t>(Objects.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Real_Object* const Obj = Objects.elems[Index];
-        Obj->flags = (Obj->flags & 0xFFFFFF01u) | 1u;
+        Obj->flags = (Obj->flags & 0xFFFFFF01u) | IVP_MT_MOVING;
         Obj->recheck_ov_element_as_moving();                     // FUN_063454e0
     }
 }
@@ -763,7 +763,7 @@ int IVP_Core::revive_pass()
     for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex)
     {
         IVP_Real_Object* const Obj = Objects.elems[ObjIndex];
-        Obj->flags = (Obj->flags & 0xFFFFFF01u) | 1u;
+        Obj->flags = (Obj->flags & 0xFFFFFF01u) | IVP_MT_MOVING;
     }
 
     mark_active_and_sync_objects(); // FUN_06347170
@@ -1045,7 +1045,7 @@ double IVP_Core::calc_kinetic_energy(const Vector* LinearVelocity, const Vector*
 void IVP_Core::calc_interpolated_transform(float CurrentTimeBase, float CurrentTimeOffset,
                                             IVP_U_Matrix* OutMatrix) const
 {
-    if (!(static_cast<int8_t>(MovementState & 0xFFu) < 8))
+    if (!(static_cast<int8_t>(MovementState & 0xFFu) < IVP_MT_NOT_SIM))
     {
         std::memcpy(OutMatrix, &MWorldFCore, sizeof(IVP_U_Matrix));
         return;
@@ -1128,7 +1128,7 @@ void IVP_Core::apply_velocity_damping(float DeltaTime, const Vector* RotDampVec,
 // DeltaTime.
 void IVP_Core::damp_velocities(float DeltaTime)
 {
-    if (!(static_cast<int8_t>(MovementState & 0xFFu) < 2))
+    if (!(static_cast<int8_t>(MovementState & 0xFFu) < IVP_MT_SLOW))
     {
         Vector FudgedRotDamp;
         FudgedRotDamp.x = RotSpeedDamp.x + 0.1f; // DAT_063a5464
@@ -1353,7 +1353,7 @@ void IVP_Core::wake_or_ensure_simulation()
     if ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
         return;
 
-    if ((MovementState & 0xFFu) == 8u)
+    if ((MovementState & 0xFFu) == IVP_MT_NOT_SIM)
         revive_sleeping_core();
     else
         ensure_in_simulation();
@@ -1398,7 +1398,7 @@ void IVP_Core::freeze_simulation_core()
         IVP_Real_Object* Object = Objects.elems[Index];
 
         // Movement byte = 8.
-        Object->flags = (Object->flags & 0xFFFFFF08u) | 0x8u;
+        Object->flags = (Object->flags & 0xFFFFFF08u) | IVP_MT_NOT_SIM;
 
         Environment->mindist_manager->RecheckOvElement(Object); // FUN_0634ebd0
 

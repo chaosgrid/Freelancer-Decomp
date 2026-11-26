@@ -20,6 +20,11 @@ class CServerInfoDlg : public CDialog
 {
 public:
 	enum { IDD = 0x83 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlInfoTree = 1005,
+	};
 
 	explicit CServerInfoDlg(CWnd* Parent = nullptr);
 

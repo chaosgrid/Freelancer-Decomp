@@ -44,7 +44,7 @@ namespace
     const float kRandToUnit = 3.0517578125e-05f;
 
     // The CEqObj type mask the attach slot tests. Both bits must be set.
-    const unsigned kEqObjShipTypeMask = 0x503;
+    const unsigned kEqObjShipTypeMask = CObject::ClassShip;
 
     const int kWatchableOffset = 8;
 

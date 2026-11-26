@@ -230,7 +230,7 @@ void FDestroyMission::FailMission(int Reason)
     if (!PlayerStates.empty())
     {
         unsigned int const Target = PlayerStates[0]->PlayerId;
-        pub::Player::DisplayMissionMessage(Target, Text, static_cast<MissionMessageType>(2), true);
+        pub::Player::DisplayMissionMessage(Target, Text, MISSION_MSG_TYPE_2, true);
     }
     FRandomMissionObject::FailMission(Reason);
 }
@@ -240,7 +240,7 @@ void FDestroyMission::RemoveMissionPlayer(unsigned int InPlayerId, int Reason)
 {
     FmtStr Text;
     Text.begin_mad_lib(GetReasonIds(Reason));
-    pub::Player::DisplayMissionMessage(InPlayerId, Text, static_cast<MissionMessageType>(2), false);
+    pub::Player::DisplayMissionMessage(InPlayerId, Text, MISSION_MSG_TYPE_2, false);
     FRandomMissionObject::RemoveMissionPlayer(InPlayerId, Reason);
 }
 
@@ -335,7 +335,7 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
         }
         if (Event->get_event_type() == SMET_Controller &&
             (static_cast<EMessage>(Controller->ControllerId) == EMessage::DockRequest ||
-             static_cast<EMessage>(Controller->ControllerId) == EMessage::Msg0x25))
+             static_cast<EMessage>(Controller->ControllerId) == EMessage::ShipLeftSystem))
         {
             // Retail scans the players for one with a ship (FUN_06ef00d0) and never reads the
             // result.
@@ -962,7 +962,7 @@ unsigned int FRandomMissionLoader::PickEnemyGroup(FSystemInfo* System, Vector co
 int FRandomMissionLoader::CreateMission(FRmMissionRequest const* Request,
                                         FRandomMissionData** OutMission)
 {
-    int const NoObjective = 3;
+    int const NoObjective = kRmCreateNoObjective;
     if (Mission != nullptr)
     {
         Mission->Release();
@@ -1037,5 +1037,5 @@ int FRandomMissionLoader::CreateMission(FRmMissionRequest const* Request,
         return Result;
     }
     *OutMission = Mission;
-    return 1;
+    return kRmCreateNoEnemyGroup;
 }

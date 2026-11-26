@@ -221,29 +221,29 @@ CObject::~CObject()
 // The six per-size pools behind CObject::operator new/delete, built by static initialisers
 // (062adaa0..062adb92) as Heap(Size, -1) at .data 0x063fc400 (0x9c), 0x063fc3f0 (0x120),
 // 0x063fc3e0 (0x104), 0x063fc3d0 (0xf0), 0x063fc3c0 (0x1ec), 0x063fc3b0 (0x2dc).
-static Heap GObjectHeap9c(0x9c, -1);
-static Heap GObjectHeap120(0x120, -1);
-static Heap GObjectHeap104(0x104, -1);
-static Heap GObjectHeapF0(0xf0, -1);
-static Heap GObjectHeap1ec(0x1ec, -1);
-static Heap GObjectHeap2dc(0x2dc, -1);
+static Heap GObjectHeap9c(sizeof(CObject), -1);
+static Heap GObjectHeap120(sizeof(CBeam), -1);
+static Heap GObjectHeap104(sizeof(CGuided), -1);
+static Heap GObjectHeapF0(sizeof(CProjectile), -1);
+static Heap GObjectHeap1ec(sizeof(CSolar), -1);
+static Heap GObjectHeap2dc(sizeof(CShip), -1);
 
 void* CObject::operator new(unsigned int Size) noexcept
 {
     // FUN_062adbc0. Any other size goes to the CRT malloc.
     switch (Size)
     {
-    case 0x9c:
+    case sizeof(CObject):
         return GObjectHeap9c.Malloc();
-    case 0xf0:
+    case sizeof(CProjectile):
         return GObjectHeapF0.Malloc();
-    case 0x104:
+    case sizeof(CGuided):
         return GObjectHeap104.Malloc();
-    case 0x120:
+    case sizeof(CBeam):
         return GObjectHeap120.Malloc();
-    case 0x1ec:
+    case sizeof(CSolar):
         return GObjectHeap1ec.Malloc();
-    case 0x2dc:
+    case sizeof(CShip):
         return GObjectHeap2dc.Malloc();
     default:
         return malloc(Size);
@@ -255,22 +255,22 @@ void CObject::operator delete(void* Ptr, unsigned int Size)
     // FUN_062adc40
     switch (Size)
     {
-    case 0x9c:
+    case sizeof(CObject):
         GObjectHeap9c.Free(Ptr);
         return;
-    case 0xf0:
+    case sizeof(CProjectile):
         GObjectHeapF0.Free(Ptr);
         return;
-    case 0x104:
+    case sizeof(CGuided):
         GObjectHeap104.Free(Ptr);
         return;
-    case 0x120:
+    case sizeof(CBeam):
         GObjectHeap120.Free(Ptr);
         return;
-    case 0x1ec:
+    case sizeof(CSolar):
         GObjectHeap1ec.Free(Ptr);
         return;
-    case 0x2dc:
+    case sizeof(CShip):
         GObjectHeap2dc.Free(Ptr);
         return;
     default:

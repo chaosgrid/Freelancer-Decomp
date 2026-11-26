@@ -129,13 +129,13 @@ int FileOpenByName(void* File, const char* ChildName)
     };
     FOpenDesc Desc;
     std::memset(&Desc, 0, sizeof(Desc));
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = ChildName;
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
     const int Handle =
         AsFileSystem(File)->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
@@ -152,10 +152,10 @@ FFileSystemDesc* FFileSystemDesc::Init(const char* Path, const char* ComponentNa
 {
     std::memset(this, 0, sizeof(FFileSystemDesc));
     this->ComponentName = ComponentName;
-    Access = 0x80000000;
-    ShareMode = 1;
-    Creation = 3;
-    Flags = 0x8000080;
+    Access = GENERIC_READ;
+    ShareMode = FILE_SHARE_READ;
+    Creation = OPEN_EXISTING;
+    Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     this->Path = Path;
     Size = 0x34;
     FindHandle = 0xFFFFFFFF;
@@ -201,7 +201,7 @@ void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraX
     *OutCameraView = CameraView;
     *OutWorld = World;
     int State = 1;
-    G_Pipeline->GetPipelineState(7, &State);
+    G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &State);
 
     const Transform* Extra = (const Transform*)ExtraXform;
     if (State != 0)

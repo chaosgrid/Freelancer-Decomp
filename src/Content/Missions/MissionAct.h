@@ -101,6 +101,13 @@ public:
     unsigned char bEnabled; // +0x0c get_value_bool(0)
 };
 
+// ActRandomPopSphere::Mode, the "on" / "off" of the script line.
+enum ERandomPopSphereMode
+{
+    kRandomPopSphereOn = 0,    // remove the exclusion sphere
+    kRandomPopSphereOff = 1    // add it
+};
+
 // Act_RandomPopSphere: new(0x20), ctor FUN_06ecdb70 (fields not set), vtable 06fb5fb4.
 class ActRandomPopSphere : public Act
 {
@@ -409,6 +416,14 @@ public:
     unsigned int ObjectiveId; // +0x10 ID_String CreateID(s0)
 };
 
+// ActSetNnObj::State of the script keywords (the objective's Type, FMissionObjective).
+enum ENnObjKeywordState
+{
+    kNnObjStateHistory = 0x12a,            // HISTORY
+    kNnObjStateObjective = 0x11a,          // OBJECTIVE
+    kNnObjStateObjectiveHistory = 0x13a    // OBJECTIVE_HISTORY
+};
+
 // Act_SetNNObj: new(0x14), ctor FUN_06ec9030, vtable 06fb5ca4. +0x0c = CreateID(""),
 // +0x10 = 0x3a.
 class ActSetNnObj : public Act
@@ -690,6 +705,13 @@ public:
     unsigned char bCloak;    // +0x40 (ctor 0) b1
 };
 
+// ActLockDock::Mode, the "lock" / "unlock" of the script line.
+enum ELockDockMode
+{
+    kLockDockUnlock = 0,
+    kLockDockLock = 1
+};
+
 // Act_LockDock: new(0x78), ctor FUN_06ec5cb0, vtable 06fb5b00.
 class ActLockDock : public Act
 {
@@ -794,6 +816,13 @@ public:
     unsigned int Buttons;    // +0x14 (ctor 0) YES_NO 3, YES_NO_LATER 7, CLOSE 8
 };
 
+// ActSetPriority::Priority of the script keywords.
+enum EScriptPriority
+{
+    kScriptPriorityAlwaysExecute = 0,   // ALWAYS_EXECUTE
+    kScriptPriorityNormal = 1           // NORMAL
+};
+
 // Act_SetPriority: new(0x14), ctor FUN_06ecd7d0, vtable 06fb5f78.
 class ActSetPriority : public Act
 {
@@ -804,6 +833,14 @@ public:
 
     unsigned int FormationId; // +0x0c ID_String CreateID(s0)
     int Priority;             // +0x10 (ctor 0) NORMAL 1, ALWAYS_EXECUTE 0
+};
+
+// ActSetFlee::Mode, the first keyword of the script line.
+enum ESetFleeMode
+{
+    kSetFleePosition = 0,   // SET_POS
+    kSetFleeObject = 1,     // SET_OBJ
+    kSetFleeClear = 2       // CLEAR
 };
 
 // Act_SetFlee: new(0x8c), ctor FUN_06ec8b50, vtable 06fb5c64.
@@ -1145,6 +1182,14 @@ public:
     unsigned char bOrientation; // +0xa5 (ctor 0) value 5 present
     unsigned char bRename;     // +0xa6 (ctor 0) no writer in the listing
     unsigned int ObjList;      // +0xa8 ID_String CreateID(s1): the first slot's init_objectives
+};
+
+// ActSpawnShipRel::Mode, the fourth value of the script line.
+enum ESpawnRelMode
+{
+    kSpawnRelPoint = 0,         // POINT
+    kSpawnRelDirectional = 1,   // DIRECTIONAL
+    kSpawnRelRelative = 2       // RELATIVE
 };
 
 // Act_SpawnShipRel: new(0xe8), ctor FUN_06ec69c0, vtable 06fb5b54.

@@ -39,10 +39,21 @@ using namespace CmnCequip;
 namespace
 {
     const char kCExternalEquipSource[] = "E:\\FL\\Scratch\\Source\\Common\\CExternalEquip.cpp";
-    const unsigned kInternalListMask = 0xc10003u;
-    const unsigned kExternalListMask = 0xff3efffcu;
-    const unsigned kExternalEquipMask = 0x1fe3u;
-    const unsigned kInternalEquipMask = 0x1ff0000u;
+    // The equipment type bits each list of CEquipManager holds (EquipTypeLight .. EquipTypeArmor),
+    // and the families CExternalEquip::cast / CInternalEquip::cast accept.
+    const unsigned kInternalListMask = EquipTypeLight | EquipTypeAttachedFX | EquipTypeCargo |
+                                       EquipTypeInternalFX | EquipTypeTradeLane;
+    const unsigned kExternalListMask = ~kInternalListMask;
+    const unsigned kExternalEquipMask = EquipTypeLight | EquipTypeAttachedFX | EquipTypeMineDropper |
+                                        EquipTypeCmDropper | EquipTypeGun | EquipTypeShield |
+                                        EquipTypeShieldGen | EquipTypeThruster | EquipTypeCargoPod |
+                                        EquipTypeCloak;
+    const unsigned kInternalEquipMask = EquipTypeCargo | EquipTypeEngine | EquipTypePower |
+                                        EquipTypeScanner | EquipTypeTractor | EquipTypeRepairDroid |
+                                        EquipTypeInternalFX | EquipTypeTradeLane | EquipTypeArmor;
+    static_assert(kInternalListMask == 0xc10003u && kExternalListMask == 0xff3efffcu &&
+                      kExternalEquipMask == 0x1fe3u && kInternalEquipMask == 0x1ff0000u,
+                  "the retail traverser masks");
 
     // DAT_063fc198: CEquip::IdentifyEquipment's 0x40-byte result buffer.
     char GIdentifyEquipmentBuf[0x40];
@@ -624,7 +635,7 @@ CEquipTraverser::CEquipTraverser()
 {
     TypeMask = 0xFFFFFFFFu;
     bIncludeDestroyed = 0;
-    State = 0;
+    State = kStateStart;
     Current = nullptr;
 }
 
@@ -632,7 +643,7 @@ CEquipTraverser::CEquipTraverser(int TypeMaskValue)
 {
     TypeMask = (unsigned)TypeMaskValue;
     bIncludeDestroyed = 0;
-    State = 0;
+    State = kStateStart;
     Current = nullptr;
 }
 
@@ -640,13 +651,13 @@ CEquipTraverser::CEquipTraverser(int TypeMaskValue, bool bIncludeDestroyedValue)
 {
     TypeMask = (unsigned)TypeMaskValue;
     bIncludeDestroyed = bIncludeDestroyedValue ? 1 : 0;
-    State = 0;
+    State = kStateStart;
     Current = nullptr;
 }
 
 void CEquipTraverser::Restart()
 {
-    State = 0;
+    State = kStateStart;
 }
 
 
@@ -834,36 +845,36 @@ CEquip* CEquipManager::Traverse(CEquipTraverser& Walk)
     {
         switch (Walk.State)
         {
-        case 0:
+        case CEquipTraverser::kStateStart:
             if (ExternalCount == 0 || (Walk.TypeMask & kExternalListMask) == 0)
             {
-                Walk.State = 2;
+                Walk.State = CEquipTraverser::kStateSecondList;
                 Walk.Current = nullptr;
                 continue;
             }
-            Walk.State = 1;
+            Walk.State = CEquipTraverser::kStateExternal;
             Walk.Current = nullptr;
             break;
-        case 1:
+        case CEquipTraverser::kStateExternal:
             break;
-        case 2:
+        case CEquipTraverser::kStateSecondList:
             if (InternalCount == 0 || (Walk.TypeMask & kInternalListMask) == 0)
             {
-                Walk.State = 0;
+                Walk.State = CEquipTraverser::kStateStart;
                 Walk.Current = nullptr;
                 return nullptr;
             }
-            Walk.State = 3;
+            Walk.State = CEquipTraverser::kStateInternal;
             Walk.Current = nullptr;
             break;
-        case 3:
+        case CEquipTraverser::kStateInternal:
             break;
         default:
             // Retail returns without resetting the state.
             return nullptr;
         }
 
-        std::list<CEquip*>* List = (Walk.State == 1) ? External : Internal;
+        std::list<CEquip*>* List = (Walk.State == CEquipTraverser::kStateExternal) ? External : Internal;
         CEquip* Found = NextMatching(List, Walk.Current, Walk.TypeMask,
                                      Walk.bIncludeDestroyed != 0);
         if (Found != nullptr)
@@ -872,13 +883,13 @@ CEquip* CEquipManager::Traverse(CEquipTraverser& Walk)
             return Found;
         }
 
-        if (Walk.State == 1)
+        if (Walk.State == CEquipTraverser::kStateExternal)
         {
-            Walk.State = 2;
+            Walk.State = CEquipTraverser::kStateSecondList;
             Walk.Current = nullptr;
             continue;
         }
-        Walk.State = 0;
+        Walk.State = CEquipTraverser::kStateStart;
         Walk.Current = nullptr;
         return nullptr;
     }
@@ -895,36 +906,36 @@ CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
     {
         switch (Walk.State)
         {
-        case 0:
+        case CEquipTraverser::kStateStart:
             if (InternalCount == 0 || (Walk.TypeMask & kInternalListMask) == 0)
             {
-                Walk.State = 2;
+                Walk.State = CEquipTraverser::kStateSecondList;
                 Walk.Current = nullptr;
                 continue;
             }
-            Walk.State = 3;
+            Walk.State = CEquipTraverser::kStateInternal;
             Walk.Current = nullptr;
             break;
-        case 3:
+        case CEquipTraverser::kStateInternal:
             break;
-        case 2:
+        case CEquipTraverser::kStateSecondList:
             if (ExternalCount == 0 || (Walk.TypeMask & kExternalListMask) == 0)
             {
-                Walk.State = 0;
+                Walk.State = CEquipTraverser::kStateStart;
                 Walk.Current = nullptr;
                 return nullptr;
             }
-            Walk.State = 1;
+            Walk.State = CEquipTraverser::kStateExternal;
             Walk.Current = nullptr;
             break;
-        case 1:
+        case CEquipTraverser::kStateExternal:
             break;
         default:
             // Retail returns without resetting the state.
             return nullptr;
         }
 
-        std::list<CEquip*>* List = (Walk.State == 3) ? Internal : External;
+        std::list<CEquip*>* List = (Walk.State == CEquipTraverser::kStateInternal) ? Internal : External;
         CEquip* Found = PrevMatching(List, Walk.Current, Walk.TypeMask,
                                      Walk.bIncludeDestroyed != 0);
         if (Found != nullptr)
@@ -933,13 +944,13 @@ CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
             return Found;
         }
 
-        if (Walk.State == 3)
+        if (Walk.State == CEquipTraverser::kStateInternal)
         {
-            Walk.State = 2;
+            Walk.State = CEquipTraverser::kStateSecondList;
             Walk.Current = nullptr;
             continue;
         }
-        Walk.State = 0;
+        Walk.State = CEquipTraverser::kStateStart;
         Walk.Current = nullptr;
         return nullptr;
     }

@@ -36,13 +36,16 @@ namespace AlchemyImpl
         return static_cast<long>(static_cast<long long>(Value));
     }
 
+    // CPUID leaf 1, EDX bit 25: SSE.
+    static const int kCpuidFeatureSse = 0x2000000;
+
     // SetMode's CPUID test (06242930 / 06241c0a): EDX bit 25, SSE. Executed on every
     // SetMode call, as retail does.
     static bool RampCpuHasSse()
     {
         int Registers[4] = {0, 0, 0, 0};
         __cpuid(Registers, 1);
-        return (Registers[3] & 0x2000000) != 0;
+        return (Registers[3] & kCpuidFeatureSse) != 0;
     }
 
     // DAT_0624bac4 = 1.0f, DAT_0624bb14 = 3.0f, DAT_0624babc = 255.0f,
@@ -1835,9 +1838,9 @@ namespace AlchemyImpl
         {
             if (Time == Begin[0].Time)
                 return Begin[0].Value;
-            if (Time < Begin[0].Time && (LoopType & 0x4u) == 0)
+            if (Time < Begin[0].Time && (LoopType & kLoopBeforeLinear) == 0)
                 return Begin[0].Value;
-            if (Time > Begin[0].Time && (LoopType & 0x40u) == 0)
+            if (Time > Begin[0].Time && (LoopType & kLoopAfterLinear) == 0)
                 return Begin[0].Value;
         }
 
@@ -1852,7 +1855,7 @@ namespace AlchemyImpl
 
         if (Time < T0)
         {
-            const unsigned long Mode = LoopType & 0xFu;
+            const unsigned long Mode = LoopType & kLoopBeforeMask;
             if (Mode == 0)
                 return V0;
             const double Rel = static_cast<double>(Time) - T0;
@@ -1864,20 +1867,20 @@ namespace AlchemyImpl
             const float N = static_cast<float>(RampFtol(Q));
             switch (Mode)
             {
-            case 1:
+            case kLoopBeforeRepeat:
                 Time = static_cast<float>(static_cast<double>(Fm) + Tl);
                 break;
-            case 2:
+            case kLoopBeforeRepeatOffset:
                 Time = static_cast<float>(static_cast<double>(Fm) + Tl);
                 Offset = static_cast<float>((static_cast<double>(Vl) - V0) * N);
                 break;
-            case 3:
+            case kLoopBeforeOscillate:
                 if ((RampFtol(N) & 1) == 0)
                     Time = static_cast<float>(static_cast<double>(Fm) + Tl);
                 else
                     Time = static_cast<float>(static_cast<double>(T0) - Fm);
                 break;
-            case 4:
+            case kLoopBeforeLinear:
                 return V0 - (static_cast<double>(T0) - Time) * Begin[0].InSlope;
             default:
                 break;
@@ -1885,7 +1888,7 @@ namespace AlchemyImpl
         }
         else if (Time > Tl)
         {
-            const unsigned long Mode = LoopType & 0xF0u;
+            const unsigned long Mode = LoopType & kLoopAfterMask;
             if (Mode == 0)
                 return Vl;
             const double Rel = static_cast<double>(Time) - T0;
@@ -1897,20 +1900,20 @@ namespace AlchemyImpl
             const float N = static_cast<float>(RampFtol(Q));
             switch (Mode)
             {
-            case 0x10:
+            case kLoopAfterRepeat:
                 Time = static_cast<float>(static_cast<double>(Fm) + T0);
                 break;
-            case 0x20:
+            case kLoopAfterRepeatOffset:
                 Time = static_cast<float>(static_cast<double>(Fm) + T0);
                 Offset = static_cast<float>((static_cast<double>(Vl) - V0) * N);
                 break;
-            case 0x30:
+            case kLoopAfterOscillate:
                 if ((RampFtol(N) & 1) == 0)
                     Time = static_cast<float>(static_cast<double>(Fm) + T0);
                 else
                     Time = static_cast<float>(static_cast<double>(Tl) - Fm);
                 break;
-            case 0x40:
+            case kLoopAfterLinear:
                 return Vl - (static_cast<double>(Tl) - Time) * LastKey->OutSlope;
             default:
                 break;
@@ -2165,7 +2168,7 @@ namespace AlchemyImpl
             0x3F800000, 0, 0, 0, 0x3F800000, 0, 0, 0, 0x3F800000, 0, 0, 0};
         std::memcpy(Out, IdentityBits, sizeof(IdentityBits));
 
-        if (ChannelFlags_ == 0x1FFu)
+        if (ChannelFlags_ == kChannelAllIdentity)
             return;
 
         // The two times travel as float bit patterns (the interface declares them as
@@ -2175,7 +2178,7 @@ namespace AlchemyImpl
         std::memcpy(&TimeAf, &TimeA, sizeof(float));
         std::memcpy(&TimeBf, &TimeB, sizeof(float));
 
-        if ((ChannelFlags_ & 0x38u) != 0x38u)
+        if ((ChannelFlags_ & kChannelRotateMask) != kChannelRotateMask)
         {
             FAnimatedSingleRamp* const Child4 = Children_[4];
             FAnimatedSingleRamp* const Child5 = Children_[5];
@@ -2191,7 +2194,7 @@ namespace AlchemyImpl
 
         // Scale on a local identity's diagonal; the 3DMathEngine (DAT_06257c58, created
         // on first use) composes Scale * Out.
-        if ((ChannelFlags_ & 0x1C0u) != 0x1C0u)
+        if ((ChannelFlags_ & kChannelScaleMask) != kChannelScaleMask)
         {
             Transform ScaleXform;
             std::memcpy(&ScaleXform, IdentityBits, sizeof(IdentityBits));
@@ -2212,7 +2215,7 @@ namespace AlchemyImpl
         }
 
         // Translation children are evaluated in the order 2, 1, 0.
-        if ((ChannelFlags_ & 0x7u) != 0x7u)
+        if ((ChannelFlags_ & kChannelTranslateMask) != kChannelTranslateMask)
         {
             FAnimatedSingleRamp* const Child2 = Children_[2];
             FAnimatedSingleRamp* const Child1 = Children_[1];

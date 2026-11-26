@@ -136,28 +136,43 @@ protected:
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
 END_MESSAGE_MAP()
 
+// The menu command ids of ServerResources.dll's menu 128 that have no MFC name.
+enum EMenuCommand
+{
+	kCmdDebugDebug = 32771,
+	kCmdDebugAiDebugger = 32772,
+	kCmdEditAccounts = 32774,
+	kCmdChatUniverse = 32775,
+	kCmdChatStarSystem = 32776,
+	kCmdChatPlayer = 32777,
+	kCmdServerNews = 32778,
+	kCmdDebugCrashMe = 32779,
+	kCmdViewStatusSummary = 32780,
+	kCmdViewConsole = 32781,
+};
+
 // .rdata:0041cdb8 — ids from ServerResources.dll's menu 128.
 BEGIN_MESSAGE_MAP(CFLServerApp, CWinApp)
 	ON_COMMAND(ID_APP_ABOUT, &CFLServerApp::OnAppAbout)
-	ON_COMMAND(32771, &CFLServerApp::OnDebugDebug)
-	ON_COMMAND(32772, &CFLServerApp::OnDebugAiDebugger)
-	ON_UPDATE_COMMAND_UI(32771, &CFLServerApp::OnUpdateDisabled)
-	ON_UPDATE_COMMAND_UI(32774, &CFLServerApp::OnUpdateNeedsServer)
-	ON_COMMAND(32774, &CFLServerApp::OnEditAccounts)
-	ON_COMMAND(32777, &CFLServerApp::OnChatPlayer)
-	ON_UPDATE_COMMAND_UI(32777, &CFLServerApp::OnUpdateNeedsServer)
-	ON_COMMAND(32776, &CFLServerApp::OnChatStarSystem)
-	ON_UPDATE_COMMAND_UI(32776, &CFLServerApp::OnUpdateNeedsServer)
-	ON_COMMAND(32775, &CFLServerApp::OnChatUniverse)
-	ON_UPDATE_COMMAND_UI(32775, &CFLServerApp::OnUpdateNeedsServer)
-	ON_COMMAND(32778, &CFLServerApp::OnServerNews)
-	ON_UPDATE_COMMAND_UI(32778, &CFLServerApp::OnUpdateNeedsServer)
-	ON_COMMAND(32779, &CFLServerApp::OnDebugCrashMe)
-	ON_UPDATE_COMMAND_UI(32779, &CFLServerApp::OnUpdateDisabled)
-	ON_UPDATE_COMMAND_UI(32781, &CFLServerApp::OnUpdateViewConsole)
-	ON_UPDATE_COMMAND_UI(32780, &CFLServerApp::OnUpdateViewStatusSummary)
-	ON_COMMAND(32780, &CFLServerApp::OnSwitchView)
-	ON_COMMAND(32781, &CFLServerApp::OnSwitchView)
+	ON_COMMAND(kCmdDebugDebug, &CFLServerApp::OnDebugDebug)
+	ON_COMMAND(kCmdDebugAiDebugger, &CFLServerApp::OnDebugAiDebugger)
+	ON_UPDATE_COMMAND_UI(kCmdDebugDebug, &CFLServerApp::OnUpdateDisabled)
+	ON_UPDATE_COMMAND_UI(kCmdEditAccounts, &CFLServerApp::OnUpdateNeedsServer)
+	ON_COMMAND(kCmdEditAccounts, &CFLServerApp::OnEditAccounts)
+	ON_COMMAND(kCmdChatPlayer, &CFLServerApp::OnChatPlayer)
+	ON_UPDATE_COMMAND_UI(kCmdChatPlayer, &CFLServerApp::OnUpdateNeedsServer)
+	ON_COMMAND(kCmdChatStarSystem, &CFLServerApp::OnChatStarSystem)
+	ON_UPDATE_COMMAND_UI(kCmdChatStarSystem, &CFLServerApp::OnUpdateNeedsServer)
+	ON_COMMAND(kCmdChatUniverse, &CFLServerApp::OnChatUniverse)
+	ON_UPDATE_COMMAND_UI(kCmdChatUniverse, &CFLServerApp::OnUpdateNeedsServer)
+	ON_COMMAND(kCmdServerNews, &CFLServerApp::OnServerNews)
+	ON_UPDATE_COMMAND_UI(kCmdServerNews, &CFLServerApp::OnUpdateNeedsServer)
+	ON_COMMAND(kCmdDebugCrashMe, &CFLServerApp::OnDebugCrashMe)
+	ON_UPDATE_COMMAND_UI(kCmdDebugCrashMe, &CFLServerApp::OnUpdateDisabled)
+	ON_UPDATE_COMMAND_UI(kCmdViewConsole, &CFLServerApp::OnUpdateViewConsole)
+	ON_UPDATE_COMMAND_UI(kCmdViewStatusSummary, &CFLServerApp::OnUpdateViewStatusSummary)
+	ON_COMMAND(kCmdViewStatusSummary, &CFLServerApp::OnSwitchView)
+	ON_COMMAND(kCmdViewConsole, &CFLServerApp::OnSwitchView)
 	ON_COMMAND(ID_FILE_NEW, &CWinApp::OnFileNew)
 	ON_COMMAND(ID_FILE_OPEN, &CWinApp::OnFileOpen)
 	ON_COMMAND(ID_FILE_PRINT_SETUP, &CWinApp::OnFilePrintSetup)

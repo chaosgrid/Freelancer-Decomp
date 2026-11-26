@@ -131,7 +131,7 @@ namespace
             Win3DDisable(kWin3DCullFace);
             Win3DDisable(kWin3DDepthTest);
             Win3DDisable(kWin3DFog);
-            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
             Win3DSetOrtho2DForCamera(WinCamera);
             DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);
             Win3DEnable(kWin3DBlend);
@@ -147,7 +147,7 @@ namespace
         Desc.Diffuse.Base = reinterpret_cast<unsigned char const*>(Batch->VertBase) + 0xc;
         Desc.Diffuse.ByteSize = 4;
         Desc.Diffuse.Stride = 0x10;
-        Desc.SrcFvf = 0x42;
+        Desc.SrcFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE;
         Desc.SrcCount = static_cast<unsigned int>(Batch->VertCount);
 
         for (FImmedStatePair const* Pair = kImmedRsOn; Pair->State != 0; ++Pair)
@@ -169,7 +169,7 @@ namespace
                 Batch->Vb->SelectVb(kImmedCurrentBuffer) == 0 &&
                 Batch->Ib->SelectIb(kImmedCurrentBuffer, VbOffset, 0, 0) == 0)
             {
-                Batch->Draw->DrawIndexedPrimitive(4, 0,
+                Batch->Draw->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0,
                                                   static_cast<unsigned int>(Batch->VertCount),
                                                   IbOffset,
                                                   static_cast<unsigned int>(Batch->IndexCount));
@@ -262,18 +262,18 @@ namespace
         {
             int SavedTss10 = 0;
             int SavedTss11 = 0;
-            Pipe->GetTextureStageState(0, 0x10, &SavedTss10);
-            Pipe->GetTextureStageState(0, 0x11, &SavedTss11);
+            Pipe->GetTextureStageState(0, D3DTSS_MAGFILTER, &SavedTss10);
+            Pipe->GetTextureStageState(0, D3DTSS_MINFILTER, &SavedTss11);
             if (G_UiOverlayForceTss != 0)
             {
-                Pipe->SetTextureStageState(0, 0x10, 1);
-                Pipe->SetTextureStageState(0, 0x11, 1);
+                Pipe->SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+                Pipe->SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
             }
 
             int Saved17 = 0;
             int Saved0E = 0;
             Pipe->GetRenderState(D3DRS_ZFUNC, &Saved17);
-            Pipe->SetRenderState(D3DRS_ZFUNC, 8);
+            Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
             Pipe->GetRenderState(D3DRS_ZWRITEENABLE, &Saved0E);
             Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
 
@@ -281,8 +281,8 @@ namespace
             // before it.
             ScreenQuadFlush(Pipe, FontAtlasMaterialKey());
 
-            Pipe->SetTextureStageState(0, 0x10, SavedTss10);
-            Pipe->SetTextureStageState(0, 0x11, SavedTss11);
+            Pipe->SetTextureStageState(0, D3DTSS_MAGFILTER, SavedTss10);
+            Pipe->SetTextureStageState(0, D3DTSS_MINFILTER, SavedTss11);
             Win3DPopProjection();
             Pipe->SetRenderState(D3DRS_ZWRITEENABLE, Saved0E);
             Pipe->SetRenderState(D3DRS_ZFUNC, Saved17);

@@ -354,7 +354,7 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
             const Matrix* OrientB = (const Matrix*)(DataB + 0x10);
             const Vector* AxisB = (const Vector*)(DataB + 0x34);
 
-            if (TypeB == 0)
+            if (TypeB == kJointTypeFix)
             {
                 const Matrix Transposed(OrientB->E[0][0], OrientB->E[1][0], OrientB->E[2][0],
                                         OrientB->E[0][1], OrientB->E[1][1], OrientB->E[2][1],
@@ -368,7 +368,7 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
                 PayloadF[6] = PosA->z - OutVec.z;
                 std::memcpy(PayloadF + 7, &OutMat, sizeof(OutMat));
             }
-            else if (TypeB == 1 || TypeB == 2)
+            else if (TypeB == kJointTypePris || TypeB == kJointTypeRev)
             {
                 std::memcpy(PayloadF + 1, PosA, 3 * sizeof(float));
                 std::memcpy(PayloadF + 4, PosB, 3 * sizeof(float));

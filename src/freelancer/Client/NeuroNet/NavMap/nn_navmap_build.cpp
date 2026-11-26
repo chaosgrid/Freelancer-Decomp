@@ -84,7 +84,7 @@ void NeuroNetNavMap::BuildSystemItems()
             continue;
 
         unsigned Type = Arch->ObjectType;
-        if ((Type & 0x80) != 0)
+        if ((Type & OBJ_TRADELANE_RING) != 0)
         {
             // A trade lane ring is remembered; one in the middle of a
             // lane (both links set) gets no item of its own.
@@ -107,13 +107,13 @@ void NeuroNetNavMap::BuildSystemItems()
                 Type = 0;
         }
 
-        if ((SolarTypeMask & Type) == 0 || Type == 0x20000000)
+        if ((SolarTypeMask & Type) == 0 || Type == OBJ_ASTEROID)
             continue;
 
         // Moons and planets face the system centre.
         float Heading = 0.0f;
         Archetype::ICliObj* const Companion = Arch->Companion;
-        if ((Type & 3) != 0)
+        if ((Type & (OBJ_MOON | OBJ_PLANET)) != 0)
         {
             double const A = -static_cast<double>(Object.Pos.x);
             double const B = -static_cast<double>(Object.Pos.z);
@@ -138,12 +138,12 @@ void NeuroNetNavMap::BuildSystemItems()
         float const Y = static_cast<float>(static_cast<double>(Object.Pos.y) * Scale);
         float const Z = static_cast<float>(Scale * static_cast<double>(Object.Pos.z));
         FNavMapItem* const Item = AddItem(
-            0, static_cast<int>(Type), X, Y, Z, Arch->SolarRadius,
+            kNavMapItemSolar, static_cast<int>(Type), X, Y, Z, Arch->SolarRadius,
             Archetype::CliSolarShapeName(Companion), Object.IdsName, Object.IdsInfo, Heading, Id,
             Object.Visit);
 
         // The item is used without a null test, as in retail.
-        if ((Type & 4) != 0)
+        if ((Type & OBJ_SUN) != 0)
             Item->Mesh.UserFloats[4] = kNavMapSunAlpha;
         if (Object.Goto != 0)
             Item->System = Universe::get_system(Object.Goto);
@@ -164,7 +164,7 @@ void NeuroNetNavMap::AddPlayerMarker()
     Vector Pos;
     float Heading;
     PlayerMapPosition(&Pos, &Heading); // FUN_00491be0
-    PlayerItem = AddItem(2, 0, Pos.x, Pos.y, Pos.z, ShipMarkerSize, "NNM_SM_INFO_POSITION",
+    PlayerItem = AddItem(kNavMapItemPlayer, 0, Pos.x, Pos.y, Pos.z, ShipMarkerSize, "NNM_SM_INFO_POSITION",
                          0x219a, 0, Heading, 0, 0);
     // No null test, as in retail.
     PlayerItem->PulsePhase = -1.0f;
@@ -269,11 +269,12 @@ void NeuroNetNavMap::BuildMapZones()
             unsigned long const Props = Zone->GetProperties();
             bool bAdd = false;
             if (Pass == 0)
-                bAdd = (Props & 0x8000) != 0 && (Props & 0x30000) == 0;
+                bAdd = (Props & Universe::kZonePropNebula) != 0 && (Props & Universe::kZonePropExclusionZone) == 0;
             else if (Pass == 1)
-                bAdd = (Props & 0x38000) == 0 && (Props & 0x7fc0) != 0;
+                bAdd = (Props & (Universe::kZonePropNebula | Universe::kZonePropExclusionZone)) == 0 &&
+                    (Props & Universe::kZonePropObjectZone) != 0;
             else
-                bAdd = (Props & 0x30000) != 0;
+                bAdd = (Props & Universe::kZonePropExclusionZone) != 0;
             if (bAdd)
                 MapZones.push_back(Zone); // FUN_00537260(last, 1, &zone)
         }
@@ -292,8 +293,8 @@ void NeuroNetNavMap::BuildMapZones()
         {
             Universe::IZone const* const Right = MapZones[Index + 1];
             Universe::IZone const* const Left = MapZones[Index];
-            unsigned long const RightKey = Right->GetProperties() & 0x7fc0;
-            unsigned long const LeftKey = Left->GetProperties() & 0x7fc0;
+            unsigned long const RightKey = Right->GetProperties() & Universe::kZonePropObjectZone;
+            unsigned long const LeftKey = Left->GetProperties() & Universe::kZonePropObjectZone;
             if (LeftKey > RightKey)
             {
                 MapZones[Index] = Right;
@@ -320,11 +321,11 @@ bool NeuroNetNavMap::HasVisitedContent()
         if (!CurrentSystem->GetSystemObject(Index, &Object))
             continue;
         Archetype::Solar const* const Arch = Archetype::GetSolar(Object.ArchetypeId);
-        if (Arch != nullptr && (Arch->ObjectType & 0x84) != 0)
+        if (Arch != nullptr && (Arch->ObjectType & (OBJ_SUN | OBJ_TRADELANE_RING)) != 0)
             continue;
         unsigned char Visit = 0;
         GetPlayerVisitFlagsRetail(CreateID(Object.Nickname.Data), &Visit, 0, 0);
-        if (((Visit | Object.Visit) & 1) != 0)
+        if (((Visit | Object.Visit) & kVisitShown) != 0)
             return true;
     }
 
@@ -335,7 +336,7 @@ bool NeuroNetNavMap::HasVisitedContent()
         Universe::IZone const* const Zone = MapZones[Index];
         unsigned char Visit = 0;
         GetPlayerVisitFlagsRetail(Zone->GetId(), &Visit, 1, 0);
-        if (((Visit | Zone->GetVisit()) & 1) != 0)
+        if (((Visit | Zone->GetVisit()) & kVisitShown) != 0)
             return true;
     }
     return false;

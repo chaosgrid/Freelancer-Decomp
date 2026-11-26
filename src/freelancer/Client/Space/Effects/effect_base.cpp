@@ -275,7 +275,7 @@ void EffectFreezeToWorld(FEffectBase* This)
         // Retail quirk kept: it calls itself with the index still set and the watcher still
         // empty, so it recurses until the stack runs out if this is reached.
         EffectFreezeToWorld(This);
-        This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+        This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return;
     }
 
@@ -294,13 +294,13 @@ void FEffectBase::Kill()
         {
             // The same unbounded self-recursion as FUN_004f7db0's; kept as retail.
             EffectKill(This);
-            This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+            This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
             return;
         }
         EffectBakeInstance(This);
     }
 
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
 }
 
 void EffectKill(FEffectBase* This)
@@ -338,5 +338,5 @@ unsigned char EffectInCameraView(FEffectBase* This, FSpaceCamera* Cam)
     // The camera's sphere classification (slot +0x3c); 3 and up is visible.
     Vector Centre = ViewPos;
     int const Class = CamIface->ClassifySphere(&Centre, Radius);
-    return static_cast<unsigned char>(Class >= 3 ? 1 : 0);
+    return static_cast<unsigned char>(Class >= kSphereStraddling ? 1 : 0);
 }

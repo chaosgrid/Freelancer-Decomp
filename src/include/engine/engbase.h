@@ -28,6 +28,20 @@ struct FEngineName
 // Joint payload contains 23 DWORDs; mixed values are copied without numeric conversion.
 static const unsigned long G_EngineJointPayloadDwords = 0x17;
 
+// The joint kinds: FEngineJointBlock::Type, the first dword of a Hardpoints record
+// (FHardpointData::Type) and what EngBase maps the hardpoint type names "Fix", "Pris", "Rev",
+// "Cyl", "Sphere", "Trans" and "Loose" to.
+enum EEngineJointType
+{
+    kJointTypeFix = 0,
+    kJointTypePris = 1,
+    kJointTypeRev = 2,
+    kJointTypeCyl = 3,
+    kJointTypeSphere = 4,
+    kJointTypeTrans = 5,
+    kJointTypeLoose = 6,
+};
+
 // The joint block of an instance: the payload CreateJoint copies in and GetInstanceRelative
 // (slot 49) hands out, null for a root. EngBase keeps it as raw dwords at instance +0x5C and
 // writes Type = 0xFFFFFFFF for no joint. Layout as Common reads it (FUN_062940c0 builds a
@@ -36,7 +50,7 @@ static const unsigned long G_EngineJointPayloadDwords = 0x17;
 // vector at +0x10 as an axis.
 struct FEngineJointBlock
 {
-    unsigned long Type;   // +0x00  EngBase's joint kind (revolute is 2)
+    unsigned long Type;   // +0x00  EEngineJointType
     Vector ParentPos;     // +0x04  the parent hardpoint position
     Vector ChildPos;      // +0x10  the child hardpoint position
     Matrix Orient;        // +0x1c  parent * child hardpoint orientation
@@ -408,6 +422,19 @@ struct IChannelArchetype : IDAComponent
                                                 unsigned long Capacity, unsigned long* Count) = 0; // 9
     virtual GENRESULT DACOM_API CollectAt(float Time, float* OutKeys, unsigned long Capacity,
                                              unsigned long* Count) = 0;                // 10
+};
+
+// FDeformAimDesc::Flags, which become FIkEvent::AimFlags (bit 0 and the axis bits steer
+// IkLookAt, 0x20 / 0x40 / 0x80 the solver).
+enum EIkAimFlag
+{
+    kIkAimTargetIsPoint = 0x1,      // TargetA is a point (else a direction)
+    kIkAimAxisX = 0x4,              // the aim direction becomes column 0 of the look matrix
+    kIkAimAxisY = 0x8,              // ... column 1
+    kIkAimAxisZ = 0x10,             // ... column 2
+    kIkAimPositionTarget = 0x20,    // position target
+    kIkAimOrientationTarget = 0x40, // orientation target (TargetB is a matrix)
+    kIkAimNoClamp = 0x80,           // no rest pull and no joint-limit clamp
 };
 
 // Aim event parameters; target pointers are borrowed.

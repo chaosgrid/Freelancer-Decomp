@@ -467,24 +467,24 @@ static bool MarshalPlayerTrade(FPacket_FLPACKET_COMMON_PLAYER_TRADE& Packet,
     const unsigned int A2 = Args[2];
 
     switch (Wire.SubType) {
-    case 0x01:   // 0x06d8b8e0 InitiateTrade-shaped
-    case 0x20:   // 0x06d8bb10
-    case 0x80:   // 0x06d8bb60
+    case kPlayerTradeInitiateTrade:   // 0x06d8b8e0 InitiateTrade-shaped
+    case kPlayerTradeRequestTrade:   // 0x06d8bb10
+    case kPlayerTradeStopTradeRequest:   // 0x06d8bb60
         Wire.ShipId = A1;
         break;
-    case 0x02:   // 0x06d8b980
+    case kPlayerTradeTerminateTrade:   // 0x06d8b980
         Wire.Reason = A1;
         break;
-    case 0x04:   // 0x06d8b9d0
+    case kPlayerTradeSetTradeMoney:   // 0x06d8b9d0
         Wire.ShipId = A1;
         Wire.Money = A2;
         break;
-    case 0x40:   // 0x06d8b930
+    case kPlayerTradeAcceptTrade:   // 0x06d8b930
         Wire.ShipId = A1;
         Wire.bAccepted = (unsigned char)(A2 & 0xffu);
         break;
-    case 0x08:   // 0x06d8ba20 -- EquipDesc, status included
-    case 0x10: { // 0x06d8baa0 -- EquipDesc, status NOT written
+    case kPlayerTradeAddTradeEquip:   // 0x06d8ba20 -- EquipDesc, status included
+    case kPlayerTradeDelTradeEquip: { // 0x06d8baa0 -- EquipDesc, status NOT written
         // Direct loads off the caller's EquipDesc (+0x04, +0x14, float +0x10, word +0x02);
         // 0x10 skips the float.
         Wire.ShipId = A1;
@@ -492,7 +492,7 @@ static bool MarshalPlayerTrade(FPacket_FLPACKET_COMMON_PLAYER_TRADE& Packet,
         Wire.EquipArchId = Desc->ArchId;
         Wire.EquipCount = (unsigned int)Desc->Count;
         Wire.EquipId = Desc->Id;
-        if (Wire.SubType == 0x08) {
+        if (Wire.SubType == kPlayerTradeAddTradeEquip) {
             Wire.EquipStatus = Desc->Health;
         }
         break;
@@ -507,16 +507,16 @@ static bool DeliverPlayerTrade(const FPacket_FLPACKET_COMMON_PLAYER_TRADE& Packe
                                IChatClient*) {
     const FPayloadCommonPlayerTrade& Wire = Packet.Wire;
     switch (Wire.SubType) {
-    case 0x01:
+    case kPlayerTradeInitiateTrade:
         Client->SendCommonPlayerTradeInitiateTrade(1u, Wire.ShipId);
         return true;
-    case 0x02:
+    case kPlayerTradeTerminateTrade:
         Client->SendCommonPlayerTradeTerminateTrade(1u, static_cast<int>(Wire.Reason));
         return true;
-    case 0x04:
+    case kPlayerTradeSetTradeMoney:
         Client->SendCommonPlayerTradeSetTradeMoney(1u, Wire.ShipId, Wire.Money);
         return true;
-    case 0x08: {
+    case kPlayerTradeAddTradeEquip: {
         // caseD_8 0x06d837df: EquipDesc::EquipDesc(), then set_arch_id(+0x34),
         // set_count(+0x38), set_status(+0x3c), set_id(word +0x40), then IClient+0x1a4.
         EquipDesc Desc;
@@ -527,7 +527,7 @@ static bool DeliverPlayerTrade(const FPacket_FLPACKET_COMMON_PLAYER_TRADE& Packe
         Client->SendCommonPlayerTradeAddTradeEquip(1u, Wire.ShipId, Desc);
         return true;
     }
-    case 0x10: {
+    case kPlayerTradeDelTradeEquip: {
         // caseD_10 0x06d83842: the same without set_status, so Health keeps the ctor's
         // default; then IClient+0x1a8.
         EquipDesc Desc;
@@ -537,14 +537,14 @@ static bool DeliverPlayerTrade(const FPacket_FLPACKET_COMMON_PLAYER_TRADE& Packe
         Client->SendCommonPlayerTradeDelTradeEquip(1u, Wire.ShipId, Desc);
         return true;
     }
-    case 0x20:
+    case kPlayerTradeRequestTrade:
         Client->SendCommonPlayerTradeRequestTrade(1u, Wire.ShipId);
         return true;
-    case 0x40:
+    case kPlayerTradeAcceptTrade:
         // The byte goes out zero-extended; the sender only ever stored a bool's 0/1.
         Client->SendCommonPlayerTradeAcceptTrade(1u, Wire.ShipId, Wire.bAccepted != 0);
         return true;
-    case 0x80:
+    case kPlayerTradeStopTradeRequest:
         Client->SendCommonPlayerTradeStopTradeRequest(1u, Wire.ShipId);
         return true;
     default:
@@ -698,47 +698,47 @@ static bool DeliverTractorObjects(const FPacket_FLPACKET_COMMON_TRACTOROBJECTS& 
 // The table. Order follows the opcode, not the retail registrator's order.
 // ===========================================================================
 const FRpcPayloadCodec GChannel1Codecs[] = {
-    { 1, 0x01, "FLPACKET_COMMON_UPDATEOBJECT",             0x2c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT), "FLPACKET_COMMON_UPDATEOBJECT",             0x2c,
       RpcMarshalAs<MarshalUpdateObject>,          RpcDeliverAs<DeliverUpdateObject> },
-    { 1, 0x02, "FLPACKET_COMMON_FIREWEAPON",               0x20,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON), "FLPACKET_COMMON_FIREWEAPON",               0x20,
       RpcMarshalAs<MarshalFireWeapon>,            RpcDeliverAs<DeliverFireWeapon> },
-    { 1, 0x04, "FLPACKET_COMMON_SETTARGET",                0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SETTARGET), "FLPACKET_COMMON_SETTARGET",                0x0c,
       RpcMarshalAs<MarshalSetTarget>,             RpcDeliverAs<DeliverSetTarget> },
-    { 1, 0x05, "FLPACKET_COMMON_CHATMSG",                  0x10,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_CHATMSG), "FLPACKET_COMMON_CHATMSG",                  0x10,
       RpcMarshalAs<MarshalChatMsg>,               RpcDeliverAs<DeliverChatMsg> },
-    { 1, 0x08, "FLPACKET_COMMON_ACTIVATEEQUIP",            0x08,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP), "FLPACKET_COMMON_ACTIVATEEQUIP",            0x08,
       RpcMarshalAs<MarshalActivateEquip>,         RpcDeliverAs<DeliverActivateEquip> },
-    { 1, 0x0e, "FLPACKET_COMMON_ACTIVATECRUISE",           0x08,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE), "FLPACKET_COMMON_ACTIVATECRUISE",           0x08,
       RpcMarshalAs<MarshalActivateCruise>,        RpcDeliverAs<DeliverActivateCruise> },
-    { 1, 0x0f, "FLPACKET_COMMON_GOTRADELANE",              0x10,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE), "FLPACKET_COMMON_GOTRADELANE",              0x10,
       RpcMarshalAs<MarshalGoTradelane>,           RpcDeliverAs<DeliverGoTradelane> },
-    { 1, 0x10, "FLPACKET_COMMON_STOPTRADELANE",            0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_STOPTRADELANE), "FLPACKET_COMMON_STOPTRADELANE",            0x0c,
       RpcMarshalAs<MarshalStopTradelane>,         RpcDeliverAs<DeliverStopTradelane> },
-    { 1, 0x11, "FLPACKET_COMMON_SET_WEAPON_GROUP",         0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP), "FLPACKET_COMMON_SET_WEAPON_GROUP",         0x0c,
       RpcMarshalAs<MarshalSetWeaponGroup>,        RpcDeliverAs<DeliverSetWeaponGroup> },
-    { 1, 0x12, "FLPACKET_COMMON_PLAYER_TRADE",             0x24,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), "FLPACKET_COMMON_PLAYER_TRADE",             0x24,
       RpcMarshalAs<MarshalPlayerTrade>,           RpcDeliverAs<DeliverPlayerTrade> },
-    { 1, 0x13, "FLPACKET_COMMON_SET_VISITED_STATE",        0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_VISITED_STATE), "FLPACKET_COMMON_SET_VISITED_STATE",        0x0c,
       RpcMarshalAs<MarshalSetVisitedState>,       RpcDeliverAs<DeliverSetVisitedState> },
-    { 1, 0x14, "FLPACKET_COMMON_JETTISONCARGO",            0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO), "FLPACKET_COMMON_JETTISONCARGO",            0x0c,
       RpcMarshalAs<MarshalJettisonCargo>,         RpcDeliverAs<DeliverJettisonCargo> },
-    { 1, 0x15, "FLPACKET_COMMON_ACTIVATETHRUSTERS",        0x08,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS), "FLPACKET_COMMON_ACTIVATETHRUSTERS",        0x08,
       RpcMarshalAs<MarshalActivateThrusters>,     RpcDeliverAs<DeliverActivateThrusters> },
-    { 1, 0x16, "FLPACKET_COMMON_REQUEST_BEST_PATH",        0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_BEST_PATH), "FLPACKET_COMMON_REQUEST_BEST_PATH",        0x0c,
       RpcMarshalAs<MarshalRequestBestPath>,       RpcDeliverAs<DeliverRequestBestPath> },
-    { 1, 0x17, "FLPACKET_COMMON_REQUEST_GROUP_POSITIONS",  0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS), "FLPACKET_COMMON_REQUEST_GROUP_POSITIONS",  0x0c,
       RpcMarshalAs<MarshalRequestGroupPositions>, RpcDeliverAs<DeliverRequestGroupPositions> },
-    { 1, 0x18, "FLPACKET_COMMON_REQUEST_PLAYER_STATS",     0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_PLAYER_STATS), "FLPACKET_COMMON_REQUEST_PLAYER_STATS",     0x0c,
       RpcMarshalAs<MarshalRequestPlayerStats>,    RpcDeliverAs<DeliverRequestPlayerStats> },
-    { 1, 0x19, "FLPACKET_COMMON_SET_MISSION_LOG",          0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_MISSION_LOG), "FLPACKET_COMMON_SET_MISSION_LOG",          0x0c,
       RpcMarshalAs<MarshalSetMissionLog>,         RpcDeliverAs<DeliverSetMissionLog> },
-    { 1, 0x1a, "FLPACKET_COMMON_REQUEST_RANK_LEVEL",       0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_REQUEST_RANK_LEVEL), "FLPACKET_COMMON_REQUEST_RANK_LEVEL",       0x0c,
       RpcMarshalAs<MarshalRequestRankLevel>,      RpcDeliverAs<DeliverRequestRankLevel> },
-    { 1, 0x1b, "FLPACKET_COMMON_POP_UP_DIALOG",            0x14,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_POP_UP_DIALOG), "FLPACKET_COMMON_POP_UP_DIALOG",            0x14,
       RpcMarshalAs<MarshalPopUpDialog>,           RpcDeliverAs<DeliverPopUpDialog> },
-    { 1, 0x1c, "FLPACKET_COMMON_SET_INTERFACE_STATE",      0x0c,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_INTERFACE_STATE), "FLPACKET_COMMON_SET_INTERFACE_STATE",      0x0c,
       RpcMarshalAs<MarshalSetInterfaceState>,     RpcDeliverAs<DeliverSetInterfaceState> },
-    { 1, 0x1d, "FLPACKET_COMMON_TRACTOROBJECTS",           0x18,
+    { kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS), "FLPACKET_COMMON_TRACTOROBJECTS",           0x18,
       RpcMarshalAs<MarshalTractorObjects>,        RpcDeliverAs<DeliverTractorObjects> },
 };
 
@@ -746,7 +746,7 @@ const unsigned int GChannel1CodecCount =
     (unsigned int)(sizeof(GChannel1Codecs) / sizeof(GChannel1Codecs[0]));
 
 extern "C" __declspec(dllexport) const FRpcPayloadCodec* RpcFindPayloadCodec(unsigned int Channel, unsigned int Opcode) {
-    if (Channel == 1u) {
+    if (Channel == kPacketChannelCommon) {
         for (unsigned int i = 0; i < GChannel1CodecCount; ++i) {
             if (GChannel1Codecs[i].Opcode == (unsigned short)Opcode) {
                 return &GChannel1Codecs[i];
@@ -754,7 +754,7 @@ extern "C" __declspec(dllexport) const FRpcPayloadCodec* RpcFindPayloadCodec(uns
         }
         return nullptr;
     }
-    if (Channel == 2u) {
+    if (Channel == kPacketChannelServer) {
         // GChannel2Codecs lives in src/rpclocal/rpc_payload_ch2.cpp.
         for (unsigned int i = 0; i < GChannel2CodecCount; ++i) {
             if (GChannel2Codecs[i].Opcode == (unsigned short)Opcode) {

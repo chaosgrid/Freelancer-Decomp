@@ -12,6 +12,34 @@
 
 struct IMaterial;
 
+// Face group channel bits of IMesh (OpenFaceGroupChannels / LockFaceGroupChannels /
+// Get/SetFaceGroupData / Get/SetFaceGroupIndices / Add/RemoveFaceGroupChannels; RendComp
+// FUN_06c28f50 and LAB_06c22d50). Position, normal, the two texture sets and diffuse are the
+// streams of the group's FRpVertexSrcDesc; the edge channels are the "Edge_indices" /
+// "Edge_angles" leaves; the extra channels are the group's four ExtraStreams.
+enum EMeshChannel
+{
+    kMeshChannelPosition = 0x1,
+    kMeshChannelTex0 = 0x2,
+    kMeshChannelTex1 = 0x4,
+    kMeshChannelNormal = 0x8,
+    kMeshChannelDiffuse = 0x10,
+    kMeshChannelEdgeIndices = 0x80,
+    kMeshChannelEdgeAngles = 0x100,
+    kMeshChannelExtra0 = 0x4000,
+    kMeshChannelExtra1 = 0x8000,
+    kMeshChannelExtra2 = 0x10000,
+    kMeshChannelExtra3 = 0x20000
+};
+
+// Mode of IMesh::OpenFaceGroup. Every caller outside RendComp reads (1); the Set* / Add* /
+// Remove* operations of FTriMeshArch require 2 (the edited group is made private).
+enum EMeshOpenMode
+{
+    kMeshOpenRead = 1,
+    kMeshOpenEdit = 2
+};
+
 #ifndef FREELANCER_IMESH
 #define FREELANCER_IMESH
 struct IMesh : IDAComponent

@@ -157,7 +157,7 @@ namespace CmnUniverse
             if (SphereCull(*Query, Zone))
                 continue;
             unsigned Flags = Zone->GetProperties();
-            if ((Flags & 0x7fc0) == 0)
+            if ((Flags & Universe::kZonePropObjectZone) == 0)
             {
                 Combined |= Flags;
                 continue;

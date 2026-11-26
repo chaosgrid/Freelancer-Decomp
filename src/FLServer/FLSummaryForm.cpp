@@ -98,11 +98,11 @@ CFLSummaryForm::~CFLSummaryForm()
 // .text:0040edc0
 void CFLSummaryForm::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 0x42b, Banner);
-	DDX_Control(DX, 0x428, Title);
-	DDX_Control(DX, 0x410, StatsList);
-	DDX_Control(DX, 0x427, LoadText);
-	DDX_Control(DX, 0x425, LoadBar);
+	DDX_Control(DX, kControlBanner, Banner);
+	DDX_Control(DX, kControlTitle, Title);
+	DDX_Control(DX, kControlStatsList, StatsList);
+	DDX_Control(DX, kControlLoadText, LoadText);
+	DDX_Control(DX, kControlLoadBar, LoadBar);
 }
 
 // .text:0040ee50
@@ -114,8 +114,8 @@ void CFLSummaryForm::ScrollMarquee()
 	}
 	if (!GApp->IsStartupPending())
 	{
-		::KillTimer(m_hWnd, 0x2002);
-		::SetTimer(m_hWnd, 0x2001, 1000, NULL);
+		::KillTimer(m_hWnd, kTimerMarquee);
+		::SetTimer(m_hWnd, kTimerRefresh, 1000, NULL);
 		return;
 	}
 	// Rotate left by one character.
@@ -288,7 +288,7 @@ void CFLSummaryForm::OnInitialUpdate()
 	LoadResourceString(AfxGetResourceHandle(), 0xf01e, Text, 0x100);
 	Marquee.assign(Text, wcslen(Text));
 
-	::SetTimer(m_hWnd, 0x2002, 100, NULL);
+	::SetTimer(m_hWnd, kTimerMarquee, 100, NULL);
 	bInitialized = true;
 	Refresh();
 }
@@ -296,12 +296,12 @@ void CFLSummaryForm::OnInitialUpdate()
 // .text:0040f950
 void CFLSummaryForm::OnTimer(UINT_PTR IdEvent)
 {
-	if (IdEvent == 0x2001)
+	if (IdEvent == kTimerRefresh)
 	{
 		Refresh();
 		return;
 	}
-	if (IdEvent == 0x2002)
+	if (IdEvent == kTimerMarquee)
 	{
 		ScrollMarquee();
 		return;

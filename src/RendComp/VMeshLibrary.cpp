@@ -314,18 +314,18 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
         IFileSystem* Child = nullptr;
         do
         {
-            if ((FindData.dwFileAttributes & 0x10) == 0 || FindData.cFileName[0] == '.')
+            if ((FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 || FindData.cFileName[0] == '.')
                 continue;
             FFileSystemDesc Desc;
             std::memset(&Desc, 0, sizeof(Desc));
             Desc.ComponentName = "FileSystem";
             Child = nullptr;
-            Desc.Access = 0x80000000;
-            Desc.ShareMode = 1;
-            Desc.Creation = 3;
-            Desc.Flags = 0x8000080;
+            Desc.Access = GENERIC_READ;
+            Desc.ShareMode = FILE_SHARE_READ;
+            Desc.Creation = OPEN_EXISTING;
+            Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
             Desc.Path = FindData.cFileName;
-            Desc.Size = 0x34;
+            Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
             Desc.FindHandle = (unsigned long)Find;
             if (LodFilter >= 0)
             {

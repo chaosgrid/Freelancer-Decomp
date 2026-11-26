@@ -143,7 +143,7 @@ void MatchThrottle2Idea::Commit()
     Sys->Thrust.SetNudgeDirection(Zero);
     if (Flag39 == 0)
     {
-        Sys->Thrust.SetThrottle(0.0f, 0);
+        Sys->Thrust.SetThrottle(0.0f, kThrottleModeEngine);
         Sys->Thrust.engage_cruise(false);
     }
     Sys->Thrust.SetThrustersActive(false);
@@ -314,13 +314,13 @@ int MatchThrottle2Idea::Update(float DeltaTime)
         {
             (void)Behavior_GetSpeed(Owner, 1.0f, ThrustEquipCruise);
             Speed2c = Speed4c;
-            Mode = 4;
+            Mode = ThrustEquipCruise;
         }
         else
         {
             (void)Behavior_GetSpeed(Owner, 1.0f, ThrustEquipEngine);
             Speed2c = Speed50;
-            Mode = 1;
+            Mode = ThrustEquipEngine;
         }
 
         ThrottleBias30 = 0.0f;
@@ -350,13 +350,13 @@ int MatchThrottle2Idea::Update(float DeltaTime)
 
     if (bWatchedCruise)
     {
-        Mode = 2;
+        Mode = kThrottleModeCruise;
         if (MatchThrottle > 0.8f && Throttle < 0.8f)
             Throttle = 0.8f;                                        // 0x3f4ccccd
     }
     else
     {
-        Mode = 0;
+        Mode = kThrottleModeEngine;
     }
 
     // Target outside the bearing cone and more than 200 out: set the throttle
@@ -364,7 +364,7 @@ int MatchThrottle2Idea::Update(float DeltaTime)
     if (BearingAngleToPoint(Owner, Position) > MaxBearing34 &&                 // FUN_062e1c90
         GetSignedRadialClearanceToPoint(Nav, Position) > 200.0f)              // FUN_062e4ea0
     {
-        Sys->Thrust.SetThrottle((Mode == 2) ? Throttle : 0.0f, Mode);
+        Sys->Thrust.SetThrottle((Mode == kThrottleModeCruise) ? Throttle : 0.0f, Mode);
     }
     else
     {
@@ -373,11 +373,11 @@ int MatchThrottle2Idea::Update(float DeltaTime)
         {
             Flag3d = 1;
             Throttle = 1.2f;                                        // 0x3f99999a
-            Mode = 2;
+            Mode = kThrottleModeCruise;
         }
         if (Flag3b != 0 || Sys->Timers.IsTimer4Active())   // FUN_062e8850
         {
-            if (!Sys->SelfTarget.Iface->is_player() && Mode == 0)
+            if (!Sys->SelfTarget.Iface->is_player() && Mode == kThrottleModeEngine)
                 Sys->Thrust.SetThrustersActive(Throttle > 2.0f);
         }
         else
@@ -389,7 +389,7 @@ int MatchThrottle2Idea::Update(float DeltaTime)
 
     // No nudge matching while PathfindManager::AvoidRecordKind bit 0 is set or Flag3a is
     // clear.
-    if ((MatchPathfindOf(Context)->AvoidRecordKind & 1) != 0 || Flag3a == 0)
+    if ((MatchPathfindOf(Context)->AvoidRecordKind & kAvoidRecordNudge) != 0 || Flag3a == 0)
         return 0;
 
     // The watched ship's nudge vector (slot 21); its length is compared unrounded.

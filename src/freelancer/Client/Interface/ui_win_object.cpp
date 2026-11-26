@@ -136,7 +136,7 @@ bool UiWinObject::Create(Win3D* NewParent, void* Payload)
 
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     return true;
 }
 

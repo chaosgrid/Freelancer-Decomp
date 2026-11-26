@@ -138,7 +138,7 @@ static_assert(sizeof(FRpcCreateObjectPacket) == 0x20u,
 // { 06d9b000, 06da4f60, 06da5550, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_FIREWEAPON : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_FIREWEAPON() : FPacketBase(0x10002u) {
+    FPacket_FLPACKET_COMMON_FIREWEAPON() : FPacketBase(FLPACKET_COMMON_FIREWEAPON) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.TargetPos.x = FLT_MAX;             // +0x24
         Wire.TargetPos.y = FLT_MAX;             // +0x28
@@ -173,7 +173,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_FIREWEAPON, Wire.Hardpoints.Cap) 
 // { 06d9af50, 06da49e0, 06da4ca0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_UPDATEOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_UPDATEOBJECT() : FPacketBase(0x10001u) {
+    FPacket_FLPACKET_COMMON_UPDATEOBJECT() : FPacketBase(FLPACKET_COMMON_UPDATEOBJECT) {
         Wire.Position.x = 0.0f;                 // +0x28
         Wire.Position.y = 0.0f;                 // +0x2c
         Wire.Position.z = 0.0f;                 // +0x30
@@ -196,7 +196,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_UPDATEOBJECT, Wire) == 0x20u, "CO
 // { 06d9b7a0, 06da6420, 06da65d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_CHATMSG : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_CHATMSG() : FPacketBase(0x10005u) {
+    FPacket_FLPACKET_COMMON_CHATMSG() : FPacketBase(FLPACKET_COMMON_CHATMSG) {
         Wire.Buffer = nullptr;                  // +0x2c
         Wire.Size = 0;                          // +0x28
         Wire.SenderId = 0;                      // +0x24
@@ -223,7 +223,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_CHATMSG, Wire.Buffer) == 0x2cu, "
 // { 06d9af50, 06da67a0, 06da68f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_ACTIVATEEQUIP : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_ACTIVATEEQUIP() : FPacketBase(0x10008u) {
+    FPacket_FLPACKET_COMMON_ACTIVATEEQUIP() : FPacketBase(FLPACKET_COMMON_ACTIVATEEQUIP) {
         Wire.EquipId = 0;                       // +0x26
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -240,7 +240,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_ACTIVATEEQUIP, Wire) == 0x20u, "C
 // { 06d9af50, 06da8b50, 06da8cd0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_SETTARGET : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_SETTARGET() : FPacketBase(0x10004u) {
+    FPacket_FLPACKET_COMMON_SETTARGET() : FPacketBase(FLPACKET_COMMON_SETTARGET) {
         Wire.SubObjId = 0;                      // +0x28
         Wire.TargetSubObjId = 0;                // +0x2a
     }
@@ -262,7 +262,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_SETTARGET, Wire) == 0x20u, "COMMO
 // { 06d9af50, 06db1b60, 06da6a50, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_ACTIVATECRUISE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_ACTIVATECRUISE() : FPacketBase(0x1000eu) {
+    FPacket_FLPACKET_COMMON_ACTIVATECRUISE() : FPacketBase(FLPACKET_COMMON_ACTIVATECRUISE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1b60
@@ -282,7 +282,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_ACTIVATECRUISE, Wire) == 0x20u, "
 // { 06d9af50, 06dab0e0, 06daf230, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS() : FPacketBase(0x10015u) {
+    FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS() : FPacketBase(FLPACKET_COMMON_ACTIVATETHRUSTERS) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab0e0
@@ -302,7 +302,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS, Wire) == 0x20u
 // { 06d9af50, 06da6b80, 06da6cf0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_GOTRADELANE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_GOTRADELANE() : FPacketBase(0x1000fu) {
+    FPacket_FLPACKET_COMMON_GOTRADELANE() : FPacketBase(FLPACKET_COMMON_GOTRADELANE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06da6b80
@@ -318,7 +318,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_GOTRADELANE, Wire) == 0x20u, "COM
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_STOPTRADELANE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_STOPTRADELANE() : FPacketBase(0x10010u) {
+    FPacket_FLPACKET_COMMON_STOPTRADELANE() : FPacketBase(FLPACKET_COMMON_STOPTRADELANE) {
         Wire.ShipId = 0;                        // +0x20
         Wire.TradelaneRing1 = 0;                // +0x24
         Wire.TradelaneRing2 = 0;                // +0x28
@@ -341,7 +341,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_STOPTRADELANE, Wire) == 0x20u, "C
 // { 06d9b0c0, 06da6190, 06da5bc0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP() : FPacketBase(0x10011u) {
+    FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP() : FPacketBase(FLPACKET_COMMON_SET_WEAPON_GROUP) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -374,7 +374,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP, Wire.Buffer) ==
 // { 06d9af50, 06da7030, 06da7430, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_PLAYER_TRADE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_PLAYER_TRADE() : FPacketBase(0x10012u) {
+    FPacket_FLPACKET_COMMON_PLAYER_TRADE() : FPacketBase(FLPACKET_COMMON_PLAYER_TRADE) {
         Wire.SubType = 0;                       // +0x20
         Wire.Reason = 0;                        // +0x24
         Wire.ShipId = 0;                        // +0x28
@@ -398,7 +398,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_PLAYER_TRADE, Wire) == 0x20u, "CO
 // { 06d9b180, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_SET_VISITED_STATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_SET_VISITED_STATE() : FPacketBase(0x10013u) {
+    FPacket_FLPACKET_COMMON_SET_VISITED_STATE() : FPacketBase(FLPACKET_COMMON_SET_VISITED_STATE) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -431,7 +431,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_SET_VISITED_STATE, Wire.Buffer) =
 // { 06d9af50, 06dae620, 06da78d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_JETTISONCARGO : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_JETTISONCARGO() : FPacketBase(0x10014u) {
+    FPacket_FLPACKET_COMMON_JETTISONCARGO() : FPacketBase(FLPACKET_COMMON_JETTISONCARGO) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.ItemId = 0;                        // +0x24
         Wire.Count = 0;                         // +0x28
@@ -454,7 +454,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_JETTISONCARGO, Wire) == 0x20u, "C
 // { 06d9b240, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH() : FPacketBase(0x10016u) {
+    FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH() : FPacketBase(FLPACKET_COMMON_REQUEST_BEST_PATH) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -487,7 +487,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH, Wire.Buffer) =
 // { 06d9b300, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS() : FPacketBase(0x10018u) {
+    FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS() : FPacketBase(FLPACKET_COMMON_REQUEST_PLAYER_STATS) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -520,7 +520,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS, Wire.Buffer
 // { 06d9b3d0, 06da5de0, 06da5fe0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_POP_UP_DIALOG : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_POP_UP_DIALOG() : FPacketBase(0x1001bu) {
+    FPacket_FLPACKET_COMMON_POP_UP_DIALOG() : FPacketBase(FLPACKET_COMMON_POP_UP_DIALOG) {
         Wire.SizeA = 0;                         // +0x20
         Wire.BufferA = nullptr;                 // +0x24
         Wire.SizeB = 0;                         // +0x28
@@ -553,7 +553,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_POP_UP_DIALOG, Wire.BufferA) == 0
 // { 06d9b4a0, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS() : FPacketBase(0x10017u) {
+    FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS() : FPacketBase(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -586,7 +586,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS, Wire.Buf
 // { 06d9b560, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_SET_MISSION_LOG : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_SET_MISSION_LOG() : FPacketBase(0x10019u) {
+    FPacket_FLPACKET_COMMON_SET_MISSION_LOG() : FPacketBase(FLPACKET_COMMON_SET_MISSION_LOG) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -619,7 +619,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_SET_MISSION_LOG, Wire.Buffer) == 
 // { 06d9b6e0, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL() : FPacketBase(0x1001au) {
+    FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL() : FPacketBase(FLPACKET_COMMON_REQUEST_RANK_LEVEL) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -652,7 +652,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL, Wire.Buffer) 
 // { 06d9b620, 06da6190, 06da62d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE() : FPacketBase(0x1001cu) {
+    FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE() : FPacketBase(FLPACKET_COMMON_SET_INTERFACE_STATE) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.bOwnsBuffer = 0;                   // +0x28
     }
@@ -685,7 +685,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE, Wire.Buffer)
 // { 06d9bc00, 06da7a00, 06da7b90, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_COMMON_TRACTOROBJECTS : public FPacketBase {
 public:
-    FPacket_FLPACKET_COMMON_TRACTOROBJECTS() : FPacketBase(0x1001du) {
+    FPacket_FLPACKET_COMMON_TRACTOROBJECTS() : FPacketBase(FLPACKET_COMMON_TRACTOROBJECTS) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.TractorEquipId = 0;                // +0x24
         Wire.TargetIds.AllocPad = 0; // +0x28; byte copied from an uninitialised stack slot
@@ -722,7 +722,7 @@ static_assert(offsetof(FPacket_FLPACKET_COMMON_TRACTOROBJECTS, Wire.TargetIds.Ca
 // { 06d9af50, 06db0310, 06db03f0, 06da8240 }.
 class FPacket_FLPACKET_SERVER_CONNECTRESPONSE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CONNECTRESPONSE() : FPacketBase(0x20001u) {
+    FPacket_FLPACKET_SERVER_CONNECTRESPONSE() : FPacketBase(FLPACKET_SERVER_CONNECTRESPONSE) {
         Wire.ClientId = 0;                      // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -744,7 +744,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CONNECTRESPONSE, Wire) == 0x20u, 
 // { 06d9af50, 06da82e0, 06da83c0, 06da84a0 }.
 class FPacket_FLPACKET_SERVER_LOGINRESPONSE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_LOGINRESPONSE() : FPacketBase(0x20002u) {
+    FPacket_FLPACKET_SERVER_LOGINRESPONSE() : FPacketBase(FLPACKET_SERVER_LOGINRESPONSE) {
         Wire.Field_0x00 = 0;                    // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -766,7 +766,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_LOGINRESPONSE, Wire) == 0x20u, "S
 // { 06d909b0, 06d90480, 06d906c0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_DAMAGEOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_DAMAGEOBJECT() : FPacketBase(0x20005u) {
+    FPacket_FLPACKET_SERVER_DAMAGEOBJECT() : FPacketBase(FLPACKET_SERVER_DAMAGEOBJECT) {
     }
     // FUN_06d90230
     ~FPacket_FLPACKET_SERVER_DAMAGEOBJECT() override {
@@ -787,7 +787,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_DAMAGEOBJECT) == 0x20u + sizeof(FPa
 // { 06d9af50, 06dab0e0, 06daf230, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_DESTROYOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_DESTROYOBJECT() : FPacketBase(0x20006u) {
+    FPacket_FLPACKET_SERVER_DESTROYOBJECT() : FPacketBase(FLPACKET_SERVER_DESTROYOBJECT) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.DestroyType = 0;                   // +0x24
     }
@@ -812,7 +812,7 @@ public:
     // FUN_06d9cc60. Wire.Common is built first, by FRpcCreateObjectWire's constructors
     // (the head, then COMMON.DLL's std::list<CollisionGroupDesc> ctor at +0x74 and
     // DamageList ctor at +0x80); the body is the tail.
-    FPacket_FLPACKET_SERVER_CREATESHIP() : FRpcCreateObjectPacket(0x20004u) {
+    FPacket_FLPACKET_SERVER_CREATESHIP() : FRpcCreateObjectPacket(FLPACKET_SERVER_CREATESHIP) {
         Wire.bUsingTradelane = 0;         // byte +0x9c
         Wire.VelXBits = 0;                // +0xa0
         Wire.VelY = 0.0f;                 // +0xa4 (integer 0 == +0.0f)
@@ -864,7 +864,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATESHIP) == 0x20u + sizeof(FPayl
 // { 06d9af50, 06daa820, 06daa990, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REQUEST_RETURNED : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REQUEST_RETURNED() : FPacketBase(0x20044u) {
+    FPacket_FLPACKET_SERVER_REQUEST_RETURNED() : FPacketBase(FLPACKET_SERVER_REQUEST_RETURNED) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daa820
@@ -880,7 +880,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REQUEST_RETURNED, Wire) == 0x20u,
 // { 06d95b70, 06d949d0, 06d934d0, 06d93310 }.
 class FPacket_FLPACKET_SERVER_CHARACTERINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CHARACTERINFO() : FPacketBase(0x20003u) {
+    FPacket_FLPACKET_SERVER_CHARACTERINFO() : FPacketBase(FLPACKET_SERVER_CHARACTERINFO) {
         RpcPacketBuildListSentinel(&Wire.Records, 0x0cu);   // operator new(0xc), Head
     }
     // FUN_06d93350
@@ -905,7 +905,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CHARACTERINFO, Wire.Records) == 0
 // { 06d9af50, 06daab40, 06daad40, 06daaee0 }.
 class FPacket_FLPACKET_SERVER_LAUNCH : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_LAUNCH() : FPacketBase(0x20007u) {
+    FPacket_FLPACKET_SERVER_LAUNCH() : FPacketBase(FLPACKET_SERVER_LAUNCH) {
         Wire.Position.x = 0.0f;                 // +0x2c
         Wire.Position.y = 0.0f;                 // +0x30
         Wire.Position.z = 0.0f;                 // +0x34
@@ -929,7 +929,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_LAUNCH, Wire) == 0x20u, "SERVER_L
 // { 06d9af50, 06dabdf0, 06dabf10, 06dac020 }.
 class FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED() : FPacketBase(0x20008u) {
+    FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED() : FPacketBase(FLPACKET_SERVER_CHARSELECTVERIFIED) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06dabdf0
@@ -946,7 +946,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED, Wire) == 0x20
 // { 06d9af50, 06da8e30, 06da8f80, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_ACTIVATEOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_ACTIVATEOBJECT() : FPacketBase(0x2000au) {
+    FPacket_FLPACKET_SERVER_ACTIVATEOBJECT() : FPacketBase(FLPACKET_SERVER_ACTIVATEOBJECT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06da8e30
@@ -962,7 +962,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_ACTIVATEOBJECT, Wire) == 0x20u, "
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_LAND : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_LAND() : FPacketBase(0x2000bu) {
+    FPacket_FLPACKET_SERVER_LAND() : FPacketBase(FLPACKET_SERVER_LAND) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -982,7 +982,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_LAND, Wire) == 0x20u, "SERVER_LAN
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST() : FPacketBase(0x2000eu) {
+    FPacket_FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST() : FPacketBase(FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1002,7 +1002,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST, Wire
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST() : FPacketBase(0x20010u) {
+    FPacket_FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST() : FPacketBase(FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1022,7 +1022,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST, Wi
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFCOMPLETECHARLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFCOMPLETECHARLIST() : FPacketBase(0x2000fu) {
+    FPacket_FLPACKET_SERVER_GFCOMPLETECHARLIST() : FPacketBase(FLPACKET_SERVER_GFCOMPLETECHARLIST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1042,7 +1042,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFCOMPLETECHARLIST, Wire) == 0x20
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST() : FPacketBase(0x20011u) {
+    FPacket_FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST() : FPacketBase(FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1062,7 +1062,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST, Wir
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST() : FPacketBase(0x20013u) {
+    FPacket_FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST() : FPacketBase(FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1082,7 +1082,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST, Wire
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT() : FPacketBase(0x20021u) {
+    FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT() : FPacketBase(FLPACKET_SERVER_SYSTEM_SWITCH_OUT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1102,7 +1102,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT, Wire) == 0x20u
 // { 06d9af50, 06da9260, 06da9430, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN() : FPacketBase(0x20022u) {
+    FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN() : FPacketBase(FLPACKET_SERVER_SYSTEM_SWITCH_IN) {
         Wire.Position.x = 0.0f;                 // +0x28
         Wire.Position.y = 0.0f;                 // +0x2c
         Wire.Position.z = 0.0f;                 // +0x30
@@ -1125,7 +1125,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN, Wire) == 0x20u,
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETSHIPARCH : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETSHIPARCH() : FPacketBase(0x20023u) {
+    FPacket_FLPACKET_SERVER_SETSHIPARCH() : FPacketBase(FLPACKET_SERVER_SETSHIPARCH) {
         Wire.Field_0x00 = 0;                    // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -1146,7 +1146,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETSHIPARCH, Wire) == 0x20u, "SER
 // { 06d91320, 06d916a0, 06d95bf0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETEQUIPMENT : public FRpcEquipListPacket {
 public:
-    FPacket_FLPACKET_SERVER_SETEQUIPMENT() : FRpcEquipListPacket(0x20024u) {
+    FPacket_FLPACKET_SERVER_SETEQUIPMENT() : FRpcEquipListPacket(FLPACKET_SERVER_SETEQUIPMENT) {
         EquipHandle = nullptr;                  // +0x20
     }
     // FUN_06d91310
@@ -1169,7 +1169,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETEQUIPMENT) == 0x24u, "FLPACKET_S
 // { 06d91680, 06d916a0, 06d95bf0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETCARGO : public FRpcEquipListPacket {
 public:
-    FPacket_FLPACKET_SERVER_SETCARGO() : FRpcEquipListPacket(0x20025u) {
+    FPacket_FLPACKET_SERVER_SETCARGO() : FRpcEquipListPacket(FLPACKET_SERVER_SETCARGO) {
         EquipHandle = nullptr;                  // +0x20
     }
     // FUN_06d91670
@@ -1192,7 +1192,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCARGO) == 0x24u, "FLPACKET_SERVE
 // { 06d9af50, 06da7fe0, 06da8100, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REQUESTCREATESHIPRESP : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REQUESTCREATESHIPRESP() : FPacketBase(0x20027u) {
+    FPacket_FLPACKET_SERVER_REQUESTCREATESHIPRESP() : FPacketBase(FLPACKET_SERVER_REQUESTCREATESHIPRESP) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06da7fe0
@@ -1208,7 +1208,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REQUESTCREATESHIPRESP, Wire) == 0
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETSTARTROOM : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETSTARTROOM() : FPacketBase(0x2000du) {
+    FPacket_FLPACKET_SERVER_SETSTARTROOM() : FPacketBase(FLPACKET_SERVER_SETSTARTROOM) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1228,7 +1228,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETSTARTROOM, Wire) == 0x20u, "SE
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFDESTROYCHARACTER : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFDESTROYCHARACTER() : FPacketBase(0x20015u) {
+    FPacket_FLPACKET_SERVER_GFDESTROYCHARACTER() : FPacketBase(FLPACKET_SERVER_GFDESTROYCHARACTER) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1248,7 +1248,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFDESTROYCHARACTER, Wire) == 0x20
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFDESTROYNEWSBROADCAST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFDESTROYNEWSBROADCAST() : FPacketBase(0x20014u) {
+    FPacket_FLPACKET_SERVER_GFDESTROYNEWSBROADCAST() : FPacketBase(FLPACKET_SERVER_GFDESTROYNEWSBROADCAST) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1268,7 +1268,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFDESTROYNEWSBROADCAST, Wire) == 
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER() : FPacketBase(0x20016u) {
+    FPacket_FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER() : FPacketBase(FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1288,7 +1288,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER, Wire) =
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR() : FPacketBase(0x20017u) {
+    FPacket_FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR() : FPacketBase(FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1308,7 +1308,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR, Wire) ==
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT() : FPacketBase(0x20019u) {
+    FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT() : FPacketBase(FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -1328,7 +1328,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT, Wire) == 
 // { 06d976e0, 06d97570, 06d978f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR() : FPacketBase(0x2001au) {
+    FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR() : FPacketBase(FLPACKET_SERVER_GFSCRIPTBEHAVIOR) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -1357,7 +1357,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR, Wire.Buffer) ==
 // { 06d978a0, 06da6190, 06d97730, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT() : FPacketBase(0x2001fu) {
+    FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT() : FPacketBase(FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.Size = 0;                          // +0x24
     }
@@ -1384,7 +1384,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT, Wire.Buffe
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_MISSIONSAVEA : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_MISSIONSAVEA() : FPacketBase(0x2005bu) {
+    FPacket_FLPACKET_SERVER_MISSIONSAVEA() : FPacketBase(FLPACKET_SERVER_MISSIONSAVEA) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1404,7 +1404,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_MISSIONSAVEA, Wire) == 0x20u, "SE
 // { 06d97a90, 06d97570, 06d978f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER() : FPacketBase(0x2001du) {
+    FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER() : FPacketBase(FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -1433,7 +1433,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER, Wire.Buf
 // { 06d97b70, 06d97570, 06d978f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST() : FPacketBase(0x2001eu) {
+    FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST() : FPacketBase(FLPACKET_SERVER_GFUPDATENEWSBROADCAST) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -1462,7 +1462,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST, Wire.Buffe
 // { 06d97ab0, 06d97570, 06d978f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE() : FPacketBase(0x20020u) {
+    FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE() : FPacketBase(FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -1491,7 +1491,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE, Wire.B
 // { 06d9af50, 06da82e0, 06da83c0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY() : FPacketBase(0x2005au) {
+    FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY() : FPacketBase(FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da82e0
@@ -1511,7 +1511,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY, Wire) ==
 // { 06d97520, 06d97570, 06d978f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_GFUPDATECHAR : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_GFUPDATECHAR() : FPacketBase(0x20026u) {
+    FPacket_FLPACKET_SERVER_GFUPDATECHAR() : FPacketBase(FLPACKET_SERVER_GFUPDATECHAR) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -1540,7 +1540,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_GFUPDATECHAR, Wire.Buffer) == 0x2
 // { 06d9d1d0, 06d928c0, 06d92d20, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CREATELOOT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CREATELOOT() : FPacketBase(0x20028u) {
+    FPacket_FLPACKET_SERVER_CREATELOOT() : FPacketBase(FLPACKET_SERVER_CREATELOOT) {
         Wire.OwnerId = 0;                       // +0x20
         Wire.Kind = 0;                          // +0x24
         RpcPacketBuildListSentinel(&Wire.Items, 0x50u);   // operator new(0x50), Head
@@ -1575,23 +1575,23 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CREATELOOT, Wire.Items) == 0x28u,
 // { 06d91eb0, 06d91ed0, 06d92350, 06d92860 }.
 class FPacket_FLPACKET_SERVER_SETREPUTATION : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETREPUTATION() : FPacketBase(0x20029u) {
+    FPacket_FLPACKET_SERVER_SETREPUTATION() : FPacketBase(FLPACKET_SERVER_SETREPUTATION) {
         Wire.NameASize = 0;                     // +0x20
         Wire.NameABuffer = nullptr;             // +0x24
         Wire.NameBSize = 0;                     // +0x28
         Wire.NameBBuffer = nullptr;             // +0x2c
-        Wire.MaskNames = 2u;                    // +0x38
+        Wire.MaskNames = kSetReputationMaskNames;                    // +0x38
         Wire.Attitude = 0.0f;                   // +0x30
-        Wire.MaskAffiliation = 1u;              // +0x34
-        Wire.MaskDisplayName = 4u;              // +0x3c
-        Wire.MaskRelationsByte = 8u;            // +0x40
-        Wire.MaskRelationsWord = 16u;           // +0x44
+        Wire.MaskAffiliation = kSetReputationMaskAffiliation;              // +0x34
+        Wire.MaskDisplayName = kSetReputationMaskDisplayName;              // +0x3c
+        Wire.MaskRelationsByte = kSetReputationMaskRelationsByte;            // +0x40
+        Wire.MaskRelationsWord = kSetReputationMaskRelationsWord;           // +0x44
         RpcPacketBuildListSentinel(&Wire.Relations, 0x0cu);   // operator new(0xc), Head
         Wire.Flags = 0;                         // +0x54
         Wire.VibeHandle = 0;                    // +0x58
         Wire.DisplayNameLength = 0;             // +0x60
         Wire.DisplayName = nullptr;             // +0x64
-        Wire.Affiliation = 0xffffffffu;         // +0x5c
+        Wire.Affiliation = kNoAffiliation;         // +0x5c
     }
     // FUN_06d91dd0
     ~FPacket_FLPACKET_SERVER_SETREPUTATION() override {
@@ -1633,7 +1633,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETREPUTATION, Wire.NameABuffer) 
 // { 06d9af50, 06daa0c0, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_ADJUSTATTITUDE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_ADJUSTATTITUDE() : FPacketBase(0x2002au) {
+    FPacket_FLPACKET_SERVER_ADJUSTATTITUDE() : FPacketBase(FLPACKET_SERVER_ADJUSTATTITUDE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daa0c0
@@ -1651,7 +1651,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_ADJUSTATTITUDE, Wire) == 0x20u, "
 // { 06d91830, 06d91890, 06d91a40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETGROUPFEELINGS : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETGROUPFEELINGS() : FPacketBase(0x2002bu) {
+    FPacket_FLPACKET_SERVER_SETGROUPFEELINGS() : FPacketBase(FLPACKET_SERVER_SETGROUPFEELINGS) {
         Wire.Name = nullptr;                    // +0x20
         Wire.NameSize = 0;                      // +0x24
         RpcPacketBuildListSentinel(&Wire.Relations, 0x0cu);   // operator new(0xc), Head
@@ -1687,7 +1687,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETGROUPFEELINGS, Wire.Name) == 0
 // { 06d9af50, 06da95d0, 06da98d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CREATEMINE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CREATEMINE() : FPacketBase(0x2002cu) {
+    FPacket_FLPACKET_SERVER_CREATEMINE() : FPacketBase(FLPACKET_SERVER_CREATEMINE) {
         Wire.ObjId = 0;                         // +0x20
         Wire.ArchetypeNickname = 0;             // +0x24
         Wire.OwnerId = 0;                       // +0x28
@@ -1721,7 +1721,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CREATEMINE, Wire) == 0x20u, "SERV
 // { 06d9af50, 06da9b50, 06da9e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CREATECOUNTER : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CREATECOUNTER() : FPacketBase(0x2002du) {
+    FPacket_FLPACKET_SERVER_CREATECOUNTER() : FPacketBase(FLPACKET_SERVER_CREATECOUNTER) {
         Wire.ArchetypeNickname = 0;             // +0x20
         Wire.ObjId = 0;                         // +0x24
         Wire.OwnerPlayer = 0;                   // +0x28
@@ -1755,7 +1755,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CREATECOUNTER, Wire) == 0x20u, "S
 // { 06d9af50, 06db14f0, 06dad820, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE() : FPacketBase(0x20031u) {
+    FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE() : FPacketBase(FLPACKET_SERVER_EXPLODEASTEROIDMINE) {
         Wire.MineId = 0;                        // +0x20
         Wire.OffsetXBits = 0;                   // +0x24
         Wire.OffsetYBits = 0;                   // +0x28
@@ -1779,7 +1779,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE, Wire) == 0x2
 // { 06d912c0, 06d90a50, 06d90ba0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_LOADHINT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_LOADHINT() : FPacketBase(0x2004du) {
+    FPacket_FLPACKET_SERVER_LOADHINT() : FPacketBase(FLPACKET_SERVER_LOADHINT) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.Size = 0;                          // +0x24
         Wire.Kind = 0;                          // +0x28
@@ -1806,7 +1806,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_LOADHINT, Wire.Buffer) == 0x20u, 
 // { 06d9af50, 06d90d10, 06d90f70, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETDIRECTIVE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETDIRECTIVE() : FPacketBase(0x2004eu) {
+    FPacket_FLPACKET_SERVER_SETDIRECTIVE() : FPacketBase(FLPACKET_SERVER_SETDIRECTIVE) {
         Wire.Field_0x04 = 0;                    // +0x24
         Wire.bDockApproachCleared = 0;          // +0x28
         Wire.DelaySeconds = 0.0f;               // +0x2c
@@ -1861,7 +1861,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETDIRECTIVE, Wire) == 0x20u, "SE
 // { 06d9af50, 06da84e0, 06da8810, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CREATEGUIDED : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CREATEGUIDED() : FPacketBase(0x20037u) {
+    FPacket_FLPACKET_SERVER_CREATEGUIDED() : FPacketBase(FLPACKET_SERVER_CREATEGUIDED) {
         Wire.PosXBits = 0;                      // +0x3c
         Wire.PosYBits = 0;                      // +0x40
         Wire.PosZBits = 0;                      // +0x44
@@ -1884,7 +1884,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CREATEGUIDED, Wire) == 0x20u, "SE
 // { 06d9af50, 06da8b50, 06da8cd0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_ITEMTRACTORED : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_ITEMTRACTORED() : FPacketBase(0x20038u) {
+    FPacket_FLPACKET_SERVER_ITEMTRACTORED() : FPacketBase(FLPACKET_SERVER_ITEMTRACTORED) {
         Wire.LootId = 0;                        // +0x20
         Wire.ShipId = 0;                        // +0x24
         Wire.TractorEquipId = 0;                // +0x28
@@ -1908,7 +1908,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_ITEMTRACTORED, Wire) == 0x20u, "S
 // { 06d9c4e0, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETREMOVEITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETREMOVEITEM() : FPacketBase(0x2002fu) {
+    FPacket_FLPACKET_SERVER_SETREMOVEITEM() : FPacketBase(FLPACKET_SERVER_SETREMOVEITEM) {
         Wire.ItemId = 0;                        // +0x20
         Wire.Count = 0xffffffffu;               // +0x24
         Wire.RemoveResult = 0xffffffffu;        // +0x28
@@ -1935,7 +1935,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETREMOVEITEM, Wire) == 0x20u, "S
 // { 06d96f70, 06d96f90, 06d97210, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETADDITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETADDITEM() : FPacketBase(0x2002eu) {
+    FPacket_FLPACKET_SERVER_SETADDITEM() : FPacketBase(FLPACKET_SERVER_SETADDITEM) {
         Wire.HardpointSize = 0;                 // +0x28
         Wire.bMission = 0;                      // +0x39
         Wire.Hardpoint = nullptr;               // +0x3c
@@ -1961,7 +1961,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETADDITEM, Wire.Hardpoint) == 0x
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETCASH : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETCASH() : FPacketBase(0x20030u) {
+    FPacket_FLPACKET_SERVER_SETCASH() : FPacketBase(FLPACKET_SERVER_SETCASH) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1981,7 +1981,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETCASH, Wire) == 0x20u, "SERVER_
 // { 06d986c0, 06d986e0, 06d98850, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT() : FPacketBase(0x20032u) {
+    FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT() : FPacketBase(FLPACKET_SERVER_REQUESTSPACESCRIPT) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.PosXBits = 0;                      // +0x28
         Wire.PosYBits = 0;                      // +0x2c
@@ -2010,7 +2010,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT, Wire.Name) ==
 // { 06d9af50, 06daaf90, 06dacea0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE() : FPacketBase(0x20033u) {
+    FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE() : FPacketBase(FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daaf90
@@ -2030,7 +2030,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE, Wire) =
 // { 06d9af50, 06dab200, 06dab350, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CFGINTERFACENOTIFICATION : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CFGINTERFACENOTIFICATION() : FPacketBase(0x20047u) {
+    FPacket_FLPACKET_SERVER_CFGINTERFACENOTIFICATION() : FPacketBase(FLPACKET_SERVER_CFGINTERFACENOTIFICATION) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06dab200
@@ -2046,7 +2046,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_CFGINTERFACENOTIFICATION, Wire) =
 // { 06d9af50, 06dab0e0, 06daf230, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_MARKOBJ : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_MARKOBJ() : FPacketBase(0x20046u) {
+    FPacket_FLPACKET_SERVER_MARKOBJ() : FPacketBase(FLPACKET_SERVER_MARKOBJ) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab0e0
@@ -2066,7 +2066,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_MARKOBJ, Wire) == 0x20u, "SERVER_
 // { 06d8fbf0, 06d8fc90, 06d8ffd0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES() : FPacketBase(0x20035u) {
+    FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES() : FPacketBase(FLPACKET_SERVER_SETMISSIONOBJECTIVES) {
         Wire.TextASize = 0;                     // +0x28
         Wire.TextABuffer = nullptr;             // +0x2c
         Wire.TextBSize = 0;                     // +0x30
@@ -2113,7 +2113,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES, Wire.TextAB
 // { 06d9d7b0, 06dab4b0, 06dab630, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE() : FPacketBase(0x20034u) {
+    FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE() : FPacketBase(FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE) {
         Wire.TextSize = 0;                      // +0x28
         Wire.TextBuffer = nullptr;              // +0x2c
     }
@@ -2138,7 +2138,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE, Wire.Tex
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SET_STORY_CUE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SET_STORY_CUE() : FPacketBase(0x20043u) {
+    FPacket_FLPACKET_SERVER_SET_STORY_CUE() : FPacketBase(FLPACKET_SERVER_SET_STORY_CUE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2158,7 +2158,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SET_STORY_CUE, Wire) == 0x20u, "S
 // { 06d9af50, 06dab780, 06dab960, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SET_CAMERA : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SET_CAMERA() : FPacketBase(0x2004bu) {
+    FPacket_FLPACKET_SERVER_SET_CAMERA() : FPacketBase(FLPACKET_SERVER_SET_CAMERA) {
         Wire.Position.x = 0.0f;                 // +0x20
         Wire.Position.y = 0.0f;                 // +0x24
         Wire.Position.z = 0.0f;                 // +0x28
@@ -2181,7 +2181,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SET_CAMERA, Wire) == 0x20u, "SERV
 // { 06d9af50, 06dae0d0, 06dabad0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REVERT_CAMERA : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REVERT_CAMERA() : FPacketBase(0x2004cu) {
+    FPacket_FLPACKET_SERVER_REVERT_CAMERA() : FPacketBase(FLPACKET_SERVER_REVERT_CAMERA) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae0d0
@@ -2199,7 +2199,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REVERT_CAMERA) == 0x20u, "FLPACKET_
 // { 06d9d9c0, 06dabbb0, 06dabd00, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE() : FPacketBase(0x20045u) {
+    FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE() : FPacketBase(FLPACKET_SERVER_SET_MISSION_MESSAGE) {
         Wire.TextSize = 0;                      // +0x20
         Wire.TextBuffer = nullptr;              // +0x24
     }
@@ -2224,7 +2224,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE, Wire.TextBuf
 // { 06d9af50, 06db0160, 06da6e40, 06dac2b0 }.
 class FPacket_FLPACKET_SERVER_REPAIROBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_REPAIROBJECT() : FPacketBase(0x2003cu) {
+    FPacket_FLPACKET_SERVER_REPAIROBJECT() : FPacketBase(FLPACKET_SERVER_REPAIROBJECT) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.EquipId = 0;                       // +0x24
         Wire.Points = 0;                        // +0x28
@@ -2248,7 +2248,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REPAIROBJECT, Wire) == 0x20u, "SE
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETNUMKILLS : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETNUMKILLS() : FPacketBase(0x2003eu) {
+    FPacket_FLPACKET_SERVER_SETNUMKILLS() : FPacketBase(FLPACKET_SERVER_SETNUMKILLS) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2268,7 +2268,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETNUMKILLS, Wire) == 0x20u, "SER
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETMISSIONSUCCESSES : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETMISSIONSUCCESSES() : FPacketBase(0x2003fu) {
+    FPacket_FLPACKET_SERVER_SETMISSIONSUCCESSES() : FPacketBase(FLPACKET_SERVER_SETMISSIONSUCCESSES) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2288,7 +2288,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETMISSIONSUCCESSES, Wire) == 0x2
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETMISSIONFAILURES : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETMISSIONFAILURES() : FPacketBase(0x20040u) {
+    FPacket_FLPACKET_SERVER_SETMISSIONFAILURES() : FPacketBase(FLPACKET_SERVER_SETMISSIONFAILURES) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2308,7 +2308,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETMISSIONFAILURES, Wire) == 0x20
 // { 06d9af50, 06dac3c0, 06dac5c0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_BURNFUSE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_BURNFUSE() : FPacketBase(0x20041u) {
+    FPacket_FLPACKET_SERVER_BURNFUSE() : FPacketBase(FLPACKET_SERVER_BURNFUSE) {
         Wire.SourceId = 0;                      // +0x20
         Wire.ObjectId = 0;                      // +0x24
         Wire.FuseId = 0;                        // +0x28
@@ -2335,7 +2335,7 @@ public:
     // (the head, with FUN_06d9cda0 inlined, then COMMON.DLL's list ctor at +0x74 and
     // DamageList ctor at +0x80); the body is the tail. +0x9e/+0x9f and Affiliation /
     // Attitude (+0xb0 / +0xb4) are not stored by retail's constructor and are not stored here.
-    FPacket_FLPACKET_SERVER_CREATESOLAR() : FRpcCreateObjectPacket(0x20042u) {
+    FPacket_FLPACKET_SERVER_CREATESOLAR() : FRpcCreateObjectPacket(FLPACKET_SERVER_CREATESOLAR) {
         Wire.NameASize = 0;               // +0xa0
         Wire.NameABuffer = nullptr;       // +0xa4
         Wire.NameBSize = 0;               // +0xa8
@@ -2368,7 +2368,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATESOLAR) == 0x20u + sizeof(FPay
 // { 06da1130, 06dacca0, 06dacd70, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS : public FRpcCollisionGroupPacket {
 public:
-    FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS() : FRpcCollisionGroupPacket(0x20048u) {
+    FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS() : FRpcCollisionGroupPacket(FLPACKET_SERVER_SETCOLLISIONGROUPS) {
         RpcPacketBuildListSentinel(&Wire, 0x10u);   // operator new(0x10), Head
     }
 };
@@ -2380,7 +2380,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS, Wire) == 0x20
 // { 06d9af50, 06db1cd0, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETHULLSTATUS : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETHULLSTATUS() : FPacketBase(0x20049u) {
+    FPacket_FLPACKET_SERVER_SETHULLSTATUS() : FPacketBase(FLPACKET_SERVER_SETHULLSTATUS) {
         Wire.HullStatus = 0.0f;                 // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -2401,7 +2401,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETHULLSTATUS, Wire) == 0x20u, "S
 // { 06d9af50, 06daaf90, 06dacea0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SETGUIDEDTARGET : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SETGUIDEDTARGET() : FPacketBase(0x2004au) {
+    FPacket_FLPACKET_SERVER_SETGUIDEDTARGET() : FPacketBase(FLPACKET_SERVER_SETGUIDEDTARGET) {
         Wire.GuidedId = 0;                      // +0x20
         Wire.TargetId = 0;                      // +0x24
         Wire.TargetSubObjId = 0;                // +0x28
@@ -2424,7 +2424,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SETGUIDEDTARGET, Wire) == 0x20u, 
 // { 06d9eaf0, 06dad000, 06dad320, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SENDCOMM : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SENDCOMM() : FPacketBase(0x2004fu) {
+    FPacket_FLPACKET_SERVER_SENDCOMM() : FPacketBase(FLPACKET_SERVER_SENDCOMM) {
         Wire.Body.Head = 0;                     // +0x2c
         Wire.Body.Body = 0;                     // +0x30
         Wire.Body.LeftHand = 0;                 // +0x34
@@ -2455,7 +2455,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SENDCOMM, Wire.Buffer) == 0x64u, 
 // { 06d9af50, 06db19b0, 06dad690, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_USE_ITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_USE_ITEM() : FPacketBase(0x20051u) {
+    FPacket_FLPACKET_SERVER_USE_ITEM() : FPacketBase(FLPACKET_SERVER_USE_ITEM) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.EquipId = 0;                       // +0x24
         Wire.Count = 0;                         // +0x26
@@ -2478,7 +2478,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_USE_ITEM, Wire) == 0x20u, "SERVER
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SCANNOTIFY : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SCANNOTIFY() : FPacketBase(0x20039u) {
+    FPacket_FLPACKET_SERVER_SCANNOTIFY() : FPacketBase(FLPACKET_SERVER_SCANNOTIFY) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -2498,8 +2498,8 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SCANNOTIFY, Wire) == 0x20u, "SERV
 // { 06d99930, 06d99990, 06d99b60, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_PLAYERLIST : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_PLAYERLIST() : FPacketBase(0x20052u) {
-        Wire.Kind = 3u;                         // +0x20
+    FPacket_FLPACKET_SERVER_PLAYERLIST() : FPacketBase(FLPACKET_SERVER_PLAYERLIST) {
+        Wire.Kind = kPlayerListKindNone;            // +0x20
         Wire.Name = nullptr;                    // +0x24
         Wire.PlayerId = 0;                      // +0x28
         Wire.bAlreadyPresent = 0;               // +0x2c
@@ -2528,7 +2528,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_PLAYERLIST, Wire.Name) == 0x24u, 
 // { 06d8f820, 06d8f840, 06d8f970, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE : public FRpcEquipListPacket {
 public:
-    FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE() : FRpcEquipListPacket(0x2003du) {
+    FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE() : FRpcEquipListPacket(FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE) {
         EquipHandle = nullptr;                  // +0x20
         Flag = 0;                               // +0x24
         ObjectId = 0;                           // +0x28
@@ -2557,7 +2557,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE, ObjectId
 // { 06d98aa0, 06d98d30, 06d990d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_MISCOBJUPDATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_MISCOBJUPDATE() : FPacketBase(0x20054u) {
+    FPacket_FLPACKET_SERVER_MISCOBJUPDATE() : FPacketBase(FLPACKET_SERVER_MISCOBJUPDATE) {
         Wire.ObjectId = 0;
         Wire.GroupId = 0;
         Wire.Flags = 0;
@@ -2565,7 +2565,7 @@ public:
         Wire.MissionId = 0;
         Wire.MissionSetBy = 0;
         Wire.Field_0x30 = 0;
-        Wire.Affiliation = 0xffffffffu;
+        Wire.Affiliation = kNoAffiliation;
         Wire.Rank = 0;
         Wire.SystemId = 0;
         Wire.IdCount = 0;
@@ -2590,7 +2590,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_MISCOBJUPDATE) == 0x20u + sizeof(FP
 // { 06d9af50, 06db14f0, 06dad820, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_FORMATION_UPDATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_FORMATION_UPDATE() : FPacketBase(0x20053u) {
+    FPacket_FLPACKET_SERVER_FORMATION_UPDATE() : FPacketBase(FLPACKET_SERVER_FORMATION_UPDATE) {
         Wire.LeaderId = 0;                      // +0x20
         Wire.Offset.x = 0.0f;                   // +0x24
         Wire.Offset.y = 0.0f;                   // +0x28
@@ -2614,7 +2614,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_FORMATION_UPDATE, Wire) == 0x20u,
 // { 06d9eeb0, 06dad9b0, 06dadb80, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE() : FPacketBase(0x20055u) {
+    FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE() : FPacketBase(FLPACKET_SERVER_OBJECTCARGOUPDATE) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.ArchId = 0;                        // +0x24
         Wire.EquipId = 0;                       // +0x28
@@ -2640,7 +2640,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE, Wire) == 0x20u
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SENDNNMESSAGE : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SENDNNMESSAGE() : FPacketBase(0x20056u) {
+    FPacket_FLPACKET_SERVER_SENDNNMESSAGE() : FPacketBase(FLPACKET_SERVER_SENDNNMESSAGE) {
         Wire.Field_0x00 = 0;                    // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -2661,7 +2661,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SENDNNMESSAGE, Wire) == 0x20u, "S
 // { 06d9af50, 06dadd60, 06dadf30, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_SET_MUSIC : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_SET_MUSIC() : FPacketBase(0x20057u) {
+    FPacket_FLPACKET_SERVER_SET_MUSIC() : FPacketBase(FLPACKET_SERVER_SET_MUSIC) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06dadd60
@@ -2677,7 +2677,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_SET_MUSIC, Wire) == 0x20u, "SERVE
 // { 06d9af50, 06dae0d0, 06dabad0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_CANCEL_MUSIC : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_CANCEL_MUSIC() : FPacketBase(0x20058u) {
+    FPacket_FLPACKET_SERVER_CANCEL_MUSIC() : FPacketBase(FLPACKET_SERVER_CANCEL_MUSIC) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae0d0
@@ -2695,7 +2695,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CANCEL_MUSIC) == 0x20u, "FLPACKET_S
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_PLAY_SOUND_EFFECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_SERVER_PLAY_SOUND_EFFECT() : FPacketBase(0x20059u) {
+    FPacket_FLPACKET_SERVER_PLAY_SOUND_EFFECT() : FPacketBase(FLPACKET_SERVER_PLAY_SOUND_EFFECT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2719,7 +2719,7 @@ static_assert(offsetof(FPacket_FLPACKET_SERVER_PLAY_SOUND_EFFECT, Wire) == 0x20u
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQCHANGECASH : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQCHANGECASH() : FPacketBase(0x3001cu) {
+    FPacket_FLPACKET_CLIENT_REQCHANGECASH() : FPacketBase(FLPACKET_CLIENT_REQCHANGECASH) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2739,7 +2739,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQCHANGECASH, Wire) == 0x20u, "C
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQSETCASH : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQSETCASH() : FPacketBase(0x3001bu) {
+    FPacket_FLPACKET_CLIENT_REQSETCASH() : FPacketBase(FLPACKET_CLIENT_REQSETCASH) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2759,7 +2759,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQSETCASH, Wire) == 0x20u, "CLIE
 // { 06da0600, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQREMOVEITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQREMOVEITEM() : FPacketBase(0x30019u) {
+    FPacket_FLPACKET_CLIENT_REQREMOVEITEM() : FPacketBase(FLPACKET_CLIENT_REQREMOVEITEM) {
         Wire.EquipId = 0;                       // +0x20
         Wire.Count = 0xffffffffu;               // +0x24
     }
@@ -2785,7 +2785,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQREMOVEITEM, Wire) == 0x20u, "C
 // { 06d9a200, 06d9a220, 06d9a410, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQMODIFYITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQMODIFYITEM() : FPacketBase(0x3001au) {
+    FPacket_FLPACKET_CLIENT_REQMODIFYITEM() : FPacketBase(FLPACKET_CLIENT_REQMODIFYITEM) {
         Wire.Count = 0;                         // +0x20
         Wire.HardpointSize = 0;                 // +0x24
         Wire.EquipId = 0;                       // +0x28
@@ -2814,7 +2814,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQMODIFYITEM, Wire.Hardpoint) ==
 // { 06d95d00, 06d916a0, 06d95bf0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQCARGO : public FRpcEquipListPacket {
 public:
-    FPacket_FLPACKET_CLIENT_REQCARGO() : FRpcEquipListPacket(0x30017u) {
+    FPacket_FLPACKET_CLIENT_REQCARGO() : FRpcEquipListPacket(FLPACKET_CLIENT_REQCARGO) {
         EquipHandle = nullptr;                  // +0x20
     }
     // FUN_06d95cf0
@@ -2837,7 +2837,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCARGO) == 0x24u, "FLPACKET_CLIEN
 // { 06d99d70, 06d99d90, 06d99f80, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQADDITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQADDITEM() : FPacketBase(0x30018u) {
+    FPacket_FLPACKET_CLIENT_REQADDITEM() : FPacketBase(FLPACKET_CLIENT_REQADDITEM) {
         Wire.ArchId = 0;                        // +0x20
         Wire.Count = 0;                         // +0x24
         Wire.HardpointSize = 0;                 // +0x28
@@ -2866,7 +2866,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQADDITEM, Wire.Hardpoint) == 0x
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQSHIPARCH : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQSHIPARCH() : FPacketBase(0x30015u) {
+    FPacket_FLPACKET_CLIENT_REQSHIPARCH() : FPacketBase(FLPACKET_CLIENT_REQSHIPARCH) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2886,7 +2886,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQSHIPARCH, Wire) == 0x20u, "CLI
 // { 06d95bd0, 06d916a0, 06d95bf0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQEQUIPMENT : public FRpcEquipListPacket {
 public:
-    FPacket_FLPACKET_CLIENT_REQEQUIPMENT() : FRpcEquipListPacket(0x30016u) {
+    FPacket_FLPACKET_CLIENT_REQEQUIPMENT() : FRpcEquipListPacket(FLPACKET_CLIENT_REQEQUIPMENT) {
         EquipHandle = nullptr;                  // +0x20
     }
     // FUN_06d95bc0
@@ -2909,7 +2909,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQEQUIPMENT) == 0x24u, "FLPACKET_C
 // { 06d9af50, 06dae280, 06dae430, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_MUNCOLLISION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_MUNCOLLISION() : FPacketBase(0x30003u) {
+    FPacket_FLPACKET_CLIENT_MUNCOLLISION() : FPacketBase(FLPACKET_CLIENT_MUNCOLLISION) {
         Wire.ProjectileArchId = 0;              // +0x20
         Wire.AttackerId = 0;                    // +0x24
         Wire.ObjectId = 0;                      // +0x28
@@ -2932,7 +2932,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_MUNCOLLISION, Wire) == 0x20u, "CL
 // { 06d9af50, 06dae620, 06da78d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION() : FPacketBase(0x3003du) {
+    FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION() : FPacketBase(FLPACKET_CLIENT_BADLANDSOBJCOLLISION) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.SubObjId = 0;                      // +0x24
         Wire.BadLandsObjId = 0;                 // +0x28
@@ -2955,7 +2955,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION, Wire) == 0x
 // { 06d9af50, 06dae770, 06dae910, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_OBJCOLLISION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_OBJCOLLISION() : FPacketBase(0x3000cu) {
+    FPacket_FLPACKET_CLIENT_OBJCOLLISION() : FPacketBase(FLPACKET_CLIENT_OBJCOLLISION) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.SubObjId = 0;                      // +0x24
         Wire.TargetObjectId = 0;                // +0x28
@@ -2976,7 +2976,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_OBJCOLLISION, Wire) == 0x20u, "CL
 // { 06d9af50, 06daa240, 06daa3e0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUEST_EVENT : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUEST_EVENT() : FPacketBase(0x30031u) {
+    FPacket_FLPACKET_CLIENT_REQUEST_EVENT() : FPacketBase(FLPACKET_CLIENT_REQUEST_EVENT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daa240
@@ -2992,7 +2992,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUEST_EVENT, Wire) == 0x20u, "C
 // { 06d9af50, 06daa560, 06daa6d0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUEST_CANCEL : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUEST_CANCEL() : FPacketBase(0x30032u) {
+    FPacket_FLPACKET_CLIENT_REQUEST_CANCEL() : FPacketBase(FLPACKET_CLIENT_REQUEST_CANCEL) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daa560
@@ -3008,7 +3008,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUEST_CANCEL, Wire) == 0x20u, "
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_CARGOSCAN : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_CARGOSCAN() : FPacketBase(0x3002bu) {
+    FPacket_FLPACKET_CLIENT_CARGOSCAN() : FPacketBase(FLPACKET_CLIENT_CARGOSCAN) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -3028,7 +3028,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_CARGOSCAN, Wire) == 0x20u, "CLIEN
 // { 06d9af50, 06db0310, 06db03f0, 06daf370 }.
 class FPacket_FLPACKET_CLIENT_REQUESTLAUNCH : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTLAUNCH() : FPacketBase(0x30004u) {
+    FPacket_FLPACKET_CLIENT_REQUESTLAUNCH() : FPacketBase(FLPACKET_CLIENT_REQUESTLAUNCH) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3049,7 +3049,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUESTLAUNCH, Wire) == 0x20u, "C
 // { 06d9af50, 06da13d0, 06da1470, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUESTCHARINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTCHARINFO() : FPacketBase(0x30005u) {
+    FPacket_FLPACKET_CLIENT_REQUESTCHARINFO() : FPacketBase(FLPACKET_CLIENT_REQUESTCHARINFO) {
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTCHARINFO) == 0x20u, "FLPACKET_CLIENT_REQUESTCHARINFO is operator new(0x20)");
@@ -3059,7 +3059,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTCHARINFO) == 0x20u, "FLPACKE
 // { 06d9af50, 06da13d0, 06da1470, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE() : FPacketBase(0x30042u) {
+    FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE() : FPacketBase(FLPACKET_CLIENT_SKIP_AUTOSAVE) {
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE) == 0x20u, "FLPACKET_CLIENT_SKIP_AUTOSAVE is operator new(0x20)");
@@ -3069,7 +3069,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE) == 0x20u, "FLPACKET_
 // { 06d9af50, 06daf830, 06daf970, 06dafab0 }.
 class FPacket_FLPACKET_CLIENT_SELECTCHARACTER : public FRpcCharacterIdPacket {
 public:
-    FPacket_FLPACKET_CLIENT_SELECTCHARACTER() : FRpcCharacterIdPacket(0x30006u) {
+    FPacket_FLPACKET_CLIENT_SELECTCHARACTER() : FRpcCharacterIdPacket(FLPACKET_CLIENT_SELECTCHARACTER) {
         CharacterId[0] = 0;                     // +0x20
     }
 };
@@ -3081,7 +3081,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_SELECTCHARACTER, CharacterId) == 
 // { 06d9af50, 06daffc0, 06d9ab00, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_COMMCOMPLETE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_COMMCOMPLETE() : FPacketBase(0x30037u) {
+    FPacket_FLPACKET_CLIENT_COMMCOMPLETE() : FPacketBase(FLPACKET_CLIENT_COMMCOMPLETE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daffc0
@@ -3101,7 +3101,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_COMMCOMPLETE, Wire) == 0x20u, "CL
 // { 06d9af50, 06da13d0, 06da1470, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO() : FPacketBase(0x30038u) {
+    FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO() : FPacketBase(FLPACKET_CLIENT_REQUESTNEWCHARINFO) {
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO) == 0x20u, "FLPACKET_CLIENT_REQUESTNEWCHARINFO is operator new(0x20)");
@@ -3111,7 +3111,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO) == 0x20u, "FLPA
 // { 06d9af50, 06daf410, 06daf5b0, 06daf760 }.
 class FPacket_FLPACKET_CLIENT_CREATENEWCHAR : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_CREATENEWCHAR() : FPacketBase(0x30039u) {
+    FPacket_FLPACKET_CLIENT_CREATENEWCHAR() : FPacketBase(FLPACKET_CLIENT_CREATENEWCHAR) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daf410
@@ -3128,7 +3128,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_CREATENEWCHAR, Wire) == 0x20u, "C
 // { 06d9af50, 06daf830, 06daf970, 06dafab0 }.
 class FPacket_FLPACKET_CLIENT_DESTROYCHAR : public FRpcCharacterIdPacket {
 public:
-    FPacket_FLPACKET_CLIENT_DESTROYCHAR() : FRpcCharacterIdPacket(0x3003au) {
+    FPacket_FLPACKET_CLIENT_DESTROYCHAR() : FRpcCharacterIdPacket(FLPACKET_CLIENT_DESTROYCHAR) {
         CharacterId[0] = 0;                     // +0x20
     }
 };
@@ -3140,7 +3140,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DESTROYCHAR, CharacterId) == 0x20
 // { 06d9af50, 06dafb10, 06dafd40, 06daff50 }.
 class FPacket_FLPACKET_CLIENT_LOGIN : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_LOGIN() : FPacketBase(0x30001u) {
+    FPacket_FLPACKET_CLIENT_LOGIN() : FPacketBase(FLPACKET_CLIENT_LOGIN) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06dafb10
@@ -3157,7 +3157,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_LOGIN, Wire) == 0x20u, "CLIENT_LO
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_ENTERBASE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_ENTERBASE() : FPacketBase(0x30007u) {
+    FPacket_FLPACKET_CLIENT_ENTERBASE() : FPacketBase(FLPACKET_CLIENT_ENTERBASE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3177,7 +3177,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_ENTERBASE, Wire) == 0x20u, "CLIEN
 // { 06d9af50, 06dab0e0, 06daf230, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUESTBASEINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTBASEINFO() : FPacketBase(0x30008u) {
+    FPacket_FLPACKET_CLIENT_REQUESTBASEINFO() : FPacketBase(FLPACKET_CLIENT_REQUESTBASEINFO) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab0e0
@@ -3197,7 +3197,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUESTBASEINFO, Wire) == 0x20u, 
 // { 06d9af50, 06dab0e0, 06daf230, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO() : FPacketBase(0x30009u) {
+    FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO() : FPacketBase(FLPACKET_CLIENT_REQUESTLOCATIONINFO) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab0e0
@@ -3217,7 +3217,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO, Wire) == 0x2
 // { 06d9af50, 06da13d0, 06da1470, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_GFREQUESTSHIPINFO : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_GFREQUESTSHIPINFO() : FPacketBase(0x3000au) {
+    FPacket_FLPACKET_CLIENT_GFREQUESTSHIPINFO() : FPacketBase(FLPACKET_CLIENT_GFREQUESTSHIPINFO) {
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFREQUESTSHIPINFO) == 0x20u, "FLPACKET_CLIENT_GFREQUESTSHIPINFO is operator new(0x20)");
@@ -3227,7 +3227,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFREQUESTSHIPINFO) == 0x20u, "FLPAC
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE() : FPacketBase(0x3000bu) {
+    FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE() : FPacketBase(FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3247,7 +3247,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE, Wire)
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_EXITBASE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_EXITBASE() : FPacketBase(0x3000du) {
+    FPacket_FLPACKET_CLIENT_EXITBASE() : FPacketBase(FLPACKET_CLIENT_EXITBASE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3267,7 +3267,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_EXITBASE, Wire) == 0x20u, "CLIENT
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_ENTERLOCATION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_ENTERLOCATION() : FPacketBase(0x3000eu) {
+    FPacket_FLPACKET_CLIENT_ENTERLOCATION() : FPacketBase(FLPACKET_CLIENT_ENTERLOCATION) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3287,7 +3287,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_ENTERLOCATION, Wire) == 0x20u, "C
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_EXITLOCATION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_EXITLOCATION() : FPacketBase(0x3000fu) {
+    FPacket_FLPACKET_CLIENT_EXITLOCATION() : FPacketBase(FLPACKET_CLIENT_EXITLOCATION) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3307,7 +3307,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_EXITLOCATION, Wire) == 0x20u, "CL
 // { 06d9af50, 06da13d0, 06da1470, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP() : FPacketBase(0x30010u) {
+    FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP() : FPacketBase(FLPACKET_CLIENT_REQUESTCREATESHIP) {
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP) == 0x20u, "FLPACKET_CLIENT_REQUESTCREATESHIP is operator new(0x20)");
@@ -3317,7 +3317,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP) == 0x20u, "FLPAC
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED() : FPacketBase(0x30035u) {
+    FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED() : FPacketBase(FLPACKET_CLIENT_INTERFACEITEMUSED) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3337,7 +3337,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED, Wire) == 0x20u
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_RTCDONE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_RTCDONE() : FPacketBase(0x30047u) {
+    FPacket_FLPACKET_CLIENT_RTCDONE() : FPacketBase(FLPACKET_CLIENT_RTCDONE) {
         Wire.Field_0x00 = 0;                    // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -3358,7 +3358,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_RTCDONE, Wire) == 0x20u, "CLIENT_
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_ABORT_MISSION : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_ABORT_MISSION() : FPacketBase(0x30041u) {
+    FPacket_FLPACKET_CLIENT_ABORT_MISSION() : FPacketBase(FLPACKET_CLIENT_ABORT_MISSION) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3378,7 +3378,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_ABORT_MISSION, Wire) == 0x20u, "C
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE() : FPacketBase(0x3003eu) {
+    FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE() : FPacketBase(FLPACKET_CLIENT_LAUNCHCOMPLETE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -3398,7 +3398,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE, Wire) == 0x20u, "
 // { 06d9af50, 06da9110, 06d95d40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE() : FPacketBase(0x30043u) {
+    FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE() : FPacketBase(FLPACKET_CLIENT_JUMPINCOMPLETE) {
         Wire.SystemId = 0;                      // +0x20
         Wire.ShipId = 0;                        // +0x24
     }
@@ -3420,7 +3420,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE, Wire) == 0x20u, "
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_HAIL : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_HAIL() : FPacketBase(0x3003fu) {
+    FPacket_FLPACKET_CLIENT_HAIL() : FPacketBase(FLPACKET_CLIENT_HAIL) {
         Wire.ShipId = 0;                        // +0x20
         Wire.TargetId = 0;                      // +0x24
         Wire.SystemId = 0;                      // +0x28
@@ -3443,7 +3443,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_HAIL, Wire) == 0x20u, "CLIENT_HAI
 // { 06d9af50, 06daffc0, 06d9ab00, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_GFGOODBUY : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_GFGOODBUY() : FPacketBase(0x30012u) {
+    FPacket_FLPACKET_CLIENT_GFGOODBUY() : FPacketBase(FLPACKET_CLIENT_GFGOODBUY) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daffc0
@@ -3463,7 +3463,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_GFGOODBUY, Wire) == 0x20u, "CLIEN
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_GFGOODSELL : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_GFGOODSELL() : FPacketBase(0x30011u) {
+    FPacket_FLPACKET_CLIENT_GFGOODSELL() : FPacketBase(FLPACKET_CLIENT_GFGOODSELL) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -3483,7 +3483,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_GFGOODSELL, Wire) == 0x20u, "CLIE
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED() : FPacketBase(0x3003cu) {
+    FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED() : FPacketBase(FLPACKET_CLIENT_GFGOODVAPORIZED) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -3503,7 +3503,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED, Wire) == 0x20u, 
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_GFSELECTOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_GFSELECTOBJECT() : FPacketBase(0x30013u) {
+    FPacket_FLPACKET_CLIENT_GFSELECTOBJECT() : FPacketBase(FLPACKET_CLIENT_GFSELECTOBJECT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3523,7 +3523,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_GFSELECTOBJECT, Wire) == 0x20u, "
 // { 06d9ac90, 06d9a800, 06d9a950, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_SAVEGAME : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_SAVEGAME() : FPacketBase(0x3001eu) {
+    FPacket_FLPACKET_CLIENT_SAVEGAME() : FPacketBase(FLPACKET_CLIENT_SAVEGAME) {
         Wire.CharId[0] = 0;                     // +0x20
     }
     // FUN_06d9a7d0
@@ -3547,7 +3547,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_SAVEGAME, Wire.Description) == 0x
 // { 06d9af50, 06daeac0, 06daeca0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_MINEASTEROID : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_MINEASTEROID() : FPacketBase(0x30020u) {
+    FPacket_FLPACKET_CLIENT_MINEASTEROID() : FPacketBase(FLPACKET_CLIENT_MINEASTEROID) {
         Wire.PositionX = 0.0f;                  // +0x24
         Wire.PositionY = 0.0f;                  // +0x28
         Wire.PositionZ = 0.0f;                  // +0x2c
@@ -3566,7 +3566,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_MINEASTEROID, Wire) == 0x20u, "CL
 // { 06d9af50, 06daeec0, 06daf010, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_MISSIONRESPONSE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_MISSIONRESPONSE() : FPacketBase(0x30014u) {
+    FPacket_FLPACKET_CLIENT_MISSIONRESPONSE() : FPacketBase(FLPACKET_CLIENT_MISSIONRESPONSE) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06daeec0
@@ -3582,7 +3582,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_MISSIONRESPONSE, Wire) == 0x20u, 
 // { 06d9a7b0, 06da9110, 06d9a660, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_TRADERESPONSE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_TRADERESPONSE() : FPacketBase(0x30027u) {
+    FPacket_FLPACKET_CLIENT_TRADERESPONSE() : FPacketBase(FLPACKET_CLIENT_TRADERESPONSE) {
         Wire.Size = 0;                          // +0x20
         Wire.Buffer = nullptr;                  // +0x24
     }
@@ -3608,7 +3608,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_TRADERESPONSE, Wire.Buffer) == 0x
 // { 06da0ea0, 06db0560, 06db0b30, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGCREATESHIP : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGCREATESHIP() : FPacketBase(0x30022u) {
+    FPacket_FLPACKET_CLIENT_DBGCREATESHIP() : FPacketBase(FLPACKET_CLIENT_DBGCREATESHIP) {
         Wire.Field_0x14.x = 0.0f;               // +0x34
         Wire.Field_0x14.y = 0.0f;               // +0x38
         Wire.Field_0x14.z = 0.0f;               // +0x3c
@@ -3666,7 +3666,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DBGCREATESHIP, Wire.DwordArray) =
 // { 06da0ef0, 06da6190, 06db10e0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM() : FPacketBase(0x30023u) {
+    FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM() : FPacketBase(FLPACKET_CLIENT_DBGLOADSYSTEM) {
         Wire.Buffer = nullptr;                  // +0x20
         Wire.Size = 0;                          // +0x24
     }
@@ -3693,7 +3693,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM, Wire.Buffer) == 0x
 // { 06da0f40, 06dae0d0, 06dabad0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGFREESYSTEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGFREESYSTEM() : FPacketBase(0x3002eu) {
+    FPacket_FLPACKET_CLIENT_DBGFREESYSTEM() : FPacketBase(FLPACKET_CLIENT_DBGFREESYSTEM) {
     }
     // FUN_06db1250
     ~FPacket_FLPACKET_CLIENT_DBGFREESYSTEM() override {
@@ -3715,7 +3715,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGFREESYSTEM) == 0x20u, "FLPACKET_
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DOCK : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DOCK() : FPacketBase(0x30024u) {
+    FPacket_FLPACKET_CLIENT_DOCK() : FPacketBase(FLPACKET_CLIENT_DOCK) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3735,7 +3735,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DOCK, Wire) == 0x20u, "CLIENT_DOC
 // { 06d9af50, 06db1670, 06db17a0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGCONSOLE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGCONSOLE() : FPacketBase(0x3002du) {
+    FPacket_FLPACKET_CLIENT_DBGCONSOLE() : FPacketBase(FLPACKET_CLIENT_DBGCONSOLE) {
         Wire.Field_0x00 = 0;                    // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -3752,7 +3752,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DBGCONSOLE, Wire) == 0x20u, "CLIE
 // { 06d9af50, 06db12c0, 06db13e0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT() : FPacketBase(0x30025u) {
+    FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT() : FPacketBase(FLPACKET_CLIENT_DBGDESTROYOBJECT) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override;   // 06db12c0
@@ -3768,7 +3768,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT, Wire) == 0x20u,
 // { 06d9af50, 06db14f0, 06dad820, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP() : FPacketBase(0x30030u) {
+    FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP() : FPacketBase(FLPACKET_CLIENT_DBGRELOCATE_SHIP) {
         Wire.Field_0x04 = 0;                    // +0x24
         Wire.Field_0x08 = 0;                    // +0x28
         Wire.Field_0x0c = 0;                    // +0x2c
@@ -3791,7 +3791,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP, Wire) == 0x20u,
 // { 06d9af50, 06db0160, 06da6e40, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_SETMANEUVER : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_SETMANEUVER() : FPacketBase(0x3002fu) {
+    FPacket_FLPACKET_CLIENT_SETMANEUVER() : FPacketBase(FLPACKET_CLIENT_SETMANEUVER) {
         Wire.Field_0x00 = 0;                    // +0x20
         Wire.Field_0x04 = 0;                    // +0x24
         Wire.Field_0x08 = 0;                    // +0x28
@@ -3814,7 +3814,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_SETMANEUVER, Wire) == 0x20u, "CLI
 // { 06da1130, 06dacca0, 06dacd70, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS : public FRpcCollisionGroupPacket {
 public:
-    FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS() : FRpcCollisionGroupPacket(0x30036u) {
+    FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS() : FRpcCollisionGroupPacket(FLPACKET_CLIENT_REQCOLLISIONGROUPS) {
         RpcPacketBuildListSentinel(&Wire, 0x10u);   // operator new(0x10), Head
     }
 };
@@ -3826,7 +3826,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS, Wire) == 0x20
 // { 06d9af50, 06db1cd0, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQHULLSTATUS : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQHULLSTATUS() : FPacketBase(0x3003bu) {
+    FPacket_FLPACKET_CLIENT_REQHULLSTATUS() : FPacketBase(FLPACKET_CLIENT_REQHULLSTATUS) {
         Wire.Field_0x00 = 0.0f;                 // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -3847,7 +3847,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQHULLSTATUS, Wire) == 0x20u, "C
 // { 06d9af50, 06db19b0, 06dad690, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM() : FPacketBase(0x30040u) {
+    FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM() : FPacketBase(FLPACKET_CLIENT_REQUEST_USE_ITEM) {
         Wire.ObjectId = 0;                      // +0x20
         Wire.ItemId = 0;                        // +0x24
         Wire.Count = 0;                         // +0x26
@@ -3870,7 +3870,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM, Wire) == 0x20u,
 // { 06d9af50, 06db1b60, 06da6a50, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQINVINCIBILITY : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQINVINCIBILITY() : FPacketBase(0x30044u) {
+    FPacket_FLPACKET_CLIENT_REQINVINCIBILITY() : FPacketBase(FLPACKET_CLIENT_REQINVINCIBILITY) {
         Wire.ShipId = 0;                        // +0x20
         Wire.Reason = 0;                        // +0x24
         Wire.bInvincible = 0;                   // +0x25
@@ -3893,7 +3893,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_REQINVINCIBILITY, Wire) == 0x20u,
 // { 06d9af50, 06db0310, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_MISSIONSAVEB : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_MISSIONSAVEB() : FPacketBase(0x30045u) {
+    FPacket_FLPACKET_CLIENT_MISSIONSAVEB() : FPacketBase(FLPACKET_CLIENT_MISSIONSAVEB) {
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3913,7 +3913,7 @@ static_assert(offsetof(FPacket_FLPACKET_CLIENT_MISSIONSAVEB, Wire) == 0x20u, "CL
 // { 06d9af50, 06db1cd0, 06db03f0, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE : public FPacketBase {
 public:
-    FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE() : FPacketBase(0x30046u) {
+    FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE() : FPacketBase(FLPACKET_CLIENT_REQDIFFICULTYSCALE) {
         Wire.Field_0x00 = 1.0f;                 // +0x20
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,

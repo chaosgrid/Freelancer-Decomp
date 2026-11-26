@@ -436,8 +436,8 @@ void NnNews::RefreshRows()
         Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(&Moved), 0);
 
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
-        IconFrames[Row]->SetProperty(0xc, bSelected, 0);
-        HeadlineBoxes[Row]->SetProperty(0xc, bSelected, 0);
+        IconFrames[Row]->SetProperty(kWinPropLit, bSelected, 0);
+        HeadlineBoxes[Row]->SetProperty(kWinPropLit, bSelected, 0);
 
         ++Row;
         if (Row >= 5)
@@ -547,7 +547,7 @@ void NnNews::BuildTicker()
         {
             FClientMarketGood const* const Entry = *It;
             int const Type = static_cast<int>(Entry->Info.Type);
-            if (Type != 2 && Type != 0)
+            if (Type != TransactionSaleOnly && Type != TransactionBuyAndSell)
                 continue;
             unsigned const GoodId = Entry->Info.GoodId;
             int const Price = static_cast<int>(
@@ -709,7 +709,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_004a4d60 (RET 0xc): byte table 0x004a4fa0 over Msg - 0x26. Every path returns 0.
     switch (Msg)
     {
-    case 0x4e:
+    case kWinPropCloseFromOutside:
     {
         // Closed from outside: no callback, no NavBar. (Retail tests `this` first.)
         Win3DDeleteTree(this);

@@ -9,6 +9,7 @@
 // The follower helpers it calls live in common_behavior.cpp (common_behavior_internal.h).
 
 #include "common_behavior.h"
+#include "common_gotobehavior.h"   // EGotoKind
 #include "AI/common_behavior_internal.h" // CmnBehavior:: follower helpers (common_behavior.cpp)
 #include "common_aisteer.h" // GetIfacePositionOrZero, IsWithinInterceptRangeOfIface
 #include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::SysMgr's real type
@@ -126,14 +127,14 @@ int BaseFollowerBehavior::OnUpdate()
     IObjRW* const Owner = OwnerContext;
     if (Owner == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     if (Flag285 != 0)
     {
-        UpdateResult = 0;
-        return 0;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
 
     SystemManager* const Sys = SysMgr;   // not null-tested from here on (as retail)
@@ -152,8 +153,8 @@ int BaseFollowerBehavior::OnUpdate()
             const_cast<Watchable*>(LeadWatcher.target()));
         if (Node == nullptr)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
 
         // Multiplayer only: when both ends are player ships, their group ids must both be
@@ -169,8 +170,8 @@ int BaseFollowerBehavior::OnUpdate()
                 unsigned int const LeaderGroup = LeaderShip->GroupId;
                 if (OwnerGroup == 0 || LeaderGroup == 0 || OwnerGroup != LeaderGroup)
                 {
-                    UpdateResult = 3;
-                    return 3;
+                    UpdateResult = kBehaviorUpdateAborted;
+                    return kBehaviorUpdateAborted;
                 }
             }
         }
@@ -179,19 +180,19 @@ int BaseFollowerBehavior::OnUpdate()
         unsigned int TypeBits = 0;
         if (Node->get_type(TypeBits) != 0)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
         if ((TypeBits & OBJ_SHIP_MASK) == 0 || (TypeBits & OBJ_CAPITAL) != 0)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
         int const BehaviorId = Node->get_behavior_id();
         if (BehaviorId == BEHAVIOR_FOLLOW || BehaviorId == BEHAVIOR_LAUNCH)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
 
         // Walk the leader chain: follow-leader first, formation-leader only when that left
@@ -211,8 +212,8 @@ int BaseFollowerBehavior::OnUpdate()
                 unsigned int const OwnerId = Owner->get_id();
                 if (Leader->get_id() == OwnerId)
                 {
-                    UpdateResult = 3;
-                    return 3;
+                    UpdateResult = kBehaviorUpdateAborted;
+                    return kBehaviorUpdateAborted;
                 }
             }
             Node = Leader;
@@ -229,8 +230,8 @@ int BaseFollowerBehavior::OnUpdate()
         {
             MatchThrottle.Commit();
             Face.Commit();
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
     }
 
@@ -238,8 +239,8 @@ int BaseFollowerBehavior::OnUpdate()
         const_cast<Watchable*>(LeadWatcher.target()));
     if (Watched == nullptr)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     if (bPlayerCatchUp != 0)
@@ -259,7 +260,7 @@ int BaseFollowerBehavior::OnUpdate()
                 if (bGotoDelegateActive == 0)
                 {
                     pub::AI::DirectiveGotoOp Op;
-                    Op.GotoKind = 0;
+                    Op.GotoKind = kGotoKindObject;
                     Op.TargetId = static_cast<int32_t>(Watched->get_id());
                     Op.ArrivalRange = 100.0f;   // 0x42c80000
                     GotoDelegate->OnApplyDirective(&Op);
@@ -308,8 +309,8 @@ int BaseFollowerBehavior::OnUpdate()
     {
         if (Order.bOrderPending != 0 || bLeftTradeLane == 0)
         {
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
         bLeftTradeLane = 0;
         bInTradeLane = 0;
@@ -362,12 +363,12 @@ int BaseFollowerBehavior::OnUpdate()
                                      Order.bMidLane != 0, Order.MaxRange);
             if (Committed != 0)
             {
-                UpdateResult = 1;
-                return 1;
+                UpdateResult = kBehaviorUpdateRunning;
+                return kBehaviorUpdateRunning;
             }
             bInTradeLane = 1;
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
         // +0x278 is not null-tested on this path.
@@ -382,8 +383,8 @@ int BaseFollowerBehavior::OnUpdate()
             DockDelegate->OnEngage();
         }
         bDockDelegateActive = 1;
-        UpdateResult = 1;
-        return 1;
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;
     }
 
     {
@@ -392,8 +393,8 @@ int BaseFollowerBehavior::OnUpdate()
         {
             Rec->SetValueB0(0);
             Flag285 = 1;
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
     }
 
@@ -417,8 +418,8 @@ int BaseFollowerBehavior::OnUpdate()
     {
         UpdateFollowerSteering();
     }
-    UpdateResult = 1;
-    return 1;
+    UpdateResult = kBehaviorUpdateRunning;
+    return kBehaviorUpdateRunning;
 }
 
 // FUN_062cbcf0. Switches on FormationParams.FormationExitMode (SystemManager+0x1810), unsigned.
@@ -428,10 +429,10 @@ void BaseFollowerBehavior::UpdateTickPayload(float Delta)
     pub::AI::Personality::FormationUseStruct const& Params = Sys->PersonalityData.FormationParams;
     switch ((unsigned int)Params.FormationExitMode)
     {
-    case 1:
+    case kFormationExitBreakAwayFromCenterAfterburner:
         (void)Afterburner.Update(Delta);
-        // falls through into case 0
-    case 0:
+        // falls through into kFormationExitBreakAwayFromCenter
+    case kFormationExitBreakAwayFromCenter:
     {
         IObjRW* const Leader = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
         // The cached-physical-bounds latch (+0x157a), set before the call.
@@ -455,17 +456,17 @@ void BaseFollowerBehavior::UpdateTickPayload(float Delta)
         (void)Move.Update(Delta);
         return;
     }
-    case 2:
+    case kFormationExitBrakeReverse:
     {
         // FUN_062e8c20 / FUN_062e89a0 on Sys+0x18.
         Vector Zero{ 0.0f, 0.0f, 0.0f };
         Sys->Thrust.SetAxisThrottle(Zero);
-        (void)Sys->Thrust.SetThrottle(-1.0f, 0);
+        (void)Sys->Thrust.SetThrottle(-1.0f, kThrottleModeEngine);
         return;
     }
-    case 3:
+    case kFormationExitOutrun:
         BreakAway.RollThrottle = Params.FormationExitRollOutrunThrottle;           // FUN_062d94a0, +0x1818
-        BreakAway.BreakStyle = 0;                           // Outrun
+        BreakAway.BreakStyle = kBreakStyleOutrun;                           // Outrun
         (void)BreakAway.Update(Delta);
         return;
     default:
@@ -502,7 +503,7 @@ void BaseFollowerBehavior::OnEngage()
     bLeftTradeLane = 0;
     SysMgr->Thrust.SetStrafeDir(StrafeNone);                     // FUN_062e9030
     SysMgr->Thrust.SetThrustersActive(false);                    // FUN_062e9120
-    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
     bDockDelegateActive = 0;
     DockDelegate = BehaviorMgr->BehaviorDispatchTable[7];        // Manager+0x190
     bGotoDelegateActive = 0;
@@ -575,7 +576,7 @@ void BaseFollowerBehavior::OnEvent(void* Arg)
     FBehaviorManagerEvent const* const Event = static_cast<FBehaviorManagerEvent const*>(Arg);
     if (bDockDelegateActive != 0 && DockDelegate != nullptr)
         DockDelegate->OnEvent(Arg);
-    if (Event->Type != 4)
+    if (Event->Type != FBehaviorManagerEvent::kEventTradelane)
         return;
     FBehaviorTradelaneEvent const* const Lane =
         static_cast<FBehaviorTradelaneEvent const*>(Event->Data);
@@ -613,5 +614,5 @@ void BaseFollowerBehavior::OnEvent(void* Arg)
     if (bDockDelegateActive != 0)
         return;
     unsigned int Zero = 0;                                          // retail reuses the argument slot
-    (void)ObjAffectOf(OwnerContext)->request_cancel(2, &Zero, 0);          // IObjAffect +0x60
+    (void)ObjAffectOf(OwnerContext)->request_cancel(kRequestEventTradelane, &Zero, 0);          // IObjAffect +0x60
 }

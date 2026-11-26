@@ -271,7 +271,7 @@ namespace
             return true;
 
         float ShapeRadius = 0.0f;
-        if (Body->object_type == 2)
+        if (Body->object_type == IVP_POLYGON)
         {
             float MassCenter[3];
             float RadiusDeviation;
@@ -279,7 +279,7 @@ namespace
             Object->SurfaceManager->get_radius_and_radius_dev_to_given_center(MassCenter, &ShapeRadius,
                                                                               &RadiusDeviation);
         }
-        else if (Body->object_type == 3)
+        else if (Body->object_type == IVP_BALL)
         {
             // x87: the length stays unrounded until stored.
             IVP_U_Point const& Shift = Body->shift_core_f_object;

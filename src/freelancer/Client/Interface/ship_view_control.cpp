@@ -61,27 +61,38 @@ namespace
     };
 
     FHpTypeCaption const G_ShipViewHpTypeCaptions[0x3c] = {
-        {15, 1525}, {16, 1526}, {17, 1527}, {18, 1528}, {19, 1529}, {20, 1530},
-        {21, 1531}, {22, 1532}, {23, 1533}, {24, 1534}, {13, 1524}, {25, 1731},
-        {26, 1732}, {27, 1733}, {28, 1734}, {29, 1735}, {30, 1736}, {31, 1737},
-        {32, 1738}, {33, 1739}, {34, 1740}, {10, 1521}, {36, 1741}, {35, 1742},
-        {11, 1522}, {12, 1523}, {37, 1700}, {38, 1701}, {39, 1702}, {40, 1704},
-        {41, 1705}, {42, 1706}, {43, 1707}, {44, 1708}, {45, 1709}, {46, 1710},
-        {6, 1517},  {47, 1711}, {48, 1712}, {49, 1713}, {50, 1714}, {51, 1715},
-        {52, 1716}, {53, 1717}, {54, 1718}, {55, 1719}, {56, 1720}, {7, 1518},
-        {57, 1721}, {58, 1722}, {59, 1723}, {60, 1724}, {61, 1725}, {62, 1726},
-        {63, 1727}, {64, 1728}, {65, 1729}, {66, 1730}, {8, 1519},  {9, 1520}};
+        {HpTypeGunSpecial1, 1525}, {HpTypeGunSpecial2, 1526}, {HpTypeGunSpecial3, 1527},
+        {HpTypeGunSpecial4, 1528}, {HpTypeGunSpecial5, 1529}, {HpTypeGunSpecial6, 1530},
+        {HpTypeGunSpecial7, 1531}, {HpTypeGunSpecial8, 1532}, {HpTypeGunSpecial9, 1533},
+        {HpTypeGunSpecial10, 1534}, {HpTypeTurret, 1524}, {HpTypeTurretSpecial1, 1731},
+        {HpTypeTurretSpecial2, 1732}, {HpTypeTurretSpecial3, 1733}, {HpTypeTurretSpecial4, 1734},
+        {HpTypeTurretSpecial5, 1735}, {HpTypeTurretSpecial6, 1736}, {HpTypeTurretSpecial7, 1737},
+        {HpTypeTurretSpecial8, 1738}, {HpTypeTurretSpecial9, 1739}, {HpTypeTurretSpecial10, 1740},
+        {HpTypeTorpedo, 1521}, {HpTypeTorpedoSpecial1, 1741}, {HpTypeTorpedoSpecial2, 1742},
+        {HpTypeMineDropper, 1522}, {HpTypeCountermeasureDropper, 1523}, {HpTypeFighterShieldSpecial1, 1700},
+        {HpTypeFighterShieldSpecial2, 1701}, {HpTypeFighterShieldSpecial3, 1702}, {HpTypeFighterShieldSpecial4, 1704},
+        {HpTypeFighterShieldSpecial5, 1705}, {HpTypeFighterShieldSpecial6, 1706}, {HpTypeFighterShieldSpecial7, 1707},
+        {HpTypeFighterShieldSpecial8, 1708}, {HpTypeFighterShieldSpecial9, 1709}, {HpTypeFighterShieldSpecial10, 1710},
+        {HpTypeFighterShieldGenerator, 1517}, {HpTypeEliteShieldSpecial1, 1711}, {HpTypeEliteShieldSpecial2, 1712},
+        {HpTypeEliteShieldSpecial3, 1713}, {HpTypeEliteShieldSpecial4, 1714}, {HpTypeEliteShieldSpecial5, 1715},
+        {HpTypeEliteShieldSpecial6, 1716}, {HpTypeEliteShieldSpecial7, 1717}, {HpTypeEliteShieldSpecial8, 1718},
+        {HpTypeEliteShieldSpecial9, 1719}, {HpTypeEliteShieldSpecial10, 1720}, {HpTypeEliteShieldGenerator, 1518},
+        {HpTypeFreighterShieldSpecial1, 1721}, {HpTypeFreighterShieldSpecial2, 1722}, {HpTypeFreighterShieldSpecial3, 1723},
+        {HpTypeFreighterShieldSpecial4, 1724}, {HpTypeFreighterShieldSpecial5, 1725}, {HpTypeFreighterShieldSpecial6, 1726},
+        {HpTypeFreighterShieldSpecial7, 1727}, {HpTypeFreighterShieldSpecial8, 1728}, {HpTypeFreighterShieldSpecial9, 1729},
+        {HpTypeFreighterShieldSpecial10, 1730}, {HpTypeFreighterShieldGenerator, 1519}, {HpTypeThruster, 1520}};
 
     // The grouping switch HasHpTypeGroup and BuildHardpointList each inline: 0 for 4, 0xa..0xd
     // and 0xf..0x24; 1 for 5..9 and 0x25..0x42; 2 for 0xe and for anything outside 4..0x42 (the
     // switch default is the 0xe case).
     int HpTypeGroup(int HpType)
     {
-        if (HpType < 4 || HpType > 0x42)
+        if (HpType < HpTypeGun || HpType > HpTypeFreighterShieldSpecial10)
             return 2;
-        if (HpType == 0xe)
+        if (HpType == HpTypeCargoPod)
             return 2;
-        if ((HpType >= 5 && HpType <= 9) || HpType >= 0x25)
+        if ((HpType >= HpTypeShieldGenerator && HpType <= HpTypeThruster) ||
+            HpType >= HpTypeFighterShieldSpecial1)
             return 1;
         return 0;
     }
@@ -139,17 +150,17 @@ int ShipViewEquipmentHpClass(unsigned ArchId, Archetype::Equipment const** OutWe
     if (Equip == nullptr)
         return 0;
     int const HpType = static_cast<int>(Equip->get_hp_type());
-    if (HpType == 0)
+    if (HpType == HpTypeNone)
         return 1;
-    if (HpType == 4 || HpType == 0xd || HpType == 0xa)
+    if (HpType == HpTypeGun || HpType == HpTypeTurret || HpType == HpTypeTorpedo)
     {
         *OutWeapon = Equip;
         return 4;
     }
-    if (HpType == 5 || HpType == 6 || HpType == 7 || HpType == 8)
+    if (HpType == HpTypeShieldGenerator || HpType == HpTypeFighterShieldGenerator ||
+        HpType == HpTypeEliteShieldGenerator || HpType == HpTypeFreighterShieldGenerator)
     {
-        // 0xe = AClassShieldGenerator.
-        if (Equip->get_class_type() == 0xe)
+        if (Equip->get_class_type() == Archetype::AClassShieldGenerator)
             *OutShield = Equip;
     }
     return HpType;
@@ -167,33 +178,65 @@ int ShipViewHpTypeClass(int HpType)
     // FUN_00585b10.
     switch (HpType)
     {
-    case 0xa:
-    case 0x24:
+    case HpTypeTorpedo:
+    case HpTypeTorpedoSpecial1:
         return 1;
-    case 0x23:
+    case HpTypeTorpedoSpecial2:
         return 2;
-    case 0xb:
+    case HpTypeMineDropper:
         return 3;
-    case 0xd:
-    case 0x19: case 0x1a: case 0x1b: case 0x1c: case 0x1d:
-    case 0x1e: case 0x1f: case 0x20: case 0x21: case 0x22:
+    case HpTypeTurret:
+    case HpTypeTurretSpecial1:
+    case HpTypeTurretSpecial2:
+    case HpTypeTurretSpecial3:
+    case HpTypeTurretSpecial4:
+    case HpTypeTurretSpecial5:
+    case HpTypeTurretSpecial6:
+    case HpTypeTurretSpecial7:
+    case HpTypeTurretSpecial8:
+    case HpTypeTurretSpecial9:
+    case HpTypeTurretSpecial10:
         return 4;
-    case 0xc:
+    case HpTypeCountermeasureDropper:
         return 5;
-    case 5:
-    case 6:
-    case 0x25: case 0x26: case 0x27: case 0x28: case 0x29:
-    case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2e:
+    case HpTypeShieldGenerator:
+    case HpTypeFighterShieldGenerator:
+    case HpTypeFighterShieldSpecial1:
+    case HpTypeFighterShieldSpecial2:
+    case HpTypeFighterShieldSpecial3:
+    case HpTypeFighterShieldSpecial4:
+    case HpTypeFighterShieldSpecial5:
+    case HpTypeFighterShieldSpecial6:
+    case HpTypeFighterShieldSpecial7:
+    case HpTypeFighterShieldSpecial8:
+    case HpTypeFighterShieldSpecial9:
+    case HpTypeFighterShieldSpecial10:
         return 6;
-    case 7:
-    case 0x2f: case 0x30: case 0x31: case 0x32: case 0x33:
-    case 0x34: case 0x35: case 0x36: case 0x37: case 0x38:
+    case HpTypeEliteShieldGenerator:
+    case HpTypeEliteShieldSpecial1:
+    case HpTypeEliteShieldSpecial2:
+    case HpTypeEliteShieldSpecial3:
+    case HpTypeEliteShieldSpecial4:
+    case HpTypeEliteShieldSpecial5:
+    case HpTypeEliteShieldSpecial6:
+    case HpTypeEliteShieldSpecial7:
+    case HpTypeEliteShieldSpecial8:
+    case HpTypeEliteShieldSpecial9:
+    case HpTypeEliteShieldSpecial10:
         return 7;
-    case 8:
-    case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d:
-    case 0x3e: case 0x3f: case 0x40: case 0x41: case 0x42:
+    case HpTypeFreighterShieldGenerator:
+    case HpTypeFreighterShieldSpecial1:
+    case HpTypeFreighterShieldSpecial2:
+    case HpTypeFreighterShieldSpecial3:
+    case HpTypeFreighterShieldSpecial4:
+    case HpTypeFreighterShieldSpecial5:
+    case HpTypeFreighterShieldSpecial6:
+    case HpTypeFreighterShieldSpecial7:
+    case HpTypeFreighterShieldSpecial8:
+    case HpTypeFreighterShieldSpecial9:
+    case HpTypeFreighterShieldSpecial10:
         return 8;
-    case 9:
+    case HpTypeThruster:
         return 9;
     default:
         return 0;
@@ -414,13 +457,13 @@ bool ShipViewControl::Create(Win3D* NewParent, void* Data)
         }
         if (Ini->is_value("show_rect"))
         {
-            unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? 4 : 0;
-            ViewFlags = static_cast<unsigned char>((ViewFlags & ~4) | Bit);
+            unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? kShipViewShowRect : 0;
+            ViewFlags = static_cast<unsigned char>((ViewFlags & ~kShipViewShowRect) | Bit);
         }
         if (Ini->is_value("show_wireframe"))
         {
-            unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? 8 : 0;
-            ViewFlags = static_cast<unsigned char>((ViewFlags & ~8) | Bit);
+            unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? kShipViewShowWireframe : 0;
+            ViewFlags = static_cast<unsigned char>((ViewFlags & ~kShipViewShowWireframe) | Bit);
         }
         if (Ini->is_value("rect_color"))
         {
@@ -486,8 +529,8 @@ void ShipViewControl::Init(Vector const* NewRotSpeed, Vector const* NewOffset, V
             }
         }
     }
-    unsigned char Bits = static_cast<unsigned char>((ViewFlags & ~4) | (bShowRect ? 4 : 0));
-    Bits = static_cast<unsigned char>((Bits & ~8) | (bShowWire ? 8 : 0));
+    unsigned char Bits = static_cast<unsigned char>((ViewFlags & ~kShipViewShowRect) | (bShowRect ? kShipViewShowRect : 0));
+    Bits = static_cast<unsigned char>((Bits & ~kShipViewShowWireframe) | (bShowWire ? kShipViewShowWireframe : 0));
     ViewFlags = Bits;
     memcpy(RectColor, NewRectColor, sizeof(RectColor));
     memcpy(WireColor, NewWireColor, sizeof(WireColor));
@@ -532,13 +575,13 @@ void ShipViewControl::Draw()
 
     // z on, draw the framed instance, then back.
     Pipe->SetRenderState(D3DRS_ZENABLE, 1);
-    Pipe->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
     // 0x300 is the flag word (rendcomp LAB_06c32a80).
     DALib::Renderer->RenderInstance(ViewCamera, Instance, 1.0f, 0x300u, nullptr, nullptr);
     Win3DDisable(0xb71);
     Pipe->SetRenderState(D3DRS_ZENABLE, 0);
-    Pipe->SetRenderState(D3DRS_ZFUNC, 8);
+    Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
     Win3DDisable(0xb71);
 
@@ -1172,7 +1215,7 @@ char const* ShipViewControl::FindHardpointForGood(unsigned GoodId, bool bFirstMa
         // A weapon whose Gun hp types include this entry's type. Retail calls Gun's accessors on
         // whatever class-4 equipment it got (hp types 4, 0xa, 0xd).
         bool bWeaponMatch = false;
-        if (HpClass == 4 && Weapon != nullptr)
+        if (HpClass == HpTypeGun && Weapon != nullptr)
         {
             Archetype::Gun const* const Gun = static_cast<Archetype::Gun const*>(Weapon);
             int const TypeCount = Gun->get_number_of_hp_types();
@@ -1188,7 +1231,9 @@ char const* ShipViewControl::FindHardpointForGood(unsigned GoodId, bool bFirstMa
 
         // The same for a shield generator of class 5..8.
         bool bShieldMatch = false;
-        if (Shield != nullptr && (HpClass == 5 || HpClass == 6 || HpClass == 7 || HpClass == 8))
+        if (Shield != nullptr &&
+            (HpClass == HpTypeShieldGenerator || HpClass == HpTypeFighterShieldGenerator ||
+             HpClass == HpTypeEliteShieldGenerator || HpClass == HpTypeFreighterShieldGenerator))
         {
             Archetype::ShieldGenerator const* const Generator =
                 static_cast<Archetype::ShieldGenerator const*>(Shield);
@@ -1308,14 +1353,14 @@ void ShipViewControl::ComputeScreenRect(float const* Where, bool bSetCamera)
 intptr_t ShipViewControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_005864c0 (RET 0xc).
-    if (Msg == 0x19)
+    if (Msg == kWinPropRenderFlags)
     {
         // Only the low word of A is tested.
-        unsigned char const Bit = (static_cast<unsigned short>(A) != 0) ? 8 : 0;
-        ViewFlags = static_cast<unsigned char>((ViewFlags & ~8) | Bit);
+        unsigned char const Bit = (static_cast<unsigned short>(A) != 0) ? kShipViewShowWireframe : 0;
+        ViewFlags = static_cast<unsigned char>((ViewFlags & ~kShipViewShowWireframe) | Bit);
         return 0;
     }
-    if (Msg == 0x4c)
+    if (Msg == kShipViewPropMode)
     {
         Mode = static_cast<int>(A);
         return 0;
@@ -1401,13 +1446,13 @@ void ShipViewControl::SetAttachPosition(Vector const* NewPosition)
 void ShipViewControl::SetShowRect(bool bShow)
 {
     // FUN_00586a30 (RET 4).
-    ViewFlags = static_cast<unsigned char>((ViewFlags & ~4) | (bShow ? 4 : 0));
+    ViewFlags = static_cast<unsigned char>((ViewFlags & ~kShipViewShowRect) | (bShow ? kShipViewShowRect : 0));
 }
 
 void ShipViewControl::SetShowWireframe(bool bShow)
 {
     // FUN_00586a50 (RET 4).
-    ViewFlags = static_cast<unsigned char>((ViewFlags & ~8) | (bShow ? 8 : 0));
+    ViewFlags = static_cast<unsigned char>((ViewFlags & ~kShipViewShowWireframe) | (bShow ? kShipViewShowWireframe : 0));
 }
 
 void ShipViewControl::SetRectColor(float const* Rgba)

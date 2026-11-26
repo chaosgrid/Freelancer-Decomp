@@ -36,6 +36,18 @@
 
 #include <stddef.h>
 
+// NnPause::ButtonAction values (see DoAction). The captions of the buttons are IDS 0x71d ..
+// 0x725 and 0x752; action 7 (a confirm with IDS 0x76b) is left numeric.
+enum EPauseAction
+{
+    kPauseActionResume = 1,
+    kPauseActionSave = 2,
+    kPauseActionLoad = 3,
+    kPauseActionOptions = 4,     // opens NN_Preferences
+    kPauseActionMainMenu = 5,    // "Quit to the main menu?" (IDS 0x75b, as NN_LoadSave's confirm)
+    kPauseActionExitGame = 6     // posts USER_EXIT_GAME
+};
+
 class NnPause : public WinControl, public EventHandler
 {
 public:

@@ -132,14 +132,14 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
     // A "DOS" FileSystem over SurPath through DALib::Data's CreateInstance.
     FFileSystemDesc Desc;
     memset(&Desc, 0, sizeof(Desc));
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.ComponentName = "FileSystem";
     Desc.Implementation = "DOS";
     Desc.Path = SurPath;
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
     IFileSystem* Filesys = nullptr;
     // FFileSystemDesc begins with AGGDESC's {size, interface name} (readfile.h).

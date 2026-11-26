@@ -35,7 +35,7 @@ namespace
     double const kOneD = 1.0;                           // DAT_005c89b8
     double const kSystemDustIntensityScale = 0.002;     // DAT_005e08f8
     int const kDefaultZoneDustParticles = 0x32;
-    unsigned const kPropDustZoneMask = 0x200000;        // PROP_DUST_ZONE
+    unsigned const kPropDustZoneMask = Universe::kZonePropSpacedust;
 
     // DAT_00614084 (.data, read only by FUN_0054beb0): the dust frame sits this far along the
     // camera's Z axis.

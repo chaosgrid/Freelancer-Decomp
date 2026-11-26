@@ -149,12 +149,12 @@ struct FVmeshFvfChannel
 };
 
 static const FVmeshFvfChannel G_FvfChannelTable[] = {
-    {1, 0xE, 0xC},
+    {kMeshChannelPosition, 0xE, 0xC},
     {0x800, 0xC, 0x30},
-    {8, 0x10, 0xC},
-    {2, 0x100, 8},
-    {4, 0x200, 8},
-    {0x10, 0x40, 4},
+    {kMeshChannelNormal, D3DFVF_NORMAL, 0xC},
+    {kMeshChannelTex0, D3DFVF_TEX1, 8},
+    {kMeshChannelTex1, D3DFVF_TEX2, 8},
+    {kMeshChannelDiffuse, D3DFVF_DIFFUSE, 4},
 };
 
 static const unsigned int G_FvfChannelCount =
@@ -168,12 +168,12 @@ bool VMeshChannelPresent(unsigned long Fvf, unsigned int ChannelId)
         const FVmeshFvfChannel* Entry = &G_FvfChannelTable[Index];
         if (ChannelId != Entry->ChannelId)
             continue;
-        if ((Entry->FvfMask & 0xF00) == 0)
+        if ((Entry->FvfMask & D3DFVF_TEXCOUNT_MASK) == 0)
             bPresent = (Fvf & Entry->FvfMask) != 0;
-        else if ((Fvf & 0xF00) == 0)
+        else if ((Fvf & D3DFVF_TEXCOUNT_MASK) == 0)
             bPresent = false;
         else
-            bPresent = ((Fvf & 0xF00) >> 8) >= (ChannelId - 2);
+            bPresent = ((Fvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT) >= (ChannelId - 2);
         if (bPresent)
             return true;
     }
@@ -235,21 +235,21 @@ bool VMeshFillChannelRecord(const FVmeshDataHeader* Header, unsigned long Vertex
 unsigned int VMeshFvfStride(unsigned long Fvf)
 {
     unsigned int Position = 0;
-    if ((Fvf & 0xC) == 0xC)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         Position = 0x1C;
-    else if ((Fvf & 4) == 4)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         Position = 0x10;
-    else if ((Fvf & 2) == 2)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
         Position = 0xC;
 
     unsigned int Normal = 0;
-    if ((Fvf & 0x10) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
         Normal = 0xC;
 
     unsigned int Colours = 0;
-    if ((Fvf & 0x40) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         Colours = 4;
-    if ((Fvf & 0x80) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         Colours += 4;
 
     unsigned int Textures = 0;
@@ -259,16 +259,16 @@ unsigned int VMeshFvfStride(unsigned long Fvf)
     {
         switch ((Fvf >> Shift) & 3)
         {
-        case 0:
+        case D3DFVF_TEXTUREFORMAT2:
             Textures += 8;
             break;
-        case 1:
+        case D3DFVF_TEXTUREFORMAT3:
             Textures += 0xC;
             break;
-        case 2:
+        case D3DFVF_TEXTUREFORMAT4:
             Textures += 0x10;
             break;
-        case 3:
+        case D3DFVF_TEXTUREFORMAT1:
             Textures += 4;
             break;
         }
@@ -297,12 +297,12 @@ void VMeshBuildVertexDesc(const FVmeshDataHeader* Header, unsigned long VertexSt
                           unsigned long VertexCount, FRpVertexSrcDesc* Out)
 {
     *Out = FRpVertexSrcDesc{};
-    VMeshFillVertexStream(Header, VertexStart, VertexCount, 1, &Out->Position);
-    VMeshFillVertexStream(Header, VertexStart, VertexCount, 8, &Out->Normal);
-    VMeshFillVertexStream(Header, VertexStart, VertexCount, 2, &Out->Tex[0]);
-    VMeshFillVertexStream(Header, VertexStart, VertexCount, 4, &Out->Tex[1]);
-    VMeshFillVertexStream(Header, VertexStart, VertexCount, 0x10, &Out->Diffuse);
-    Out->Flags = 2;
+    VMeshFillVertexStream(Header, VertexStart, VertexCount, kMeshChannelPosition, &Out->Position);
+    VMeshFillVertexStream(Header, VertexStart, VertexCount, kMeshChannelNormal, &Out->Normal);
+    VMeshFillVertexStream(Header, VertexStart, VertexCount, kMeshChannelTex0, &Out->Tex[0]);
+    VMeshFillVertexStream(Header, VertexStart, VertexCount, kMeshChannelTex1, &Out->Tex[1]);
+    VMeshFillVertexStream(Header, VertexStart, VertexCount, kMeshChannelDiffuse, &Out->Diffuse);
+    Out->Flags = kRpVertexSrcInterleaved;
     Out->SrcFvf = Header->Fvf;
     Out->SrcCount = VertexCount;
 }

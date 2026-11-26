@@ -564,9 +564,9 @@ namespace
     FNebulaVolumeSettings GSettings = DefaultSettings();
     std::vector<FNebulaOverride> GOverrides;
     std::vector<FRegisteredNebula> GNebulae;
-    // [Debug] nebula_view: 0 normal, 1 cloud density, 2 key-light shadow, 3 haze only,
-    // 4 clouds only.
-    int GNebulaView = 0;
+    // [Debug] nebula_view: normal, cloud density, key-light shadow, haze only, clouds only.
+    enum ENebulaDebugView { kNebulaViewNormal = 0, kNebulaViewCloudDensity = 1, kNebulaViewKeyLightShadow = 2, kNebulaViewHazeOnly = 3, kNebulaViewCloudsOnly = 4 };
+    int GNebulaView = kNebulaViewNormal;
     // [Debug] lightning_force: strikes one after another near the camera (tuning);
     // lightning_show_positions: the strikes' cores seen through everything.
     bool GbLightningForce = false;
@@ -2019,11 +2019,11 @@ namespace
         // Debug views: 3 haze only, 4 clouds only (the other two are drawn by the shader).
         float HazeSigma = Medium.HazeSigma;
         float CloudSigma = Medium.CloudSigma;
-        if (GNebulaView == 3)
+        if (GNebulaView == kNebulaViewHazeOnly)
             CloudSigma = 0.0f;
-        else if (GNebulaView == 4)
+        else if (GNebulaView == kNebulaViewCloudsOnly)
             HazeSigma = 0.0f;
-        const bool bShaderView = GNebulaView == 1 || GNebulaView == 2;
+        const bool bShaderView = GNebulaView == kNebulaViewCloudDensity || GNebulaView == kNebulaViewKeyLightShadow;
 
         // c10 march: steps, distance cap, step distribution, jitter.
         Set4(RaymarchRegister(10), Clamp(S.StepCount, 1.0f, (float)(kMaxSteps)), Medium.MarchCap,
@@ -2946,7 +2946,7 @@ namespace
     // A lit GameLight (Flags bit 3) goes dark through its vtable slot 2, as retail does it.
     void SwitchLightOff(FGameLight* Light)
     {
-        if (Light != nullptr && (Light->Flags & 0x08) != 0)
+        if (Light != nullptr && (Light->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Light);
     }
 
@@ -3077,7 +3077,7 @@ namespace
         EngineLightSetPosition(Target, reinterpret_cast<Vector const*>(CamPosF));
         EngineLightSetDirection(Target, &DirF);
         EngineLightSetColorBytes(Target, Rgb);
-        if ((Target->Flags & 0x08) == 0)
+        if ((Target->Flags & kLightFlagEnabled) == 0)
             GameLightEnable(Target);
     }
 
@@ -3251,7 +3251,7 @@ void NebulaVolume::LoadSettings(char const* IniPath)
 {
     GSettings = DefaultSettings();
     GOverrides.clear();
-    GNebulaView = 0;
+    GNebulaView = kNebulaViewNormal;
     GbLightningForce = false;
     GbLightningShowPositions = false;
     // resolution_scale may have changed: a failed render target is tried again.

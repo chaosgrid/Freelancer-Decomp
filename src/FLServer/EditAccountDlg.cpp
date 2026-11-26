@@ -20,19 +20,19 @@ CEditAccountDlg::CEditAccountDlg(CWnd* Parent)
 // .text:00409390
 void CEditAccountDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1044, BannedCheck);
-	DDX_Control(DX, 1040, CharacterList);
-	DDX_Control(DX, 1041, DeleteCharacterButton);
-	DDX_Control(DX, 1037, AccountNameEdit);
+	DDX_Control(DX, kControlBanned, BannedCheck);
+	DDX_Control(DX, kControlCharacterList, CharacterList);
+	DDX_Control(DX, kControlDeleteCharacter, DeleteCharacterButton);
+	DDX_Control(DX, kControlAccountName, AccountNameEdit);
 }
 
 // Message map .rdata:0041cb70.
 BEGIN_MESSAGE_MAP(CEditAccountDlg, CDialog)
-	ON_LBN_SELCHANGE(1040, &CEditAccountDlg::OnSelChangeCharacterList) // 00409410
-	ON_LBN_SELCANCEL(1040, &CEditAccountDlg::OnSelCancelCharacterList) // 00409420
-	ON_BN_CLICKED(1041, &CEditAccountDlg::OnDeleteCharacter)           // 004094e0
+	ON_LBN_SELCHANGE(kControlCharacterList, &CEditAccountDlg::OnSelChangeCharacterList) // 00409410
+	ON_LBN_SELCANCEL(kControlCharacterList, &CEditAccountDlg::OnSelCancelCharacterList) // 00409420
+	ON_BN_CLICKED(kControlDeleteCharacter, &CEditAccountDlg::OnDeleteCharacter)           // 004094e0
 	ON_WM_MEASUREITEM()                                                // 00409610
-	ON_BN_CLICKED(1045, &CEditAccountDlg::OnKickAccount)               // 00409770
+	ON_BN_CLICKED(kControlKickAccount, &CEditAccountDlg::OnKickAccount)               // 00409770
 END_MESSAGE_MAP()
 
 // .text:00409430
@@ -90,7 +90,7 @@ void CEditAccountDlg::OnDeleteCharacter()
 // .text:00409610 — rows are as tall as the list box's regular font.
 void CEditAccountDlg::OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo)
 {
-	if (IDCtl != 1040)
+	if (IDCtl != kControlCharacterList)
 	{
 		CWnd::OnMeasureItem(IDCtl, MeasureInfo);
 		return;

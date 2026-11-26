@@ -130,6 +130,13 @@ struct FVertexRemapList
 
 static_assert(sizeof(FVertexRemapList) == 0x10, "vertex remap list must be 0x10");
 
+// FDeformPart::Flags.
+enum EDeformPartFlag
+{
+    kDeformPartLodChanged = 0x1, // rebuild both buffers (FUN_065f6930)
+    kDeformPartSkinStale = 0x2,  // re-skin the vertex buffer (FUN_065f69c0)
+};
+
 struct FDeformPart;
 struct FLodHolder;
 
@@ -400,6 +407,12 @@ struct FSkeleton
 static_assert(sizeof(FSkeleton) == 0x1E88, "skeleton must be 0x1e88");
 static_assert(offsetof(FSkeleton, EngineHandle) == 0x1E80, "skel handle +1e80");
 
+// FBoneRuntime::Flags. Bit 0 is set from the skeleton slot (not named yet).
+enum EBoneFlag
+{
+    kBoneFlagPoseChanged = 0x2, // a set_* call or joint_changed marked the pose; the skinning pass clears it
+};
+
 // Engine instance callbacks: local pose, dirty flags and computed world pose.
 struct FBoneRuntime : IEngineInstance
 {
@@ -497,6 +510,13 @@ struct FIkListNode
 
 static_assert(sizeof(FIkListNode) == 0x14, "IK list node must be 0x14");
 static_assert(offsetof(FIkListNode, StartHeight) == 0x08, "list node start height +8");
+
+// FIkEvent::StateFlags.
+enum EIkStateFlag
+{
+    kIkStateStopped = 0x1,    // FUN_065f5950: Apply returns the current joint rotation
+    kIkStateSphereAxis = 0x2, // the DLS solve takes the sphere-axis variant (SolveDlsAlt)
+};
 
 // IK event owns its typed channels and serves as their owner callback.
 struct FIkEvent : IChannelOwner

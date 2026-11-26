@@ -326,26 +326,26 @@ GENRESULT DACOM_API FThornSound::GetPan(float* OutPan)
 // LAB_00457760. Mask bit i copies Props[i] into the i-th dword from +0x88.
 GENRESULT DACOM_API FThornSound::SetAudioProps(float const* Props8, int Mask)
 {
-    if ((Mask & 0x1) != 0)
+    if ((Mask & kThornAudioAttenuation) != 0)
     {
         float const Value = Props8[0];
         Attenuation = Value;
         if (bAmbient != 0)
             SnapClientAudioFade(Value);
     }
-    if ((Mask & 0x2) != 0)
+    if ((Mask & kThornAudioPan) != 0)
         CopyDword(&Pan, &Props8[1]);
-    if ((Mask & 0x4) != 0)
+    if ((Mask & kThornAudioMinDistance) != 0)
         CopyDword(&MinDistance, &Props8[2]);
-    if ((Mask & 0x8) != 0)
+    if ((Mask & kThornAudioMaxDistance) != 0)
         CopyDword(&MaxDistance, &Props8[3]);
-    if ((Mask & 0x10) != 0)
+    if ((Mask & kThornAudioConeInsideAngle) != 0)
         CopyDword(&ConeInsideAngle, &Props8[4]);
-    if ((Mask & 0x20) != 0)
+    if ((Mask & kThornAudioConeOutsideAngle) != 0)
         CopyDword(&ConeOutsideAngle, &Props8[5]);
-    if ((Mask & 0x40) != 0)
+    if ((Mask & kThornAudioConeOutsideAttenuation) != 0)
         CopyDword(&ConeOutsideAttenuation, &Props8[6]);
-    if ((Mask & 0x80) != 0)
+    if ((Mask & kThornAudioReverbMix) != 0)
         CopyDword(&ReverbMix, &Props8[7]);
     RefreshSound();
     return GR_OK;
@@ -354,21 +354,21 @@ GENRESULT DACOM_API FThornSound::SetAudioProps(float const* Props8, int Mask)
 // LAB_00457810.
 GENRESULT DACOM_API FThornSound::GetAudioProps(float* Props8, int Mask)
 {
-    if ((Mask & 0x1) != 0)
+    if ((Mask & kThornAudioAttenuation) != 0)
         CopyDword(&Props8[0], &Attenuation);
-    if ((Mask & 0x2) != 0)
+    if ((Mask & kThornAudioPan) != 0)
         CopyDword(&Props8[1], &Pan);
-    if ((Mask & 0x4) != 0)
+    if ((Mask & kThornAudioMinDistance) != 0)
         CopyDword(&Props8[2], &MinDistance);
-    if ((Mask & 0x8) != 0)
+    if ((Mask & kThornAudioMaxDistance) != 0)
         CopyDword(&Props8[3], &MaxDistance);
-    if ((Mask & 0x10) != 0)
+    if ((Mask & kThornAudioConeInsideAngle) != 0)
         CopyDword(&Props8[4], &ConeInsideAngle);
-    if ((Mask & 0x20) != 0)
+    if ((Mask & kThornAudioConeOutsideAngle) != 0)
         CopyDword(&Props8[5], &ConeOutsideAngle);
-    if ((Mask & 0x40) != 0)
+    if ((Mask & kThornAudioConeOutsideAttenuation) != 0)
         CopyDword(&Props8[6], &ConeOutsideAttenuation);
-    if ((Mask & 0x80) != 0)
+    if ((Mask & kThornAudioReverbMix) != 0)
         CopyDword(&Props8[7], &ReverbMix);
     return GR_OK;
 }

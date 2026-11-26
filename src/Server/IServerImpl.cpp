@@ -212,12 +212,12 @@ void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
             if (player && player->client_id != 0) return;
         }
         unsigned char result = Players.login(info, session_id);
-        if (result == 3) Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogin, &session_id);
+        if (result == kLoginAccepted) Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogin, &session_id);
         // IClient slot 12, FLPACKET_SERVER_LOGINRESPONSE; the status byte travels by reference.
         g_pClientInterface->SendServerLoginResponse(session_id, result);
         // Retail reads back the stored login result here (Ghidra shows it as the high byte of
         // param_2).
-        if (result == 3) {
+        if (result == kLoginAccepted) {
             GServerStats.LoginSuccessCount++;
         } else {
             GServerStats.LoginFailCount++;
@@ -297,7 +297,7 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
 
         // The result code is not tested.
         int AffiliationVibe = Slot.rep_vibe;
-        unsigned int Affiliation = 0xffffffffu;
+        unsigned int Affiliation = kNoAffiliation;
         ::Reputation::Vibe::GetAffiliation(AffiliationVibe, Affiliation, false);
 
         g_pClientInterface->SendServerMiscObjUpdateAffiliation(session_id, Slot.ship_object_id, Affiliation);
@@ -766,9 +766,9 @@ void StarSystem::resolve_collision_side(CObject* Part, unsigned int PartId, Game
     if (Root != nullptr)
     {
         unsigned int const Class = static_cast<unsigned int>(Root->ObjectClass);
-        if ((Class & 3u) == 3u)
+        if ((Class & CObject::ClassSimple) == CObject::ClassSimple)
         {
-            if ((Class & 0x67u) != 0x67u)
+            if ((Class & CObject::ClassBeam) != CObject::ClassBeam)
             {
                 Found = find_object(static_cast<CSimple*>(Root)->Id);   // FUN_06d0c840
             }
@@ -815,7 +815,7 @@ void StarSystem::resolve_collision_side(CObject* Part, unsigned int PartId, Game
         return;
 
     // A functioning shield takes the hit instead.
-    CEShield* const Shield = CEShield::cast(Eq->EquipManager.FindFirst(0x100));
+    CEShield* const Shield = CEShield::cast(Eq->EquipManager.FindFirst(EquipTypeShield));
     if (Shield == nullptr)
         return;
     if (!Shield->IsFunctioning())

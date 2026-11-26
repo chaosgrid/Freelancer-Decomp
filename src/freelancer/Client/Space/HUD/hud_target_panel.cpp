@@ -138,12 +138,12 @@ namespace
 
     void SetFlagBits(WinControl* Control)
     {
-        Control->Flags |= 3;
+        Control->Flags |= kWin3DActive | kWin3DVisible;
     }
 
     void ClearFlagBits(WinControl* Control)
     {
-        Control->Flags &= 0xfc;
+        Control->Flags &= ~(kWin3DActive | kWin3DVisible);
     }
 
     void SetPos(WinControl* Control, float X, float Y, float Z)
@@ -221,7 +221,7 @@ void FHudSubTargetFlash::Update(float DeltaSeconds, unsigned short NewSubId)
         Timer = Duration;
         if (NewSubId != SUBOBJ_ID_NONE)
         {
-            PlayOrRewindUiSoundSlot(0x18);
+            PlayOrRewindUiSoundSlot(kUiSoundHudSubtarget);
         }
     }
     if (Timer > 0.0f)
@@ -247,7 +247,7 @@ void FHudSubTargetFlash::DrawBracket(float const* ScreenPos, float HalfSize) con
     float const Px = ScreenPos[0];
     float const Py = ScreenPos[1];
 
-    Win3DBegin(2);
+    Win3DBegin(kWin3DLines);
 
     // Top-left corner.
     Win3DVertex3f(Px - S, Py - S, 0.0f);
@@ -327,11 +327,11 @@ void FHudSubTargetFlash::DrawBracket(float const* ScreenPos, float HalfSize) con
 void FHudSubTargetFlash::Draw(FSpaceCamera* Camera, float* ScreenPos) const
 {
     // FUN_004e04f0: 2D state for Camera's viewport.
-    Win3DDisable(0xde1); // GL_TEXTURE_2D
-    Win3DDisable(0xb71); // GL_DEPTH_TEST
+    Win3DDisable(kWin3DTexture2D); // GL_TEXTURE_2D
+    Win3DDisable(kWin3DDepthTest); // GL_DEPTH_TEST
     Win3DSetOrtho2DForCamera(Camera);
-    Win3DEnable(0xbe2);  // GL_BLEND
-    Win3DSetBlendFunc(2, 4);
+    Win3DEnable(kWin3DBlend);  // GL_BLEND
+    Win3DSetBlendFunc(kWin3DBlendOne, D3DBLEND_INVSRCCOLOR);
 
     // The point rounded in place: ftol(v + 0.5) (DAT_005c75e8, double), back to float.
     ScreenPos[0] = static_cast<float>(static_cast<int>(static_cast<double>(ScreenPos[0]) + 0.5));
@@ -470,8 +470,11 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     PlayerNameFont = FindMenuFontImp("PlayerName");
 
     // FUN_005760d0 for each id, on the handler at +0x384.
-    unsigned const kEvents[0x10] = {0x5f, 0x21, 0x22, 0xcc, 0x54, 0x58, 0x59, 0x8b,
-                                    0x24, 0x25, 0x26, 0xbb, 0xc9, 0xca, 0x23, 0x8a};
+    unsigned const kEvents[0x10] = {USER_TARGET, USER_NEXT_SUBTARGET, USER_PREV_SUBTARGET, 0xcc,
+                                    USER_CONTACT_LIST, USER_SWITCH_TO_TARGET, USER_FORMATION_LIST,
+                                    USER_TRACTOR_BEAM, USER_NEXT_ENEMY, USER_PREV_ENEMY,
+                                    USER_CLOSEST_ENEMY, USER_FIRE_FORWARD, USER_GROUP_INVITE,
+                                    USER_TRADE_REQUEST, USER_CLEAR_TARGET, USER_SCAN_CARGO};
     for (unsigned Index = 0; Index < 0x10; ++Index)
     {
         RegisterEvent(kEvents[Index]);
@@ -512,7 +515,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     ToggleButton = CreateButtonControl("HudTargetOpen", "interface\\hud\\hud_ShipTarget.3db",
                                        nullptr, "ui_window_open", nullptr, &HomePosition,
                                        nullptr, &ToggleHalf, 0, 1, 0, 0, 0x3fe, 0, 0);
-    ToggleButton->SetProperty(0x36, 1, 0);
+    ToggleButton->SetProperty(kButtonPropSpin, 1, 0);
 
     Vector const ShipNamePos = {-0.488f, -0.2f, 0.0f};
     ShipName = CreateTextControl("TargetShipName", "HudSmall", &ShipNamePos, nullptr, 0.205f,
@@ -547,12 +550,12 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     ScanButton = CreateButtonControl("TargetScanButton",
                                      "interface\\hud\\HUD_scanshipinactive.3db", nullptr,
                                      "ui_item_select", nullptr, &ScanPos, nullptr, &SmallHalf, 0,
-                                     1, 0, 0, 0x440, 0, 0x8a);
+                                     1, 0, 0, 0x440, 0, USER_SCAN_CARGO);
 
     TractorButton = CreateButtonControl("TargetTractorButton",
                                         "interface\\hud\\HUD_tractorbeam2.3db", nullptr,
                                         "ui_item_select", nullptr, &ScanPos, nullptr, &SmallHalf,
-                                        0, 1, 0, 0, 0xbc2, 0, 0x8b);
+                                        0, 1, 0, 0, 0xbc2, 0, USER_TRACTOR_BEAM);
 
     Vector const CommPos = {-0.445f, -0.37f, 0.0f};
     CommButton = CreateButtonControl("TargetCommButton",
@@ -580,25 +583,25 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     ContactListButton = CreateButtonControl("SwitchToContactList",
                                             "interface\\hud\\HUD_contactlist.3db", nullptr,
                                             "ui_select_item", nullptr, &ContactListPos, nullptr,
-                                            &SmallHalf, 0, 1, 0, 0, 0x448, 0, 0x54);
+                                            &SmallHalf, 0, 1, 0, 0, 0x448, 0, USER_CONTACT_LIST);
 
     Vector const TargetPos = {-0.377f, -0.37f, 0.0f};
     TargetButton = CreateButtonControl("SwitchToTarget",
                                        "interface\\HUD\\HUD_targetedobject.3db", nullptr,
                                        "ui_select_item", nullptr, &TargetPos, nullptr, &SmallHalf,
-                                       0, 1, 0, 0, 0x5ff, 0, 0x58);
+                                       0, 1, 0, 0, 0x5ff, 0, USER_SWITCH_TO_TARGET);
 
     Vector const NextEnemyPos = {-0.479f, -0.37f, 0.0f};
     NextEnemyButton = CreateButtonControl("NextEnemyButton",
                                           "interface\\HUD\\HUD_nextenemy.3db", nullptr,
                                           "ui_select_item", nullptr, &NextEnemyPos, nullptr,
-                                          &SmallHalf, 0, 1, 0, 0, 0x3e2, 0, 0x26);
+                                          &SmallHalf, 0, 1, 0, 0, 0x3e2, 0, USER_CLOSEST_ENEMY);
 
     Vector const FormationPos = {-0.278f, -0.37f, 0.0f};
     FormationButton = CreateButtonControl("FormationList",
                                           "interface\\HUD\\HUD_formation.3db", nullptr,
                                           "ui_select_item", nullptr, &FormationPos, nullptr,
-                                          &SmallHalf, 0, 1, 0, 0, 0x60c, 0, 0x59);
+                                          &SmallHalf, 0, 1, 0, 0, 0x60c, 0, USER_FORMATION_LIST);
     FormationButton->SetProperty(kWinPropHide, 1, 0);
 
     Vector const RankPos = {-0.49f, -0.361f, 0.0f};
@@ -609,8 +612,8 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     PreviousButton->SetProperty(kWinPropHide, 1, 0);
     NextButton->SetProperty(kWinPropHide, 1, 0);
     TradeButton->SetProperty(kWinPropHide, 1, 0);
-    ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
-    TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
+    ContactListButton->SetProperty(kWinPropLit, Mode == kTargetPanelContactList ? 1 : 0, 0);
+    TargetButton->SetProperty(kWinPropLit, Mode == kTargetPanelTarget ? 1 : 0, 0);
 
     // Retail clones the StyleNode twice: the list takes a clone of the clone, and the first
     // clone is deleted.
@@ -702,7 +705,7 @@ void HudTarget::DrawViewObject()
     {
         return;
     }
-    if (GetGameOption(0xb) == 0)
+    if (GetGameOption(kGameOptShipWires) == 0)
     {
         return;
     }
@@ -714,13 +717,13 @@ void HudTarget::DrawViewObject()
     // The GL viewport saved (FUN_00422390, GL_VIEWPORT), the view camera pointed at the object.
     int SavedViewport[4];
     Win3DGetViewport(0xba2, SavedViewport);
-    SetupViewCamera(GetGameOption(0xc) != 0, -0.0125f);
+    SetupViewCamera(GetGameOption(kGameOptTargetWindowLock) != 0, -0.0125f);
 
     // A CSimple (class & 3) is drawn -- as a wire sphere when TypeBits & 7, else as
     // its coloured part cache -- and the scan sweep over it; anything else draws nothing.
     CSimple* Simple = nullptr;
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
-    if (Object != nullptr && IsClass(Object, 3))
+    if (Object != nullptr && IsClass(Object, CObject::ClassSimple))
     {
         Simple = static_cast<CSimple*>(Object);
         if ((Simple->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
@@ -807,7 +810,7 @@ void HudTarget::UpdateLabels()
     SubtargetName->SetProperty(kTextPropSetIds, 1, 0);
 
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
-    if (Object == nullptr || !IsClass(Object, 3))
+    if (Object == nullptr || !IsClass(Object, CObject::ClassSimple))
     {
         return;
     }
@@ -1120,7 +1123,7 @@ void HudTarget::Draw()
         return;
     }
     if ((ButtonMover::IsActive() || ButtonScaler::IsActive()) && TradeButton != nullptr &&
-        (TradeButton->Flags & 2) != 0)
+        (TradeButton->Flags & kWin3DVisible) != 0)
     {
         TradeButton->Draw();
     }
@@ -1138,7 +1141,7 @@ void HudTarget::Update()
     if (bFirstUpdate != 0)
     {
         bFirstUpdate = 0;
-        unsigned char const bSessionExpanded = TestGameSessionFlags(1) ? 1 : 0;
+        unsigned char const bSessionExpanded = TestGameSessionFlags(kSessionTargetPanelExpanded) ? 1 : 0;
         if (bSessionExpanded != bExpanded)
         {
             ToggleExpanded();
@@ -1206,7 +1209,7 @@ void HudTarget::Update()
             IBehaviorManager* const Behavior = Ship->get_behavior_interface();
             if (Behavior != nullptr)
             {
-                bFormation = (Behavior->CurrentBehaviorIndex == 10) ? 1 : 0;
+                bFormation = (Behavior->CurrentBehaviorIndex == BEHAVIOR_FORMATION) ? 1 : 0;
             }
             if (SinglePlayer())
             {
@@ -1276,9 +1279,9 @@ void HudTarget::Update()
 
     if (Mode != ShownMode)
     {
-        ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
-        TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
-        FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
+        ContactListButton->SetProperty(kWinPropLit, Mode == kTargetPanelContactList ? 1 : 0, 0);
+        TargetButton->SetProperty(kWinPropLit, Mode == kTargetPanelTarget ? 1 : 0, 0);
+        FormationButton->SetProperty(kWinPropLit, Mode == kTargetPanelFormation ? 1 : 0, 0);
     }
 
     // The target was lost while flagged unfriendly -- post 0x26 (next target) and play UI
@@ -1289,7 +1292,7 @@ void HudTarget::Update()
         HudPostCommand(USER_CLOSEST_ENEMY, 0);
         if (SyncPlayerTarget() != nullptr)
         {
-            PlayOrRewindUiSoundSlot(0x23);
+            PlayOrRewindUiSoundSlot(kUiSoundTargetChange);
         }
     }
 
@@ -1300,7 +1303,7 @@ void HudTarget::Update()
             // Leaving the target view: hide every child, then show this panel, the view panel,
             // the close button and the three switches again.
             SetHiddenWithChildren(true);
-            Flags |= 3;
+            Flags |= kWin3DActive | kWin3DVisible;
             SetFlagBits(ViewPanel);
             SetFlagBits(CloseButton);
             SetFlagBits(ContactListButton);
@@ -1364,7 +1367,7 @@ bool HudTarget::MouseEvent(FWin3DMouseEvent const* Event)
         IObjRW* const View = WatchedObjRw(ViewObject);
         if (SubTargetId != SUBOBJ_ID_NONE && Event->Action == kWin3DMousePress && View != nullptr)
         {
-            PlayOrRewindUiSoundSlot(0x18);
+            PlayOrRewindUiSoundSlot(kUiSoundHudSubtarget);
             FSpaceCommand Command = {};
             Command.Byte26 = 1;
             Command.Id = USER_SET_TARGET;
@@ -1398,10 +1401,10 @@ void HudTarget::OnMoveFinished()
 
     // The collapse ended.
     bExpanded = 0;
-    SetGameSessionFlags(1, false);
-    ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
-    TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
-    FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
+    SetGameSessionFlags(kSessionTargetPanelExpanded, false);
+    ContactListButton->SetProperty(kWinPropLit, Mode == kTargetPanelContactList ? 1 : 0, 0);
+    TargetButton->SetProperty(kWinPropLit, Mode == kTargetPanelTarget ? 1 : 0, 0);
+    FormationButton->SetProperty(kWinPropLit, Mode == kTargetPanelFormation ? 1 : 0, 0);
     HalfExtents.x = 0.109f;
     HalfExtents.y = 0.02f;
     HalfExtents.z = 0.0f;
@@ -1418,7 +1421,7 @@ void HudTarget::OnScaleFinished()
     {
         // The view panel reached full size: the panel is open.
         bExpanded = 1;
-        SetGameSessionFlags(1, true);
+        SetGameSessionFlags(kSessionTargetPanelExpanded, true);
         float const TopY = -0.171f; // 0xbe2f1aa0
         SetPos(NextEnemyButton, -0.465f, TopY, 0.0f);
         SetPos(ScanButton, -0.397f, TopY, 0.0f);
@@ -1432,7 +1435,7 @@ void HudTarget::OnScaleFinished()
         if (Mode != kTargetPanelTarget)
         {
             SetHiddenWithChildren(true);
-            Flags |= 3;
+            Flags |= kWin3DActive | kWin3DVisible;
             SetFlagBits(ViewPanel);
             SetFlagBits(CloseButton);
             ClearFlagBits(ShipName);
@@ -1459,9 +1462,9 @@ void HudTarget::OnScaleFinished()
         SetFlagBits(NextEnemyButton);
         SetFlagBits(TargetButton); // retail sets +0x63c twice
         FormationButton->SetProperty(kWinPropHide, bFormationAvailable == 0 ? 1 : 0, 0);
-        ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
-        TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
-        FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
+        ContactListButton->SetProperty(kWinPropLit, Mode == kTargetPanelContactList ? 1 : 0, 0);
+        TargetButton->SetProperty(kWinPropLit, Mode == kTargetPanelTarget ? 1 : 0, 0);
+        FormationButton->SetProperty(kWinPropLit, Mode == kTargetPanelFormation ? 1 : 0, 0);
         HalfExtents.x = 0.131f;  // 0x3e0624dd
         HalfExtents.y = 0.117f;  // 0x3def9db2
         HalfExtents.z = 0.0f;
@@ -1666,7 +1669,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
             return true;
         }
         CObject* const ViewObjectPtr = CObjectOfObjRw(WatchedObjRw(ViewObject));
-        if (ViewObjectPtr == nullptr || !IsClass(ViewObjectPtr, 3))
+        if (ViewObjectPtr == nullptr || !IsClass(ViewObjectPtr, CObject::ClassSimple))
         {
             return true;
         }
@@ -1749,7 +1752,7 @@ void HudTarget::OpenScanner()
     {
         return;
     }
-    if ((Type & 0x7f0000) == 0)
+    if ((Type & OBJ_SHIP_MASK) == 0)
     {
         return;
     }
@@ -1762,7 +1765,7 @@ void HudTarget::OpenScanner()
     }
     unsigned ArchId = 0;
     CObject const* const TargetObject = ScanTarget->cobject();
-    if (TargetObject != nullptr && (static_cast<unsigned>(TargetObject->ObjectClass) & 1) != 0)
+    if (TargetObject != nullptr && (static_cast<unsigned>(TargetObject->ObjectClass) & CObject::ClassObject) != 0)
     {
         ArchId = TargetObject->get_archetype()->Nickname.Id;
     }
@@ -1892,7 +1895,7 @@ RankDone:
             ScanButton->SetProperty(kWinPropHide, bHideScan, 0);
             Win3D* const ScannerWindow = Win3DFindByName("NN_Scanner");
             bScannerOpen = (ScannerWindow != nullptr) ? 1 : 0;
-            ScanButton->SetProperty(0xc, bScannerOpen, 0);
+            ScanButton->SetProperty(kWinPropLit, bScannerOpen, 0);
             if (ScannerWindow != nullptr && bHideScan != 0)
             {
                 ScannerWindow->ProcessMessage(kWinMsgHide, 0, 0);
@@ -2233,14 +2236,14 @@ void HudTarget::DrawScanSweep()
     float const X = static_cast<float>(floor(static_cast<double>(PointX) + kSweepRound));
     float const Y = static_cast<float>(floor(static_cast<double>(PointY) + kSweepRound));
 
-    Win3DDisable(0xde1);
-    Win3DDisable(0xb71);
+    Win3DDisable(kWin3DTexture2D);
+    Win3DDisable(kWin3DDepthTest);
     Win3DSetOrtho2DForCamera(&ViewCamera);
-    Win3DEnable(0xbe2);
-    Win3DSetBlendFunc(5, 6);
+    Win3DEnable(kWin3DBlend);
+    Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
     unsigned char const Red[4] = {0xff, 0, 0, 0x80};
     Win3DColor4ubv(Red);
-    Win3DBegin(2);
+    Win3DBegin(kWin3DLines);
 
     int const* const Viewport = ViewCamera.Viewport;
     float const Height = static_cast<float>(Viewport[3] - Viewport[1] + 1);

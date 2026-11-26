@@ -52,7 +52,7 @@ namespace
 DodgeMissileIdea::DodgeMissileIdea()
     : BaseIdea()
     , MissileWatcher()
-    , Mode1c(0)           // not written by retail's ctor
+    , Mode1c(kDodgeMissileAfterburn)           // not written by retail's ctor
 {
 }
 
@@ -112,14 +112,14 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
 
         // Unlike the mode ladder's tail, no SetThrustersActive here.
         Thrust->SetAxisThrottle(Command);
-        Thrust->SetThrottle(1.0f, 0);
+        Thrust->SetThrottle(1.0f, kThrottleModeEngine);
         return 0;
     }
 
     // Mode ladder; values other than 0/1/2 return 0.
     Vector Command{ 0.0f, 0.0f, 0.0f };
 
-    if (Mode1c == 2)
+    if (Mode1c == kDodgeMissileSlide)
     {
         // Nudge sideways; never touches the throttle and returns on its own.
 
@@ -160,7 +160,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
         return 0;
     }
 
-    if (Mode1c == 1)
+    if (Mode1c == kDodgeMissileBreak)
     {
         // The real dodge: fly a frame along the perpendicular escape direction.
         NavTarget->RefreshPos();
@@ -217,7 +217,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
         ComputeBankedSteeringFrame(Nav, Up, Basis, Throttle, 1);
         Command = Throttle;
     }
-    else if (Mode1c != 0)
+    else if (Mode1c != kDodgeMissileAfterburn)
     {
         return 0;
     }
@@ -225,7 +225,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
 
     // Shared by modes 0 and 1, so SetThrustersActive(true) fires on both.
     Thrust->SetAxisThrottle(Command);
-    Thrust->SetThrottle(1.0f, 0);
+    Thrust->SetThrottle(1.0f, kThrottleModeEngine);
     Thrust->SetThrustersActive(true);
     return 0;
 }

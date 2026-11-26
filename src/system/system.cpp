@@ -187,6 +187,7 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
     {
         const char* Iid;
         unsigned long ByteOffset;
+        enum : unsigned long { kIndirect = 0x80000000u }; // ByteOffset bit: follow the pointer at the offset
     };
     static const FQiEntry Table[] = {
         {Iids::SystemContainer, 0},            // 06f1205c / 06f12060
@@ -203,8 +204,8 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
             unsigned char* Base = (unsigned char*)(Outer);
             unsigned long Offset = Table[Index].ByteOffset;
             IDAComponent* Face = nullptr;
-            if ((Offset & 0x80000000u) != 0)
-                Face = *(IDAComponent**)(Base + (Offset & 0x7FFFFFFFu));
+            if ((Offset & FQiEntry::kIndirect) != 0)
+                Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
             else
                 Face = (IDAComponent*)(Base + Offset);
             Face->AddRef();

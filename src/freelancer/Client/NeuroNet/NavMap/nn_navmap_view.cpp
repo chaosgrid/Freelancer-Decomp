@@ -103,7 +103,7 @@ void NeuroNetNavMap::SetMapMeshTransform(int View, float Alpha)
     double const PanX = static_cast<double>(PanOffset[0]) * Zoom;
     double const PanY = static_cast<double>(PanOffset[1]) * Zoom;
 
-    if (View == 2)
+    if (View == kNavMapViewSystemZoomed)
     {
         // The zoomed mesh (+0x378), placed at +0x828 plus the scaled pan,
         // its rotation's [0][0] / [1][1] = ZoomScale * 5/43 (the rest of the rotation kept).
@@ -271,7 +271,7 @@ void NeuroNetNavMap::ZoomToClick()
         static_cast<double>(MapExtentX) * kNavMapZoomedDistance - Distance);
     ZoomDistance = static_cast<float>(Distance);
 
-    PlayOrRewindUiSoundSlot(6); // FUN_005645c0(6)
+    PlayOrRewindUiSoundSlot(kUiSoundHudZoomIn); // FUN_005645c0(6)
 }
 
 // ----------------------------------------------------------------------------------------
@@ -281,7 +281,7 @@ void NeuroNetNavMap::ZoomToClick()
 void NeuroNetNavMap::EnterSystemView()
 {
     // FUN_0049e1d0.
-    if (G_NavMapFilterMode == 6)
+    if (G_NavMapFilterMode == kNavMapFilterInfoCard)
         SetFilterMode(FilterModeBeforeInfoCard);
     ViewMode = kNavMapViewSystem;
     CachedObjectId = 0xffffffffu;
@@ -340,7 +340,7 @@ void NeuroNetNavMap::EnterSystemView()
     MissionFilter->SetProperty(kWinPropHide, bNoMission, 0);
 
     // The political sub-filters only in modes 1 / 2.
-    if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
+    if (G_NavMapFilterMode == kNavMapFilterPolitical || G_NavMapFilterMode == kNavMapFilterPatrol)
     {
         AllFilter->SetProperty(kWinPropHide, bHidden, 0);
         HostileFilter->SetProperty(kWinPropHide, bHidden, 0);
@@ -377,9 +377,9 @@ void NeuroNetNavMap::EnterUniverseView()
 {
     // FUN_0049e550.
     ViewMode = kNavMapViewUniverse;
-    if (G_NavMapFilterMode == 4 || G_NavMapFilterMode == 7)
-        SetFilterMode(0);
-    else if (G_NavMapFilterMode == 6)
+    if (G_NavMapFilterMode == kNavMapFilterLegend || G_NavMapFilterMode == kNavMapFilterBaseList)
+        SetFilterMode(kNavMapFilterPhysical);
+    else if (G_NavMapFilterMode == kNavMapFilterInfoCard)
         SetFilterMode(FilterModeBeforeInfoCard);
 
     // The jump links (records freed) and the items.
@@ -410,7 +410,7 @@ void NeuroNetNavMap::EnterUniverseView()
     for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
     {
         FNavMapItem* const Item = *It;
-        if (Item->Kind != 0)
+        if (Item->Kind != kNavMapItemSolar)
             continue;
         if (Item->System->GetId() != PlayerSystem)
             continue;
@@ -507,7 +507,7 @@ void NeuroNetNavMap::SlideSidePanels(unsigned char bOpen)
     // FUN_004a0a70.
     if (bOpen == bSidePanelsOpen)
         return;
-    PlayOrRewindUiSoundSlot(5);         // FUN_005645c0(5)
+    PlayOrRewindUiSoundSlot(kUiSoundNavMapExpand);         // FUN_005645c0(5)
     ButtonMover::Start(0.4f);           // FUN_0055e120(0.4)
     bSidePanelsOpen = bOpen;
 

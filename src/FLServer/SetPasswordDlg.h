@@ -15,6 +15,11 @@ class CSetPasswordDlg : public CDialog
 {
 public:
 	enum { IDD = 0x8f };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlPassword = 1038,
+	};
 
 	explicit CSetPasswordDlg(CWnd* Parent = nullptr);
 

@@ -71,7 +71,7 @@ bool __cdecl IsSpaceObjTypeSet(unsigned int ObjId, FSystemInfo* Unused)
     unsigned int Type = ObjId;
     if (pub::SpaceObj::GetType(ObjId, Type) != 0)
         return false;
-    return (Type & 0xfdff) != 0;
+    return (Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0;
 }
 
 // FUN_06f0e3e0. The heartbeat interval is 0x3d088889 (1/30 s).
@@ -203,7 +203,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
     if (First != Nodes.end() && (*First)->GetType() == NNOBJ_TYPE5)
     {
         FNnPathLeg const& FirstLeg = Legs->front();
-        Vector const& Point = FirstLeg.Kind == 1 ? FirstLeg.PointB : FirstLeg.PointA;
+        Vector const& Point = FirstLeg.Kind == kNnPathLegFlight ? FirstLeg.PointB : FirstLeg.PointA;
         Vector const MarkerPosition =
             GetMarkerPosition(static_cast<FNNObjectiveType5*>(*First)->Marker);
         if (IsAxisClose(Point.x, MarkerPosition.x) && IsAxisClose(Point.y, MarkerPosition.y) &&
@@ -234,7 +234,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
             Nodes.insert(Ins, Created);
         FNNObjectiveType5* Objective = static_cast<FNNObjectiveType5*>(Created);
 
-        if (LegIt->Kind == 0)
+        if (LegIt->Kind == kNnPathLegTradeLane)
         {
             if (LegIt == Legs->begin())
             {
@@ -260,7 +260,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
             ObjectiveB->Ids = LegIds;
             FillPathObjective(ObjectiveB, RepB, GotoSystemId, System->SystemId, LegIt->PointB);
         }
-        else if (LegIt->Kind == 1)
+        else if (LegIt->Kind == kNnPathLegFlight)
         {
             int Rep = -1;
             if (TargetObjectId != 0)
@@ -1534,7 +1534,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         break;
     }
 
-    case EMessage::Msg0x25:
+    case EMessage::ShipLeftSystem:
         OnShipJump(Parms);
         break;
 
@@ -2872,7 +2872,7 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         Params->Position.y = Local.Translation.y;
         Params->Position.z = Local.Translation.z;
         Params->Orientation = Local.Rotation;
-        Params->CreationType = 0;
+        Params->CreationType = kNpcCreationMission;
         Params->ControllerId = ControllerId;
         Params->LabelIds = Ship->LabelIds;
         Params->DockIndex = Group->ArrivalDockIndex;
@@ -3094,7 +3094,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
             continue;
         pub::SpaceObj::EQInfo EquipInfo;
         std::memset(&EquipInfo, 0, sizeof(EquipInfo));
-        EquipInfo.Type = 2;
+        EquipInfo.Type = pub::SpaceObj::EQINFO_TYPE_CLOAK;
         EquipInfo.EquipId = 0;
         pub::SpaceObj::ActivateEquipment(Solar->SpaceObjId, &EquipInfo);
     }
@@ -3233,7 +3233,7 @@ void FMissionObject::RegisterNpc(void const* MessageParms)
             continue;
         pub::SpaceObj::EQInfo EquipInfo;
         std::memset(&EquipInfo, 0, sizeof(EquipInfo));
-        EquipInfo.Type = 2;
+        EquipInfo.Type = pub::SpaceObj::EQINFO_TYPE_CLOAK;
         EquipInfo.EquipId = 0;
         pub::SpaceObj::ActivateEquipment(NpcId, &EquipInfo);
     }
@@ -3983,42 +3983,42 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     switch (MessageId)
     {
     case EMessage::BaseExit:
-        if (State == 3 && Owner->PlayerId == Parms[1] && (Owner->PlayerId & GIdValueMask) != 0)
-            State = 4;
+        if (State == kNnPathTimerRunning && Owner->PlayerId == Parms[1] && (Owner->PlayerId & GIdValueMask) != 0)
+            State = kNnPathDocked;
         return State;
 
     case EMessage::TradelaneEnter:
-        if (State != 3 || FindContentPlayerState(Owner->PlayerId) == nullptr)
+        if (State != kNnPathTimerRunning || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
         if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & GIdValueMask) == 0)
             return State;
-        State = 4;
+        State = kNnPathDocked;
         SendObjectives(true, false);
         return State;
 
     case EMessage::TradelaneExit:
-        if (State != 4 || FindContentPlayerState(Owner->PlayerId) == nullptr)
+        if (State != kNnPathDocked || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
         if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & GIdValueMask) == 0)
             return State;
         StartNnPathTimer(this);
-        State = 3;
+        State = kNnPathTimerRunning;
         return State;
 
     case EMessage::Heartbeat:
-        if (State != 1)
+        if (State != kNnPathStarted)
             return State;
         StartNnPathTimer(this);
-        State = 2;
+        State = kNnPathHeartbeatSeen;
         return State;
 
     case EMessage::SpaceEnter:
         if (Owner->PlayerId != Parms[1] || (Owner->PlayerId & GIdValueMask) == 0)
             return State;
-        if (State == 4)
+        if (State == kNnPathDocked)
         {
             StartNnPathTimer(this);
-            State = 3;
+            State = kNnPathTimerRunning;
         }
         if (Owner->PlayerState->GetSystemId() == SystemId)
             TargetObjectId = Owner->GetLabelObjectId(&Label);
@@ -4051,7 +4051,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
 
     case EMessage::TimerExpired:
         // This path's timer, not while docked.
-        if (Parms[0] != TimerId || State == 4)
+        if (Parms[0] != TimerId || State == kNnPathDocked)
             return State;
         break;
 
@@ -4094,7 +4094,7 @@ void FMissionNnPath::Load(INI_Reader* Reader, FMissionObject* InMission)
     if (!Reader->is_value_empty(5))
         Label = Reader->get_value_string(5);
     SystemId = static_cast<unsigned int>(Reader->get_value_int(6));
-    State = 1;
+    State = kNnPathStarted;
     bActive = 1;
     Mission = InMission;
 }
@@ -4138,9 +4138,9 @@ void FMissionNnPath::Rebuild()
     }
     else
     {
-        Target = GetNextHopConnectionObject(System->SystemId, SystemId, 1);
+        Target = GetNextHopConnectionObject(System->SystemId, SystemId, CONN_TYPE_JUMP_GATE);
         if ((Target & GIdValueMask) == 0)
-            Target = GetNextHopConnectionObject(System->SystemId, SystemId, 0);
+            Target = GetNextHopConnectionObject(System->SystemId, SystemId, CONN_TYPE_ALL);
         GetConnectionPosition(System->SystemId, Target, &Destination);
     }
 
@@ -4159,7 +4159,7 @@ void FMissionNnPath::Rebuild()
         if (bArrived == 0)
         {
             bArrived = 1;
-            State = 5;
+            State = kNnPathArrived;
         }
     }
     Owner->BuildPathObjectives(System, &Legs, &Objectives, TravelIds, Ids, Ids, Target, 8, 9, 8,
@@ -4187,15 +4187,15 @@ void FMissionNnPath::SendObjectives(bool bSkipFirst, bool bLaunched)
         FMissionObjective* Objective = *It;
         if (!Objective->BuildDescription())
             continue;
-        if (State == 2 || State == 5)
+        if (State == kNnPathHeartbeatSeen || State == kNnPathArrived)
         {
             Objective->Objective.Type = Index != 0 ? 9u : 0x3au;
-            State = 3;
+            State = kNnPathTimerRunning;
         }
         else if (bLaunched)
         {
             Objective->Objective.Type = Index != 0 ? 9u : 0x1au;
-            State = 3;
+            State = kNnPathTimerRunning;
         }
         else
         {
@@ -4227,7 +4227,7 @@ void FMissionNnPath::Reset()
     Position.y = 0.0f;
     Position.z = 0.0f;
     SystemId = 0;
-    State = 0;
+    State = kNnPathIdle;
     bArrived = 0;
     TimerId = 0;
     Mission = nullptr;

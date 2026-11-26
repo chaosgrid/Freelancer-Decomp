@@ -9,7 +9,61 @@
 // EffectTypes.cpp — PTR_s_EFT_NONE_00612a68 (stride 0x28), FUN_004fd500/560/5a0.
 // EffectLOD screen-size table — DAT_00667d90 (FUN_0042dae0 / LAB_0042dac0).
 
-constexpr int kEffectTypeCount = 0x2f; // 0..0x2e; 0x2f = unknown
+// The [EffectType] rows, in the order of G_EffectTypeTable; the names are the retail strings
+// (PTR_s_EFT_NONE_00612a68 .. PTR_s_EFT_NUMTYPES_006131c0).
+enum EEffectType
+{
+    EFT_NONE = 0x0,
+    EFT_EXPLOSION_SMALL = 0x1,
+    EFT_EXPLOSION_MEDIUM = 0x2,
+    EFT_EXPLOSION_LARGE = 0x3,
+    EFT_EXPLOSION_DEBRIS = 0x4,
+    EFT_EXPLOSION_SHIP = 0x5,
+    EFT_EXPLOSION_MISSILE = 0x6,
+    EFT_EXPLOSION_MINE = 0x7,
+    EFT_MUZZLE_FLASH = 0x8,
+    EFT_MUZZLE_LARGE_FLASH = 0x9,
+    EFT_MISSILE_DRIVE = 0xa,
+    EFT_WEAPON_PROJ = 0xb,
+    EFT_WEAPON_LARGE_PROJ = 0xc,
+    EFT_WEAPON_IMPACT = 0xd,
+    EFT_WEAPON_LARGE_IMPACT = 0xe,
+    EFT_WEAPON_COUNTER_MEASURE = 0xf,
+    EFT_WEAPON_MINE = 0x10,
+    EFT_DAMAGE_HULL = 0x11,
+    EFT_DAMAGE_LARGE_SHIELD = 0x12,
+    EFT_DAMAGE_SHIELD = 0x13,
+    EFT_DAMAGE_CRUISE = 0x14,
+    EFT_DAMAGE_SMOKE = 0x15,
+    EFT_DAMAGE_LARGE_SMOKE = 0x16,
+    EFT_DEBRIS_TRAIL = 0x17,
+    EFT_ENGINE_CONTRAIL = 0x18,
+    EFT_ENGINE_TRAIL = 0x19,
+    EFT_ENGINE_LARGE_TRAIL = 0x1a,
+    EFT_ENGINE_FIRE = 0x1b,
+    EFT_ENGINE_LARGE_FIRE = 0x1c,
+    EFT_ENGINE_THRUSTER = 0x1d,
+    EFT_EQUIP_CLOAK = 0x1e,
+    EFT_EQUIP_LARGE_CLOAK = 0x1f,
+    EFT_EQUIP_ATTACHED = 0x20,
+    EFT_EQUIP_ATTACHED_LARGE = 0x21,
+    EFT_EQUIP_ATTACHED_INSANELY_LARGE = 0x22,
+    EFT_MISC_DUST = 0x23,
+    EFT_MOTION_DUST = 0x24,
+    EFT_JUMP_EFFECTS = 0x25,
+    EFT_JUMP_GATE_EFFECTS = 0x26,
+    EFT_LANE_ACTIVE = 0x27,
+    EFT_LANE_TUBE = 0x28,
+    EFT_LANE_SHIP = 0x29,
+    EFT_LANE_SHIP_TRAVEL = 0x2a,
+    EFT_CUSTOM_EFFECTS = 0x2b,
+    EFT_CODE_PROJ_EFFECT = 0x2c,
+    EFT_TRACTORBEAM = 0x2d,
+    EFT_FLASHLIGHT = 0x2e,
+    EFT_NUMTYPES = 0x2f,
+};
+
+constexpr int kEffectTypeCount = EFT_NUMTYPES; // 0..0x2e; 0x2f = unknown
 constexpr int kEffectLodTypeCount = 7; // 0=none .. 6=small_distant (names FUN_0042dae0 matches)
 // DAT_00667d90 holds 8 rows: the static initializer LAB_0042dac0 seeds 8 x (-1,-1,-1); only
 // rows 1..6 are ever filled by FUN_0042dae0.

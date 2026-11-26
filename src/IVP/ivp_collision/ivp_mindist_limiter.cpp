@@ -131,14 +131,14 @@ namespace
 
         switch (Kind)
         {
-        case 0:
+        case IVP_SYNAPSE_POINT:
             return NodeEdge->GetCompactLedge() == TargetEdge->GetCompactLedge()
                 && NodeEdge->GetStartPointIndex() == TargetEdge->GetStartPointIndex();
-        case 1:
+        case IVP_SYNAPSE_EDGE:
             return NodeEdge == TargetEdge || NodeEdge->GetOppositeEdge() == TargetEdge;
-        case 2:
+        case IVP_SYNAPSE_POLY:
             return NodeEdge->GetCompactTriangle() == TargetEdge->GetCompactTriangle();
-        case 3:
+        case IVP_SYNAPSE_BALL:
             return true;
         default:
             // The library's CORE trap (:063567e7), then returns 0.
@@ -799,14 +799,14 @@ void IVP_Contact_Point::UpdateContactFrame()
     bool bSecondSwitch = true;
     switch (ShapeTag1)
     {
-    case 0:
+    case IVP_SYNAPSE_POINT:
         IVP_Compact_Ledge_Solver::give_world_coords_AT(Edge1, &Cache1, &PointA);
         break;
-    case 1:
+    case IVP_SYNAPSE_EDGE:
         CalcFrictionEdgeEdge(Edge1, Edge2, &Cache1, &Cache2, NewOwner, &Situation);
         bSecondSwitch = false;
         break;
-    case 3:
+    case IVP_SYNAPSE_BALL:
         PointA.x = Cache1.cache_object->WorldTransform.vv.x;
         PointA.y = Cache1.cache_object->WorldTransform.vv.y;
         PointA.z = Cache1.cache_object->WorldTransform.vv.z;
@@ -823,17 +823,17 @@ void IVP_Contact_Point::UpdateContactFrame()
     {
         switch (static_cast<uint32_t>(ShapeTag2))
         {
-        case 0:
+        case IVP_SYNAPSE_POINT:
             IVP_Compact_Ledge_Solver::give_world_coords_AT(Edge2, &Cache2, &PointB);
             IVP_BuildPointPointContactFrame(this, &PointA, &PointB, NewOwner, &Situation);
             break;
-        case 1:
+        case IVP_SYNAPSE_EDGE:
             IVP_BuildPointEdgeContactFrame(this, &PointA, Edge2, &Cache2, NewOwner, &Situation);
             break;
-        case 2:
+        case IVP_SYNAPSE_POLY:
             IVP_BuildPointPolyContactFrame(this, &PointA, Edge2, &Cache2, NewOwner, &Situation);
             break;
-        case 3:
+        case IVP_SYNAPSE_BALL:
             IVP_BuildPointPointContactFrame(this, &PointA, &Cache2.cache_object->WorldTransform.vv, NewOwner, &Situation);
             break;
         default:
@@ -1012,9 +1012,9 @@ void IVP_Ledge_Mindist::do_impact()
 
     ++Env->sim_unit_mem->State;
 
-    if (int8_t(ObjA->core->MovementState & 0xff) < 8 && (ObjA->core->Flags & IVP_CORE_PINNED) == 0)
+    if (int8_t(ObjA->core->MovementState & 0xff) < IVP_MT_NOT_SIM && (ObjA->core->Flags & IVP_CORE_PINNED) == 0)
         ObjA->core->recalc_interpolated_frame();
-    if (int8_t(ObjB->core->MovementState & 0xff) < 8 && (ObjB->core->Flags & IVP_CORE_PINNED) == 0)
+    if (int8_t(ObjB->core->MovementState & 0xff) < IVP_MT_NOT_SIM && (ObjB->core->Flags & IVP_CORE_PINNED) == 0)
         ObjB->core->recalc_interpolated_frame();
 
     ++Env->mindist_event_stamp;
@@ -1043,9 +1043,9 @@ namespace
     {
         const IVP_Compact_Ledge* LedgeA = FeatureA->GetCompactLedge();
         const IVP_Compact_Ledge* LedgeB = FeatureB->GetCompactLedge();
-        if ((LedgeA->SizeAndFlags & 3) != 0)
+        if ((LedgeA->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) != 0)
         {
-            if ((LedgeB->SizeAndFlags & 3) == 0) return 0;
+            if ((LedgeB->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) == 0) return 0;
             if (LedgetreeNodeRadius(LedgeB) < LedgetreeNodeRadius(LedgeA)) return 0;
         }
         return 1;
@@ -1820,7 +1820,7 @@ void IVP_Mindist_Manager::recalc_all_exact_wheel_mindist()
         const float Gap = Mindist->SeparationGap;
         if (Gap >= G_IVP_MindistSettings.max_distance_for_friction)
             continue;
-        if ((Other->get_ledge()->SizeAndFlags & 3) != 0)
+        if ((Other->get_ledge()->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) != 0)
             continue;
 
         IVP_Create_Cp_In_Advance_Pretension(Mindist, Ball->l_obj, Gap); // FUN_0634fd10
@@ -2677,15 +2677,15 @@ void IVP_Ledge_Mindist::init_mindist(IVP_Real_Object* Object0, IVP_Real_Object* 
     // ---- Object1 -> Syn1 ----
     switch (Object1->object_type)
     {
-    case 2: // polygon: status 0, take a ledge reference
+    case IVP_POLYGON: // polygon: status 0, take a ledge reference
         Syn1->init_synapse_real(this, Object1);
         Syn1->set_edge(Edge1, IVP_SYNAPSE_POINT);
         Object1->surface_manager->add_reference_to_ledge(Edge1->GetCompactLedge()); // slot 7
         break;
-    case 3: // ball
+    case IVP_BALL: // ball
         // Two balls are ordered by the unsigned dword at +0xa4: Object0 keeps
         // synapse A only when it is a ball too and its value is >= Object1's.
-        if (!(Object0->object_type == 3 &&
+        if (!(Object0->object_type == IVP_BALL &&
               reinterpret_cast<uintptr_t>(Object0->client_data) >= reinterpret_cast<uintptr_t>(Object1->client_data)))
         {
             IVP_Synapse_Real* Tmp = Syn0;
@@ -2703,12 +2703,12 @@ void IVP_Ledge_Mindist::init_mindist(IVP_Real_Object* Object0, IVP_Real_Object* 
     // ---- Object0 -> Syn0 ----
     switch (Object0->object_type)
     {
-    case 2:
+    case IVP_POLYGON:
         Syn0->init_synapse_real(this, Object0);
         Syn0->set_edge(Edge0, IVP_SYNAPSE_POINT);
         Object0->surface_manager->add_reference_to_ledge(Edge0->GetCompactLedge());
         break;
-    case 3:
+    case IVP_BALL:
         Syn0->init_synapse_real(this, Object0);
         Syn0->set_edge(Edge0, IVP_SYNAPSE_BALL);
         break;

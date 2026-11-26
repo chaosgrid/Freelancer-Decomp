@@ -204,7 +204,7 @@ static char G_TriMeshProfileValue[0x400];
 static GENRESULT TriMeshPluginReadProfile(int* Flag, const FRenderPluginDesc* Desc)
 {
     if (Desc->Parent == nullptr || Desc->Engine == nullptr)
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     ICOManager* Dacom = DACOM_Acquire();
     IProfileParser* First = nullptr;
     if (Dacom->QueryInterface(Iids::ProfileParser, (void**)(&First)) < 0)
@@ -1131,13 +1131,13 @@ public:
                             Value.Payload0 = 0;
                             Candidate->GetParameterValue(8, &Value);
                             std::memcpy(&Scale, &Value.Payload0, 4);
-                            if (Value.Type == 5 || Value.Type == 7)
+                            if (Value.Type == kMaterialParamString || Value.Type == kMaterialParamTextureName)
                             {
                                 if (Value.Payload0 != 0)
                                     HeapFree(GetProcessHeap(), 0,
                                              (void*)Value.Payload0);
                             }
-                            else if (Value.Type == 6)
+                            else if (Value.Type == kMaterialParamComponent)
                             {
                                 IDAComponent* Component =
                                     (IDAComponent*)Value.Payload0;
@@ -1757,7 +1757,7 @@ public:
         LevelMax = 9;
         VertexCount = 0;
         std::memset(&Desc, 0, sizeof(Desc));
-        Desc.SrcFvf = 0x112;
+        Desc.SrcFvf = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1;
         Desc.Flags = 0;
         Radius = 1.0f;
         if (Arch == nullptr)
@@ -1993,7 +1993,7 @@ public:
                 MathEngineCached(G_MathSphere)->MulTransform(Oriented, *World, Rotation);
                 FaceWorld = Oriented;
                 int State = 1;
-                G_Pipeline->GetPipelineState(7, &State);
+                G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &State);
                 if (State != 0)
                 {
                     Transform Product;
@@ -2008,7 +2008,7 @@ public:
                 if (Material != nullptr)
                 {
                     Material->Bind(&Context);
-                    Material->Submit(&Context, 4, Geometry->BaseVertex, Geometry->VertexCount, 0,
+                    Material->Submit(&Context, D3DPT_TRIANGLELIST, Geometry->BaseVertex, Geometry->VertexCount, 0,
                                      Geometry->IndexCount, 0);
                     Material->Teardown(&Context);
                 }
@@ -2063,7 +2063,7 @@ public:
             if (Atmosphere != nullptr)
             {
                 Atmosphere->Bind(&Context);
-                Atmosphere->Submit(&Context, 4, Geometry->BaseVertex, Geometry->VertexCount, 0,
+                Atmosphere->Submit(&Context, D3DPT_TRIANGLELIST, Geometry->BaseVertex, Geometry->VertexCount, 0,
                                    Geometry->IndexCount, 0);
                 Atmosphere->Teardown(&Context);
             }
@@ -2443,7 +2443,7 @@ GENRESULT CreateSphereMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
     }
     GENRESULT Result = GR_OK;
     if (Desc->Parent == nullptr || Desc->Engine == nullptr)
-        Result = (GENRESULT)0xFFFFFFFE;
+        Result = GR_INVALID_PARMS;
     if (Result != GR_OK)
     {
         delete Plugin;

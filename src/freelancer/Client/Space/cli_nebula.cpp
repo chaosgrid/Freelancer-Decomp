@@ -32,6 +32,7 @@
 #include "render/IRenderPipeline.h"
 #include "render/rendcomp.h"
 #include "render/shading.h"
+#include "render/slots.h"      // Render::EDeviceAbility
 #include "x86math.h"
 
 #include <list>
@@ -173,16 +174,16 @@ void FogApplyColorAndRange(float const* Rgb3, float FogStart, float FogEnd)
     // Pipeline vt+0x20 queries device ability 0xd (W-fog), preset to 0. (GetPipelineState,
     // vt+0x18, reads an unrelated setting.)
     unsigned long WFogAbility = 0;
-    DALib::Pipeline->QueryDeviceAbility(0xd, &WFogAbility);
+    DALib::Pipeline->QueryDeviceAbility(Render::FogW, &WFogAbility);
     if (WFogAbility == 0)
     {
-        DALib::Pipeline->SetRenderState(D3DRS_FOGTABLEMODE, 0);
-        DALib::Pipeline->SetRenderState(D3DRS_FOGVERTEXMODE, 3);
+        DALib::Pipeline->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_NONE);
+        DALib::Pipeline->SetRenderState(D3DRS_FOGVERTEXMODE, D3DFOG_LINEAR);
     }
     else
     {
-        DALib::Pipeline->SetRenderState(D3DRS_FOGTABLEMODE, 3);
-        DALib::Pipeline->SetRenderState(D3DRS_FOGVERTEXMODE, 0);
+        DALib::Pipeline->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_LINEAR);
+        DALib::Pipeline->SetRenderState(D3DRS_FOGVERTEXMODE, D3DFOG_NONE);
         DALib::Pipeline->SetRenderState(D3DRS_RANGEFOGENABLE, 0);
     }
 
@@ -267,7 +268,7 @@ namespace
             Dir.z = static_cast<float>(static_cast<float>(X) * static_cast<double>(Inv));
             EngineLightSetDirection(Light, &Dir);
             // Lit (+0xb4 bit 3) -> GameLight vt+8 (disable).
-            if ((Light->Flags & 0x08) != 0)
+            if ((Light->Flags & kLightFlagEnabled) != 0)
                 GameLightVirtualDisable(GLight);
             return;
         }
@@ -308,7 +309,7 @@ namespace
         Rgba[3] = 0xff;
         EngineLightSetColorBytes(Light, Rgba);
         // Not lit -> GameLight vt+4 (enable).
-        if ((Light->Flags & 0x08) == 0)
+        if ((Light->Flags & kLightFlagEnabled) == 0)
             GameLightEnable(Light);
     }
 
@@ -1534,7 +1535,7 @@ namespace
 
         Win3DDisable(kWin3DCullFace);
         Win3DEnable(kWin3DBlend);
-        Win3DSetBlendFunc(2, 2);
+        Win3DSetBlendFunc(kWin3DBlendOne, kWin3DBlendOne);
         Win3DSetDepthWrite(0);
 
         // The red product stays on the FPU between the two multiplies; green and blue are
@@ -1760,7 +1761,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                       "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x32a, 500000.0);
                 This->DynamicLight = nullptr;
             }
-            else if ((Light->Flags & 0x08) != 0)
+            else if ((Light->Flags & kLightFlagEnabled) != 0)
             {
                 GameLightVirtualDisable(Light);
             }
@@ -1816,10 +1817,10 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
         Win3DDisable(kWin3DLightingCap);
         Win3DSetDepthWrite(0);
         Win3DDisable(kWin3DDepthTest);
-        Win3DDisable(0xde1); // GL_TEXTURE_2D
+        Win3DDisable(kWin3DTexture2D); // GL_TEXTURE_2D
         Win3DEnable(kWin3DBlend);
         Win3DDisable(kWin3DCullFace);
-        Win3DSetBlendFunc(5, 6);
+        Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
         Win3DBegin(kWin3DQuads);
         float const* Rgb = This->FogColor;
         Win3DColor4f(Rgb[0], Rgb[1], Rgb[2], Alpha);
@@ -1918,7 +1919,7 @@ void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
     Win3DSetDepthWrite(1);
     Win3DEnable(kWin3DDepthTest);
-    Win3DDisable(0xb60); // GL_FOG
+    Win3DDisable(kWin3DFog); // GL_FOG
 }
 
 // LAB_00508f20 — exclusion-shell mesh draw, only while Update found a shell for the current
@@ -1971,12 +1972,12 @@ void FNebulaEffect::DrawExclusionShell(void* Camera)
 
     if (Shell->Handle.EngineInstance != InvalidInstanceIndex)
     {
-        DALib::Renderer->RenderInstance(Camera, Shell->Handle.EngineInstance, 1.0f, 0x108u, nullptr,
+        DALib::Renderer->RenderInstance(Camera, Shell->Handle.EngineInstance, 1.0f, kDrawNoCull | kDrawPickSwitch, nullptr,
                               nullptr);
     }
 
     SetMaterialBatchBinOrder(1u, 1);
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 2);
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
     DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, SavedRs8b);
     Win3DSetDepthWrite(1);
@@ -2799,7 +2800,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
         Nebula->FogStart = static_cast<float>(Near);
         Nebula->FogEnd = static_cast<float>(Near + Nebula->FogDistance);
         FGameLight* const Light = Nebula->DynamicLight;
-        if (Light != nullptr && (Light->Flags & 0x08) != 0)
+        if (Light != nullptr && (Light->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Light);
     }
 
@@ -2992,7 +2993,7 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     Win3DDisable(kWin3DDepthTest);
     Win3DEnable(kWin3DBlend);
     Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0));
-    Win3DSetBlendFunc(5, 6);
+    Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
     Win3DBegin(kWin3DQuads);
 
     float const* const Fog = Nebula->FogColor;
@@ -3081,7 +3082,7 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
         AcquireNebulaMath()->InverseTransform(ZoneView, View, ZoneWorld);
         float const Center[3] = { ZoneView.x, ZoneView.y, ZoneView.z };
         float const ZoneRadius = Nebula->Zone->GetRadius();
-        if (static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)Center, ZoneRadius)) < 3)
+        if (static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)Center, ZoneRadius)) < kSphereStraddling)
             return;
     }
 
@@ -3371,7 +3372,7 @@ void FNebulaEffect::Shutdown()
     FGameLight* const Ambient = Nebula->DynamicLight;
     if (Ambient != nullptr)
     {
-        if ((Ambient->Flags & 0x08) != 0)
+        if ((Ambient->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Ambient);
         GameLightRelease(Nebula->DynamicLight);
     }

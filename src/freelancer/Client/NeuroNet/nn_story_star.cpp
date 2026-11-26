@@ -8,6 +8,8 @@
 
 #include "NeuroNet/nn_story_star.h"
 
+#include "common_server.h"                 // MissionMessageType
+
 #include "NeuroNet/Economy/best_path.h"            // G_BestPaths (DAT_00672950), BestPathGetWaypoint(Count)
 #include "Core/client_state.h"         // QueueLoadGameCharacter (FUN_005b2c70)
 #include "Common/Fonts/font_string.h"          // FFontString (+0x28 LayoutGen, +0x30 bMultiLine)
@@ -173,10 +175,10 @@ void StoryStarOnMissionMessage(FmtStr const* Text, int Type)
         }
         else
         {
-            // 7 queues, 8 records, 9 does both; 4, 6 and the rest nothing.
-            if (Type == 7 || Type == 9)
+            // OBJECTIVE queues, HISTORY records, OBJECTIVE_HISTORY does both; 4, 6 and the rest nothing.
+            if (Type == MISSION_MSG_OBJECTIVE || Type == MISSION_MSG_OBJECTIVE_HISTORY)
                 StoryStarPushPending(Text);
-            if (Type == 8 || Type == 9)
+            if (Type == MISSION_MSG_HISTORY || Type == MISSION_MSG_OBJECTIVE_HISTORY)
                 StoryStarAddHistory(Text);
             return;
         }
@@ -544,7 +546,7 @@ void StoryStarTick()
         G_StoryStarRankUp = 0;
         G_StoryStarPending.push_front(RankUp);
         StoryStarResolveIds(&G_StoryStarPending.front());
-        PlayOrRewindUiSoundSlot(0x27);
+        PlayOrRewindUiSoundSlot(kUiSoundGainLevel);
     }
 
     Win3D* const Window = WinFactoryCreate("MissionObjectiveWindow", "MissionObjectiveWindow",
@@ -605,7 +607,7 @@ bool MissionObjectiveWindow::Create(Win3D* NewParent, void* Data)
     // The banner sound, unless it announces a rank-up. The only maker (FUN_004bc990) creates
     // it with the pending list non-empty; retail's null test at 0x004bb2e3 is dead.
     if (G_StoryStarPending.front().MadLibId != kIdsRankUp)
-        PlayOrRewindUiSoundSlot(0xf);
+        PlayOrRewindUiSoundSlot(kUiSoundNewStoryStar);
 
     // After more than half a second idle the log icon flies back out of the button (unless it
     // already does).
@@ -954,7 +956,7 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
     SetMissionMode(bMission);
 
     SetOffset(0.0f, 0.0f, 0.0f);
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     return Win3D::Create(NewParent, Data);
 }
 
@@ -978,10 +980,10 @@ void NeuroNetStoryStar::SetMissionMode(bool bMission)
     {
         uintptr_t const bOn = bMission ? 1u : 0u;
         uintptr_t const bOff = bMission ? 0u : 1u;
-        MissionButton->SetProperty(0xc, bOn, 0);
-        MissionText->SetProperty(0xc, bOn, 0);
-        LogButton->SetProperty(0xc, bOff, 0);
-        LogText->SetProperty(0xc, bOff, 0);
+        MissionButton->SetProperty(kWinPropLit, bOn, 0);
+        MissionText->SetProperty(kWinPropLit, bOn, 0);
+        LogButton->SetProperty(kWinPropLit, bOff, 0);
+        LogText->SetProperty(kWinPropLit, bOff, 0);
     }
 
     RebuildHistoryText();
@@ -997,7 +999,7 @@ bool NeuroNetStoryStar::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         // Onto the parent's position, shown.
         if (Parent != nullptr)
             SetPosition(&Parent->Position);
-        Flags = static_cast<unsigned char>(Flags | 3);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return true;
     }
     if (Msg == kWinMsgHide)
@@ -1047,7 +1049,7 @@ intptr_t NeuroNetStoryStar::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         NnMainButtonOnModalOpen();
         NavBarCloseService(true);
-        OpenNnLoadSave(3); // FUN_00488970(3)
+        OpenNnLoadSave(kNnLoadSaveModeStoryStar); // FUN_00488970(3)
         return 1;
     }
     if (Clicked == MainMenuButton)
@@ -1256,7 +1258,7 @@ void NeuroNetStoryStar::LoadAutosave()
     // Not found: the load/save screen instead.
     FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp",
           0x6db, "Failed to find character to reload\n");
-    OpenNnLoadSave(3);
+    OpenNnLoadSave(kNnLoadSaveModeStoryStar);
 }
 
 void NeuroNetStoryStar::Draw()

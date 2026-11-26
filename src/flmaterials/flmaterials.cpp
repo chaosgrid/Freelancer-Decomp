@@ -115,7 +115,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // Validate size and name, construct the object and its controller, then Slot22.
-            if (Desc->size != 0x14)
+            if (Desc->size != sizeof(FMaterialAggregateDesc))
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -157,7 +157,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // LAB_066fd830: descriptor and result pointer are mandatory.
-            if (Desc->size != 0x18)
+            if (Desc->size != sizeof(FAggDesc18))
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;

@@ -547,7 +547,7 @@ namespace
 
         int const LastRing = static_cast<int>(Rings->size()) - 1;
         bool bMiddle;
-        if (Request->ZoneList != 0)
+        if (Request->ZoneList != kSpawnZonesAtShip)
             bMiddle = true;
         else if (!*bInLaneZone || Nearest == 0 || Nearest == LastRing)
             bMiddle = false;
@@ -638,7 +638,7 @@ namespace
         std::vector<std::vector<FTradeLaneRing>> Lanes;
         *OutRingId = 0;
         bool bInLaneZone;
-        if (Zone != nullptr && Zone->bTradelane && Request->ZoneList == 0)
+        if (Zone != nullptr && Zone->bTradelane && Request->ZoneList == kSpawnZonesAtShip)
         {
             bInLaneZone = true;
             System->FindTradeLaneRingListsNear(&Request->Placement.Position, 5000.0f, &Lanes); // FUN_06f76970
@@ -825,7 +825,7 @@ namespace
     bool PlaceOnTradeLane(FSpawnRequest const* Request, FSystemInfo* System, FSystemZone* Zone,
                           FSpawnPlan* Plan, std::list<FContentNpcShipParams>* Blocks)
     {
-        float const Offset = Request->ZoneList == 2 ? 0.0f : 3750.0f;
+        float const Offset = Request->ZoneList == kSpawnZonesAhead ? 0.0f : 3750.0f;
         unsigned int RingId;
         unsigned int NextRingId;
         Vector Position;
@@ -1406,7 +1406,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
             FPatrolPath* Path = Plan->Path;
             int First = -1;
             int Last = -1;
-            if ((Path->Usage & 0x10) != 0)
+            if ((Path->Usage & kPathUsageTrade) != 0)
             {
                 if (Plan->PathDirection == 1)
                 {
@@ -1521,7 +1521,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
         int const LastPoint = static_cast<int>(Path->Points.size()) - 1;
         int First;
         int Last;
-        if ((Path->Usage & 0x10) != 0)
+        if ((Path->Usage & kPathUsageTrade) != 0)
         {
             if (Plan->PathDirection == 1)
             {
@@ -1554,7 +1554,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
         int SecondLast;
         if (!Path->bLoop)
         {
-            if ((Path->Usage & 0x10) != 0)
+            if ((Path->Usage & kPathUsageTrade) != 0)
             {
                 if (Plan->PathDirection == 1)
                 {

@@ -27,6 +27,13 @@ class UiRichTextWin;
 class UiTextEdit;
 class UiTextMsgButton;
 
+// The button commands PageAccountSelect::ProcessMessage receives with kWinMsgCommand.
+enum EAccountSelectCommand
+{
+    kAccountCmdBack = 0x3e9,
+    kAccountCmdSelectServer = 0x3ea
+};
+
 class PageAccountSelect : public UIPage::MasterWin
 {
 public:

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "MaterialBatcher.h"
+#include "render/slots.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
 #include <algorithm>
@@ -174,7 +175,7 @@ static double ComputeBatchPositionDepth(const FBatchRecord& Record, const float*
 
 static float ComputeBatchDepth(const FBatchRecord& Record)
 {
-    if ((Record.Flags & 0x20) != 0)
+    if ((Record.Flags & kMaterialSubmitSortDepth) != 0)
     {
         const unsigned long Bits = (unsigned long)Record.SortDepth;
         float Depth;
@@ -447,7 +448,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
         return GR_GENERIC;
     }
     ParseBatchedMaterials();
-    Bin1SortOrder = ReadBatcherProfileUnsigned(Manager, Parser, "Bin1SortOrder", 2);
+    Bin1SortOrder = ReadBatcherProfileUnsigned(Manager, Parser, "Bin1SortOrder", kBatchSortAscending);
     BinOrder[0] = 0;
     FBatchBin* FirstBin = new FBatchBin();
     // LAB_06ec8b3c overwrites the old bin pointer without destroying it; the leak on a
@@ -506,9 +507,9 @@ void FMaterialBatcher::ParseBatchedMaterials()
                         --ValueEnd;
                     ValueEnd[1] = '\0';
                     if (_stricmp(Key, "type") == 0)
-                        AddRule(1, Value);
+                        AddRule(kBatchRuleType, Value);
                     else if (_stricmp(Key, "name") == 0)
-                        AddRule(2, Value);
+                        AddRule(kBatchRuleName, Value);
                 }
                 ++LineIndex;
             }
@@ -551,10 +552,10 @@ void FMaterialBatcher::FlushOne(FBatchBin* Bin, unsigned char Clear)
     case 1:
         WarnMalformedBatchSort();
         break;
-    case 2:
-    case 3:
-    case 4:
-    case 5:
+    case kBatchSortAscending:
+    case kBatchSortDescending:
+    case kBatchSortAscendingTriangles:
+    case kBatchSortDescendingTriangles:
         ProcessQueuedBin(Bin);
         break;
     case 6:
@@ -573,10 +574,10 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
 {
     FBatchDispatch* Dispatch = (FBatchDispatch*)AllocateScratch(Bin->RecordCount * sizeof(FBatchDispatch));
     BuildBatchDispatch(Bin, Dispatch);
-    const bool bSortTriangles = Bin->SortKind == 4 || Bin->SortKind == 5;
-    if (Bin->SortKind == 2 || Bin->SortKind == 4)
+    const bool bSortTriangles = Bin->SortKind == kBatchSortAscendingTriangles || Bin->SortKind == kBatchSortDescendingTriangles;
+    if (Bin->SortKind == kBatchSortAscending || Bin->SortKind == kBatchSortAscendingTriangles)
         std::qsort(Dispatch, Bin->RecordCount, sizeof(FBatchDispatch), CompareBatchDispatchAscending);
-    else if (Bin->SortKind == 3 || Bin->SortKind == 5)
+    else if (Bin->SortKind == kBatchSortDescending || Bin->SortKind == kBatchSortDescendingTriangles)
         std::qsort(Dispatch, Bin->RecordCount, sizeof(FBatchDispatch), CompareBatchDispatchDescending);
 
     IBatchedMaterial* Active = nullptr;
@@ -609,9 +610,9 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
                 Depth += ComputeBatchPositionDepth(Record, Positions + Triangle.PositionIndices[0] * 3);
                 Triangle.Key = (float)(Depth * (double)0.3333333432674408f);
             }
-            if (Bin->SortKind == 4)
+            if (Bin->SortKind == kBatchSortAscendingTriangles)
                 std::qsort(Triangles, TriangleCount, sizeof(FBatchTriangle), CompareBatchTriangleAscending);
-            else if (Bin->SortKind == 5)
+            else if (Bin->SortKind == kBatchSortDescendingTriangles)
                 std::qsort(Triangles, TriangleCount, sizeof(FBatchTriangle), CompareBatchTriangleDescending);
             if ((Record.InternalFlags & 1) == 0)
             {
@@ -626,15 +627,15 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
                 Destination[TriangleIndex * 3 + 2] = Triangles[TriangleIndex].Indices[2];
             }
         }
-        if ((Record.Flags & 0x100) != 0)
+        if ((Record.Flags & kMaterialSubmitUseBuffers) != 0)
         {
             if (RpVertexBuffer->SelectVb(Record.VertexBufferListing.VertexBuffer) < 0 ||
                 RpIndexBuffer->SelectIb(Record.IndexBufferScratch.IndexBuffer,
                                         Record.VertexBufferListing.BaseVertex, 0, 0) < 0)
-                Record.Flags &= ~0x100UL;
+                Record.Flags &= ~(unsigned long)kMaterialSubmitUseBuffers;
         }
         int StateValue = 1;
-        Pipeline->GetPipelineState(7, &StateValue);
+        Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &StateValue);
         if (StateValue != 0)
             Pipeline->SetModelview(&Record.Combined);
         else
@@ -847,7 +848,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
         Source->World, sizeof(Record.MatrixDataA));
     std::memcpy(&Record.MatrixDataB,
         Source->View, sizeof(Record.MatrixDataB));
-    if ((QueuedFlags & 0x100) != 0)
+    if ((QueuedFlags & kMaterialSubmitUseBuffers) != 0)
     {
         const FVbListing* Listing = Source->VbListing;
         const FIbScratch* Scratch = Source->IbScratch;
@@ -859,12 +860,12 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     else
         Record.Context.VbListing = nullptr;
     const FRpVertexSrcDesc* VertexSource = Source->SourceVertices;
-    if ((QueuedFlags & 4) != 0)
+    if ((QueuedFlags & kMaterialSubmitKeepVertices) != 0)
         Record.Context.SourceVertices = VertexSource;
     else
         Record.Context.SourceVertices = CloneVertexSource(*VertexSource);
     unsigned short* IndexSource = Source->Indices;
-    if ((Record.Flags & 8) != 0)
+    if ((Record.Flags & kMaterialSubmitKeepIndices) != 0)
         Record.Context.Indices = IndexSource;
     else
     {

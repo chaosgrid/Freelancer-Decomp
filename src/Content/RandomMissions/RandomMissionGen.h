@@ -112,6 +112,14 @@ struct FRmDifficultyWindowList
     void PushBack(FRmDifficultyWindow const* Window);                  // FUN_06f9f860
 };
 
+// FRmOfferTextEntry::Form, the "singular" / "plural" keywords of an offer_text entry.
+enum ERmOfferTextForm
+{
+    kRmOfferTextSingular = 1,
+    kRmOfferTextPlural = 2,
+    kRmOfferTextDefault = 3
+};
+
 // TU63 -- one "offer_text" line entry (retail 0x18 bytes).
 struct FRmOfferTextEntry
 {
@@ -560,6 +568,13 @@ extern FRandomMissionGenerator* GRandomMissionGenerator;  // DAT_06fcf25c
 // DAT_06fd3d90: vector of 0x1c-byte records, static init LAB_06fa66e0, atexit FUN_06fa6710
 // (record dtor FUN_06fa6d20).
 // ---------------------------------------------------------------------------------------
+// The gender bits of FVoiceProperties::Flags ("gender = male / female" of voice_properties.ini).
+enum EVoiceGender : unsigned int
+{
+    kVoiceGenderMale = 0x1,
+    kVoiceGenderFemale = 0x2
+};
+
 struct FVoiceProperties                             // retail 0x1c bytes
 {
     unsigned int VoiceId;                           // +0x00 pub::GetVoiceID("voice")

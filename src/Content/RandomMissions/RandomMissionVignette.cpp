@@ -281,7 +281,7 @@ void FRmVignetteMachine::ClearShipTargets()
 {
     RemoveObjective(RmObjKillShips);
     RemoveObjective(RmObjKillBigShips);
-    FRmRecordList Flagged = Ships->Query(0, 2, 2);
+    FRmRecordList Flagged = Ships->Query(0, RmRecordAlive, RmRecordFlagTarget);
     for (std::list<FRmSpawnRecord*>::iterator It = Flagged.Records.begin();
          It != Flagged.Records.end(); ++It)
     {
@@ -299,7 +299,7 @@ void FRmVignetteMachine::ClearSolarTargets()
 {
     RemoveObjective(RmObjKillBigSolar);
     RemoveObjective(RmObjKillOtherSolars);
-    FRmRecordList Flagged = Solars->Query(-1, 2, 2);
+    FRmRecordList Flagged = Solars->Query(-1, RmRecordAlive, RmRecordFlagTarget);
     for (std::list<FRmSpawnRecord*>::iterator It = Flagged.Records.begin();
          It != Flagged.Records.end(); ++It)
     {
@@ -347,9 +347,9 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
              It != Members.Records.end(); ++It)
         {
             int const Kind = static_cast<FRmShipRecord*>(*It)->Kind;
-            if (Kind == 1)
+            if (Kind == RmShipKindDefensive)
                 bDefensive = true;
-            else if (Kind == 2)
+            else if (Kind == RmShipKindBig)
                 bBig = true;
         }
         if (!bBigShipSpawnSent && bBig)
@@ -396,15 +396,15 @@ void FRmVignetteMachine::OnFlaggedShipsLost(unsigned int ObjectId)
 {
     FRmShipRecord* Record = static_cast<FRmShipRecord*>(Ships->Records.FindById(ObjectId));
     int const Kind = Record->Kind;
-    if (Kind == 2)
+    if (Kind == RmShipKindBig)
     {
-        FRmRecordList Left = Ships->Query(2, 2, 2);
+        FRmRecordList Left = Ships->Query(RmShipKindBig, RmRecordAlive, RmRecordFlagTarget);
         if (Left.Records.size() == 0)
             RemoveObjective(RmObjKillBigShips);
     }
-    else if (Kind == 1)
+    else if (Kind == RmShipKindDefensive)
     {
-        FRmRecordList Left = Ships->Query(1, 2, 2);
+        FRmRecordList Left = Ships->Query(RmShipKindDefensive, RmRecordAlive, RmRecordFlagTarget);
         if (Left.Records.size() == 0)
             RemoveObjective(RmObjKillShips);
     }
@@ -451,7 +451,7 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
     for (std::list<FRmSpawnRecord*>::iterator It = Members->Records.begin();
          It != Members->Records.end(); ++It)
     {
-        if (((*It)->Flags & 2) != 0)
+        if (((*It)->Flags & RmRecordFlagTarget) != 0)
         {
             Flagged = static_cast<FRmShipRecord*>(*It);
             break;
@@ -467,15 +467,15 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
         {
             // The component's objective marks the members; AddObjective is inlined in retail.
             static_cast<FRmObjectiveType3*>(Map->Objectives[Key])
-                ->SetTargetRecords(Members, GetMissionPlayers(), 2, SystemId, Position);
+                ->SetTargetRecords(Members, GetMissionPlayers(), RmRecordFlagTarget, SystemId, Position);
             AddObjective(Key, static_cast<FRmObjective*>(Map->Objectives[Key]));
         }
         else
         {
             // The active objective marks every alive flagged ship of the kind.
-            FRmRecordList SameKind = Ships->Query(Flagged->Kind, 2, 2);
+            FRmRecordList SameKind = Ships->Query(Flagged->Kind, RmRecordAlive, RmRecordFlagTarget);
             static_cast<FRmObjectiveType3*>(*Active)
-                ->SetTargetRecords(&SameKind, GetMissionPlayers(), 2, SystemId, Position);
+                ->SetTargetRecords(&SameKind, GetMissionPlayers(), RmRecordFlagTarget, SystemId, Position);
             RebuildObjective((*Active)->Key);
         }
         RemoveObjective(RmObjDontKillShips);
@@ -671,9 +671,9 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         std::vector<FRmObjective*>::iterator Active = FindObjective(Key);
         if (Active != ActiveObjectives.end())
         {
-            FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, 2, 0, 2, 0);
+            FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, RmLootCritical, 0, RmRecordAlive, 0);
             static_cast<FRmObjectiveType3*>(*Active)
-                ->SetTargetRecords(&Critical, Mission->GetPlayerStates(), 2, SystemId, Where);
+                ->SetTargetRecords(&Critical, Mission->GetPlayerStates(), RmRecordFlagTarget, SystemId, Where);
             RebuildObjective((*Active)->Key);
         }
         else
@@ -681,7 +681,7 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
             FRmRecordList Critical;
             Critical.Records.push_back(Record);
             static_cast<FRmObjectiveType3*>(RmComponentObjective(&VignetteOffer->General, Key))
-                ->SetTargetRecords(&Critical, Mission->GetPlayerStates(), 2, SystemId, Where);
+                ->SetTargetRecords(&Critical, Mission->GetPlayerStates(), RmRecordFlagTarget, SystemId, Where);
             AddObjective(Key, static_cast<FRmObjective*>(
                                   RmComponentObjective(&VignetteOffer->General, Key)));
         }
@@ -967,10 +967,10 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
         if (RmHasUnspawnedGroup(&VignetteOffer->TargetShips.Groups))
             return true;
         // Built and kept to the end unread, as retail.
-        FRmRecordList Flagged = Ships->Query(0, 2, 2);
+        FRmRecordList Flagged = Ships->Query(0, RmRecordAlive, RmRecordFlagTarget);
         bool bNoneAlive = false;
         {
-            FRmRecordList Alive = Ships->Query(0, 2, 0);
+            FRmRecordList Alive = Ships->Query(0, RmRecordAlive, 0);
             bNoneAlive = Alive.Records.size() == 0;
         }
         if (bNoneAlive)
@@ -1170,14 +1170,14 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
         FRmSolarRecord* Record = static_cast<FRmSolarRecord*>(Solars->Records.FindById(SolarId));
         size_t TypeLeft = 0;
         {
-            FRmRecordList Left = Solars->Query(Record->SolarType, 2, 2);
+            FRmRecordList Left = Solars->Query(Record->SolarType, RmRecordAlive, RmRecordFlagTarget);
             TypeLeft = Left.Records.size();
         }
         if (TypeLeft != 0)
             return true;
-        if (Record->SolarType == 0)
+        if (Record->SolarType == kRmSolarBig)
             RemoveObjective(RmObjKillBigSolar);
-        else if (Record->SolarType == 1)
+        else if (Record->SolarType == kRmSolarDefensive)
             RemoveObjective(RmObjKillOtherSolars);
         size_t AnyLeft = 0;
         {
@@ -1198,7 +1198,7 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
             return true;
         // Retail searches key 7 through the FUN_06f90a40 getter here.
         std::vector<FRmObjective*>::iterator Big = ActiveObjectives.begin();
-        while (Big != ActiveObjectives.end() && (*Big)->Key != 7)
+        while (Big != ActiveObjectives.end() && (*Big)->Key != RmObjKillBigShips)
             ++Big;
         if (Big != ActiveObjectives.end())
             return true;
@@ -1369,14 +1369,14 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
         FRmSolarRecord* Record = static_cast<FRmSolarRecord*>(Solars->Records.FindById(SolarId));
         bool bTypeGone = false;
         {
-            FRmRecordList Left = Solars->Query(Record->SolarType, 2, 2);
+            FRmRecordList Left = Solars->Query(Record->SolarType, RmRecordAlive, RmRecordFlagTarget);
             bTypeGone = Left.Records.empty();
         }
         if (!bTypeGone)
             return true;
-        if (Record->SolarType == 0)
+        if (Record->SolarType == kRmSolarBig)
             RemoveObjective(RmObjKillBigSolar);
-        else if (Record->SolarType == 1)
+        else if (Record->SolarType == kRmSolarDefensive)
             RemoveObjective(RmObjKillOtherSolars);
         if (ActiveObjectives.size() == 1 &&
             FindObjective(RmObjDontKillShips) != ActiveObjectives.end())

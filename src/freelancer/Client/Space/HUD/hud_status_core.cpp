@@ -262,8 +262,8 @@ bool HUD_Core::OnEvent(unsigned MsgId)
     if (bStatusOpen == 0 && Target->bExpanded == 0)
     {
         // Both closed -- both open, the target panel re-read from DAT_00674b04.
-        static_cast<EventHandler*>(Status)->OnEvent(0x6d);
-        static_cast<EventHandler*>(G_HudTargetPanel)->OnEvent(0x6d);
+        static_cast<EventHandler*>(Status)->OnEvent(USER_MINIMIZE_HUD);
+        static_cast<EventHandler*>(G_HudTargetPanel)->OnEvent(USER_MINIMIZE_HUD);
         NnMainButtonOnModalOpen();
         return true;
     }
@@ -272,12 +272,12 @@ bool HUD_Core::OnEvent(unsigned MsgId)
     // command, from a fresh DAT_00674b04 when the status panel was open).
     if (bStatusOpen != 0)
     {
-        static_cast<EventHandler*>(Status)->OnEvent(0x6d);
+        static_cast<EventHandler*>(Status)->OnEvent(USER_MINIMIZE_HUD);
         Target = G_HudTargetPanel;
     }
     if (Target->bExpanded != 0)
     {
-        static_cast<EventHandler*>(Target)->OnEvent(0x6d);
+        static_cast<EventHandler*>(Target)->OnEvent(USER_MINIMIZE_HUD);
     }
     NnMainButtonOnModalOpen();
     return true;
@@ -369,7 +369,7 @@ void HUD_Core::DrawBars(float DesignY, unsigned long Color, float Ratio)
     IRenderPipeline* const Pipe = DALib::Pipeline;
     int Saved = 0;
     Pipe->GetRenderState(D3DRS_ZFUNC, &Saved);
-    Pipe->SetRenderState(D3DRS_ZFUNC, 8);
+    Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
     ScreenQuadFlush(Pipe, G_HudCoreListKey); // FUN_00403ea0(Pipe, DAT_00674980)
     Pipe->SetRenderState(D3DRS_ZFUNC, Saved);
 }
@@ -558,10 +558,24 @@ namespace
 {
     // The 0x3b command ids the ctor registers on its handler, in order.
     unsigned const kStatusCommandIds[0x3b] = {
-        0x5e, 0xbc, 0xc0, 0xc1, 0xbd, 0xbe, 0x3a, 0x3c, 0x3b, 0x3e, 0x3d, 0x56, 0x57, 0xa1, 0xa2,
-        0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0x97, 0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d,
-        0x9e, 0x9f, 0xa0, 0xab, 0xac, 0xad, 0xae, 0xaf, 0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
-        0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x8f, 0x90, 0x0f, 0xb7, 0xb8, 0xb9, 0xba, 0x6f,
+        USER_STATUS, USER_LAUNCH_MISSILES, USER_LAUNCH_TORPEDOS, USER_LAUNCH_CRUISE_DISRUPTORS,
+        USER_LAUNCH_MINES, USER_LAUNCH_COUNTERMEASURES, USER_AFTERBURN, USER_AFTERBURN_ON,
+        USER_AFTERBURN_OFF, USER_TOGGLE_AUTO_LEVEL, USER_TOGGLE_AUTO_AVOIDANCE,
+        USER_SWITCH_TO_PLAYER_SHIP, USER_SWITCH_TO_WEAPON_LIST, USER_FIRE_WEAPON1,
+        USER_FIRE_WEAPON2,
+        USER_FIRE_WEAPON3, USER_FIRE_WEAPON4, USER_FIRE_WEAPON5, USER_FIRE_WEAPON6,
+        USER_FIRE_WEAPON7, USER_FIRE_WEAPON8, USER_FIRE_WEAPON9, USER_FIRE_WEAPON10,
+        USER_TOGGLE_WEAPON1, USER_TOGGLE_WEAPON2, USER_TOGGLE_WEAPON3, USER_TOGGLE_WEAPON4,
+        USER_TOGGLE_WEAPON5, USER_TOGGLE_WEAPON6, USER_TOGGLE_WEAPON7,
+        USER_TOGGLE_WEAPON8, USER_TOGGLE_WEAPON9, USER_TOGGLE_WEAPON10, USER_FIRE_WEAPON_GROUP1,
+        USER_FIRE_WEAPON_GROUP2, USER_FIRE_WEAPON_GROUP3, USER_FIRE_WEAPON_GROUP4,
+        USER_FIRE_WEAPON_GROUP5, USER_FIRE_WEAPON_GROUP6, USER_ASSIGN_WEAPON_GROUP1,
+        USER_ASSIGN_WEAPON_GROUP2, USER_ASSIGN_WEAPON_GROUP3, USER_ASSIGN_WEAPON_GROUP4,
+        USER_ASSIGN_WEAPON_GROUP5, USER_ASSIGN_WEAPON_GROUP6,
+        USER_WEAPON_GROUP1, USER_WEAPON_GROUP2, USER_WEAPON_GROUP3, USER_WEAPON_GROUP4,
+        USER_WEAPON_GROUP5, USER_WEAPON_GROUP6, USER_REPAIR_HEALTH, USER_REPAIR_SHIELD,
+        USER_CANCEL, USER_REMAPPABLE_LEFT, USER_REMAPPABLE_RIGHT, USER_REMAPPABLE_UP,
+        USER_REMAPPABLE_DOWN, USER_COLLECT_LOOT,
     };
 
     // .rdata 0x005d86b8: the wide placeholder both count texts start with (raw bytes
@@ -679,7 +693,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     ToggleButton = CreateButtonControl("HudStatusOpen", "interface\\hud\\hud_ShipInfo_button.3db",
                                        nullptr, "ui_window_open", nullptr, &HomePosition,
                                        nullptr, &OpenHalf, 0, 1, 0, 0, 0x3ff, 0, 0);
-    ToggleButton->SetProperty(0x36, 1, 0);
+    ToggleButton->SetProperty(kButtonPropSpin, 1, 0);
 
     // Ten rows. Step = float(Index * 0.018f) (DAT_005d3ee8). The number column is -0.199f
     // (DAT_005d8768) - Step; the name and ammo columns are -0.199 (the double DAT_005d8750)
@@ -725,7 +739,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     Vector const RepairPos = {0.341f, -0.371f, 0.0f};
     RepairButton = CreateButtonControl("HudRepairButton", "interface\\hud\\HUD_repairactivate.3db",
                                        nullptr, "ui_item_select", nullptr, &RepairPos, nullptr,
-                                       &SmallHalf, 0, 1, 0, 0, 0x43e, 0, 0x8f);
+                                       &SmallHalf, 0, 1, 0, 0, 0x43e, 0, USER_REPAIR_HEALTH);
     Vector const RepairCountPos = {0.347f, -0.359f, 0.0f};
     RepairCountText = CreateTextControl("RepairCountText", "HudSmall", &RepairCountPos, nullptr,
                                         0.034f, 0.03f, 0.8f, 0, 1, 0x4b2, 1);
@@ -736,7 +750,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     UseBatteryButton = CreateButtonControl("UseBatteryButton",
                                            "interface\\hud\\HUD_shieldgaugeicon.3db", nullptr,
                                            "ui_item_select", nullptr, &BatteryPos, nullptr,
-                                           &SmallHalf, 0, 1, 0, 0, 0x4b5, 0, 0x90);
+                                           &SmallHalf, 0, 1, 0, 0, 0x4b5, 0, USER_REPAIR_SHIELD);
     Vector const BatteryCountPos = {0.404f, -0.359f, 0.0f};
     BatteryCountText = CreateTextControl("BatteryCountText", "HudSmall", &BatteryCountPos, nullptr,
                                          0.034f, 0.03f, 0.8f, 0, 1, 0x4b3, 1);
@@ -755,16 +769,16 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     Vector const CancelPos = {-0.513f, -0.321f, 0.0f};
     SpecialModeTextCancel = CreateTextControl("SpecialModeTextCancel", "Normal", &CancelPos,
                                               nullptr, 1.028f, 0.03f, 1.3f, 0, 1, 0, 1);
-    SpecialModeText->Flags &= 0xfc;
-    SpecialModeTextCancel->Flags &= 0xfc;
+    SpecialModeText->Flags &= ~(kWin3DActive | kWin3DVisible);
+    SpecialModeTextCancel->Flags &= ~(kWin3DActive | kWin3DVisible);
 
     RebuildWeaponList();
 
     Vector const LootPos = {0.21f, -0.37f, 0.0f};
     LootButton = CreateButtonControl("LootButton", "interface\\HUD\\HUD_loot_bw.3db", nullptr,
                                      "ui_select_item", nullptr, &LootPos, nullptr, &SmallHalf, 0, 1,
-                                     0, 0, 0x3a2, 0, 0x6f);
-    LootButton->Flags &= 0xfc;
+                                     0, 0, 0x3a2, 0, USER_COLLECT_LOOT);
+    LootButton->Flags &= ~(kWin3DActive | kWin3DVisible);
 
     SetOffset(0.0f, 0.0f, -1.0f);
     SetPosition(&Position);
@@ -1052,7 +1066,7 @@ void HUD_Status::Draw()
     // While either animation runs, the loot button draws itself when it exists and its Flags
     // bit 1 is set -- the only null test here is retail's.
     if ((ButtonMover::IsActive() || ButtonScaler::IsActive()) && LootButton != nullptr &&
-        (LootButton->Flags & 0x02) != 0)
+        (LootButton->Flags & kWin3DVisible) != 0)
     {
         LootButton->Draw();
     }
@@ -1140,8 +1154,8 @@ void HUD_Status::OnMoveFinished()
         // Opening, stage 2 -- the toggle button and the minimized frame are hidden, and the
         // background grows 0.1 -> 1.0 over 0.3 s.
         HideExpandedControls(true);
-        ToggleButton->Flags &= 0xfc;
-        MinimizedFrame->Flags &= 0xfc;
+        ToggleButton->Flags &= ~(kWin3DActive | kWin3DVisible);
+        MinimizedFrame->Flags &= ~(kWin3DActive | kWin3DVisible);
         ButtonScaler::Start(0.3f);
         ButtonScaler::AddButton(ViewPanel, 0.1f, 1.0f);
         ButtonScaler::Update();
@@ -1150,7 +1164,7 @@ void HUD_Status::OnMoveFinished()
 
     // Closing, done -- collapsed, session flag 2 cleared, and the minimized hit box back.
     bExpanded = 0;
-    SetGameSessionFlags(2, false);
+    SetGameSessionFlags(kSessionStatusPanelExpanded, false);
     HalfExtents.x = 0.105f;
     HalfExtents.y = 0.02f;
     HalfExtents.z = 0.0f;
@@ -1168,7 +1182,7 @@ void HUD_Status::OnScaleFinished()
         // on the panel, the weapon rows and the scroll bar shown when bShowWeaponList is set,
         // the minimized frame hidden, and the expanded hit box.
         bExpanded = 1;
-        SetGameSessionFlags(2, true);
+        SetGameSessionFlags(kSessionStatusPanelExpanded, true);
         HideExpandedControls(false);
         Vector const RepairPos = {0.3f, -0.171f, 0.0f};
         RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RepairPos), 0);
@@ -1241,7 +1255,7 @@ void HUD_Status::ToggleLauncher(unsigned short SubId)
     }
 
     // UI sound slot 0x17, then the toggle record (id 0x19) through FUN_0054bcb0.
-    PlayOrRewindUiSoundSlot(0x17);
+    PlayOrRewindUiSoundSlot(kUiSoundHudWeaponSelect);
     FSpaceCommand Command;
     memset(&Command, 0, sizeof(Command));
     Command.Byte26 = 1;
@@ -1354,7 +1368,7 @@ void HUD_Status::Update()
     if (bPendingExpandedSync != 0 && ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())) != nullptr)
     {
         bPendingExpandedSync = 0;
-        unsigned char const bFlag = TestGameSessionFlags(2) ? 1 : 0;
+        unsigned char const bFlag = TestGameSessionFlags(kSessionStatusPanelExpanded) ? 1 : 0;
         if (bFlag != bExpanded)
         {
             ToggleExpanded();
@@ -1386,8 +1400,8 @@ void HUD_Status::Update()
                 // Ids 0x63b shown, the cancel caption hidden; with a target whose TypeBits has
                 // bit 7, the cancel caption gets the target's caption.
                 SpecialModeText->SetProperty(kTextPropSetIds, 0x63b, 0);
-                SpecialModeText->Flags |= 3;
-                SpecialModeTextCancel->Flags &= 0xfc;
+                SpecialModeText->Flags |= kWin3DActive | kWin3DVisible;
+                SpecialModeTextCancel->Flags &= ~(kWin3DActive | kWin3DVisible);
                 bDockingOrTradeLaneCaption = 1;
                 IObjRW* const ShipTarget = Ship->get_target();
                 if (ShipTarget != nullptr)
@@ -1406,8 +1420,8 @@ void HUD_Status::Update()
                         if (HudBuildObjectCaption(Simple, &Caption, kCaptionLocation, false))
                         {
                             SpecialModeTextCancel->SetProperty(
-                                0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
-                            SpecialModeTextCancel->Flags |= 3;
+                                kTextPropSetText, reinterpret_cast<uintptr_t>(Caption.Text), 0);
+                            SpecialModeTextCancel->Flags |= kWin3DActive | kWin3DVisible;
                         }
                     }
                 }
@@ -1417,14 +1431,14 @@ void HUD_Status::Update()
                 if (Ship->is_using_tradelane())
                 {
                     SpecialModeTextCancel->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Caption.Text), 0);
-                    SpecialModeTextCancel->Flags |= 3;
+                    SpecialModeTextCancel->Flags |= kWin3DActive | kWin3DVisible;
                     bDockingOrTradeLaneCaption = 1;
                 }
                 else
                 {
                     bDockingOrTradeLaneCaption = 0;
-                    SpecialModeText->Flags &= 0xfc;
-                    SpecialModeTextCancel->Flags &= 0xfc;
+                    SpecialModeText->Flags &= ~(kWin3DActive | kWin3DVisible);
+                    SpecialModeTextCancel->Flags &= ~(kWin3DActive | kWin3DVisible);
                     UpdateSpecialModeCaptions();
                 }
             }
@@ -1553,11 +1567,11 @@ void HUD_Status::Update()
                     UpdateRepairBatteryCounts();
                     if (IsLootInReach())
                     {
-                        LootButton->Flags |= 3;
+                        LootButton->Flags |= kWin3DActive | kWin3DVisible;
                     }
                     else
                     {
-                        LootButton->Flags &= 0xfc;
+                        LootButton->Flags &= ~(kWin3DActive | kWin3DVisible);
                     }
                     if (bExpanded != 0)
                     {
@@ -1588,7 +1602,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
             bTradelane = true;
         }
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();
-        if (Behavior != nullptr && Behavior->CurrentBehaviorIndex == 10)
+        if (Behavior != nullptr && Behavior->CurrentBehaviorIndex == BEHAVIOR_FORMATION)
         {
             bHideText = true;
         }
@@ -1645,7 +1659,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
     }
     else if (bTradelane)
     {
-        SpecialModeText->Flags &= 0xfc;
+        SpecialModeText->Flags &= ~(kWin3DActive | kWin3DVisible);
         return;
     }
     else
@@ -1660,14 +1674,14 @@ void HUD_Status::UpdateSpecialModeCaptions()
                                  G_NnTextScratchCapacity);
     wchar_t KeyName[0x100];
     wcscpy(KeyName, L"???"); // DAT_005d0214
-    unsigned Command = 0xc8;
+    unsigned Command = USER_TURN_SHIP;
     if (bTurretView != 0)
     {
-        Command = 0xbf;
+        Command = USER_AUTO_TURRET;
     }
     else if (IsMouseFlightUnlocked())
     {
-        Command = 0xf;
+        Command = USER_CANCEL;
     }
     FKeyBindingLookup Binding;
     if (KeyMapFindActiveBinding(Command, &Binding)) // FUN_00577dd0
@@ -1742,7 +1756,7 @@ bool HUD_Status::IsLootInReach()
     }
 
     // Bucket 7 (loot).
-    int Kind = 7;
+    int Kind = static_cast<int>(EClientGameobjKind::Loot);
     FClientGameobj* Loot = ClientObjDb_GetKindHead(&Kind);
     while (Loot != nullptr)
     {
@@ -1933,7 +1947,7 @@ void HUD_Status::FireSeekerGuns(int Mode)
                         if (_stricmp(Legal.Hardpoints[NameIndex].Value, HpName.Value) == 0)
                         {
                             unsigned const Type = static_cast<unsigned>(Legal.Type);
-                            if (Type == 0x0au || Type == 0x24u || Type == 0x23u)
+                            if (Type == HpTypeTorpedo || Type == HpTypeTorpedoSpecial1 || Type == HpTypeTorpedoSpecial2)
                             {
                                 bTorpedo = true;
                             }
@@ -1943,15 +1957,15 @@ void HUD_Status::FireSeekerGuns(int Mode)
             }
 
             bool bTake = false;
-            if (Mode == 0)
+            if (Mode == kSeekerMissile)
             {
                 bTake = !bTorpedo && !bCruiseDisruptor;
             }
-            else if (Mode == 1)
+            else if (Mode == kSeekerTorpedo)
             {
                 bTake = bTorpedo;
             }
-            else if (Mode == 2)
+            else if (Mode == kSeekerCruiseDisruptor)
             {
                 bTake = bCruiseDisruptor;
             }
@@ -2016,7 +2030,7 @@ void HUD_Status::TractorInAllLoot()
     // player position asked first); the square is summed y, z, x on the FPU against 1e6
     // (DAT_005d848c), >= and NaN skipping.
     std::vector<IObjRW*> Loot; // retail vector<IObjInspect*>
-    int Kind = 7;
+    int Kind = static_cast<int>(EClientGameobjKind::Loot);
     FClientGameobj* Item = ClientObjDb_GetKindHead(&Kind);
     while (Item != nullptr)
     {
@@ -2178,7 +2192,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
             ToggleExpanded();
         }
         bShowWeaponList = (MsgId == USER_SWITCH_TO_WEAPON_LIST) ? 1 : 0;
-        SetGameSessionFlags(4, MsgId == USER_SWITCH_TO_WEAPON_LIST);
+        SetGameSessionFlags(kSessionWeaponList, MsgId == USER_SWITCH_TO_WEAPON_LIST);
         return true;
 
     case USER_STATUS:
@@ -2199,10 +2213,10 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         {
             static_cast<IObjAffect*>(Player)->use_item(Repair->Id, static_cast<unsigned>(Repair->Count),
                                                       static_cast<int>(GetPlayerConnectionId()));
-            PlayOrRewindUiSoundSlot(0x28);
+            PlayOrRewindUiSoundSlot(kUiSoundUseNanobotsSuccess);
             return true;
         }
-        PlayOrRewindUiSoundSlot(0x2a);
+        PlayOrRewindUiSoundSlot(kUiSoundUseNanobotsFailure);
         return true;
     }
 
@@ -2222,13 +2236,13 @@ bool HUD_Status::OnEvent(unsigned MsgId)
                     static_cast<IObjAffect*>(Player)->use_item(
                         Battery->Id, static_cast<unsigned>(Battery->Count),
                         static_cast<int>(GetPlayerConnectionId()));
-                    PlayOrRewindUiSoundSlot(0x29);
+                    PlayOrRewindUiSoundSlot(kUiSoundUseShieldBatterySuccess);
                     return true;
                 }
                 Shield = Ship->EquipManager.Traverse(Walk);
             }
         }
-        PlayOrRewindUiSoundSlot(0x2b);
+        PlayOrRewindUiSoundSlot(kUiSoundUseShieldBatteryFailure);
         return true;
     }
 
@@ -2366,15 +2380,15 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     }
 
     case USER_LAUNCH_MISSILES:
-        FireSeekerGuns(0); // missiles
+        FireSeekerGuns(kSeekerMissile); // missiles
         return true;
 
     case USER_LAUNCH_TORPEDOS:
-        FireSeekerGuns(1); // torpedoes
+        FireSeekerGuns(kSeekerTorpedo); // torpedoes
         return true;
 
     case USER_LAUNCH_CRUISE_DISRUPTORS:
-        FireSeekerGuns(2); // cruise disruptors
+        FireSeekerGuns(kSeekerCruiseDisruptor); // cruise disruptors
         return true;
 
     case USER_LAUNCH_MINES:

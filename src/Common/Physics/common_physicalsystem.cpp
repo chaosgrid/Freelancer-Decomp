@@ -133,14 +133,14 @@ void PhysicalSystem::event_pre_collision(IVP_Event_Collision* Event)
 
         // A class with the three low bits set (the projectile classes) is taken out of
         // collision after its first contact. The body is not tested.
-        if (((unsigned)ObjectA->ObjectClass & 7) == 7)
+        if (((unsigned)ObjectA->ObjectClass & CObject::ClassProjectile) == CObject::ClassProjectile)
         {
             ObjectA->BodyPtr->disable_simulation();
             ObjectA->enable_collisions_r(false);
         }
     }
 
-    if (ObjectB != nullptr && ((unsigned)ObjectB->ObjectClass & 7) == 7)
+    if (ObjectB != nullptr && ((unsigned)ObjectB->ObjectClass & CObject::ClassProjectile) == CObject::ClassProjectile)
     {
         ObjectB->BodyPtr->disable_simulation();
         ObjectB->enable_collisions_r(false);
@@ -200,7 +200,7 @@ static void PhySys_SyncObjectFromBody(CObject* Object)
     }
 
     // CSimple-derived classes re-cache their physical properties.
-    if (((unsigned)Object->ObjectClass & 3) == 3)
+    if (((unsigned)Object->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
         ((CSimple*)Object)->cache_physical_props();
 }
 

@@ -26,6 +26,12 @@ namespace
 	// FLServer.cfg — written and read field by field in this order (binary, "wb" / "rb").
 	// Version 2 files lack the trailing bAllowPvp byte. Retail keeps every field as a separate
 	// local of OnInitDialog / OnOK.
+	enum EConfigVersion
+	{
+		kConfigVersionNoPvp = 2,
+		kConfigVersionPvp = 3,         // the one written
+	};
+
 	struct FServerConfigFile
 	{
 		int Version;                   // 3 when written
@@ -57,15 +63,15 @@ void CServerConfigDlg::DoDataExchange(CDataExchange* DX)
 // .text:004067f0
 BOOL CServerConfigDlg::OnInitDialog()
 {
-	MaxPlayersSpin = GetDlgItem(1011);
-	MaxPlayersEdit = GetDlgItem(1012);
-	AllowNewPlayersCheck = GetDlgItem(1010);
-	PvpCheck = GetDlgItem(1059);
-	InternetCheck = GetDlgItem(1014);
-	ServerNameEdit = GetDlgItem(1006);
-	DescriptionEdit = GetDlgItem(1007);
-	PasswordEdit = GetDlgItem(1008);
-	LegalNotice = GetDlgItem(1070);
+	MaxPlayersSpin = GetDlgItem(kControlMaxPlayersSpin);
+	MaxPlayersEdit = GetDlgItem(kControlMaxPlayersEdit);
+	AllowNewPlayersCheck = GetDlgItem(kControlAllowNewPlayers);
+	PvpCheck = GetDlgItem(kControlAllowPvp);
+	InternetCheck = GetDlgItem(kControlInternetAccessible);
+	ServerNameEdit = GetDlgItem(kControlServerName);
+	DescriptionEdit = GetDlgItem(kControlDescription);
+	PasswordEdit = GetDlgItem(kControlPassword);
+	LegalNotice = GetDlgItem(kControlLegalNotice);
 
 	::SendMessage(MaxPlayersEdit->m_hWnd, EM_LIMITTEXT, 3, 0);
 	::SendMessage(ServerNameEdit->m_hWnd, EM_EXLIMITTEXT, 0, 0x20);
@@ -73,7 +79,7 @@ BOOL CServerConfigDlg::OnInitDialog()
 	::SendMessage(PasswordEdit->m_hWnd, EM_EXLIMITTEXT, 0, 0x10);
 
 	FServerConfigFile Config = {};
-	Config.Version = 3;
+	Config.Version = kConfigVersionPvp;
 	Config.bAllowPvp = false;
 	Config.bAllowNewPlayers = true;
 	Config.bInternetAccessible = true;
@@ -85,7 +91,7 @@ BOOL CServerConfigDlg::OnInitDialog()
 	if (File != nullptr)
 	{
 		fread(&Config.Version, 4, 1, File);
-		if (Config.Version == 2 || Config.Version == 3)
+		if (Config.Version == kConfigVersionNoPvp || Config.Version == kConfigVersionPvp)
 		{
 			fread(Config.ServerName, sizeof(Config.ServerName), 1, File);
 			fread(Config.Description, sizeof(Config.Description), 1, File);
@@ -93,7 +99,7 @@ BOOL CServerConfigDlg::OnInitDialog()
 			fread(&Config.bAllowNewPlayers, 1, 1, File);
 			fread(&Config.bInternetAccessible, 1, 1, File);
 			fread(&Config.MaxPlayers, 4, 1, File);
-			if (Config.Version == 3)
+			if (Config.Version == kConfigVersionPvp)
 			{
 				fread(&Config.bAllowPvp, 1, 1, File);
 			}
@@ -131,7 +137,7 @@ BOOL CServerConfigDlg::OnInitDialog()
 void CServerConfigDlg::OnOK()
 {
 	FServerConfigFile Config;
-	Config.Version = 3;
+	Config.Version = kConfigVersionPvp;
 
 	char MaxPlayersText[4];
 	MaxPlayersEdit->GetWindowText(MaxPlayersText, 4);

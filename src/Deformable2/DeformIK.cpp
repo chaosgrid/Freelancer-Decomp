@@ -687,7 +687,7 @@ static void IkLookAt(Matrix* Out, const Vector* Dir, const Matrix* Parent, unsig
     Vector Col0 = {0.0f, 0.0f, 0.0f};
     Vector Col1 = {0.0f, 0.0f, 0.0f};
     Vector Col2 = {0.0f, 0.0f, 0.0f};
-    if ((Flags & 4) != 0)
+    if ((Flags & kIkAimAxisX) != 0)
     {
         IkCopy3(&Col0, Dir);
         const double P2 = (double)Parent->E[0][2];
@@ -705,7 +705,7 @@ static void IkLookAt(Matrix* Out, const Vector* Dir, const Matrix* Parent, unsig
         Col1.z = (float)(Y2 * Inv);
         IkCross3(&Col2, &Col0, &Col1);
     }
-    else if ((Flags & 8) != 0)
+    else if ((Flags & kIkAimAxisY) != 0)
     {
         IkCopy3(&Col1, Dir);
         Vector Temp;
@@ -719,7 +719,7 @@ static void IkLookAt(Matrix* Out, const Vector* Dir, const Matrix* Parent, unsig
         Col2.z = (float)((double)Col2.z * Inv);
         IkCross3(&Col0, &Col1, &Col2);
     }
-    else if ((Flags & 0x10) != 0)
+    else if ((Flags & kIkAimAxisZ) != 0)
     {
         IkCopy3(&Col2, Dir);
         Col1.x = Parent->E[0][1];
@@ -797,7 +797,7 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
     Matrix Local;
     IkCopy9(&Local, ParentRot);
     Matrix Trans;
-    if ((Event->AimFlags & 0x40) != 0)
+    if ((Event->AimFlags & kIkAimOrientationTarget) != 0)
     {
         Trans.E[0][0] = Local.E[0][0];
         Trans.E[0][1] = Local.E[1][0];
@@ -820,7 +820,7 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
         const Vector* Target = (const Vector*)Event->TargetA;
         Vector Diff;
         const Vector* Src = Target;
-        if ((Event->AimFlags & 1) != 0)
+        if ((Event->AimFlags & kIkAimTargetIsPoint) != 0)
         {
             Diff.x = (float)((double)Target->x - (double)P.x);
             Diff.y = (float)((double)Target->y - (double)P.y);
@@ -853,7 +853,7 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
     }
     Matrix Result;
     IkCopy9(&Result, &Local);
-    if ((Event->AimFlags & 0x80) == 0)
+    if ((Event->AimFlags & kIkAimNoClamp) == 0)
     {
         Matrix Clamp;
         const Matrix* Clamped = IkEulerClamp(&Clamp, Bone, &Result);
@@ -873,7 +873,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
     int MatchId = (int)ChannelKey;
     FIkApplyGate* Gate = (FIkApplyGate*)BindDesc;
     (void)Time;
-    if ((StateFlags & 1) != 0)
+    if ((StateFlags & kIkStateStopped) != 0)
     {
         for (int Index = 0; Index < JointCount; ++Index)
         {
@@ -896,7 +896,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
             Gate->Joint));
         if (JointCount == 1)
             IkSolveSingleJoint(this, Gate, Bone);
-        else if ((StateFlags & 2) != 0)
+        else if ((StateFlags & kIkStateSphereAxis) != 0)
             SolveDlsAlt();
         else
             SolveDls();

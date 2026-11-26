@@ -418,7 +418,7 @@ IVP_Compact_Ledgetree_Node* IVP_SurfaceBuilder_Ledge_Soup::CompileNode(BuildNode
     {
         // Terminal node: its ledge gets has-children = 0.
         IVP_Compact_Ledge* Ledge = source->Ledge;
-        Ledge->SizeAndFlags &= ~0x3u;
+        Ledge->SizeAndFlags &= ~IVP_Compact_Ledge::kHasChildrenMask;
         dest->offset_compact_ledge = (int32_t)((char*)Ledge - (char*)dest);
         dest->offset_right_node = 0;
     }

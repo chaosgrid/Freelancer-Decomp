@@ -147,7 +147,7 @@ using FPacketServerLoginResponse = FRpcLoginResponsePacket;
 // (+0x3c) never travels.
 class FRpcServerDamageObjectPacket : public FPacketBase {
 public:
-    FRpcServerDamageObjectPacket() : FPacketBase(0x20005u) {}
+    FRpcServerDamageObjectPacket() : FPacketBase(FLPACKET_SERVER_DAMAGEOBJECT) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -166,7 +166,7 @@ public:
 // RS 06be5110 / 06be5150; both ctors zero the two fields. Wire: dword, byte.
 class FRpcServerDestroyObjectPacket : public FPacketBase {
 public:
-    FRpcServerDestroyObjectPacket() : FPacketBase(0x20006u), ObjectId(0), DestroyType(0) {}
+    FRpcServerDestroyObjectPacket() : FPacketBase(FLPACKET_SERVER_DESTROYOBJECT), ObjectId(0), DestroyType(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -205,7 +205,7 @@ public:
 // through the x87 stack on encode (FLD/FSTP qword) and by two integer dwords on decode.
 class FRpcServerCharSelectVerifiedPacket : public FPacketBase {
 public:
-    FRpcServerCharSelectVerifiedPacket() : FPacketBase(0x20008u) {}
+    FRpcServerCharSelectVerifiedPacket() : FPacketBase(FLPACKET_SERVER_CHARSELECTVERIFIED) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -222,7 +222,7 @@ public:
 // 06be50b0; the ctor writes no payload field. Wire: dword, raw byte, dword (9 bytes).
 class FRpcServerActivateObjectPacket : public FPacketBase {
 public:
-    FRpcServerActivateObjectPacket() : FPacketBase(0x2000au) {}
+    FRpcServerActivateObjectPacket() : FPacketBase(FLPACKET_SERVER_ACTIVATEOBJECT) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -237,34 +237,34 @@ public:
 
 // 0x0b FLPACKET_SERVER_LAND: RC 06b4b140 / ctor 06b4b180, RS 06be5c60 / 06be5ca0;
 // three dwords, ctor writes none of them.
-using FRpcServerLandPacket = FRpcClientDwordTriplePacket<0x2000bu>;
+using FRpcServerLandPacket = FRpcClientDwordTriplePacket<FLPACKET_SERVER_LAND>;
 // 0x0d FLPACKET_SERVER_SETSTARTROOM: RC 06b4be00 / ctor 06b4be40, RS 06be6960 /
 // 06be69a0; two dwords, ctor writes neither.
-using FRpcServerSetStartRoomPacket = FRpcClientDwordPairPacket<0x2000du>;
+using FRpcServerSetStartRoomPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_SETSTARTROOM>;
 
 // Single-dword lists: the ctor writes no payload field; wire is one dword.
 // 0x0e GFCOMPLETENEWSBROADCASTLIST RC 06b4bc20/06b4bc60, RS 06be6780/06be67c0.
-using FRpcServerGfCompleteNewsBroadcastListPacket = FRpcScalarPacket<0x2000eu, unsigned int, false>;
+using FRpcServerGfCompleteNewsBroadcastListPacket = FRpcScalarPacket<FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST, unsigned int, false>;
 // 0x0f GFCOMPLETECHARLIST RC 06b4bae0/06b4bb20, RS 06be6640/06be6680.
-using FRpcServerGfCompleteCharListPacket = FRpcScalarPacket<0x2000fu, unsigned int, false>;
+using FRpcServerGfCompleteCharListPacket = FRpcScalarPacket<FLPACKET_SERVER_GFCOMPLETECHARLIST, unsigned int, false>;
 // 0x10 GFCOMPLETEMISSIONCOMPUTERLIST RC 06b4bb80/06b4bbc0, RS 06be66e0/06be6720.
-using FRpcServerGfCompleteMissionComputerListPacket = FRpcScalarPacket<0x20010u, unsigned int, false>;
+using FRpcServerGfCompleteMissionComputerListPacket = FRpcScalarPacket<FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST, unsigned int, false>;
 // 0x11 GFCOMPLETESCRIPTBEHAVIORLIST RC 06b4bcc0/06b4bd00, RS 06be6820/06be6860.
-using FRpcServerGfCompleteScriptBehaviorListPacket = FRpcScalarPacket<0x20011u, unsigned int, false>;
+using FRpcServerGfCompleteScriptBehaviorListPacket = FRpcScalarPacket<FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST, unsigned int, false>;
 // 0x13 GFCOMPLETEAMBIENTSCRIPTLIST RC 06b4bd60/06b4bda0, RS 06be68c0/06be6900.
-using FRpcServerGfCompleteAmbientScriptListPacket = FRpcScalarPacket<0x20013u, unsigned int, false>;
+using FRpcServerGfCompleteAmbientScriptListPacket = FRpcScalarPacket<FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST, unsigned int, false>;
 
 // Dword pairs: the ctor writes no payload field; wire is two dwords.
 // 0x14 GFDESTROYNEWSBROADCAST RC 06b4bfe0/06b4c020, RS 06be6b40/06be6b80.
-using FRpcServerGfDestroyNewsBroadcastPacket = FRpcClientDwordPairPacket<0x20014u>;
+using FRpcServerGfDestroyNewsBroadcastPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_GFDESTROYNEWSBROADCAST>;
 // 0x15 GFDESTROYCHARACTER RC 06b4bea0/06b4bee0, RS 06be6a00/06be6a40.
-using FRpcServerGfDestroyCharacterPacket = FRpcClientDwordPairPacket<0x20015u>;
+using FRpcServerGfDestroyCharacterPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_GFDESTROYCHARACTER>;
 // 0x16 GFDESTROYMISSIONCOMPUTER RC 06b4bf40/06b4bf80, RS 06be6aa0/06be6ae0.
-using FRpcServerGfDestroyMissionComputerPacket = FRpcClientDwordPairPacket<0x20016u>;
+using FRpcServerGfDestroyMissionComputerPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER>;
 // 0x17 GFDESTROYSCRIPTBEHAVIOR RC 06b4c080/06b4c0c0, RS 06be6be0/06be6c20.
-using FRpcServerGfDestroyScriptBehaviorPacket = FRpcClientDwordPairPacket<0x20017u>;
+using FRpcServerGfDestroyScriptBehaviorPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR>;
 // 0x19 GFDESTROYAMBIENTSCRIPT RC 06b4c120/06b4c160, RS 06be6c80/06be6cc0.
-using FRpcServerGfDestroyAmbientScriptPacket = FRpcClientDwordPairPacket<0x20019u>;
+using FRpcServerGfDestroyAmbientScriptPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT>;
 
 // Owned byte block {Size, Data} (1a/1d/1e: Size +0x20, Data +0x24; 1f: Data +0x20,
 // Size +0x24, as its native ctor 06b4c350, set helper 06b3d490 and codecs 06b3d4d0 /
@@ -323,13 +323,13 @@ public:
 };
 
 // 0x1a GFSCRIPTBEHAVIOR RC 06b4c1c0/06b4c200 (E 06b3d170, D 06b3d2b0), RS 06be6d20/06be6d60.
-using FRpcServerGfScriptBehaviorPacket = FRpcServerBlobPacket<0x2001au>;
+using FRpcServerGfScriptBehaviorPacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFSCRIPTBEHAVIOR>;
 // 0x1d GFUPDATEMISSIONCOMPUTER RC 06b4c230/06b4c270, RS 06be6db0/06be6df0.
-using FRpcServerGfUpdateMissionComputerPacket = FRpcServerBlobPacket<0x2001du>;
+using FRpcServerGfUpdateMissionComputerPacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER>;
 // 0x1e GFUPDATENEWSBROADCAST RC 06b4c2a0/06b4c2e0, RS 06be6e40/06be6e80.
-using FRpcServerGfUpdateNewsBroadcastPacket = FRpcServerBlobPacket<0x2001eu>;
+using FRpcServerGfUpdateNewsBroadcastPacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFUPDATENEWSBROADCAST>;
 // 0x1f GFUPDATEAMBIENTSCRIPT RC 06b4c310/06b4c350, RS 06be6ed0/06be6f10.
-using FRpcServerGfUpdateAmbientScriptPacket = FRpcServerBlobPacket<0x2001fu, true>;
+using FRpcServerGfUpdateAmbientScriptPacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT, true>;
 static_assert(sizeof(FRpcServerGfScriptBehaviorPacket) == 0x28, "SERVER 0x1a size 0x28");
 static_assert(sizeof(FRpcServerGfUpdateAmbientScriptPacket) == 0x28, "SERVER 0x1f size 0x28");
 
@@ -386,21 +386,21 @@ public:
 
 // One-scalar and empty bodies. Encode: header, one reserved field, end, stats.
 // 0x40 SETMISSIONFAILURES  RC 06b4c670/06b4c6b0, RS 06be7270/06be72b0; ctor leaves +0x20.
-using FRpcServerSetMissionFailuresPacket = FRpcScalarPacket<0x20040u, unsigned int, false>;
+using FRpcServerSetMissionFailuresPacket = FRpcScalarPacket<FLPACKET_SERVER_SETMISSIONFAILURES, unsigned int, false>;
 // 0x43 SET_STORY_CUE       RC 06b4b5e0/06b4b620, RS 06be6100/06be6140; ctor leaves +0x20.
-using FRpcServerSetStoryCuePacket = FRpcScalarPacket<0x20043u, unsigned int, false>;
+using FRpcServerSetStoryCuePacket = FRpcScalarPacket<FLPACKET_SERVER_SET_STORY_CUE, unsigned int, false>;
 // 0x56 SENDNNMESSAGE       RC 06b4d1c0/06b4d200, RS 06be7e00/06be7e40; ctor zeroes +0x20.
-using FRpcServerSendNNMessagePacket = FRpcScalarPacket<0x20056u, unsigned int, true>;
+using FRpcServerSendNNMessagePacket = FRpcScalarPacket<FLPACKET_SERVER_SENDNNMESSAGE, unsigned int, true>;
 // 0x59 PLAY_SOUND_EFFECT   RC 06b4d3a0/06b4d3e0, RS 06be7fe0/06be8020; ctor leaves +0x20.
-using FRpcServerPlaySoundEffectPacket = FRpcScalarPacket<0x20059u, unsigned int, false>;
+using FRpcServerPlaySoundEffectPacket = FRpcScalarPacket<FLPACKET_SERVER_PLAY_SOUND_EFFECT, unsigned int, false>;
 // 0x5a GFMISSIONVENDORWHYEMPTY  RC 06b4c3f0/06b4c430, RS 06be6ff0/06be7030; one byte, unset.
-using FRpcServerGfMissionVendorWhyEmptyPacket = FRpcScalarPacket<0x2005au, unsigned char, false>;
+using FRpcServerGfMissionVendorWhyEmptyPacket = FRpcScalarPacket<FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY, unsigned char, false>;
 // 0x5b MISSIONSAVEA        RC 06b4d440/06b4d480, RS 06be8080/06be80c0; ctor leaves +0x20.
-using FRpcServerMissionSaveAPacket = FRpcScalarPacket<0x2005bu, unsigned int, false>;
+using FRpcServerMissionSaveAPacket = FRpcScalarPacket<FLPACKET_SERVER_MISSIONSAVEA, unsigned int, false>;
 // 0x4c REVERT_CAMERA       RC 06b4b730/06b4b770, RS 06be6250/06be6290; header only.
-using FRpcServerRevertCameraPacket = FRpcEmptyPacket<0x2004cu>;
+using FRpcServerRevertCameraPacket = FRpcEmptyPacket<FLPACKET_SERVER_REVERT_CAMERA>;
 // 0x58 CANCEL_MUSIC        RC 06b4d300/06b4d340, RS 06be7f40/06be7f80; header only.
-using FRpcServerCancelMusicPacket = FRpcEmptyPacket<0x20058u>;
+using FRpcServerCancelMusicPacket = FRpcEmptyPacket<FLPACKET_SERVER_CANCEL_MUSIC>;
 
 // 0x41 FLPACKET_SERVER_BURNFUSE. RC 06b4c710 / ctor 06b4c750, RS 06be7310 / 06be7350.
 // The argument is FServerBurnFuseInfo (rpc_iclient_args.h). Wire: three dwords, word,
@@ -428,7 +428,7 @@ public:
 // 06be5c00; the ctor writes no payload field. Wire: dword and three bytes (7 bytes).
 class FRpcServerRequestReturnedPacket : public FPacketBase {
 public:
-    FRpcServerRequestReturnedPacket() : FPacketBase(0x20044u) {}
+    FRpcServerRequestReturnedPacket() : FPacketBase(FLPACKET_SERVER_REQUEST_RETURNED) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -448,7 +448,7 @@ public:
 // CSetMissionMessage::Text as a length-prefixed block.
 class FRpcServerSetMissionMessagePacket : public FPacketBase {
 public:
-    FRpcServerSetMissionMessagePacket() : FPacketBase(0x20045u), TextSize(0), TextData(nullptr) {}
+    FRpcServerSetMissionMessagePacket() : FPacketBase(FLPACKET_SERVER_SET_MISSION_MESSAGE), TextSize(0), TextData(nullptr) {}
     ~FRpcServerSetMissionMessagePacket() override;
     FRpcServerSetMissionMessagePacket(const FRpcServerSetMissionMessagePacket&) = delete;
     FRpcServerSetMissionMessagePacket& operator=(const FRpcServerSetMissionMessagePacket&) = delete;
@@ -468,7 +468,7 @@ public:
 // the ctor writes no payload field. Wire: dword, byte.
 class FRpcServerMarkObjPacket : public FPacketBase {
 public:
-    FRpcServerMarkObjPacket() : FPacketBase(0x20046u) {}
+    FRpcServerMarkObjPacket() : FPacketBase(FLPACKET_SERVER_MARKOBJ) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -485,7 +485,7 @@ public:
 // then +0x24. The sender copies the byte raw; only the receiver normalizes it.
 class FRpcServerCfgInterfaceNotificationPacket : public FPacketBase {
 public:
-    FRpcServerCfgInterfaceNotificationPacket() : FPacketBase(0x20047u) {}
+    FRpcServerCfgInterfaceNotificationPacket() : FPacketBase(FLPACKET_SERVER_CFGINTERFACENOTIFICATION) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -503,7 +503,7 @@ public:
 class FRpcServerSetGuidedTargetPacket : public FPacketBase {
 public:
     FRpcServerSetGuidedTargetPacket()
-        : FPacketBase(0x2004au), GuidedId(0), TargetId(0), TargetSubObjId(0) {}
+        : FPacketBase(FLPACKET_SERVER_SETGUIDEDTARGET), GuidedId(0), TargetId(0), TargetSubObjId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -543,7 +543,7 @@ public:
 // (rpc_iclient_args.h). Wire: dword, word, word.
 class FRpcServerUseItemPacket : public FPacketBase {
 public:
-    FRpcServerUseItemPacket() : FPacketBase(0x20051u), ObjectId(0), EquipId(0), Count(0) {}
+    FRpcServerUseItemPacket() : FPacketBase(FLPACKET_SERVER_USE_ITEM), ObjectId(0), EquipId(0), Count(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -601,7 +601,7 @@ public:
 // Tryptich fields).
 class FRpcServerSetMusicPacket : public FPacketBase {
 public:
-    FRpcServerSetMusicPacket() : FPacketBase(0x20057u) {}
+    FRpcServerSetMusicPacket() : FPacketBase(FLPACKET_SERVER_SET_MUSIC) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -624,7 +624,7 @@ public:
 // non-null block and clears the pointer. Wire: Size, Kind, then Size bytes.
 class FRpcServerLoadHintPacket : public FPacketBase {
 public:
-    FRpcServerLoadHintPacket() : FPacketBase(0x2004du), Data(nullptr), Size(0), Kind(0) {}
+    FRpcServerLoadHintPacket() : FPacketBase(FLPACKET_SERVER_LOADHINT), Data(nullptr), Size(0), Kind(0) {}
     ~FRpcServerLoadHintPacket() override;
     FRpcServerLoadHintPacket(const FRpcServerLoadHintPacket&) = delete;
     FRpcServerLoadHintPacket& operator=(const FRpcServerLoadHintPacket&) = delete;
@@ -673,7 +673,7 @@ public:
 class FRpcServerPlayerListPacket : public FPacketBase {
 public:
     FRpcServerPlayerListPacket()
-        : FPacketBase(0x20052u), Kind(kPlayerListKindNone), Name(nullptr), PlayerId(0), bAlreadyPresent(0) {}
+        : FPacketBase(FLPACKET_SERVER_PLAYERLIST), Kind(kPlayerListKindNone), Name(nullptr), PlayerId(0), bAlreadyPresent(0) {}
     ~FRpcServerPlayerListPacket() override;
     FRpcServerPlayerListPacket(const FRpcServerPlayerListPacket&) = delete;
     FRpcServerPlayerListPacket& operator=(const FRpcServerPlayerListPacket&) = delete;
@@ -705,7 +705,7 @@ public:
 // Health (x87 on encode, raw on decode).
 class FRpcServerSetCollisionGroupsPacket : public FPacketBase {
 public:
-    FRpcServerSetCollisionGroupsPacket() : FPacketBase(0x20048u) {}
+    FRpcServerSetCollisionGroupsPacket() : FPacketBase(FLPACKET_SERVER_SETCOLLISIONGROUPS) {}
     void SetGroups(const std::list<CollisionGroupDesc>& Source);
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
@@ -874,19 +874,19 @@ public:
 };
 
 // 0x24: RC factory 06b4a090 / ctor 06b4a0d0, RS 06be4b90 / 06be4bd0.
-using FRpcServerSetEquipmentPacket = FRpcServerEquipListPacket<0x20024u>;
+using FRpcServerSetEquipmentPacket = FRpcServerEquipListPacket<FLPACKET_SERVER_SETEQUIPMENT>;
 // 0x25: RC factory 06b4a100 / ctor 06b4a140, RS 06be4c00 / 06be4c40.
-using FRpcServerSetCargoPacket = FRpcServerEquipListPacket<0x20025u>;
+using FRpcServerSetCargoPacket = FRpcServerEquipListPacket<FLPACKET_SERVER_SETCARGO>;
 
 // 0x21 FLPACKET_SERVER_SYSTEM_SWITCH_OUT: RC 06b4a6b0 / ctor 06b4a6f0, RS 06be51b0 /
 // 06be51f0; two dwords, ctor writes neither.
-using FRpcServerSystemSwitchOutPacket = FRpcClientDwordPairPacket<0x20021u>;
+using FRpcServerSystemSwitchOutPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_SYSTEM_SWITCH_OUT>;
 
 // 0x27 FLPACKET_SERVER_REQUESTCREATESHIPRESP: RC 06b49ff0 / ctor 06b4a030, RS
 // 06be4af0 / 06be4b30; ctor writes no payload field. Wire: raw byte, dword.
 class FRpcServerRequestCreateShipRespPacket : public FPacketBase {
 public:
-    FRpcServerRequestCreateShipRespPacket() : FPacketBase(0x20027u) {}
+    FRpcServerRequestCreateShipRespPacket() : FPacketBase(FLPACKET_SERVER_REQUESTCREATESHIPRESP) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -903,7 +903,7 @@ public:
 // integer MOV on decode).
 class FRpcServerAdjustAttitudePacket : public FPacketBase {
 public:
-    FRpcServerAdjustAttitudePacket() : FPacketBase(0x2002au) {}
+    FRpcServerAdjustAttitudePacket() : FPacketBase(FLPACKET_SERVER_ADJUSTATTITUDE) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -917,7 +917,7 @@ public:
 
 // 0x2f FLPACKET_SERVER_SETREMOVEITEM: RC 06b49e90 / ctor 06b49ed0, RS 06be4970 /
 // 06be49b0; the ctor writes +0x20 = 0, +0x24 = +0x28 = -1. Wire: three dwords.
-class FRpcServerSetRemoveItemPacket : public FRpcClientDwordTriplePacket<0x2002fu> {
+class FRpcServerSetRemoveItemPacket : public FRpcClientDwordTriplePacket<FLPACKET_SERVER_SETREMOVEITEM> {
 public:
     FRpcServerSetRemoveItemPacket() {
         Field_0x00 = 0;
@@ -932,21 +932,21 @@ public:
 // 0x30 SETCASH (RC 06b49d80 / 06b49dc0, RS 06be4840 / 06be4880), 0x3e SETNUMKILLS
 // (RC 06b4c530 / 06b4c570, RS 06be7130 / 06be7170), 0x3f SETMISSIONSUCCESSES (RC
 // 06b4c5d0 / 06b4c610, RS 06be71d0 / 06be7210): one dword the ctor leaves unset.
-using FRpcServerSetCashPacket = FRpcScalarPacket<0x20030u, unsigned int, false>;
-using FRpcServerSetNumKillsPacket = FRpcScalarPacket<0x2003eu, unsigned int, false>;
-using FRpcServerSetMissionSuccessesPacket = FRpcScalarPacket<0x2003fu, unsigned int, false>;
+using FRpcServerSetCashPacket = FRpcScalarPacket<FLPACKET_SERVER_SETCASH, unsigned int, false>;
+using FRpcServerSetNumKillsPacket = FRpcScalarPacket<FLPACKET_SERVER_SETNUMKILLS, unsigned int, false>;
+using FRpcServerSetMissionSuccessesPacket = FRpcScalarPacket<FLPACKET_SERVER_SETMISSIONSUCCESSES, unsigned int, false>;
 
 // 0x39 FLPACKET_SERVER_SCANNOTIFY: RC 06b4ce40 / ctor 06b4ce80, RS 06be7a40 /
 // 06be7a80; two dwords, ctor writes neither.
-using FRpcServerScanNotifyPacket = FRpcClientDwordPairPacket<0x20039u>;
+using FRpcServerScanNotifyPacket = FRpcClientDwordPairPacket<FLPACKET_SERVER_SCANNOTIFY>;
 
 // 0x20 GFMISSIONVENDORACCEPTANCE (RC factory 06b4c380 / ctor 06b4c3c0, E 06b3dd00,
 // D 06b3de40, dtor 06b3e1b0, set helper 06b3dcc0; RS 06be6f60 / 06be6fa0) and 0x26
 // GFUPDATECHAR (RC 06b4ba70 / 06b4bab0, E 06b3ce10, D 06b3cf50, dtor 06b3d0e0, set
 // helper 06b3cdd0; RS 06be65b0 / 06be65f0): instruction-identical to 0x1a in both DLLs
 // (address-masked compare); the ctors differ only in store order. Size 0x28.
-using FRpcServerGfMissionVendorAcceptancePacket = FRpcServerBlobPacket<0x20020u>;
-using FRpcServerGfUpdateCharPacket = FRpcServerBlobPacket<0x20026u>;
+using FRpcServerGfMissionVendorAcceptancePacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE>;
+using FRpcServerGfUpdateCharPacket = FRpcServerBlobPacket<FLPACKET_SERVER_GFUPDATECHAR>;
 
 // 0x22 FLPACKET_SERVER_SYSTEM_SWITCH_IN: RC factory 06b4a750 / ctor 06b4a790, RS
 // 06be5250 / 06be5290 (size 0x44). The ctor zeroes Position and seeds Orientation
@@ -1076,7 +1076,7 @@ public:
 // FServerMissionObjectiveStateInfo.
 class FRpcServerSetMissionObjectiveStatePacket : public FPacketBase {
 public:
-    FRpcServerSetMissionObjectiveStatePacket() : FPacketBase(0x20033u) {}
+    FRpcServerSetMissionObjectiveStatePacket() : FPacketBase(FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1097,7 +1097,7 @@ public:
 class FRpcServerReplaceMissionObjectivePacket : public FPacketBase {
 public:
     FRpcServerReplaceMissionObjectivePacket()
-        : FPacketBase(0x20034u), TextSize(0), TextData(nullptr) {}
+        : FPacketBase(FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE), TextSize(0), TextData(nullptr) {}
     ~FRpcServerReplaceMissionObjectivePacket() override;
     FRpcServerReplaceMissionObjectivePacket(const FRpcServerReplaceMissionObjectivePacket&) = delete;
     FRpcServerReplaceMissionObjectivePacket& operator=(
@@ -1283,7 +1283,7 @@ static_assert(sizeof(FRpcServerLootRecord) == 0x48, "CREATELOOT list record 0x48
 // std::list of the same records, so sizeof differs from retail (not a cross-module type).
 class FRpcServerCreateLootPacket : public FPacketBase {
 public:
-    FRpcServerCreateLootPacket() : FPacketBase(0x20028u), OwnerId(0), Kind(0) {}
+    FRpcServerCreateLootPacket() : FPacketBase(FLPACKET_SERVER_CREATELOOT), OwnerId(0), Kind(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1359,7 +1359,7 @@ public:
 // keeps a VC6 std::list inline (+0x28 allocator byte, +0x2c head, +0x30 size).
 class FRpcServerSetGroupFeelingsPacket : public FPacketBase {
 public:
-    FRpcServerSetGroupFeelingsPacket() : FPacketBase(0x2002bu), Name(nullptr), NameSize(0) {}
+    FRpcServerSetGroupFeelingsPacket() : FPacketBase(FLPACKET_SERVER_SETGROUPFEELINGS), Name(nullptr), NameSize(0) {}
     ~FRpcServerSetGroupFeelingsPacket() override;
     FRpcServerSetGroupFeelingsPacket(const FRpcServerSetGroupFeelingsPacket&) = delete;
     FRpcServerSetGroupFeelingsPacket& operator=(const FRpcServerSetGroupFeelingsPacket&) = delete;
@@ -1412,7 +1412,7 @@ public:
 class FRpcServerRemoteObjectCargoUpdatePacket : public FRpcServerEquipListPacketBase {
 public:
     FRpcServerRemoteObjectCargoUpdatePacket()
-        : FRpcServerEquipListPacketBase(0x2003du), Flag(0), ObjectId(0) {}
+        : FRpcServerEquipListPacketBase(FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE), Flag(0), ObjectId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1499,7 +1499,7 @@ struct FRpcServerCharacterRecord {
 // allocates them). Dump RC 06b40340 / RS 06bdea20.
 class FRpcServerCharacterInfoPacket : public FPacketBase {
 public:
-    FRpcServerCharacterInfoPacket() : FPacketBase(0x20003u) {}
+    FRpcServerCharacterInfoPacket() : FPacketBase(FLPACKET_SERVER_CHARACTERINFO) {}
     // RS 06bdea60: pass 1 deletes every non-null record, pass 2 frees the nodes.
     ~FRpcServerCharacterInfoPacket() override;
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,

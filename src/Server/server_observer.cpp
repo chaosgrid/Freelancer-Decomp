@@ -303,11 +303,11 @@ void Observer::update(double Dt)
         CObject* const Raw = (Obj != nullptr) ? Obj->cobj() : nullptr;
         unsigned int const Cls =
             (Raw != nullptr) ? static_cast<unsigned int>(Raw->ObjectClass) : 0u;
-        bool const bIsLoot = (Raw != nullptr) && (Cls & 0x803u) == 0x803u;
-        bool const bIsShip = (Raw != nullptr) && (Cls & 0x503u) == 0x503u;
-        bool const bIsCounter = (Raw != nullptr) && (Cls & 0x17u) == 0x17u;
-        bool const bIsMine = (Raw != nullptr) && (Cls & 0x0fu) == 0x0fu;
-        bool const bIsGuided = (Raw != nullptr) && (Cls & 0xa7u) == 0xa7u;
+        bool const bIsLoot = (Raw != nullptr) && (Cls & CObject::ClassLoot) == CObject::ClassLoot;
+        bool const bIsShip = (Raw != nullptr) && (Cls & CObject::ClassShip) == CObject::ClassShip;
+        bool const bIsCounter = (Raw != nullptr) && (Cls & CObject::ClassCounterMeasure) == CObject::ClassCounterMeasure;
+        bool const bIsMine = (Raw != nullptr) && (Cls & CObject::ClassMine) == CObject::ClassMine;
+        bool const bIsGuided = (Raw != nullptr) && (Cls & CObject::ClassGuided) == CObject::ClassGuided;
 
         if (bIsLoot) {
             // CREATELOOT, IClient +0x0c0: a 0x48-byte LootDesc filled by FUN_06d07b90

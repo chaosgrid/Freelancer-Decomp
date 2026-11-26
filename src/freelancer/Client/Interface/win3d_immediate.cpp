@@ -21,6 +21,7 @@
 #include "Core/globals.h"
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"
+#include "render/slots.h"      // Render::EPipelineState
 #include "x86math.h"
 
 #include <math.h>
@@ -53,13 +54,15 @@ namespace
 
     // .rdata 0x005c96c0 -- what a textured stage is set to: MODULATE of the texture against the
     // vertex diffuse, on both colour and alpha.
-    const int kStageTextured[6] = {4, 2, 0, 4, 2, 0};
+    const int kStageTextured[6] = {D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE,
+                                   D3DTOP_MODULATE, D3DTA_TEXTURE, D3DTA_DIFFUSE};
 
     // .rdata 0x005c96f8 -- and what an untextured stage is set to: DISABLE.
-    const int kStageDisabled[6] = {1, 2, 1, 1, 2, 1};
+    const int kStageDisabled[6] = {D3DTOP_DISABLE, D3DTA_TEXTURE, D3DTA_CURRENT,
+                                   D3DTOP_DISABLE, D3DTA_TEXTURE, D3DTA_CURRENT};
 
     // XYZ | DIFFUSE | TEX1.
-    const unsigned kWin3DFvf = 0x142;
+    const unsigned kWin3DFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 
     // DAT_006168a4 / DAT_006168b0: retail keeps the capacities as globals, but every writer
     // stores 0x3000, so a constant is the same value.
@@ -116,7 +119,7 @@ namespace
 
     // The pipeline-state id the projection setter asks about. Non-zero means the pipeline wants
     // one combined modelview rather than a separate world and view.
-    const int kPipelineStateViewspace = 7;
+    const int kPipelineStateViewspace = Render::PipelineStateViewspaceLights;
 
     // The only kind the ortho setter stores, so it doubles as "an ortho projection is
     // installed".
@@ -196,7 +199,7 @@ namespace
         Pipe->SetTextureStageTexture(0, G_BoundTexture);
 
         // Stage state 0xb (D3D8 D3DTSS_TEXCOORDINDEX) is set to 0 before the table runs.
-        Pipe->SetTextureStageState(0, 0xb, 0);
+        Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
         ApplyStageTable(Pipe, 0, kStageTextured);
 
         // Stage ONE is always disabled, textured or not.
@@ -339,7 +342,7 @@ void Win3DSetPipelineClearColor(float R, float G, float B, float A)
                                   (static_cast<unsigned long>(Green) << 8) |
                                   static_cast<unsigned long>(Blue);
 
-    const int kPipelineStateClearColor = 8;
+    const int kPipelineStateClearColor = Render::PipelineStateClearColor;
     Pipe->SetPipelineState(kPipelineStateClearColor, static_cast<int>(Packed));
 }
 
@@ -409,7 +412,7 @@ void Win3DEnable(int Capability)
 
     case kWin3DCullFace:
         // D3DCULL_CW (2). glDisable writes 1 (NONE) into the same state.
-        Pipe->SetRenderState(kRsCullMode, 2);
+        Pipe->SetRenderState(kRsCullMode, D3DCULL_CW);
         return;
 
     case kWin3DLightingCap:
@@ -451,7 +454,7 @@ void Win3DDisable(int Capability)
         return;
 
     case kWin3DCullFace:
-        Pipe->SetRenderState(kRsCullMode, 1);   // D3DCULL_NONE
+        Pipe->SetRenderState(kRsCullMode, D3DCULL_NONE);
         return;
 
     case kWin3DLightingCap:
@@ -461,7 +464,7 @@ void Win3DDisable(int Capability)
     case kWin3DFog:
         // Seven fog states zeroed in this order. glEnable has no fog case.
         Pipe->SetRenderState(D3DRS_FOGENABLE, 0);
-        Pipe->SetRenderState(D3DRS_FOGTABLEMODE, 0);
+        Pipe->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_NONE);
         Pipe->SetRenderState(D3DRS_FOGVERTEXMODE, 0);
         Pipe->SetRenderState(D3DRS_FOGCOLOR, 0);
         Pipe->SetRenderState(D3DRS_FOGSTART, 0);
@@ -789,7 +792,7 @@ void Win3DEnd()
     {
         // The vertex colour drives the diffuse material (.rdata 0x005c9698).
         Pipe->SetRenderState(kRsColorVertex, 1);
-        Pipe->SetRenderState(kRsDiffuseMaterialSource, 1);
+        Pipe->SetRenderState(kRsDiffuseMaterialSource, D3DMCS_COLOR1);
 
         int SavedLighting = 0;
         Pipe->GetRenderState(kRsLighting, &SavedLighting);
@@ -802,45 +805,45 @@ void Win3DEnd()
         switch (G_PrimitiveMode)
         {
         case kWin3DPoints:
-            Pipe->DrawPrimitive(1, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+            Pipe->DrawPrimitive(D3DPT_POINTLIST, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             break;
 
         case kWin3DLines:
             // The locked path draws through the index buffer, since a locked pool's vertices
             // are not in draw order.
             if (G_bBufferLocked == 0)
-                Pipe->DrawPrimitive(2, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+                Pipe->DrawPrimitive(D3DPT_LINELIST, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             else
                 Pipe->DrawIndexedPrimitiveUp(2, kWin3DFvf, G_Vertices, VertexCount, G_Indices,
                                              static_cast<unsigned>(G_IndexCount), 0);
             break;
 
         case kWin3DLineStrip:
-            Pipe->DrawPrimitive(3, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+            Pipe->DrawPrimitive(D3DPT_LINESTRIP, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             break;
 
         case kWin3DTriangles:
             if (G_bBufferLocked == 0)
-                Pipe->DrawPrimitive(4, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+                Pipe->DrawPrimitive(D3DPT_TRIANGLELIST, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             else
                 Pipe->DrawIndexedPrimitiveUp(4, kWin3DFvf, G_Vertices, VertexCount, G_Indices,
                                              static_cast<unsigned>(G_IndexCount), 0);
             break;
 
         case kWin3DTriangleStrip:
-            Pipe->DrawPrimitive(5, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+            Pipe->DrawPrimitive(D3DPT_TRIANGLESTRIP, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             break;
 
         case kWin3DTriangleFan:
         case kWin3DPolygon:
             // A polygon and a fan are the same draw; retail shares the case outright.
-            Pipe->DrawPrimitive(6, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+            Pipe->DrawPrimitive(D3DPT_TRIANGLEFAN, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             break;
 
         case kWin3DLineLoop:
         {
             // A strip over everything, then one indexed line from the last vertex to the first.
-            Pipe->DrawPrimitive(3, kWin3DFvf, G_Vertices, VertexCount, nullptr);
+            Pipe->DrawPrimitive(D3DPT_LINESTRIP, kWin3DFvf, G_Vertices, VertexCount, nullptr);
 
             const unsigned short Closing[2] = {
                 static_cast<unsigned short>(G_VertexCount - 1), 0};

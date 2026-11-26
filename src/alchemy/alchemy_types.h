@@ -211,6 +211,26 @@ namespace AlchemyImpl
     // one per retail set class): the outer's interface is its IFxNodePropertySet base,
     // the inner vtable's bodies are its virtual overrides, the data its members.
 
+    // The kind of a node property (FNodePropertyRow::Kind), which is also the type word of a
+    // property in an ALE node-library stream (FUN_062291a0, LAB_06228350): the getter / setter
+    // pair of IFxNodePropertySet it selects is in the name. 0x100..0x102 are the stream's
+    // version 1.0 spellings of 0x200..0x202 (LAB_06228da0).
+    enum EFxPropKind : unsigned long
+    {
+        kFxPropBool = 0x1,                 // GetPropBool / SetPropBool
+        kFxPropInt = 0x2,                  // GetPropInt / SetPropInt
+        kFxPropFloat = 0x3,                // GetPropFloat / SetPropFloat
+        kFxPropSingleRamp = 0x100,         // GetPropSingleRamp
+        kFxPropColorRamp = 0x101,          // GetPropColorRamp
+        kFxPropAnimatedSingle = 0x102,     // GetPropAnimatedSingle
+        kFxPropName = 0x103,               // GetPropName / SetPropName
+        kFxPropPair = 0x104,               // GetPropPair / SetPropPair
+        kFxPropTransform = 0x105,          // GetPropTransform
+        kFxPropSingleRampRamp = 0x200,     // GetPropSingleRampRamp
+        kFxPropColorRampRamp = 0x201,      // GetPropColorRampRamp
+        kFxPropAnimatedSingleRamp = 0x202  // GetPropAnimatedSingleRamp
+    };
+
     // One row of a property-set table in .data (0x14 bytes: name, hash, kind, min, max).
     // Declared ahead of the interface, which enumerates rows.
     struct FNodePropertyRow;
@@ -417,6 +437,32 @@ namespace AlchemyImpl
     // +0x7c, AxisOverrideRamp +0x80, FrameRamp +0x84, CommonTexFrameRamp +0x88,
     // LocalTransform +0x8c (oriented, beam). Each class maps its own hashes onto these
     // fields (alchemy_appearances.cpp); the ramp kinds differ per class.
+    // FAppearanceRampDescriptor::Flags: the bits the bool properties of the six billboard
+    // classes set (the kFlags tables of alchemy_appearances.cpp); the names are the property
+    // names. A bit is only meaningful in the classes whose table lists it.
+    enum EAppearanceFlag : unsigned long
+    {
+        kAppFlagTriTexture = 0x1,                  // BasicApp_TriTexture (basic)
+        kAppFlagCenterOnPos = 0x1,                 // RectApp_CenterOnPos (rect)
+        kAppFlagQuadTexture = 0x2,                 // BasicApp_QuadTexture (basic, beam)
+        kAppFlagMotionBlur = 0x4,                  // BasicApp_MotionBlur (basic, rect)
+        kAppFlagUseCommonTexFrame = 0x8,           // BasicApp_UseCommonTexFrame
+        kAppFlagViewingAngleFade = 0x10,           // RectApp_ViewingAngleFade (rect, perp)
+        kAppFlagOrientedViewingAngleFade = 0x40,   // RectApp_ViewingAngleFade (oriented)
+        kAppFlagBeamDupeFirstParticle = 0x100,     // BeamApp_DupeFirstParticle
+        kAppFlagBeamDisablePlaceHolder = 0x200,    // BeamApp_DisablePlaceHolder
+        kAppFlagBeamLineAppearance = 0x400,        // BeamApp_LineAppearance
+        kAppFlagFlipTexU = 0x1000,                 // BasicApp_FlipTexU
+        kAppFlagFlipTexV = 0x2000                  // BasicApp_FlipTexV
+    };
+
+    // FFxParticleAppearancePropertySet::Flags (+0x9c).
+    enum EParticleAppearanceFlag : unsigned long
+    {
+        kParticleFlagUseDynamicRotation = 0x1, // ParticleApp_UseDynamicRotation
+        kParticleFlagSmoothRotation = 0x2      // ParticleApp_SmoothRotation
+    };
+
     class FAppearanceRampDescriptor : public FFxAppearancePropertySet
     {
     public:
@@ -580,6 +626,16 @@ namespace AlchemyImpl
 
         // FUN_06222f80: uint16 (strlen+1 or 0) + bytes + odd pad.
         int WriteString(const char* Text);
+    };
+
+    // IGenericFx::GetNodeFlags / SetNodeFlags (the node flags, node-base +0x4).
+    enum EFxNodeFlag : unsigned long
+    {
+        kNodeFlagLifetimeOver = 0x1,   // TickLifetime: Age_ > Duration_
+        kNodeFlagSkipNodeAnim = 0x2,   // skip the Node_Transform animation in the compose
+        kNodeFlagLocalXformSet = 0x4,  // the raw transform was set from outside
+        kNodeFlagWorldXformSet = 0x8,  // the composed transform was set from outside
+        kNodeFlagDead = 0x80000000u    // IsNodeDead
     };
 
     // IFxNode returned by QI. The property protocol (retail IFxNodePropertySet, the set
@@ -942,6 +998,36 @@ namespace AlchemyImpl
         virtual GENRESULT DACOM_API GetKeyFactoryName(const char** Out) = 0;          // +0x40 06209b50
         virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;                    // +0x44 06207c90
         virtual GENRESULT DACOM_API CreateKeyValue(IDAComponent** Out) = 0;           // +0x48 06208450
+    };
+
+    // FxAnimatedSingle track LoopType (FFxAnimatedSingle::EvalTrack): the low nibble is the
+    // behaviour before the first key, the high nibble the behaviour after the last one.
+    // Repeat wraps the time, RepeatOffset also adds the first-to-last value difference per
+    // wrap, Oscillate mirrors every other wrap, Linear extends the end slope; 0 holds the
+    // end value.
+    enum EAnimatedSingleLoop : unsigned long
+    {
+        kLoopBeforeMask = 0xF,
+        kLoopBeforeRepeat = 0x1,
+        kLoopBeforeRepeatOffset = 0x2,
+        kLoopBeforeOscillate = 0x3,
+        kLoopBeforeLinear = 0x4,
+        kLoopAfterMask = 0xF0,
+        kLoopAfterRepeat = 0x10,
+        kLoopAfterRepeatOffset = 0x20,
+        kLoopAfterOscillate = 0x30,
+        kLoopAfterLinear = 0x40
+    };
+
+    // IAnimatedTransform::GetChannelFlags: one bit per child ramp (0..2 translate X/Y/Z,
+    // 3..5 rotate X/Y/Z, 6..8 scale X/Y/Z), set while the channel is left at its identity
+    // value (FFxAnimatedTransform::Evaluate skips the group whose bits are all set).
+    enum EAnimatedTransformChannel : unsigned long
+    {
+        kChannelTranslateMask = 0x7,
+        kChannelRotateMask = 0x38,
+        kChannelScaleMask = 0x1C0,
+        kChannelAllIdentity = 0x1FF
     };
 
     // FxAnimatedSingle ("1.11_IAnimatedSingle", vtable 0x0624bca0; its abstract base's

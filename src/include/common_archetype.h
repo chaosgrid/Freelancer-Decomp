@@ -537,6 +537,30 @@ namespace Archetype
         // +0x06, +0x17 and +0x25..+0x27 are alignment padding: no retail ctor, copy or
         // operator= (062f9930 / 0626fa70 / 0626fbc0) writes them and nothing reads them.
         char const* ObjName;                          // +0x08 obj
+        // The "type" values the loader maps from the names of PTR_DAT_063ec968 (named as that
+        // table's strings; the default 1 has no name there).
+        enum EGroupType : unsigned
+        {
+            kGroupTypeFin = 0x2,
+            kGroupTypeTopFin = 0x4,
+            kGroupTypePortFin = 0x8,
+            kGroupTypeStarboardFin = 0x10,
+            kGroupTypePortWing = 0x20,
+            kGroupTypeStarboardWing = 0x40,
+            kGroupTypeMiddleWing = 0x80,
+            kGroupTypeEngine = 0x100,
+            kGroupTypePortEngine = 0x200,
+            kGroupTypeMiddleEngine = 0x400,
+            kGroupTypeStarboardEngine = 0x800,
+            kGroupTypeTopEngine = 0x1000,
+            kGroupTypeBottomEngine = 0x2000,
+            kGroupTypeSpoiler = 0x4000,
+            kGroupTypeTail = 0x8000,
+            kGroupTypePortSidePanel = 0x10000,
+            kGroupTypeStarboardSidePanel = 0x20000,
+            kGroupTypePortArm = 0x40000,
+            kGroupTypeStarboardArm = 0x80000,
+        };
         unsigned Type;                                // +0x0C default 1
         int HitPts;                                   // +0x10
         bool bSeparable;                              // +0x14
@@ -1865,8 +1889,11 @@ enum EObjectType : unsigned int
     OBJ_GUIDED = 0x1000000,
     OBJ_BULLET = 0x2000000,
     OBJ_MINE = 0x4000000,
+    OBJ_COUNTERMEASURE = 0x8000000,   // CounterMeasure::get_type_bits (.text:06ce61f0)
     OBJ_LOOT = 0x10000000,
     OBJ_ASTEROID = 0x20000000,
+    OBJ_DYNAMIC_ASTEROID = 0x40000000,  // Archetype::DynamicAsteroid::ObjectType
+    OBJ_DEBRIS = 0x80000000,            // FClientDebrisGameobj::get_type
     // The seven ship types, FIGHTER .. MINING.
     OBJ_SHIP_MASK = 0x7f0000,
     // Every type below FIGHTER (MOON .. MISSION_SATELLITE) except WAYPOINT.

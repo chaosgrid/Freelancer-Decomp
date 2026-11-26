@@ -49,8 +49,8 @@ bool PageOptions::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
     // FUN_005736a0.
     if (Msg == kWinMsgCommand)
     {
-        PlayOrRewindUiSoundSlot(0);
-        if (A != 0x300c)
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
+        if (A != kOptionsCmdMainMenu)
             return false;
         Result = kMenuStateMainMenu;
         return true;

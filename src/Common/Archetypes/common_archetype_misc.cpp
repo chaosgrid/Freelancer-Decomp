@@ -39,7 +39,7 @@ namespace Archetype
         , ExplosionOffset(0.0f)
         , RechargeTime(1000.0f)
     {
-        ObjectType = 0x20000000;
+        ObjectType = OBJ_ASTEROID;
     }
 
     bool Asteroid::read(INI_Reader& Reader)
@@ -78,7 +78,7 @@ namespace Archetype
     DynamicAsteroid::DynamicAsteroid(ICliObj* InCompanion)
         : Root(InCompanion)
     {
-        ObjectType = 0x40000000;
+        ObjectType = OBJ_DYNAMIC_ASTEROID;
     }
 
     // FUN_062fa0b0

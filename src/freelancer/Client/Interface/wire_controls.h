@@ -73,6 +73,16 @@ enum EWireState2
     kWire2FlushBatchers = 0x01,    // flush both line batchers at the end of Draw
 };
 
+// WireStaticControl::EdgeMask (+0x384) bits: the box edges Draw outlines (zero means all four).
+enum EWireEdge
+{
+    kWireEdgeTop = 0x01,
+    kWireEdgeRight = 0x02,
+    kWireEdgeBottom = 0x04,
+    kWireEdgeLeft = 0x08,
+    kWireEdgeAll = 0x0f,
+};
+
 // WireButtonControl::ButtonState (+0x388) bits.
 enum EWireButtonState
 {

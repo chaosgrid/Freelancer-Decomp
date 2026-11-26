@@ -35,6 +35,16 @@ class SystemManager;
 // LootBehavior).
 // ============================================================================
 
+// FaceBehavior::TargetKind2c (+0x2c), written by OnApplyDirective from DirectiveFaceOp::Mode
+// (Content's [ObjList] Face keywords give OBJECT 1 and POINT 2) and switched on by Update.
+enum EFaceKind
+{
+    kFaceKindObject = 1,        // face the object Watcher30 watches
+    kFaceKindPoint = 2,         // face TargetPosition5c
+    kFaceKindOrientation = 3,   // face along OrientMatrix38
+    kFaceKindAhead = 4,         // keep facing the ship's own forward axis
+};
+
 class FaceBehavior : public Behavior
 {
 public:

@@ -123,10 +123,10 @@ bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
                 if (Handle != -1)
                 {
                     unsigned long Got = 0;
-                    if (Child->Read((unsigned long)Handle, Buffer, 0x30, &Got, 0) != 0 &&
-                        Got == 0x30)
+                    if (Child->Read((unsigned long)Handle, Buffer, sizeof(Buffer), &Got, 0) != 0 &&
+                        Got == sizeof(Buffer))
                     {
-                        std::memcpy(&Bone->BoneToRoot, Buffer, 0x30);
+                        std::memcpy(&Bone->BoneToRoot, Buffer, sizeof(Buffer));
                         bRead = true;
                     }
                     Child->CloseFile((unsigned long)Handle);
@@ -374,7 +374,7 @@ void DACOM_API FBoneRuntime::set_position(long /*Inst*/, Vector const& Pos)
     Dest->y = Pos.y;
     Dest->z = Pos.z;
     if ((this->Flags & 1u) != 0)
-        this->Flags = (unsigned char)(this->Flags | 2u);
+        this->Flags = (unsigned char)(this->Flags | kBoneFlagPoseChanged);
 }
 
 // LAB_065f16e0, slot 4.
@@ -390,7 +390,7 @@ void DACOM_API FBoneRuntime::set_orientation(long /*Inst*/, Matrix const& Orient
     const unsigned char Flags = this->Flags;
     std::memcpy(&LocalTransform.Rotation, &Orient, 9 * sizeof(float));
     if ((Flags & 1u) != 0)
-        this->Flags = (unsigned char)(Flags | 2u);
+        this->Flags = (unsigned char)(Flags | kBoneFlagPoseChanged);
 }
 
 // LAB_065f1720, slots 6 and 8.
@@ -411,7 +411,7 @@ void DACOM_API FBoneRuntime::set_transform(long /*Inst*/, Transform const& Xform
     const unsigned char Flags = this->Flags;
     std::memcpy(&LocalTransform, &Xform, 12 * sizeof(float));
     if ((Flags & 1u) != 0)
-        this->Flags = (unsigned char)(Flags | 2u);
+        this->Flags = (unsigned char)(Flags | kBoneFlagPoseChanged);
 }
 
 // LAB_065f1760, slot 9. The instance is not read. Retail leaves OutCenter in EAX; the slot
@@ -452,9 +452,9 @@ unsigned long DACOM_API FBoneRuntime::get_instance_flags(long /*Inst*/) const
 bool DACOM_API FBoneRuntime::joint_changed(long /*Inst*/)
 {
     unsigned char Flags = this->Flags;
-    if ((Flags & 2u) != 0)
+    if ((Flags & kBoneFlagPoseChanged) != 0)
         return false;
-    Flags = (unsigned char)(Flags | 2u);
+    Flags = (unsigned char)(Flags | kBoneFlagPoseChanged);
     this->Flags = Flags;
     return ((~Flags) & 1u) != 0;
 }
@@ -1386,7 +1386,7 @@ GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, v
     // FUN_065f22f0. operator new(0x18) returns null on failure (VC6 MSVCRT), which retail tests.
     // No test of This, Desc, Out or either name.
     FAggDesc18* Extended = (FAggDesc18*)Desc;
-    if (Extended->Size != 0x18 || std::strcmp(Extended->NameAt4, This->Name) != 0)
+    if (Extended->Size != sizeof(FAggDesc18) || std::strcmp(Extended->NameAt4, This->Name) != 0)
     {
         *Out = nullptr;
         return GR_INTERFACE_UNSUPPORTED;

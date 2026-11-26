@@ -12,6 +12,7 @@
 
 #include "common_cobject.h" // CollisionGroupDesc (get_undamaged_collision_group_list)
 #include "common_fuses.h"
+#include "common_iface.h"  // TERMINAL_TYPE (the docking_sphere type table)
 #include "common_ini.h"
 #include "common_misc.h"
 #include "common_phyarch.h"
@@ -44,14 +45,14 @@ namespace Archetype
         FDockTypeEntry const* DockTypeTable(unsigned* OutCount)
         {
             static FDockTypeEntry const kTable[] = {
-                {"berth", 1},
-                {"moor_small", 3},
-                {"moor_medium", 4},
-                {"moor_large", 5},
-                {"ring", 6},
-                {"pad", 6},
-                {"jump", 7},
-                {"airlock", 8},
+                {"berth", TERM_BERTH},
+                {"moor_small", TERM_MOOR_SMALL},
+                {"moor_medium", TERM_MOOR_MEDIUM},
+                {"moor_large", TERM_MOOR_LARGE},
+                {"ring", TERM_RING},
+                {"pad", TERM_RING}, // the archetype table has no TERM_PAD
+                {"jump", TERM_JUMP},
+                {"airlock", TERM_AIRLOCK},
             };
             if (OutCount != nullptr)
                 *OutCount = sizeof(kTable) / sizeof(kTable[0]);
@@ -89,43 +90,43 @@ namespace Archetype
 
         // PTR_DAT_063ec968, 19 entries.
         const FNamedType kCollisionGroupTypes[] = {
-            {"Fin", 2},
-            {"Top_Fin", 4},
-            {"Port_Fin", 8},
-            {"Starboard_Fin", 0x10},
-            {"Port_Wing", 0x20},
-            {"Starboard_Wing", 0x40},
-            {"Middle_Wing", 0x80},
-            {"Engine", 0x100},
-            {"Port_Engine", 0x200},
-            {"Middle_Engine", 0x400},
-            {"Starboard_Engine", 0x800},
-            {"Top_Engine", 0x1000},
-            {"Bottom_Engine", 0x2000},
-            {"Spoiler", 0x4000},
-            {"Tail", 0x8000},
-            {"Port_Side_Panel", 0x10000},
-            {"Starboard_Side_Panel", 0x20000},
-            {"Port_Arm", 0x40000},
-            {"Starboard_Arm", 0x80000}
+            {"Fin", CollisionGroup::kGroupTypeFin},
+            {"Top_Fin", CollisionGroup::kGroupTypeTopFin},
+            {"Port_Fin", CollisionGroup::kGroupTypePortFin},
+            {"Starboard_Fin", CollisionGroup::kGroupTypeStarboardFin},
+            {"Port_Wing", CollisionGroup::kGroupTypePortWing},
+            {"Starboard_Wing", CollisionGroup::kGroupTypeStarboardWing},
+            {"Middle_Wing", CollisionGroup::kGroupTypeMiddleWing},
+            {"Engine", CollisionGroup::kGroupTypeEngine},
+            {"Port_Engine", CollisionGroup::kGroupTypePortEngine},
+            {"Middle_Engine", CollisionGroup::kGroupTypeMiddleEngine},
+            {"Starboard_Engine", CollisionGroup::kGroupTypeStarboardEngine},
+            {"Top_Engine", CollisionGroup::kGroupTypeTopEngine},
+            {"Bottom_Engine", CollisionGroup::kGroupTypeBottomEngine},
+            {"Spoiler", CollisionGroup::kGroupTypeSpoiler},
+            {"Tail", CollisionGroup::kGroupTypeTail},
+            {"Port_Side_Panel", CollisionGroup::kGroupTypePortSidePanel},
+            {"Starboard_Side_Panel", CollisionGroup::kGroupTypeStarboardSidePanel},
+            {"Port_Arm", CollisionGroup::kGroupTypePortArm},
+            {"Starboard_Arm", CollisionGroup::kGroupTypeStarboardArm}
         };
 
         // PTR_s_scanner_063ec8f8, 14 entries. Values are EEquipType bits.
         const FNamedType kLinkedEquipTypes[] = {
-            {"scanner", 0x80000},
-            {"engine", 0x20000},
-            {"weapon", 0x80},
-            {"shield", 0x100},
-            {"thruster", 0x400},
-            {"power", 0x40000},
-            {"light", 1},
-            {"tractor", 0x100000},
-            {"attached_fx", 2},
-            {"internal_fx", 0x400000},
-            {"tradelane", 0x800000},
-            {"repairdroid", 0x200000},
-            {"cloaking_device", 0x1000},
-            {"armor", 0x1000000}
+            {"scanner", EquipTypeScanner},
+            {"engine", EquipTypeEngine},
+            {"weapon", EquipTypeGun},
+            {"shield", EquipTypeShield},
+            {"thruster", EquipTypeThruster},
+            {"power", EquipTypePower},
+            {"light", EquipTypeLight},
+            {"tractor", EquipTypeTractor},
+            {"attached_fx", EquipTypeAttachedFX},
+            {"internal_fx", EquipTypeInternalFX},
+            {"tradelane", EquipTypeTradeLane},
+            {"repairdroid", EquipTypeRepairDroid},
+            {"cloaking_device", EquipTypeCloak},
+            {"armor", EquipTypeArmor}
         };
 
         // FUN_062f9b10's two table walks ("type", "linked_equip"), DACOM stricmp.

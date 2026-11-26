@@ -13,6 +13,16 @@
 // an FFxEffectArchetype).
 namespace AlchemyImpl
 {
+    // The node-class mask IFxEffect::IsFinished / DestroyNodes take (FFxEffectObject::
+    // WalkNodesFlagged, DispatchFlagsToAlchemy): which of IGenericFx::GetIsEmitter /
+    // GetIsField / GetIsAppearance a node must answer.
+    enum EFxNodeClass : unsigned long
+    {
+        kFxNodeClassEmitter = 0x1,
+        kFxNodeClassField = 0x2,
+        kFxNodeClassAppearance = 0x4
+    };
+
     class FFxEffectObject final : public IFxEffect
     {
     public:

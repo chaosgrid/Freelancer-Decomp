@@ -117,7 +117,7 @@ void FCliMedAsteroidGameobj::Explode(Vector const* Pos)
               "asteroid_mine told to explode but has no explosion archetype");
         return;
     }
-    if (ExplosionArch->Process != 2)
+    if (ExplosionArch->Process != Archetype::Explosion::ProcessNone)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x79c,
               "Explosion process for asteroid should be set to none");

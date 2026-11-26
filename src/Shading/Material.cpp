@@ -8,6 +8,7 @@
 #include "MaterialAnimation.h"
 #include "MaterialLibrary.h"
 #include "engine/engbase.h"
+#include "render/slots.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -17,53 +18,148 @@
 
 // Retail Shading.dll state tables: 0-terminated {state, value} pairs (render-state or
 // texture-stage-state); the name suffix is the DAT_ address.
-static const unsigned long GDetailTable_06ed188c[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed18ac[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x5, 0x14, 0x6, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed18dc[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1914[] = {0x1, 0x5, 0x2, 0x2, 0x3, 0x1, 0x4, 0x4, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed194c[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1e7c[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1e9c[] = {0x89, 0x0, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x5, 0x14, 0x6, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1ecc[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1f04[] = {0x1, 0x5, 0x2, 0x2, 0x3, 0x1, 0x4, 0x4, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1f3c[] = {0x1, 0x2, 0x2, 0x2, 0x3, 0x0, 0x4, 0x2, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed1f74[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed220c[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed222c[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x5, 0x14, 0x6, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed225c[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed2294[] = {0x1, 0x5, 0x2, 0x2, 0x3, 0x1, 0x4, 0x4, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GDetailTable_06ed22cc[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
+static const unsigned long GDetailTable_06ed188c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GDetailTable_06ed18ac[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+static const unsigned long GDetailTable_06ed18dc[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GDetailTable_06ed1914[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailTable_06ed194c[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailTable_06ed1e7c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GDetailTable_06ed1e9c[] = {
+    D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+static const unsigned long GDetailTable_06ed1ecc[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GDetailTable_06ed1f04[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailTable_06ed1f3c[] = {
+    D3DTSS_COLOROP, D3DTOP_SELECTARG1, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GDetailTable_06ed1f74[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailTable_06ed220c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GDetailTable_06ed222c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+static const unsigned long GDetailTable_06ed225c[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GDetailTable_06ed2294[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailTable_06ed22cc[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
 
 // LAB_06eb81e0.
-static const unsigned long GDetailMapTable_06ed1a9c[] = {0x89, 1, 0x1D, 0, 0x1B, 0, 0, 0};
-static const unsigned long GDetailMapTable_06ed1abc[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0, 0};
-static const unsigned long GDetailMapTable_06ed1af4[] = {1, 5, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0, 0};
-static const unsigned long GDetailMapTable_06ed1b2c[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0, 0};
+static const unsigned long GDetailMapTable_06ed1a9c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GDetailMapTable_06ed1abc[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GDetailMapTable_06ed1af4[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GDetailMapTable_06ed1b2c[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
 
 // State tables for the material Bind callbacks.
-static const unsigned long GBindTable_06ed209c[] = {0x8D, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed20ac[] = {0x1, 0x2, 0x2, 0x2, 0x3, 0x0, 0x4, 0x2, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed20e4[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GBindTable_06ed206c[] = {0x89, 0x0, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x9, 0x14, 0x1, 0x0, 0x0};
+static const unsigned long GBindTable_06ed209c[] = {
+    D3DRS_COLORVERTEX, FALSE, 0, 0};
+static const unsigned long GBindTable_06ed20ac[] = {
+    D3DTSS_COLOROP, D3DTOP_SELECTARG1, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GBindTable_06ed20e4[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GBindTable_06ed206c[] = {
+    D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR, D3DRS_DESTBLEND, D3DBLEND_ZERO, 0, 0};
 
-static const unsigned long GBindTable_06ed26dc[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed2714[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GBindTable_06ed26ac[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x5, 0x14, 0x6, 0x0, 0x0};
-static const unsigned long GBindTable_06ed268c[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
+static const unsigned long GBindTable_06ed26dc[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GBindTable_06ed2714[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GBindTable_06ed26ac[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+static const unsigned long GBindTable_06ed268c[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
 
-static const unsigned long GBindTable_06ed1484[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed14a4[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed14dc[] = {0x1, 0x5, 0x2, 0x2, 0x3, 0x1, 0x4, 0x4, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GBindTable_06ed1514[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
+static const unsigned long GBindTable_06ed1484[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GBindTable_06ed14a4[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GBindTable_06ed14dc[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE2X, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GBindTable_06ed1514[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
 
-static const unsigned long GBindTable_06ed16cc[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed16ec[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed1724[] = {0x1, 0x7, 0x2, 0x2, 0x3, 0x1, 0x4, 0x4, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GBindTable_06ed175c[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
+static const unsigned long GBindTable_06ed16cc[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, FALSE, 0, 0};
+static const unsigned long GBindTable_06ed16ec[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GBindTable_06ed1724[] = {
+    D3DTSS_COLOROP, D3DTOP_ADD, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GBindTable_06ed175c[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
 
-static const unsigned long GBindTable_06ed1c84[] = {0x1, 0x4, 0x2, 0x2, 0x3, 0x0, 0x4, 0x4, 0x5, 0x2, 0x6, 0x0, 0x0, 0x0};
-static const unsigned long GBindTable_06ed1cbc[] = {0x1, 0x1, 0x2, 0x2, 0x3, 0x1, 0x4, 0x1, 0x5, 0x2, 0x6, 0x1, 0x0, 0x0};
-static const unsigned long GBindTable_06ed1c54[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x1, 0x13, 0x2, 0x14, 0x2, 0x0, 0x0};
+static const unsigned long GBindTable_06ed1c84[] = {
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
+static const unsigned long GBindTable_06ed1cbc[] = {
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
+static const unsigned long GBindTable_06ed1c54[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_ONE, D3DRS_DESTBLEND, D3DBLEND_ONE, 0, 0};
 
 // FUN_06eb7120: one texture block, four calls in the original order.
 static void BindDetailTexture(IRenderPipeline* Pipeline, const FTexBlock& Block,
@@ -97,7 +193,7 @@ static void BindMaterialAndContext(IRenderPipeline* Pipeline, const float* Mater
     {
         const FRpVertexSrcDesc* Source = ((const FMaterialSubmitContext*)Context)->SourceVertices;
         if (Source != nullptr && Source->Diffuse.Base != nullptr)
-            Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
+            Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
     }
 }
 
@@ -133,7 +229,7 @@ bool FDetailMap2PassMaterial::ApplyDetailPassState(unsigned long Pass)
             BindDetailTexture(Pipeline, TexBlocks[1], 1);
             ApplyDetailTable(Pipeline, GDetailTable_06ed1914, true, 1);
             Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 0);
-            Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+            Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
             SetDetailTileTransform(Pipeline, DetailTileRate0);
             DisabledStage = 2;
         }
@@ -144,7 +240,7 @@ bool FDetailMap2PassMaterial::ApplyDetailPassState(unsigned long Pass)
     {
         ApplyDetailTable(Pipeline, GDetailTable_06ed194c, true, 1);
         ApplyDetailTable(Pipeline, GDetailTable_06ed18ac, false, 0);
-        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     }
     return true;
 }
@@ -163,7 +259,7 @@ bool FIllumDetailMapMaterial::ApplyIllumDetailPassState(unsigned long Pass)
             BindDetailTexture(Pipeline, TexBlocks[1], 1);
             ApplyDetailTable(Pipeline, GDetailTable_06ed1f04, true, 1);
             Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 0);
-            Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+            Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
             SetDetailTileTransform(Pipeline, DetailTileRate0);
             DisabledStage = 2;
         }
@@ -177,7 +273,7 @@ bool FIllumDetailMapMaterial::ApplyIllumDetailPassState(unsigned long Pass)
         ApplyDetailTable(Pipeline, GDetailTable_06ed1f74, true, 2);
         ApplyDetailTable(Pipeline, GDetailTable_06ed1e9c, false, 0);
         BindDetailTexture(Pipeline, TexBlocks[2], 1);
-        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
         SetDetailTileTransform(Pipeline, DetailTileRate1);
     }
     return true;
@@ -205,7 +301,7 @@ bool FMasked2DetailMapMaterial::ApplyMaskedDetailPassState(unsigned long Pass)
         ApplyDetailTable(Pipeline, GDetailTable_06ed22cc, true, 2);
         ApplyDetailTable(Pipeline, GDetailTable_06ed220c, false, 0);
         Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 0);
-        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
         SetDetailTileTransform(Pipeline, DetailTileRate0);
     }
     else if (Pass == 1)
@@ -215,7 +311,7 @@ bool FMasked2DetailMapMaterial::ApplyMaskedDetailPassState(unsigned long Pass)
         ApplyDetailTable(Pipeline, GDetailTable_06ed222c, false, 0);
         BindDetailTexture(Pipeline, TexBlocks[2], 1);
         Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 0);
-        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
         SetDetailTileTransform(Pipeline, DetailTileRate1);
     }
     return true;
@@ -223,12 +319,20 @@ bool FMasked2DetailMapMaterial::ApplyMaskedDetailPassState(unsigned long Pass)
 
 // Raw retail tables at 06ed1140/1178 and 06ed23fc/2434 are identical.
 static const unsigned long GAtmosphereNebulaTss0[] = {
-    1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0, 0};
+    D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE, 0, 0};
 static const unsigned long GAtmosphereNebulaTss1[] = {
-    1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0, 0};
+    D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+    D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+    D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0, 0};
 // Raw retail RS tables 06ed1100 and 06ed23cc.
-static const unsigned long GAtmosphereRs[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0, 0};
-static const unsigned long GNebulaRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 2, 0, 0};
+static const unsigned long GAtmosphereRs[] = {
+    D3DRS_LIGHTING, TRUE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+static const unsigned long GNebulaRs[] = {
+    D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+    D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_ONE, 0, 0};
 
 namespace
 {
@@ -284,7 +388,7 @@ void ConstructPropertyRecords(FShadingPropertyRecord* Records, unsigned long Cou
 // All schema on-exit bodies clear the COM pointer before calling Release.
 void ReleaseSchemaPayload(FShadingPropertyValue& Value)
 {
-    if (Value.Type == 6)
+    if (Value.Type == kMaterialParamComponent)
     {
         IDAComponent* Component = (IDAComponent*)(Value.Payload0);
         Value.Payload0 = 0;
@@ -381,36 +485,54 @@ void InitializeAtmospherePropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[0], 0x0, "Ac", "Ambient Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereAmbient], 0x0, "Ac", "Ambient Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
     static const unsigned long Payload_1_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_1_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_1_2[] = {0x41200000, 0x41200000, 0x41200000};
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[1], 0x0, "Dc", "Diffuse Color",
-                                3, Payload_1_0, 3, Payload_1_1, 3, Payload_1_2);
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[2], 0x0, "Dt_name", "Fade 1D Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[3], 0x0, "Dt_flags", "Fade 1D Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[4], 0x20000, "Dt_flags", "Fade 1D Texture U Address Mode",
-                                9, (void*)2, 9, nullptr, 9, nullptr);
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[5], 0x40000, "Dt_flags", "Fade 1D Texture V Address Mode",
-                                9, (void*)2, 9, nullptr, 9, nullptr);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereDiffuse], 0x0, "Dc", "Diffuse Color",
+                                kMaterialParamVector3, Payload_1_0,
+                                kMaterialParamVector3, Payload_1_1,
+                                kMaterialParamVector3, Payload_1_2);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereFadeTextureName], 0x0, "Dt_name", "Fade 1D Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereFadeTextureWrap], 0x0, "Dt_flags", "Fade 1D Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereFadeTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Fade 1D Texture U Address Mode",
+                                kMaterialParamAddressMode, (void*)2,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereFadeTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Fade 1D Texture V Address Mode",
+                                kMaterialParamAddressMode, (void*)2,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
     static const unsigned long Payload_6_0[] = {0x3F800000};
     static const unsigned long Payload_6_1[] = {0xFF7FFFFF};
     static const unsigned long Payload_6_2[] = {0x7F7FFFFF};
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[6], 0x0, "Fade", "Fade Off",
-                                2, Payload_6_0, 2, Payload_6_1, 2, Payload_6_2);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereFadeOff], 0x0, "Fade", "Fade Off",
+                                kMaterialParamFloat, Payload_6_0,
+                                kMaterialParamFloat, Payload_6_1,
+                                kMaterialParamFloat, Payload_6_2);
     static const unsigned long Payload_7_0[] = {0x3F400000};
     static const unsigned long Payload_7_1[] = {0xFF7FFFFF};
     static const unsigned long Payload_7_2[] = {0x7F7FFFFF};
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[7], 0x0, "Alpha", "Alpha",
-                                2, Payload_7_0, 2, Payload_7_1, 2, Payload_7_2);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereAlpha], 0x0, "Alpha", "Alpha",
+                                kMaterialParamFloat, Payload_7_0,
+                                kMaterialParamFloat, Payload_7_1,
+                                kMaterialParamFloat, Payload_7_2);
     static const unsigned long Payload_8_0[] = {0x3F833333};
     static const unsigned long Payload_8_1[] = {0xFF7FFFFF};
     static const unsigned long Payload_8_2[] = {0x7F7FFFFF};
-    SetAtmospherePropertyRecord(GAtmospherePropertySchema[8], 0x0, "Scale", "Scale",
-                                2, Payload_8_0, 2, Payload_8_1, 2, Payload_8_2);
+    SetAtmospherePropertyRecord(GAtmospherePropertySchema[kAtmosphereScale], 0x0, "Scale", "Scale",
+                                kMaterialParamFloat, Payload_8_0,
+                                kMaterialParamFloat, Payload_8_1,
+                                kMaterialParamFloat, Payload_8_2);
 }
 
 void InitializeSinglePassPropertySchema()
@@ -427,41 +549,61 @@ void InitializeSinglePassPropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[0], 0x0, "Ac", "Ambient Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassAmbient], 0x0, "Ac", "Ambient Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
     static const unsigned long Payload_1_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_1_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_1_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[1], 0x0, "Dc", "Diffuse Color",
-                                3, Payload_1_0, 3, Payload_1_1, 3, Payload_1_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassDiffuse], 0x0, "Dc", "Diffuse Color",
+                                kMaterialParamVector3, Payload_1_0,
+                                kMaterialParamVector3, Payload_1_1,
+                                kMaterialParamVector3, Payload_1_2);
     static const unsigned long Payload_2_0[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_2_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_2_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[2], 0x0, "Ec", "Emissive Color",
-                                3, Payload_2_0, 3, Payload_2_1, 3, Payload_2_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassEmissive], 0x0, "Ec", "Emissive Color",
+                                kMaterialParamVector3, Payload_2_0,
+                                kMaterialParamVector3, Payload_2_1,
+                                kMaterialParamVector3, Payload_2_2);
     static const unsigned long Payload_3_0[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_3_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_3_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[3], 0x0, "Sc", "Specular Color",
-                                3, Payload_3_0, 3, Payload_3_1, 3, Payload_3_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassSpecular], 0x0, "Sc", "Specular Color",
+                                kMaterialParamVector3, Payload_3_0,
+                                kMaterialParamVector3, Payload_3_1,
+                                kMaterialParamVector3, Payload_3_2);
     static const unsigned long Payload_4_0[] = {0x00000000};
     static const unsigned long Payload_4_1[] = {0x00000000};
     static const unsigned long Payload_4_2[] = {0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[4], 0x0, "Sp", "Specular Power",
-                                2, Payload_4_0, 2, Payload_4_1, 2, Payload_4_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassSpecularPower], 0x0, "Sp", "Specular Power",
+                                kMaterialParamFloat, Payload_4_0,
+                                kMaterialParamFloat, Payload_4_1,
+                                kMaterialParamFloat, Payload_4_2);
     static const unsigned long Payload_5_0[] = {0x3F800000};
     static const unsigned long Payload_5_1[] = {0x00000000};
     static const unsigned long Payload_5_2[] = {0x3F800000};
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[5], 0x0, "Oc", "Opacity ",
-                                2, Payload_5_0, 2, Payload_5_1, 2, Payload_5_2);
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[6], 0x0, "Dt_name", "Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[7], 0x0, "Dt_flags", "Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[8], 0x20000, "Dt_flags", "Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GSinglePassPropertySchema[9], 0x40000, "Dt_flags", "Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassOpacity], 0x0, "Oc", "Opacity ",
+                                kMaterialParamFloat, Payload_5_0,
+                                kMaterialParamFloat, Payload_5_1,
+                                kMaterialParamFloat, Payload_5_2);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassTextureName], 0x0, "Dt_name", "Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassTextureWrap], 0x0, "Dt_flags", "Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GSinglePassPropertySchema[kSinglePassTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
 }
 
 void InitializeDetailPropertyRecords(FShadingPropertyRecord* Records)
@@ -472,54 +614,54 @@ void InitializeDetailPropertyRecords(FShadingPropertyRecord* Records)
     static const unsigned long kFloatMinBits = 0xFF7FFFFF;
     static const unsigned long kFloatMaxBits = 0x7F7FFFFF;
 
-    SetSinglePassPropertyRecord(Records[0], 0, "Ac", "Ambient Color", 3,
-                                kWhite3, 3, kZero3, 3, kWhite3);
-    SetSinglePassPropertyRecord(Records[1], 0, "Dc", "Diffuse Color", 3,
-                                kWhite3, 3, kZero3, 3, kWhite3);
-    SetSinglePassPropertyRecord(Records[2], 0, "Dt_name",
-                                "Diffuse Texture Name", 7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(Records[3], 0, "Dt_flags",
-                                "Diffuse Texture Wrap Mode", 8, (void*)4,
-                                8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[4], 0x20000, "Dt_flags",
-                                "Diffuse Texture U Address Mode", 9, (void*)2, 9, nullptr,
-                                9, nullptr);
-    SetSinglePassPropertyRecord(Records[5], 0x40000, "Dt_flags",
-                                "Diffuse Texture V Address Mode", 9, (void*)2, 9, nullptr,
-                                9, nullptr);
-    SetSinglePassPropertyRecord(Records[6], 0, "flip u", "Flip U ", 1,
-                                nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(Records[7], 0, "flip v", "Flip V ", 1,
-                                nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(Records[8], 0, "Dm0_name",
-                                "Detail Texture Alpha0 Name", 7, "(None)", 7, nullptr, 7,
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAmbient], 0, "Ac", "Ambient Color", kMaterialParamVector3,
+                                kWhite3, kMaterialParamVector3, kZero3, kMaterialParamVector3, kWhite3);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapDiffuse], 0, "Dc", "Diffuse Color", kMaterialParamVector3,
+                                kWhite3, kMaterialParamVector3, kZero3, kMaterialParamVector3, kWhite3);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapDiffuseTextureName], 0, "Dt_name",
+                                "Diffuse Texture Name", kMaterialParamTextureName, "(None)", kMaterialParamTextureName, nullptr, kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapDiffuseTextureWrap], 0, "Dt_flags",
+                                "Diffuse Texture Wrap Mode", kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr, kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapDiffuseTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags",
+                                "Diffuse Texture U Address Mode", kMaterialParamAddressMode, (void*)2, kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapDiffuseTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags",
+                                "Diffuse Texture V Address Mode", kMaterialParamAddressMode, (void*)2, kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapFlipU], 0, "flip u", "Flip U ", kMaterialParamInteger,
+                                nullptr, kMaterialParamInteger, nullptr, kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapFlipV], 0, "flip v", "Flip V ", kMaterialParamInteger,
+                                nullptr, kMaterialParamInteger, nullptr, kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha0TextureName], 0, "Dm0_name",
+                                "Detail Texture Alpha0 Name", kMaterialParamTextureName, "(None)", kMaterialParamTextureName, nullptr, kMaterialParamTextureName,
                                 nullptr);
-    SetSinglePassPropertyRecord(Records[9], 0, "Dm0_flags",
-                                "Detail Texture Alpha0 Wrap Mode", 8,
-                                (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[10], 0x20000, "Dm0_flags",
-                                "Detail Texture Alpha0 U Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[11], 0x40000, "Dm0_flags",
-                                "Detail Texture Alpha0 V Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[12], 0, "TileRate0",
-                                "Tile Rate Alpha0", 2, &kFourBits, 2, &kFloatMinBits, 2,
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha0TextureWrap], 0, "Dm0_flags",
+                                "Detail Texture Alpha0 Wrap Mode", kMaterialParamWrapMode,
+                                (void*)4, kMaterialParamWrapMode, nullptr, kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha0TextureAddressU], kMaterialParamFlagAddressU, "Dm0_flags",
+                                "Detail Texture Alpha0 U Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha0TextureAddressV], kMaterialParamFlagAddressV, "Dm0_flags",
+                                "Detail Texture Alpha0 V Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapTileRate0], 0, "TileRate0",
+                                "Tile Rate Alpha0", kMaterialParamFloat, &kFourBits, kMaterialParamFloat, &kFloatMinBits, kMaterialParamFloat,
                                 &kFloatMaxBits);
-    SetSinglePassPropertyRecord(Records[13], 0, "Dm1_name",
-                                "Detail Texture Alpha1 Name", 7, "(None)", 7, nullptr, 7,
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha1TextureName], 0, "Dm1_name",
+                                "Detail Texture Alpha1 Name", kMaterialParamTextureName, "(None)", kMaterialParamTextureName, nullptr, kMaterialParamTextureName,
                                 nullptr);
-    SetSinglePassPropertyRecord(Records[14], 0, "Dm1_flags",
-                                "Detail Texture Alpha1 Wrap Mode", 8,
-                                (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[15], 0x20000, "Dm1_flags",
-                                "Detail Texture Alpha1 U Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[16], 0x40000, "Dm1_flags",
-                                "Detail Texture Alpha1 V Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[17], 0, "TileRate1",
-                                "Tile Rate Alpha1", 2, &kFourBits, 2, &kFloatMinBits, 2,
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha1TextureWrap], 0, "Dm1_flags",
+                                "Detail Texture Alpha1 Wrap Mode", kMaterialParamWrapMode,
+                                (void*)4, kMaterialParamWrapMode, nullptr, kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha1TextureAddressU], kMaterialParamFlagAddressU, "Dm1_flags",
+                                "Detail Texture Alpha1 U Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapAlpha1TextureAddressV], kMaterialParamFlagAddressV, "Dm1_flags",
+                                "Detail Texture Alpha1 V Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kTwoDetailMapTileRate1], 0, "TileRate1",
+                                "Tile Rate Alpha1", kMaterialParamFloat, &kFourBits, kMaterialParamFloat, &kFloatMinBits, kMaterialParamFloat,
                                 &kFloatMaxBits);
 }
 
@@ -565,39 +707,39 @@ void InitializeDetail2PassPropertyRecords(FShadingPropertyRecord* Records)
     static const unsigned long kFloatMinBits = 0xFF7FFFFF;
     static const unsigned long kFloatMaxBits = 0x7F7FFFFF;
 
-    SetSinglePassPropertyRecord(Records[0], 0, "Ac", "Ambient Color", 3,
-                                kWhite3, 3, kZero3, 3, kWhite3);
-    SetSinglePassPropertyRecord(Records[1], 0, "Dc", "Diffuse Color", 3,
-                                kWhite3, 3, kZero3, 3, kTen3);
-    SetSinglePassPropertyRecord(Records[2], 0, "Dt_name",
-                                "Diffuse Texture Name", 7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(Records[3], 0, "Dt_flags",
-                                "Diffuse Texture Wrap Mode", 8, (void*)4,
-                                8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[4], 0x20000, "Dt_flags",
-                                "Diffuse Texture U Address Mode", 9, (void*)2, 9, nullptr,
-                                9, nullptr);
-    SetSinglePassPropertyRecord(Records[5], 0x40000, "Dt_flags",
-                                "Diffuse Texture V Address Mode", 9, (void*)2, 9, nullptr,
-                                9, nullptr);
-    SetSinglePassPropertyRecord(Records[6], 0, "flip u", "Flip U ", 1,
-                                nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(Records[7], 0, "flip v", "Flip V ", 1,
-                                nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(Records[8], 0, "Dm1_name",
-                                "Detail Texture Name", 7, "(None)", 7, nullptr, 7,
+    SetSinglePassPropertyRecord(Records[kDetailMapAmbient], 0, "Ac", "Ambient Color", kMaterialParamVector3,
+                                kWhite3, kMaterialParamVector3, kZero3, kMaterialParamVector3, kWhite3);
+    SetSinglePassPropertyRecord(Records[kDetailMapDiffuse], 0, "Dc", "Diffuse Color", kMaterialParamVector3,
+                                kWhite3, kMaterialParamVector3, kZero3, kMaterialParamVector3, kTen3);
+    SetSinglePassPropertyRecord(Records[kDetailMapDiffuseTextureName], 0, "Dt_name",
+                                "Diffuse Texture Name", kMaterialParamTextureName, "(None)", kMaterialParamTextureName, nullptr, kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapDiffuseTextureWrap], 0, "Dt_flags",
+                                "Diffuse Texture Wrap Mode", kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr, kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapDiffuseTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags",
+                                "Diffuse Texture U Address Mode", kMaterialParamAddressMode, (void*)2, kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapDiffuseTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags",
+                                "Diffuse Texture V Address Mode", kMaterialParamAddressMode, (void*)2, kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapFlipU], 0, "flip u", "Flip U ", kMaterialParamInteger,
+                                nullptr, kMaterialParamInteger, nullptr, kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(Records[kDetailMapFlipV], 0, "flip v", "Flip V ", kMaterialParamInteger,
+                                nullptr, kMaterialParamInteger, nullptr, kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(Records[kDetailMapDetailTextureName], 0, "Dm1_name",
+                                "Detail Texture Name", kMaterialParamTextureName, "(None)", kMaterialParamTextureName, nullptr, kMaterialParamTextureName,
                                 nullptr);
-    SetSinglePassPropertyRecord(Records[9], 0, "Dm1_flags",
-                                "Detail Texture Wrap Mode", 8,
-                                (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[10], 0x20000, "Dm1_flags",
-                                "Detail Texture U Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[11], 0x40000, "Dm1_flags",
-                                "Detail Texture V Address Mode", 9, nullptr, 9,
-                                nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[12], 0, "TileRate",
-                                "Tile Rate ", 2, &kFourBits, 2, &kFloatMinBits, 2,
+    SetSinglePassPropertyRecord(Records[kDetailMapDetailTextureWrap], 0, "Dm1_flags",
+                                "Detail Texture Wrap Mode", kMaterialParamWrapMode,
+                                (void*)4, kMaterialParamWrapMode, nullptr, kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapDetailTextureAddressU], kMaterialParamFlagAddressU, "Dm1_flags",
+                                "Detail Texture U Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapDetailTextureAddressV], kMaterialParamFlagAddressV, "Dm1_flags",
+                                "Detail Texture V Address Mode", kMaterialParamAddressMode, nullptr, kMaterialParamAddressMode,
+                                nullptr, kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kDetailMapTileRate], 0, "TileRate",
+                                "Tile Rate ", kMaterialParamFloat, &kFourBits, kMaterialParamFloat, &kFloatMinBits, kMaterialParamFloat,
                                 &kFloatMaxBits);
 }
 
@@ -640,38 +782,64 @@ void InitializeDetailMapPropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[0], 0x0, "Ac", "Ambient Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapAmbient], 0x0, "Ac", "Ambient Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
     static const unsigned long Payload_1_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_1_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_1_2[] = {0x41200000, 0x41200000, 0x41200000};
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[1], 0x0, "Dc", "Diffuse Color",
-                                3, Payload_1_0, 3, Payload_1_1, 3, Payload_1_2);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[2], 0x0, "Dt_name", "Diffuse Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[3], 0x0, "Dt_flags", "Diffuse Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[4], 0x20000, "Dt_flags", "Diffuse Texture U Address Mode",
-                                9, (void*)2, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[5], 0x40000, "Dt_flags", "Diffuse Texture V Address Mode",
-                                9, (void*)2, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[6], 0x0, "flip u", "Flip U ",
-                                1, nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[7], 0x0, "flip v", "Flip V ",
-                                1, nullptr, 1, nullptr, 1, (void*)1);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[8], 0x0, "Dm_name", "Detail Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[9], 0x0, "Dm_flags", "Detail Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[10], 0x20000, "Dm_flags", "Detail Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[11], 0x40000, "Dm_flags", "Detail Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDiffuse], 0x0, "Dc", "Diffuse Color",
+                                kMaterialParamVector3, Payload_1_0,
+                                kMaterialParamVector3, Payload_1_1,
+                                kMaterialParamVector3, Payload_1_2);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDiffuseTextureName], 0x0, "Dt_name", "Diffuse Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDiffuseTextureWrap], 0x0, "Dt_flags", "Diffuse Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDiffuseTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Diffuse Texture U Address Mode",
+                                kMaterialParamAddressMode, (void*)2,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDiffuseTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Diffuse Texture V Address Mode",
+                                kMaterialParamAddressMode, (void*)2,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapFlipU], 0x0, "flip u", "Flip U ",
+                                kMaterialParamInteger, nullptr,
+                                kMaterialParamInteger, nullptr,
+                                kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapFlipV], 0x0, "flip v", "Flip V ",
+                                kMaterialParamInteger, nullptr,
+                                kMaterialParamInteger, nullptr,
+                                kMaterialParamInteger, (void*)1);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDetailTextureName], 0x0, "Dm_name", "Detail Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDetailTextureWrap], 0x0, "Dm_flags", "Detail Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDetailTextureAddressU], kMaterialParamFlagAddressU, "Dm_flags", "Detail Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapDetailTextureAddressV], kMaterialParamFlagAddressV, "Dm_flags", "Detail Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
     static const unsigned long Payload_12_0[] = {0x40800000};
     static const unsigned long Payload_12_1[] = {0xFF7FFFFF};
     static const unsigned long Payload_12_2[] = {0x7F7FFFFF};
-    SetSinglePassPropertyRecord(GDetailMapPropertySchema[12], 0x0, "TileRate", "Tile Rate ",
-                                2, Payload_12_0, 2, Payload_12_1, 2, Payload_12_2);
+    SetSinglePassPropertyRecord(GDetailMapPropertySchema[kDetailMapTileRate], 0x0, "TileRate", "Tile Rate ",
+                                kMaterialParamFloat, Payload_12_0,
+                                kMaterialParamFloat, Payload_12_1,
+                                kMaterialParamFloat, Payload_12_2);
 }
 
 void DestroyBtDetailPropertySchema()
@@ -686,14 +854,14 @@ void AssignOverlappingZeroAddressMode(void* TypeAddress, unsigned long& Payload)
 {
     unsigned long PreviousType;
     std::memcpy(&PreviousType, TypeAddress, sizeof(PreviousType));
-    if (PreviousType != 9)
+    if (PreviousType != kMaterialParamAddressMode)
     {
-        if (PreviousType == 5 || PreviousType == 7)
+        if (PreviousType == kMaterialParamString || PreviousType == kMaterialParamTextureName)
         {
             if (Payload != 0)
                 HeapFree(GetProcessHeap(), 0, (void*)Payload);
         }
-        else if (PreviousType == 6)
+        else if (PreviousType == kMaterialParamComponent)
         {
             IDAComponent* Component = (IDAComponent*)Payload;
             Payload = 0;
@@ -702,7 +870,7 @@ void AssignOverlappingZeroAddressMode(void* TypeAddress, unsigned long& Payload)
         }
         Payload = 0;
     }
-    const unsigned long NewType = 9;
+    const unsigned long NewType = kMaterialParamAddressMode;
     std::memcpy(TypeAddress, &NewType, sizeof(NewType));
     Payload = 0;
 }
@@ -721,47 +889,73 @@ void InitializeBtDetailPropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[0], 0x0, "Ac", "Ambient Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailAmbient], 0x0, "Ac", "Ambient Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
     static const unsigned long Payload_1_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_1_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_1_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[1], 0x0, "Dc", "Diffuse Color",
-                                3, Payload_1_0, 3, Payload_1_1, 3, Payload_1_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailDiffuse], 0x0, "Dc", "Diffuse Color",
+                                kMaterialParamVector3, Payload_1_0,
+                                kMaterialParamVector3, Payload_1_1,
+                                kMaterialParamVector3, Payload_1_2);
     static const unsigned long Payload_2_0[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_2_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_2_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[2], 0x0, "Ec", "Emissive Color",
-                                3, Payload_2_0, 3, Payload_2_1, 3, Payload_2_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailEmissive], 0x0, "Ec", "Emissive Color",
+                                kMaterialParamVector3, Payload_2_0,
+                                kMaterialParamVector3, Payload_2_1,
+                                kMaterialParamVector3, Payload_2_2);
     static const unsigned long Payload_3_0[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_3_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_3_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[3], 0x0, "Sc", "Specular Color",
-                                3, Payload_3_0, 3, Payload_3_1, 3, Payload_3_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailSpecular], 0x0, "Sc", "Specular Color",
+                                kMaterialParamVector3, Payload_3_0,
+                                kMaterialParamVector3, Payload_3_1,
+                                kMaterialParamVector3, Payload_3_2);
     static const unsigned long Payload_4_0[] = {0x00000000};
     static const unsigned long Payload_4_1[] = {0x00000000};
     static const unsigned long Payload_4_2[] = {0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[4], 0x0, "Sp", "Specular Power",
-                                2, Payload_4_0, 2, Payload_4_1, 2, Payload_4_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailSpecularPower], 0x0, "Sp", "Specular Power",
+                                kMaterialParamFloat, Payload_4_0,
+                                kMaterialParamFloat, Payload_4_1,
+                                kMaterialParamFloat, Payload_4_2);
     static const unsigned long Payload_5_0[] = {0x3F800000};
     static const unsigned long Payload_5_1[] = {0x00000000};
     static const unsigned long Payload_5_2[] = {0x3F800000};
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[5], 0x0, "Oc", "Opacity ",
-                                2, Payload_5_0, 2, Payload_5_1, 2, Payload_5_2);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[6], 0x0, "Dt_name", "Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[7], 0x0, "Dt_flags", "Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[8], 0x20000, "Dt_flags", "Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[9], 0x40000, "Dt_flags", "Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[10], 0x0, "Bt_name", "DetailTexture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[11], 0x0, "Bt_flags", "DetailTexture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GBtDetailPropertySchema[12], 0x20000, "Bt_flags", "DetailTexture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailOpacity], 0x0, "Oc", "Opacity ",
+                                kMaterialParamFloat, Payload_5_0,
+                                kMaterialParamFloat, Payload_5_1,
+                                kMaterialParamFloat, Payload_5_2);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailTextureName], 0x0, "Dt_name", "Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailTextureWrap], 0x0, "Dt_flags", "Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailDetailTextureName], 0x0, "Bt_name", "DetailTexture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailDetailTextureWrap], 0x0, "Bt_flags", "DetailTexture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GBtDetailPropertySchema[kBtDetailDetailTextureAddressU], kMaterialParamFlagAddressU, "Bt_flags", "DetailTexture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
 
     // 06eb4d94/4d99: flags alias the Atmosphere construction guard; the
     // following words overlap record zero and are published in setter order.
@@ -778,14 +972,22 @@ void InitializeBtDetailPropertySchema()
 // LAB_06ebc3f0 / LAB_06eba540.
 void InitializeTexturePropertyRecords(FShadingPropertyRecord* Records)
 {
-    SetSinglePassPropertyRecord(Records[0], 0, "Dt_name", "Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(Records[1], 0, "Dt_flags", "Texture Wrap Mode",
-                                8, (const void*)4UL, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(Records[2], 0x20000, "Dt_flags", "Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(Records[3], 0x40000, "Dt_flags", "Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(Records[kNebulaTextureName], 0, "Dt_name", "Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(Records[kNebulaTextureWrap], 0, "Dt_flags", "Texture Wrap Mode",
+                                kMaterialParamWrapMode, (const void*)4UL,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kNebulaTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(Records[kNebulaTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
 }
 
 void DestroyNebulaPropertySchema()
@@ -840,16 +1042,26 @@ void InitializeEcEtPropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GEcEtPropertySchema[0], 0x4, "Ec", "Emissive Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
-    SetSinglePassPropertyRecord(GEcEtPropertySchema[1], 0x0, "Et_name", "Emissive Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GEcEtPropertySchema[2], 0x0, "Et_flags", "Emissive Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GEcEtPropertySchema[3], 0x20000, "Et_flags", "Emissive Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GEcEtPropertySchema[4], 0x40000, "Et_flags", "Emissive Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(GEcEtPropertySchema[kEcEtEmissive], 0x4, "Ec", "Emissive Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
+    SetSinglePassPropertyRecord(GEcEtPropertySchema[kEcEtEmissiveTextureName], 0x0, "Et_name", "Emissive Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GEcEtPropertySchema[kEcEtEmissiveTextureWrap], 0x0, "Et_flags", "Emissive Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GEcEtPropertySchema[kEcEtEmissiveTextureAddressU], kMaterialParamFlagAddressU, "Et_flags", "Emissive Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GEcEtPropertySchema[kEcEtEmissiveTextureAddressV], kMaterialParamFlagAddressV, "Et_flags", "Emissive Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
 }
 
 void InitializeDcDtEtPropertySchema()
@@ -866,24 +1078,42 @@ void InitializeDcDtEtPropertySchema()
     static const unsigned long Payload_0_0[] = {0x3F800000, 0x3F800000, 0x3F800000};
     static const unsigned long Payload_0_1[] = {0x00000000, 0x00000000, 0x00000000};
     static const unsigned long Payload_0_2[] = {0x3F800000, 0x3F800000, 0x3F800000};
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[0], 0x0, "Dc", "Diffuse Color",
-                                3, Payload_0_0, 3, Payload_0_1, 3, Payload_0_2);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[1], 0x0, "Dt_name", "Diffuse Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[2], 0x0, "Dt_flags", "Diffuse Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[3], 0x20000, "Dt_flags", "Diffuse Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[4], 0x40000, "Dt_flags", "Diffuse Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[5], 0x0, "Et_name", "Emissive Texture Name",
-                                7, "(None)", 7, nullptr, 7, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[6], 0x0, "Et_flags", "Emissive Texture Wrap Mode",
-                                8, (void*)4, 8, nullptr, 8, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[7], 0x20000, "Et_flags", "Emissive Texture U Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
-    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[8], 0x40000, "Et_flags", "Emissive Texture V Address Mode",
-                                9, nullptr, 9, nullptr, 9, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtDiffuse], 0x0, "Dc", "Diffuse Color",
+                                kMaterialParamVector3, Payload_0_0,
+                                kMaterialParamVector3, Payload_0_1,
+                                kMaterialParamVector3, Payload_0_2);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtDiffuseTextureName], 0x0, "Dt_name", "Diffuse Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtDiffuseTextureWrap], 0x0, "Dt_flags", "Diffuse Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtDiffuseTextureAddressU], kMaterialParamFlagAddressU, "Dt_flags", "Diffuse Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtDiffuseTextureAddressV], kMaterialParamFlagAddressV, "Dt_flags", "Diffuse Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtEmissiveTextureName], 0x0, "Et_name", "Emissive Texture Name",
+                                kMaterialParamTextureName, "(None)",
+                                kMaterialParamTextureName, nullptr,
+                                kMaterialParamTextureName, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtEmissiveTextureWrap], 0x0, "Et_flags", "Emissive Texture Wrap Mode",
+                                kMaterialParamWrapMode, (void*)4,
+                                kMaterialParamWrapMode, nullptr,
+                                kMaterialParamWrapMode, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtEmissiveTextureAddressU], kMaterialParamFlagAddressU, "Et_flags", "Emissive Texture U Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
+    SetSinglePassPropertyRecord(GDcDtEtPropertySchema[kDcDtEtEmissiveTextureAddressV], kMaterialParamFlagAddressV, "Et_flags", "Emissive Texture V Address Mode",
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr,
+                                kMaterialParamAddressMode, nullptr);
 }
 } // namespace
 
@@ -1137,7 +1367,7 @@ GENRESULT FMaterial::InitializeOwnedSchema()
     TexCount = 0;
     for (unsigned long Index = 0; Index < Count; ++Index)
     {
-        if (Records[Index].Current.Type == 7)
+        if (Records[Index].Current.Type == kMaterialParamTextureName)
             ++TexCount;
     }
     if (TexCount != 0)
@@ -1259,26 +1489,26 @@ GENRESULT FMaterial::LoadDeclaredSchema(IFileSystem* FileSystem)
     for (unsigned long Index = 0; Index < Count; ++Index)
     {
         FShadingPropertyRecord& Record = Records[Index];
-        if ((Record.Flags & 1) != 0)
+        if ((Record.Flags & kMaterialParamFlagNotSaved) != 0)
             continue;
         FShadingPropertyValue Value = {};
         Value.Type = Record.Current.Type;
         GENRESULT Result = GR_OK;
         switch (Value.Type)
         {
-        case 1:
+        case kMaterialParamInteger:
             Result = ReadSinglePassWord(FileSystem, Record.Name, &Value.Payload0);
             break;
-        case 2:
+        case kMaterialParamFloat:
             Result = ReadSinglePassWord(FileSystem, Record.Name, &Value.Payload0, true);
             break;
-        case 3:
-        case 4:
-            Result = ReadSinglePassVector(FileSystem, Record.Name, Value.Type == 3 ? 3 : 4,
+        case kMaterialParamVector3:
+        case kMaterialParamVector4:
+            Result = ReadSinglePassVector(FileSystem, Record.Name, Value.Type == kMaterialParamVector3 ? 3 : 4,
                                           &Value.Payload0, nullptr);
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
         {
             char* RawString;
             Result = ReadSinglePassString(FileSystem, Record.Name, 0, &RawString);
@@ -1290,19 +1520,19 @@ GENRESULT FMaterial::LoadDeclaredSchema(IFileSystem* FileSystem)
             // Retail's failed read does not transfer RawString into Value.
             break;
         }
-        case 8:
-        case 9:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         {
             unsigned long Packed;
             Result = ReadSinglePassWord(FileSystem, Record.Name, &Packed);
             if (Result >= 0)
             {
-                if (Value.Type == 8)
+                if (Value.Type == kMaterialParamWrapMode)
                     Value.Payload0 = (Packed >> 4) & 0xF;
                 else
                 {
-                    const bool bV = (Record.Flags & 0x20000) == 0 &&
-                                    (Record.Flags & 0x40000) != 0;
+                    const bool bV = (Record.Flags & kMaterialParamFlagAddressU) == 0 &&
+                                    (Record.Flags & kMaterialParamFlagAddressV) != 0;
                     Value.Payload0 = (Packed >> (bV ? 2 : 0)) & 3;
                 }
             }
@@ -1334,8 +1564,8 @@ namespace
         FFileSystemDesc Desc;
         InitializeShadingFileDesc(&Desc, Name);
         Desc.Implementation = "UTF";
-        Desc.Access = 0xC0000000;
-        Desc.Creation = 2;
+        Desc.Access = GENERIC_READ | GENERIC_WRITE;
+        Desc.Creation = CREATE_ALWAYS;
         const int Handle = FileSystem->OpenByDesc(&Desc);
         if (Handle == -1)
             return (GENRESULT)0x80004005UL;
@@ -1359,7 +1589,7 @@ GENRESULT DACOM_API FMaterial::SaveProperties(void* FileSystem)
     for (unsigned long Index = 0; Index < Count; ++Index)
     {
         FShadingPropertyRecord& Record = Records[Index];
-        if ((Record.Flags & 1) != 0)
+        if ((Record.Flags & kMaterialParamFlagNotSaved) != 0)
             continue;
         FShadingPropertyValue Value = {};
         Value.Type = Record.Current.Type;
@@ -1372,53 +1602,53 @@ GENRESULT DACOM_API FMaterial::SaveProperties(void* FileSystem)
         }
         switch (Value.Type)
         {
-        case 4:
+        case kMaterialParamVector4:
             Value.Payload3 = Target[3];
             [[fallthrough]];
-        case 3:
+        case kMaterialParamVector3:
             Value.Payload2 = Target[2];
             Value.Payload1 = Target[1];
             [[fallthrough]];
         default:
             Value.Payload0 = Target[0];
             break;
-        case 5:
-        case 7:
-        case 6:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
+        case kMaterialParamComponent:
             Value.Assign(Value.Type, (const void*)(Target[0]));
             break;
         }
         GENRESULT WriteResult = GR_OK;
         switch (Value.Type)
         {
-        case 1:
-        case 2:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
             WriteResult = WriteMaterialPropertyBytes(Files, Record.Name, &Value.Payload0, 4);
             break;
-        case 3:
-        case 4:
+        case kMaterialParamVector3:
+        case kMaterialParamVector4:
             WriteResult = WriteMaterialPropertyBytes(Files, Record.Name, &Value.Payload0,
-                                                     Value.Type == 3 ? 12 : 16);
+                                                     Value.Type == kMaterialParamVector3 ? 12 : 16);
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
         {
             const char* Text = (const char*)(Value.Payload0);
             WriteResult = WriteMaterialPropertyBytes(Files, Record.Name, Text,
                 (unsigned long)(std::strlen(Text) + 1));
             break;
         }
-        case 8:
-        case 9:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         {
             unsigned long Packed = 0;
             ReadSinglePassWord(Files, Record.Name, &Packed); // Read failure is ignored.
-            if (Value.Type == 8)
+            if (Value.Type == kMaterialParamWrapMode)
                 Packed = (Packed & ~0xF0UL) | ((Value.Payload0 << 4) & 0xF0UL);
             else
             {
-                const bool bV = (Record.Flags & 0x20000) == 0 &&
-                                (Record.Flags & 0x40000) != 0;
+                const bool bV = (Record.Flags & kMaterialParamFlagAddressU) == 0 &&
+                                (Record.Flags & kMaterialParamFlagAddressV) != 0;
                 if (!bV)
                     Packed = (Packed & ~3UL) | (Value.Payload0 & 3UL);
                 // Retail quirk (06eb196c): U also writes the V bits.
@@ -1736,7 +1966,7 @@ GENRESULT DACOM_API FSinglePassMaterial::Bind(void* Context)
         IImaInstance* Instance = MatAnim;
         if (Instance->FillUvMatrix(Matrix) != 0)
         {
-            Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+            Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
             Pipeline->SetTextureStageTransform(0, Matrix);
         }
     }
@@ -1763,7 +1993,7 @@ GENRESULT DACOM_API FNebulaMaterial::Bind(void* Context)
     {
         const FRpVertexSrcDesc* Source = ((const FMaterialSubmitContext*)Context)->SourceVertices;
         if (Source != nullptr && Source->Diffuse.Base != nullptr)
-            PipeSetRs(Pipeline, kRsColorVertex, 1);
+            PipeSetRs(Pipeline, kRsColorVertex, TRUE);
     }
     FTexBlock* Block = &TexBlocks[0];
     PipeSetTexture(Pipeline, 0, Block->Handle);
@@ -1831,7 +2061,7 @@ GENRESULT DACOM_API FDetailMapMaterial::Bind(void* Context)
     {
         const FRpVertexSrcDesc* Source = ((const FMaterialSubmitContext*)Context)->SourceVertices;
         if (Source != nullptr && Source->Diffuse.Base != nullptr)
-            Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
+            Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
     }
     BindDetailTexture(Pipeline, TexBlocks[0], 0);
     ApplyDetailTable(Pipeline, GDetailMapTable_06ed1abc, true, 0);
@@ -1841,7 +2071,7 @@ GENRESULT DACOM_API FDetailMapMaterial::Bind(void* Context)
         BindDetailTexture(Pipeline, TexBlocks[1], 1);
         ApplyDetailTable(Pipeline, GDetailMapTable_06ed1af4, true, 1);
         Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 0);
-        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 2);
+        Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
         float Matrix[16] = {};
         Matrix[0] = DetailTileRate0;
         Matrix[5] = DetailTileRate0;
@@ -1884,7 +2114,7 @@ GENRESULT DACOM_API FMaterial::Teardown(void* Context)
     {
         const FRpVertexSrcDesc* Source = ((const FMaterialSubmitContext*)Context)->SourceVertices;
         if (Source != nullptr && Source->Diffuse.Base != nullptr)
-            Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
+            Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     }
     return GR_OK;
 }
@@ -1898,7 +2128,7 @@ GENRESULT DACOM_API FSinglePassMaterial::Teardown(void* Context)
 {
     // FUN_06ebda30: the animated texture-stage reset comes before Context is read.
     if (MatAnim != nullptr)
-        Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+        Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     return FMaterial::Teardown(Context);
 }
 
@@ -1913,8 +2143,8 @@ GENRESULT DACOM_API FDetailMap2PassMaterial::Teardown(void* /*Context*/)
 {
     // FUN_06eb6e80: the stage-1 table, then three texture-stage resets; Context is ignored.
     ApplyDetailTable(Pipeline, GDetailTable_06ed194c, true, 1);
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
-    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
     return GR_OK;
 }
@@ -1923,8 +2153,8 @@ GENRESULT DACOM_API FIllumDetailMapMaterial::Teardown(void* /*Context*/)
 {
     // FUN_06eb98b0: the stage-1 table, then three texture-stage resets; Context is ignored.
     ApplyDetailTable(Pipeline, GDetailTable_06ed1f74, true, 1);
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
-    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
     return GR_OK;
 }
@@ -1933,8 +2163,8 @@ GENRESULT DACOM_API FMasked2DetailMapMaterial::Teardown(void* /*Context*/)
 {
     // FUN_06ebb610: the stage-1 table, then three texture-stage resets; Context is ignored.
     ApplyDetailTable(Pipeline, GDetailTable_06ed22cc, true, 1);
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
-    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
     return GR_OK;
 }
@@ -1943,8 +2173,8 @@ GENRESULT DACOM_API FDetailMapMaterial::Teardown(void* /*Context*/)
 {
     // FUN_06eb8170: the stage-1 table, then three texture-stage resets; Context is ignored.
     ApplyDetailTable(Pipeline, GDetailMapTable_06ed1b2c, true, 1);
-    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
-    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    Pipeline->SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
     Pipeline->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
     return GR_OK;
 }
@@ -1975,7 +2205,7 @@ static void NegateTwoPassNormals(const FRpVertexSrcDesc* Source, unsigned long S
 {
     // LAB_06ebe1ff: read original source normals, not the copied destination.
     uintptr_t Destination = (uintptr_t)Vertices + DestPosSize;
-    if ((Source->Flags & 4) != 0)
+    if ((Source->Flags & kRpVertexSrcIndexed) != 0)
     {
         const unsigned long* Indices = Source->Normal.IndexArray + Start;
         for (unsigned long Index = 0; Index < Count; ++Index)
@@ -2023,7 +2253,7 @@ GENRESULT FSinglePassTwoMaterial::SubmitSecondPass(void* Context, unsigned long 
     Manager->CopyVertexData(Destination, Lock.Listing.Fvf,
                            SubmitContext->SourceVertices, Start,
                            Count);
-    if ((Source->SrcFvf & 0x10) != 0)
+    if ((Source->SrcFvf & D3DFVF_NORMAL) != 0)
         NegateTwoPassNormals(Source, Start, Count, Lock.Vertices, DestStride, DestPosSize);
     Manager->UnlockVertexMemory(&Lock);
     int SavedCull;
@@ -2041,9 +2271,9 @@ GENRESULT FSinglePassTwoMaterial::SubmitSecondPass(void* Context, unsigned long 
 // Each two-sided class has its own {-, 1, 3, 2} cull lookup indexed by D3DCULL (1..3). Word
 // zero is whatever precedes the table in .rdata: DAT_06ed44cc aliases the "Ec" string,
 // DAT_06ed46a8 the tail of another name, DAT_06ed4824 a zero.
-static const unsigned long GBtDetailTwoCullFlip[4] = {0x00006345, 1, 3, 2};
-static const unsigned long GEcEtTwoCullFlip[4] = {0x00656d61, 1, 3, 2};
-static const unsigned long GNebulaTwoCullFlip[4] = {0, 1, 3, 2};
+static const unsigned long GBtDetailTwoCullFlip[4] = {0x00006345, D3DCULL_NONE, D3DCULL_CCW, D3DCULL_CW};
+static const unsigned long GEcEtTwoCullFlip[4] = {0x00656d61, D3DCULL_NONE, D3DCULL_CCW, D3DCULL_CW};
+static const unsigned long GNebulaTwoCullFlip[4] = {0, D3DCULL_NONE, D3DCULL_CCW, D3DCULL_CW};
 
 GENRESULT FMaterial::SubmitBackFacePass(void* Context, unsigned long PrimType, unsigned long Start,
                                        unsigned long Count, unsigned long IbStart,
@@ -2059,7 +2289,7 @@ GENRESULT FMaterial::SubmitBackFacePass(void* Context, unsigned long PrimType, u
     if (Locked < 0)
         return Locked;
     Source = SubmitContext->SourceVertices;
-    const bool bHasNormals = (Source->SrcFvf & 0x10) != 0;
+    const bool bHasNormals = (Source->SrcFvf & D3DFVF_NORMAL) != 0;
     const unsigned long DestPosSize = FvfPosSize(Lock.Listing.Fvf);
     const unsigned long DestStride = DestPosSize + FvfNormalSize(Lock.Listing.Fvf) +
                                      FvfColorSize(Lock.Listing.Fvf) + FvfTexSize(Lock.Listing.Fvf);
@@ -2124,7 +2354,7 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
     G_MathEngine->MulTransform(Temporary, World, ScaleTransform);
     const Transform ScaledWorld = Temporary;
     int State7 = 1;
-    Pipeline->GetPipelineState(7, &State7);
+    Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &State7);
     if (State7 != 0)
     {
         if (G_MathEngine == nullptr)
@@ -2183,7 +2413,7 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
     uintptr_t NormalAddress = (uintptr_t)(Source->Normal.Base) + Start * 12UL;
     uintptr_t UvCursor = (uintptr_t)(Source->Tex[0].Base) + Start * 8UL;
     const uintptr_t UvEnd = UvCursor + Count * 8UL;
-    if ((Source->Flags & 4) == 0)
+    if ((Source->Flags & kRpVertexSrcIndexed) == 0)
     {
         while (UvCursor != UvEnd)
         {
@@ -2208,17 +2438,17 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
     Manager->UnlockVertexMemory(&Lock);
     int SavedZFunc;
     Pipeline->GetRenderState(D3DRS_ZFUNC, &SavedZFunc);
-    Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     int SavedZWrite;
     Pipeline->GetRenderState(D3DRS_ZWRITEENABLE, &SavedZWrite);
-    Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+    Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     Pipeline->DrawIndexedPrimitiveVb(PrimType, Lock.Listing.VertexBuffer, Lock.Listing.BaseVertex, Count,
         (unsigned short*)((uintptr_t)(SubmitContext->Indices) + IbStart * 2),
         IndexSpan, 0);
     Pipeline->SetRenderState(D3DRS_ZFUNC, SavedZFunc);
     Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, SavedZWrite);
     // DAT_06ed1130 {COLORVERTEX, 0}, whether or not the mesh has diffuse colours.
-    Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
+    Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
@@ -2268,7 +2498,7 @@ GENRESULT FMaterial::SubmitKernel(void* Context, unsigned long PrimType, unsigne
     // FUN_06eb3b90: direct draw, indexed listing, then vertex-copy fallback.
     FMaterialSubmitContext* SubmitContext = (FMaterialSubmitContext*)Context;
     GENRESULT Result = -1;
-    if ((Flags & 0x100) != 0)
+    if ((Flags & kMaterialSubmitUseBuffers) != 0)
     {
         Result = RPDraw->DrawIndexedPrimitive(PrimType, Start, Count,
             SubmitContext->IbScratch->Bias + IbStart, IndexSpan);
@@ -2286,7 +2516,7 @@ GENRESULT DACOM_API FSinglePassMaterial::Submit(void* Context, unsigned long Pri
                                                 unsigned long Flags)
 {
     // LAB_06ebda80: alpha scope surrounds the complete FUN_06eb3b90 draw route.
-    const bool bSetAlphaTest = bAlphatest != 0 && (Flags & 0x400) == 0;
+    const bool bSetAlphaTest = bAlphatest != 0 && (Flags & kMaterialSubmitNoAlphaTest) == 0;
     int Saved18;
     int Saved19;
     int Saved0F;
@@ -2295,9 +2525,9 @@ GENRESULT DACOM_API FSinglePassMaterial::Submit(void* Context, unsigned long Pri
         Pipeline->GetRenderState(D3DRS_ALPHAREF, &Saved18);
         Pipeline->SetRenderState(D3DRS_ALPHAREF, 0x80);
         Pipeline->GetRenderState(D3DRS_ALPHAFUNC, &Saved19);
-        Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 5);
+        Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
         Pipeline->GetRenderState(D3DRS_ALPHATESTENABLE, &Saved0F);
-        Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, 1);
+        Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     }
     const GENRESULT Result = SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     if (bSetAlphaTest)
@@ -2337,7 +2567,7 @@ GENRESULT DACOM_API FLightMapMaterial::Submit(void* Context, unsigned long PrimT
     // LAB_06eba860: temporary ZFUNC=4; all draw/lock results are discarded.
     int Saved17;
     Pipeline->GetRenderState(D3DRS_ZFUNC, &Saved17);
-    Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     Pipeline->SetRenderState(D3DRS_ZFUNC, Saved17);
     return GR_OK;
@@ -2350,7 +2580,7 @@ GENRESULT DACOM_API FIllumDetailMapMaterial::Submit(void* Context, unsigned long
     // LAB_06eb9e40: first pass ALPHATEST=0 in either mode.
     int Saved0F;
     Pipeline->GetRenderState(D3DRS_ALPHATESTENABLE, &Saved0F);
-    Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, 0);
+    Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
     ApplyIllumDetailPassState(0);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     if (DetailPassCount == 1)
@@ -2359,7 +2589,7 @@ GENRESULT DACOM_API FIllumDetailMapMaterial::Submit(void* Context, unsigned long
         Teardown(nullptr);
         return GR_OK;
     }
-    Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, 1);
+    Pipeline->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     int Saved18;
     int Saved19;
     int Saved17;
@@ -2367,11 +2597,11 @@ GENRESULT DACOM_API FIllumDetailMapMaterial::Submit(void* Context, unsigned long
     Pipeline->GetRenderState(D3DRS_ALPHAREF, &Saved18);
     Pipeline->SetRenderState(D3DRS_ALPHAREF, 1);
     Pipeline->GetRenderState(D3DRS_ALPHAFUNC, &Saved19);
-    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 5);
+    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
     Pipeline->GetRenderState(D3DRS_ZFUNC, &Saved17);
-    Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     Pipeline->GetRenderState(D3DRS_ZWRITEENABLE, &Saved0E);
-    Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
+    Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
     ApplyIllumDetailPassState(1);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, Saved0E);
@@ -2405,13 +2635,13 @@ GENRESULT DACOM_API FMasked2DetailMapMaterial::Submit(void* Context, unsigned lo
     Pipeline->GetRenderState(D3DRS_ALPHAREF, &Saved18);
     Pipeline->SetRenderState(D3DRS_ALPHAREF, 0xFE);
     Pipeline->GetRenderState(D3DRS_ALPHAFUNC, &Saved19);
-    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 2);
+    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_LESS);
     ApplyMaskedDetailPassState(0);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     Pipeline->SetRenderState(D3DRS_ALPHAREF, 1);
-    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 5);
+    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
     Pipeline->GetRenderState(D3DRS_ZFUNC, &Saved17);
-    Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     ApplyMaskedDetailPassState(1);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     Pipeline->SetRenderState(D3DRS_ZFUNC, Saved17);
@@ -2444,13 +2674,13 @@ GENRESULT DACOM_API FDetailMap2PassMaterial::Submit(void* Context, unsigned long
     Pipeline->GetRenderState(D3DRS_ALPHAREF, &Saved18);
     Pipeline->SetRenderState(D3DRS_ALPHAREF, 0xFE);
     Pipeline->GetRenderState(D3DRS_ALPHAFUNC, &Saved19);
-    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 2);
+    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_LESS);
     ApplyDetailPassState(0);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     Pipeline->SetRenderState(D3DRS_ALPHAREF, 1);
-    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, 5);
+    Pipeline->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
     Pipeline->GetRenderState(D3DRS_ZFUNC, &Saved17);
-    Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+    Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     ApplyDetailPassState(1);
     SubmitKernel(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     // Scope destructors +28/+34/+10/+1C: ZFUNC, DESTBLEND, SRCBLEND, ALPHATEST.
@@ -2656,18 +2886,18 @@ static void CopyPropertyValue(FShadingPropertyValue* Destination, const FShading
     Destination->SetType(Type);
     switch (Type)
     {
-    case 4:
+    case kMaterialParamVector4:
         Destination->Payload3 = Source->Payload3;
         [[fallthrough]];
-    case 3:
+    case kMaterialParamVector3:
         Destination->Payload2 = Source->Payload2;
         Destination->Payload1 = Source->Payload1;
         [[fallthrough]];
     default:
         Destination->Payload0 = Source->Payload0;
         break;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
     {
         const char* Text = (const char*)(Source->Payload0);
         if (Destination->Payload0 != 0)
@@ -2681,7 +2911,7 @@ static void CopyPropertyValue(FShadingPropertyValue* Destination, const FShading
         }
         break;
     }
-    case 6:
+    case kMaterialParamComponent:
     {
         IDAComponent* Component = (IDAComponent*)(Source->Payload0);
         IDAComponent* Previous = (IDAComponent*)(Destination->Payload0);
@@ -2735,23 +2965,23 @@ GENRESULT DACOM_API FMaterial::GetParameterValue(unsigned long Index, void* InOu
 
     switch (Result->Type)
     {
-    case 1:
-    case 2:
-    case 8:
-    case 9:
+    case kMaterialParamInteger:
+    case kMaterialParamFloat:
+    case kMaterialParamWrapMode:
+    case kMaterialParamAddressMode:
     case 10:
         Result->Payload0 = *(unsigned long*)Target;
         break;
-    case 4:
+    case kMaterialParamVector4:
         Result->Payload3 = ((unsigned long*)Target)[3];
         [[fallthrough]];
-    case 3:
+    case kMaterialParamVector3:
         Result->Payload2 = ((unsigned long*)Target)[2];
         Result->Payload1 = ((unsigned long*)Target)[1];
         Result->Payload0 = ((unsigned long*)Target)[0];
         break;
-    case 5:
-    case 7:
+    case kMaterialParamString:
+    case kMaterialParamTextureName:
     {
         const char* Source = *(const char* const*)Target;
         if (Result->Payload0 != 0)
@@ -2766,7 +2996,7 @@ GENRESULT DACOM_API FMaterial::GetParameterValue(unsigned long Index, void* InOu
         }
         break;
     }
-    case 6:
+    case kMaterialParamComponent:
     {
         IDAComponent* Component = *(IDAComponent**)Target;
         IDAComponent* Previous = (IDAComponent*)(Result->Payload0);
@@ -2895,7 +3125,7 @@ GENRESULT __thiscall FMaterial::Setup()
     if (Pipeline->GetTextureFormat((void*)Handle, &FormatIndex) < 0)
         return GR_OK;
     bAlphatest = PixelFormatAlphaBits(FormatIndex) == 1 ? 1 : 0;
-    const bool bHasAlpha = (FormatIndex >= 10 && FormatIndex <= 14) ||
+    const bool bHasAlpha = (FormatIndex >= kTextureFormatDxt1 && FormatIndex <= kTextureFormatDxt5) ||
                            PixelFormatHasAlpha(FormatIndex) != 0;
     bAlphablend = bHasAlpha && bAlphatest == 0 ? 1 : 0;
     return GR_OK;
@@ -2930,14 +3160,14 @@ bool __thiscall FMaterial::ValueWithinDeclaredRange(unsigned long Index, void* E
     if (Typed->Type != Record->Current.Type)
         return false;
 
-    if (Typed->Type == 2)
+    if (Typed->Type == kMaterialParamFloat)
     {
         return IsShadingPropertyValueWithinRange(Typed->Payload0, Record->Minimum.Payload0,
                                                  Record->Maximum.Payload0);
     }
-    if (Typed->Type == 3 || Typed->Type == 4)
+    if (Typed->Type == kMaterialParamVector3 || Typed->Type == kMaterialParamVector4)
     {
-        const unsigned long ComponentCount = Typed->Type == 3 ? 3UL : 4UL;
+        const unsigned long ComponentCount = Typed->Type == kMaterialParamVector3 ? 3UL : 4UL;
         const unsigned long* ValuePayload = &Typed->Payload0;
         const unsigned long* MinimumPayload = &Record->Minimum.Payload0;
         const unsigned long* MaximumPayload = &Record->Maximum.Payload0;
@@ -2965,22 +3195,22 @@ GENRESULT __thiscall FMaterial::StoreParameterValue(unsigned long Index, void* E
         unsigned long* Words = (unsigned long*)Target;
         switch (Typed->Type)
         {
-        case 4:
+        case kMaterialParamVector4:
             Words[3] = Typed->Payload3;
             [[fallthrough]];
-        case 3:
+        case kMaterialParamVector3:
             Words[2] = Typed->Payload2;
             Words[1] = Typed->Payload1;
             [[fallthrough]];
-        case 1:
-        case 2:
-        case 8:
-        case 9:
+        case kMaterialParamInteger:
+        case kMaterialParamFloat:
+        case kMaterialParamWrapMode:
+        case kMaterialParamAddressMode:
         case 10:
             Words[0] = Typed->Payload0;
             break;
-        case 5:
-        case 7:
+        case kMaterialParamString:
+        case kMaterialParamTextureName:
         {
             char** TextTarget = (char**)Target;
             delete[] *TextTarget;
@@ -2996,7 +3226,7 @@ GENRESULT __thiscall FMaterial::StoreParameterValue(unsigned long Index, void* E
             }
             break;
         }
-        case 6:
+        case kMaterialParamComponent:
         {
             IDAComponent** ComponentTarget = (IDAComponent**)Target;
             IDAComponent* Previous = *ComponentTarget;
@@ -3023,9 +3253,9 @@ GENRESULT __thiscall FDetailMap2PassMaterial::StoreParameterValue(unsigned long 
 {
     // FUN_06eb6c40: the shared store, then the flip flags are normalised to 0 / 1.
     FMaterial::StoreParameterValue(Index, Entry, Value);
-    if (Index == 6)
+    if (Index == kDetailMapFlipU)
         DetailFlipU = (int)DetailFlipU > 0 ? 1UL : 0UL;
-    else if (Index == 7)
+    else if (Index == kDetailMapFlipV)
         DetailFlipV = (int)DetailFlipV > 0 ? 1UL : 0UL;
     return GR_OK;
 }
@@ -3034,9 +3264,9 @@ GENRESULT __thiscall FDetailMapMaterial::StoreParameterValue(unsigned long Index
 {
     // FUN_06eb6c40: the shared store, then the flip flags are normalised to 0 / 1.
     FMaterial::StoreParameterValue(Index, Entry, Value);
-    if (Index == 6)
+    if (Index == kDetailMapFlipU)
         DetailFlipU = (int)DetailFlipU > 0 ? 1UL : 0UL;
-    else if (Index == 7)
+    else if (Index == kDetailMapFlipV)
         DetailFlipV = (int)DetailFlipV > 0 ? 1UL : 0UL;
     return GR_OK;
 }
@@ -3045,9 +3275,9 @@ GENRESULT __thiscall FTwoDetailMapMaterial::StoreParameterValue(unsigned long In
 {
     // FUN_06ebb3f0: the shared store, then the flip flags are normalised to 0 / 1.
     FMaterial::StoreParameterValue(Index, Entry, Value);
-    if (Index == 6)
+    if (Index == kTwoDetailMapFlipU)
         DetailFlipU = (int)DetailFlipU > 0 ? 1UL : 0UL;
-    else if (Index == 7)
+    else if (Index == kTwoDetailMapFlipV)
         DetailFlipV = (int)DetailFlipV > 0 ? 1UL : 0UL;
     return GR_OK;
 }
@@ -3160,10 +3390,10 @@ void* __thiscall FNebulaMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06ebc5a0: actual texture block, not fields of the material itself.
     switch (Index)
     {
-    case 0: return &TexBlocks[0].Name;
-    case 1: return &TexBlocks[0].Flags;
-    case 2: return &TexBlocks[0].AddressU;
-    case 3: return &TexBlocks[0].AddressV;
+    case kNebulaTextureName: return &TexBlocks[0].Name;
+    case kNebulaTextureWrap: return &TexBlocks[0].Flags;
+    case kNebulaTextureAddressU: return &TexBlocks[0].AddressU;
+    case kNebulaTextureAddressV: return &TexBlocks[0].AddressV;
     default: return nullptr;
     }
 }
@@ -3173,10 +3403,10 @@ void* __thiscall FLightMapMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06ebc5a0: actual texture block, not fields of the material itself.
     switch (Index)
     {
-    case 0: return &TexBlocks[0].Name;
-    case 1: return &TexBlocks[0].Flags;
-    case 2: return &TexBlocks[0].AddressU;
-    case 3: return &TexBlocks[0].AddressV;
+    case kNebulaTextureName: return &TexBlocks[0].Name;
+    case kNebulaTextureWrap: return &TexBlocks[0].Flags;
+    case kNebulaTextureAddressU: return &TexBlocks[0].AddressU;
+    case kNebulaTextureAddressV: return &TexBlocks[0].AddressV;
     default: return nullptr;
     }
 }
@@ -3185,23 +3415,23 @@ void* __thiscall FAtmosphereMaterial::GetParameterAddress(unsigned long Index)
 {
     switch (Index)
     {
-    case 0:
+    case kAtmosphereAmbient:
         return Ambient;
-    case 1:
+    case kAtmosphereDiffuse:
         return &DiffuseR;
-    case 2:
+    case kAtmosphereFadeTextureName:
         return &TexBlocks[0].Name;
-    case 3:
+    case kAtmosphereFadeTextureWrap:
         return &TexBlocks[0].Flags;
-    case 4:
+    case kAtmosphereFadeTextureAddressU:
         return &TexBlocks[0].AddressU;
-    case 5:
+    case kAtmosphereFadeTextureAddressV:
         return &TexBlocks[0].AddressV;
-    case 6:
+    case kAtmosphereFadeOff:
         return &FadeOff;
-    case 7:
+    case kAtmosphereAlpha:
         return &Alpha;
-    case 8:
+    case kAtmosphereScale:
         return &Scale;
     default:
         return nullptr;
@@ -3214,15 +3444,15 @@ void* __thiscall FEcEtMaterial::GetParameterAddress(unsigned long Index)
     // +0x50 and the single Et texture block at +0x18/+1C/+20/+24.
     switch (Index)
     {
-    case 0:
+    case kEcEtEmissive:
         return Emissive;
-    case 1:
+    case kEcEtEmissiveTextureName:
         return (char**)(&TexBlocks[0].Name);
-    case 2:
+    case kEcEtEmissiveTextureWrap:
         return &TexBlocks[0].Flags;
-    case 3:
+    case kEcEtEmissiveTextureAddressU:
         return &TexBlocks[0].AddressU;
-    case 4:
+    case kEcEtEmissiveTextureAddressV:
         return &TexBlocks[0].AddressV;
     default:
         return nullptr;
@@ -3234,23 +3464,23 @@ void* __thiscall FDcDtEtMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06eb5dd0: Dc, then the diffuse and emissive texture blocks.
     switch (Index)
     {
-    case 0:
+    case kDcDtEtDiffuse:
         return &DiffuseR;
-    case 1:
+    case kDcDtEtDiffuseTextureName:
         return (char**)(&TexBlocks[0].Name);
-    case 2:
+    case kDcDtEtDiffuseTextureWrap:
         return &TexBlocks[0].Flags;
-    case 3:
+    case kDcDtEtDiffuseTextureAddressU:
         return &TexBlocks[0].AddressU;
-    case 4:
+    case kDcDtEtDiffuseTextureAddressV:
         return &TexBlocks[0].AddressV;
-    case 5:
+    case kDcDtEtEmissiveTextureName:
         return (char**)(&TexBlocks[1].Name);
-    case 6:
+    case kDcDtEtEmissiveTextureWrap:
         return &TexBlocks[1].Flags;
-    case 7:
+    case kDcDtEtEmissiveTextureAddressU:
         return &TexBlocks[1].AddressU;
-    case 8:
+    case kDcDtEtEmissiveTextureAddressV:
         return &TexBlocks[1].AddressV;
     default:
         return nullptr;
@@ -3261,20 +3491,20 @@ void* __thiscall FBtDetailMapMaterial::GetParameterAddress(unsigned long Index)
 {
     switch (Index)
     {
-    case 0: return Ambient;
-    case 1: return &DiffuseR;
-    case 2: return Emissive;
-    case 3: return Specular;
-    case 4: return &SpecularPower;
-    case 5: return &Opacity;
-    case 6: return &TexBlocks[0].Name;
-    case 7: return &TexBlocks[0].Flags;
-    case 8: return &TexBlocks[0].AddressU;
-    case 9: return &TexBlocks[0].AddressV;
-    case 10: return &TexBlocks[1].Name;
-    case 11: return &TexBlocks[1].Flags;
-    case 12: return &TexBlocks[1].AddressU;
-    case 13: return &TexBlocks[1].AddressV;
+    case kBtDetailAmbient: return Ambient;
+    case kBtDetailDiffuse: return &DiffuseR;
+    case kBtDetailEmissive: return Emissive;
+    case kBtDetailSpecular: return Specular;
+    case kBtDetailSpecularPower: return &SpecularPower;
+    case kBtDetailOpacity: return &Opacity;
+    case kBtDetailTextureName: return &TexBlocks[0].Name;
+    case kBtDetailTextureWrap: return &TexBlocks[0].Flags;
+    case kBtDetailTextureAddressU: return &TexBlocks[0].AddressU;
+    case kBtDetailTextureAddressV: return &TexBlocks[0].AddressV;
+    case kBtDetailDetailTextureName: return &TexBlocks[1].Name;
+    case kBtDetailDetailTextureWrap: return &TexBlocks[1].Flags;
+    case kBtDetailDetailTextureAddressU: return &TexBlocks[1].AddressU;
+    case kBtDetailDetailTextureAddressV: return &TexBlocks[1].AddressV;
     default: return nullptr;
     }
 }
@@ -3284,19 +3514,19 @@ void* __thiscall FDetailMap2PassMaterial::GetParameterAddress(unsigned long Inde
     // LAB_06eb6b80, shared with DetailMapMaterial.
     switch (Index)
     {
-    case 0: return Ambient;
-    case 1: return &DiffuseR;
-    case 2: return &TexBlocks[0].Name;
-    case 3: return &TexBlocks[0].Flags;
-    case 4: return &TexBlocks[0].AddressU;
-    case 5: return &TexBlocks[0].AddressV;
-    case 6: return &DetailFlipU;
-    case 7: return &DetailFlipV;
-    case 8: return &TexBlocks[1].Name;
-    case 9: return &TexBlocks[1].Flags;
-    case 10: return &TexBlocks[1].AddressU;
-    case 11: return &TexBlocks[1].AddressV;
-    case 12: return &DetailTileRate0;
+    case kDetailMapAmbient: return Ambient;
+    case kDetailMapDiffuse: return &DiffuseR;
+    case kDetailMapDiffuseTextureName: return &TexBlocks[0].Name;
+    case kDetailMapDiffuseTextureWrap: return &TexBlocks[0].Flags;
+    case kDetailMapDiffuseTextureAddressU: return &TexBlocks[0].AddressU;
+    case kDetailMapDiffuseTextureAddressV: return &TexBlocks[0].AddressV;
+    case kDetailMapFlipU: return &DetailFlipU;
+    case kDetailMapFlipV: return &DetailFlipV;
+    case kDetailMapDetailTextureName: return &TexBlocks[1].Name;
+    case kDetailMapDetailTextureWrap: return &TexBlocks[1].Flags;
+    case kDetailMapDetailTextureAddressU: return &TexBlocks[1].AddressU;
+    case kDetailMapDetailTextureAddressV: return &TexBlocks[1].AddressV;
+    case kDetailMapTileRate: return &DetailTileRate0;
     default: return nullptr;
     }
 }
@@ -3306,19 +3536,19 @@ void* __thiscall FDetailMapMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06eb6b80, shared with DetailMap2Dm1Msk2PassMaterial.
     switch (Index)
     {
-    case 0: return Ambient;
-    case 1: return &DiffuseR;
-    case 2: return &TexBlocks[0].Name;
-    case 3: return &TexBlocks[0].Flags;
-    case 4: return &TexBlocks[0].AddressU;
-    case 5: return &TexBlocks[0].AddressV;
-    case 6: return &DetailFlipU;
-    case 7: return &DetailFlipV;
-    case 8: return &TexBlocks[1].Name;
-    case 9: return &TexBlocks[1].Flags;
-    case 10: return &TexBlocks[1].AddressU;
-    case 11: return &TexBlocks[1].AddressV;
-    case 12: return &DetailTileRate0;
+    case kDetailMapAmbient: return Ambient;
+    case kDetailMapDiffuse: return &DiffuseR;
+    case kDetailMapDiffuseTextureName: return &TexBlocks[0].Name;
+    case kDetailMapDiffuseTextureWrap: return &TexBlocks[0].Flags;
+    case kDetailMapDiffuseTextureAddressU: return &TexBlocks[0].AddressU;
+    case kDetailMapDiffuseTextureAddressV: return &TexBlocks[0].AddressV;
+    case kDetailMapFlipU: return &DetailFlipU;
+    case kDetailMapFlipV: return &DetailFlipV;
+    case kDetailMapDetailTextureName: return &TexBlocks[1].Name;
+    case kDetailMapDetailTextureWrap: return &TexBlocks[1].Flags;
+    case kDetailMapDetailTextureAddressU: return &TexBlocks[1].AddressU;
+    case kDetailMapDetailTextureAddressV: return &TexBlocks[1].AddressV;
+    case kDetailMapTileRate: return &DetailTileRate0;
     default: return nullptr;
     }
 }
@@ -3328,41 +3558,41 @@ void* __thiscall FTwoDetailMapMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06ebb2e0: all 18 targets, including the distinct third texture block.
     switch (Index)
     {
-    case 0:
+    case kTwoDetailMapAmbient:
         return Ambient;
-    case 1:
+    case kTwoDetailMapDiffuse:
         return &DiffuseR;
-    case 2:
+    case kTwoDetailMapDiffuseTextureName:
         return &TexBlocks[0].Name;
-    case 3:
+    case kTwoDetailMapDiffuseTextureWrap:
         return &TexBlocks[0].Flags;
-    case 4:
+    case kTwoDetailMapDiffuseTextureAddressU:
         return &TexBlocks[0].AddressU;
-    case 5:
+    case kTwoDetailMapDiffuseTextureAddressV:
         return &TexBlocks[0].AddressV;
-    case 6:
+    case kTwoDetailMapFlipU:
         return &DetailFlipU;
-    case 7:
+    case kTwoDetailMapFlipV:
         return &DetailFlipV;
-    case 8:
+    case kTwoDetailMapAlpha0TextureName:
         return &TexBlocks[1].Name;
-    case 9:
+    case kTwoDetailMapAlpha0TextureWrap:
         return &TexBlocks[1].Flags;
-    case 10:
+    case kTwoDetailMapAlpha0TextureAddressU:
         return &TexBlocks[1].AddressU;
-    case 11:
+    case kTwoDetailMapAlpha0TextureAddressV:
         return &TexBlocks[1].AddressV;
-    case 12:
+    case kTwoDetailMapTileRate0:
         return &DetailTileRate0;
-    case 13:
+    case kTwoDetailMapAlpha1TextureName:
         return &TexBlocks[2].Name;
-    case 14:
+    case kTwoDetailMapAlpha1TextureWrap:
         return &TexBlocks[2].Flags;
-    case 15:
+    case kTwoDetailMapAlpha1TextureAddressU:
         return &TexBlocks[2].AddressU;
-    case 16:
+    case kTwoDetailMapAlpha1TextureAddressV:
         return &TexBlocks[2].AddressV;
-    case 17:
+    case kTwoDetailMapTileRate1:
         return &DetailTileRate1;
     default:
         return nullptr;
@@ -3374,25 +3604,25 @@ void* __thiscall FSinglePassMaterial::GetParameterAddress(unsigned long Index)
     // LAB_06ebd770: ten SinglePass targets; unsigned out-of-range returns null.
     switch (Index)
     {
-    case 0:
+    case kSinglePassAmbient:
         return Ambient;
-    case 1:
+    case kSinglePassDiffuse:
         return &DiffuseR;
-    case 2:
+    case kSinglePassEmissive:
         return Emissive;
-    case 3:
+    case kSinglePassSpecular:
         return Specular;
-    case 4:
+    case kSinglePassSpecularPower:
         return &SpecularPower;
-    case 5:
+    case kSinglePassOpacity:
         return &Opacity;
-    case 6:
+    case kSinglePassTextureName:
         return (char**)(&TexBlocks[0].Name);
-    case 7:
+    case kSinglePassTextureWrap:
         return &TexBlocks[0].Flags;
-    case 8:
+    case kSinglePassTextureAddressU:
         return &TexBlocks[0].AddressU;
-    case 9:
+    case kSinglePassTextureAddressV:
         return &TexBlocks[0].AddressV;
     default:
         return nullptr;
@@ -3733,14 +3963,14 @@ GENRESULT DACOM_API FBatchedMaterial::Submit(void* Context, unsigned long PrimTy
     ((IMaterialBatcher2*)Batcher)->SelectBin(BatchBin);
 
     unsigned long DepthBits = 0;
-    if ((Flags & 0x40) != 0)
+    if ((Flags & kMaterialSubmitComputeDepth) != 0)
     {
         // Retail captures both pointers before the lazy math-engine creation.
         const FMaterialSubmitContext* SubmitContext = (const FMaterialSubmitContext*)Context;
         const Transform* View = SubmitContext->View;
         const Vector* Translation = &SubmitContext->World->Translation;
         static I3DMathEngine* GBatchedMathEngine = nullptr; // retail DAT_06ed56c8
-        Flags |= 0x20;
+        Flags |= kMaterialSubmitSortDepth;
         if (GBatchedMathEngine == nullptr)
             GBatchedMathEngine = AcquireMathEngine();
         Vector Transformed;
@@ -3788,7 +4018,7 @@ GENRESULT DACOM_API FBatchedMaterial::GetRenderFlags(unsigned long* Out)
     unsigned long Value = 0;
     if (Inner->GetRenderFlags(&Value) < GR_OK)
         return GR_GENERIC;
-    *Out = Value | 0x10;
+    *Out = Value | kMaterialRenderBatched;
     return GR_OK;
 }
 

@@ -21,6 +21,38 @@
 // The listener/source vectors this interface takes are plain 3-float records (x86math.h's
 // Vector).
 
+// ISoundManager::StartupDevice option bits, kept in FSoundManager::Flags; the same bits in
+// FSoundManager::CapsFlags are what the device granted. The [SoundManager] / [AudioProperties]
+// ini keys use2DHW, use3DHW, useEAX, rightHandedCoordinates, createAll2DInSoftware,
+// 3D_SW_Algorithm (USER / BASIC / LIGHT / FULL / NONE) and useNoHW set and clear them
+// (FUN_06ee3670; the "SoundMgr:... requested and ENABLED" notices of FUN_06ee5b20).
+enum ESoundManagerFlag
+{
+    kSoundFlagHw2D = 0x1,
+    kSoundFlagHw3D = 0x2,
+    kSoundFlagEax = 0x4,
+    kSoundFlagRightHanded = 0x10,
+    kSoundFlagAll2DInSoftware = 0x20,
+    kSoundFlagAlgUser = 0x40,
+    kSoundFlagAlgBasic = 0x80,
+    kSoundFlagAlgLight = 0x100,
+    kSoundFlagAlgFull = 0x200,
+    kSoundFlagAlgMask = 0x3C0, // User | Basic | Light | Full
+    kSoundFlagAlgNone = 0x400,
+    kSoundFlagNoHw = 0x800,
+};
+
+// ArchFlags of ISoundManager::CreateArchetype* (FUN_06ee1330 builds the DSBUFFERDESC from them).
+enum ESoundArchetypeFlag
+{
+    kSoundArchMute3dAtMaxDistance = 0x1, // 3D buffer: DSBCAPS_MUTE3DATMAXDISTANCE
+    kSoundArchFrequency = 0x2,           // pitch-bendable: DSBCAPS_CTRLFREQUENCY
+    kSoundArch3d = 0x8,                  // DSBCAPS_CTRL3D
+    kSoundArchPan = 0x10,                // 2D: DSBCAPS_CTRLPAN ("requested 3D and Pan controls, disabling pan")
+    kSoundArchSoftware = 0x20,           // DSBCAPS_LOCSOFTWARE
+    kSoundArchLoopNotify = 0x40,         // position notification at the loop end
+};
+
 struct ISoundManagerStatus : IDAComponent
 {
     virtual GENRESULT DACOM_API GetInstanceStatus(int Index, void* Out) = 0; // +0x0C

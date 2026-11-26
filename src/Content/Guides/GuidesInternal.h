@@ -109,6 +109,25 @@ public:
 // 06f0c2ef) and adds a deleting dtor as its slot 6.
 // ---------------------------------------------------------------------------------------
 
+// FGuideRoute::GetType (slot 1).
+enum EGuideRouteType
+{
+    kGuideRouteTrade = 1,        // FTradeRoute (06ee9e10)
+    kGuideRoutePatrol = 2,       // FPatrolRoute (06ee9660)
+    kGuideRouteCargoScan = 3     // FCargoScanRoute (06f5e540)
+};
+
+// FGuideRoute::GetStatus / Update result, as the guides test it (FTradeGuide::Start and
+// FPatrolGuide::Start go on after a finished route; FPatrolGuide::HandleEvent follows the
+// scan worker's busy / not busy changes).
+enum EGuideRouteStatus
+{
+    kGuideRouteIdle = 0,         // the scan worker is on but has no target
+    kGuideRouteBusy = 1,         // the route is running (directives handed out)
+    kGuideRouteInactive = 2,     // the scan worker is off; a patrol route not under way
+    kGuideRouteFinished = 3      // the route reached its end
+};
+
 class FGuideRoute
 {
 public:
@@ -135,6 +154,16 @@ protected:
     FGuideRoute() = default;
     FGuideRoute(FGuideRoute const& Other) = default;
     ~FGuideRoute() = default;
+};
+
+// FTradeRoute::State, the steps of FTradeRoute::Update.
+enum ETradeRouteState
+{
+    kTradeRouteStart = 0,          // the path from the ship's position
+    kTradeRouteGoto = 1,           // a GotoVec was handed out; the path is rebuilt from its end
+    kTradeRouteDock = 2,           // a Dock directive was handed out (the trade lane)
+    kTradeRouteFormationWait = 3,  // waits while a formation member is in a lane
+    kTradeRouteDone = 4            // no directives left: the route is finished
 };
 
 // The trade guide's route (retail 0x20, vtable 06fb8384): the way to Center (the trade
@@ -166,6 +195,15 @@ public:
 // ---------------------------------------------------------------------------------------
 // Type 2 "trade" (retail vtable 06fb8330, 0x34).
 // ---------------------------------------------------------------------------------------
+
+// FTradeGuide::State, the steps of FTradeGuide::Start.
+enum ETradeGuideState
+{
+    kTradeGuideRoute = 0,        // fly the route; finished -> kTradeGuideDock
+    kTradeGuideDock = 1,         // the Dock directive at TargetId2 is handed out
+    kTradeGuideDocking = 2,      // docked -> the delay directive, else back to the route
+    kTradeGuideLaunch = 3        // the delay is over: launch, swap the targets, fly on
+};
 
 class FTradeGuide final : public FTargetGuide
 {
@@ -203,6 +241,15 @@ public:
 // path (FSpawnPlan::Path) point by point between the two targets (FPatrolRoute, 06fb854c) and
 // meanwhile scans the cargo of the ships it passes (FCargoScanRoute, 06fb8520).
 // ---------------------------------------------------------------------------------------
+
+// FPatrolRoute::State, the steps of FPatrolRoute::Update.
+enum EPatrolRouteState
+{
+    kPatrolRouteStart = 1,       // the GotoVec to the next point is handed out
+    kPatrolRouteGoto = 2,        // flying; reaching the point advances it
+    kPatrolRouteFlee = 3,        // RequestFleeDestination answered; flying on resumes as kPatrolRouteGoto
+    kPatrolRouteDone = 4         // the end point was reached
+};
 
 // The patrol guide's route (retail 0x1c, vtable 06fb854c = the route base slots + two).
 class FPatrolRoute final : public FGuideRoute
@@ -325,6 +372,17 @@ public:
     bool bScanAnnounce = true;                   // +0x61 the faction's scan_announce
 };
 
+// FPatrolGuide::State, the steps of FPatrolGuide::Start.
+enum EPatrolGuideState
+{
+    kPatrolGuideBegin = 0,       // -> kPatrolGuideRoute
+    kPatrolGuideRoute = 1,       // fly the route; finished -> kPatrolGuideDock
+    kPatrolGuideDock = 2,        // dock at TargetId2, scanning off
+    kPatrolGuideDocked = 3,      // docked -> the delay, else the targets swap and the route goes on
+    kPatrolGuideLaunch = 4,      // launch, swap the targets, pick the route's end point
+    kPatrolGuideScan = 5         // the cargo scanner's directives
+};
+
 // Type 3 "patrol_path" guide.
 class FPatrolGuide final : public FTargetGuide
 {
@@ -398,6 +456,23 @@ public:
     FLineGuide(FLineGuide const& Other) = default;
 
     TString<0x100> Line;                         // +0x14
+};
+
+// FGotoGuide::State (the dock guide adds 12 and 13): what the guide has handed the ship.
+enum EGotoGuideState
+{
+    kGotoStart = 1,              // initial; the next heartbeat -> kGotoApproach
+    kGotoApproach = 2,           // a Guide directive to the first leg's start point
+    kGotoWaitForTarget = 3,      // the ship stands by and nags the target ("get going")
+    kGotoCombat = 4,             // combat near the target: comms muted, CombatIds tracked
+    kGotoLeadToWaypoint = 5,     // a Guide directive to the lane entry Waypoint
+    kGotoLeadToLegEnd = 6,       // a Guide directive to the leg's end point
+    kGotoTradeLane = 7,          // a Dock directive into the trade lane
+    kGotoFollowPath = 8,         // path directives to the Waypoint
+    kGotoLegDone = 9,            // the leg's end reached: next leg, or the end
+    kGotoDestination = 10,       // a Guide directive to Destination; the heartbeat then sets bDone
+    kDockGuideDocking = 12,      // FDockGuide: the Dock directive at DockTargetId
+    kDockGuideDocked = 13        // FDockGuide: arrived / docked; the heartbeat sets bDone
 };
 
 // Type 5 "goto_guide" (retail vtable 06fb8404, 0x1b0).

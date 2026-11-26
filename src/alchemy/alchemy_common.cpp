@@ -41,12 +41,12 @@ namespace AlchemyImpl
     const char kAleLeaveNode[] = "..";
     const char kAleFileSystemName[] = "FileSystem";
     const unsigned long kAleDescSize = 0x34;
-    const unsigned long kAleAccessRead = 0x80000000;
-    const unsigned long kAleAccessWrite = 0xC0000000;
-    const unsigned long kAleShareRead = 1;
-    const unsigned long kAleOpenExisting = 3;
-    const unsigned long kAleCreateAlways = 2;
-    const unsigned long kAleFileFlags = 0x08000080;
+    const unsigned long kAleAccessRead = GENERIC_READ;
+    const unsigned long kAleAccessWrite = GENERIC_READ | GENERIC_WRITE;
+    const unsigned long kAleShareRead = FILE_SHARE_READ;
+    const unsigned long kAleOpenExisting = OPEN_EXISTING;
+    const unsigned long kAleCreateAlways = CREATE_ALWAYS;
+    const unsigned long kAleFileFlags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     const unsigned long kAleVersion10Bits = 0x3F800000; // 1.0f DAT_0624bac4
     const unsigned long kAleVersion11Bits = 0x3F8CCCCD; // 1.1f
     // FUN_0623ef70 / IAlchemy+0x14 / DAT_06256d68: same 256-dword table as
@@ -178,7 +178,7 @@ namespace AlchemyImpl
         "You must call end_draw method before call beging_draw method.\n";
     const char kMsgEndWithoutBegin[] =
         "You must call begin_draw method before call end_draw method.\n";
-    const unsigned int kAlchemyVbFvf = 0x142; // D3DFVF_XYZ|DIFFUSE|TEX1
+    const unsigned int kAlchemyVbFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
     const unsigned long kAlchemyVertexStride = 0x18; // FUN_06208aa0 pointer += 0x18
     const unsigned long kInitNodeBoundBits = 0x7F7FFFFF;
     const unsigned long kBatchListCount = 4; // DAT_062578b4 .. DAT_062578e4 stride 0xC
@@ -1095,7 +1095,7 @@ namespace AlchemyImpl
             G_VbHandle = nullptr;
         }
         const GENRESULT Result =
-            CallCreateVb(G_RpVertexBuffer, kAlchemyVbFvf, G_MaxVertices, &G_VbHandle, 1);
+            CallCreateVb(G_RpVertexBuffer, kAlchemyVbFvf, G_MaxVertices, &G_VbHandle, kRpBufferDynamic);
         if (Result < 0)
         {
             FdumpAlchemyError(0x43, kMsgCreateVb);
@@ -1324,11 +1324,14 @@ namespace AlchemyImpl
 
     FnAlchemySinCos G_AlchemySinCos = ComputeSinCosFpu; // PTR_FUN_062572a0
 
+    // CPUID leaf 1, EDX bit 25: SSE.
+    const int kCpuidFeatureSse = 0x02000000;
+
     void SelectAlchemyMathImplementation()
     {
         int CpuInfo[4];
         __cpuid(CpuInfo, 1);
-        if ((CpuInfo[3] & 0x02000000) != 0)
+        if ((CpuInfo[3] & kCpuidFeatureSse) != 0)
             G_AlchemySinCos = ComputeSinCosSse;
     }
 
@@ -2035,6 +2038,11 @@ namespace AlchemyImpl
         ChildNode->SetNextSibling(Cursor);
     }
 
+    // The type word of a property in an ALE node-library stream: the EFxPropKind in the low
+    // 15 bits, and for a bool its value in bit 15.
+    const unsigned long kNodeLibTypeKindMask = 0x7FFF;
+    const unsigned long kNodeLibTypeBoolSet = 0x8000;
+
     // LAB_06228d74: DAT_062563a8 pairs until key==0.
     unsigned long RemapNodeLibHash(unsigned long Hash)
     {
@@ -2050,12 +2058,12 @@ namespace AlchemyImpl
     {
         if (VersionBits != kAleVersion10Bits)
             return Kind;
-        if (Kind == 0x100)
-            return 0x200;
-        if (Kind == 0x101)
-            return 0x201;
-        if (Kind == 0x102)
-            return 0x202;
+        if (Kind == kFxPropSingleRamp)
+            return kFxPropSingleRampRamp;
+        if (Kind == kFxPropColorRamp)
+            return kFxPropColorRampRamp;
+        if (Kind == kFxPropAnimatedSingle)
+            return kFxPropAnimatedSingleRamp;
         return Kind;
     }
 
@@ -2067,17 +2075,17 @@ namespace AlchemyImpl
                                     unsigned long Hash, unsigned long Type,
                                     unsigned long VersionBits)
     {
-        const unsigned long Kind = Type & 0x7FFF;
-        if (Kind == 1)
+        const unsigned long Kind = Type & kNodeLibTypeKindMask;
+        if (Kind == kFxPropBool)
         {
-            Set->SetPropBool(Hash, (Type & 0x8000) == 0x8000 ? 1 : 0);
+            Set->SetPropBool(Hash, (Type & kNodeLibTypeBoolSet) == kNodeLibTypeBoolSet ? 1 : 0);
         }
-        else if (Kind == 2 || Kind == 3)
+        else if (Kind == kFxPropInt || Kind == kFxPropFloat)
         {
             unsigned long Value;
             if (Chunk->ReadBytes(&Value, 4) < 0)
                 return;
-            if (Kind == 2)
+            if (Kind == kFxPropInt)
             {
                 Set->SetPropInt(Hash, Value);
             }
@@ -2088,45 +2096,45 @@ namespace AlchemyImpl
                 Set->SetPropFloat(Hash, FloatValue);
             }
         }
-        else if (Kind == 0x103)
+        else if (Kind == kFxPropName)
         {
             char Name[kAleNameMax];
             if (Chunk->ReadString(Name, kAleNameMax) < 0)
                 return;
             Set->SetPropName(Hash, Name);
         }
-        else if (Kind == 0x104)
+        else if (Kind == kFxPropPair)
         {
             unsigned long Pair[2];
             if (Chunk->ReadBytes(Pair, 8) < 0)
                 return;
             Set->SetPropPair(Hash, Pair);
         }
-        else if (Kind == 0x100)
+        else if (Kind == kFxPropSingleRamp)
         {
             FAlchemyReaderRef<IRampSingle> Ramp;
             Set->GetPropSingleRamp(Hash, &Ramp.Pointer);
             ReadRampSingleBlock(Chunk, Ramp.Pointer);
         }
-        else if (Kind == 0x101)
+        else if (Kind == kFxPropColorRamp)
         {
             FAlchemyReaderRef<IRampColor> Ramp;
             Set->GetPropColorRamp(Hash, &Ramp.Pointer);
             ReadRampColorBlock(Chunk, Ramp.Pointer);
         }
-        else if (Kind == 0x102)
+        else if (Kind == kFxPropAnimatedSingle)
         {
             FAlchemyReaderRef<IFxAnimatedSingle> Single;
             Set->GetPropAnimatedSingle(Hash, &Single.Pointer);
             ReadAnimatedSingleBlock(Chunk, Single.Pointer);
         }
-        else if (Kind == 0x105)
+        else if (Kind == kFxPropTransform)
         {
             FAlchemyReaderRef<IAnimatedTransform> Anim;
             Set->GetPropTransform(Hash, &Anim.Pointer);
             ReadAnimatedTransform(Chunk, Anim.Pointer, VersionBits);
         }
-        else if (Kind == 0x200)
+        else if (Kind == kFxPropSingleRampRamp)
         {
             FAlchemyReaderRef<INestedSingleRamp> Ramp;
             if (Set->GetPropSingleRampRamp(Hash, &Ramp.Pointer) < 0)
@@ -2139,14 +2147,14 @@ namespace AlchemyImpl
             if (Ramp.Pointer != nullptr)
                 ReadNestedSingleRamp(Chunk, Ramp.Pointer, VersionBits);
         }
-        else if (Kind == 0x201)
+        else if (Kind == kFxPropColorRampRamp)
         {
             FAlchemyReaderRef<IRampColorRamp> Ramp;
             Set->GetPropColorRampRamp(Hash, &Ramp.Pointer);
             if (Ramp.Pointer != nullptr)
                 ReadNestedColorRamp(Chunk, Ramp.Pointer, VersionBits);
         }
-        else if (Kind == 0x202)
+        else if (Kind == kFxPropAnimatedSingleRamp)
         {
             FAlchemyReaderRef<INestedSingleRamp> Ramp;
             if (Set->GetPropAnimatedSingleRamp(Hash, &Ramp.Pointer) < 0)
@@ -2351,9 +2359,9 @@ namespace AlchemyImpl
             Anim->UpdateChannelFlags();
             unsigned long Flags = 0;
             Anim->GetChannelFlags(&Flags);
-            Header[3] = Flags == 0x1FF ? 0 : 0x80;
+            Header[3] = Flags == kChannelAllIdentity ? 0 : 0x80;
             Chunk->WriteBytes(Header, 4);
-            if (Flags == 0x1FF)
+            if (Flags == kChannelAllIdentity)
                 return;
             for (unsigned long Channel = 0; Channel < 9; ++Channel)
             {
@@ -2374,7 +2382,7 @@ namespace AlchemyImpl
         // getters serve). Always returns 0, so the walk visits every row.
         int WriteNodeProperty(const FNodePropertyRow* Row, void* ContextRaw)
         {
-            if (Row->Hash == 0xF54EF296u)
+            if (Row->Hash == kNodeClassNameHash)
                 return 0;
             FNodeWriteContext* const Context = static_cast<FNodeWriteContext*>(ContextRaw);
             FAleChunk* const Chunk = Context->Chunk;
@@ -2383,46 +2391,46 @@ namespace AlchemyImpl
             const unsigned long Kind = Row->Kind;
 
             unsigned short Type = static_cast<unsigned short>(Kind);
-            if (Kind == 1)
+            if (Kind == kFxPropBool)
             {
                 unsigned char Value = 0;
                 Set->GetPropBool(Hash, &Value);
                 if (Value != 0)
-                    Type = static_cast<unsigned short>(Type | 0x8000);
+                    Type = static_cast<unsigned short>(Type | kNodeLibTypeBoolSet);
             }
             Chunk->WriteBytes(&Type, 2);
             Chunk->WriteBytes(&Hash, 4);
 
-            if (Kind == 1)
+            if (Kind == kFxPropBool)
             {
             }
-            else if (Kind == 2)
+            else if (Kind == kFxPropInt)
             {
                 unsigned long Value = 0;
                 Set->GetPropInt(Hash, &Value);
                 Chunk->WriteBytes(&Value, 4);
             }
-            else if (Kind == 3)
+            else if (Kind == kFxPropFloat)
             {
                 float Value = 0.0f;
                 Set->GetPropFloat(Hash, &Value);
                 Chunk->WriteBytes(&Value, 4);
             }
-            else if (Kind == 0x100)
+            else if (Kind == kFxPropSingleRamp)
             {
                 IRampSingle* Ramp = nullptr;
                 Set->GetPropSingleRamp(Hash, &Ramp);
                 WriteRampSingleBlock(Chunk, Ramp);
                 Ramp->Release();
             }
-            else if (Kind == 0x101)
+            else if (Kind == kFxPropColorRamp)
             {
                 IRampColor* Ramp = nullptr;
                 Set->GetPropColorRamp(Hash, &Ramp);
                 WriteRampColorBlock(Chunk, Ramp);
                 Ramp->Release();
             }
-            else if (Kind == 0x102)
+            else if (Kind == kFxPropAnimatedSingle)
             {
                 IFxAnimatedSingle* Single = nullptr;
                 Set->GetPropAnimatedSingle(Hash, &Single);
@@ -2430,19 +2438,19 @@ namespace AlchemyImpl
                 if (Single != nullptr)
                     Single->Release();
             }
-            else if (Kind == 0x103)
+            else if (Kind == kFxPropName)
             {
                 const char* Name = nullptr;
                 Set->GetPropName(Hash, &Name);
                 Chunk->WriteString(Name);
             }
-            else if (Kind == 0x104)
+            else if (Kind == kFxPropPair)
             {
                 unsigned long Pair[2];
                 Set->GetPropPair(Hash, Pair);
                 Chunk->WriteBytes(Pair, 8);
             }
-            else if (Kind == 0x105)
+            else if (Kind == kFxPropTransform)
             {
                 IAnimatedTransform* Anim = nullptr;
                 Set->GetPropTransform(Hash, &Anim);
@@ -2450,7 +2458,7 @@ namespace AlchemyImpl
                 if (Anim != nullptr)
                     Anim->Release();
             }
-            else if (Kind == 0x200)
+            else if (Kind == kFxPropSingleRampRamp)
             {
                 INestedSingleRamp* Ramp = nullptr;
                 Set->GetPropSingleRampRamp(Hash, &Ramp);
@@ -2458,7 +2466,7 @@ namespace AlchemyImpl
                 if (Ramp != nullptr)
                     Ramp->Release();
             }
-            else if (Kind == 0x201)
+            else if (Kind == kFxPropColorRampRamp)
             {
                 IRampColorRamp* Ramp = nullptr;
                 Set->GetPropColorRampRamp(Hash, &Ramp);
@@ -2466,7 +2474,7 @@ namespace AlchemyImpl
                 if (Ramp != nullptr)
                     Ramp->Release();
             }
-            else if (Kind == 0x202)
+            else if (Kind == kFxPropAnimatedSingleRamp)
             {
                 INestedSingleRamp* Ramp = nullptr;
                 Set->GetPropAnimatedSingleRamp(Hash, &Ramp);
@@ -2501,7 +2509,7 @@ namespace AlchemyImpl
         } Owner;
         AsFxNode(Node)->GetPropertySet(&Owner.Set); // 0x06228280
         const char* ClassName = nullptr;
-        Owner.Set->GetPropName(0xF54EF296u, &ClassName);
+        Owner.Set->GetPropName(kNodeClassNameHash, &ClassName);
         Chunk->WriteString(ClassName);
         FNodeWriteContext Context;
         Context.Chunk = Chunk;

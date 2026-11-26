@@ -94,6 +94,16 @@ struct FRmNamedValue
     int Value;
 };
 
+// The solar types of GRmSolarTypes (the retail names of the "solar" keys): FRmSolarSpawn /
+// FRmSolarRecord / FRmKillableSolar SolarType.
+enum ERmSolarType
+{
+    kRmSolarBig = 0,              // "big_solar"
+    kRmSolarDefensive = 1,        // "defensive_solar"
+    kRmSolarKillableNeutral = 2,  // "killable_neutral"
+    kRmSolarBackground = 3        // "background_solar"
+};
+
 // .data PTR_s_big_solar_06fce748: big_solar 0, defensive_solar 1, killable_neutral 2,
 // background_solar 3. One retail object, shared by TU51 and TU62.
 extern FRmNamedValue const GRmSolarTypes[4];

@@ -65,6 +65,15 @@ int __cdecl GetBaseMsgIdPrefix(unsigned int BaseId, TString<0x40>* Out);
 // FUN_06eeb190 (cdecl): the same for the faction (GetFactionProps).
 int __cdecl GetFactionMsgIdPrefix(unsigned int FactionId, TString<0x40>* Out);
 
+// MakeObjectReferenceName's Kind.
+enum EGcsObjectReference
+{
+    kGcsObjectReferenceBusiness = 0,         // the ship's line of business (trader / patrol)
+    kGcsObjectReferenceFormationDesig = 1,   // its formation designation
+    kGcsObjectReferenceNumber = 2,           // its number
+    kGcsObjectReferenceRolledNumber = 3      // its number with a dash
+};
+
 // FUN_06eeb210 (cdecl, the result through a hidden pointer): the voice line naming Object
 // (a ship of the system): Kind 0 the ship's line of business for a dock hail ("gcs_dhail_mbid_
 // trader(s)" / "patrol(lers)" + "_leg" / "_ill"), 1 its formation designation, 2 its number
@@ -1049,6 +1058,14 @@ private:
 // whose slot 0 returns its type (ICF-shared constant getters).
 // ---------------------------------------------------------------------------------------
 
+// FGcsFidgetEvent::Kind / FGcsFidgetConversation::Kind.
+enum EGcsFidgetKind
+{
+    kGcsFidgetSimple = 0,            // one chatter line
+    kGcsFidgetFormationStatus = 1,   // the leader's status query and the wingmen's answers
+    kGcsFidgetRumor = 2              // a rumour line
+};
+
 // The event types (FGcsEvent::GetType; also the comm categories of IsGcsCommAllowed /
 // RecordGcsComm), named after the message or scan step that queues them and the lines they
 // build. QueueConversation builds nothing for 4.
@@ -1262,6 +1279,14 @@ extern FGcsConversationManager* GGcsConversationManager;
 // ---------------------------------------------------------------------------------------
 // Handlers (base vtable 06fb7494: LAB_06ee9640 deleting dtor, purecall, purecall).
 // ---------------------------------------------------------------------------------------
+
+// FGcsHandler::GetType, the key of the handler registry GetGcsHandler.
+enum EGcsHandlerType
+{
+    kGcsHandlerDockHail = 0,   // FGcsDockHailHandler
+    kGcsHandlerCombat = 1,     // FGcsCombatHandler
+    kGcsHandlerFidget = 2      // FGcsFidgetHandler
+};
 
 class FGcsHandler
 {

@@ -21,7 +21,7 @@ CSetPasswordDlg::CSetPasswordDlg(CWnd* Parent)
 // .text:00415bd0
 void CSetPasswordDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1038, PasswordEdit);
+	DDX_Control(DX, kControlPassword, PasswordEdit);
 }
 
 // .rdata:0041e4d0: no entries.

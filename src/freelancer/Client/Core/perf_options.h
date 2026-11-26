@@ -52,6 +52,19 @@ FPerfOption* FindPerfOptionByIds(int IdsName);
 unsigned GetPerfOptionCount();
 FPerfOption* GetPerfOptionAt(unsigned Index);
 
+// The indices of the shared floats GetPerfOptionSlot answers; each is written by the apply
+// function of the option it is named after.
+enum EPerfSlot
+{
+    kPerfSlotUseEnvironmentMaps = 0,   // LAB_005b4700
+    kPerfSlotHighDetailTextures = 1,   // LAB_005b4870
+    kPerfSlotSoundMaxDistScale = 2,    // LAB_005b6230
+    kPerfSlotSoundLevelOfDetail = 3,   // LAB_005b4bd0
+    kPerfSlotUse3dSounds = 4,          // LAB_005b6240
+    kPerfSlotDynamicCommHead = 5,      // LAB_005b6250
+    kPerfSlotDifficultyScale = 6       // LAB_005b6260
+};
+
 // FUN_005b3510 — the seven shared floats at DAT_0067ed10 that some applies write into.
 float GetPerfOptionSlot(int Index);
 

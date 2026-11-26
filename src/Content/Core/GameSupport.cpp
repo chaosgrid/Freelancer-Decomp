@@ -265,7 +265,7 @@ namespace
         FBestPathPoint* Points =
             reinterpret_cast<FBestPathPoint*>(Data.data() + sizeof(FBestPathHeader));
         std::list<unsigned int> Route =
-            GetSystemPath(Request->FromSystemId, Request->ToSystemId, 1);
+            GetSystemPath(Request->FromSystemId, Request->ToSystemId, CONN_TYPE_JUMP_GATE);
 
         // The gates locked for the player (or everybody).
         std::vector<unsigned int> LockedGates;
@@ -324,7 +324,7 @@ namespace
             else
             {
                 unsigned int const EntryObjectId =
-                    GetNextHopConnectionObject(CurrentSystemId, PreviousSystemId, 1);
+                    GetNextHopConnectionObject(CurrentSystemId, PreviousSystemId, CONN_TYPE_JUMP_GATE);
                 Vector Position;
                 GetConnectionPosition(CurrentSystemId, EntryObjectId, &Position);
                 Start = Position;
@@ -349,7 +349,7 @@ namespace
             }
             else
             {
-                ExitObjectId = GetNextHopConnectionObject(CurrentSystemId, NextSystemId, 1);
+                ExitObjectId = GetNextHopConnectionObject(CurrentSystemId, NextSystemId, CONN_TYPE_JUMP_GATE);
                 Vector Position;
                 GetConnectionPosition(CurrentSystemId, ExitObjectId, &Position);
                 End = Position;
@@ -719,7 +719,7 @@ namespace
             System->RemoveTradeLaneShip(&Message[0], &Message[1]);              // FUN_06f78dd0
             break;
         }
-        case EMessage::Msg0x25:
+        case EMessage::ShipLeftSystem:
         {
             // Parms = {ship, target}.
             unsigned int const* Message = static_cast<unsigned int const*>(Parms);

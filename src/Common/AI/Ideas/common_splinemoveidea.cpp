@@ -41,7 +41,7 @@ SplineMoveIdea::SplineMoveIdea()
     , WideMode(0)
     , Pad151{}
     , BankBlendCap(1.0f)
-    , StopStyle(0)
+    , StopStyle(kMoveStopThrottleCut)
     , MaxSpeed15c(0.0f)
     , CoastDistance(0.0f)
     , SplineLength(0.0f)
@@ -117,7 +117,7 @@ void SplineMoveIdea::SetStopStyle(int Value)
 void SplineMoveIdea::SetWideMode(unsigned char Value)
 {
     WideMode = Value; // the caller's byte stored raw
-    Move.SetMode(Value != 0 ? 2 : 0);
+    Move.SetMode(Value != 0 ? kMoveModeCruise : kMoveModeEngine);
 }
 
 // FUN_062da380, RET 4.
@@ -126,7 +126,7 @@ void SplineMoveIdea::SetSpline(ICRSplineSegment* NewSpline)
     Move.ArrivalRange = ExtrapolateBase;
 
     Spline = NewSpline;
-    Move.StopStyle = 2;
+    Move.StopStyle = kMoveStopFlyThrough;
     Move.bKillEngineOffBearing = 0;
 
     // FUN_062e5af0: get_speed at full engine throttle.
@@ -232,12 +232,12 @@ int SplineMoveIdea::Update(float Dt)
     else
     {
         // MoveIdea::SetMode(2) inlined.
-        if (Move.Mode != 2 && Move.Mode == 1)
+        if (Move.Mode != kMoveModeCruise && Move.Mode == kMoveModeTradelane)
         {
             Vector ZeroDir{ 0.0f, 0.0f, 0.0f };
             Move.Handle->Thrust.SetNudgeDirection(ZeroDir);
         }
-        Move.Mode = 2;
+        Move.Mode = kMoveModeCruise;
     }
 
     // Two min-clamps on the unrounded value: the first keeps it on less or
@@ -250,13 +250,13 @@ int SplineMoveIdea::Update(float Dt)
     // Move's bearing default back to pi (0x40490fdb).
     Move.Throttle = (float)BankBlend;
     Move.MaxThrustBearing = BitsToFloat(0x40490fdbu);
-    Move.TargetKind48 = 2;
+    Move.TargetKind48 = kMoveTargetPoint;
 
     // Retail dereferences the Context->Pathfind chain unconditionally.
     Move.Position = Spline->P2;
     ((IBehaviorManager*)Move.Context)->Pathfind->CachedTargetPosition = Move.Position;
 
-    ((IBehaviorManager*)Move.Context)->Pathfind->NudgeObstacleTypeMask = 0x30038010;
+    ((IBehaviorManager*)Move.Context)->Pathfind->NudgeObstacleTypeMask = OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_MISSION_SATELLITE | OBJ_SATELLITE | OBJ_LOOT | OBJ_ASTEROID;
 
     int const MoveResult = Move.Update(Dt);
 
@@ -266,12 +266,12 @@ int SplineMoveIdea::Update(float Dt)
     {
         Vector const Chord{ Spline->P3.x - Spline->P2.x, Spline->P3.y - Spline->P2.y, Spline->P3.z - Spline->P2.z };
         Face.Direction28 = Chord;
-        Face.TargetKind = 3;
+        Face.TargetKind = kFaceTargetDirection;
     }
     else
     {
         Face.Position1c = FarPoint;
-        Face.TargetKind = 2;
+        Face.TargetKind = kFaceTargetPoint;
     }
     (void)Face.Update(Dt);
 

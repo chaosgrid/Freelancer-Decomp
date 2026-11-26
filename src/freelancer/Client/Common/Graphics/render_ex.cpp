@@ -95,10 +95,10 @@ namespace
         Desc.ComponentName = "FileSystem";
         Desc.BackendName = "DOS";
         Desc.DataPath = Path;
-        Desc.Access = 0x80000000; // GENERIC_READ
-        Desc.ShareMode = 1;          // FILE_SHARE_READ
-        Desc.Creation = 3;          // OPEN_EXISTING
-        Desc.Flags = 0x08000080;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xFFFFFFFF;
         IFileSystem* FileSystem = nullptr;
         if (DALib::Dacom == nullptr ||

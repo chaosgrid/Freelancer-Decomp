@@ -27,11 +27,11 @@ bool UiStaticText::Create(Win3D* NewParent, void* Payload)
     // FUN_00599ac0 (RET 8).
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
 
     InitTextDefaults();
 
-    Flags = static_cast<unsigned char>(Flags & 0xfe);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DActive);
     Width = 0.1f;
     Height = 0.1f;
     bDrawBackground = 0;

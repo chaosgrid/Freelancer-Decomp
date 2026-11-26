@@ -49,34 +49,34 @@ namespace AlchemyImpl
         // The property tables the sets enumerate (.data 0x06257700 emitter, 0x06255e28
         // cone, 0x06255f30 cube, 0x06256c4c sphere; {name, hash, kind, min, max}).
         const FNodePropertyRow kEmitterPropertyRows[] = {
-            {"Emitter_LODCurve", 0xFE077E05U, 0x200, 0.0f, 1.0f},
-            {"Emitter_InitialParticles", 0x0F9A9D52U, 0x2, 0.0f, 1000.0f},
-            {"Emitter_Frequency", 0x023C350CU, 0x202, 0.0f, kNodePropertyRowMax},
-            {"Emitter_MaxParticles", 0xF5042852U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"Emitter_EmitCount", 0xE7221F95U, 0x202, 0.0f, 5000.0f},
-            {"Emitter_InitLifeSpan", 0x0A635880U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"Emitter_Pressure", 0x0AB180C5U, 0x202, -kNodePropertyRowMax, kNodePropertyRowMax},
-            {"Emitter_VelocityApproach", 0x0681233EU, 0x202, 0.0f, 1.0f},
+            {"Emitter_LODCurve", 0xFE077E05U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"Emitter_InitialParticles", 0x0F9A9D52U, kFxPropInt, 0.0f, 1000.0f},
+            {"Emitter_Frequency", 0x023C350CU, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"Emitter_MaxParticles", 0xF5042852U, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"Emitter_EmitCount", 0xE7221F95U, kFxPropAnimatedSingleRamp, 0.0f, 5000.0f},
+            {"Emitter_InitLifeSpan", 0x0A635880U, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"Emitter_Pressure", 0x0AB180C5U, kFxPropAnimatedSingleRamp, -kNodePropertyRowMax, kNodePropertyRowMax},
+            {"Emitter_VelocityApproach", 0x0681233EU, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kConePropertyRows[] = {
-            {"ConeEmitter_MinRadius", 0x1C73D16BU, 0x202, 0.0f, kNodePropertyRowMax},
-            {"ConeEmitter_MaxRadius", 0xF636F07FU, 0x202, 0.0f, kNodePropertyRowMax},
-            {"ConeEmitter_MinSpread", 0x100E7F55U, 0x202, 0.0f, 90.0f},
-            {"ConeEmitter_MaxSpread", 0xFA4B5E41U, 0x202, 0.0f, 90.0f},
+            {"ConeEmitter_MinRadius", 0x1C73D16BU, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"ConeEmitter_MaxRadius", 0xF636F07FU, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"ConeEmitter_MinSpread", 0x100E7F55U, kFxPropAnimatedSingleRamp, 0.0f, 90.0f},
+            {"ConeEmitter_MaxSpread", 0xFA4B5E41U, kFxPropAnimatedSingleRamp, 0.0f, 90.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kCubePropertyRows[] = {
-            {"CubeEmitter_Width", 0xFD22A11CU, 0x202, 0.0f, kNodePropertyRowMax},
-            {"CubeEmitter_Height", 0xEFB0F8CFU, 0x202, 0.0f, kNodePropertyRowMax},
-            {"CubeEmitter_Depth", 0x14B74EB2U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"CubeEmitter_MinSpread", 0xE282006BU, 0x202, 0.0f, 90.0f},
-            {"CubeEmitter_MaxSpread", 0x08C7217FU, 0x202, 0.0f, 90.0f},
+            {"CubeEmitter_Width", 0xFD22A11CU, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"CubeEmitter_Height", 0xEFB0F8CFU, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"CubeEmitter_Depth", 0x14B74EB2U, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"CubeEmitter_MinSpread", 0xE282006BU, kFxPropAnimatedSingleRamp, 0.0f, 90.0f},
+            {"CubeEmitter_MaxSpread", 0x08C7217FU, kFxPropAnimatedSingleRamp, 0.0f, 90.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kSpherePropertyRows[] = {
-            {"SphereEmitter_MinRadius", 0xF231FF60U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"SphereEmitter_MaxRadius", 0x1874DE74U, 0x202, 0.0f, kNodePropertyRowMax},
+            {"SphereEmitter_MinRadius", 0xF231FF60U, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"SphereEmitter_MaxRadius", 0x1874DE74U, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
 

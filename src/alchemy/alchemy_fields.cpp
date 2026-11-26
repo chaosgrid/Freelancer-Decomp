@@ -32,38 +32,53 @@ namespace AlchemyImpl
         // (0x06212d80); no instruction in the image writes it.
         unsigned char G_DustAgeMinusUpdateDt = 0;
 
+        // Field property-name hashes (the names of the rows below).
+        const unsigned long kGravityFieldGravityHash = 0xE02B8BD4U;
+        const unsigned long kAirFieldMagnitudeHash = 0xE5E3524CU;
+        const unsigned long kAirFieldApproachHash = 0x10423CEBU;
+        const unsigned long kRadialFieldRadiusHash = 0xFF28F620U;
+        const unsigned long kRadialFieldAttenuationHash = 0x1A433168U;
+        const unsigned long kRadialFieldMagnitudeHash = 0x0064B3B9U;
+        const unsigned long kRadialFieldApproachHash = 0xF3CF5EA5U;
+        const unsigned long kTurbulenceFieldMagnitudeHash = 0x1CEAC6D1U;
+        const unsigned long kTurbulenceFieldApproachHash = 0x1B970B9AU;
+        const unsigned long kCollideFieldReflectivityHash = 0xF2468210U;
+        const unsigned long kCollideFieldWidthHash = 0x138BDB51U;
+        const unsigned long kCollideFieldHeightHash = 0x11336C98U;
+        const unsigned long kSphereEmitterMaxRadiusHash = 0x1874DE74U;
+
         // The field sets' property tables (.data 0x06256240 gravity, 0x06255af4 air,
         // 0x062569c8 radial, 0x06256ccc turbulence, 0x06255d78 collide, 0x06255aa8 dust),
         // each enumerated after the base rows.
         const FNodePropertyRow kGravityPropertyRows[] = {
-            {"GravityField_Gravity", 0xE02B8BD4U, 0x202, 0.0f, kNodePropertyRowMax},
+            {"GravityField_Gravity", kGravityFieldGravityHash, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kAirPropertyRows[] = {
-            {"AirField_Magnitude", 0xE5E3524CU, 0x202, -kNodePropertyRowMax, kNodePropertyRowMax},
-            {"AirField_Approach", 0x10423CEBU, 0x202, 0.0f, 2.0f},
+            {"AirField_Magnitude", kAirFieldMagnitudeHash, kFxPropAnimatedSingleRamp, -kNodePropertyRowMax, kNodePropertyRowMax},
+            {"AirField_Approach", kAirFieldApproachHash, kFxPropAnimatedSingleRamp, 0.0f, 2.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kRadialPropertyRows[] = {
-            {"RadialField_Radius", 0xFF28F620U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"RadialField_Attenuation", 0x1A433168U, 0x200, -1.0f, 1.0f},
-            {"RadialField_Magnitude", 0x0064B3B9U, 0x202, -kNodePropertyRowMax, kNodePropertyRowMax},
-            {"RadialField_Approach", 0xF3CF5EA5U, 0x202, 0.0f, 10.0f},
+            {"RadialField_Radius", kRadialFieldRadiusHash, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"RadialField_Attenuation", kRadialFieldAttenuationHash, kFxPropSingleRampRamp, -1.0f, 1.0f},
+            {"RadialField_Magnitude", kRadialFieldMagnitudeHash, kFxPropAnimatedSingleRamp, -kNodePropertyRowMax, kNodePropertyRowMax},
+            {"RadialField_Approach", kRadialFieldApproachHash, kFxPropAnimatedSingleRamp, 0.0f, 10.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kTurbulencePropertyRows[] = {
-            {"TurbulenceField_Magnitude", 0x1CEAC6D1U, 0x202, -kNodePropertyRowMax, kNodePropertyRowMax},
-            {"TurbulenceField_Approach", 0x1B970B9AU, 0x202, 0.0f, 2.0f},
+            {"TurbulenceField_Magnitude", kTurbulenceFieldMagnitudeHash, kFxPropAnimatedSingleRamp, -kNodePropertyRowMax, kNodePropertyRowMax},
+            {"TurbulenceField_Approach", kTurbulenceFieldApproachHash, kFxPropAnimatedSingleRamp, 0.0f, 2.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kCollidePropertyRows[] = {
-            {"CollideField_Reflectivity", 0xF2468210U, 0x202, 0.0f, 1.0f},
-            {"CollideField_Width", 0x138BDB51U, 0x202, 0.0f, kNodePropertyRowMax},
-            {"CollideField_Height", 0x11336C98U, 0x202, 0.0f, kNodePropertyRowMax},
+            {"CollideField_Reflectivity", kCollideFieldReflectivityHash, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"CollideField_Width", kCollideFieldWidthHash, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
+            {"CollideField_Height", kCollideFieldHeightHash, kFxPropAnimatedSingleRamp, 0.0f, kNodePropertyRowMax},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kDustFieldPropertyRows[] = {
-            {"SphereEmitter_MaxRadius", 0x1874DE74U, 0x202, 60.1f, kNodePropertyRowMax},
+            {"SphereEmitter_MaxRadius", kSphereEmitterMaxRadiusHash, kFxPropAnimatedSingleRamp, 60.1f, kNodePropertyRowMax},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
 
@@ -276,7 +291,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxGravityFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
-        if (Hash != 0xE02B8BD4u)
+        if (Hash != kGravityFieldGravityHash)
             return GR_ALE_CREATE_FAIL;
         return HandOutFieldRamp(GravityRamp, Out);
     }
@@ -361,9 +376,9 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxAirFieldPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                           INestedSingleRamp** Out)
     {
-        if (Hash == 0x10423CEBu)
+        if (Hash == kAirFieldApproachHash)
             return HandOutFieldRamp(ApproachRamp, Out);
-        if (Hash == 0xE5E3524Cu)
+        if (Hash == kAirFieldMagnitudeHash)
             return HandOutFieldRamp(MagnitudeRamp, Out);
         return GR_ALE_CREATE_FAIL;
     }
@@ -448,7 +463,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxRadialFieldPropertySet::GetPropSingleRampRamp(unsigned long Hash,
                                                                          INestedSingleRamp** Out)
     {
-        if (Hash != 0x1A433168u)
+        if (Hash != kRadialFieldAttenuationHash)
             return GR_ALE_CREATE_FAIL;
         return HandOutFieldRamp(FalloffRamp, Out);
     }
@@ -457,11 +472,11 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxRadialFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
-        if (Hash == 0xFF28F620u)
+        if (Hash == kRadialFieldRadiusHash)
             return HandOutFieldRamp(RadiusRamp, Out);
-        if (Hash == 0x0064B3B9u)
+        if (Hash == kRadialFieldMagnitudeHash)
             return HandOutFieldRamp(MagnitudeRamp, Out);
-        if (Hash == 0xF3CF5EA5u)
+        if (Hash == kRadialFieldApproachHash)
             return HandOutFieldRamp(ApproachRamp, Out);
         return GR_ALE_CREATE_FAIL;
     }
@@ -579,9 +594,9 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxTurbulenceFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
-        if (Hash == 0x1B970B9Au)
+        if (Hash == kTurbulenceFieldApproachHash)
             return HandOutFieldRamp(ApproachRamp, Out);
-        if (Hash == 0x1CEAC6D1u)
+        if (Hash == kTurbulenceFieldMagnitudeHash)
             return HandOutFieldRamp(MagnitudeRamp, Out);
         return GR_ALE_CREATE_FAIL;
     }
@@ -707,11 +722,11 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxCollideFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
-        if (Hash == 0xF2468210u || Hash == 0xE462B789u)
+        if (Hash == kCollideFieldReflectivityHash || Hash == 0xE462B789u)
             return HandOutFieldRamp(ReflectRamp, Out);
-        if (Hash == 0x138BDB51u || Hash == 0x061AAF28u)
+        if (Hash == kCollideFieldWidthHash || Hash == 0x061AAF28u)
             return HandOutFieldRamp(WidthRamp, Out);
-        if (Hash == 0x11336C98u || Hash == 0x16FF3474u)
+        if (Hash == kCollideFieldHeightHash || Hash == 0x16FF3474u)
             return HandOutFieldRamp(HeightRamp, Out);
         return GR_ALE_CREATE_FAIL;
     }
@@ -886,7 +901,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxDustFieldPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                            INestedSingleRamp** Out)
     {
-        if (Hash != 0x1874DE74u)
+        if (Hash != kSphereEmitterMaxRadiusHash)
             return GR_ALE_CREATE_FAIL;
         return HandOutFieldRamp(RadiusRamp, Out);
     }

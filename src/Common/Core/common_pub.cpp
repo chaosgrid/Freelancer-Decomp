@@ -219,7 +219,7 @@ Personality::RepairUseStruct& Personality::RepairUseStruct::operator=(RepairUseS
 }
 
 Personality::GunUseStruct::GunUseStruct()
-    : FireStyle(0)
+    : FireStyle(kFireStyleMultiple)
     , GunFireIntervalTime(0.0f)
     , GunFireIntervalVariancePercent(0.5f)
     , GunFireBurstIntervalTime(1.5f)
@@ -390,12 +390,13 @@ Personality::JobStruct::JobStruct()
     , bForceAttackFormation(0)
     , bForceAttackFormationSet(0)
 {
-    AttackPreferences[0].ShipClass = 11;      // ANYTHING
+    AttackPreferences[0].ShipClass = kAttackClassAnything;
     AttackPreferences[0].Range = 5000.0f;
-    AttackPreferences[0].WeaponFlags = 0xF;   // every weapon type
-    AttackPreferences[1].ShipClass = 12;      // list terminator
-    AttackSubtargetOrder[0] = 6;              // ANYTHING
-    AttackSubtargetOrder[1] = 7;              // list terminator
+    AttackPreferences[0].WeaponFlags =
+        kAttackWeaponGuns | kAttackWeaponGuided | kAttackWeaponUnguided | kAttackWeaponTorpedo;
+    AttackPreferences[1].ShipClass = kAttackClassEnd;
+    AttackSubtargetOrder[0] = kAttackSubtargetAnything;
+    AttackSubtargetOrder[1] = kAttackSubtargetEnd;
 }
 
 Personality::JobStruct& Personality::JobStruct::operator=(JobStruct const& Other)
@@ -490,7 +491,7 @@ BaseOp::BaseOp(BaseOp const& Other)
 
 DirectiveGotoOp::DirectiveGotoOp()
     : BaseOp(OpType_DirectiveGotoOp)
-    , GotoKind(3)
+    , GotoKind(kGotoKindNone)
     , Destination{0.0f, 0.0f, 0.0f}
     , TargetId(0)
     , SplineP1X(0), SplineP1Y(0), SplineP1Z(0), SplineP2X(0)
@@ -1002,7 +1003,7 @@ SetZoneBehaviorParams::SetZoneBehaviorParams()
     // .text:062dad60 writes neither Mode nor the box; the port zeroes them (over-initialisation).
     : BaseOp(OpType_SetZoneBehaviorParams)
     , Mode(0)
-    , InvertMode(2)
+    , InvertMode(kInvertClearUserZone)
     , TargetPoint{0.0f, 0.0f, 0.0f}
     , TargetId(0)
     , BoxMin{0.0f, 0.0f, 0.0f}
@@ -1026,7 +1027,7 @@ SetZoneBehaviorParams::SetZoneBehaviorParams(SetZoneBehaviorParams const& Other)
 bool SetZoneBehaviorParams::validate()
 {
     // .text:062dad90. A NaN radius passes; a NaN target sum fails.
-    if (InvertMode != 2)
+    if (InvertMode != kInvertClearUserZone)
     {
         if (Radius == 0.0f)
             return false;

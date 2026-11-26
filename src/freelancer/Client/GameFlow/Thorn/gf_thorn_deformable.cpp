@@ -343,12 +343,12 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, Vector* Position, M
     AimDesc.Field1C = 0;
     if (Desc->bPointAt != 0)
     {
-        AimDesc.Flags = EventFlags | 0x40;
+        AimDesc.Flags = EventFlags | kIkAimOrientationTarget;
         if (Desc->CountToRoot == 1)
-            AimDesc.Flags = EventFlags | 0x40 | 0x80;
+            AimDesc.Flags = EventFlags | kIkAimOrientationTarget | kIkAimNoClamp;
     }
     if (Desc->bMoveTo != 0)
-        AimDesc.Flags |= 0x20;
+        AimDesc.Flags |= kIkAimPositionTarget;
     if (static_cast<signed char>(EventFlags & 0xff) < 0)
         AimDesc.Flags |= 0x100;
 

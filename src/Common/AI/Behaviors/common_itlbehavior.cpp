@@ -12,7 +12,7 @@
 // two vtables and writes nothing else; the port zero-initialises every field.
 InstantTradeLaneBehavior::InstantTradeLaneBehavior(int InTypeId)
     : Behavior(InTypeId)
-    , State30(0)
+    , State30(kItlStateStart)
     , EntranceRing(nullptr)
     , ExitRing(nullptr)
     , LaneStart3c()
@@ -54,8 +54,8 @@ void InstantTradeLaneBehavior::TurnOff()
 {
     if (OwnerContext == nullptr)
         return;
-    SetAvoidanceAllowed(0, 3);                                                    // FUN_062d21d0
-    State30 = 0;
+    SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);                                                    // FUN_062d21d0
+    State30 = kItlStateStart;
     Behavior::OnEngage();
     SysMgr->Thrust.engage_cruise(false);
 }
@@ -70,7 +70,7 @@ void InstantTradeLaneBehavior::RequestExitTradeLane()
     bool const bWasStatusSet = (Flags54 != 0);
     Flag55 = 0;
     Flag56 = 0;
-    Flags28 |= 0x1;
+    Flags28 |= kBehaviorFlagDisengageRequested;
 
     if (bWasStatusSet)
     {
@@ -89,7 +89,7 @@ void InstantTradeLaneBehavior::RequestExitTradeLane()
 
     Behavior::OnDisengage();
     EntranceRing = nullptr;
-    SetAvoidanceAllowed(0, 3);
+    SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);
 }
 
 // Slot 5, LAB_062ceeb0.
@@ -124,15 +124,15 @@ int InstantTradeLaneBehavior::UpdateMode()
 int InstantTradeLaneBehavior::Update()
 {
     // The exit-tradelane bit is already set.
-    if (Flags28 & 0x1)
+    if (Flags28 & kBehaviorFlagDisengageRequested)
     {
-        UpdateResult = 2;
+        UpdateResult = kBehaviorUpdateFinished;
         return UpdateResult;
     }
 
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
+        UpdateResult = kBehaviorUpdateAborted;
         return UpdateResult;
     }
 
@@ -140,7 +140,7 @@ int InstantTradeLaneBehavior::Update()
     // reloaded after the guard), not on this object.
     switch (State30)
     {
-    case 0:
+    case kItlStateStart:
     {
         if (ExitRing == nullptr)
         {
@@ -151,20 +151,20 @@ int InstantTradeLaneBehavior::Update()
             // Zero is success.
             if (LaneResult != 0)
             {
-                UpdateResult = 3;
-                return 3;
+                UpdateResult = kBehaviorUpdateAborted;
+                return kBehaviorUpdateAborted;
             }
             ExitRing = OutLane;
         }
 
-        UpdateResult = 1;
-        State30 = 3;
+        UpdateResult = kBehaviorUpdateRunning;
+        State30 = kItlStateEnter;
         Flag56 = 1;
         Flag55 = 0;
-        return 1;
+        return kBehaviorUpdateRunning;
     }
 
-    case 3:
+    case kItlStateEnter:
     {
         // IObjAffect slot 25 on OwnerContext+4.
         int const AffectResult = OwnerContext->go_tradelane(EntranceRing, ExitRing, true, LaneSpeed);
@@ -172,42 +172,42 @@ int InstantTradeLaneBehavior::Update()
         // Zero is success; the failure path still returns 1.
         if (AffectResult != 0)
         {
-            UpdateResult = 1;
-            State30 = 6;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            State30 = kItlStateFailed;
+            return kBehaviorUpdateRunning;
         }
 
         // FUN_062d4520 with Extra 0 and Duration 0.0f: OwnerContext's formation followers get
         // notification 0 at once. No null test on the manager.
         BehaviorMgr->QueueNotification(OwnerContext, 0, 0.0f);
 
-        UpdateResult = 0;
+        UpdateResult = kBehaviorUpdateBusy;
         Flags54 = 1;
-        State30 = 4;
-        return 0;
+        State30 = kItlStateInLane;
+        return kBehaviorUpdateBusy;
     }
 
-    case 5:
-    case 6:
+    case kItlStateLeftLane:
+    case kItlStateFailed:
     {
         // Retail picks the constant at the case label, before the virtual OnDisengage call,
         // so it must not be re-derived from State30 afterwards.
-        int const ManagerArg118 = (State30 == 6) ? 2 : 0;
+        int const ManagerArg118 = (State30 == kItlStateFailed) ? 2 : 0;
 
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
         OnDisengage();
-        BehaviorMgr->SetDirectiveResult(9, ManagerArg118);    // FUN_062d29a0
-        UpdateResult = 2;
-        return 2;
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_INSTANT_TRADE_LANE, ManagerArg118);    // FUN_062d29a0
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     case 1:
     case 2:
-    case 4:
+    case kItlStateInLane:
     default:
         // Still running.
-        UpdateResult = 1;
-        return 1;
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;
     }
 }
 
@@ -215,7 +215,7 @@ int InstantTradeLaneBehavior::Update()
 // the manager at +0x20.
 bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
 {
-    Flags28 &= ~0x1;
+    Flags28 &= ~kBehaviorFlagDisengageRequested;
 
     pub::AI::DirectiveInstantTradelaneOp const* const Op =
         static_cast<pub::AI::DirectiveInstantTradelaneOp const*>(Directive);
@@ -227,9 +227,9 @@ bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
     LaneSpeed = *reinterpret_cast<float const*>(&Op->LaneSpeed);   // float bits
 
     if (EntranceRing != nullptr)
-        Flags28 |= 0x2;
+        Flags28 |= kBehaviorFlagDirectiveAccepted;
     else
-        Flags28 &= ~0x2;
+        Flags28 &= ~kBehaviorFlagDirectiveAccepted;
 
     return EntranceRing != nullptr;
 }
@@ -240,21 +240,21 @@ void InstantTradeLaneBehavior::HandleTargetEvent(void* Event)
     struct TaggedEvent { int Tag; unsigned char* Payload; };
     TaggedEvent const* Ev = static_cast<TaggedEvent const*>(Event);
 
-    if (Ev->Tag != 4 || Ev->Payload[0] != 0)                         // no null test
+    if (Ev->Tag != FBehaviorManagerEvent::kEventTradelane || Ev->Payload[0] != 0)                         // no null test
         return;
 
     if (OwnerContext->get_id() != *reinterpret_cast<unsigned const*>(Ev->Payload + 0xc))
         return;
 
     // Set regardless of EntranceRing; its null test gates only the cancel below.
-    State30 = 5;
+    State30 = kItlStateLeftLane;
 
     if (EntranceRing == nullptr)
         return;
 
     // Retail uses its own incoming parameter slot as the id scratch.
     unsigned SavedId = EntranceRing->get_id();
-    (void)OwnerContext->request_cancel(2, &SavedId, 0);
+    (void)OwnerContext->request_cancel(kRequestEventTradelane, &SavedId, 0);
 }
 
 // IObjAffect::RequestCB override, the secondary vtable's single slot (LAB_062cf150); retail
@@ -266,11 +266,11 @@ bool InstantTradeLaneBehavior::OnResult(int /*Param1*/, int /*Param2*/, int Para
     if (Param3 != -1)
     {
         Flag56 = 1;
-        State30 = 3;
+        State30 = kItlStateEnter;
         return false;
     }
 
-    State30 = 6;
+    State30 = kItlStateFailed;
 
     // Retail also re-tests Flag55 here, which is dead since it was just zeroed; only Flag56
     // gates the block.
@@ -278,7 +278,7 @@ bool InstantTradeLaneBehavior::OnResult(int /*Param1*/, int /*Param2*/, int Para
     {
         // Same (2, &SavedId, 0) shape as HandleTargetEvent; both calls unguarded in retail.
         unsigned SavedId = EntranceRing->get_id();
-        (void)OwnerContext->request_cancel(2, &SavedId, 0);
+        (void)OwnerContext->request_cancel(kRequestEventTradelane, &SavedId, 0);
 
         Flag55 = 0;
         Flag56 = 0;
@@ -287,7 +287,7 @@ bool InstantTradeLaneBehavior::OnResult(int /*Param1*/, int /*Param2*/, int Para
     if (Flags54 != 0)
     {
         Flags54 = 0;
-        State30 = 6;
+        State30 = kItlStateFailed;
     }
 
     return false;

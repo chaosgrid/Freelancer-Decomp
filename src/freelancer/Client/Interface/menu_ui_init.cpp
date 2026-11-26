@@ -165,7 +165,7 @@ void PlayUiRolloverSound()
     // FUN_00564700: a plain start, not the if-idle variant.
     if (!IsClientIntroEnvironment() && !IsClientServerTickPaused())
         return;
-    unsigned int const Slot = 0x1d;
+    unsigned int const Slot = kUiSoundRollover;
     if (GUiSoundTable[Slot] == nullptr)
     {
         char const* const Name = kUiSoundNames[Slot];

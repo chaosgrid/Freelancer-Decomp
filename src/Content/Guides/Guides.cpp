@@ -392,7 +392,7 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     if (Type == OBJLIST_GOTO_VEC)
     {
         TRefHandle<FObjListDirective> Typed(First);
-        OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+        OutType = pub::AI::ContentCallback::FleeDestPoint;
         OutPosition = static_cast<FObjListGotoVec*>(Typed.Pointer)->Op.Destination;   // +0x11c
         OutFloat = 2000.0f;
         return true;
@@ -400,7 +400,7 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     if (Type == OBJLIST_DOCK)
     {
         TRefHandle<FObjListDirective> Typed(First);
-        OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(2);
+        OutType = pub::AI::ContentCallback::FleeDestDock;
         OutParam = static_cast<FObjListDock*>(Typed.Pointer)->Op.DockObjectId;       // +0x118
         return true;
     }
@@ -484,13 +484,13 @@ FGuideRoute* FTradeRoute::Clone()
 // 06ee9e10.
 int FTradeRoute::GetType()
 {
-    return 1;
+    return kGuideRouteTrade;
 }
 
 // LAB_06f07110.
 int FTradeRoute::GetStatus()
 {
-    return State == 4 ? 3 : 1;
+    return State == kTradeRouteDone ? kGuideRouteFinished : kGuideRouteBusy;
 }
 
 // LAB_06f077b0 (RET 4). As retail, a State above 4 spins the loop forever.
@@ -500,23 +500,23 @@ int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
     {
         switch (State)
         {
-        case 0:
+        case kTradeRouteStart:
         {
             Vector const ShipPosition = GetShipPosition(Ship);
             BuildPathDirectives(Ship->GetSystem(), &ShipPosition, &Center, Out, 1, &Range);
             if (Out->empty())
             {
-                State = 4;
+                State = kTradeRouteDone;
                 return GetStatus();
             }
             int const Type = Out->front()->GetType();
             if (Type == OBJLIST_GOTO_VEC)
-                State = 1;
+                State = kTradeRouteGoto;
             else
-                State = Type == OBJLIST_DOCK ? 2 : 1;
+                State = Type == OBJLIST_DOCK ? kTradeRouteDock : kTradeRouteGoto;
             return GetStatus();
         }
-        case 1:
+        case kTradeRouteGoto:
         {
             FObjListDirective** Active = Ship->GetActiveDirectiveSlot();
             Vector From;
@@ -527,25 +527,25 @@ int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
             BuildPathDirectives(Ship->GetSystem(), &From, &Center, Out, 1, &Range);
             if (Out->empty())
             {
-                State = 4;
+                State = kTradeRouteDone;
                 return GetStatus();
             }
             int const Type = Out->front()->GetType();
             if (Type == OBJLIST_GOTO_VEC)
-                State = 1;
+                State = kTradeRouteGoto;
             else if (Type == OBJLIST_DOCK)
-                State = 2;
+                State = kTradeRouteDock;
             return GetStatus();
         }
-        case 2:
-            State = 3;
+        case kTradeRouteDock:
+            State = kTradeRouteFormationWait;
             continue;
-        case 3:
+        case kTradeRouteFormationWait:
             if (AddFormationWaitDirective(Out))
                 return GetStatus();
-            State = 1;
+            State = kTradeRouteGoto;
             continue;
-        case 4:
+        case kTradeRouteDone:
             return GetStatus();
         default:
             continue;
@@ -629,22 +629,22 @@ void FTradeGuide::Start()
     {
         switch (State)
         {
-        case 0:
+        case kTradeGuideRoute:
         {
             FMissionDirectiveList Next;
-            if (Route->Update(&Next.Items) == 3)
+            if (Route->Update(&Next.Items) == kGuideRouteFinished)
             {
-                State = 1;
+                State = kTradeGuideDock;
                 continue;
             }
             Ship->SetDirectives(&Next.Items, 0);                        // FUN_06f57840
             return;
         }
-        case 1:
+        case kTradeGuideDock:
             IssueDockDirective();
-            State = 2;
+            State = kTradeGuideDocking;
             return;
-        case 2:
+        case kTradeGuideDocking:
         {
             unsigned int const ShipId = Ship->SpaceObjId;
             unsigned int DockTarget;
@@ -652,17 +652,17 @@ void FTradeGuide::Start()
             if (GetShipDockingTarget(&ShipId, &DockTarget, &DockIndex, nullptr))   // FUN_06f6eca0
             {
                 IssueDelayDirective();
-                State = 3;
+                State = kTradeGuideLaunch;
                 return;
             }
             SwapTargets();
-            State = 0;
+            State = kTradeGuideRoute;
             continue;
         }
-        case 3:
+        case kTradeGuideLaunch:
             IssueLaunchDirective();
             SwapTargets();
-            State = 0;
+            State = kTradeGuideRoute;
             continue;
         default:
             continue;
@@ -673,7 +673,7 @@ void FTradeGuide::Start()
 // LAB_06f061a0: +0x24 = 0.
 void FTradeGuide::Reset()
 {
-    State = 0;
+    State = kTradeGuideRoute;
 }
 
 // LAB_06f0af30.
@@ -743,9 +743,9 @@ bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinati
     float const Range = 1500.0f;
     BuildNnPath(Ship->GetSystem(), &ShipPosition, &TargetPosition, &Legs, 1, &Range, 1);
 
-    if (Legs.empty() || Legs.front().Kind == 1)
+    if (Legs.empty() || Legs.front().Kind == kNnPathLegFlight)
     {
-        OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(2);
+        OutType = pub::AI::ContentCallback::FleeDestDock;
         OutParam = TargetId2;
         return true;
     }
@@ -761,7 +761,7 @@ bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinati
         (static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy) + Dz * Dz;
     if (!(LengthSquared > GGuideLaneEntryRangeSquared))
     {
-        OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(2);
+        OutType = pub::AI::ContentCallback::FleeDestDock;
         OutParam = First.ObjectA;
         return true;
     }
@@ -773,7 +773,7 @@ bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinati
     OutPosition.x = static_cast<float>(static_cast<double>(Nx) * 10000.0);
     OutPosition.y = static_cast<float>(static_cast<double>(Ny) * 10000.0);
     OutPosition.z = static_cast<float>(Nz * 10000.0);
-    OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+    OutType = pub::AI::ContentCallback::FleeDestPoint;
     OutFloat = 500.0f;
     return true;
 }

@@ -31,7 +31,7 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Flag2ec(0)
     , Pad2ed{}
     , Field2f0(1.5f)
-    , GotoKind(3)
+    , GotoKind(kGotoKindNone)
     , ActiveTargetPos{}    // not written by retail's ctor; value-initialised (OnApplyDirective/Update write it first)
     , Destination{}
     , Watcher310()
@@ -148,7 +148,7 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
     double const Distance = std::sqrt((static_cast<double>(Dz) * Dz + static_cast<double>(Dx) * Dx) +
                                       static_cast<double>(Dy) * Dy);
     if (RadialClearance > Distance)
-        *ZoneFlags = 1;
+        *ZoneFlags = kProxZoneOverlap;
 
     // Retail re-reads the watcher before each of the next two calls and re-guards neither.
     IObjRW* const ClearanceObj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
@@ -175,14 +175,14 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
     // Greater or unordered skips each test. Inside the band the previous tick's zone bits
     // are OR'd back in.
     if (Clearance <= NearLimit - HysteresisBand)
-        *ZoneFlags |= 2;
+        *ZoneFlags |= kProxZoneNear;
     else if (Clearance <= NearLimit + HysteresisBand)
         *ZoneFlags |= *SavedFlags;
 
     // Same on the far limit, but retail returns right after setting bit 0x4.
     if (Clearance <= FarLimit - HysteresisBand)
     {
-        *ZoneFlags |= 4;
+        *ZoneFlags |= kProxZoneFar;
         return;
     }
     if (Clearance <= FarLimit + HysteresisBand)
@@ -207,14 +207,14 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
 
     unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
     double ZoneSpeed;
-    if ((ZoneFlags & 3) != 0)
+    if ((ZoneFlags & (kProxZoneOverlap | kProxZoneNear)) != 0)
     {
         // Retail has two identical arms (one re-reads the watcher, one passes a null
         // receiver); collapsed, since Behavior_GetSpeed returns 0.0f on null.
         ZoneSpeed = Behavior_GetSpeed(
             ObjInspectOf(ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00))), 1.0f, ThrustType);
     }
-    else if ((ZoneFlags & 4) == 0)
+    else if ((ZoneFlags & kProxZoneFar) == 0)
     {
         ZoneSpeed = 0.0f;
     }
@@ -258,12 +258,12 @@ void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, 
     unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
 
     int Code;
-    if ((Saved & 4) != 0 && (Saved & 2) == 0 && (ZoneFlags & 2) != 0)
-        Code = 1;
-    else if ((Saved & 4) == 0 && (ZoneFlags & 4) != 0)
-        Code = 2;
-    else if ((Saved & 4) != 0 && (ZoneFlags & 4) == 0)
-        Code = 3;
+    if ((Saved & kProxZoneFar) != 0 && (Saved & kProxZoneNear) == 0 && (ZoneFlags & kProxZoneNear) != 0)
+        Code = pub::AI::ContentCallback::TetherEnterNear;
+    else if ((Saved & kProxZoneFar) == 0 && (ZoneFlags & kProxZoneFar) != 0)
+        Code = pub::AI::ContentCallback::TetherEnterFar;
+    else if ((Saved & kProxZoneFar) != 0 && (ZoneFlags & kProxZoneFar) == 0)
+        Code = pub::AI::ContentCallback::TetherExitFar;
     else
         return;
 
@@ -563,14 +563,14 @@ void GotoBehavior::OnEngage()
     int const CruiseResult =
         ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag368));
     // Mode 2 only when the flag came back set AND the call returned 0.
-    Move.SetMode((Flag368 != 0 && CruiseResult == 0) ? 2 : 0);    // FUN_062d5980
+    Move.SetMode((Flag368 != 0 && CruiseResult == 0) ? kMoveModeCruise : kMoveModeEngine);    // FUN_062d5980
     Flag365 = 1;
     Flag36c = 1;
     Move.SetAngle38(3.14159274f);                             // 0x40490fdb
     UserThrottle = MaxThrottle;
     Flag2ea = 0;
     Flag2ec = 0;
-    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
     SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.Iface->is_player())
         set_cruise(true);
@@ -581,8 +581,8 @@ void GotoBehavior::OnDisengage()
 {
     Face.Commit();
     SystemManager* const Sys = SysMgr;
-    if (Sys->SelfTarget.Iface->is_player() && GotoKind == 0)
-        Move.SetField44(2);                                   // FUN_062d88b0
+    if (Sys->SelfTarget.Iface->is_player() && GotoKind == kGotoKindObject)
+        Move.SetField44(kMoveStopFlyThrough);                                   // FUN_062d88b0
     Move.Commit();
     SysMgr->Thrust.SetStrafeDir(StrafeNone); // FUN_062e9030(+0x18, 0)
     Behavior::OnDisengage();
@@ -593,7 +593,7 @@ int GotoBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     int Result = 2;
-    if ((Flags28 & 0x2) != 0)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) != 0)
         Result = (Flag29 != 0) ? 3 : 1;
     else if (Flag29 != 0)
         Result = 3;
@@ -690,16 +690,16 @@ namespace
 int GotoBehavior::Update()
 {
     // A pending disengage request finishes the tick with 2.
-    if ((Flags28 & 0x1) != 0)
+    if ((Flags28 & kBehaviorFlagDisengageRequested) != 0)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
-    if (OwnerContext == nullptr || (Flags28 & 0x2) == 0)
+    if (OwnerContext == nullptr || (Flags28 & kBehaviorFlagDirectiveAccepted) == 0)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
@@ -732,7 +732,7 @@ int GotoBehavior::Update()
     }
 
     // Everything but kinds 0 and 1 goes straight to the tail.
-    if (GotoKind == 1)
+    if (GotoKind == kGotoKindPoint)
     {
         Clearance = static_cast<float>(GetSignedRadialClearanceToPoint(Elem, Destination));
 
@@ -763,7 +763,7 @@ int GotoBehavior::Update()
             else
                 Face.SetPosition(Ahead);
 
-            Move.SetField44(2);
+            Move.SetField44(kMoveStopFlyThrough);
             Move.SetDirection(Dir);
 
             // bFlyThrough is stored between the load and the compare.
@@ -771,13 +771,13 @@ int GotoBehavior::Update()
             if (Clearance < ArrivalRange)
             {
                 // Arrived.
-                Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+                Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
                 Flag368 = 0;
                 OnDisengage();
-                Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgr->SetDirectiveResult(2, 0);
-                UpdateResult = 2;
-                return 2;
+                Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+                BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 0);
+                UpdateResult = kBehaviorUpdateFinished;
+                return kBehaviorUpdateFinished;
             }
         }
         else
@@ -788,24 +788,24 @@ int GotoBehavior::Update()
 
         ActiveTargetPos = Destination;
     }
-    else if (GotoKind == 0)
+    else if (GotoKind == kGotoKindObject)
     {
         if (GotoWatchedObject(Watcher310) == nullptr)
         {
             // The watched object is gone. Retail disengages and reports twice.
-            Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+            Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
             OnDisengage();
-            Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgr->SetDirectiveResult(2, 2);
+            Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+            BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 2);
 
             if (Elem->Iface->is_player())
                 ObjAffectOf(OwnerContext)->slot_6c(3, 0);
 
-            Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+            Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
             Flag368 = 0;
             OnDisengage();
-            Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgr->SetDirectiveResult(2, 2);
+            Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+            BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 2);
             UpdateResult = Result;
             return Result;
         }
@@ -818,11 +818,11 @@ int GotoBehavior::Update()
             if (LengthSquaredXyz(Velocity) > 25.0)
             {
                 ObjAffectOf(OwnerContext)->slot_6c(2, 0);
-                Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+                Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
                 Flag368 = 0;
                 OnDisengage();
-                Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgr->SetDirectiveResult(2, 2);
+                Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+                BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 2);
                 UpdateResult = Result;
                 return Result;
             }
@@ -842,13 +842,13 @@ int GotoBehavior::Update()
 
             if (Clearance < ArrivalRange)
             {
-                Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+                Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
                 Flag368 = 0;
                 OnDisengage();
-                Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgr->SetDirectiveResult(2, 0);
-                UpdateResult = 2;
-                return 2;
+                Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+                BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 0);
+                UpdateResult = kBehaviorUpdateFinished;
+                return kBehaviorUpdateFinished;
             }
         }
         else
@@ -863,7 +863,7 @@ int GotoBehavior::Update()
     ProxWatcherRecomputeZoneFlags(ProxWatcher, SysMgr, ActiveTargetPos);
     ProxWatcherNotifyZoneChange(ProxWatcher, SysMgr, BehaviorMgr, ActiveTargetPos);
 
-    if (GotoKind == 2)
+    if (GotoKind == kGotoKindSpline)
     {
         // The lead point is the spline's end point (+0x330).
         ActiveTargetPos = Spline.P2;
@@ -873,7 +873,7 @@ int GotoBehavior::Update()
         {
             // Clearance is reused for the speed cap.
             Clearance = static_cast<float>(
-                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContext, SysMgr, 1, MaxThrottle));
+                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContext, SysMgr, ThrustEquipEngine, MaxThrottle));
             if (Behavior_GetSpeed(Owner, Throttle, ThrustEquipEngine) > Clearance)
                 SplineMove.SetThrottleScale(Clearance);
         }
@@ -893,7 +893,7 @@ int GotoBehavior::Update()
         {
             // Done with the spline: keep going while the watcher still has an object outside
             // zone 2 and bFlyThrough is clear.
-            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && bFlyThrough == 0)
+            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & kProxZoneNear) == 0 && bFlyThrough == 0)
             {
                 Result = 1;
                 UpdateResult = Result;
@@ -902,9 +902,9 @@ int GotoBehavior::Update()
             Result = 2;
         }
     }
-    else if (GotoKind == 0 || GotoKind == 1)
+    else if (GotoKind == kGotoKindObject || GotoKind == kGotoKindPoint)
     {
-        Move.SetField44(bFlyThrough != 0 ? 2 : 0);
+        Move.SetField44(bFlyThrough != 0 ? kMoveStopFlyThrough : kMoveStopThrottleCut);
 
         // Once per goto (Flag365); unordered gives 0.
         if (Flag365 != 0)
@@ -974,14 +974,14 @@ int GotoBehavior::Update()
         {
             if (bCruise != 0)
             {
-                Move.SetMode(2);
+                Move.SetMode(kMoveModeCruise);
                 Flag368 = 1;
             }
             else
             {
                 // SetRange3c is the DeviceTRC::bind_to_dc ICF fold.
                 Move.SetRange3c(ArrivalRange);
-                Move.SetMode(0);
+                Move.SetMode(kMoveModeEngine);
                 Flag368 = 0;
             }
         }
@@ -991,7 +991,7 @@ int GotoBehavior::Update()
         if (GotoWatchedObject(Watcher370) != nullptr)
         {
             Clearance = static_cast<float>(ProxWatcherComputeSpeedCap(
-                ProxWatcher, OwnerContext, SysMgr, Flag368 != 0 ? 4 : 1, MaxThrottle));
+                ProxWatcher, OwnerContext, SysMgr, Flag368 != 0 ? ThrustEquipCruise : ThrustEquipEngine, MaxThrottle));
             ThrustEquipType const QueryType =
                 (Flag368 != 0 && bTargetCruise != 0) ? ThrustEquipCruise : ThrustEquipEngine;
             if (Behavior_GetSpeed(Owner, Throttle, QueryType) > Clearance)
@@ -1009,7 +1009,7 @@ int GotoBehavior::Update()
         {
             if (Flag2ec != 0)
             {
-                Sys->Thrust.SetThrottle(-1.0f, 0);
+                Sys->Thrust.SetThrottle(-1.0f, kThrottleModeEngine);
                 bRunMove = false;
             }
             else if (Flag2e9 == 0)
@@ -1046,7 +1046,7 @@ int GotoBehavior::Update()
             }
 
             // Same keep-going test as the spline arm.
-            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && bFlyThrough == 0)
+            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & kProxZoneNear) == 0 && bFlyThrough == 0)
             {
                 Result = 1;
                 UpdateResult = Result;
@@ -1061,14 +1061,14 @@ int GotoBehavior::Update()
     }
 
     // LAB_062fe5ea: finish and report to the manager.
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDisengageRequested);
     Flag368 = 0;
     OnDisengage();
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     if (Result == 2)
-        BehaviorMgr->SetDirectiveResult(2, 0);
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 0);
     else
-        BehaviorMgr->SetDirectiveResult(2, 2);
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_GOTO, 2);
     UpdateResult = Result;
     return Result;
 }
@@ -1076,7 +1076,7 @@ int GotoBehavior::Update()
 // Slot 10, LAB_062fe670: apply a pub::AI::DirectiveGotoOp.
 bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
 {
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfe);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDisengageRequested);
     // The whole op (0x1c dwords, vptr included).
     std::memcpy(static_cast<void*>(&GotoOp), DirectiveOp, sizeof(GotoOp));
     pub::AI::DirectiveGotoOp const& Op = *static_cast<pub::AI::DirectiveGotoOp const*>(DirectiveOp);
@@ -1085,7 +1085,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
 
     switch (Op.GotoKind)
     {
-    case 0:
+    case kGotoKindObject:
     {
         // FUN_062e74a0: watch the object Op.TargetId names.
         IObjRW* const Dest = static_cast<IObjRW*>(
@@ -1097,12 +1097,12 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
         Face.SetWatchObject(Watched);
         break;
     }
-    case 1:
+    case kGotoKindPoint:
         Destination = Op.Destination;
         Move.SetPosition(Destination);
         Face.SetPosition(Destination);
         break;
-    case 2:
+    case kGotoKindSpline:
         // The spline's control points come from op+0x38/+0x20/+0x2c/+0x44, in that order.
         Spline.P0 = *reinterpret_cast<Vector const*>(&Op.SplineP0X);
         Spline.P1 = *reinterpret_cast<Vector const*>(&Op.SplineP1X);
@@ -1114,7 +1114,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
         ActiveTargetPos = Spline.P2;
         break;
     default:
-        Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
         return false;
     }
 
@@ -1130,9 +1130,9 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     Flag367 = Op.Field_59;
     Move.SetEnabled(Flag367);                                 // raw byte
     bFlyThrough = Op.bFlyThrough;
-    Move.SetField44(Op.bFlyThrough != 0 ? 2 : 0);
-    SplineMove.SetStopStyle(Op.bFlyThrough != 0 ? 2 : 0);               // FUN_062da400
-    SetAvoidanceAllowed(Op.bDisableAvoidance == 0 ? 1 : 0, 3);
+    Move.SetField44(Op.bFlyThrough != 0 ? kMoveStopFlyThrough : kMoveStopThrottleCut);
+    SplineMove.SetStopStyle(Op.bFlyThrough != 0 ? kMoveStopFlyThrough : kMoveStopThrottleCut);               // FUN_062da400
+    SetAvoidanceAllowed(Op.bDisableAvoidance == 0 ? 1 : 0, kAvoidanceObstacleNudge | kAvoidancePoint);
     bGotoCruise = Op.bGotoCruise;
     bGotoNoCruise = Op.bGotoNoCruise;
 
@@ -1152,7 +1152,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     ProxWatcherInit(reinterpret_cast<unsigned char*>(&Watcher370), SysMgr, ProxTarget,
                     ProxNear, ProxFar, ProxRatio);                  // FUN_062c29f0
 
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     Flag2ea = 0;
     return true;
 }
@@ -1180,11 +1180,11 @@ void GotoBehavior::set_direction(Vector const& Dir)
 {
     // Kind 1 always proceeds; kind 0 only on a strictly positive |Dir|^2.
     bool bProceed = false;
-    if (GotoKind == 1)
+    if (GotoKind == kGotoKindPoint)
     {
         bProceed = true;
     }
-    else if (GotoKind == 0)
+    else if (GotoKind == kGotoKindObject)
     {
         double const LengthSq = static_cast<double>(Dir.x) * Dir.x
                               + static_cast<double>(Dir.y) * Dir.y

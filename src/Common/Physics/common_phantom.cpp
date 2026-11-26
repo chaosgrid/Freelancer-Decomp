@@ -733,7 +733,7 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
     if (Handle == nullptr)
         return false;
     IVP_Real_Object* const Body = ((Phantom*)Handle)->Body;
-    if (Body->object_type != 3)
+    if (Body->object_type != IVP_BALL)
         return false;
 
     // The core's world translation.
@@ -773,7 +773,7 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
         CObject* const Root = GetRoot((CObject*)Intruder->client_data);
         if (Root == nullptr)
             continue;
-        if ((uint8_t)((unsigned)Root->ObjectClass & 3u) != 3)
+        if ((uint8_t)((unsigned)Root->ObjectClass & CObject::ClassSimple) != CObject::ClassSimple)
             continue;
         CSimple* const Simple = (CSimple*)Root;
         if ((Simple->TypeBits & FilterA) == 0)

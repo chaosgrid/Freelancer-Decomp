@@ -37,12 +37,12 @@ namespace
     // The Flags (+0x6c) edits FUN_004a6630 makes: AND 0xfc hides, OR 3 shows.
     void HideControl(WinControl* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags & 0xfc);
+        Control->Flags = static_cast<unsigned char>(Control->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     void ShowControl(WinControl* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags | 3);
+        Control->Flags = static_cast<unsigned char>(Control->Flags | kWin3DActive | kWin3DVisible);
     }
 }
 

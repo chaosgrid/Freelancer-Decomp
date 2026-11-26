@@ -83,7 +83,7 @@ WinControl::WinControl()
     ToolTipIds = 0;
     UserData = 0;
     OwnerData = 0;
-    PositionFlags = static_cast<unsigned char>(PositionFlags | 1);
+    PositionFlags = static_cast<unsigned char>(PositionFlags | kWinPositionAddOffset);
     bIdentityHitOrientation = 1;
     HitOffset.x = 0.0f;
     HitOffset.y = 0.0f;
@@ -116,7 +116,7 @@ WinControl::~WinControl()
         Child = ChildHead;
     }
 
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Rest = ChildHead; Rest != nullptr; Rest = Rest->NextSibling)
         Rest->Destroy();
     Win3DUnregister(this);
@@ -189,7 +189,7 @@ void WinControl::SetPosition(Vector const* NewPosition)
     if (HasInstance(this))
     {
         Vector Placed;
-        if ((PositionFlags & 1) != 0)
+        if ((PositionFlags & kWinPositionAddOffset) != 0)
         {
             Placed.x = Offset.x + Position.x;
             Placed.y = Position.y + Offset.y;
@@ -233,7 +233,7 @@ void WinControl::Destroy()
         delete Child;
         Child = ChildHead;
     }
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Rest = ChildHead; Rest != nullptr; Rest = Rest->NextSibling)
         Rest->Destroy();
     Win3DUnregister(this);
@@ -283,9 +283,9 @@ void WinControl::SetHiddenWithChildren(bool bHide)
         }
     }
     if (bHide)
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     else
-        Flags = static_cast<unsigned char>(Flags | 3);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
 }
 
 bool WinControl::MouseEvent(FWin3DMouseEvent const* Event)
@@ -310,7 +310,7 @@ bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
     }
     if (Msg == kWinMsgHide)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         return true;
     }
     return false;
@@ -599,12 +599,12 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
     case kWinPropHide:
         if (A == 1)
-            Flags = static_cast<unsigned char>(Flags & 0xfc);
+            Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         else
             Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return 1;
     case kWinPropDisable:
-        Flags = static_cast<unsigned char>((Flags & 0xfe) | (A == 0 ? 1 : 0));
+        Flags = static_cast<unsigned char>((Flags & ~kWin3DActive) | (A == 0 ? 1 : 0));
         return 1;
     case kWinPropToolTip:
         ToolTipIds = static_cast<int>(A);
@@ -624,7 +624,7 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (HasInstance(this))
         {
             Vector Placed;
-            if ((PositionFlags & 1) != 0)
+            if ((PositionFlags & kWinPositionAddOffset) != 0)
             {
                 Placed.x = Offset.x + Position.x;
                 Placed.y = Offset.y + Position.y;

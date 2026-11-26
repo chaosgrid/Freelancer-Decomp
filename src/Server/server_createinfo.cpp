@@ -33,7 +33,7 @@ I3DMathEngine* Server_Acquire3DMathEngine()
         void* OuterUnknown;         // +0x08
     };
     FAGGDESC12 Desc;
-    Desc.Size = 0xc;
+    Desc.Size = sizeof(FAGGDESC12);
     Desc.Name = "3DMathEngine";
     Desc.OuterUnknown = nullptr;
 
@@ -136,7 +136,7 @@ void __cdecl CShipCreateInfo_Fill(CShipCreateInfo* Info, CShip* Ship)
     // CEquip::GetHitPoints is virtual and an override could have a side effect.
     {
         DamageList Discarded;
-        CEquipTraverser Walk(0x100);
+        CEquipTraverser Walk(EquipTypeShield);
         for (;;) {
             CEquip* const Equip = Ship->EquipManager.Traverse(Walk);
             if (Equip == nullptr)
@@ -189,7 +189,7 @@ void __cdecl CSolarCreateInfo_Fill(CSolarCreateInfo* Info, CSolar* Solar)
     // The same dead stack DamageList the ship fill builds; nothing reads it.
     {
         DamageList Discarded;
-        CEquipTraverser Walk(0x100);
+        CEquipTraverser Walk(EquipTypeShield);
         for (;;) {
             CEquip* const Equip = Solar->EquipManager.Traverse(Walk);
             if (Equip == nullptr)

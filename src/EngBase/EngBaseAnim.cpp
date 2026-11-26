@@ -110,7 +110,7 @@ void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
     float BestDuration = -1.0f;
     do
     {
-        if ((FindData.dwFileAttributes & 0x10) == 0)
+        if ((FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
         {
             if (std::strcmp(FindData.cFileName, G_NameRootHeight) != 0)
                 continue;
@@ -297,7 +297,7 @@ void FAnimPlayback::CloneTypedChannels(FAnimNameEntry* Entry)
         unsigned long Type = 0;
         Cursor->Channel->GetFlags(&Type);
         FTypedChannel* Typed = NewTypedChannelWithArchetype(Type, Cursor->Channel);
-        Typed->PlayState &= 0xFE;
+        Typed->PlayState &= ~G_PlayStatePlaying;
         *Slot = Typed;
         ++Slot;
         ++Cursor;
@@ -312,7 +312,7 @@ unsigned long FAnimPlayback::FilterTyped(IChannel* Filter)
     {
         FTypedChannel* Typed = *Cursor;
         const unsigned long Type = Typed->GetType();
-        if (Type != 8)
+        if (Type != G_TypedTypeBase)
         {
             if (Filter->InMixer((unsigned long)((size_t)Typed)) != 0)
                 return 0;
@@ -399,7 +399,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         FArchetypeName NameOut;
         if (Track->ParentCrc != G_AnimEngine->GetInstanceName(&NameOut, (InstanceIndex)Parent)->Crc)
             return 0;
-        Out->Kind = 0;
+        Out->Kind = G_BindKindJoint;
         Out->Instance = Inst;
         Out->Sink = Sink;
         return 1;
@@ -415,12 +415,12 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         if (bMapped)
             return 0;
         Out->Instance = Inst;
-        Out->Kind = 1;
+        Out->Kind = G_BindKindObject;
         Out->Sink = Sink;
         return 1;
     }
     Out->Instance = Root;
-    Out->Kind = 2;
+    Out->Kind = G_BindKindRoot;
     Out->Sink = Sink;
     return Sink != nullptr ? 1 : 0;
 }
@@ -441,7 +441,7 @@ void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Si
     while (Cursor != Playback->Typed.end())
     {
         FAnimBindOut Bind;
-        Bind.Kind = 2;
+        Bind.Kind = G_BindKindRoot;
         Bind.Sink = nullptr;
         Bind.SinkContext = nullptr;
         Bind.Instance = (FEngineInstance*)((ptrdiff_t)-1);
@@ -550,7 +550,7 @@ unsigned long FAnimPlayback::EvalTyped(unsigned long Flags, float Start, float S
                                        unsigned long TranslationScaleBits, const ::Transform* Transform)
 {
     // Flags bit 0 means reverse.
-    const long Sign = (Flags & 1) == 0 ? 1 : -1;
+    const long Sign = (Flags & G_PlayFlagReverse) == 0 ? 1 : -1;
     const float Rate = (float)(std::fabs((double)Speed) *
                                           (double)Sign);
     FPlayHeader Header;
@@ -590,7 +590,7 @@ void FAnimPlayback::StopTyped()
     while (Index < this->Typed.size())
     {
         FTypedChannel* Typed = this->Typed[Index];
-        Typed->PlayState &= 0xFE;
+        Typed->PlayState &= ~G_PlayStatePlaying;
         Typed->ApplyFromArchetype();
         Index += 1;
     }
@@ -618,12 +618,12 @@ FTypedChannel* FAnimPlayback::FindTypedByHeader(const FAnimBindOut* Header)
         const FAnimBindOut* Desc = TypedBindDesc(Typed);
         if (Desc->Kind == Header->Kind)
         {
-            if (Desc->Kind == 0 || Desc->Kind == 1)
+            if (Desc->Kind == G_BindKindJoint || Desc->Kind == G_BindKindObject)
             {
                 if (Desc->Instance == Header->Instance)
                     return Typed;
             }
-            else if (Desc->Kind == 2)
+            else if (Desc->Kind == G_BindKindRoot)
             {
                 if (Desc->Sink == Header->Sink)
                     return Typed;

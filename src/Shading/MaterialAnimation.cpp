@@ -69,13 +69,13 @@ static void ClearKeyBlock(FMaKeyBlock* Block)
 static void InitializeMaFileDesc(FFileSystemDesc* Desc, const char* Name)
 {
     std::memset(Desc, 0, sizeof(*Desc));
-    Desc->Size = 0x34;
+    Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc->ComponentName = "FileSystem";
     Desc->Path = Name;
-    Desc->Access = 0x80000000;
-    Desc->ShareMode = 1;
-    Desc->Creation = 3;
-    Desc->Flags = 0x08000080;
+    Desc->Access = GENERIC_READ;
+    Desc->ShareMode = FILE_SHARE_READ;
+    Desc->Creation = OPEN_EXISTING;
+    Desc->Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
@@ -480,7 +480,7 @@ void* DACOM_API FMaterialAnimation::LoadAnimationGroup(void* FileSystem)
         do
         {
             const char* ChildName = FindData.cFileName;
-            if ((FindData.dwFileAttributes & 0x10) != 0 && ChildName[0] != '.')
+            if ((FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && ChildName[0] != '.')
             {
                 const unsigned long Crc = DACOM_CRC::GetCRC32(ChildName);
                 FImaData* Data = new FImaData();

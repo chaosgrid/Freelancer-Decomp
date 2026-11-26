@@ -64,7 +64,7 @@ int FollowBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
-    if ((Flags28 & 0x2) == 0 || Lead == nullptr)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) == 0 || Lead == nullptr)
     {
         Readiness = (Flag29 != 0) ? 3 : 2;
         return Readiness;
@@ -89,7 +89,7 @@ EvaluateResult FollowBehavior::evaluate(unsigned int Context)
     if (bInLane)
         return EvalSkip;
     // FUN_062e6200: any ship-class bit.
-    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & 0x7f0000u) != 0)
+    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & OBJ_SHIP_MASK) != 0)
         return EvalBlocked;
     return EvalSkip;
 }
@@ -123,14 +123,14 @@ bool FollowBehavior::OnApplyDirective(void* Param)
             SysMgr->FormationLeaders.SetFollowLeader(
                 ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target())));
 
-            Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+            Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
             return true;
         }
 
         EngageRange = Op->EngageRange;
     }
 
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     return false;
 }
 
@@ -182,7 +182,7 @@ void FollowBehavior::UpdateInterceptEngageState()
         float const Range = FollowRangeBias + FollowDistance;
         unsigned const LeaderId = ObjInspectOf(Leader)->get_id();
         (void)BehaviorMgr->NotifyFollowEvent(OwnId, LeaderId,
-                                                pub::AI::ContentCallback::FollowStatus1, Range);
+                                                pub::AI::ContentCallback::FollowEnterRange, Range);
         return;
     }
 
@@ -194,7 +194,7 @@ void FollowBehavior::UpdateInterceptEngageState()
     unsigned const LeaderId = ObjInspectOf(Leader)->get_id();
     // Disengage passes the raw FollowDistance, not the biased range.
     (void)BehaviorMgr->NotifyFollowEvent(OwnId, LeaderId,
-                                            pub::AI::ContentCallback::FollowStatus2,
+                                            pub::AI::ContentCallback::FollowLeaveRange,
                                             FollowDistance);
 }
 

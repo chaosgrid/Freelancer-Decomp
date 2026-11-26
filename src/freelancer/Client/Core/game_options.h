@@ -146,6 +146,16 @@ char const* GetGameOptionName(int Index);
 // Session/game-mode flags word -- .data:00612274. A separate global from the debug option table
 // above (mutated at runtime, no descriptor table).
 
+// The bits of the session flags word. The word starts as 3 and is sent to the server (and
+// restored from the save by FUN_004c8190) as the player's interface state.
+enum ESessionFlag
+{
+    kSessionTargetPanelExpanded = 0x1,   // the HUD target panel is expanded
+    kSessionStatusPanelExpanded = 0x2,   // the HUD status panel is expanded
+    kSessionWeaponList = 0x4,            // the status panel shows the weapon list
+    kSessionFirstPerson = 0x8,           // the player prefers the first person camera
+};
+
 // FUN_004c8120 -- set or clear the bits in Mask, then send the new word to the server through
 // IServer slot 77 SetInterfaceState(DAT_00673344, &word, 4) when DAT_0067ecd0 is set.
 void SetGameSessionFlags(unsigned Mask, bool bSet);

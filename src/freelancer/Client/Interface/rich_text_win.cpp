@@ -133,7 +133,7 @@ BaseRichTextWin::BaseRichTextWin()
     ScrollBarGap = 0.002f;
     LayoutHeight = 0;
     Pitch = 0;
-    AlignMode = 0;
+    AlignMode = kRichAlignScroll;
     bNeverHit = 0;
     bToolTipEnabled = 0;
 
@@ -272,7 +272,7 @@ void BaseRichTextWin::UpdateInactive()
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
-        if ((Child->Flags & 1) == 0)
+        if ((Child->Flags & kWin3DActive) == 0)
             Child->UpdateInactive();
         Child = Child->NextSibling;
     }
@@ -281,7 +281,7 @@ void BaseRichTextWin::UpdateInactive()
 void BaseRichTextWin::Draw()
 {
     // FUN_0057ab10.
-    if ((Flags & 2) == 0)
+    if ((Flags & kWin3DVisible) == 0)
         return;
 
     EnsureSurface();
@@ -309,15 +309,15 @@ void BaseRichTextWin::Draw()
 
         switch (AlignMode)
         {
-        case 1:
+        case kRichAlignTop:
             Trc.set_origin_v(0);
             Trc.set_origin_h(-ScrollX);
             break;
-        case 2:
+        case kRichAlignMiddle:
             Trc.set_origin_v((PixelHeight - LayoutHeight) / 2);
             Trc.set_origin_h(-ScrollX);
             break;
-        case 3:
+        case kRichAlignBottom:
             Trc.set_origin_v(PixelHeight - LayoutHeight);
             Trc.set_origin_h(-ScrollX);
             break;
@@ -410,7 +410,7 @@ void BaseRichTextWin::Draw()
             Win3DDisable(kWin3DCullFace);
             DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
             DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
             Win3DBindModelview(nullptr, &Placement);
             Win3DColor4ubv(FrameColor);
             Win3DDisable(kWin3DTexture2D);
@@ -445,16 +445,16 @@ bool BaseRichTextWin::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             int OriginY;
             switch (AlignMode)
             {
-            case 0:
+            case kRichAlignScroll:
                 OriginY = ScrollY;
                 break;
-            case 1:
+            case kRichAlignTop:
                 OriginY = 0;
                 break;
-            case 2:
+            case kRichAlignMiddle:
                 OriginY = -((PixelHeight - LayoutHeight) / 2);
                 break;
-            case 3:
+            case kRichAlignBottom:
                 OriginY = LayoutHeight - PixelHeight;
                 break;
             default:
@@ -540,16 +540,16 @@ void BaseRichTextWin::GetScrollOrigin(int* OutScrollX, int* OutScrollY)
     *OutScrollX = ScrollX;
     switch (AlignMode)
     {
-    case 0:
+    case kRichAlignScroll:
         *OutScrollY = ScrollY;
         break;
-    case 1:
+    case kRichAlignTop:
         *OutScrollY = 0;
         break;
-    case 2:
+    case kRichAlignMiddle:
         *OutScrollY = -((PixelHeight - LayoutHeight) / 2);
         break;
-    case 3:
+    case kRichAlignBottom:
         *OutScrollY = LayoutHeight - PixelHeight;
         break;
     default:
@@ -1113,7 +1113,7 @@ RichTextEditWin::RichTextEditWin()
     , FormatMask(-1)
     , bFixedStyle(0)
     , bPasswordMode(0)
-    , CaseMode(0)
+    , CaseMode(kRichCaseKeep)
     , MaxLength(0)
     , ReplacementChar(L'_')
     , bFilterIsAllowList(0)
@@ -1184,7 +1184,7 @@ void RichTextEditWin::Draw()
     }
 
     // The caret only while shown, holding the input focus and in its visible blink phase.
-    if ((Flags & 2) == 0)
+    if ((Flags & kWin3DVisible) == 0)
         return;
     if (HudGetInputFocus() != AsHudCmdHandler())
         return;
@@ -1214,16 +1214,16 @@ void RichTextEditWin::Draw()
         int OffsetV = 0;
         switch (AlignMode)
         {
-        case 0:
+        case kRichAlignScroll:
             OffsetV = ScrollY;
             break;
-        case 1:
+        case kRichAlignTop:
             OffsetV = 0;
             break;
-        case 2:
+        case kRichAlignMiddle:
             OffsetV = -((PixelHeight - LayoutHeight) / 2);
             break;
-        case 3:
+        case kRichAlignBottom:
             OffsetV = LayoutHeight - PixelHeight;
             break;
         default:
@@ -1290,7 +1290,7 @@ void RichTextEditWin::CreateSized(Win3D* NewParent, float Width, float Height)
 bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
 {
     // FUN_0057c9b0 (RET 4).
-    if ((Flags & 1) == 0)
+    if ((Flags & kWin3DActive) == 0)
         return false;
 
     // A key-up leaves at once, without the IME forward.
@@ -1305,7 +1305,7 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
         bResult = true;
         switch (Key)
         {
-        case 0x08:
+        case VK_BACK:
             // Backspace: one to the left, then the cell there erased.
             if (Caret > 0)
             {
@@ -1315,52 +1315,52 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
                 RebuildDisplay();
             }
             break;
-        case 0x09:
-        case 0x2d:
+        case VK_TAB:
+        case VK_INSERT:
             // Tab / Insert: false; with an IME box it returns before the forward.
             if (ImeBox != nullptr)
                 return false;
             bResult = false;
             break;
-        case 0x0d:
+        case VK_RETURN:
             // Enter: the IME box sees the key, the parent gets 0xf004.
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
                 Parent->ProcessMessage(kWinMsgEnter, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
-        case 0x1b:
+        case VK_ESCAPE:
             // Escape: the same with 0xf003.
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
                 Parent->ProcessMessage(kWinMsgEscape, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
-        case 0x23:
+        case VK_END:
             // End.
             if (ImeBox != nullptr)
                 return false;
             SetCaret(static_cast<int>(Cells.size()));
             break;
-        case 0x24:
+        case VK_HOME:
             // Home.
             if (ImeBox != nullptr)
                 return false;
             SetCaret(0);
             break;
-        case 0x25:
+        case VK_LEFT:
             // Left.
             if (ImeBox != nullptr)
                 return false;
             SetCaret(Caret - 1);
             break;
-        case 0x27:
+        case VK_RIGHT:
             // Right.
             if (ImeBox != nullptr)
                 return false;
             SetCaret(Caret + 1);
             break;
-        case 0x2e:
+        case VK_DELETE:
             // Delete: the cell at the caret erased, the caret re-applied.
             if (!Cells.empty())
             {
@@ -1373,36 +1373,36 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
                 }
             }
             break;
-        case 0x42:
+        case 'B':
             // Ctrl+B: bit 0 of the attributes toggled when allowed.
-            if (bFixedStyle == 0 && (FormatMask & 1) != 0 && (Record->Modifiers & 0xc) != 0)
-                CurrentAttr.Packed ^= 0x01u;
+            if (bFixedStyle == 0 && (FormatMask & kTextAttrBold) != 0 && (Record->Modifiers & 0xc) != 0)
+                CurrentAttr.Packed ^= kTextAttrBold;
             else
                 bResult = false;
             break;
-        case 0x49:
+        case 'I':
             // Ctrl+I: bit 1.
-            if (bFixedStyle == 0 && (FormatMask & 2) != 0 && (Record->Modifiers & 0xc) != 0)
-                CurrentAttr.Packed ^= 0x02u;
+            if (bFixedStyle == 0 && (FormatMask & kTextAttrItalic) != 0 && (Record->Modifiers & 0xc) != 0)
+                CurrentAttr.Packed ^= kTextAttrItalic;
             else
                 bResult = false;
             break;
-        case 0x55:
+        case 'U':
             // Ctrl+U: bit 2.
-            if (bFixedStyle == 0 && (FormatMask & 4) != 0 && (Record->Modifiers & 0xc) != 0)
-                CurrentAttr.Packed ^= 0x04u;
+            if (bFixedStyle == 0 && (FormatMask & kTextAttrUnderline) != 0 && (Record->Modifiers & 0xc) != 0)
+                CurrentAttr.Packed ^= kTextAttrUnderline;
             else
                 bResult = false;
             break;
-        case 0x6b:
+        case VK_ADD:
             // Ctrl+numpad plus: the size field (bits 3..7) up one, capped at 0xf8.
-            if (bFixedStyle == 0 && (FormatMask & 0xf8) != 0 && (Record->Modifiers & 0xc) != 0)
+            if (bFixedStyle == 0 && (FormatMask & kTextAttrFontMask) != 0 && (Record->Modifiers & 0xc) != 0)
             {
                 unsigned char const Low = static_cast<unsigned char>(CurrentAttr.Packed & 0xffu);
-                if ((Low & 0xf8u) < 0xf8u)
+                if ((Low & kTextAttrFontMask) < kTextAttrFontMask)
                 {
                     unsigned char const NewLow =
-                        static_cast<unsigned char>((((Low & 0xf8u) + 8u) & 0xffu) ^ (Low & 0x07u));
+                        static_cast<unsigned char>((((Low & kTextAttrFontMask) + 8u) & 0xffu) ^ (Low & kTextAttrStyleMask));
                     CurrentAttr.Packed = (CurrentAttr.Packed & ~0xffu) | NewLow;
                 }
             }
@@ -1411,16 +1411,16 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
                 bResult = false;
             }
             break;
-        case 0x6d:
+        case VK_SUBTRACT:
             // Ctrl+numpad minus: the size field down, stopping at 0. Retail's arithmetic (minus
             // 1, xor with the inverted low bits) is kept as is.
-            if (bFixedStyle == 0 && (FormatMask & 0xf8) != 0 && (Record->Modifiers & 0xc) != 0)
+            if (bFixedStyle == 0 && (FormatMask & kTextAttrFontMask) != 0 && (Record->Modifiers & 0xc) != 0)
             {
                 unsigned char const Low = static_cast<unsigned char>(CurrentAttr.Packed & 0xffu);
-                if ((Low & 0xf8u) != 0)
+                if ((Low & kTextAttrFontMask) != 0)
                 {
                     unsigned char const NewLow = static_cast<unsigned char>(
-                        (((Low & 0xf8u) - 1u) & 0xffu) ^ (static_cast<unsigned>(~Low) & 0x07u));
+                        (((Low & kTextAttrFontMask) - 1u) & 0xffu) ^ (static_cast<unsigned>(~Low) & kTextAttrStyleMask));
                     CurrentAttr.Packed = (CurrentAttr.Packed & ~0xffu) | NewLow;
                 }
             }
@@ -1444,7 +1444,7 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
 bool RichTextEditWin::OnChar(FHudCmdRecord const* Record)
 {
     // LAB_0057ceb0 (RET 4).
-    if ((Flags & 1) == 0)
+    if ((Flags & kWin3DActive) == 0)
         return false;
 
     // The character is the record's wParam word; a control character is consumed and nothing
@@ -1453,9 +1453,9 @@ bool RichTextEditWin::OnChar(FHudCmdRecord const* Record)
     if (iswcntrl(static_cast<wint_t>(Ch)))
         return true;
 
-    if (CaseMode == 1)
+    if (CaseMode == kRichCaseUpper)
         Ch = towupper(static_cast<wint_t>(Ch));
-    else if (CaseMode == 2)
+    else if (CaseMode == kRichCaseLower)
         Ch = towlower(static_cast<wint_t>(Ch));
 
     // An allow list replaces what it does not hold, a deny list what it does. Only the low word
@@ -1610,9 +1610,9 @@ void RichTextEditWin::SetText(wchar_t const* Text, TextRenderAttributes const* A
         if (MaxLength != 0 && static_cast<unsigned>(Cells.size()) >= static_cast<unsigned>(MaxLength))
             break;
         wchar_t Ch;
-        if (CaseMode == 0)
+        if (CaseMode == kRichCaseKeep)
             Ch = *P;
-        else if (CaseMode == 1)
+        else if (CaseMode == kRichCaseUpper)
             Ch = static_cast<wchar_t>(towupper(static_cast<wint_t>(*P)));
         else
             Ch = static_cast<wchar_t>(towlower(static_cast<wint_t>(*P)));

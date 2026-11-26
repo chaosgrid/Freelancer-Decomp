@@ -108,7 +108,7 @@ int AfterburnerIdea::Update(float /*DeltaTime*/)
     }
 
     Handle->Thrust.SetThrustersActive(true);
-    Handle->Thrust.SetThrottle(1.0f, 0);
+    Handle->Thrust.SetThrottle(1.0f, kThrottleModeEngine);
 
     return 0;
 }
@@ -138,8 +138,8 @@ int IdleIdea::Update(float /*DeltaTime*/)
         return 3;
 
     ThrustManager* const Thrust = &Handle->Thrust;
-    Thrust->SetThrottle(0.0f, 2);
-    Thrust->SetThrottle(0.0f, 0);
+    Thrust->SetThrottle(0.0f, kThrottleModeCruise);
+    Thrust->SetThrottle(0.0f, kThrottleModeEngine);
     Vector Zero;
     Zero.x = 0.0f;
     Zero.y = 0.0f;
@@ -199,10 +199,10 @@ int GenericWeightedPick(int* State)
     // Local copies of the four weights, the current tag's zeroed.
     int const Tag = State[0];
     float const* const W = reinterpret_cast<float const*>(State + 1);
-    float const W1 = (Tag == 1) ? 0.0f : W[0];
-    float const W2 = (Tag == 2) ? 0.0f : W[1];
-    float const W3 = (Tag == 3) ? 0.0f : W[2];
-    float const W4 = (Tag == 4) ? 0.0f : W[3];
+    float const W1 = (Tag == kDodgeDirLeft) ? 0.0f : W[0];
+    float const W2 = (Tag == kDodgeDirRight) ? 0.0f : W[1];
+    float const W3 = (Tag == kDodgeDirUp) ? 0.0f : W[2];
+    float const W4 = (Tag == kDodgeDirDown) ? 0.0f : W[3];
 
     // Sum order W4+W3+W2+W1; DAT_063997d0 == 2^-15. The draw is never rounded.
     double const Draw = ((double)rand() * ((((double)W4 + W3) + W2) + W1)) * (1.0 / 32768.0);
@@ -211,13 +211,13 @@ int GenericWeightedPick(int* State)
     // The running sums are rebuilt each time, also unrounded.
     int NewTag;
     if (Draw < W1)
-        NewTag = 1;
+        NewTag = kDodgeDirLeft;
     else if (Draw < (double)W2 + W1)
-        NewTag = 2;
+        NewTag = kDodgeDirRight;
     else if (Draw < ((double)W3 + W2) + W1)
-        NewTag = 3;
+        NewTag = kDodgeDirUp;
     else
-        NewTag = 4;
+        NewTag = kDodgeDirDown;
 
     State[0] = NewTag;
     return NewTag;

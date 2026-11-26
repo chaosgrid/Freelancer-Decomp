@@ -38,6 +38,23 @@ namespace
     const uint32_t kDdsCaps2CubemapNegZ      = 0x00008000u;
     const uint32_t kDdsCaps2Volume           = 0x00200000u;
 
+    // DDS_HEADER.Flags (DDSD_*) and Caps (DDSCAPS_TEXTURE).
+    const uint32_t kDdsdCaps        = 0x00000001u;
+    const uint32_t kDdsdHeight      = 0x00000002u;
+    const uint32_t kDdsdWidth       = 0x00000004u;
+    const uint32_t kDdsdPitch       = 0x00000008u;
+    const uint32_t kDdsdPixelFormat = 0x00001000u;
+    const uint32_t kDdsCapsTexture  = 0x00001000u;
+
+    // TGA header: image type (byte 2) and image descriptor bits (byte 17).
+    const int kTgaColorMapped    = 1;
+    const int kTgaTrueColor      = 2;
+    const int kTgaGrayscale      = 3;
+    const int kTgaRleColorMapped = 9;
+    const int kTgaRleTrueColor   = 10;
+    const int kTgaRleGrayscale   = 11;
+    const uint32_t kTgaDescTopOrigin = 0x20u;
+
     struct FDdsPixelFormat
     {
         uint32_t Size;
@@ -143,13 +160,14 @@ namespace
             case MAKEFOURCC('D', 'X', 'T', '3'): return D3DFMT_DXT3;
             case MAKEFOURCC('D', 'X', 'T', '4'): return D3DFMT_DXT4;
             case MAKEFOURCC('D', 'X', 'T', '5'): return D3DFMT_DXT5;
-            case 36:  return D3DFMT_A16B16G16R16;
-            case 111: return D3DFMT_R16F;
-            case 112: return D3DFMT_G16R16F;
-            case 113: return D3DFMT_A16B16G16R16F;
-            case 114: return D3DFMT_R32F;
-            case 115: return D3DFMT_G32R32F;
-            case 116: return D3DFMT_A32B32G32R32F;
+            // Legacy DDS files store the D3DFORMAT value itself in the FourCC field.
+            case D3DFMT_A16B16G16R16:  return D3DFMT_A16B16G16R16;
+            case D3DFMT_R16F: return D3DFMT_R16F;
+            case D3DFMT_G16R16F: return D3DFMT_G16R16F;
+            case D3DFMT_A16B16G16R16F: return D3DFMT_A16B16G16R16F;
+            case D3DFMT_R32F: return D3DFMT_R32F;
+            case D3DFMT_G32R32F: return D3DFMT_G32R32F;
+            case D3DFMT_A32B32G32R32F: return D3DFMT_A32B32G32R32F;
             default:  return D3DFMT_UNKNOWN;
             }
         }
@@ -606,7 +624,8 @@ namespace
 
         if (ColorMapType > 1)
             return false;
-        if (ImgType != 1 && ImgType != 2 && ImgType != 3 && ImgType != 9 && ImgType != 10 && ImgType != 11)
+        if (ImgType != kTgaColorMapped && ImgType != kTgaTrueColor && ImgType != kTgaGrayscale &&
+            ImgType != kTgaRleColorMapped && ImgType != kTgaRleTrueColor && ImgType != kTgaRleGrayscale)
             return false;
         if (W == 0 || H == 0)
             return false;
@@ -635,24 +654,24 @@ namespace
         else if (Bpp == 16 || Bpp == 15)
             OutFmt = D3DFMT_A1R5G5B5;
         else
-            OutFmt = (ImgType == 3 || ImgType == 11) ? D3DFMT_L8 : D3DFMT_A8R8G8B8;
+            OutFmt = (ImgType == kTgaGrayscale || ImgType == kTgaRleGrayscale) ? D3DFMT_L8 : D3DFMT_A8R8G8B8;
         return true;
     }
 
     uint32_t DecodeTgaSample(const uint8_t* P, uint8_t Bpp, uint8_t ImgType,
                              const uint8_t* ColorMap, UINT ColorMapEntries, uint8_t ColorMapBpp)
     {
-        if (ImgType == 1 || ImgType == 9)
+        if (ImgType == kTgaColorMapped || ImgType == kTgaRleColorMapped)
         {
             const uint8_t Idx = P[0];
             if (ColorMap != nullptr && Idx < ColorMapEntries)
             {
                 const UINT Stride = (ColorMapBpp + 7u) / 8u;
-                return DecodeTgaSample(ColorMap + (size_t)Idx * Stride, ColorMapBpp, 2, nullptr, 0, 0);
+                return DecodeTgaSample(ColorMap + (size_t)Idx * Stride, ColorMapBpp, kTgaTrueColor, nullptr, 0, 0);
             }
             return PackArgb(255u, Idx, Idx, Idx);
         }
-        if (ImgType == 3 || ImgType == 11)
+        if (ImgType == kTgaGrayscale || ImgType == kTgaRleGrayscale)
             return PackArgb(255u, P[0], P[0], P[0]);
         if (Bpp == 32)
             return PackArgb(P[3], P[2], P[1], P[0]);
@@ -683,7 +702,7 @@ namespace
 
         const uint8_t* Cur = Data + PixOff;
         const uint8_t* End = Data + Size;
-        const bool bRle = (ImgType >= 9);
+        const bool bRle = (ImgType >= kTgaRleColorMapped);
 
         if (!bRle)
         {
@@ -724,7 +743,7 @@ namespace
             }
         }
 
-        const bool bTopOrigin = (Desc & 0x20u) != 0;
+        const bool bTopOrigin = (Desc & kTgaDescTopOrigin) != 0;
         OutArgb.resize(TotalPixels);
         for (UINT y = 0; y < OutH; ++y)
         {
@@ -858,7 +877,7 @@ namespace
             return false;
         FDdsHeader Hdr;
         std::memcpy(&Hdr, (const uint8_t*)SrcData + 4, sizeof(Hdr));
-        return Hdr.Size == 124u && Hdr.Width > 0 && Hdr.Height > 0;
+        return Hdr.Size == sizeof(FDdsHeader) && Hdr.Width > 0 && Hdr.Height > 0;
     }
 
     bool CheckDeviceFormatSupported(IDirect3DDevice9* Device, D3DFORMAT Format, D3DRESOURCETYPE RType)
@@ -972,7 +991,7 @@ namespace
         if (Fp == nullptr)
             return E_FAIL;
         uint8_t Header[18] = {};
-        Header[2] = 2; // uncompressed true-color
+        Header[2] = kTgaTrueColor;
         Header[12] = (uint8_t)(Width & 0xFFu);
         Header[13] = (uint8_t)((Width >> 8) & 0xFFu);
         Header[14] = (uint8_t)(Height & 0xFFu);
@@ -991,19 +1010,19 @@ namespace
         if (Fp == nullptr)
             return E_FAIL;
         FDdsHeader Hdr = {};
-        Hdr.Size = 124;
-        Hdr.Flags = 0x1u | 0x2u | 0x4u | 0x8u | 0x1000u; // CAPS|HEIGHT|WIDTH|PITCH|PIXELFORMAT
+        Hdr.Size = sizeof(FDdsHeader);
+        Hdr.Flags = kDdsdCaps | kDdsdHeight | kDdsdWidth | kDdsdPitch | kDdsdPixelFormat;
         Hdr.Height = Height;
         Hdr.Width = Width;
         Hdr.PitchOrLinearSize = Width * 4u;
-        Hdr.PixelFormat.Size = 32;
+        Hdr.PixelFormat.Size = sizeof(FDdsPixelFormat);
         Hdr.PixelFormat.Flags = kDdpfRgb | kDdpfAlphaPixels;
         Hdr.PixelFormat.RgbBitCount = 32;
         Hdr.PixelFormat.RBitMask = 0x00FF0000u;
         Hdr.PixelFormat.GBitMask = 0x0000FF00u;
         Hdr.PixelFormat.BBitMask = 0x000000FFu;
         Hdr.PixelFormat.ABitMask = 0xFF000000u;
-        Hdr.Caps = 0x1000u; // DDSCAPS_TEXTURE
+        Hdr.Caps = kDdsCapsTexture;
         std::fwrite(&kDdsMagic, 4, 1, Fp);
         std::fwrite(&Hdr, sizeof(Hdr), 1, Fp);
         std::fwrite(Bgra, 4, (size_t)Width * (size_t)Height, Fp);

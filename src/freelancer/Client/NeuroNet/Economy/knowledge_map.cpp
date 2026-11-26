@@ -138,18 +138,18 @@ bool FKnowledgeMap::Resolve(FmtStr const* Text, unsigned* OutId, unsigned char* 
             unsigned Key = 0;
             switch (Val->TypeTag)
             {
-            case 0x73: // 's'
+            case FmtStr::TagString:
                 Key = Val->Value;
                 // Marked known through DAT_0066d334 (not this) first.
                 G_KnowledgeMap->MarkKnown(Key);
                 break;
-            case 0x53: // 'S'
+            case FmtStr::TagSystem:
                 Key = (unsigned)Universe::get_system(Val->Value)->GetStridName();
                 break;
-            case 0x42: // 'B' -- BASE vtable +0x8 (strid_name)
+            case FmtStr::TagBase: // BASE vtable +0x8 (strid_name)
                 Key = static_cast<unsigned>(Universe::get_base(Val->Value)->StridName);
                 break;
-            case 0x46: // 'F'
+            case FmtStr::TagRepGroup:
                 Key = Reputation::get_name(Val->Value);
                 break;
             default:
@@ -218,30 +218,30 @@ void KnowledgeMapRevealFmtStr(FmtStr const* Text)
     {
         switch (Val->TypeTag)
         {
-        case 0x73: // 's'
+        case FmtStr::TagString:
             G_KnowledgeMap->MarkKnown(Val->Value);
             break;
-        case 0x53: // 'S'
+        case FmtStr::TagSystem:
         {
             unsigned const Key =
                 (unsigned)Universe::get_system(Val->Value)->GetStridName();
             G_KnowledgeMap->MarkKnown(Key);
             break;
         }
-        case 0x42: // 'B'
+        case FmtStr::TagBase:
         {
             unsigned const Key =
                 static_cast<unsigned>(Universe::get_base(Val->Value)->StridName);
             G_KnowledgeMap->MarkKnown(Key);
             break;
         }
-        case 0x46: // 'F'
+        case FmtStr::TagRepGroup:
         {
             unsigned const Key = Reputation::get_name(Val->Value);
             G_KnowledgeMap->MarkKnown(Key);
             break;
         }
-        case 0x5a: // 'Z' -- only a zone that exists
+        case FmtStr::TagZoneId: // only a zone that exists
         {
             Universe::IZone const* const Zone = Universe::get_zone(Val->Value);
             if (Zone != nullptr)
@@ -250,7 +250,7 @@ void KnowledgeMapRevealFmtStr(FmtStr const* Text)
             }
             break;
         }
-        case 0x21: // '!' -- a nested FmtStr
+        case FmtStr::TagFmtStr: // a nested FmtStr
             KnowledgeMapRevealFmtStr(Val->Subtree);
             break;
         default:

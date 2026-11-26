@@ -87,7 +87,7 @@ bool LaunchBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     Move.SetContext(OwnerContext, SysMgr, Param2);
 
     // FUN_062d5980(&Move, 0), MoveIdea::SetMode(0).
-    ReleaseApproachStep(0);
+    ReleaseApproachStep(kMoveModeEngine);
 
     Face.SetContext(OwnerContext, SysMgr, Param2);
 
@@ -112,12 +112,12 @@ void LaunchBehavior::Engage()
 
     SysMgr->GunGroups.SetShieldActive(0); // FUN_062e9a60
 
-    ModeState164 = 1;
+    ModeState164 = kLaunchStateDwell;
     bStraightLaunch = 0;
     LaunchDwellElapsed = 0.0f;
     TotalLaunchElapsed = 0.0f;
 
-    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 }
 
 // Slot 4, FUN_062cd8b0. Move commits before Face here.
@@ -130,18 +130,18 @@ void LaunchBehavior::Disengage()
 
     SysMgr->GunGroups.SetShieldActive(1);
 
-    SetAvoidanceAllowed(1, 3);
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);
 
-    Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
+    Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
 
-    BehaviorMgr->SetDirectiveResult(8, 0);
+    BehaviorMgr->SetDirectiveResult(BEHAVIOR_LAUNCH, 0);
 }
 
 // Slot 5, LAB_062cd910.
 int LaunchBehavior::SetModeFromFlags()
 {
-    int Mode = (Flags28 & 0x2) ? 0 : 2;
-    if (UpdateResult == 2 || UpdateResult == 3)
+    int Mode = (Flags28 & kBehaviorFlagDirectiveAccepted) ? 0 : 2;
+    if (UpdateResult == kBehaviorUpdateFinished || UpdateResult == kBehaviorUpdateAborted)
         Mode = 2;
     if (Flag29 != 0)
     {
@@ -170,12 +170,12 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
 
     if (RawBlock != nullptr)
     {
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
-        UpdateResult = 1;
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
+        UpdateResult = kBehaviorUpdateRunning;
         return true;
     }
 
-    Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     return false;
 }
 
@@ -189,109 +189,109 @@ int LaunchBehavior::Update()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     Watchable const* Watched168 = Watcher168.target();
     if (Watched168 == nullptr || (reinterpret_cast<unsigned char const*>(Watched168) - 8) == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     // A system change since Engage() aborts with 2.
     if (CachedSystemId170 != FetchSystemId())
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // Launch timeout. Strictly greater aborts.
     if (TotalLaunchElapsed > LaunchTimeout)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     TotalLaunchElapsed += DeltaTime;
 
     switch (ModeState164)
     {
-    case 1:
+    case kLaunchStateDwell:
     {
         // Strictly greater advances.
         if (LaunchDwellElapsed > LaunchDwellDuration)
-            ModeState164 = 2;
+            ModeState164 = kLaunchStatePlanApproach;
         LaunchDwellElapsed += DeltaTime;
-        UpdateResult = 0;
-        return 0;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
-    case 2:
+    case kLaunchStatePlanApproach:
     {
         ComputeLaunchApproachTransform();
         // Also reached by the helper's early return on a successful get_hardpoint; retail
         // then falls straight into case 3.
-        ModeState164 = 3;
+        ModeState164 = kLaunchStateAwaitPort;
         [[fallthrough]];
     }
-    case 3:
+    case kLaunchStateAwaitPort:
     {
         if (DockPortIndex >= 0)
         {
             StartLaunchSequence();                                   // FUN_062cdfa0
-            ModeState164 = 4;
-            UpdateResult = 0;
-            return 0;
+            ModeState164 = kLaunchStateExitBay;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
         if (DockPortIndex == -1)
         {
-            ModeState164 = 2;
-            UpdateResult = 0;
-            return 0;
+            ModeState164 = kLaunchStatePlanApproach;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
         if (DockPortIndex == -2)
         {
             Disengage();                                             // own slot 4
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
-        UpdateResult = 0;
-        return 0;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
-    case 4:
+    case kLaunchStateExitBay:
     {
         if (bStraightLaunch != 0)
         {
             SetApproachSpeedParam(25.0f);
-            ReleaseApproachStep(0);
-            ModeState164 = 5;
-            UpdateResult = 0;
-            return 0;
+            ReleaseApproachStep(kMoveModeEngine);
+            ModeState164 = kLaunchStateFlyOut;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
         PushApproachBasisToSubObjectB(&ApproachBasis2[0]);
         TickSubObject(&Face, DeltaTime);
         SetApproachOffset(&DockPointB);
         SetApproachSpeedParam(5.0f);
-        ReleaseApproachStep(1);
+        ReleaseApproachStep(kMoveModeTradelane);
         SetApproachThrottleScale(LaunchThrottleScale);
-        SetApproachMode(2);
+        SetApproachMode(kMoveStopFlyThrough);
         int TickResult = TickSubObject(&Move, DeltaTime);
         if (TickResult != 1)
         {
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
         SetApproachSpeedParam(15.0f);
-        ModeState164 = 5;
-        UpdateResult = 0;
-        return 0;
+        ModeState164 = kLaunchStateFlyOut;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
-    case 5:
+    case kLaunchStateFlyOut:
     {
         PushApproachBasisToSubObjectB(&LaunchBasis[0]);
         TickSubObject(&Face, DeltaTime);
         SetApproachOffset(&DockPointC);
-        SetApproachMode(2);
+        SetApproachMode(kMoveStopFlyThrough);
         int TickResult = TickSubObject(&Move, DeltaTime);
 
         // Delta1 is stored to float.
@@ -315,8 +315,8 @@ int LaunchBehavior::Update()
             double const Dot = (Delta1Z * Delta2Z + Delta1Y * Delta2Y) + Delta1X * Delta2X;
             if (!(Dot > 0.0))
             {
-                UpdateResult = 0;
-                return 0;
+                UpdateResult = kBehaviorUpdateBusy;
+                return kBehaviorUpdateBusy;
             }
         }
 
@@ -332,16 +332,16 @@ int LaunchBehavior::Update()
             // so sin() is -8.742278e-08, not 0.
             RotateBasisRowsXZ(LaunchBasis, 3.1415927410125732);
 
-            ModeState164 = 6;
-            UpdateResult = 0;
-            return 0;
+            ModeState164 = kLaunchStateTurnAround;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
-        Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
-        UpdateResult = 2;
-        return 2;
+        Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
-    case 6:
+    case kLaunchStateTurnAround:
     {
         // pi/8 as an immediate (0x3ec90fdb), not from .rdata.
         SetHardpointCone(0.39269909f);
@@ -349,16 +349,16 @@ int LaunchBehavior::Update()
         int TickResult = TickSubObject(&Face, DeltaTime);
         if (TickResult != 1)
         {
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
-        Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
-        UpdateResult = 2;
-        return 2;
+        Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
     default:
-        UpdateResult = 0;
-        return 0;
+        UpdateResult = kBehaviorUpdateBusy;
+        return kBehaviorUpdateBusy;
     }
 }
 
@@ -525,22 +525,22 @@ bool LaunchBehavior::StartLaunchSequence()
     // switch (Type - 1); anything above 7 (unsigned) just returns.
     switch (static_cast<int>(Type))
     {
-    case 1:
+    case TERM_BERTH:
         bHalfThrottleOnExit = 1;
         [[fallthrough]];
-    case 6:
-    case 7:
-    case 8:
+    case TERM_RING:
+    case TERM_JUMP:
+    case TERM_AIRLOCK:
         // ApproachBasis3 gets the inlined rotation with the double DAT_0639e2d0; the other
         // two go through FUN_062ce320 with the float immediate 0x40490fdb.
         RotateBasisRowsXZ(ApproachBasis3, 3.1415927410125732);                  // DAT_0639e2d0
         RotateBasisRowsXZ(ApproachBasis2, static_cast<double>(3.14159274f));
         RotateBasisRowsXZ(LaunchBasis, static_cast<double>(3.14159274f));
         return true;
-    case 2:
-    case 3:
-    case 4:
-    case 5:
+    case TERM_PAD:
+    case TERM_MOOR_SMALL:
+    case TERM_MOOR_MEDIUM:
+    case TERM_MOOR_LARGE:
         bStraightLaunch = 0;
         bFlipHeadingOnExit = 1;
         return true;
@@ -573,7 +573,7 @@ void LaunchBehavior::SetApproachOffset(Vector const* OffsetVector)
 // FaceIdea+0x34 (the data flows into the idea, not out of it).
 void LaunchBehavior::PushApproachBasisToSubObjectB(void const* SrcVectorBlock)
 {
-    Face.TargetKind = 4;
+    Face.TargetKind = kFaceTargetBasis;
     std::memcpy(&Face.ZeroBlock34, SrcVectorBlock, sizeof(Face.ZeroBlock34));
 }
 
@@ -613,5 +613,5 @@ void LaunchBehavior::SetHardpointCone(float Angle)
 // FUN_062e89a0, ThrustManager::SetThrottle.
 void LaunchBehavior::AdjustNavHelperThrottle(float Value)
 {
-    SysMgr->Thrust.SetThrottle(Value, 0);
+    SysMgr->Thrust.SetThrottle(Value, kThrottleModeEngine);
 }

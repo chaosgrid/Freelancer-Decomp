@@ -310,6 +310,13 @@ bool RaySphereIntersect(Vector const& RayOrigin, Vector const& RayDir, Vector co
 // tightened it, i.e. degenerate input, not a real hit).
 bool RayAABBIntersect(Vector const& LocalOrigin, Vector const& LocalDir, Vector const& HalfExtent, float& TMin, float& TMax);
 
+// RayOrientedBoxIntersect's *OutHitType.
+enum ERayBoxHit
+{
+    kRayBoxMiss = 0,
+    kRayBoxInside = 1,   // the ray origin is inside the box: only the exit point is written
+    kRayBoxEnter = 2,    // entered from outside: entry and exit points
+};
 // FUN_062dfd80. Ray-vs-oriented-box (Box is common_ini.h's OrientedBox; Ghidra
 // mistypes it as float). Transforms
 // RayOrigin (recentered on the box) and RayDir into box-local space via dot

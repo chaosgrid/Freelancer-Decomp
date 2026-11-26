@@ -70,6 +70,13 @@ enum EGameCameraSlot
                                            // 0x005dc08c..0x005dc108, the name string at 0x005dc10c)
 };
 
+// FGameCamera::Flags (+0xe8), read by FUN_0051b500 (GameCameraClear).
+enum EGameCameraFlag
+{
+    kGameCameraClearColour = 0x1, // clear the colour buffer to ClearColor
+    kGameCameraClearDepth = 0x2   // clear the depth buffer
+};
+
 // Retail layout, every offset traced to the store in FUN_0051b2f0.
 struct FGameCamera : FSpaceCamera
 {

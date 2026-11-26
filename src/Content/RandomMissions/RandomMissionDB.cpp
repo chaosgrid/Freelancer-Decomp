@@ -613,10 +613,10 @@ FRmBonusLootEntry const* __cdecl PickRmBonusLoot(unsigned int Faction, float Dif
 // .data PTR_s_big_solar_06fce748 (4 entries): read by TU51 FUN_06f58f30 (through
 // FUN_06f59550) and inline by TU62 FUN_06f95040.
 FRmNamedValue const GRmSolarTypes[4] = {
-    { "big_solar", 0 },
-    { "defensive_solar", 1 },
-    { "killable_neutral", 2 },
-    { "background_solar", 3 },
+    { "big_solar", kRmSolarBig },
+    { "defensive_solar", kRmSolarDefensive },
+    { "killable_neutral", kRmSolarKillableNeutral },
+    { "background_solar", kRmSolarBackground },
 };
 
 namespace
@@ -1015,9 +1015,9 @@ FRandomMissionObject::FRandomMissionObject(unsigned int const* InControllerId,
         // The empty FmtStr is destroyed before the second message.
         FmtStr Empty;
         pub::Player::DisplayMissionMessage(Data->PlayerId, Empty,
-                                           static_cast<MissionMessageType>(0xa), true);
+                                           MISSION_MSG_PRUNE_HISTORY, true);
     }
-    pub::Player::DisplayMissionMessage(Data->PlayerId, MissionOffer, static_cast<MissionMessageType>(8),
+    pub::Player::DisplayMissionMessage(Data->PlayerId, MissionOffer, MISSION_MSG_HISTORY,
                                        true);
 }
 
@@ -1508,10 +1508,10 @@ void FRandomMissionObject::AddGroupMember(unsigned int InPlayerId)
     {
         // The empty FmtStr dies before the second message.
         FmtStr Empty;
-        pub::Player::DisplayMissionMessage(Target, Empty, static_cast<MissionMessageType>(0xa),
+        pub::Player::DisplayMissionMessage(Target, Empty, MISSION_MSG_PRUNE_HISTORY,
                                            false);
     }
-    pub::Player::DisplayMissionMessage(Target, MissionOffer, static_cast<MissionMessageType>(8), false);
+    pub::Player::DisplayMissionMessage(Target, MissionOffer, MISSION_MSG_HISTORY, false);
 }
 
 // FUN_06f4bf30. Only for the "any state" call (State < 0); every controller event (type 4) is
@@ -1912,9 +1912,9 @@ bool __cdecl CreateRandEncParams(char const* Name, FRandEncParams** Out)
 bool __cdecl CreateRandEncParamsByType(int Type, FRandEncParams** Out)
 {
     *Out = nullptr;
-    if (Type == 2)
+    if (Type == kRandEncParamsSP)
         *Out = new FRandEncSPParams();
-    else if (Type == 3)
+    else if (Type == kRandEncParamsTL)
         *Out = new FRandEncTLParams();
     return *Out != nullptr;
 }

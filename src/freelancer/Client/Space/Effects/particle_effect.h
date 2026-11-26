@@ -22,6 +22,15 @@ struct FGameLight; // engine_light.h
 // Same 0x84 footprint as BeamEffect, but +0x04 = VisEffect*, +0x6c = IFxEffect*,
 // +0x70 = FxNode*, +0x7c = Alchemy flags (bit2 created, bit3 ale loaded, bit4 start).
 
+// FParticleEffect::Flags7C (+0x7c).
+enum EParticleEffectFlag
+{
+    kParticleFlagVisible = 0x1,   // the result of UpdateVisibility
+    kParticleFlagFxCreated = 0x4, // the alchemy ale.eff exists (FxNode / FxEffect), made by FUN_004f8360
+    kParticleFlagArchRef = 0x8,   // holds a reference on the VisEffect archetype; the destructor releases it
+    kParticleFlagStarted = 0x10   // Start succeeded (the effect runs)
+};
+
 struct FParticleEffect : FEffectBase
 {
     explicit FParticleEffect(unsigned TypeId);

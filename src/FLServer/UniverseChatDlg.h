@@ -17,6 +17,13 @@ class CUniverseChatDlg : public CDialog
 {
 public:
 	enum { IDD = 0x92 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlInput = 1047,
+		kControlLog = 1048,
+		kControlClose = 1053,
+	};
 
 	explicit CUniverseChatDlg(CWnd* Parent = nullptr);
 

@@ -127,36 +127,36 @@ void LoadRichFontsFromIni(char const* RelPath, IFileSystem* Filesys)
                         unsigned char const Font = static_cast<unsigned char>(Reader.get_value_int(0));
                         unsigned char const Flags = static_cast<unsigned char>(Packed);
                         unsigned char const NewFlags =
-                            static_cast<unsigned char>((Font << 3) ^ (Flags & 7));
-                        Packed = (Packed & 0xffffff00u) | NewFlags;
-                        Mask |= 0xf8;
+                            static_cast<unsigned char>((Font << 3) ^ (Flags & kTextAttrStyleMask));
+                        Packed = (Packed & kTextAttrColorMask) | NewFlags;
+                        Mask |= kTextAttrFontMask;
                     }
                     else if (Reader.is_value("bold"))
                     {
                         unsigned char const Value = static_cast<unsigned char>(Reader.get_value_bool(0));
                         unsigned char const Flags = static_cast<unsigned char>(Packed);
                         unsigned char const NewFlags =
-                            static_cast<unsigned char>(Flags ^ ((Value ^ Flags) & 1));
-                        Packed = (Packed & 0xffffff00u) | NewFlags;
-                        Mask |= 1;
+                            static_cast<unsigned char>(Flags ^ ((Value ^ Flags) & kTextAttrBold));
+                        Packed = (Packed & kTextAttrColorMask) | NewFlags;
+                        Mask |= kTextAttrBold;
                     }
                     else if (Reader.is_value("italic"))
                     {
                         unsigned char const Value = static_cast<unsigned char>(Reader.get_value_bool(0));
                         unsigned char const Flags = static_cast<unsigned char>(Packed);
                         unsigned char const NewFlags =
-                            static_cast<unsigned char>(Flags ^ (((Value << 1) ^ Flags) & 2));
-                        Packed = (Packed & 0xffffff00u) | NewFlags;
-                        Mask |= 2;
+                            static_cast<unsigned char>(Flags ^ (((Value << 1) ^ Flags) & kTextAttrItalic));
+                        Packed = (Packed & kTextAttrColorMask) | NewFlags;
+                        Mask |= kTextAttrItalic;
                     }
                     else if (Reader.is_value("underline"))
                     {
                         unsigned char const Value = static_cast<unsigned char>(Reader.get_value_bool(0));
                         unsigned char const Flags = static_cast<unsigned char>(Packed);
                         unsigned char const NewFlags =
-                            static_cast<unsigned char>(Flags ^ (((Value << 2) ^ Flags) & 4));
-                        Packed = (Packed & 0xffffff00u) | NewFlags;
-                        Mask |= 4;
+                            static_cast<unsigned char>(Flags ^ (((Value << 2) ^ Flags) & kTextAttrUnderline));
+                        Packed = (Packed & kTextAttrColorMask) | NewFlags;
+                        Mask |= kTextAttrUnderline;
                     }
                     else if (Reader.is_value("color"))
                     {
@@ -164,7 +164,7 @@ void LoadRichFontsFromIni(char const* RelPath, IFileSystem* Filesys)
                         unsigned int const Green = static_cast<unsigned char>(Reader.get_value_int(1));
                         unsigned int const Blue = static_cast<unsigned char>(Reader.get_value_int(2));
                         Packed = (Packed & 0xffu) | (Red << 8) | (Green << 16) | (Blue << 24);
-                        Mask |= 0xffffff00u;
+                        Mask |= kTextAttrColorMask;
                     }
                     else if (Reader.is_value("justify"))
                     {

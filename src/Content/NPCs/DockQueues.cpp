@@ -427,7 +427,7 @@ void __cdecl SetDockEquipment(unsigned int ShipId, bool bOn, bool bFormation, FS
 {
     pub::SpaceObj::EQInfo Info;
     std::memset(&Info, 0, sizeof(Info));
-    Info.Type = 3;
+    Info.Type = pub::SpaceObj::EQINFO_TYPE_DOCKING_LIGHTS;
     Info.EquipId = bOn ? 1 : 0;
 
     if (!bFormation)
@@ -672,15 +672,15 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
 
         switch (Response)
         {
-        case 0:
-        case 1:
-        case 2:
-        case 5:
+        case DOCK_HOST_RESPONSE_DENIED_HOSTILE:
+        case DOCK_HOST_RESPONSE_ACCESS_DENIED:
+        case DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL:
+        case DOCK_HOST_RESPONSE_NO_TERMINAL:
             pub::SpaceObj::Dock(Wait->ShipId, Wait->DockTargetId, -1,
                                 static_cast<DOCK_HOST_RESPONSE>(Response));
             Wait = GDockWaitingShips.erase(Wait);
             break;
-        case 3:
+        case DOCK_HOST_RESPONSE_BUSY:
             ++Wait;
             break;
         default:
@@ -1547,7 +1547,7 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
         pub::SpaceObj::GetRep(*DockTargetId, TargetRep);
         unsigned int Affiliation = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(ShipId));
         pub::Reputation::GetAffiliation(TargetRep, Affiliation);
-        if (Affiliation != 0xffffffffu)
+        if (Affiliation != kNoAffiliation)
             pub::Reputation::GetReputation(Affiliation, *Group, Attitude);
     }
     if (!(Attitude > GDockHostileAttitude))
@@ -1622,13 +1622,13 @@ void __cdecl ApplyDockTerminalStates()
 // LAB_06ee9660 (ICF-shared).
 int FGcsDockGrantedEvent::GetType() const
 {
-    return 2;
+    return GCS_EVENT_DOCK_GRANTED;
 }
 
 // LAB_06f5e540.
 int FGcsLaunchEvent::GetType() const
 {
-    return 3;
+    return GCS_EVENT_LAUNCH;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1916,7 +1916,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 {
                     // The dock hail handler keeps quiet about this ship for 30 s (FUN_06ee9b70;
                     // phantom DAT_06fbbb98 = 0, i.e. any).
-                    int const HandlerType = 0;
+                    int const HandlerType = kGcsHandlerDockHail;
                     void* const AnyPhantom = nullptr;
                     unsigned int ShipId = Ship->SpaceObjId;
                     static_cast<FGcsDockHailHandler*>(GetGcsHandler(&HandlerType))

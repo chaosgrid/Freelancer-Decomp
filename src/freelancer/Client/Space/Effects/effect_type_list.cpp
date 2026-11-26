@@ -60,7 +60,7 @@ void EffectTypeListLink(void* EffectPtr)
     FEffectBase* const Effect = static_cast<FEffectBase*>(EffectPtr);
     if (Effect->LinkSelf != nullptr)
         return;
-    if ((Effect->Flags08 & 2u) != 0)
+    if ((Effect->Flags08 & kEffectFlagDeactivated) != 0)
         return;
 
     unsigned const TypeId = Effect->EffectTypeId;

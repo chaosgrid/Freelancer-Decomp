@@ -14,6 +14,7 @@
 #include "RP9Ex.h"
 #include "Mgsdb.h"
 #include "readfile.h"
+#include "render/slots.h"
 #include "x86math.h"
 #include "msvcrt_compat.h"
 
@@ -106,6 +107,34 @@ namespace
     const char kSrcPixel[] =
         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\RenderPipeline\\RPUL\\Pixel.cpp";
 
+    // ---- Direct3D 8 numbering kept by the caches (dx8/include/d3d8types.h) ----
+    //
+    // The render-state and texture-stage caches stay indexed in D3D8 numbers, so every Get*
+    // answers exactly what RP8 answers. Only the values sent to the device are translated.
+    // d3d8types.h cannot be included here, hence the named literals.
+
+    // D3DRENDERSTATETYPE values that Direct3D 9 dropped (d3d8types.h lines 324..388).
+    const unsigned int kD3d8RsLinePattern = 10;               // D3DRS_LINEPATTERN
+    const unsigned int kD3d8RsZVisible = 30;                  // D3DRS_ZVISIBLE
+    const unsigned int kD3d8RsEdgeAntialias = 40;             // D3DRS_EDGEANTIALIAS
+    const unsigned int kD3d8RsZBias = 47;                     // D3DRS_ZBIAS
+    const unsigned int kD3d8RsSoftwareVertexProcessing = 153; // D3DRS_SOFTWAREVERTEXPROCESSING
+    const unsigned int kD3d8RsPatchSegments = 164;            // D3DRS_PATCHSEGMENTS
+
+    // D3DTEXTURESTAGESTATETYPE values that Direct3D 9 moved to sampler states (d3d8types.h
+    // lines 446..458). The values they carry (D3DTEXTUREADDRESS, D3DTEXTUREFILTERTYPE, D3DCOLOR,
+    // float bits, DWORD) keep their encoding in D3D9.
+    const unsigned long kD3d8TssAddressU = 13;      // D3DTSS_ADDRESSU
+    const unsigned long kD3d8TssAddressV = 14;      // D3DTSS_ADDRESSV
+    const unsigned long kD3d8TssBorderColor = 15;   // D3DTSS_BORDERCOLOR
+    const unsigned long kD3d8TssMagFilter = 16;     // D3DTSS_MAGFILTER
+    const unsigned long kD3d8TssMinFilter = 17;     // D3DTSS_MINFILTER
+    const unsigned long kD3d8TssMipFilter = 18;     // D3DTSS_MIPFILTER
+    const unsigned long kD3d8TssMipMapLodBias = 19; // D3DTSS_MIPMAPLODBIAS
+    const unsigned long kD3d8TssMaxMipLevel = 20;   // D3DTSS_MAXMIPLEVEL
+    const unsigned long kD3d8TssMaxAnisotropy = 21; // D3DTSS_MAXANISOTROPY
+    const unsigned long kD3d8TssAddressW = 25;      // D3DTSS_ADDRESSW
+
     // One map insertion of FUN_06d01c68 / FUN_06d19530 / FUN_06d176e0 / FUN_06d19c30: the
     // arguments of FUN_06d175f0 / FUN_06d176a0 (id, name, default, value 0, enabled), in the
     // order the listing inserts them. Names are the rp8.dll .data strings.
@@ -119,157 +148,159 @@ namespace
 
     // FUN_06d01c68, map object+0x278.
     const FRp9PropertyInit kPipelineProperties[] = {
-        {0x0, "TEXTURE", 0x1, 1},
-        {0x1, "LIGHTING", 0x1, 1},
-        {0x7, "VIEWSPACE_LIGHTS", 0x1, 1},
-        {0xB, "STATE_CACHE", 0x1, 1},
-        {0x8, "CLEAR_COLOR", 0x0, 1},
-        {0x9, "CLEAR_ZDEPTH", 0x3F800000, 1},
-        {0xA, "CLEAR_STENCIL", 0xFFFFFFFF, 1},
-        {0x2, "TEXTURE_LOD", 0x1, 1},
-        {0x3, "TEXTURE_ALLOW_8BIT", 0x0, 1},
-        {0x4, "TEXTURE_ALLOW_32BIT", 0x1, 1},
-        {0x5, "TEXTURE_ALLOW_DXT", 0x1, 1},
-        {0x6, "BROKEN_MULTITEXTURE", 0x1, 1},
-        {0xC, "BROKEN_MOD2X", 0x0, 1},
-        {0xD, "BROKEN_FLIP", 0x0, 1},
+        {PipelineStateTexture, "TEXTURE", 0x1, 1},
+        {PipelineStateLighting, "LIGHTING", 0x1, 1},
+        {PipelineStateViewspaceLights, "VIEWSPACE_LIGHTS", 0x1, 1},
+        {PipelineStateStateCache, "STATE_CACHE", 0x1, 1},
+        {PipelineStateClearColor, "CLEAR_COLOR", 0x0, 1},
+        {PipelineStateClearZDepth, "CLEAR_ZDEPTH", 0x3F800000, 1},
+        {PipelineStateClearStencil, "CLEAR_STENCIL", 0xFFFFFFFF, 1},
+        {PipelineStateTextureLod, "TEXTURE_LOD", 0x1, 1},
+        {PipelineStateTextureAllow8Bit, "TEXTURE_ALLOW_8BIT", 0x0, 1},
+        {PipelineStateTextureAllow32Bit, "TEXTURE_ALLOW_32BIT", 0x1, 1},
+        {PipelineStateTextureAllowDxt, "TEXTURE_ALLOW_DXT", 0x1, 1},
+        {PipelineStateStageCount, "BROKEN_MULTITEXTURE", 0x1, 1},
+        {PipelineStateBrokenMod2x, "BROKEN_MOD2X", 0x0, 1},
+        {PipelineStateBrokenFlip, "BROKEN_FLIP", 0x0, 1},
     };
 
     // FUN_06d19530, map object+0x28C: disabled until startup finds the key in the INI.
     const FRp9PropertyInit kAbilityProperties[] = {
-        {0x4, "DEVICE_GEOMETRY", 0x0, 0},
-        {0x5, "TEXTURE_SQUARE_ONLY", 0x0, 0},
-        {0x6, "TEXTURE_MAX_WIDTH", 0x0, 0},
-        {0x7, "TEXTURE_MAX_HEIGHT", 0x0, 0},
-        {0x8, "TEXTURE_CUBEMAPS", 0x0, 0},
-        {0x9, "DEPTH_BIAS", 0x0, 0},
-        {0xA, "FOG_VERTEX", 0x0, 0},
-        {0xB, "FOG_PIXEL", 0x0, 0},
-        {0xC, "FOG_RANGE", 0x0, 0},
-        {0xD, "FOG_W", 0x0, 0},
-        {0xE, "RASTER_ANTIALIASEDGES", 0x0, 0},
-        {0xF, "DEVICE_SUPPORT_LEVEL", 0x0, 0},
-        {0x10, "TEXTURE_TRILINEAR", 0x0, 0},
-        {0x11, "DEVICE_BAD_MODE", 0x0, 0},
-        {0x12, "DEVICE_BAD_4444", 0x0, 0},
+        {Render::DeviceGeometry, "DEVICE_GEOMETRY", 0x0, 0},
+        {Render::TextureSquareOnly, "TEXTURE_SQUARE_ONLY", 0x0, 0},
+        {Render::TextureMaxWidth, "TEXTURE_MAX_WIDTH", 0x0, 0},
+        {Render::TextureMaxHeight, "TEXTURE_MAX_HEIGHT", 0x0, 0},
+        {Render::TextureCubemaps, "TEXTURE_CUBEMAPS", 0x0, 0},
+        {Render::DepthBias, "DEPTH_BIAS", 0x0, 0},
+        {Render::FogVertex, "FOG_VERTEX", 0x0, 0},
+        {Render::FogPixel, "FOG_PIXEL", 0x0, 0},
+        {Render::FogRange, "FOG_RANGE", 0x0, 0},
+        {Render::FogW, "FOG_W", 0x0, 0},
+        {Render::RasterAntialiasEdges, "RASTER_ANTIALIASEDGES", 0x0, 0},
+        {Render::DeviceSupportLevel, "DEVICE_SUPPORT_LEVEL", 0x0, 0},
+        {Render::TextureTrilinear, "TEXTURE_TRILINEAR", 0x0, 0},
+        {Render::DeviceBadMode, "DEVICE_BAD_MODE", 0x0, 0},
+        {Render::DeviceBad4444, "DEVICE_BAD_4444", 0x0, 0},
     };
 
     // FUN_06d176e0, map object+0x2A0 (D3DRENDERSTATETYPE ids).
     const FRp9PropertyInit kRenderStateProperties[] = {
-        {0x7, "ZENABLE", 0x1, 1},
-        {0x8, "FILLMODE", 0x3, 1},
-        {0x9, "SHADEMODE", 0x2, 1},
-        {0xA, "LINEPATTERN", 0x0, 1},
-        {0xE, "ZWRITEENABLE", 0x1, 1},
-        {0xF, "ALPHATESTENABLE", 0x0, 1},
-        {0x10, "LASTPIXEL", 0x1, 1},
-        {0x13, "SRCBLEND", 0x2, 1},
-        {0x14, "DESTBLEND", 0x1, 1},
-        {0x16, "CULLMODE", 0x1, 1},
-        {0x17, "ZFUNC", 0x2, 1},
-        {0x18, "ALPHAREF", 0x0, 1},
-        {0x19, "ALPHAFUNC", 0x8, 1},
-        {0x1A, "DITHERENABLE", 0x0, 1},
-        {0x1B, "ALPHABLENDENABLE", 0x0, 1},
-        {0x1C, "FOGENABLE", 0x0, 1},
-        {0x1D, "SPECULARENABLE", 0x0, 1},
-        {0x1E, "ZVISIBLE", 0x1, 1},
-        {0x22, "FOGCOLOR", 0x0, 1},
-        {0x23, "FOGTABLEMODE", 0x1, 1},
-        {0x24, "FOGSTART", 0x0, 1},
-        {0x25, "FOGEND", 0x0, 1},
-        {0x26, "FOGDENSITY", 0x0, 1},
-        {0x28, "EDGEANTIALIAS", 0x0, 1},
-        {0x2F, "ZBIAS", 0x0, 1},
-        {0x30, "RANGEFOGENABLE", 0x0, 1},
-        {0x34, "STENCILENABLE", 0x0, 1},
-        {0x35, "STENCILFAIL", 0x1, 1},
-        {0x36, "STENCILZFAIL", 0x1, 1},
-        {0x37, "STENCILPASS", 0x1, 1},
-        {0x38, "STENCILFUNC", 0x8, 1},
-        {0x39, "STENCILREF", 0xFFFFFFFF, 1},
-        {0x3A, "STENCILMASK", 0xFFFFFFFF, 1},
-        {0x3B, "STENCILWRITEMASK", 0xFFFFFFFF, 1},
-        {0x3C, "TEXTUREFACTOR", 0x0, 1},
-        {0x80, "WRAP0", 0x0, 1},
-        {0x81, "WRAP1", 0x0, 1},
-        {0x82, "WRAP2", 0x0, 1},
-        {0x83, "WRAP3", 0x0, 1},
-        {0x84, "WRAP4", 0x0, 1},
-        {0x85, "WRAP5", 0x0, 1},
-        {0x86, "WRAP6", 0x0, 1},
-        {0x87, "WRAP7", 0x0, 1},
-        {0x88, "CLIPPING", 0x1, 1},
-        {0x89, "LIGHTING", 0x0, 1},
-        {0x8B, "AMBIENT", 0x0, 1},
-        {0x8C, "FOGVERTEXMODE", 0x0, 1},
-        {0x8D, "COLORVERTEX", 0x0, 1},
-        {0x8E, "LOCALVIEWER", 0x0, 1},
-        {0x8F, "NORMALIZENORMALS", 0x0, 1},
-        {0x91, "DIFFUSEMATERIALSOURCE", 0x1, 1},
-        {0x92, "SPECULARMATERIALSOURCE", 0x2, 1},
-        {0x93, "AMBIENTMATERIALSOURCE", 0x2, 1},
-        {0x94, "EMISSIVEMATERIALSOURCE", 0x0, 1},
-        {0x97, "VERTEXBLEND", 0x0, 1},
-        {0x98, "CLIPPLANEENABLE", 0x0, 1},
-        {0x99, "SOFTWAREVERTEXPROCESSING", 0x0, 1},
-        {0x9A, "POINTSIZE", 0x3F800000, 1},
-        {0x9B, "POINTSIZE_MIN", 0x3F800000, 1},
-        {0x9C, "POINTSPRITEENABLE", 0x0, 1},
-        {0x9D, "POINTSCALEENABLE", 0x0, 1},
-        {0x9E, "POINTSCALE_A", 0x3F800000, 1},
-        {0x9F, "POINTSCALE_B", 0x0, 1},
-        {0xA0, "POINTSCALE_C", 0x0, 1},
-        {0xA1, "MULTISAMPLEANTIALIAS", 0x1, 1},
-        {0xA2, "MULTISAMPLEMASK", 0xFFFFFFFF, 1},
-        {0xA3, "PATCHEDGESTYLE", 0x0, 1},
-        {0xA4, "PATCHSEGMENTS", 0x0, 1},
-        {0xA5, "DEBUGMONITORTOKEN", 0x0, 1},
-        {0xA6, "POINTSIZE_MAX", 0x3F800000, 1},
-        {0xA7, "INDEXEDVERTEXBLENDENABLE", 0x0, 1},
-        {0xA8, "COLORWRITEENABLE", 0xF, 1},
-        {0xAA, "TWEENFACTOR", 0x0, 1},
-        {0xAB, "BLENDOP", 0x1, 1},
-        {0xAC, "POSITIONORDER", 0x1, 1},
-        {0xAD, "NORMALORDER", 0x1, 1},
+        {D3DRS_ZENABLE, "ZENABLE", D3DZB_TRUE, 1},
+        {D3DRS_FILLMODE, "FILLMODE", D3DFILL_SOLID, 1},
+        {D3DRS_SHADEMODE, "SHADEMODE", D3DSHADE_GOURAUD, 1},
+        {kD3d8RsLinePattern, "LINEPATTERN", 0x0, 1},
+        {D3DRS_ZWRITEENABLE, "ZWRITEENABLE", 0x1, 1},
+        {D3DRS_ALPHATESTENABLE, "ALPHATESTENABLE", 0x0, 1},
+        {D3DRS_LASTPIXEL, "LASTPIXEL", 0x1, 1},
+        {D3DRS_SRCBLEND, "SRCBLEND", D3DBLEND_ONE, 1},
+        {D3DRS_DESTBLEND, "DESTBLEND", D3DBLEND_ZERO, 1},
+        {D3DRS_CULLMODE, "CULLMODE", D3DCULL_NONE, 1},
+        {D3DRS_ZFUNC, "ZFUNC", D3DCMP_LESS, 1},
+        {D3DRS_ALPHAREF, "ALPHAREF", 0x0, 1},
+        {D3DRS_ALPHAFUNC, "ALPHAFUNC", D3DCMP_ALWAYS, 1},
+        {D3DRS_DITHERENABLE, "DITHERENABLE", 0x0, 1},
+        {D3DRS_ALPHABLENDENABLE, "ALPHABLENDENABLE", 0x0, 1},
+        {D3DRS_FOGENABLE, "FOGENABLE", 0x0, 1},
+        {D3DRS_SPECULARENABLE, "SPECULARENABLE", 0x0, 1},
+        {kD3d8RsZVisible, "ZVISIBLE", 0x1, 1},
+        {D3DRS_FOGCOLOR, "FOGCOLOR", 0x0, 1},
+        {D3DRS_FOGTABLEMODE, "FOGTABLEMODE", D3DFOG_EXP, 1},
+        {D3DRS_FOGSTART, "FOGSTART", 0x0, 1},
+        {D3DRS_FOGEND, "FOGEND", 0x0, 1},
+        {D3DRS_FOGDENSITY, "FOGDENSITY", 0x0, 1},
+        {kD3d8RsEdgeAntialias, "EDGEANTIALIAS", 0x0, 1},
+        {kD3d8RsZBias, "ZBIAS", 0x0, 1},
+        {D3DRS_RANGEFOGENABLE, "RANGEFOGENABLE", 0x0, 1},
+        {D3DRS_STENCILENABLE, "STENCILENABLE", 0x0, 1},
+        {D3DRS_STENCILFAIL, "STENCILFAIL", D3DSTENCILOP_KEEP, 1},
+        {D3DRS_STENCILZFAIL, "STENCILZFAIL", D3DSTENCILOP_KEEP, 1},
+        {D3DRS_STENCILPASS, "STENCILPASS", D3DSTENCILOP_KEEP, 1},
+        {D3DRS_STENCILFUNC, "STENCILFUNC", D3DCMP_ALWAYS, 1},
+        {D3DRS_STENCILREF, "STENCILREF", 0xFFFFFFFF, 1},
+        {D3DRS_STENCILMASK, "STENCILMASK", 0xFFFFFFFF, 1},
+        {D3DRS_STENCILWRITEMASK, "STENCILWRITEMASK", 0xFFFFFFFF, 1},
+        {D3DRS_TEXTUREFACTOR, "TEXTUREFACTOR", 0x0, 1},
+        {D3DRS_WRAP0, "WRAP0", 0x0, 1},
+        {D3DRS_WRAP1, "WRAP1", 0x0, 1},
+        {D3DRS_WRAP2, "WRAP2", 0x0, 1},
+        {D3DRS_WRAP3, "WRAP3", 0x0, 1},
+        {D3DRS_WRAP4, "WRAP4", 0x0, 1},
+        {D3DRS_WRAP5, "WRAP5", 0x0, 1},
+        {D3DRS_WRAP6, "WRAP6", 0x0, 1},
+        {D3DRS_WRAP7, "WRAP7", 0x0, 1},
+        {D3DRS_CLIPPING, "CLIPPING", 0x1, 1},
+        {D3DRS_LIGHTING, "LIGHTING", 0x0, 1},
+        {D3DRS_AMBIENT, "AMBIENT", 0x0, 1},
+        {D3DRS_FOGVERTEXMODE, "FOGVERTEXMODE", D3DFOG_NONE, 1},
+        {D3DRS_COLORVERTEX, "COLORVERTEX", 0x0, 1},
+        {D3DRS_LOCALVIEWER, "LOCALVIEWER", 0x0, 1},
+        {D3DRS_NORMALIZENORMALS, "NORMALIZENORMALS", 0x0, 1},
+        {D3DRS_DIFFUSEMATERIALSOURCE, "DIFFUSEMATERIALSOURCE", D3DMCS_COLOR1, 1},
+        {D3DRS_SPECULARMATERIALSOURCE, "SPECULARMATERIALSOURCE", D3DMCS_COLOR2, 1},
+        {D3DRS_AMBIENTMATERIALSOURCE, "AMBIENTMATERIALSOURCE", D3DMCS_COLOR2, 1},
+        {D3DRS_EMISSIVEMATERIALSOURCE, "EMISSIVEMATERIALSOURCE", D3DMCS_MATERIAL, 1},
+        {D3DRS_VERTEXBLEND, "VERTEXBLEND", D3DVBF_DISABLE, 1},
+        {D3DRS_CLIPPLANEENABLE, "CLIPPLANEENABLE", 0x0, 1},
+        {kD3d8RsSoftwareVertexProcessing, "SOFTWAREVERTEXPROCESSING", 0x0, 1},
+        {D3DRS_POINTSIZE, "POINTSIZE", 0x3F800000, 1},
+        {D3DRS_POINTSIZE_MIN, "POINTSIZE_MIN", 0x3F800000, 1},
+        {D3DRS_POINTSPRITEENABLE, "POINTSPRITEENABLE", 0x0, 1},
+        {D3DRS_POINTSCALEENABLE, "POINTSCALEENABLE", 0x0, 1},
+        {D3DRS_POINTSCALE_A, "POINTSCALE_A", 0x3F800000, 1},
+        {D3DRS_POINTSCALE_B, "POINTSCALE_B", 0x0, 1},
+        {D3DRS_POINTSCALE_C, "POINTSCALE_C", 0x0, 1},
+        {D3DRS_MULTISAMPLEANTIALIAS, "MULTISAMPLEANTIALIAS", 0x1, 1},
+        {D3DRS_MULTISAMPLEMASK, "MULTISAMPLEMASK", 0xFFFFFFFF, 1},
+        {D3DRS_PATCHEDGESTYLE, "PATCHEDGESTYLE", 0x0, 1},
+        {kD3d8RsPatchSegments, "PATCHSEGMENTS", 0x0, 1},
+        {D3DRS_DEBUGMONITORTOKEN, "DEBUGMONITORTOKEN", 0x0, 1},
+        {D3DRS_POINTSIZE_MAX, "POINTSIZE_MAX", 0x3F800000, 1},
+        {D3DRS_INDEXEDVERTEXBLENDENABLE, "INDEXEDVERTEXBLENDENABLE", 0x0, 1},
+        {D3DRS_COLORWRITEENABLE, "COLORWRITEENABLE",
+         D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE |
+             D3DCOLORWRITEENABLE_ALPHA, 1},
+        {D3DRS_TWEENFACTOR, "TWEENFACTOR", 0x0, 1},
+        {D3DRS_BLENDOP, "BLENDOP", D3DBLENDOP_ADD, 1},
+        {D3DRS_POSITIONDEGREE, "POSITIONORDER", D3DDEGREE_LINEAR, 1},
+        {D3DRS_NORMALDEGREE, "NORMALORDER", D3DDEGREE_LINEAR, 1},
     };
 
     // FUN_06d19c30(map, bFirstStage): a non-zero flag inserts COLOROP 4 / ALPHAOP 2 (MODULATE /
     // SELECTARG1), zero inserts 1 / 1 (DISABLE); the rest is shared.
     const FRp9PropertyInit kStageOpsFirstStage[] = {
-        {0x1, "COLOROP", 0x4, 1},
-        {0x4, "ALPHAOP", 0x2, 1},
+        {D3DTSS_COLOROP, "COLOROP", D3DTOP_MODULATE, 1},
+        {D3DTSS_ALPHAOP, "ALPHAOP", D3DTOP_SELECTARG1, 1},
     };
     const FRp9PropertyInit kStageOpsOtherStage[] = {
-        {0x1, "COLOROP", 0x1, 1},
-        {0x4, "ALPHAOP", 0x1, 1},
+        {D3DTSS_COLOROP, "COLOROP", D3DTOP_DISABLE, 1},
+        {D3DTSS_ALPHAOP, "ALPHAOP", D3DTOP_DISABLE, 1},
     };
     const FRp9PropertyInit kStageStateProperties[] = {
-        {0x2, "COLORARG1", 0x2, 1},
-        {0x3, "COLORARG2", 0x1, 1},
-        {0x5, "ALPHAARG1", 0x2, 1},
-        {0x6, "ALPHAARG2", 0x1, 1},
-        {0x7, "BUMPENVMAT00", 0x0, 1},
-        {0x8, "BUMPENVMAT01", 0x0, 1},
-        {0x9, "BUMPENVMAT10", 0x0, 1},
-        {0xA, "BUMPENVMAT11", 0x0, 1},
-        {0xB, "TEXCOORDINDEX", 0x0, 1},
-        {0xD, "ADDRESSU", 0x1, 1},
-        {0xE, "ADDRESSV", 0x1, 1},
-        {0xF, "BORDERCOLOR", 0x0, 1},
-        {0x10, "MAGFILTER", 0x2, 1},
-        {0x11, "MINFILTER", 0x2, 1},
-        {0x12, "MIPFILTER", 0x1, 1},
-        {0x13, "MIPMAPLODBIAS", 0x0, 1},
-        {0x14, "MAXMIPLEVEL", 0x0, 1},
-        {0x15, "MAXANISOTROPY", 0x1, 1},
-        {0x16, "BUMPENVLSCALE", 0x0, 1},
-        {0x17, "BUMPENVLOFFSET", 0x0, 1},
-        {0x18, "TEXTURETRANSFORMFLAGS", 0x0, 1},
-        {0x19, "ADDRESSW", 0x1, 1},
-        {0x1A, "COLORARG0", 0x1, 1},
-        {0x1B, "ALPHAARG0", 0x1, 1},
-        {0x1C, "RESULTARG", 0x1, 1},
+        {D3DTSS_COLORARG1, "COLORARG1", D3DTA_TEXTURE, 1},
+        {D3DTSS_COLORARG2, "COLORARG2", D3DTA_CURRENT, 1},
+        {D3DTSS_ALPHAARG1, "ALPHAARG1", D3DTA_TEXTURE, 1},
+        {D3DTSS_ALPHAARG2, "ALPHAARG2", D3DTA_CURRENT, 1},
+        {D3DTSS_BUMPENVMAT00, "BUMPENVMAT00", 0x0, 1},
+        {D3DTSS_BUMPENVMAT01, "BUMPENVMAT01", 0x0, 1},
+        {D3DTSS_BUMPENVMAT10, "BUMPENVMAT10", 0x0, 1},
+        {D3DTSS_BUMPENVMAT11, "BUMPENVMAT11", 0x0, 1},
+        {D3DTSS_TEXCOORDINDEX, "TEXCOORDINDEX", 0x0, 1},
+        {kD3d8TssAddressU, "ADDRESSU", D3DTADDRESS_WRAP, 1},
+        {kD3d8TssAddressV, "ADDRESSV", D3DTADDRESS_WRAP, 1},
+        {kD3d8TssBorderColor, "BORDERCOLOR", 0x0, 1},
+        {kD3d8TssMagFilter, "MAGFILTER", D3DTEXF_LINEAR, 1},
+        {kD3d8TssMinFilter, "MINFILTER", D3DTEXF_LINEAR, 1},
+        {kD3d8TssMipFilter, "MIPFILTER", D3DTEXF_POINT, 1},
+        {kD3d8TssMipMapLodBias, "MIPMAPLODBIAS", 0x0, 1},
+        {kD3d8TssMaxMipLevel, "MAXMIPLEVEL", 0x0, 1},
+        {kD3d8TssMaxAnisotropy, "MAXANISOTROPY", 0x1, 1},
+        {D3DTSS_BUMPENVLSCALE, "BUMPENVLSCALE", 0x0, 1},
+        {D3DTSS_BUMPENVLOFFSET, "BUMPENVLOFFSET", 0x0, 1},
+        {D3DTSS_TEXTURETRANSFORMFLAGS, "TEXTURETRANSFORMFLAGS", D3DTTFF_DISABLE, 1},
+        {kD3d8TssAddressW, "ADDRESSW", D3DTADDRESS_WRAP, 1},
+        {D3DTSS_COLORARG0, "COLORARG0", D3DTA_CURRENT, 1},
+        {D3DTSS_ALPHAARG0, "ALPHAARG0", D3DTA_CURRENT, 1},
+        {D3DTSS_RESULTARG, "RESULTARG", D3DTA_CURRENT, 1},
     };
 
     // FUN_06d16ff0 (clear) followed by one insertion per row (FUN_06d15f80 operator[] +
@@ -436,8 +467,9 @@ namespace
     // DAT_06d6ffa8 — 22 dword (FUN_06d5cc20). Numeric ids only; no PF_* names.
     // Values at idx 2/7 are 0x14/0x15 (also valid indices 20/21 = DAA4/DAA8).
     const unsigned int kPfToD3d[22] = {
-        0,    0x29, 0x14, 0x17, 0x18, 0x1A, 0x19, 0x15, 0x16, 0,
-        0x31545844, 0x32545844, 0x33545844, 0x34545844, 0x35545844,
+        0,    D3DFMT_P8, D3DFMT_R8G8B8, D3DFMT_R5G6B5, D3DFMT_X1R5G5B5, D3DFMT_A4R4G4B4,
+        D3DFMT_A1R5G5B5, D3DFMT_A8R8G8B8, D3DFMT_X8R8G8B8, 0,
+        D3DFMT_DXT1, D3DFMT_DXT2, D3DFMT_DXT3, D3DFMT_DXT4, D3DFMT_DXT5,
         0x504F4144, 0x544F4144, 0x41414144, 0x4C414144, 0x31414144,
         0x34414144, 0x38414144};
 
@@ -479,35 +511,7 @@ namespace
     // named members VbList_, IbList_, ScratchIb_ and PipelineStates_ of FDirectX9 (RP9.h).
 
     // FUN_06d1b480(0x200): Flags = 0x200|8 (D3DUSAGE_DYNAMIC|WRITEONLY).
-    static const unsigned long kVbPoolUsage = 0x208;
-
-    // ---- Direct3D 8 numbering kept by the caches (dx8/include/d3d8types.h) ----
-    //
-    // The render-state and texture-stage caches stay indexed in D3D8 numbers, so every Get*
-    // answers exactly what RP8 answers. Only the values sent to the device are translated.
-    // d3d8types.h cannot be included here, hence the named literals.
-
-    // D3DRENDERSTATETYPE values that Direct3D 9 dropped (d3d8types.h lines 324..388).
-    const unsigned int kD3d8RsLinePattern = 10;               // D3DRS_LINEPATTERN
-    const unsigned int kD3d8RsZVisible = 30;                  // D3DRS_ZVISIBLE
-    const unsigned int kD3d8RsEdgeAntialias = 40;             // D3DRS_EDGEANTIALIAS
-    const unsigned int kD3d8RsZBias = 47;                     // D3DRS_ZBIAS
-    const unsigned int kD3d8RsSoftwareVertexProcessing = 153; // D3DRS_SOFTWAREVERTEXPROCESSING
-    const unsigned int kD3d8RsPatchSegments = 164;            // D3DRS_PATCHSEGMENTS
-
-    // D3DTEXTURESTAGESTATETYPE values that Direct3D 9 moved to sampler states (d3d8types.h
-    // lines 446..458). The values they carry (D3DTEXTUREADDRESS, D3DTEXTUREFILTERTYPE, D3DCOLOR,
-    // float bits, DWORD) keep their encoding in D3D9.
-    const unsigned long kD3d8TssAddressU = 13;      // D3DTSS_ADDRESSU
-    const unsigned long kD3d8TssAddressV = 14;      // D3DTSS_ADDRESSV
-    const unsigned long kD3d8TssBorderColor = 15;   // D3DTSS_BORDERCOLOR
-    const unsigned long kD3d8TssMagFilter = 16;     // D3DTSS_MAGFILTER
-    const unsigned long kD3d8TssMinFilter = 17;     // D3DTSS_MINFILTER
-    const unsigned long kD3d8TssMipFilter = 18;     // D3DTSS_MIPFILTER
-    const unsigned long kD3d8TssMipMapLodBias = 19; // D3DTSS_MIPMAPLODBIAS
-    const unsigned long kD3d8TssMaxMipLevel = 20;   // D3DTSS_MAXMIPLEVEL
-    const unsigned long kD3d8TssMaxAnisotropy = 21; // D3DTSS_MAXANISOTROPY
-    const unsigned long kD3d8TssAddressW = 25;      // D3DTSS_ADDRESSW
+    static const unsigned long kVbPoolUsage = D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY;
 
     // D3D8 caps bits with no D3D9 define (dx8/include/d3d8caps.h).
     const DWORD kD3d8Caps2CanRenderWindowed = 0x00080000;   // D3DCAPS2_CANRENDERWINDOWED
@@ -804,9 +808,9 @@ namespace
 
     unsigned int FormatBpp(D3DFORMAT Format)
     {
-        if (Format == 21 || Format == 22)
+        if (Format == D3DFMT_A8R8G8B8 || Format == D3DFMT_X8R8G8B8)
             return 32;
-        if (Format == 23 || Format == 24 || Format == 25)
+        if (Format == D3DFMT_R5G6B5 || Format == D3DFMT_X1R5G5B5 || Format == D3DFMT_A1R5G5B5)
             return 16;
         return 16;
     }
@@ -872,7 +876,7 @@ namespace
     // (Extra == 1) takes Level as the face, mip 0.
     HRESULT TextureGetSubSurface(FRp9TextureHandle* Handle, UINT Level, IDirect3DSurface9** Out)
     {
-        HRESULT Hr = (HRESULT)(0x80004005);
+        HRESULT Hr = E_FAIL;
         IDirect3DTexture9* Texture = Handle->Extra != 0 ? nullptr : Handle->Texture;
         if (Texture != nullptr)
             Hr = Texture->GetSurfaceLevel(Level, Out);
@@ -1182,7 +1186,7 @@ FDirectX9::FDirectX9()
     : Parser_(nullptr), CreateFlags_(0), SwapFlags_(0), D3d_(nullptr), Device_(nullptr),
       LockBufferSurf_(nullptr), VidMem_(0), VbPoolBytes_(0), DeviceReady_(0),
       FormatCatalogBegin_(nullptr), FormatCatalogEnd_(nullptr), FormatCatalogCap_(nullptr),
-      AdapterIndex_(0xFFFFFFFF), DeviceType_(1), DisplayPfIndex_(0), BbPfIndex_(0), Hwnd_(nullptr),
+      AdapterIndex_(0xFFFFFFFF), DeviceType_(D3DDEVTYPE_HAL), DisplayPfIndex_(0), BbPfIndex_(0), Hwnd_(nullptr),
       WindowX_(0), WindowY_(0), WindowW_(0), WindowH_(0), WindowOverride_(nullptr),
       bDepthRangeValid_(0), bViewportRectValid_(0), DeviceBaseVertex_(0), Outer_(nullptr),
       Ex_(new FRp9ExState())
@@ -1194,7 +1198,7 @@ FDirectX9::FDirectX9()
     StreamCache_.BaseVertex = 0xFFFFFFFF;
     // RP8's ScratchIbFlags_ / ScratchIb_ / Pad154_ / IbUsed_ / IbCapacity_.
     memset(&ScratchIb_, 0, sizeof(ScratchIb_));
-    ScratchIb_.Flags = 0x200 | 8;
+    ScratchIb_.Flags = D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY;
     // +0x230 and +0x234 = FUN_06d5cc30(0).
     DisplayPfIndex_ = PfIndex(0);
     BbPfIndex_ = PfIndex(0);
@@ -1328,7 +1332,7 @@ GENRESULT FDirectX9::NeedStartup(const char* Message, int Line)
 // RP8: FDirectX8::NeedBuffers
 GENRESULT FDirectX9::NeedBuffers(const char* Message, int Line)
 {
-    if ((DeviceReady_ & 1) != 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) != 0)
         return GR_OK;
     Rp9Fdump(kFdumpWarning, Line, "WARNING", Message);
     return GR_GENERIC;
@@ -1407,7 +1411,7 @@ void FDirectX9::EnumAdapters()
         memset(&Caps9, 0, sizeof(Caps9));
         D3d_->GetDeviceCaps(Index, (D3DDEVTYPE)(DeviceType_), &Caps9);
         Rp9Caps8FromCaps9(Caps9, &Adapter.Caps);
-        Adapter.CanRenderWindowed = Adapter.Caps.Caps2 & 0x80000;
+        Adapter.CanRenderWindowed = Adapter.Caps.Caps2 & kD3d8Caps2CanRenderWindowed;
     }
 }
 
@@ -1427,7 +1431,10 @@ unsigned long FDirectX9::QueryVidMem()
     unsigned long Best = 0;
     if (SUCCEEDED(Hr))
     {
-        const unsigned long Masks[3] = {0x10007000ul, 0x10005000ul, 0x10004040ul};
+        const unsigned long Masks[3] = {
+            DDSCAPS_LOCALVIDMEM | DDSCAPS_VIDEOMEMORY | DDSCAPS_3DDEVICE | DDSCAPS_TEXTURE,
+            DDSCAPS_LOCALVIDMEM | DDSCAPS_VIDEOMEMORY | DDSCAPS_TEXTURE,
+            DDSCAPS_LOCALVIDMEM | DDSCAPS_VIDEOMEMORY | DDSCAPS_OFFSCREENPLAIN};
         for (int Index = 0; Index < 3; ++Index)
         {
             DDSCAPS2 Caps = {};
@@ -1490,7 +1497,7 @@ void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
         FRp9Property& AlphaFunc = States[D3DRS_ALPHAFUNC];
         AlphaFunc.Name = "ALPHAFUNC";
         AlphaFunc.Id = D3DRS_ALPHAFUNC;
-        AlphaFunc.Default = 8;
+        AlphaFunc.Default = D3DCMP_ALWAYS;
         AlphaFunc.Value = 0;
         AlphaFunc.bEnabled = 1;
         RenderStates_.Entries[D3DRS_ALPHATESTENABLE].bEnabled = 0;
@@ -1500,7 +1507,7 @@ void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
     if (MgsdbHasFlag(Db, "NoTriLinear"))
     {
         Rp9Fdump(kFdumpNotice, 0x410, "NOTICE", "MGS: TRILINEAR FILTERING DISABLED");
-        Ability_[16] = 0;
+        Ability_[Render::TextureTrilinear] = 0;
     }
     if (MgsdbHasFlag(Db, "DefaultBltNotFlip"))
     {
@@ -1522,25 +1529,25 @@ void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
     if (MgsdbHasFlag(Db, "Disable1600x1200"))
     {
         Rp9Fdump(kFdumpNotice, 0x428, "NOTICE", "MGS: 1600x1200 (and above) DISABLED");
-        Ability_[17] = 0x640;
+        Ability_[Render::DeviceBadMode] = 0x640;
     }
     if (MgsdbHasFlag(Db, "Bad4444"))
     {
         Rp9Fdump(kFdumpNotice, 0x42d, "NOTICE", "MGS: 4x4x4x4 TEXTURES DISABLED");
-        Ability_[18] = 1;
+        Ability_[Render::DeviceBad4444] = 1;
     }
     if (MgsdbHasFlag(Db, "LimitTextureSize"))
     {
         Rp9Fdump(kFdumpNotice, 0x432, "NOTICE", "MGS: LARGE TEXTURES DISABLED");
-        if (Ability_[6] > 0x100)
-            Ability_[6] = 0x100;
-        if (Ability_[7] > 0x100)
-            Ability_[7] = 0x100;
+        if (Ability_[Render::TextureMaxWidth] > 0x100)
+            Ability_[Render::TextureMaxWidth] = 0x100;
+        if (Ability_[Render::TextureMaxHeight] > 0x100)
+            Ability_[Render::TextureMaxHeight] = 0x100;
     }
     if (MgsdbHasFlag(Db, "ForceSquareTextures"))
     {
         Rp9Fdump(kFdumpNotice, 0x43b, "NOTICE", "MGS: NON-SQUARE TEXTURES DISABLED");
-        Ability_[5] = 1;
+        Ability_[Render::TextureSquareOnly] = 1;
     }
     if (MgsdbHasFlag(Db, "Bad8888"))
     {
@@ -1582,27 +1589,27 @@ void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
     if (MgsdbHasFlag(Db, "FL_BAD_ENVMAP"))
     {
         Rp9Fdump(kFdumpNotice, 0x457, "NOTICE", "MGS: ENVMAP USAGE DISABLED");
-        Ability_[8] = 0;
+        Ability_[Render::TextureCubemaps] = 0;
     }
     if (MgsdbHasFlag(Db, "FL_BAD_WFOG"))
     {
         Rp9Fdump(kFdumpNotice, 0x45d, "NOTICE", "MGS: WFOG USAGE DISABLED");
-        Ability_[13] = 0;
+        Ability_[Render::FogW] = 0;
     }
     if (MgsdbHasFlag(Db, "UnknownHardware"))
     {
         Rp9Fdump(kFdumpNotice, 0x466, "NOTICE", "MGS: Unknown hardware");
-        Ability_[15] = 1;
+        Ability_[Render::DeviceSupportLevel] = 1;
     }
     if (MgsdbHasFlag(Db, "UnsupportedDriver"))
     {
         Rp9Fdump(kFdumpNotice, 0x46b, "NOTICE", "MGS: Unsupported Driver");
-        Ability_[15] = 2;
+        Ability_[Render::DeviceSupportLevel] = 2;
     }
     if (MgsdbHasFlag(Db, "UnsupportedHardware"))
     {
         Rp9Fdump(kFdumpNotice, 0x470, "NOTICE", "MGS: Unsupported hardware");
-        Ability_[15] = 3;
+        Ability_[Render::DeviceSupportLevel] = 3;
     }
 }
 
@@ -1628,29 +1635,31 @@ void FDirectX9::ApplyDeviceCaps(const FRp9Caps8* Caps)
 {
     memset(Ability_, 0, 0x14 * sizeof(unsigned long));
     Ability_[3] = VidMem_;
-    Ability_[1] = (Caps->RasterCaps & 0x20000) != 0;
-    Ability_[2] = (Caps->RasterCaps & 0x100000) != 0;
-    Ability_[4] = ((Caps->DevCaps & 0x10000) != 0 && (Caps->DevCaps & 0x8000) != 0) ? 1 : 0;
-    Ability_[10] = (Caps->RasterCaps & 0x80) != 0;
-    Ability_[11] = (Caps->RasterCaps & 0x100) != 0;
-    Ability_[12] = (Caps->RasterCaps & 0x10000) != 0;
-    const bool bWFog = (Caps->RasterCaps & 0x100000) != 0;
-    const bool bZFog = (Caps->RasterCaps & 0x200000) != 0;
-    const bool bTnl = Ability_[4] != 0;
+    Ability_[1] = (Caps->RasterCaps & D3DPRASTERCAPS_ANISOTROPY) != 0;
+    Ability_[2] = (Caps->RasterCaps & D3DPRASTERCAPS_WFOG) != 0;
+    Ability_[Render::DeviceGeometry] = ((Caps->DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) != 0 &&
+                   (Caps->DevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) != 0) ? 1 : 0;
+    Ability_[Render::FogVertex] = (Caps->RasterCaps & D3DPRASTERCAPS_FOGVERTEX) != 0;
+    Ability_[Render::FogPixel] = (Caps->RasterCaps & D3DPRASTERCAPS_FOGTABLE) != 0;
+    Ability_[Render::FogRange] = (Caps->RasterCaps & D3DPRASTERCAPS_FOGRANGE) != 0;
+    const bool bWFog = (Caps->RasterCaps & D3DPRASTERCAPS_WFOG) != 0;
+    const bool bZFog = (Caps->RasterCaps & D3DPRASTERCAPS_ZFOG) != 0;
+    const bool bTnl = Ability_[Render::DeviceGeometry] != 0;
     bool bUseWFog = bWFog;
     if (bWFog && bZFog && !bTnl)
         bUseWFog = false;
-    Ability_[13] = bUseWFog ? 1 : 0;
-    Ability_[9] = (Caps->RasterCaps & 0x4000) != 0;
-    Ability_[14] = (Caps->RasterCaps & 0x1000) != 0;
-    Ability_[8] = ((Caps->TextureCaps & 0x800) != 0 && (Caps->VertexProcessingCaps & 1) != 0 &&
-                   Ability_[4] != 0)
+    Ability_[Render::FogW] = bUseWFog ? 1 : 0;
+    Ability_[Render::DepthBias] = (Caps->RasterCaps & kD3d8RasterCapsZBias) != 0;
+    Ability_[Render::RasterAntialiasEdges] = (Caps->RasterCaps & kD3d8RasterCapsAntialiasEdges) != 0;
+    Ability_[Render::TextureCubemaps] = ((Caps->TextureCaps & D3DPTEXTURECAPS_CUBEMAP) != 0 &&
+                   (Caps->VertexProcessingCaps & D3DVTXPCAPS_TEXGEN) != 0 &&
+                   Ability_[Render::DeviceGeometry] != 0)
                       ? 1
                       : 0;
-    Ability_[5] = (Caps->TextureCaps & 0x20) != 0;
-    Ability_[16] = (Caps->TextureFilterCaps & 0x20000) != 0;
-    Ability_[6] = Caps->MaxTextureWidth != 0 ? Caps->MaxTextureWidth : 0x100;
-    Ability_[7] = Caps->MaxTextureHeight != 0 ? Caps->MaxTextureHeight : 0x100;
+    Ability_[Render::TextureSquareOnly] = (Caps->TextureCaps & D3DPTEXTURECAPS_SQUAREONLY) != 0;
+    Ability_[Render::TextureTrilinear] = (Caps->TextureFilterCaps & D3DPTFILTERCAPS_MIPFLINEAR) != 0;
+    Ability_[Render::TextureMaxWidth] = Caps->MaxTextureWidth != 0 ? Caps->MaxTextureWidth : 0x100;
+    Ability_[Render::TextureMaxHeight] = Caps->MaxTextureHeight != 0 ? Caps->MaxTextureHeight : 0x100;
 
     unsigned long Stages = Caps->MaxTextureBlendStages;
     if (Stages >= 8)
@@ -2001,39 +2010,39 @@ void FDirectX9::PopulateFormatCatalog()
 static unsigned int VertexStrideFromFvf(unsigned long Fvf)
 {
     unsigned int Stride = 0;
-    if ((Fvf & 0xc) == 0xc)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         Stride = 0x1c;
-    else if ((Fvf & 4) != 0)
+    else if ((Fvf & D3DFVF_XYZRHW) != 0)
         Stride = 0x10;
-    else if ((Fvf & 2) != 0)
+    else if ((Fvf & D3DFVF_XYZ) != 0)
         Stride = 0xc;
 
     unsigned int NormalSize = 0;
-    if ((Fvf & 0x10) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
         NormalSize = 0xc;
 
     unsigned int DiffuseSize = 0;
-    if ((Fvf & 0x40) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         DiffuseSize = 4;
-    if ((Fvf & 0x80) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         DiffuseSize += 4;
 
     unsigned int TexSize = 0;
-    const unsigned int TexCount = (Fvf & 0xf00) >> 8;
+    const unsigned int TexCount = (Fvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
     for (unsigned int TexIndex = 0; TexIndex < TexCount; ++TexIndex)
     {
         switch ((Fvf >> (TexIndex * 2 + 16)) & 3)
         {
-        case 0:
+        case D3DFVF_TEXTUREFORMAT2:
             TexSize += 8;
             break;
-        case 1:
+        case D3DFVF_TEXTUREFORMAT3:
             TexSize += 12;
             break;
-        case 2:
+        case D3DFVF_TEXTUREFORMAT4:
             TexSize += 16;
             break;
-        case 3:
+        case D3DFVF_TEXTUREFORMAT1:
             TexSize += 4;
             break;
         }
@@ -2390,17 +2399,17 @@ unsigned int FDirectX9::PrimCountFromVerts(unsigned long Prim, unsigned int Coun
     {
     case 0:
         return 0;
-    case 1:
+    case D3DPT_POINTLIST:
         return Count;
-    case 2:
+    case D3DPT_LINELIST:
         return (unsigned int)((int)(Count) / 2);
-    case 3:
+    case D3DPT_LINESTRIP:
         return Count - 1;
-    case 4:
+    case D3DPT_TRIANGLELIST:
         return (unsigned int)((int)(Count) / 3);
-    case 5:
+    case D3DPT_TRIANGLESTRIP:
         return Count - 2;
-    case 6:
+    case D3DPT_TRIANGLEFAN:
         return Count - 2;
     default:
         return 0;
@@ -2882,27 +2891,27 @@ unsigned int FDirectX9::PfBytesPerPixel(unsigned int Format)
 unsigned int FDirectX9::FvfStride(unsigned int Fvf)
 {
     unsigned int Base = 0;
-    if ((Fvf & 0xC) == 0xC)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         Base = 0x1C;
-    else if ((Fvf & 4) == 4)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         Base = 0x10;
-    else if ((Fvf & 2) == 2)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
         Base = 0xC;
-    if ((Fvf & 0x10) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
         Base += 0xC;
-    if ((Fvf & 0x40) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         Base += 4;
-    if ((Fvf & 0x80) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         Base += 4;
-    const unsigned int TexCount = (Fvf & 0xF00) >> 8;
+    const unsigned int TexCount = (Fvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
     for (unsigned int Index = 0; Index < TexCount; ++Index)
     {
         const unsigned int Size = (Fvf >> (Index * 2 + 0x10)) & 3;
-        if (Size == 0)
+        if (Size == D3DFVF_TEXTUREFORMAT2)
             Base += 8;
-        else if (Size == 1)
+        else if (Size == D3DFVF_TEXTUREFORMAT3)
             Base += 0xC;
-        else if (Size == 2)
+        else if (Size == D3DFVF_TEXTUREFORMAT4)
             Base += 0x10;
         else
             Base += 4;
@@ -2970,29 +2979,29 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
     EnumAdapters();
 
     AdapterIndex_ = 0;
-    DeviceType_ = 1;
+    DeviceType_ = D3DDEVTYPE_HAL;
     CreateFlags_ = 0;
     // FUN_06d16930 inlined, default 0. The D3DCREATE_* bits are the same
     // in D3D9 (FPU_PRESERVE 2, MULTITHREADED 4, PUREDEVICE 0x10, SOFTWARE/HARDWARE/MIXED
     // _VERTEXPROCESSING 0x20/0x40/0x80). Without FPU_PRESERVE Direct3D 9 CreateDevice drops the
     // thread's x87 precision to 24 bits exactly as Direct3D 8 does (Directory.Build.props).
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "FPU_PRESERVE", 0, nullptr) != 0)
-        CreateFlags_ |= 0x2;
+        CreateFlags_ |= D3DCREATE_FPU_PRESERVE;
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "MULTITHREADED", 0, nullptr) != 0)
-        CreateFlags_ |= 0x4;
+        CreateFlags_ |= D3DCREATE_MULTITHREADED;
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "PUREDEVICE", 0, nullptr) != 0)
-        CreateFlags_ |= 0x10;
+        CreateFlags_ |= D3DCREATE_PUREDEVICE;
     // SOFTWARE -> 0x20, else MIXED -> 0x80, else 0x40 whatever HARDWARE_VERTEXPROCESSING
     // says (it is read, and both of its outcomes OR 0x40).
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "SOFTWARE_VERTEXPROCESSING", 0, nullptr) != 0)
-        CreateFlags_ |= 0x20;
+        CreateFlags_ |= D3DCREATE_SOFTWARE_VERTEXPROCESSING;
     else if (ReadProfileNumber(Dacom, Parser_, SectionName, "MIXED_VERTEXPROCESSING", 0, nullptr) != 0)
-        CreateFlags_ |= 0x80;
+        CreateFlags_ |= D3DCREATE_MIXED_VERTEXPROCESSING;
     else if (ReadProfileNumber(Dacom, Parser_, SectionName, "HARDWARE_VERTEXPROCESSING", 0, nullptr) !=
              0)
-        CreateFlags_ |= 0x40;
+        CreateFlags_ |= D3DCREATE_HARDWARE_VERTEXPROCESSING;
     else
-        CreateFlags_ |= 0x40;
+        CreateFlags_ |= D3DCREATE_HARDWARE_VERTEXPROCESSING;
 
     // +0x128 = 0, then bit0 LOCKABLE_BACKBUFFER (dacom.ini's commented-out
     // "LOCAKABLE_BACKBUFFER" is a typo retail never reads), bit1 USE_SYSLOCK, bit2 HANDLE_SWAPLOSS
@@ -3001,13 +3010,13 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
     unsigned char* SwapByte = (unsigned char*)(&SwapFlags_);
     const unsigned char bLockable =
         ReadProfileNumber(Dacom, Parser_, SectionName, "LOCKABLE_BACKBUFFER", 0, nullptr) != 0 ? 1 : 0;
-    *SwapByte = (unsigned char)((*SwapByte & 0xFE) | bLockable);
+    *SwapByte = (unsigned char)((*SwapByte & ~SwapFlagLockableBackbuffer) | bLockable);
     const unsigned char bSysLock =
         ReadProfileNumber(Dacom, Parser_, SectionName, "USE_SYSLOCK", 0, nullptr) != 0 ? 1 : 0;
-    *SwapByte = (unsigned char)((*SwapByte & 0xFD) | (bSysLock << 1));
+    *SwapByte = (unsigned char)((*SwapByte & ~SwapFlagUseSyslock) | (bSysLock << 1));
     const unsigned char bSwapLoss =
         ReadProfileNumber(Dacom, Parser_, SectionName, "HANDLE_SWAPLOSS", 1, nullptr) != 0 ? 1 : 0;
-    *SwapByte = (unsigned char)((*SwapByte & 0xFB) | (bSwapLoss << 2));
+    *SwapByte = (unsigned char)((*SwapByte & ~SwapFlagHandleSwapLoss) | (bSwapLoss << 2));
 
     // Every enabled pipeline-state property is read into its node and stored as
     // {Value, 1, 1} at +0x354 + Id*0xC (the slot is first reset to {0, 1, 0}).
@@ -3217,7 +3226,7 @@ GENRESULT DACOM_API FDirectX9::GetDisplayModeEnum(unsigned int Index, void* Out)
     Record[2] = Display.Height;
     Record[3] = Display.RefreshRate;
     Record[4] = PfIndex((unsigned int)(Display.Format));
-    if (Ability_[0x11] != 0 && Record[1] >= Ability_[0x11])
+    if (Ability_[Render::DeviceBadMode] != 0 && Record[1] >= Ability_[Render::DeviceBadMode])
         return (GENRESULT)(0xFFFFFFF8);
     return GR_OK;
 }
@@ -3245,7 +3254,7 @@ GENRESULT DACOM_API FDirectX9::SelectMode(int* Mode, unsigned int* OutIndex)
             continue;
         if ((int)(RetailPfBppBits(PfId)) != Desc->Format)
             continue;
-        if (Ability_[0x11] != 0 && Display.Width >= Ability_[0x11])
+        if (Ability_[Render::DeviceBadMode] != 0 && Display.Width >= Ability_[Render::DeviceBadMode])
             continue;
         Found = (int)(Index);
         break;
@@ -3267,7 +3276,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     FRp9Mode* Desc = (FRp9Mode*)(Mode);
     // A live device whose TestCooperativeLevel is D3DERR_DEVICELOST -> -1.
     if (Device_ != nullptr &&
-        Device_->TestCooperativeLevel() == (HRESULT)(0x88760868))
+        Device_->TestCooperativeLevel() == D3DERR_DEVICELOST)
         return GR_GENERIC;
     // vtbl[0x38] = destroy_buffers.
     DestroyGpuResources();
@@ -3363,7 +3372,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     BOOL Windowed = TRUE;
     UINT BackBufferCount = 1;
     UINT PresentInterval = 0;
-    DWORD SwapEffect = 0x7FFFFFFF;
+    DWORD SwapEffect = D3DSWAPEFFECT_FORCE_DWORD;
     if (Desc->Fullscreen == 0)
     {
         if (Desc->SwapExtra != 0 && BltNotFlip == 0 && Desc->Interval != 0)
@@ -3386,19 +3395,19 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
         switch ((unsigned int)(Desc->Interval))
         {
         case 0:
-            PresentInterval = 0x80000000u;
+            PresentInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
             break;
         case 1:
-            PresentInterval = 1;
+            PresentInterval = D3DPRESENT_INTERVAL_ONE;
             break;
         case 2:
-            PresentInterval = 2;
+            PresentInterval = D3DPRESENT_INTERVAL_TWO;
             break;
         case 3:
-            PresentInterval = 4;
+            PresentInterval = D3DPRESENT_INTERVAL_THREE;
             break;
         case 4:
-            PresentInterval = 8;
+            PresentInterval = D3DPRESENT_INTERVAL_FOUR;
             break;
         default:
             break;
@@ -3448,7 +3457,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     if (bIntzDepth)
         Present.EnableAutoDepthStencil = FALSE;
     // D3DPRESENTFLAG_LOCKABLE_BACKBUFFER is 1 in both versions.
-    Present.Flags = (SwapFlags_ & 1) != 0 ? 1 : 0;
+    Present.Flags = (SwapFlags_ & SwapFlagLockableBackbuffer) != 0 ? 1 : 0;
     Present.FullScreen_RefreshRateInHz = 0;
     Present.PresentationInterval = PresentInterval9;
     if (Device_ == nullptr)
@@ -3460,9 +3469,11 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
         {
             Hr = D3d_->CreateDevice(AdapterIndex_, (D3DDEVTYPE)(DeviceType_), Focus,
                                     CreateFlags_, &Present, &Device_);
-            if (Hr >= 0 || (CreateFlags_ & 0xC0) == 0)
+            if (Hr >= 0 ||
+                (CreateFlags_ & (D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MIXED_VERTEXPROCESSING)) == 0)
                 break;
-            CreateFlags_ = (CreateFlags_ & 0xFFFFFF3Ful) | 0x20ul;
+            CreateFlags_ = (CreateFlags_ & ~(D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MIXED_VERTEXPROCESSING)) |
+                           D3DCREATE_SOFTWARE_VERTEXPROCESSING;
         }
         if (Hr < 0)
         {
@@ -3516,7 +3527,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
         return (GENRESULT)(Hr);
     }
 
-    DeviceReady_ |= 1;
+    DeviceReady_ |= DeviceReadyBuffers;
     DisplayPfIndex_ = DisplayPf;
     BbPfIndex_ = PfIndex((unsigned int)(Present.BackBufferFormat));
     Hwnd_ = Hwnd;
@@ -3571,7 +3582,7 @@ GENRESULT DACOM_API FDirectX9::DestroyGpuResources()
     // The inline scratch IB node at +0x14C.
     ReleaseIbGpu(&ScratchIb_);
     WindowOverride_ = nullptr;
-    DeviceReady_ &= ~1ul;
+    DeviceReady_ &= ~(unsigned long)DeviceReadyBuffers;
     return GR_OK;
 }
 
@@ -3584,19 +3595,19 @@ GENRESULT DACOM_API FDirectX9::ClearBuffers(unsigned long Flags, const void* Rec
         return Ready;
     unsigned long D3dFlags = 0;
     int ZBits = 0x3F800000;
-    if ((Flags & 1) != 0)
+    if ((Flags & D3DCLEAR_TARGET) != 0)
         D3dFlags |= D3DCLEAR_TARGET;
-    if ((Flags & 2) != 0)
+    if ((Flags & D3DCLEAR_ZBUFFER) != 0)
     {
         D3dFlags |= D3DCLEAR_ZBUFFER;
-        ZBits = PipelineStateValue(9);
+        ZBits = PipelineStateValue(PipelineStateClearZDepth);
     }
-    if ((Flags & 4) != 0)
+    if ((Flags & D3DCLEAR_STENCIL) != 0)
         D3dFlags |= D3DCLEAR_STENCIL;
     float Z;
     memcpy(&Z, &ZBits, sizeof(Z));
-    const unsigned long Color = (unsigned long)(PipelineStateValue(8));
-    const unsigned long Stencil = (unsigned long)(PipelineStateValue(0xA));
+    const unsigned long Color = (unsigned long)(PipelineStateValue(PipelineStateClearColor));
+    const unsigned long Stencil = (unsigned long)(PipelineStateValue(PipelineStateClearStencil));
     const DWORD Count = (Rects != nullptr) ? 1 : 0;
     const HRESULT Hr = Device_->Clear(Count, (const D3DRECT*)(Rects), D3dFlags,
                                       Color, Z, Stencil);
@@ -3637,10 +3648,10 @@ GENRESULT DACOM_API FDirectX9::SwapBuffers()
     // D3DERR_DEVICELOST with HANDLE_SWAPLOSS -> TestCooperativeLevel; when that also answers
     // D3DERR_DEVICELOST (retail tests the same constant twice) -> create_buffers with the saved
     // mode blob. Returns hr of whichever call ran last.
-    if (Hr == (HRESULT)(0x88760868) && ((SwapFlags_ >> 2) & 1) != 0)
+    if (Hr == D3DERR_DEVICELOST && ((SwapFlags_ >> 2) & 1) != 0)
     {
         Hr = Device_->TestCooperativeLevel();
-        if (Hr == (HRESULT)(0x88760868))
+        if (Hr == D3DERR_DEVICELOST)
             Hr = (HRESULT)(CreateBuffers(Hwnd_, ModeBlob_, nullptr));
     }
     return (GENRESULT)(Hr);
@@ -3682,14 +3693,14 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitive(unsigned long Prim, unsigned
     // RP8 reads the IRPDraw-adjusted [this+0x128] (Device_) and [this+0x17c] (DeviceReady_).
     IDirect3DDevice9* Device = Device_;
     // FUN_06d111e1 tests the ready bit only; the device pointer is not looked at.
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 3945, "WARNING",
                  "draw_indexed_primitive() called outside of create_buffers/destroy_buffers");
         return GR_GENERIC;
     }
     // FUN_06d010cf; a signed PrimCount <= 0 returns E_FAIL. FUN_06d04138 flushes.
-    HRESULT Hr = (HRESULT)(0x80004005);
+    HRESULT Hr = E_FAIL;
     const unsigned int PrimCount = PrimCountFromVerts(Prim, Count);
     if ((int)(PrimCount) <= 0)
         return (GENRESULT)(Hr);
@@ -3732,7 +3743,7 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
     if (Ready != GR_OK)
         return Ready;
     // LOCKABLE_BACKBUFFER.
-    if ((SwapFlags_ & 1) == 0)
+    if ((SwapFlags_ & SwapFlagLockableBackbuffer) == 0)
     {
         Rp9Fdump(kFdumpWarning, 2482, "WARNING",
                  "lock_buffer: lock called but [RenderPipeline] wasnt configured with "
@@ -3820,8 +3831,8 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
     if (Hr >= 0)
     {
         // USE_SYSLOCK ? 0 : D3DLOCK_NOSYSLOCK, plus D3DLOCK_READONLY.
-        unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
-        LockFlags |= 0x10;
+        unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : D3DLOCK_NOSYSLOCK;
+        LockFlags |= D3DLOCK_READONLY;
         D3DLOCKED_RECT Locked;
         Hr = LockBufferSurf_->LockRect(&Locked, nullptr, LockFlags);
         if (Hr < 0)
@@ -3871,7 +3882,7 @@ GENRESULT DACOM_API FDirectX9::UnlockBuffer()
 GENRESULT DACOM_API FDirectX9::GetBufferInterface(void* /*Out*/, void* /*Unused*/)
 {
     // FUN_06d0a7ec: checks the ready bit only (not the device pointer).
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 2573, "WARNING",
                  "get_buffer_interface() called outside of create_buffers/destroy_buffers");
@@ -4086,7 +4097,7 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const Transform* M12)
     if (Ready != GR_OK)
         return Ready;
 
-    const bool bViewspaceLightsOff = PipelineStateValue(7) == 0;
+    const bool bViewspaceLightsOff = PipelineStateValue(PipelineStateViewspaceLights) == 0;
     if (!bViewspaceLightsOff)
     {
         Transform Flipped;
@@ -4124,7 +4135,7 @@ GENRESULT DACOM_API FDirectX9::GetModelview(Transform* Out12)
         NeedDeviceLifetime("get_modelview() called outside of device lifetime", 0xad4);
     if (Ready != GR_OK)
         return Ready;
-    const bool bViewspaceLightsOff = PipelineStateValue(7) == 0;
+    const bool bViewspaceLightsOff = PipelineStateValue(PipelineStateViewspaceLights) == 0;
 
     Transform World;
     Transform* World12 = &World;
@@ -4238,7 +4249,7 @@ GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, flo
     // and marked dirty (+0x40 = 0) but NOT sent to the device here -- FUN_06d04138 commits it
     // at draw time (FlushDrawState). The bFlip argument multiplies ZFlip in first.
     Transform Flipped;
-    if (PipelineStateValue(7) != 0)
+    if (PipelineStateValue(PipelineStateViewspaceLights) != 0)
     {
         // FUN_06d172f0(+0x2240, device, bFlip=1, D3DTS_WORLD, &Xform, 0)
         MulZFlip12(&Flipped, Xform12);
@@ -4428,12 +4439,12 @@ GENRESULT DACOM_API FDirectX9::CreateTexture(int Width, int Height, unsigned int
     }
     // flags & 1 -> 0xFFFFFFFE (nothing written).
     if ((Flags & 1) != 0)
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     unsigned int WinningFormat = PfIndex(0);
     // TEXTURE_SQUARE_ONLY through the vtable; the result is not checked. Square-only and
     // W != H -> both become the larger (signed compare).
     unsigned long bSquareOnly = 0;
-    QueryDeviceAbility(5, &bSquareOnly);
+    QueryDeviceAbility(Render::TextureSquareOnly, &bSquareOnly);
     if (Width != Height && bSquareOnly != 0)
     {
         if (Width > Height)
@@ -4539,7 +4550,7 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
     }
     // FUN_06d0dce3.
     if (Handle == nullptr)
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
     D3DSURFACE_DESC Desc;
     if (!TextureGetDesc(Wrapper, (UINT)(Level), &Desc))
@@ -4556,7 +4567,7 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
         return GR_GENERIC;
     }
     // USE_SYSLOCK ? 0 : D3DLOCK_NOSYSLOCK.
-    const unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
+    const unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : D3DLOCK_NOSYSLOCK;
     D3DLOCKED_RECT Locked;
     Hr = Surface->LockRect(&Locked, nullptr, LockFlags);
     if (Hr < 0)
@@ -4583,7 +4594,7 @@ GENRESULT DACOM_API FDirectX9::UnlockTexture(void* A, int Level)
     }
     // FUN_06d0e1af.
     if (Handle == nullptr)
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
     IDirect3DSurface9* Surface = nullptr;
     HRESULT Hr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
@@ -4685,18 +4696,18 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
     {
         Rp9Fdump(kFdumpWarning, 3363, "WARNING",
                  " set_texture_level_data: invalid texture handle passsed");
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     // The SrcFormat pointer is not tested.
     if (*SrcFormat == 0)
     {
         Rp9Fdump(kFdumpWarning, 3369, "WARNING",
                  " set_texture_level_data: invalid src format passed");
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     UnbindTextureHandle(Wrapper);
     // A non-zero level with TEXTURE_LOD (pipeline state 2, +0x36c) off -> 0.
-    if (Level != 0 && PipelineStateValue(2) == 0)
+    if (Level != 0 && PipelineStateValue(PipelineStateTextureLod) == 0)
         return GR_OK;
     // FUN_06d1b1c0 = get_desc of level 0 (its format result is never used).
     D3DSURFACE_DESC Level0Desc;
@@ -4769,14 +4780,14 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
     {
         Rp9Fdump(kFdumpWarning, 3468, "WARNING",
                  " set_texture_level_data: invalid texture handle passsed");
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     FRp9TextureHandle* SrcWrapper = (FRp9TextureHandle*)(SrcHandle);
     if (SrcWrapper == nullptr || SrcWrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3475, "WARNING",
                  " set_texture_level_data: invalid texture handle passsed");
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     IDirect3DSurface9* DstSurf = nullptr;
     HRESULT Hr = TextureGetSubSurface(DstWrapper, (UINT)(DstLevel), &DstSurf);
@@ -4815,7 +4826,7 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
 // RP8: FDirectX8::SetRenderTarget (unsupported there too; no device call)
 GENRESULT DACOM_API FDirectX9::SetRenderTarget(void* /*A*/, void* /*UnusedA*/, void* /*UnusedB*/)
 {
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 3508, "WARNING",
                  "set_render_target() called outside of create_buffers/destroy_buffers");
@@ -4826,7 +4837,7 @@ GENRESULT DACOM_API FDirectX9::SetRenderTarget(void* /*A*/, void* /*UnusedA*/, v
 // RP8: FDirectX8::GetRenderTarget
 GENRESULT DACOM_API FDirectX9::GetRenderTarget(void* /*A*/)
 {
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 3512, "WARNING",
                  "get_render_target() called outside of create_buffers/destroy_buffers");
@@ -4936,7 +4947,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTexture(int Stage, void* Handle)
         return Ready;
     // FUN_06d100d3 (stage entry +0x1F94 + stage*8). Nothing happens while pipeline state 0
     // (TEXTURE) is off. A handle without a texture is reported and bound as null.
-    if (PipelineStateValue(0) == 0)
+    if (PipelineStateValue(PipelineStateTexture) == 0)
         return GR_OK;
     FRp9TextureBinding& Cache = DeviceStates_.TextureBindings[(unsigned int)Stage];
     if (Cache.bValid != 0 && Cache.Handle == Handle)
@@ -4967,7 +4978,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageTexture(int Stage, void** Out)
         return Ready;
     // FUN_06d10247. Out is not tested.
     void* Result = nullptr;
-    if (PipelineStateValue(0) != 0)
+    if (PipelineStateValue(PipelineStateTexture) != 0)
     {
         FRp9TextureBinding& Cache = DeviceStates_.TextureBindings[(unsigned int)Stage];
         if (Cache.bValid == 0)
@@ -4983,7 +4994,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageTexture(int Stage, void** Out)
 // RP8: FDirectX8::VerifyState
 GENRESULT DACOM_API FDirectX9::VerifyState()
 {
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 3717, "WARNING",
                  "verify_state() called outside of create_buffers/destroy_buffers");
@@ -4991,7 +5002,8 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
     }
     // RP8 kOffStageCount 0x39C = pipeline-state 6's value.
     const unsigned long StageCount = PipelineStates_[PipelineStateStageCount].Value;
-    const unsigned int Fvf = (StageCount == 1) ? 0x152u : 0x252u;
+    const unsigned int Fvf = (StageCount == 1) ? (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX1)
+                                                 : (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2);
     StreamCache_.SelectVertexStream(nullptr, Fvf);
     FlushDrawState(Device_);
 
@@ -5001,10 +5013,10 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
     if (Hr >= 0)
     {
         if (NumPasses == 0)
-            Result = (GENRESULT)0x80004005;
-        if (DeviceStates_.ReadTextureStageState(Device_, StageCount, D3DTSS_COLOROP) != 1)
+            Result = (GENRESULT)E_FAIL;
+        if (DeviceStates_.ReadTextureStageState(Device_, StageCount, D3DTSS_COLOROP) != D3DTOP_DISABLE)
             return GR_GENERIC;
-        if (DeviceStates_.ReadTextureStageState(Device_, StageCount, D3DTSS_ALPHAOP) != 1)
+        if (DeviceStates_.ReadTextureStageState(Device_, StageCount, D3DTSS_ALPHAOP) != D3DTOP_DISABLE)
             return GR_GENERIC;
         // RP8 [+0x3E4] = pipeline-state 0xC (BROKEN_MOD2X) value.
         const unsigned long Mod2xFlag = PipelineStates_[PipelineStateBrokenMod2x].Value;
@@ -5013,9 +5025,9 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
             for (unsigned long S = 0; S <= StageCount; ++S)
             {
                 const unsigned long ColorOp = DeviceStates_.ReadTextureStageState(Device_, S, D3DTSS_COLOROP);
-                if (ColorOp == 1)
+                if (ColorOp == D3DTOP_DISABLE)
                     break;
-                if (ColorOp == 5)
+                if (ColorOp == D3DTOP_MODULATE2X)
                     return GR_GENERIC;
             }
         }
@@ -5031,8 +5043,8 @@ GENRESULT DACOM_API FDirectX9::DrawPrimitive(unsigned long Prim, unsigned int Fv
     const GENRESULT Ready = NeedBuffers(
         "draw_primitive() called outside of create_buffers/destroy_buffers", 3789);
     if (Ready != GR_OK)
-        return (GENRESULT)0xFFFFFFFF;
-    HRESULT Result = (HRESULT)0x80004005;
+        return GR_GENERIC;
+    HRESULT Result = E_FAIL;
     if ((int)Count <= 0)
         return (GENRESULT)Result;
 
@@ -5058,8 +5070,8 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(unsigned long Prim, unsign
     const GENRESULT Ready = NeedBuffers(
         "draw_indexed_primitive() called outside of create_buffers/destroy_buffers", 3819);
     if (Ready != GR_OK)
-        return (GENRESULT)0xFFFFFFFF;
-    HRESULT Result = (HRESULT)0x80004005;
+        return GR_GENERIC;
+    HRESULT Result = E_FAIL;
     const unsigned int PrimCount = PrimCountFromVerts(Prim, IndexCount);
     if ((int)PrimCount <= 0)
         return (GENRESULT)Result;
@@ -5082,8 +5094,8 @@ GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(unsigned long Prim, void* Vb, uns
     const GENRESULT Ready = NeedBuffers(
         "draw_primitive_vb() called outside of create_buffers/destroy_buffers", 3853);
     if (Ready != GR_OK)
-        return (GENRESULT)0xFFFFFFFF;
-    HRESULT Result = (HRESULT)0x80004005;
+        return GR_GENERIC;
+    HRESULT Result = E_FAIL;
     const unsigned int PrimCount = PrimCountFromVerts(Prim, Count);
     if ((int)PrimCount <= 0)
         return (GENRESULT)Result;
@@ -5105,8 +5117,8 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* 
     const GENRESULT Ready = NeedBuffers(
         "draw_indexed_primitive_vb() called outside of create_buffers/destroy_buffers", 3878);
     if (Ready != GR_OK)
-        return (GENRESULT)0xFFFFFFFF;
-    HRESULT Result = (HRESULT)0x80004005;
+        return GR_GENERIC;
+    HRESULT Result = E_FAIL;
     const unsigned int PrimCount = PrimCountFromVerts(Prim, IndexCount);
     if ((int)PrimCount <= 0)
         return (GENRESULT)Result;
@@ -5248,7 +5260,7 @@ GENRESULT DACOM_API FDirectX9::UnlockVertexMemory(FVertexMemoryLock* Out)
     // FUN_06d11877. Out itself is not tested.
     FRp9Vb* Wrapper = (FRp9Vb*)Out->Listing.VertexBuffer;
     if (Wrapper == nullptr)
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     Wrapper->Locked = 0;
     return (GENRESULT)(Wrapper->Gpu->Unlock());
 }
@@ -5268,9 +5280,9 @@ namespace
     {
         switch (Code & 3)
         {
-        case 0: return 8;
-        case 1: return 0xC;
-        case 2: return 0x10;
+        case D3DFVF_TEXTUREFORMAT2: return 8;
+        case D3DFVF_TEXTUREFORMAT3: return 0xC;
+        case D3DFVF_TEXTUREFORMAT4: return 0x10;
         default: return 4;
         }
     }
@@ -5280,19 +5292,19 @@ namespace
     unsigned int Rp9ComputeFvfStride(unsigned int Fvf)
     {
         unsigned int Stride = 0;
-        if ((Fvf & 0xC) == 0xC)
+        if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
             Stride = 0x1C;
-        else if ((Fvf & 4) == 4)
+        else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
             Stride = 0x10;
-        else if ((Fvf & 2) == 2)
+        else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
             Stride = 0xC;
-        if ((Fvf & 0x10) != 0)
+        if ((Fvf & D3DFVF_NORMAL) != 0)
             Stride += 0xC;
-        if ((Fvf & 0x40) != 0)
+        if ((Fvf & D3DFVF_DIFFUSE) != 0)
             Stride += 4;
-        if ((Fvf & 0x80) != 0)
+        if ((Fvf & D3DFVF_SPECULAR) != 0)
             Stride += 4;
-        const unsigned int TexCount = (Fvf & 0xF00) >> 8;
+        const unsigned int TexCount = (Fvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
         for (unsigned int Index = 0; Index < TexCount; ++Index)
             Stride += Rp9TexelByteSize(Fvf >> (Index * 2 + 0x10));
         return Stride;
@@ -5588,15 +5600,15 @@ namespace
         const unsigned int PosStride = Src->Position.Stride;
         const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
 
-        const bool bSrcHasNormal = (SrcFvf & 0x10) != 0;
+        const bool bSrcHasNormal = (SrcFvf & D3DFVF_NORMAL) != 0;
         const unsigned int NormStride = Src->Normal.Stride;
         const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
 
-        const bool bSrcHasDiffuse = (SrcFvf & 0x40) != 0;
+        const bool bSrcHasDiffuse = (SrcFvf & D3DFVF_DIFFUSE) != 0;
         const unsigned int DiffStride = Src->Diffuse.Stride;
         const unsigned long* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
 
-        const unsigned int SrcTexCount = (SrcFvf & 0xF00) >> 8;
+        const unsigned int SrcTexCount = (SrcFvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
         const unsigned char* TexBase[8] = {};
         unsigned int TexStride[8] = {};
         unsigned int TexByteSize[8] = {};
@@ -5610,9 +5622,9 @@ namespace
             TexIdx[Index] = Set->IndexArray + StartVertex;
         }
 
-        const bool bDstHasNormal = (DstFvf & 0x10) != 0;
-        const bool bDstHasDiffuse = (DstFvf & 0x40) != 0;
-        const unsigned int DstTexCount = (DstFvf & 0xF00) >> 8;
+        const bool bDstHasNormal = (DstFvf & D3DFVF_NORMAL) != 0;
+        const bool bDstHasDiffuse = (DstFvf & D3DFVF_DIFFUSE) != 0;
+        const unsigned int DstTexCount = (DstFvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
         unsigned int DstTexByteSize[8] = {};
         for (unsigned int Index = 0; Index < DstTexCount && Index < 8; ++Index)
             DstTexByteSize[Index] = Rp9TexelByteSize(DstFvf >> (Index * 2 + 0x10));
@@ -5672,15 +5684,15 @@ namespace
         const unsigned int PosStride = Src->Position.Stride;
         const unsigned char* PosPtr = Src->Position.Base + StartVertex * PosStride;
 
-        const bool bSrcHasNormal = (SrcFvf & 0x10) != 0;
+        const bool bSrcHasNormal = (SrcFvf & D3DFVF_NORMAL) != 0;
         const unsigned int NormStride = Src->Normal.Stride;
         const unsigned char* NormPtr = Src->Normal.Base + StartVertex * NormStride;
 
-        const bool bSrcHasDiffuse = (SrcFvf & 0x40) != 0;
+        const bool bSrcHasDiffuse = (SrcFvf & D3DFVF_DIFFUSE) != 0;
         const unsigned int DiffStride = Src->Diffuse.Stride;
         const unsigned char* DiffPtr = Src->Diffuse.Base + StartVertex * DiffStride;
 
-        const unsigned int SrcTexCount = (SrcFvf & 0xF00) >> 8;
+        const unsigned int SrcTexCount = (SrcFvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
         const unsigned char* TexPtr[8] = {};
         unsigned int TexStride[8] = {};
         unsigned int TexByteSize[8] = {};
@@ -5693,9 +5705,9 @@ namespace
             TexPtr[Index] = SetBase + StartVertex * TexStride[Index];
         }
 
-        const bool bDstHasNormal = (DstFvf & 0x10) != 0;
-        const bool bDstHasDiffuse = (DstFvf & 0x40) != 0;
-        const unsigned int DstTexCount = (DstFvf & 0xF00) >> 8;
+        const bool bDstHasNormal = (DstFvf & D3DFVF_NORMAL) != 0;
+        const bool bDstHasDiffuse = (DstFvf & D3DFVF_DIFFUSE) != 0;
+        const unsigned int DstTexCount = (DstFvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
         unsigned int DstTexByteSize[8] = {};
         for (unsigned int Index = 0; Index < DstTexCount && Index < 8; ++Index)
             DstTexByteSize[Index] = Rp9TexelByteSize(DstFvf >> (Index * 2 + 0x10));
@@ -5794,33 +5806,41 @@ namespace
 
     unsigned int Rp9JumpTableIndex(unsigned int DstFvf)
     {
-        if (((DstFvf & 0xF00) >> 8) < 3 || (DstFvf & 4) != 0)
+        if (((DstFvf & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT) < 3 || (DstFvf & D3DFVF_XYZRHW) != 0)
             return Rp9FvfJumpIndex(DstFvf);
         return 0x40u;
     }
+
+    // The layouts the hard-coded converters below are specialised for (Pos = XYZ, Norm = NORMAL,
+    // Diff = DIFFUSE; the TexN suffix is the texture-coordinate count).
+    const unsigned int kFvfPosNorm = D3DFVF_XYZ | D3DFVF_NORMAL;
+    const unsigned int kFvfPosNormTex1 = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1;
+    const unsigned int kFvfPosNormDiffTex1 = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX1;
+    const unsigned int kFvfPosNormTex2 = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX2;
+    const unsigned int kFvfPosNormDiffTex2 = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2;
 
     // FUN_06d1f040 case 4's nested if/goto chain, flattened into an equivalent truth table.
     void DispatchFamilyBHardcoded(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                                   unsigned int StartVertex, unsigned int Count, unsigned int SrcFvf)
     {
-        if (SrcFvf == 0x12)
+        if (SrcFvf == kFvfPosNorm)
         {
-            if (DstFvf == 0x252) { ConvIndexedPosNorm_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
-            if (DstFvf == 0x212) { ConvIndexedPosNorm_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
-            if (DstFvf == 0x112) { ConvIndexedPosNorm_S20(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormDiffTex2) { ConvIndexedPosNorm_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormTex2) { ConvIndexedPosNorm_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormTex1) { ConvIndexedPosNorm_S20(Dst, DstFvf, Src, StartVertex, Count); return; }
         }
-        else if (SrcFvf == 0x112)
+        else if (SrcFvf == kFvfPosNormTex1)
         {
-            if (DstFvf == 0x252) { ConvIndexedPosNormTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
-            if (DstFvf == 0x212) { ConvIndexedPosNormTex1_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormDiffTex2) { ConvIndexedPosNormTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormTex2) { ConvIndexedPosNormTex1_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
         }
-        else if (SrcFvf == 0x152)
+        else if (SrcFvf == kFvfPosNormDiffTex1)
         {
-            if (DstFvf == 0x252) { ConvIndexedPosNormDiffTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormDiffTex2) { ConvIndexedPosNormDiffTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
         }
-        else if (SrcFvf == 0x212)
+        else if (SrcFvf == kFvfPosNormTex2)
         {
-            if (DstFvf == 0x252) { ConvIndexedPosNormTex2_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormDiffTex2) { ConvIndexedPosNormTex2_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
         }
         ConvIndexedGeneric(Dst, DstFvf, Src, StartVertex, Count);
     }
@@ -5829,12 +5849,12 @@ namespace
     void DispatchFamilyASeqHardcoded(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                                      unsigned int StartVertex, unsigned int Count, unsigned int SrcFvf)
     {
-        if (SrcFvf == 0x112)
+        if (SrcFvf == kFvfPosNormTex1)
         {
-            if (DstFvf == 0x252) { ConvSeqPosNormTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
-            if (DstFvf == 0x212) { ConvSeqPosNormTex1_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormDiffTex2) { ConvSeqPosNormTex1_S2C(Dst, DstFvf, Src, StartVertex, Count); return; }
+            if (DstFvf == kFvfPosNormTex2) { ConvSeqPosNormTex1_S28(Dst, DstFvf, Src, StartVertex, Count); return; }
         }
-        else if (SrcFvf == 0x212 && DstFvf == 0x252)
+        else if (SrcFvf == kFvfPosNormTex2 && DstFvf == kFvfPosNormDiffTex2)
         {
             ConvSeqPosNormTex2_S2C(Dst, DstFvf, Src, StartVertex, Count);
             return;
@@ -5854,7 +5874,7 @@ GENRESULT DACOM_API FDirectX9::CopyVertexData(void* Destination, unsigned int Ds
 
     // No test of Dst, Src or Count (a zero Count reaches the converters, which copy nothing).
     const unsigned int SrcFvf = Src->SrcFvf;
-    const unsigned int Selector = (unsigned int)(SrcFvf == DstFvf) | (Src->Flags & 6u);
+    const unsigned int Selector = (unsigned int)(SrcFvf == DstFvf) | (Src->Flags & (kRpVertexSrcInterleaved | kRpVertexSrcIndexed));
 
     switch (Selector)
     {
@@ -5905,14 +5925,14 @@ GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
         return GR_GENERIC;
     }
     unsigned long Usage = 0;
-    if ((Flags & 1) != 0)
-        Usage |= 0x200;
-    if ((Flags & 2) != 0)
-        Usage |= 0x10;
+    if ((Flags & kRpBufferDynamic) != 0)
+        Usage |= D3DUSAGE_DYNAMIC;
+    if ((Flags & kRpBufferSoftwareProcessing) != 0)
+        Usage |= D3DUSAGE_SOFTWAREPROCESSING;
     // operator new(0x1c). +0x14 (Cursor) is not written here; ResizeIb below zeroes it before
     // anyone reads it.
     FRp9Ib* Wrapper = new FRp9Ib;
-    Wrapper->Flags = Usage | 8;
+    Wrapper->Flags = Usage | D3DUSAGE_WRITEONLY;
     Wrapper->Gpu = nullptr;
     Wrapper->LockedBits = nullptr;
     Wrapper->Next = nullptr;
@@ -5983,7 +6003,7 @@ GENRESULT DACOM_API FDirectX9::ResizeIb(void* A, unsigned int Count)
         return GR_GENERIC;
     }
     if (Wrapper == nullptr || Wrapper == (FRp9Ib*)((intptr_t)-1))
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     if (Wrapper->Gpu != nullptr && Count == Wrapper->Capacity)
         return GR_OK;
     ReleaseIbGpu(Wrapper);
@@ -6009,7 +6029,7 @@ GENRESULT DACOM_API FDirectX9::CopyIndices(void* Handle, unsigned int* OutOffset
     }
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
     if (Wrapper == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     unsigned int* InOutStart = OutOffset;
     void* LockedBits = nullptr;
     unsigned int Start = 0;
@@ -6043,7 +6063,7 @@ GENRESULT DACOM_API FDirectX9::LockIb(void* Handle, unsigned int* Offset, void**
     // lock failure, including Gpu == 0 and Count > Capacity, dumps "ib_lock".
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
     if (Wrapper == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     unsigned int Start = 0;
     if (Offset != nullptr)
         Start = *Offset;
@@ -6065,7 +6085,7 @@ GENRESULT DACOM_API FDirectX9::UnlockIb(void* Handle)
     }
     // No Gpu test.
     if (Handle == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
     Wrapper->LockedBits = nullptr;
     const HRESULT Hr = Wrapper->Gpu->Unlock();
@@ -6098,12 +6118,12 @@ GENRESULT DACOM_API FDirectX9::SelectIb(void* Handle, unsigned int BaseVertexInd
             Cache.IndexBuffer = nullptr;
             Cache.BaseVertex = 0;
         }
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     }
 
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
     if (Wrapper == nullptr || Wrapper->Gpu == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
 
     FRp9Ib* Current = Cache.IndexBuffer;
     const unsigned int CurrentBase = Cache.BaseVertex;
@@ -6121,7 +6141,7 @@ GENRESULT DACOM_API FDirectX9::GetIbCapacity(void* A, unsigned int* OutCapacity)
 {
     FRp9Ib* Wrapper = ResolveIbHandle(A);
     if (Wrapper == nullptr || OutCapacity == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     *OutCapacity = Wrapper->Capacity;
     return GR_OK;
 }
@@ -6149,7 +6169,7 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
     }
     // flags & 1 -> the pooled buffer for Fvf: find-or-insert, the inlined grow (select_vb(0)
     // only when it grew the selected node), FUN_06d1c770.
-    if ((Flags & 1) != 0)
+    if ((Flags & kRpBufferDynamic) != 0)
     {
         FRp9Vb* Wrapper = FindOrInsertPoolVb(Fvf);
         GrowPoolVb(Wrapper, Fvf, Count);
@@ -6159,10 +6179,10 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
     }
     // operator new(0x24); +0x1c is left as allocated (ResizeVb zeroes it before use).
     unsigned long Usage = 0;
-    if ((Flags & 2) != 0)
-        Usage |= 0x10;
+    if ((Flags & kRpBufferSoftwareProcessing) != 0)
+        Usage |= D3DUSAGE_SOFTWAREPROCESSING;
     FRp9Vb* Wrapper = new FRp9Vb;
-    Wrapper->Flags = Usage | 8;
+    Wrapper->Flags = Usage | D3DUSAGE_WRITEONLY;
     Wrapper->Fvf = 0;
     Wrapper->Count = 0;
     Wrapper->Used = 0;
@@ -6206,7 +6226,7 @@ GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
     if (Wrapper == nullptr)
         return GR_OK;
     // A pool buffer (usage bit 0x200, create_vb flags&1) is not destroyed here.
-    if ((Wrapper->Flags & 0x200) != 0)
+    if ((Wrapper->Flags & D3DUSAGE_DYNAMIC) != 0)
         return GR_OK;
     // The selected VB -> select_vb(0) through the vtable.
     if (Wrapper == StreamCache_.VertexBuffer)
@@ -6325,7 +6345,7 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
         return GR_GENERIC;
     }
     // A null or -1 node returns E_FAIL with no text.
-    HRESULT Hr = (HRESULT)0x80004005;
+    HRESULT Hr = E_FAIL;
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
         return (GENRESULT)Hr;
@@ -6335,7 +6355,7 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
     // RP8 [sub+0x118] = SwapFlags_.
     const bool bSysLock = ((SwapFlags_ >> 1) & 1) != 0;
     if (Wrapper->Gpu == nullptr)
-        Hr = (HRESULT)0x80004005;
+        Hr = E_FAIL;
     else if (Wrapper->Count < Count)
     {
         // dx8_vertex_buffer.h line 0xa9.
@@ -6346,28 +6366,28 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
                   (int)Wrapper->Count, (int)Count);
         Text[sizeof(Text) - 1] = '\0';
         Rp9Fdump(kFdumpNotice, 169, "NOTICE", Text, kSrcDx8VertexBuffer);
-        Hr = (HRESULT)0x80004005;
+        Hr = E_FAIL;
     }
     else
     {
         const unsigned int Stride = FvfStride(Wrapper->Fvf);
         const unsigned int CapacityBytes = Stride * Wrapper->Count;
         const unsigned int RequestBytes = Count * Stride;
-        unsigned long LockFlags = bSysLock ? 0ul : 0x800ul;
+        unsigned long LockFlags = bSysLock ? 0ul : D3DLOCK_NOSYSLOCK;
         // Dynamic (usage 0x200): a ring that restarts at 0 with DISCARD when full, else appends
         // with NOOVERWRITE.
-        if ((Wrapper->Flags & 0x200) != 0)
+        if ((Wrapper->Flags & D3DUSAGE_DYNAMIC) != 0)
         {
             if (Wrapper->Used + RequestBytes > CapacityBytes)
             {
                 Wrapper->Used = 0;
                 Wrapper->LockStartVertex = 0;
-                LockFlags |= 0x2000;
+                LockFlags |= D3DLOCK_DISCARD;
                 StartBytes = 0;
             }
             else
             {
-                LockFlags |= 0x1000;
+                LockFlags |= D3DLOCK_NOOVERWRITE;
                 StartBytes = Wrapper->Used;
             }
         }
@@ -6400,7 +6420,7 @@ GENRESULT DACOM_API FDirectX9::UnlockVb(void* Handle)
     // FUN_06d12a8b. The buffer pointer is not tested.
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     Wrapper->Locked = 0;
     return (GENRESULT)(Wrapper->Gpu->Unlock());
 }
@@ -6431,7 +6451,7 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
         Cache.IndexBuffer = nullptr;
         Cache.BaseVertex = 0xFFFFFFFF;
         memset(&Cache.Flags, 0, sizeof(Cache.Flags));
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
     }
 
     // -1 -> the node already selected. The device is not called here -- FUN_06d04138 binds the
@@ -6442,7 +6462,7 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
     else
         Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == nullptr || Wrapper->Gpu == nullptr)
-        return (GENRESULT)0x80004005;
+        return (GENRESULT)E_FAIL;
 
     FRp9Vb* Current = Cache.VertexBuffer;
     const unsigned long OverrideFvf = Cache.Fvf;
@@ -6458,11 +6478,11 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
 GENRESULT DACOM_API FDirectX9::GetVbInfo(void* Handle, unsigned int* OutFvf, unsigned int* OutCount)
 {
     if (Handle == nullptr || Handle == (void*)((intptr_t)(-1)))
-        return (GENRESULT)(0x80004005);
+        return (GENRESULT)E_FAIL;
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper->Gpu == nullptr)
-        return (GENRESULT)(0x80004005);
-    GENRESULT Result = (GENRESULT)(0x80004005);
+        return (GENRESULT)E_FAIL;
+    GENRESULT Result = (GENRESULT)E_FAIL;
     if (OutFvf != nullptr)
     {
         *OutFvf = Wrapper->Fvf;
@@ -6491,8 +6511,8 @@ GENRESULT DACOM_API FDirectX9::SetGammaEnable(unsigned char Enable)
 {
     // FUN_06d1535d.
     if (Ability_[1] == 0 || Ability_[2] == 0)
-        return (GENRESULT)(0xFFFFFFFD);
-    DeviceReady_ = (DeviceReady_ & ~2ul) | ((unsigned long)(Enable & 1) << 1);
+        return GR_INTERFACE_UNSUPPORTED;
+    DeviceReady_ = (DeviceReady_ & ~(unsigned long)DeviceReadyGammaEnable) | ((unsigned long)(Enable & 1) << 1);
     return GR_OK;
 }
 // RP8: FDirectX8::GetGammaEnable
@@ -6500,7 +6520,7 @@ GENRESULT DACOM_API FDirectX9::GetGammaEnable()
 {
     // FUN_06d153a4.
     if (Ability_[1] == 0 || Ability_[2] == 0)
-        return (GENRESULT)(0xFFFFFFFD);
+        return GR_INTERFACE_UNSUPPORTED;
     if (((DeviceReady_ >> 1) & 1) == 0)
         return GR_GENERIC;
     return GR_OK;
@@ -6510,14 +6530,14 @@ GENRESULT DACOM_API FDirectX9::SetGammaFunction(unsigned int ChannelMask, float 
                                                 float Brightness, float Contrast, float Bias)
 {
     // Gamma calculations retain double intermediates and float storage boundaries.
-    if ((DeviceReady_ & 1) == 0)
+    if ((DeviceReady_ & DeviceReadyBuffers) == 0)
     {
         Rp9Fdump(kFdumpWarning, 4819, "WARNING",
                  "set_gamma_function() called outside of create_buffers/destroy_buffers");
         return GR_GENERIC;
     }
     if (Ability_[1] == 0)
-        return (GENRESULT)(0xFFFFFFFD);
+        return GR_INTERFACE_UNSUPPORTED;
     D3DGAMMARAMP Ramp;
     const float InvGamma = (float)(1.0 / (double)(Gamma));
     const float Scale = 65535.0f;
@@ -6533,11 +6553,11 @@ GENRESULT DACOM_API FDirectX9::SetGammaFunction(unsigned int ChannelMask, float 
         if (Value > 1.0f)
             Value = 1.0f;
         const long Word = (long)((double)(Value) * (double)(Scale));
-        if ((ChannelMask & 1) != 0)
+        if ((ChannelMask & kRpGammaRed) != 0)
             Ramp.red[Index] = (WORD)(Word);
-        if ((ChannelMask & 2) != 0)
+        if ((ChannelMask & kRpGammaGreen) != 0)
             Ramp.green[Index] = (WORD)(Word);
-        if ((ChannelMask & 4) != 0)
+        if ((ChannelMask & kRpGammaBlue) != 0)
             Ramp.blue[Index] = (WORD)(Word);
     }
     const DWORD Flags = ((DeviceReady_ >> 1) & 1) != 0 ? 1u : 0u;
@@ -6556,15 +6576,15 @@ GENRESULT DACOM_API FDirectX9::SetGammaRamp(unsigned int ChannelMask, const unsi
         return GR_GENERIC;
     }
     if (Ability_[1] == 0)
-        return (GENRESULT)(0xFFFFFFFD);
+        return GR_INTERFACE_UNSUPPORTED;
     D3DGAMMARAMP Ramp;
-    if (ChannelMask != 7)
+    if (ChannelMask != (kRpGammaRed | kRpGammaGreen | kRpGammaBlue))
         Device_->GetGammaRamp(0, &Ramp);
-    if ((ChannelMask & 1) != 0)
+    if ((ChannelMask & kRpGammaRed) != 0)
         memcpy(Ramp.red, RampData, sizeof(Ramp.red));
-    if ((ChannelMask & 2) != 0)
+    if ((ChannelMask & kRpGammaGreen) != 0)
         memcpy(Ramp.green, RampData, sizeof(Ramp.green));
-    if ((ChannelMask & 4) != 0)
+    if ((ChannelMask & kRpGammaBlue) != 0)
         memcpy(Ramp.blue, RampData, sizeof(Ramp.blue));
     const DWORD Flags = ((DeviceReady_ >> 1) & 1) != 0 ? 1u : 0u;
     Device_->SetGammaRamp(0, Flags, &Ramp);
@@ -6581,14 +6601,14 @@ GENRESULT DACOM_API FDirectX9::GetGammaRamp(unsigned int Channel, unsigned short
         return GR_GENERIC;
     }
     if (Ability_[1] == 0)
-        return (GENRESULT)(0xFFFFFFFD);
+        return GR_INTERFACE_UNSUPPORTED;
     D3DGAMMARAMP Ramp;
     Device_->GetGammaRamp(0, &Ramp);
-    if (Channel == 1)
+    if (Channel == kRpGammaRed)
         memcpy(OutRamp, Ramp.red, sizeof(Ramp.red));
-    else if (Channel == 2)
+    else if (Channel == kRpGammaGreen)
         memcpy(OutRamp, Ramp.green, sizeof(Ramp.green));
-    else if (Channel == 4)
+    else if (Channel == kRpGammaBlue)
         memcpy(OutRamp, Ramp.blue, sizeof(Ramp.blue));
     else
     {
@@ -6632,8 +6652,8 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         const char* Extension;
         unsigned long Format;
     };
-    const FPrintScreenFormat Formats[7] = {{".BMP", 0}, {".JPG", 1}, {".TGA", 2}, {".PNG", 3},
-                                           {".DDS", 4}, {".PPM", 5}, {".DIB", 6}};
+    const FPrintScreenFormat Formats[7] = {{".BMP", D3DXIFF_BMP}, {".JPG", D3DXIFF_JPG}, {".TGA", D3DXIFF_TGA}, {".PNG", D3DXIFF_PNG},
+                                           {".DDS", D3DXIFF_DDS}, {".PPM", D3DXIFF_PPM}, {".DIB", D3DXIFF_DIB}};
     const int FormatCount = 7;
     int FormatIndex = 0;
     for (FormatIndex = 0; FormatIndex < FormatCount; ++FormatIndex)
@@ -6731,15 +6751,15 @@ namespace
 {
     void InitTextureFileDesc(FFileSystemDesc* Desc, const char* Name, const char* Component)
     {
-        Desc->Size = 0x34;
+        Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc->ComponentName = Component;
         Desc->Implementation = nullptr;
         Desc->Path = Name;
-        Desc->Access = 0x80000000;
-        Desc->ShareMode = 1;
+        Desc->Access = GENERIC_READ;
+        Desc->ShareMode = FILE_SHARE_READ;
         Desc->Security = nullptr;
-        Desc->Creation = 3;
-        Desc->Flags = 0x8000080;
+        Desc->Creation = OPEN_EXISTING;
+        Desc->Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc->TemplateFile = nullptr;
         Desc->Parent = nullptr;
         Desc->Extra = 0;
@@ -6771,10 +6791,10 @@ namespace
         if (Map->Handle == -1)
             return (HRESULT)(-8);
         Map->Size = Map->FileSystem->GetSize((unsigned long)(Map->Handle), 0);
-        Map->Mapping = Map->FileSystem->CreateMapping((unsigned long)(Map->Handle), 0, 2, 0, 0, 0);
+        Map->Mapping = Map->FileSystem->CreateMapping((unsigned long)(Map->Handle), 0, PAGE_READONLY, 0, 0, 0);
         if (Map->Mapping == -1)
             return (HRESULT)(-6);
-        Map->View = Map->FileSystem->MapFileView((unsigned long)(Map->Mapping), 4, 0, 0, 0);
+        Map->View = Map->FileSystem->MapFileView((unsigned long)(Map->Mapping), FILE_MAP_READ, 0, 0, 0);
         if (Map->View != 0)
             Hr = 0;
         return Hr;
@@ -6878,7 +6898,7 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1249, "WARNING", "load_tga_surface_data: invalid texture\n");
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     IDirect3DSurface9* Surface = nullptr;
     const HRESULT SubHr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
@@ -6891,7 +6911,7 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
             Surface->Release();
             Surface = nullptr;
         }
-        return (GENRESULT)(0xFFFFFFFE);
+        return GR_INVALID_PARMS;
     }
     // FUN_06d2fcbf = the statically linked D3DX 8.1 D3DXLoadSurfaceFromFileInMemory.
     const HRESULT Hr = Rp9LoadSurfaceFromFileInMemory(Surface, nullptr, nullptr, SrcData, SrcSize,
@@ -6931,7 +6951,7 @@ GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* 
     }
     // TEXTURE_CUBEMAPS (object+0x41C) off -> -7 before the FileSystem is touched.
     HRESULT Hr = (HRESULT)(-7);
-    if (Ability_[8] == 0)
+    if (Ability_[Render::TextureCubemaps] == 0)
         return (GENRESULT)(Hr);
     FRp9TextureFileMap Map;
     Map.FileSystem = FileSystem;

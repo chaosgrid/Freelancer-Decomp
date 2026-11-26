@@ -58,6 +58,15 @@ static_assert(sizeof(FBeamEffectArch) == 0x80, "BeamEffectArch 0x80");
 // Retail object through FUN_004f9540's last write at +0x80.
 // Transform at +0x10; BaseWatcher at +0x44 (FUN_004f9450 ADD ECX,0x44).
 // Link node at +0x60/+0x64/+0x68 (EffectTypeListLink); type id at +0x5C.
+// FBeamEffect::Flags70 (+0x70).
+enum EBeamEffectFlag
+{
+    kBeamFlagVisible = 0x1,     // frustum / pbubble visibility (UpdateVisibility)
+    kBeamFlagHit = 0x2,         // BeamEffectSetHitFlags bHit
+    kBeamFlagHitPlayer = 0x4,   // BeamEffectSetHitFlags bHitPlayer
+    kBeamFlagUseLookDir = 0x8   // the projectile effect's bUseLookDir
+};
+
 struct FBeamEffect : FEffectBase
 {
     explicit FBeamEffect(unsigned TypeId);

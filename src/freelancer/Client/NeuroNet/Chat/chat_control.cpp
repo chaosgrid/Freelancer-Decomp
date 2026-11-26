@@ -307,7 +307,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         BroadcastList->SetLayoutFlag(true);
         BroadcastList->SetBorders(false, false, false, true);
         BroadcastList->SetRowHighlights(false);
-        BroadcastList->SetTipMode(2);
+        BroadcastList->SetTipMode(kTableTipRow);
         BroadcastList->SetToolTipEnabled(true);
         BroadcastList->SetScrollBarGap(BroadcastList->GetScrollBarGap() * 4.0f);   // DAT_005cfc9c
         BroadcastList->SetCallback(ChatControlBroadcastCallback, this);
@@ -334,7 +334,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         PrivateList->SetBorders(false, false, false, true);
         PrivateList->SetRowHighlights(false);
         PrivateList->SetCellMargins(2, 0);
-        PrivateList->SetTipMode(0);
+        PrivateList->SetTipMode(kTableTipSingle);
         PrivateList->GetToolTipHoverInfo()->IdsAlt = 0x1b74;
         PrivateList->SetToolTipEnabled(true);
         PrivateList->SetScrollBarGap(PrivateList->GetScrollBarGap() * 4.0f);
@@ -885,28 +885,28 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         if (Parent != nullptr)
             SetPosition(&Parent->Position);
         ChatControlRefreshAll(this);
-        Flags = static_cast<unsigned char>(Flags | 0x03);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         // Retail does not test HistoryDisplay for null.
         HistoryDisplay->Update();
         HistoryDisplay->RebuildLayoutIfDirty();
         HistoryDisplay->ScrollToEnd();
         if (G_ChatMsgWin != nullptr)
-            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & 0xfc);
+            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & ~(kWin3DActive | kWin3DVisible));
         return true;
     }
     if (Msg == kWinMsgHide)
     {
         if (Parent != nullptr)
             Win3DReparent(this, nullptr);
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         if (G_bChatMsgWinWanted)
         {
             if (G_ChatMsgWin != nullptr)
-                G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | 0x03);
+                G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | kWin3DActive | kWin3DVisible);
         }
         else if (G_ChatMsgWin != nullptr)
         {
-            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & 0xfc);
+            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & ~(kWin3DActive | kWin3DVisible));
         }
         return true;
     }

@@ -92,7 +92,7 @@ FmtStr::Val::~Val()
 {
     // FUN_0630d510. Tag 0x21: delete each child, clear the subtree's Head, delete the subtree.
     // Tag 0x4E: delete the block.
-    if (TypeTag == 0x21)
+    if (TypeTag == FmtStr::TagFmtStr)
     {
         if (Subtree != nullptr)
         {
@@ -108,7 +108,7 @@ FmtStr::Val::~Val()
             delete Subtree;
         }
     }
-    else if (TypeTag == 0x4E)
+    else if (TypeTag == FmtStr::TagNavMarker)
     {
         // No null test, no store afterwards.
         delete Marker;
@@ -124,7 +124,7 @@ FmtStr::Val const& FmtStr::Val::operator=(const Val& Other)
     TypeTag = Other.TypeTag;
     Flags = Other.Flags;
 
-    if (TypeTag == 0x21)
+    if (TypeTag == FmtStr::TagFmtStr)
     {
         // VC6 operator new returns null on failure (hence nothrow); a null subtree skips the
         // copy.
@@ -133,7 +133,7 @@ FmtStr::Val const& FmtStr::Val::operator=(const Val& Other)
             *NewSub = *Other.Subtree;
         Subtree = NewSub;
     }
-    else if (TypeTag == 0x4E)
+    else if (TypeTag == FmtStr::TagNavMarker)
     {
         // The new block is not null-tested, as retail.
         NavMarker* const NewBlock = new (std::nothrow) NavMarker;
@@ -150,7 +150,7 @@ bool FmtStr::Val::operator==(const Val& Other) const
     {
         return false;
     }
-    if (TypeTag == 0x4E)
+    if (TypeTag == FmtStr::TagNavMarker)
     {
         // Dwords 0..1 compare as integers, dwords 2..4 (presumably the position) with a float
         // epsilon. Neither payload is null-tested.
@@ -175,7 +175,7 @@ bool FmtStr::Val::operator==(const Val& Other) const
         }
         return true;
     }
-    if (TypeTag == 0x21)
+    if (TypeTag == FmtStr::TagFmtStr)
     {
         // MadLibId first, then both child lists. Neither subtree is null-tested.
         FmtStr const* ThisSub = Subtree;
@@ -221,7 +221,7 @@ int FmtStr::Val::InitFromVoid(const void* Src)
     TypeTag = Tag;
     Flags = P[2];
 
-    if (Tag == 0x21)
+    if (Tag == FmtStr::TagFmtStr)
     {
         // A nested subtree: the bytes unflatten consumed plus this node's 3-byte header.
         // A failed allocation is not tested: retail unflattens into the null subtree and faults;
@@ -231,7 +231,7 @@ int FmtStr::Val::InitFromVoid(const void* Src)
         int const Consumed = Sub->unflatten((void*)(P + 3), 0);
         return Consumed + 3;
     }
-    if (Tag == 0x4E)
+    if (Tag == FmtStr::TagNavMarker)
     {
         // Data block: 5 dwords, filled with no null test.
         NavMarker* Block = new (std::nothrow) NavMarker;
@@ -255,7 +255,7 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
     *(unsigned short*)P = TypeTag;
     P[2] = Flags;
 
-    if (TypeTag == 0x21)
+    if (TypeTag == FmtStr::TagFmtStr)
     {
         // A 9-byte header (tag, flags, the subtree's MadLibId, child count), then the children;
         // the result is the bytes written. The subtree is not null-tested.
@@ -279,7 +279,7 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
         }
         return (unsigned int)(Cur - P);
     }
-    if (TypeTag == 0x4E)
+    if (TypeTag == FmtStr::TagNavMarker)
     {
         // Copy 5 dwords from Data block
         unsigned int const* SrcBlock = Marker->Data;
@@ -298,9 +298,9 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
 unsigned int FmtStr::Val::get_flattened_size() const
 {
     // FUN_06263a20
-    if (TypeTag != 0x21)
+    if (TypeTag != FmtStr::TagFmtStr)
     {
-        if (TypeTag == 0x4E)
+        if (TypeTag == FmtStr::TagNavMarker)
         {
             return 0x17;
         }
@@ -361,7 +361,7 @@ namespace
                 Node->Value = Cur->Value; // the raw payload slot, whatever the tag
                 Node->TypeTag = Cur->TypeTag;
                 Node->Flags = Cur->Flags;
-                if (Node->TypeTag == 0x21)
+                if (Node->TypeTag == FmtStr::TagFmtStr)
                 {
                     // A null subtree (VC6 new, hence nothrow) skips the copy.
                     FmtStr* const Sub = new (std::nothrow) FmtStr();
@@ -369,7 +369,7 @@ namespace
                         *Sub = *Cur->Subtree;
                     Node->Subtree = Sub;
                 }
-                else if (Node->TypeTag == 0x4E)
+                else if (Node->TypeTag == FmtStr::TagNavMarker)
                 {
                     // Filled without a null test.
                     FmtStr::NavMarker* const Block = new (std::nothrow) FmtStr::NavMarker;
@@ -452,13 +452,13 @@ void FmtStr::destroy()
     while (Current != nullptr)
     {
         Val* Next = Current->Next;
-        if (Current->TypeTag == 0x21 && Current->Subtree != nullptr)
+        if (Current->TypeTag == FmtStr::TagFmtStr && Current->Subtree != nullptr)
         {
             FmtStr* SubTree = Current->Subtree;
             SubTree->destroy();
             delete SubTree;
         }
-        else if (Current->TypeTag == 0x4E)
+        else if (Current->TypeTag == FmtStr::TagNavMarker)
         {
             delete Current->Marker; // no null test
         }
@@ -504,7 +504,7 @@ void FmtStr::append_fmt_str(const FmtStr& Other)
     ++ValueIndex[KindFmtStr];
     Node->Subtree = Sub;
     Node->Next = nullptr;
-    Node->TypeTag = 0x21;
+    Node->TypeTag = FmtStr::TagFmtStr;
     LinkFmtStrTail(*this, Node);
 }
 
@@ -522,7 +522,7 @@ void FmtStr::append_nav_marker(const NavMarker& Marker)
     ++ValueIndex[KindNavMarker];
     Node->Next = nullptr;
     Node->Marker = Block;
-    Node->TypeTag = 0x4E;
+    Node->TypeTag = FmtStr::TagNavMarker;
     LinkFmtStrTail(*this, Node);
 }
 
@@ -543,67 +543,67 @@ int FmtStr::append_void(void* Data)
 void FmtStr::append_system(const unsigned int& Id)
 {
     // FUN_0630d980: tag 0x53 'S', counter +0x09.
-    AppendValueNode(*this, 0x53, Id, ValueIndex[KindSystem]);
+    AppendValueNode(*this, FmtStr::TagSystem, Id, ValueIndex[KindSystem]);
 }
 
 void FmtStr::append_base(const unsigned int& Id)
 {
     // FUN_0630d9d0: tag 0x42 'B', counter +0x0A. An id by reference, not a char*.
-    AppendValueNode(*this, 0x42, Id, ValueIndex[KindBase]);
+    AppendValueNode(*this, FmtStr::TagBase, Id, ValueIndex[KindBase]);
 }
 
 void FmtStr::append_string(unsigned int Id)
 {
     // FUN_0630da20: tag 0x73 's', counter +0x0B. An IDS id, not a char*.
-    AppendValueNode(*this, 0x73, Id, ValueIndex[KindString]);
+    AppendValueNode(*this, FmtStr::TagString, Id, ValueIndex[KindString]);
 }
 
 void FmtStr::append_good(const unsigned int& Id)
 {
     // FUN_0630da70: tag 0x47 'G', counter +0x0C.
-    AppendValueNode(*this, 0x47, Id, ValueIndex[KindGood]);
+    AppendValueNode(*this, FmtStr::TagGood, Id, ValueIndex[KindGood]);
 }
 
 void FmtStr::append_int(unsigned int Value)
 {
     // FUN_0630dac0: tag 0x64 'd', counter +0x0E.
-    AppendValueNode(*this, 0x64, Value, ValueIndex[KindInt]);
+    AppendValueNode(*this, FmtStr::TagInt, Value, ValueIndex[KindInt]);
 }
 
 void FmtStr::append_rep_instance(const int& Id)
 {
     // FUN_0630db10: tag 0x52 'R', counter +0x0F. Signed, unlike its group sibling.
-    AppendValueNode(*this, 0x52, Id, ValueIndex[KindRepInstance]);
+    AppendValueNode(*this, FmtStr::TagRepInstance, Id, ValueIndex[KindRepInstance]);
 }
 
 void FmtStr::append_rep_group(const unsigned int& Id)
 {
     // FUN_0630db60: tag 0x46 'F', counter +0x10.
-    AppendValueNode(*this, 0x46, Id, ValueIndex[KindRepGroup]);
+    AppendValueNode(*this, FmtStr::TagRepGroup, Id, ValueIndex[KindRepGroup]);
 }
 
 void FmtStr::append_zone_id(const unsigned int& Id)
 {
     // FUN_0630dbb0: tag 0x5A 'Z', counter +0x11.
-    AppendValueNode(*this, 0x5A, Id, ValueIndex[KindZoneId]);
+    AppendValueNode(*this, FmtStr::TagZoneId, Id, ValueIndex[KindZoneId]);
 }
 
 void FmtStr::append_spaceobj_id(const unsigned int& Id)
 {
     // FUN_0630dc00: tag 0x4F 'O', counter +0x12.
-    AppendValueNode(*this, 0x4F, Id, ValueIndex[KindSpaceObjId]);
+    AppendValueNode(*this, FmtStr::TagSpaceObjId, Id, ValueIndex[KindSpaceObjId]);
 }
 
 void FmtStr::append_installation(int Id)
 {
     // FUN_0630dd00: tag 0x49 'I', counter +0x14.
-    AppendValueNode(*this, 0x49, Id, ValueIndex[KindInstallation]);
+    AppendValueNode(*this, FmtStr::TagInstallation, Id, ValueIndex[KindInstallation]);
 }
 
 void FmtStr::append_loot(int Id)
 {
     // FUN_0630dd50: tag 0x4C 'L', counter +0x15.
-    AppendValueNode(*this, 0x4C, Id, ValueIndex[KindLoot]);
+    AppendValueNode(*this, FmtStr::TagLoot, Id, ValueIndex[KindLoot]);
 }
 
 int FmtStr::flatten(void* Dest, unsigned int MaxSize) const
@@ -625,13 +625,13 @@ int FmtStr::flatten(void* Dest, unsigned int MaxSize) const
         *(Cursor + 2) = V->Flags;
 
         unsigned int Written;
-        if (V->TypeTag == 0x21)
+        if (V->TypeTag == FmtStr::TagFmtStr)
         {
             // The nested flatten gets the same (not reduced) budget; its byte count plus the
             // 3-byte header is this node's size. The subtree is not null-tested.
             Written = V->Subtree->flatten(Cursor + 3, Remaining) + 3;
         }
-        else if (V->TypeTag == 0x4E)
+        else if (V->TypeTag == FmtStr::TagNavMarker)
         {
             memcpy(Cursor + 3, V->Marker, sizeof(NavMarker));
             Written = 0x17;

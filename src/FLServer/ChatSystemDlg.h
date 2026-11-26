@@ -17,6 +17,14 @@ class CChatSystemDlg : public CDialog
 {
 public:
 	enum { IDD = 0x95 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlInput = 1047,
+		kControlLog = 1048,
+		kControlTitle = 1049,
+		kControlClose = 1053,
+	};
 
 	explicit CChatSystemDlg(CWnd* Parent = nullptr);
 	virtual ~CChatSystemDlg();

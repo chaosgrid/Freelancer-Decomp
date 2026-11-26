@@ -146,6 +146,10 @@ public:
         // retail object is allocated with either value (both classes are abstract).
         ClassSimple = 0x03,
         ClassEqObj = 0x103,
+        // The three low bits every CProjectile subclass carries (Mine, CounterMeasure, Beam, Guided);
+        // CProjectile is abstract, no object is allocated with exactly this value. Retail tests
+        // (ObjectClass & 7) == 7 to mean "a projectile".
+        ClassProjectile = 0x07,
         ClassMine = 0x0f,
         ClassCounterMeasure = 0x17,
         ClassBeam = 0x67,
@@ -456,6 +460,11 @@ public:
     // +0x9c. Every CSimple can be watched through this embedded Watchable; watchers recover
     // the CSimple by subtracting 0x9c (TractorArm::GetTarget/SetTarget, CEGun's lock).
     Watchable SelfWatchable;    // +0x9c
+    // FlagsA0's bits.
+    enum
+    {
+        kSimpleFlagTargetable = 0x01,
+    };
     unsigned char FlagsA0;      // +0xa0  bit0 targetable (+0xa1..+0xa3: alignment, never written)
     // +0xa4 / +0xa8: set by update_zones, the smallest physical zone at the object's position
     // (Common ZONE, vftable 063a5094) and that zone's GetImmersion there.

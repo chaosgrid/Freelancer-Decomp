@@ -277,7 +277,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, Vector const* Position)
     HealthBar->Color[1] = 0xc8;
     HealthBar->Color[2] = 0x00;
     HealthBar->Color[3] = 0xff;
-    HealthBar->SetProperty(0x19, 0x10000, 0);
+    HealthBar->SetProperty(kWinPropRenderFlags, kRenderArgNoWireRender, 0);
 }
 
 void CTradeEquipListLine::Hide()
@@ -366,7 +366,7 @@ void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
     unsigned Layer;
     if (Selection != 0)
         Layer = 2;
-    else if ((IconFrame->GetButtonBits() & 0x01) != 0)
+    else if ((IconFrame->GetButtonBits() & kButtonHovered) != 0)
         Layer = 1;
     else
         Layer = 0;

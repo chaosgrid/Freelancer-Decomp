@@ -17,7 +17,7 @@ DrasticEvadeBehavior::DrasticEvadeBehavior(int InTypeId)
     , StateTimer2c(0.0f)
     , DurationThreshold30(4.0f)
     , NudgeOffset{}
-    , EvadeMode(0)
+    , EvadeMode(kDrasticEvadeNudge)
 {
 }
 
@@ -43,7 +43,7 @@ void DrasticEvadeBehavior::OnEngage()
 void DrasticEvadeBehavior::OnDisengage()
 {
     Behavior::OnDisengage();
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
 }
 
 // Slot 5, LAB_062c8760.
@@ -51,7 +51,7 @@ int DrasticEvadeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     int Result = 2;
-    if ((Flags28 & 0x2) != 0)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) != 0)
         Result = 0;
     if (Flag29 != 0)
         Result = 3;
@@ -62,7 +62,7 @@ int DrasticEvadeBehavior::OnEvaluateReadiness(float Unused)
 // Slot 7, LAB_062c8800.
 int DrasticEvadeBehavior::OnUpdate()
 {
-    if (EvadeMode == 0)
+    if (EvadeMode == kDrasticEvadeNudge)
     {
         // Strict timer < duration on the unrounded x87 sum (FST, not FSTP).
         double const Timer = static_cast<double>(DeltaTime) + static_cast<double>(StateTimer2c);
@@ -72,16 +72,16 @@ int DrasticEvadeBehavior::OnUpdate()
         {
             Vector const Nudge = { NudgeOffset.x, NudgeOffset.y, 0.0f };
             Affect->set_nudge_vec(Nudge);
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
         Vector const Zero = { 0.0f, 0.0f, 0.0f };
         Affect->set_nudge_vec(Zero);
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
-    if (EvadeMode == 1)
+    if (EvadeMode == kDrasticEvadeReverse)
     {
         // Same accumulate/compare; FUN_062e89a0 with full reverse while running, 0 when expired.
         double const Timer = static_cast<double>(DeltaTime) + static_cast<double>(StateTimer2c);
@@ -89,17 +89,17 @@ int DrasticEvadeBehavior::OnUpdate()
         ThrustManager* const Thrust = &SysMgr->Thrust;
         if (Timer < (double)DurationThreshold30)
         {
-            Thrust->SetThrottle(-1.0f, 0);
-            UpdateResult = 1;
-            return 1;
+            Thrust->SetThrottle(-1.0f, kThrottleModeEngine);
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
-        Thrust->SetThrottle(0.0f, 0);
-        UpdateResult = 2;
-        return 2;
+        Thrust->SetThrottle(0.0f, kThrottleModeEngine);
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
-    UpdateResult = 3;
-    return 3;
+    UpdateResult = kBehaviorUpdateAborted;
+    return kBehaviorUpdateAborted;
 }
 
 // Slot 10, LAB_062c87c0.
@@ -108,9 +108,9 @@ bool DrasticEvadeBehavior::OnApplyDirective(void* DirectiveOp)
     pub::AI::DirectiveDrasticEvadeOp const* const Op =
         static_cast<pub::AI::DirectiveDrasticEvadeOp const*>(DirectiveOp);
     EvadeMode = static_cast<int>(Op->Mode);
-    if (EvadeMode == 0)
+    if (EvadeMode == kDrasticEvadeNudge)
         std::memcpy(&NudgeOffset, &Op->NudgeX, sizeof(NudgeOffset));   // three float-bit dwords
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     DurationThreshold30 = Op->Duration;
     return true;
 }

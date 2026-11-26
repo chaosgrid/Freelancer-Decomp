@@ -92,7 +92,9 @@ bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4)
 {
     // FUN_0051a640: the five turret ids registered on the face at +0xf8, then HUDCamera's
     // activate.
-    static const unsigned kTurretEvents[5] = {0x32, 0x33, 0x34, 0x35, 0x36};
+    static const unsigned kTurretEvents[5] = {USER_LOOK_ROTATE_CAMERA_LEFT, USER_LOOK_ROTATE_CAMERA_RIGHT,
+                                              USER_LOOK_ROTATE_CAMERA_UP, USER_LOOK_ROTATE_CAMERA_DOWN,
+                                              USER_LOOK_ROTATE_CAMERA_RESET};
     FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
     for (unsigned Index = 0; Index < 5; ++Index)
         HudRegisterCommandHandler(Face, kTurretEvents[Index]);

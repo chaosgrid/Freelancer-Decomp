@@ -419,7 +419,7 @@ void DrawFlashlightFlares(FFlashLight* const* Lights, int Count, ICamera* Camera
     Win3DSetBlendFunc(kWin3DBlendOne, kWin3DBlendOne);
     Win3DSetDepthWrite(0);
     Win3DEnable(kWin3DDepthTest);
-    Win3DSetDepthFunc(4);
+    Win3DSetDepthFunc(D3DCMP_LESSEQUAL);
     Win3DDisable(kWin3DFog);
 
     // The "shine" frame is bound without testing the result. Deviation: retail's out buffer is
@@ -441,7 +441,7 @@ void DrawFlashlightFlares(FFlashLight* const* Lights, int Count, ICamera* Camera
         Lights[Index]->DrawBulb(Camera);
     Win3DEnd();
 
-    Win3DSetDepthFunc(2);
+    Win3DSetDepthFunc(D3DCMP_LESS);
     Win3DEnable(kWin3DDepthTest);
     Win3DSetDepthWrite(1);
     Win3DEnable(kWin3DCullFace);

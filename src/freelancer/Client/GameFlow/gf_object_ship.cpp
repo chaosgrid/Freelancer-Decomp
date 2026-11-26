@@ -354,7 +354,7 @@ void FObjectShip::Load(FObjectShipDesc const& Desc)
     Equipment->Items = Desc.Equipment->Items;
     ScriptState = kShipScriptNone;
     RebuildModel();
-    RenderMode = 0;
+    RenderMode = kRoomRenderMesh;
     LightGroup = 3;
     Layer = 0;
     bRunningLights = 0;
@@ -829,7 +829,7 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
     // On both paths.
     LightGroup = 3;
     Layer = 0;
-    RenderMode = 0;
+    RenderMode = kRoomRenderMesh;
     RecomputeShipCompanionLod(Companion, Handle);
 }
 

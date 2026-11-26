@@ -240,7 +240,7 @@ void StartExplosionAction::Trigger(unsigned SourceId, unsigned short SubObjId)
         // The explosion is looked up again by name (not +0x3c); only one whose process (+0x14)
         // is 2 starts.
         Archetype::Explosion* const Arch = Archetype::GetExplosion(Explosion);
-        if (Arch != nullptr && Arch->Process == 2)
+        if (Arch != nullptr && Arch->Process == Archetype::Explosion::ProcessNone)
         {
             long HpHandle = 0;
             HardpointInfo Info;
@@ -722,7 +722,7 @@ void ClientImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                 static_cast<double>(Force) > kImpulseMinimum)
             {
                 // The ObjDB kind-10 bucket.
-                int Kind = 10;
+                int Kind = static_cast<int>(EClientGameobjKind::Debris);
                 FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind);
                 while (Go != nullptr)
                 {

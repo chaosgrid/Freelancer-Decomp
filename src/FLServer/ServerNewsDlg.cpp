@@ -26,7 +26,7 @@ CServerNewsDlg::CServerNewsDlg(CWnd* Parent)
 // .text:004135e0
 void CServerNewsDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1058, NewsEdit);
+	DDX_Control(DX, kControlNews, NewsEdit);
 }
 
 // .rdata:0041e078: no entries.

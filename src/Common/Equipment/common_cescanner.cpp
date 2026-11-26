@@ -143,9 +143,9 @@ int ScanList::add_in_range(Vector const& Pos, float Range, IObjDB* Db, unsigned 
     float RangeSq = Range * Range;
     int Added = 0;
 
-    if (TypeMask & 0xfdffu)
+    if (TypeMask & OBJ_SOLAR_NO_WAYPOINT_MASK)
     {
-        void* Bucket = Db->GetBucket(0xfdffu);
+        void* Bucket = Db->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
         if (Bucket != nullptr)
         {
             Geometry::Sphere Sphere;
@@ -178,7 +178,7 @@ int ScanList::add_in_range(Vector const& Pos, float Range, IObjDB* Db, unsigned 
         unsigned Unused0;
         unsigned Unused1;
         unsigned Mask;
-    } IterState = { 0, 0, TypeMask & 0xffff0200u };
+    } IterState = { 0, 0, TypeMask & ~OBJ_SOLAR_NO_WAYPOINT_MASK };
 
     IObjRW* Candidate = Db->GetNext(&IterState);
     while (Candidate != nullptr)
@@ -214,7 +214,7 @@ namespace
     {
         if (Owner == nullptr)
             return false;
-        if ((Owner->ObjectClass & 0x303u) != 0x303u)
+        if ((Owner->ObjectClass & CObject::ClassSolar) != CObject::ClassSolar)
             return false;
         return !((CSolar const*)Owner)->bDynamic;
     }
@@ -275,7 +275,7 @@ void CEScanner::scan_for_types(unsigned TypeMask)
 
     unsigned EffectiveMask = TypeMask;
     if (OwnerIsStaticSolar(Owner))
-        EffectiveMask = TypeMask & 0xdfff0200u;
+        EffectiveMask = TypeMask & ~OBJ_SOLAR_NO_WAYPOINT_MASK & ~OBJ_ASTEROID;
 
     unsigned const NewTypes = EffectiveMask & ~CachedTypeMask;
 

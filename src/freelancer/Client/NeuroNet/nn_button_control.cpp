@@ -287,15 +287,16 @@ NnButtonControl::NnButtonControl()
     Colour[1] = 0;
     Colour[2] = 0;
     Colour[3] = 0;
-    ButtonBits = static_cast<unsigned char>(ButtonBits & 0x80);
-    ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xee) | 0x0e);
+    ButtonBits = static_cast<unsigned char>(ButtonBits & kButtonDoubleClick);
+    ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & ~(kButtonNoMeshRender | kButtonDrawWhileInactive)) |
+        kButtonEnabled | kButtonLightWhilePressed | kButtonPulseWhenHovered);
 }
 
 NnButtonControl::~NnButtonControl()
 {
     // FUN_0055d610: a button still holding the capture leaves the capture stack
     // (FUN_0059d960); then the two strings (+0x360 first) and WinControl's FUN_0059fa50.
-    if ((ButtonBits & 0x10) != 0)
+    if ((ButtonBits & kButtonCaptured) != 0)
         Win3DRemoveCapture(this);
 }
 
@@ -308,7 +309,7 @@ void NnButtonControl::SetPosition(Vector const* NewPosition)
     bAttached = 1;
 
     Vector Placed;
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         Vector Attach;
         GetAttachPosition(&Attach); // slot 41
@@ -328,7 +329,7 @@ void NnButtonControl::SetPosition(Vector const* NewPosition)
     if (!HasInstance(this))
         return;
     Vector Instance;
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         Instance.x = Offset.x + Position.x;
         Instance.y = Offset.y + Position.y;
@@ -367,7 +368,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
     // FUN_0055a6b0 (RET 8).
     Win3DReparent(this, NewParent); // FUN_0059dd00
     Win3DRegister(this);            // FUN_0059dbf0
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
 
     INI_Reader* const Ini = static_cast<INI_Reader*>(Data);
     if (Ini != nullptr)
@@ -461,20 +462,20 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
             }
             if (Ini->is_value("no_mesh_render"))
             {
-                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? 1 : 0;
-                ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xfe) | Bit);
+                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? kButtonNoMeshRender : 0;
+                ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & ~kButtonNoMeshRender) | Bit);
                 continue;
             }
             if (Ini->is_value("action_button"))
             {
-                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? 0x08 : 0;
-                ButtonBits = static_cast<unsigned char>((ButtonBits & 0xf7) | Bit);
+                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? kButtonAction : 0;
+                ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonAction) | Bit);
                 continue;
             }
             if (Ini->is_value("no_color_change"))
             {
-                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? 0x20 : 0;
-                ButtonBits = static_cast<unsigned char>((ButtonBits & 0xdf) | Bit);
+                unsigned char const Bit = (Ini->get_value_float(0) != 0.0f) ? kButtonNoColorChange : 0;
+                ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonNoColorChange) | Bit);
                 continue;
             }
             if (Ini->is_value("no_z_enable"))
@@ -509,15 +510,15 @@ void NnButtonControl::Update()
 
     // While the button holds the capture, follow the cursor and light / unlight
     // bit 2 as it moves on and off.
-    if ((ButtonBits & 0x10) != 0)
+    if ((ButtonBits & kButtonCaptured) != 0)
     {
         Vector Ray;
         CursorRayForUpdate(&Ray);
         if (HitTest(&Ray)) // slot 4
         {
-            if ((ButtonBits & 0x04) == 0)
+            if ((ButtonBits & kButtonLitWhilePressed) == 0)
             {
-                ButtonBits = static_cast<unsigned char>(ButtonBits | 0x04);
+                ButtonBits = static_cast<unsigned char>(ButtonBits | kButtonLitWhilePressed);
                 TellParent(this, kWinNotifyCapturedEnter);
                 if (Parent != nullptr)
                 {
@@ -526,9 +527,9 @@ void NnButtonControl::Update()
                 }
             }
         }
-        else if ((ButtonBits & 0x04) != 0)
+        else if ((ButtonBits & kButtonLitWhilePressed) != 0)
         {
-            ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfb);
+            ButtonBits = static_cast<unsigned char>(ButtonBits & ~kButtonLitWhilePressed);
             TellParent(this, kWinNotifyCapturedLeave);
             TellParent(this, kWinNotifyUnhighlight);
         }
@@ -569,7 +570,7 @@ void NnButtonControl::Draw()
         return;
     if ((Flags & kWin3DVisible) == 0)
         return;
-    if ((ButtonBits2 & 0x10) == 0 && (Flags & kWin3DActive) == 0)
+    if ((ButtonBits2 & kButtonDrawWhileInactive) == 0 && (Flags & kWin3DActive) == 0)
         return;
     if (bBlink != 0 && bBlinkPhase != 0)
         return;
@@ -585,7 +586,7 @@ void NnButtonControl::Draw()
         if (SpinSpeed > 0.0f) // FCOMP 0 / TEST AH,0x41 / JNZ: not above skips
         {
             double const Step = Frame * SpinSpeed;
-            if ((ButtonBits & 0x01) != 0)
+            if ((ButtonBits & kButtonHovered) != 0)
             {
                 SpinAngle = static_cast<float>(Step + SpinAngle);
             }
@@ -628,17 +629,17 @@ void NnButtonControl::Draw()
     if ((Flags & kWin3DActive) == 0)
     {
         // Inactive: grey, and the selected / lit bits are dropped.
-        ButtonBits = static_cast<unsigned char>(ButtonBits & 0xbb);
+        ButtonBits = static_cast<unsigned char>(ButtonBits & ~(kButtonSelected | kButtonLitWhilePressed));
         SetRgba(Glow, 0x80, 0x80, 0x80, 0xff);
         SetRgba(Body, 0x80, 0x80, 0x80, 0xff);
     }
-    else if ((ButtonBits & 0x40) != 0 || ((ButtonBits2 & 0x04) != 0 && (ButtonBits & 0x04) != 0))
+    else if ((ButtonBits & kButtonSelected) != 0 || ((ButtonBits2 & kButtonLightWhilePressed) != 0 && (ButtonBits & kButtonLitWhilePressed) != 0))
     {
         // Selected, or lit while pressed: yellow.
         SetRgba(Glow, 0xff, 0xff, 0x00, 0xff);
         SetRgba(Body, 0xff, 0xff, 0x00, 0xff);
     }
-    else if ((ButtonBits & 0x02) != 0 || ((ButtonBits & 0x01) != 0 && (ButtonBits2 & 0x08) != 0))
+    else if ((ButtonBits & kButtonFocused) != 0 || ((ButtonBits & kButtonHovered) != 0 && (ButtonBits2 & kButtonPulseWhenHovered) != 0))
     {
         // Focused, or hovered with the hover pulse on: two FUN_00561da0 samples.
         unsigned long Pulse = 0;
@@ -653,7 +654,7 @@ void NnButtonControl::Draw()
         memcpy(Glow, &G_NnPaletteCyan, sizeof(Glow));
         memcpy(Body, &G_NnPaletteCyan, sizeof(Body));
     }
-    if ((ButtonBits & 0x20) != 0)
+    if ((ButtonBits & kButtonNoColorChange) != 0)
         SetRgba(Body, 0xff, 0xff, 0xff, 0xff); // no_color_change
     if (bUseColour != 0)
     {
@@ -662,9 +663,9 @@ void NnButtonControl::Draw()
     }
 
     // The body, unless no_mesh_render.
-    if ((ButtonBits2 & 0x01) == 0)
+    if ((ButtonBits2 & kButtonNoMeshRender) == 0)
     {
-        if (bSpin != 0 && (ButtonBits & 0x01) != 0)
+        if (bSpin != 0 && (ButtonBits & kButtonHovered) != 0)
         {
             if (HasInstance(this))
             {
@@ -679,7 +680,7 @@ void NnButtonControl::Draw()
     }
 
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
-    if ((ButtonBits2 & 0x01) != 0 || bGlow != 0)
+    if ((ButtonBits2 & kButtonNoMeshRender) != 0 || bGlow != 0)
     {
         if (HasInstance(this))
         {
@@ -694,7 +695,7 @@ void NnButtonControl::Draw()
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
 
     // Bit 6 goes back to what it was before the inactive arm could clear it.
-    ButtonBits = static_cast<unsigned char>((ButtonBits & 0xbf) | (SavedSelected << 6));
+    ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonSelected) | (SavedSelected << 6));
     PostDraw(); // vt+0x9c
 }
 
@@ -706,8 +707,8 @@ void NnButtonControl::MouseEnter(Vector const* /*Ray*/)
         NnUiPulseReset(); // FUN_0059d580
         TellParent(this, kWinNotifyHighlight);
     }
-    ButtonBits = static_cast<unsigned char>(ButtonBits | 0x01);
-    if ((ButtonBits2 & 0x02) != 0)
+    ButtonBits = static_cast<unsigned char>(ButtonBits | kButtonHovered);
+    if ((ButtonBits2 & kButtonEnabled) != 0)
         PlayUiRolloverSound(); // FUN_00564700
 }
 
@@ -717,13 +718,13 @@ void NnButtonControl::MouseLeave(Vector const* /*Ray*/)
     if (ToolTipIds != 0)
         NnToolTipHideGlobal(); // FUN_004be390
     TellParent(this, kWinNotifyUnhighlight);
-    ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfe);
+    ButtonBits = static_cast<unsigned char>(ButtonBits & ~kButtonHovered);
 }
 
 bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_0055b950 (RET 4).
-    if ((ButtonBits2 & 0x02) == 0)
+    if ((ButtonBits2 & kButtonEnabled) == 0)
         return false;
     // While some control holds the mouse, a button whose WinControl parent does
     // not hold it ignores the event.
@@ -734,12 +735,12 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             return false;
     }
 
-    if ((ButtonBits & 0x10) != 0)
+    if ((ButtonBits & kButtonCaptured) != 0)
     {
         // The release of a press this button captured.
         if (Event->Button != kWin3DMouseLeft || Event->Action != kWin3DMouseRelease)
             return false;
-        ButtonBits = static_cast<unsigned char>(ButtonBits & 0xeb);
+        ButtonBits = static_cast<unsigned char>(ButtonBits & ~(kButtonCaptured | kButtonLitWhilePressed));
         Win3DRemoveCapture(this); // FUN_0059d960
 
         // The cursor ray (FUN_004bdd40), through the math engine.
@@ -750,7 +751,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         {
             // Released off the button.
             TellParent(this, kWinNotifyRelease);
-            ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfe);
+            ButtonBits = static_cast<unsigned char>(ButtonBits & ~kButtonHovered);
             return true;
         }
 
@@ -768,7 +769,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             PlayClientSoundArchIfIdle(Arch, nullptr, nullptr);          // FUN_004285f0
         }
 
-        if ((ButtonBits & 0x80) != 0)
+        if ((ButtonBits & kButtonDoubleClick) != 0)
         {
             // A double click only tells the parent 0x27 (its answer is ignored).
             TellParent(this, kWinNotifyDoubleClick);
@@ -784,11 +785,11 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
     if (Event->Action != kWin3DMousePress && Event->Action != kWin3DMouseDoubleClick)
         return false;
     if (Event->Action == kWin3DMouseDoubleClick)
-        ButtonBits = static_cast<unsigned char>(ButtonBits | 0x80);
+        ButtonBits = static_cast<unsigned char>(ButtonBits | kButtonDoubleClick);
     else
-        ButtonBits = static_cast<unsigned char>(ButtonBits & 0x7f);
+        ButtonBits = static_cast<unsigned char>(ButtonBits & ~kButtonDoubleClick);
     TellParent(this, kWinNotifyPress);
-    ButtonBits = static_cast<unsigned char>(ButtonBits | 0x14);
+    ButtonBits = static_cast<unsigned char>(ButtonBits | kButtonCaptured | kButtonLitWhilePressed);
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
@@ -839,32 +840,32 @@ intptr_t NnButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_0055bc30. Every own case answers 0; the rest go to WinControl's FUN_005a13c0.
     switch (Msg)
     {
-    case 0x0c:
-        ButtonBits = static_cast<unsigned char>((ButtonBits & 0xbf) | (A != 0 ? 0x40 : 0));
+    case kWinPropLit:
+        ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonSelected) | (A != 0 ? kButtonSelected : 0));
         return 0;
     case kWinNotifyHighlight:
-        ButtonBits = static_cast<unsigned char>(ButtonBits | 0x02);
+        ButtonBits = static_cast<unsigned char>(ButtonBits | kButtonFocused);
         return 0;
     case kWinNotifyUnhighlight:
-        ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfd);
+        ButtonBits = static_cast<unsigned char>(ButtonBits & ~kButtonFocused);
         return 0;
-    case 0x2e:
+    case kButtonPropGetCommand:
         *reinterpret_cast<int*>(A) = CommandId;
         return 0;
-    case 0x32:
-        ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xfe) | (A != 0 ? 0x01 : 0));
+    case kButtonPropNoMeshRender:
+        ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & ~kButtonNoMeshRender) | (A != 0 ? kButtonNoMeshRender : 0));
         return 0;
     case kWinPropColour:
         memcpy(Colour, reinterpret_cast<void const*>(A), sizeof(Colour));
         bUseColour = (B == 1) ? 1 : 0;
         return 0;
-    case 0x34:
-        ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xef) | (A != 0 ? 0x10 : 0));
+    case kWinPropDrawInactive:
+        ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & ~kButtonDrawWhileInactive) | (A != 0 ? kButtonDrawWhileInactive : 0));
         return 0;
-    case 0x35:
+    case kButtonPropGlow:
         bGlow = (A != 0) ? 1 : 0;
         return 0;
-    case 0x36:
+    case kButtonPropSpin:
         bSpin = (A == 1) ? 1 : 0;
         return 0;
     case kWinPropBlink:
@@ -959,9 +960,9 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
     HalfExtents.x = NewHalfExtents->x;
     HalfExtents.y = NewHalfExtents->y;
     HalfExtents.z = NewHalfExtents->z;
-    ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xfe) | (bNoMeshRender & 0x01));
-    ButtonBits = static_cast<unsigned char>((ButtonBits & 0xf7) | ((bActionButton << 3) & 0x08));
-    ButtonBits = static_cast<unsigned char>((ButtonBits & 0xdf) | ((bNoColorChange << 5) & 0x20));
+    ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & ~kButtonNoMeshRender) | (bNoMeshRender & kButtonNoMeshRender));
+    ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonAction) | ((bActionButton << 3) & kButtonAction));
+    ButtonBits = static_cast<unsigned char>((ButtonBits & ~kButtonNoColorChange) | ((bNoColorChange << 5) & kButtonNoColorChange));
     bNoZEnable = bNewNoZEnable;
     ToolTipIds = NewToolTipIds;
     ToolTip2Ids = NewToolTip2Ids;
@@ -1197,7 +1198,7 @@ void NnToggleButtonControl::Update()
     // DAT_0067dbf8, the 3DMathEngine's TransformMatrix with a copy of the camera orientation,
     // normalised by 1 / sqrt), then slot 4. Unlike ButtonControl's LAB_0055b660 no +0x330 bit is
     // written: on the button it tests bit 0 (not bit 2), off it tests bit 2.
-    if ((ButtonBits & 0x10) != 0)
+    if ((ButtonBits & kButtonCaptured) != 0)
     {
         Vector Ray;
         CursorRayThroughMathEngine(&Ray);
@@ -1206,7 +1207,7 @@ void NnToggleButtonControl::Update()
         unsigned char const Bits = ButtonBits; // read after the call (0x0055cb68)
         if (bHit)
         {
-            if ((Bits & 0x01) == 0)
+            if ((Bits & kButtonHovered) == 0)
             {
                 TellParent(this, kWinNotifyCapturedEnter);
                 if (Parent != nullptr)
@@ -1216,7 +1217,7 @@ void NnToggleButtonControl::Update()
                 }
             }
         }
-        else if ((Bits & 0x04) != 0)
+        else if ((Bits & kButtonLitWhilePressed) != 0)
         {
             TellParent(this, kWinNotifyCapturedLeave);
             TellParent(this, kWinNotifyUnhighlight);
@@ -1327,7 +1328,7 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (HasInstance(this))
         {
             Vector Placed;
-            if ((PositionFlags & 1) != 0)
+            if ((PositionFlags & kWinPositionAddOffset) != 0)
             {
                 Placed.x = Offset.x + Position.x;
                 Placed.y = Offset.y + Position.y;
@@ -1344,14 +1345,14 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return NnButtonControl::SetProperty(Msg, A, B); // FUN_0055bc30
     }
-    case 0x2f:
+    case kTogglePropGetState:
         *reinterpret_cast<int*>(A) = ToggleState;
         return 0;
-    case 0x30:
+    case kTogglePropSetState:
         // SETZ: a zero A selects state 1.
         ToggleState = (A == 0) ? 1 : 0;
         return 0;
-    case 0x31:
+    case kTogglePropSounds:
         // The two state sounds, each only when its pointer is non-null.
         if (A != 0)
         {
@@ -1375,6 +1376,6 @@ void NnToggleButtonControl::Activate()
     // 0x26), then the state flips and the parent hears 0x30 with the new state as B.
     NnButtonControl::Activate();
     ToggleState = (ToggleState == 0) ? 1 : 0;
-    TellParentWithValue(this, 0x30, static_cast<uintptr_t>(ToggleState));
+    TellParentWithValue(this, kWinNotifyToggled, static_cast<uintptr_t>(ToggleState));
 }
 

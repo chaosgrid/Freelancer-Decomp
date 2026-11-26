@@ -946,14 +946,14 @@ void __cdecl DAEngine_create_filesystem(char const* Path, IFileSystem** Out,
     IFileSystem* Filesys = DALib::Data;
     FFileSystemDesc Desc;
     memset(&Desc, 0, sizeof(Desc));
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.ComponentName = "FileSystem";
     Desc.Implementation = Implementation;
     Desc.Path = Path;
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
 
     // +0x0C IComponentFactory::CreateInstance -- the FileSystem desc stands in for AGGDESC.

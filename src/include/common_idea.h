@@ -182,6 +182,34 @@ public:
 };
 static_assert(sizeof(IdleIdea) == 0x14, "IdleIdea adds no fields to BaseIdea");
 
+// MoveIdea::Mode (+0x34), selected by SetMode. Picks the thrust equipment the idea throttles
+// with (SetThrottleScale: ThrustEquipEngine / ThrustEquipTradelane / ThrustEquipCruise) and
+// which ThrustManager throttle Update drives (cruise for 2, engine for the rest).
+enum EMoveMode
+{
+    kMoveModeEngine = 0,
+    kMoveModeTradelane = 1,
+    kMoveModeCruise = 2,
+};
+
+// MoveIdea::TargetKind48 (+0x48), stamped by the four target setters.
+enum EMoveTargetKind
+{
+    kMoveTargetNone = 0,
+    kMoveTargetObject = 1,      // SetWatchObject
+    kMoveTargetPoint = 2,       // SetPosition
+    kMoveTargetDirection = 3,   // SetDirection / SetDirectionFrom
+};
+
+// MoveIdea::StopStyle (+0x44, SetField44), the stopping-speed lookahead Update uses once the
+// target is within reach (see StopStyle below). GotoBehavior stores `bFlyThrough ? 2 : 0`.
+enum EMoveStopStyle
+{
+    kMoveStopThrottleCut = 0,   // SetThrottle(0), lookahead FUN_062e5ab0
+    kMoveStopIdea = 1,          // the embedded StopIdea, lookahead FUN_062e58f0
+    kMoveStopFlyThrough = 2,    // no lookahead, nothing stopped
+};
+
 // ============================================================================
 // MoveIdea : public BaseIdea -- ".?AVMoveIdea@@", ctor FUN_062d4e60, 0x78 bytes.
 // ============================================================================
@@ -482,6 +510,17 @@ static_assert(offsetof(MatchThrottle2Idea, ClosingWindow54) == 0x54, "MatchThrot
 static_assert(offsetof(MatchThrottle2Idea, CatchUpRange58) == 0x58, "MatchThrottle2Idea::CatchUpRange58 offset");
 static_assert(sizeof(MatchThrottle2Idea) == 0x5c, "MatchThrottle2Idea size (operator-new-free embed; next member at +0x5c in every owner)");
 
+// FaceIdea::TargetKind (+0xa0), the aim-mode tag the target setters stamp and Update switches on.
+enum EFaceTargetKind
+{
+    kFaceTargetNone = 0,
+    kFaceTargetObject = 1,      // SetWatchObject
+    kFaceTargetPoint = 2,       // SetPosition
+    kFaceTargetDirection = 3,   // SetDirection
+    kFaceTargetBasis = 4,       // SetBasis
+    kFaceTargetAxis = 5,        // SetAxis
+};
+
 // ============================================================================
 // FaceIdea : public BaseIdea -- ".?AVFaceIdea@@", ctor FUN_062d6750, 0xc0 bytes.
 // ============================================================================
@@ -763,6 +802,17 @@ static_assert(offsetof(SplineMoveIdea, ExtrapolateBase) == 0x16c, "SplineMoveIde
 static_assert(offsetof(SplineMoveIdea, PersistedT) == 0x170, "SplineMoveIdea::PersistedT offset");
 static_assert(sizeof(SplineMoveIdea) == 0x174, "SplineMoveIdea size (0x164+0x174==0x2d8 in GotoBehavior, 0x168+0x174==0x2dc in FUN_062c2e60)");
 
+// The direction GenericWeightedPick (FUN_062d76d0) draws, stored in FDirectionPicker::LastDirection:
+// the tag of the weight it drew, in the order of SetWeights(Left, Right, Up, Down). 0 before the
+// first draw.
+enum EDodgeDirection
+{
+    kDodgeDirLeft = 1,
+    kDodgeDirRight = 2,
+    kDodgeDirUp = 3,
+    kDodgeDirDown = 4,
+};
+
 // ============================================================================
 // DirectionPicker -- the second base of DodgeIdea and BreakAwayIdea.
 // ============================================================================
@@ -825,6 +875,16 @@ static_assert(offsetof(FDirectionPicker, WeightDown) == 0x10, "FDirectionPicker:
 static_assert(offsetof(FDirectionPicker, Watcher) == 0x14, "FDirectionPicker::Watcher offset");
 static_assert(offsetof(FDirectionPicker, Flag1c) == 0x1c, "FDirectionPicker::Flag1c offset");
 static_assert(sizeof(FDirectionPicker) == 0x20, "FDirectionPicker size (both derived ctors' shared region is +0x14..+0x34)");
+
+// DodgeIdea::DodgeStyle (+0xb4), named after the EvadeDodgeStyleWeight* personality keys
+// EvadeBehavior::PickDodgeStyle (FUN_062c8690) draws it from.
+enum EDodgeStyle
+{
+    kDodgeStyleWaggle = 0,
+    kDodgeStyleWaggleRandom = 1,
+    kDodgeStyleSlide = 2,
+    kDodgeStyleCorkscrew = 3,
+};
 
 // ============================================================================
 // DodgeIdea : public BaseIdea (+ DirectionPicker at +0x14) -- Common.dll RTTI
@@ -960,6 +1020,15 @@ static_assert(offsetof(DodgeIdea, bRollFlipDirection) == 0xd8, "DodgeIdea::bRoll
 static_assert(offsetof(DodgeIdea, ChaseSpeedScale) == 0xdc, "DodgeIdea::ChaseSpeedScale offset");
 static_assert(sizeof(DodgeIdea) == 0xe0, "DodgeIdea size (BuzzBehavior's 0x178..0x258 ctor gap meets the ctor's own +0xdc write)");
 
+// BreakAwayIdea::BreakStyle (+0x34), named after the EvadeBreakStyleWeight* personality keys
+// EvadeBehavior::OnEngage draws it from (see BreakStyle below).
+enum EBreakStyle
+{
+    kBreakStyleOutrun = 0,     // the "drive forward" arm
+    kBreakStyleSideways = 1,
+    kBreakStyleReverse = 2,    // runs the AttemptReverseTime / ReverseDistance checks
+};
+
 // ============================================================================
 // BreakAwayIdea : public BaseIdea (+ DirectionPicker at +0x14) -- Common.dll
 // RTTI name ".?AVBreakAwayIdea@@". Ctor FUN_062d8970 (vptr 063a04f8 at .text:062d89b6).
@@ -1079,6 +1148,16 @@ static_assert(offsetof(BreakAwayIdea, AfterburnerDelay) == 0x8c, "BreakAwayIdea:
 static_assert(offsetof(BreakAwayIdea, TurnThrottle) == 0x94, "BreakAwayIdea::TurnThrottle offset");
 static_assert(offsetof(BreakAwayIdea, RollThrottle) == 0x98, "BreakAwayIdea::RollThrottle offset");
 static_assert(sizeof(BreakAwayIdea) == 0x9c, "BreakAwayIdea size (BuzzBehavior's 0x258..0x2f4 upper bound meets the ctor's own +0x98 write)");
+
+// DodgeMissileIdea::Mode1c (+0x1c), set by EvadeBehavior::OnUpdate's mode 4 from which of the
+// Personality MissileReaction EvadeBreak / EvadeSlide / EvadeAfterburn reaction times the
+// incoming missile is inside (TimerTableMissileWithinReaction00 / 04 / 08).
+enum EDodgeMissileMode
+{
+    kDodgeMissileAfterburn = 0,   // zero steering command, thrusters on
+    kDodgeMissileBreak = 1,       // fly the perpendicular escape frame
+    kDodgeMissileSlide = 2,       // nudge sideways
+};
 
 // ============================================================================
 // DodgeMissileIdea : public BaseIdea -- Common.dll RTTI name

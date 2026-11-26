@@ -332,8 +332,8 @@ IVP_Collision* IVP_Collision_Delegator_Root_Mindist::delegate_collisions_for_obj
         // (0x94), else a plain one (0x80).
         IVP_Environment* Environment = BaseObject->environment;
         IVP_Ledge_Mindist* Mindist;
-        if ((Ledge0->SizeAndFlags & 3) == 0 &&
-            (Ledge1->SizeAndFlags & 3) == 0)
+        if ((Ledge0->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) == 0 &&
+            (Ledge1->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) == 0)
             Mindist = new IVP_Ledge_Mindist(Environment, this);     // FUN_0634dd10
         else
             Mindist = new IVP_Complex_Mindist(Environment, this);   // FUN_06362ab0
@@ -1148,14 +1148,14 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
         // test on CoreA is retail's (redundant).
         IVP_Core* CoreA = Object->core;
         const uint32_t FlagsA = CoreA->Flags;
-        if ((FlagsA & 0x300u) != 0)
+        if ((FlagsA & IVP_CORE_PINNED) != 0)
         {
             if ((OtherObj->core->Flags & IVP_CORE_PINNED) != 0)
                 continue;
             if ((CoreA->Flags & IVP_CORE_PINNED) != 0 && (OtherObj->core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                 continue;
         }
-        if ((FlagsA & 0x0cu) != 0)
+        if ((FlagsA & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
         {
             if ((OtherObj->core->Flags & IVP_CORE_PINNED) != 0)
                 continue;

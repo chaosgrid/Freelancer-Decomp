@@ -20,6 +20,7 @@
 #include "common_newchar.h" // RtcSlider::validate_setting (RoomData priority tokens)
 #include "DALib.h"
 #include "dacom.h"
+#include <d3d9types.h>   // D3DLIGHT_DIRECTIONAL (the light blob embeds a D3DLIGHT8)
 #include "x86math.h"        // I3DMathEngine::TransformMatrix (RoomData set_script lights)
 
 #include <cmath>
@@ -462,7 +463,7 @@ void RoomData::read_set_script(char const* RelPath)
             if (CallDacomStricmp(Name, "LtShadowSource") == 0)
             {
                 bShadowLight = true;
-                if (LightType == 3)
+                if (LightType == D3DLIGHT_DIRECTIONAL)
                 {
                     TurnLightDirection(Frame, BlobDirection, ShadowLightDirection);
                     bShadowLightWorldSpaceDir = true;
@@ -477,7 +478,7 @@ void RoomData::read_set_script(char const* RelPath)
             else if (CallDacomStricmp(Name, "LtGlareSource") == 0)
             {
                 bGlareLight = true;
-                if (LightType == 3)
+                if (LightType == D3DLIGHT_DIRECTIONAL)
                 {
                     TurnLightDirection(Frame, BlobDirection, GlareLightDirection);
                     bGlareLightWorldSpaceDir = true;
@@ -1065,17 +1066,17 @@ void RoomData::read_ambient_script(INI_Reader* Reader)
     int Type = 0;
     if (CallDacomStricmp(TypeName, "ambient") == 0)
     {
-        Type = 1;
+        Type = kAmbientScriptAmbient;
     }
     else if (CallDacomStricmp(TypeName, "traffic") == 0)
     {
-        Type = 2;
+        Type = kAmbientScriptTraffic;
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: traffic ambient is obsolete in room .ini %s\n",
               kRoomDataSource, 0x3a3, Reader->get_file_name());
     }
     else if (CallDacomStricmp(TypeName, "once") == 0)
     {
-        Type = 3;
+        Type = kAmbientScriptOnce;
     }
     else
     {
@@ -1337,7 +1338,7 @@ void RoomData::read_FlashLightSet_block(INI_Reader* Reader)
 {
     // 0x06276c00 (append FUN_06279670, Mode at +0x1c).
     FlashLightSetInfo* const Set = AppendRoomRecord(FlashLightSets);
-    Set->Mode = 1;
+    Set->Mode = kFlashLightModeSet;
     ReadFlashLightKeys(*Reader, *Set, false);
 }
 
@@ -1345,7 +1346,7 @@ void RoomData::read_FlashLightLine_block(INI_Reader* Reader)
 {
     // 0x06276df0
     FlashLightSetInfo* const Set = AppendRoomRecord(FlashLightSets);
-    Set->Mode = 2;
+    Set->Mode = kFlashLightModeLine;
     ReadFlashLightKeys(*Reader, *Set, true);
 }
 

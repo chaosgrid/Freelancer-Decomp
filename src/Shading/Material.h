@@ -108,6 +108,21 @@ protected:
 };
 static_assert(sizeof(FMaterial) == 0x68, "the common material part is 0x68 bytes");
 
+// FSinglePassMaterial parameter ids (the rows of its property schema).
+enum ESinglePassParam
+{
+    kSinglePassAmbient = 0,
+    kSinglePassDiffuse = 1,
+    kSinglePassEmissive = 2,
+    kSinglePassSpecular = 3,
+    kSinglePassSpecularPower = 4,
+    kSinglePassOpacity = 5,
+    kSinglePassTextureName = 6,
+    kSinglePassTextureWrap = 7,
+    kSinglePassTextureAddressU = 8,
+    kSinglePassTextureAddressV = 9,
+};
+
 // "SinglePassMaterial": DcDt, DcDtEc, DcDtOcOt, DcDtEcOcOt (object vtable 06ed27f0).
 class FSinglePassMaterial : public FMaterial
 {
@@ -144,6 +159,20 @@ private:
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan);
 };
 
+// FDcDtEtMaterial parameter ids: diffuse colour, diffuse texture, emissive texture.
+enum EDcDtEtParam
+{
+    kDcDtEtDiffuse = 0,
+    kDcDtEtDiffuseTextureName = 1,
+    kDcDtEtDiffuseTextureWrap = 2,
+    kDcDtEtDiffuseTextureAddressU = 3,
+    kDcDtEtDiffuseTextureAddressV = 4,
+    kDcDtEtEmissiveTextureName = 5,
+    kDcDtEtEmissiveTextureWrap = 6,
+    kDcDtEtEmissiveTextureAddressU = 7,
+    kDcDtEtEmissiveTextureAddressV = 8,
+};
+
 // "DcDtEt" (object vtable 06ed17b8).
 class FDcDtEtMaterial : public FMaterial
 {
@@ -160,6 +189,16 @@ public:
 
 protected:
     FDcDtEtMaterial();
+};
+
+// FEcEtMaterial parameter ids: emissive colour and emissive texture.
+enum EEcEtParam
+{
+    kEcEtEmissive = 0,
+    kEcEtEmissiveTextureName = 1,
+    kEcEtEmissiveTextureWrap = 2,
+    kEcEtEmissiveTextureAddressU = 3,
+    kEcEtEmissiveTextureAddressV = 4,
 };
 
 // "EcEt" (object vtable 06ed1d28).
@@ -181,6 +220,20 @@ public:
                                unsigned long Flags) override;                      // 06eb8d90
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // LAB_06ebdfa0
     const char* __thiscall ClassName() override;
+};
+
+// FAtmosphereMaterial parameter ids.
+enum EAtmosphereParam
+{
+    kAtmosphereAmbient = 0,
+    kAtmosphereDiffuse = 1,
+    kAtmosphereFadeTextureName = 2,
+    kAtmosphereFadeTextureWrap = 3,
+    kAtmosphereFadeTextureAddressU = 4,
+    kAtmosphereFadeTextureAddressV = 5,
+    kAtmosphereFadeOff = 6,
+    kAtmosphereAlpha = 7,
+    kAtmosphereScale = 8,
 };
 
 // "AtmosphereMaterial" (object vtable 06ed11f0).
@@ -211,6 +264,25 @@ protected:
                                    unsigned long Count, unsigned long IbStart, unsigned long IndexSpan);
 };
 
+// FBtDetailMapMaterial parameter ids (the single-pass rows, then the "Bt" detail texture).
+enum EBtDetailParam
+{
+    kBtDetailAmbient = 0,
+    kBtDetailDiffuse = 1,
+    kBtDetailEmissive = 2,
+    kBtDetailSpecular = 3,
+    kBtDetailSpecularPower = 4,
+    kBtDetailOpacity = 5,
+    kBtDetailTextureName = 6,
+    kBtDetailTextureWrap = 7,
+    kBtDetailTextureAddressU = 8,
+    kBtDetailTextureAddressV = 9,
+    kBtDetailDetailTextureName = 10,
+    kBtDetailDetailTextureWrap = 11,
+    kBtDetailDetailTextureAddressU = 12,
+    kBtDetailDetailTextureAddressV = 13,
+};
+
 // "BtDetailMapMaterial" (object vtable 06ed1598).
 class FBtDetailMapMaterial : public FMaterial
 {
@@ -239,6 +311,24 @@ public:
                                unsigned long Flags) override;                      // LAB_06eb55b0
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // LAB_06eb5590
     const char* __thiscall ClassName() override;
+};
+
+// Parameter ids shared by FDetailMap2PassMaterial and FDetailMapMaterial (retail shares LAB_06eb6b80 / FUN_06eb6c40).
+enum EDetailMapParam
+{
+    kDetailMapAmbient = 0,
+    kDetailMapDiffuse = 1,
+    kDetailMapDiffuseTextureName = 2,
+    kDetailMapDiffuseTextureWrap = 3,
+    kDetailMapDiffuseTextureAddressU = 4,
+    kDetailMapDiffuseTextureAddressV = 5,
+    kDetailMapFlipU = 6,
+    kDetailMapFlipV = 7,
+    kDetailMapDetailTextureName = 8,
+    kDetailMapDetailTextureWrap = 9,
+    kDetailMapDetailTextureAddressU = 10,
+    kDetailMapDetailTextureAddressV = 11,
+    kDetailMapTileRate = 12,
 };
 
 // "DetailMap2Dm1Msk2PassMaterial" (object vtable 06ed19c8).
@@ -289,6 +379,29 @@ public:
 
 protected:
     FDetailMapMaterial();
+};
+
+// Parameter ids shared by FIllumDetailMapMaterial and FMasked2DetailMapMaterial (FTwoDetailMapMaterial).
+enum ETwoDetailMapParam
+{
+    kTwoDetailMapAmbient = 0,
+    kTwoDetailMapDiffuse = 1,
+    kTwoDetailMapDiffuseTextureName = 2,
+    kTwoDetailMapDiffuseTextureWrap = 3,
+    kTwoDetailMapDiffuseTextureAddressU = 4,
+    kTwoDetailMapDiffuseTextureAddressV = 5,
+    kTwoDetailMapFlipU = 6,
+    kTwoDetailMapFlipV = 7,
+    kTwoDetailMapAlpha0TextureName = 8,
+    kTwoDetailMapAlpha0TextureWrap = 9,
+    kTwoDetailMapAlpha0TextureAddressU = 10,
+    kTwoDetailMapAlpha0TextureAddressV = 11,
+    kTwoDetailMapTileRate0 = 12,
+    kTwoDetailMapAlpha1TextureName = 13,
+    kTwoDetailMapAlpha1TextureWrap = 14,
+    kTwoDetailMapAlpha1TextureAddressU = 15,
+    kTwoDetailMapAlpha1TextureAddressV = 16,
+    kTwoDetailMapTileRate1 = 17,
 };
 
 // What IllumDetailMapMaterial and Masked2DetailMapMaterial have in common: retail shares
@@ -343,6 +456,15 @@ public:
 
 protected:
     bool ApplyMaskedDetailPassState(unsigned long Pass);
+};
+
+// Parameter ids shared by FNebulaMaterial and FLightMapMaterial (one texture; retail shares LAB_06ebc5a0).
+enum ENebulaParam
+{
+    kNebulaTextureName = 0,
+    kNebulaTextureWrap = 1,
+    kNebulaTextureAddressU = 2,
+    kNebulaTextureAddressV = 3,
 };
 
 // "LightMap" (object vtable 06ed2138).

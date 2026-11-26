@@ -128,7 +128,7 @@ public:
 void ServerPhantom::added(CObject* Obj)
 {
     if (Obj == nullptr) return;
-    if ((static_cast<unsigned int>(Obj->ObjectClass) & 3u) != 3u) return;
+    if ((static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple) return;
     if ((static_cast<CSimple*>(Obj)->TypeBits & TypeMask) == 0) return;
     Entered.push_back(static_cast<CSimple*>(Obj)->Id);
 }
@@ -136,7 +136,7 @@ void ServerPhantom::added(CObject* Obj)
 void ServerPhantom::deleted(CObject* Obj)
 {
     if (Obj == nullptr) return;
-    if ((static_cast<unsigned int>(Obj->ObjectClass) & 3u) != 3u) return;
+    if ((static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple) return;
     if ((static_cast<CSimple*>(Obj)->TypeBits & TypeMask) == 0) return;
     Left.push_back(static_cast<CSimple*>(Obj)->Id);
 }
@@ -1194,7 +1194,7 @@ SERVER_API int __cdecl GetReputationGroup(unsigned int& out_id, const char* name
     while (tname.Length < 15 && local_name[tname.Length] != '\0') {
         ++tname.Length;
     }
-    memcpy(tname.Data, local_name, 16);
+    memcpy(tname.Data, local_name, sizeof(tname.Data));
     unsigned int id = GlobalReputation::get_id(tname);
     if (id != 0xFFFFFFFF) {
         out_id = id;
@@ -1540,11 +1540,11 @@ SERVER_API int __cdecl EnumerateConnections(const unsigned int& system_id, Conne
         Universe::FSystemConnection Record;
         Record.Object.clear();
         sys->GetConnection(static_cast<unsigned int>(Index), &Record);
-        if (connection_type == 1) {
-            if (Record.GateType != 1) continue;
-        } else if (connection_type == 2) {
-            if (Record.GateType != 2) continue;
-        } else if (connection_type != 0) {
+        if (connection_type == CONN_TYPE_JUMP_GATE) {
+            if (Record.GateType != Universe::SolarGateJumpGate) continue;
+        } else if (connection_type == CONN_TYPE_JUMP_HOLE) {
+            if (Record.GateType != Universe::SolarGateJumpHole) continue;
+        } else if (connection_type != CONN_TYPE_ALL) {
             continue;
         }
         unsigned int const Slot = enumerator.Count;
@@ -1750,7 +1750,7 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
         if (Params->bSetPersonality != 0) {
             Behavior->set_personality(Params->Value);
         }
-        return static_cast<OP_RTYPE>(0);
+        return OpRTypeSuccess;
     }
 
     if (Op->OpType == OpType_SetZoneBehaviorParams) {
@@ -1762,7 +1762,7 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
         // Deviation: retail writes only the fields each zone kind uses and submits the rest
         // as stack residue (+0x08/+0x14/+0x54 for a box, +0x08 for kind 2, +0x00 for an
         // unknown kind, +0x04 for an unknown mode). The port zeroes those fields first.
-        Zone.Mode = 0;
+        Zone.Mode = SetZoneBehaviorParams::kZoneSphere;
         Zone.Invert = 0;
         Zone.TargetPoint.x = 0.0f;
         Zone.TargetPoint.y = 0.0f;
@@ -1773,27 +1773,27 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
         Zone.BoxHalfExtent.z = 0.0f;
         Zone.TargetKey = 0;
 
-        if (Params->InvertMode == 0) {
+        if (Params->InvertMode == SetZoneBehaviorParams::kInvertNormal) {
             Zone.Invert = 0;
-        } else if (Params->InvertMode == 1) {
+        } else if (Params->InvertMode == SetZoneBehaviorParams::kInvertInverted) {
             Zone.Invert = 1;
-        } else if (Params->InvertMode == 2) {
+        } else if (Params->InvertMode == SetZoneBehaviorParams::kInvertClearUserZone) {
             Pathfind->clear_user_zone();
-            return static_cast<OP_RTYPE>(0);
+            return OpRTypeSuccess;
         }
 
         // BoxMin = Params+0x24..+0x2c, BoxMax = Params+0x30..+0x38.
-        if (Params->Mode == 0) {
-            Zone.Mode = 0;
+        if (Params->Mode == SetZoneBehaviorParams::kZoneSphere) {
+            Zone.Mode = SetZoneBehaviorParams::kZoneSphere;
             Zone.TargetPoint.x = Params->TargetPoint.x;
             Zone.TargetPoint.y = Params->TargetPoint.y;
             Zone.TargetPoint.z = Params->TargetPoint.z;
             Zone.Radius = Params->Radius;
-        } else if (Params->Mode == 1) {
+        } else if (Params->Mode == SetZoneBehaviorParams::kZoneBox) {
             // Center = (max + min) * 0.5f (DAT_06d6b9cc), each component stored to float
             // before use; extents = |min - center|. Retail re-copies an identity into the
             // rotation, which changes nothing.
-            Zone.Mode = 1;
+            Zone.Mode = SetZoneBehaviorParams::kZoneBox;
             float const CenterX = (Params->BoxMax.x + Params->BoxMin.x) * 0.5f;
             float const CenterY = (Params->BoxMax.y + Params->BoxMin.y) * 0.5f;
             float const CenterZ = (Params->BoxMax.z + Params->BoxMin.z) * 0.5f;
@@ -1803,8 +1803,8 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
             Zone.BoxHalfExtent.x = std::fabs(Params->BoxMin.x - CenterX);
             Zone.BoxHalfExtent.y = std::fabs(Params->BoxMin.y - CenterY);
             Zone.BoxHalfExtent.z = std::fabs(Params->BoxMin.z - CenterZ);
-        } else if (Params->Mode == 2) {
-            Zone.Mode = 2;
+        } else if (Params->Mode == SetZoneBehaviorParams::kZoneObject) {
+            Zone.Mode = SetZoneBehaviorParams::kZoneObject;
             Zone.Radius = Params->Radius;
             Zone.TargetKey = Params->TargetId;
         }
@@ -1859,15 +1859,15 @@ static const FSubmitDirectiveBehavior GSubmitDirectiveBehaviors[] = {
 // object), the directive goes to that player's client (player branch); otherwise to the AI.
 SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
     if ((Flid & 0x3fffffff) == 0) return static_cast<OP_RTYPE>(4);
-    if (!Op->validate()) return static_cast<OP_RTYPE>(5);
+    if (!Op->validate()) return OpRTypeInvalid;
 
     GameObject* Obj = Server_LookupLiveObject(Flid);
-    if (Obj == nullptr) return static_cast<OP_RTYPE>(5);
+    if (Obj == nullptr) return OpRTypeInvalid;
 
     CObject const* Inspected = Obj->cobject();
-    if (Inspected == nullptr) return static_cast<OP_RTYPE>(5);
-    if ((static_cast<unsigned int>(Inspected->ObjectClass) & 3u) != 3u) return static_cast<OP_RTYPE>(5);
-    if (static_cast<CSimple const*>(Inspected)->ObjectDb == nullptr) return static_cast<OP_RTYPE>(5);
+    if (Inspected == nullptr) return OpRTypeInvalid;
+    if ((static_cast<unsigned int>(Inspected->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple) return OpRTypeInvalid;
+    if (static_cast<CSimple const*>(Inspected)->ObjectDb == nullptr) return OpRTypeInvalid;
 
     // No null test on csimple() (retail would fault reading +0xb4 of null).
     unsigned int OwnerPlayer = Obj->csimple()->OwnerPlayer;
@@ -1880,14 +1880,14 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
         // retail; zeroed here (rpclocal's marshal zeroes them again).
         FPayloadServerSetDirective Info = {};
         Info.DockPortIndex = -1;
-        Info.GotoMode = 3;
+        Info.GotoMode = kGotoKindNone;
 
         if (Op->OpType == OpType_DirectiveCancelOp) {
-            Info.DirectiveKind = 0;
+            Info.DirectiveKind = kDirectiveKindCancel;
         } else if (Op->OpType == OpType_DirectiveDelayOp) {
             DirectiveDelayOp* Delay = static_cast<DirectiveDelayOp*>(Op);
             Info.DelaySeconds = Delay->DelaySeconds;
-            Info.DirectiveKind = 1;
+            Info.DirectiveKind = kDirectiveKindDelay;
         } else if (Op->OpType == OpType_DirectiveDockOp) {
             DirectiveDockOp* Dock = static_cast<DirectiveDockOp*>(Op);
             Info.DockObjectId = Dock->DockObjectId;
@@ -1897,7 +1897,7 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
             Info.ProxTargetId = static_cast<unsigned int>(Dock->TetherObjectId);
             Info.ProxNearDist = Dock->TetherNearRange;
             Info.ProxFarDist = Dock->TetherFarRange;
-            Info.DirectiveKind = 2;
+            Info.DirectiveKind = kDirectiveKindDock;
         } else if (Op->OpType == OpType_DirectiveFollowOp) {
             DirectiveFollowOp* Follow = static_cast<DirectiveFollowOp*>(Op);
             Info.FollowTargetId = Follow->TargetId;
@@ -1906,9 +1906,9 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
             Info.FollowOffset.y = Follow->FollowOffsetY;
             Info.FollowOffset.z = Follow->FollowOffsetZ;
             Info.FollowEngageRange = Follow->EngageRange;
-            Info.DirectiveKind = 3;
+            Info.DirectiveKind = kDirectiveKindFollow;
         } else if (Op->OpType == OpType_DirectiveIdleOp) {
-            Info.DirectiveKind = 5;
+            Info.DirectiveKind = kDirectiveKindIdle;
         } else if (Op->OpType == OpType_DirectiveGotoOp) {
             // The only kind that fills +0x84..+0x90 (the others zero it before the send).
             DirectiveGotoOp* Goto = static_cast<DirectiveGotoOp*>(Op);
@@ -1937,16 +1937,16 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
             Info.ProxNearDist = Goto->TetherNearRange;
             Info.ProxFarDist = Goto->TetherFarRange;
             Info.bGotoDisableAvoidance = Goto->bDisableAvoidance;
-            Info.DirectiveKind = 4;
+            Info.DirectiveKind = kDirectiveKindGoto;
         } else {
             // Trail, Strafe, Face, Ram, TractorBeam, Evade, DrasticEvade, Launch,
             // InstantTradelane, Formation, Guide, WaitForShip, WaitForPlayerManeuver and the
             // Set*Params ops.
-            return static_cast<OP_RTYPE>(5);
+            return OpRTypeInvalid;
         }
 
         g_pClientInterface->SendServerSetDirective(OwnerPlayer, Info);
-        return static_cast<OP_RTYPE>(1);
+        return OpRTypeAccepted;
     }
 
     // AI branch. GetBehaviorManager is not null-tested (retail would fault).
@@ -1956,30 +1956,30 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
         // Kind 2 with the named behaviour; an unknown name returns 5.
         DirectiveWaitForPlayerManeuverOp* Wait = static_cast<DirectiveWaitForPlayerManeuverOp*>(Op);
         int const BehaviorId = BehaviorTypes::get_behavior_id(Wait->BehaviorName);
-        if (BehaviorId == -1) return static_cast<OP_RTYPE>(5);
+        if (BehaviorId == -1) return OpRTypeInvalid;
         Behavior->set_current_directive(
             Server_MakeDirectiveInfo(2u, Op->Priority, static_cast<unsigned int>(BehaviorId)), Op);
-        return static_cast<OP_RTYPE>(1);
+        return OpRTypeAccepted;
     }
 
     if (Op->OpType == OpType_DirectiveCancelOp) {
         // The callee's result is ignored.
         Behavior->set_current_directive(Server_MakeDirectiveInfo(0u, Op->Priority, 0xffffffffu), Op);
-        return static_cast<OP_RTYPE>(1);
+        return OpRTypeAccepted;
     }
 
     // A current directive whose word 0 is non-zero blocks every other op.
     unsigned int CurrentKind = 0;
     std::memcpy(&CurrentKind, Behavior->get_current_directive()->Data, sizeof(CurrentKind));
-    if (CurrentKind != 0) return static_cast<OP_RTYPE>(2);
+    if (CurrentKind != 0) return OpRTypeDirectiveBusy;
 
-    unsigned int Result = 5;
+    unsigned int Result = OpRTypeInvalid;
     size_t const PairCount = sizeof(GSubmitDirectiveBehaviors) / sizeof(GSubmitDirectiveBehaviors[0]);
     for (size_t Index = 0; Index < PairCount; ++Index) {
         if (Op->OpType != GSubmitDirectiveBehaviors[Index].OpType) continue;
         if (Behavior->set_current_directive(
                 Server_MakeDirectiveInfo(1u, Op->Priority, GSubmitDirectiveBehaviors[Index].BehaviorId), Op)) {
-            Result = 1;
+            Result = OpRTypeAccepted;
         }
     }
     return static_cast<OP_RTYPE>(Result);
@@ -1988,9 +1988,9 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
 // pub::AI::set_directive_priority -- retail 0x7db70. No Flid mask test.
 SERVER_API OP_RTYPE __cdecl set_directive_priority(unsigned int Flid, DirectivePriority Priority) {
     GameObject* Obj = Server_LookupLiveObject(Flid);
-    if (Obj == nullptr) return static_cast<OP_RTYPE>(5);
+    if (Obj == nullptr) return OpRTypeInvalid;
     IBehaviorManager* Behavior = GetBehaviorManager(Obj);
-    if (Behavior == nullptr) return static_cast<OP_RTYPE>(5);
+    if (Behavior == nullptr) return OpRTypeInvalid;
     return Behavior->set_directive_priority(Priority);
 }
 
@@ -2062,14 +2062,14 @@ SERVER_API bool __cdecl lock_maneuvers(unsigned int Flid, bool bLock) {
 // otherwise the AI answers. No null test on csimple().
 SERVER_API ScanResponse __cdecl get_scan_response(unsigned int ScannerFlid, unsigned int TargetFlid, unsigned int GoodId) {
     GameObject* Obj = Server_LookupLiveObject(TargetFlid);
-    if (Obj == nullptr) return static_cast<ScanResponse>(0);
+    if (Obj == nullptr) return ScanRespNone;
     unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
     if (::Players.is_valid_ship_owner(OwnerPlayer, TargetFlid)) {
         g_pClientInterface->SendServerScanNotify(OwnerPlayer, ScannerFlid, GoodId);
-        return static_cast<ScanResponse>(3);
+        return ScanRespNeutral;
     }
     IBehaviorManager* Behavior = GetBehaviorManager(Obj);
-    if (Behavior == nullptr) return static_cast<ScanResponse>(0);
+    if (Behavior == nullptr) return ScanRespNone;
     return Behavior->get_scan_response(ScannerFlid);
 }
 
@@ -2286,7 +2286,7 @@ SERVER_API int __cdecl Attach(const unsigned int& ObjId, void* Handle) {
     std::list<ServerPhantom*>::iterator It = FindPhantom(Handle);
     if (It == GPhantoms.end()) return -3;
     CObject* Raw = Obj->Object;
-    if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 1u) != 1u)
+    if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassObject) != CObject::ClassObject)
         Raw = nullptr;
     if (PhySys::AttachPhantom(Raw, (*It)->PhyHandle) != 0) return -1;
     return 0;

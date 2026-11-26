@@ -26,6 +26,7 @@
 #include "common_csys.h"              // Acquire3DMathEngine (FUN_005b73e0)
 #include "common_goods.h"             // EquipDescList / EquipDescVector / Loadout
 #include "common_iface.h"             // IBehaviorManager, IDirectiveInfo, FBehaviorManagerEvent
+#include "server_cobject.h"            // DestroyType
 #include "common_misc.h"              // DamageList, SUBOBJ_ID_NONE / SUBOBJ_ID_ROOT
 #include "common_physys.h"            // PhySys::AnyActive / RCSet / RCEnd
 #include "common_pub.h"               // pub::AI::Directive*Op (slot 100)
@@ -218,7 +219,7 @@ void IClientImpl::SendCommonActivateEquip(unsigned int /*ClientId*/, const XActi
 // FUN_0053c940 -- ch1 ACTIVATECRUISE: the ship (bucket 1), IObjAffect slot 20.
 void IClientImpl::SendCommonActivateCruise(unsigned int /*ClientId*/, const XActivateCruise& Info)
 {
-    FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 1);
+    FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, static_cast<int>(EClientGameobjKind::Ship));
     if (Go == nullptr)
     {
         return;
@@ -229,7 +230,7 @@ void IClientImpl::SendCommonActivateCruise(unsigned int /*ClientId*/, const XAct
 // FUN_0053c980 -- ch1 ACTIVATETHRUSTERS: the ship (bucket 1), IObjAffect slot 21.
 void IClientImpl::SendCommonActivateThrusters(unsigned int /*ClientId*/, const XActivateThrusters& Info)
 {
-    FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 1);
+    FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, static_cast<int>(EClientGameobjKind::Ship));
     if (Go == nullptr)
     {
         return;
@@ -472,7 +473,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     }
 
     // The player's CShip is beamed there with its own rotation.
-    CObject* const PlayerShip = NarrowObject(const_cast<CObject*>(Player->cobject()), 0x503);
+    CObject* const PlayerShip = NarrowObject(const_cast<CObject*>(Player->cobject()), CObject::ClassShip);
     if (PlayerShip == nullptr)
     {
         return;
@@ -802,7 +803,7 @@ void IClientImpl::SendServerCreateMine(unsigned int /*ClientId*/, const FServerC
     {
         return;
     }
-    CreateDroppedProjectile(new FClientMineGameobj(), 0xf, &Info);
+    CreateDroppedProjectile(new FClientMineGameobj(), CObject::ClassMine, &Info);
 }
 
 // FUN_0053d080 -- ch2 CREATEGUIDED. ClientId is not read.
@@ -883,7 +884,7 @@ void IClientImpl::SendServerCreateCounter(const unsigned int& /*ClientId*/,
     {
         return;
     }
-    CreateDroppedProjectile(new FClientCounterMeasureGameobj(), 0x17, &Info);
+    CreateDroppedProjectile(new FClientCounterMeasureGameobj(), CObject::ClassCounterMeasure, &Info);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -894,7 +895,7 @@ void IClientImpl::SendServerCreateCounter(const unsigned int& /*ClientId*/,
 // position + offset. No null test on the narrowed object.
 void IClientImpl::SendServerExplodeAsteroidMine(unsigned int /*ClientId*/, const FMineExplosion& Info)
 {
-    FClientGameobj* const Go = ClientObjDb_FindObject(Info.MineId, 8);
+    FClientGameobj* const Go = ClientObjDb_FindObject(Info.MineId, static_cast<int>(EClientGameobjKind::MedAsteroid));
     if (Go == nullptr)
     {
         return;
@@ -945,7 +946,7 @@ void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServ
     }
     if (IsPlayerShipId(Info.ObjectId))
     {
-        if (DestroyType == 1)
+        if (DestroyType == DESTROY_FUSE)
         {
             ReqPlayerHullStatusRetail(0.0f);
         }
@@ -958,7 +959,7 @@ void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServ
         Simple->connect(GetClientObjDb());
     }
     Go->Destroy(static_cast<int>(DestroyType));
-    if (SinglePlayer() || DestroyType != 0)
+    if (SinglePlayer() || DestroyType != DESTROY_VANISH)
     {
         return;
     }
@@ -977,7 +978,7 @@ void IClientImpl::SendServerActivateObject(unsigned int /*ClientId*/, const FPay
 void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FServerSystemSwitchOutInfo& Info)
 {
     FClientShipGameobj* const Ship =
-        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
+        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, static_cast<int>(EClientGameobjKind::Ship)));
     if (Ship == nullptr)
     {
         return;
@@ -985,7 +986,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
 
     // A missing gate is an ERROR, and the handler goes on (retail reads the gate next with no
     // test).
-    FClientGameobj* const Gate = ClientObjDb_FindObject(Info.GateId, 2);
+    FClientGameobj* const Gate = ClientObjDb_FindObject(Info.GateId, static_cast<int>(EClientGameobjKind::Solar));
     if (Gate == nullptr)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x54e,
@@ -1014,7 +1015,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
             Gate->get_type(GateType);
             Block[1] = GateType;
             FBehaviorManagerEvent Event;
-            Event.Type = 3;
+            Event.Type = FBehaviorManagerEvent::kEventObjectLeftSystem;
             Event.Data = Block;
             Behavior->OnEvent(&Event);
         }
@@ -1033,7 +1034,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
     // straight away.
     unsigned Type = 0;
     Gate->get_type(Type);
-    if ((Type & 0x40u) != 0 || (Type & 0x800u) != 0)
+    if ((Type & OBJ_JUMP_GATE) != 0 || (Type & OBJ_JUMP_HOLE) != 0)
     {
         Ship->BeginJumpOut(Gate);
     }
@@ -1109,7 +1110,7 @@ void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInf
 void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunchInfo& Info)
 {
     FClientShipGameobj* const Ship =
-        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
+        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, static_cast<int>(EClientGameobjKind::Ship)));
     if (Ship == nullptr)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Launch (): launching object %d not found.",
@@ -1161,14 +1162,14 @@ void IClientImpl::SendServerRequestSpaceScript(unsigned int /*ClientId*/, const 
     }
 
     // Mode 1: the script camera (FUN_0054bb10) keeps the transform it has.
-    if (Info.CameraMode == 1u)
+    if (Info.CameraMode == kRequestSpaceScriptCameraKeepTransform)
     {
         SetupSpaceScriptCamera(Object, nullptr, Info.Name);
         return;
     }
 
     // Mode 2: identity orientation at the given position. Any other mode does nothing.
-    if (Info.CameraMode != 2u)
+    if (Info.CameraMode != kRequestSpaceScriptCameraIdentity)
     {
         return;
     }
@@ -1336,7 +1337,7 @@ void IClientImpl::SendServerSendNNMessage(unsigned int /*ClientId*/, unsigned in
 // it.
 void IClientImpl::SendServerLoadHint(const unsigned int& /*ClientId*/, BaseHint* Hint)
 {
-    if (Hint->Kind == 1)
+    if (Hint->Kind == kLoadHintKindCostume)
     {
         Costume Copy;
         memcpy(&Copy, &static_cast<CostumeHint*>(Hint)->Cost, sizeof(Copy));
@@ -1384,7 +1385,7 @@ void IClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& /*Client
         return;
     }
     CEqObj* const Eq =
-        static_cast<CEqObj*>(NarrowObject(const_cast<CObject*>(Go->cobject()), 0x503));
+        static_cast<CEqObj*>(NarrowObject(const_cast<CObject*>(Go->cobject()), CObject::ClassShip));
     if (Eq == nullptr)
     {
         return;
@@ -1607,20 +1608,20 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
 
     switch (Info.DirectiveKind)
     {
-    case 0:
+    case kDirectiveKindCancel:
     {
         pub::AI::DirectiveCancelOp Op;
         Behavior->set_current_directive(MakeDirectiveInfo(0u, 0xffffffffu), &Op);
         break;
     }
-    case 1:
+    case kDirectiveKindDelay:
     {
         pub::AI::DirectiveDelayOp Op;
         Op.DelaySeconds = Info.DelaySeconds;
-        Behavior->set_current_directive(MakeDirectiveInfo(1u, 0x14u), &Op);
+        Behavior->set_current_directive(MakeDirectiveInfo(1u, BEHAVIOR_DELAY), &Op);
         break;
     }
-    case 2:
+    case kDirectiveKindDock:
     {
         pub::AI::DirectiveDockOp Op;
         Op.DockObjectId = Info.DockObjectId;
@@ -1630,10 +1631,10 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
         Op.TetherObjectId = static_cast<int32_t>(Info.ProxTargetId);
         Op.TetherNearRange = Info.ProxNearDist;
         Op.TetherFarRange = Info.ProxFarDist;
-        Behavior->set_current_directive(MakeDirectiveInfo(1u, 7u), &Op);
+        Behavior->set_current_directive(MakeDirectiveInfo(1u, BEHAVIOR_DOCK), &Op);
         break;
     }
-    case 3:
+    case kDirectiveKindFollow:
     {
         pub::AI::DirectiveFollowOp Op;
         Op.TargetId = Info.FollowTargetId;
@@ -1642,10 +1643,10 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
         Op.FollowOffsetY = Info.FollowOffset.y;
         Op.FollowOffsetZ = Info.FollowOffset.z;
         Op.EngageRange = Info.FollowEngageRange;
-        Behavior->set_current_directive(MakeDirectiveInfo(1u, 0x11u), &Op);
+        Behavior->set_current_directive(MakeDirectiveInfo(1u, BEHAVIOR_FOLLOW), &Op);
         break;
     }
-    case 4:
+    case kDirectiveKindGoto:
     {
         pub::AI::DirectiveGotoOp Op;
         Op.GotoKind = Info.GotoMode;
@@ -1673,12 +1674,12 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
         Op.TetherNearRange = Info.ProxNearDist;
         Op.TetherFarRange = Info.ProxFarDist;
         Op.bDisableAvoidance = Info.bGotoDisableAvoidance;
-        Behavior->set_current_directive(MakeDirectiveInfo(1u, 2u), &Op);
+        Behavior->set_current_directive(MakeDirectiveInfo(1u, BEHAVIOR_GOTO), &Op);
         break;
     }
-    case 5:
+    case kDirectiveKindIdle:
     {
-        Behavior->set_current_directive(MakeDirectiveInfo(1u, 6u), nullptr);
+        Behavior->set_current_directive(MakeDirectiveInfo(1u, BEHAVIOR_IDLE), nullptr);
         Behavior->update_current_behavior_throttle(0.0f);
         Behavior->update_current_behavior_cruise(false);
         break;
@@ -1713,7 +1714,7 @@ void IClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int /*ClientId*/, 
         return;
     }
     CShip* const Ship =
-        static_cast<CShip*>(NarrowObject(const_cast<CObject*>(Go->cobject()), 0x503));
+        static_cast<CShip*>(NarrowObject(const_cast<CObject*>(Go->cobject()), CObject::ClassShip));
     if (Ship == nullptr)
     {
         return;
@@ -1749,7 +1750,7 @@ void IClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int /*ClientId*/, 
     if (Go != nullptr)
     {
         CEqObj* const Eq =
-            static_cast<CEqObj*>(NarrowObject(const_cast<CObject*>(Go->cobject()), 0x103));
+            static_cast<CEqObj*>(NarrowObject(const_cast<CObject*>(Go->cobject()), CObject::ClassEqObj));
         if (Eq == nullptr)
         {
             return;

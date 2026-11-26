@@ -23,7 +23,7 @@
 #include "Core/RefHandle.h"          // TRefHandle (FUN_06f28e10)
 #include "common_ini.h"
 #include "common_server.h"
-#include "server_cobject.h"     // pub::SpaceObj::Destroy, DESTROY_NORMAL
+#include "server_cobject.h"     // pub::SpaceObj::Destroy, DESTROY_VANISH
 
 #include <algorithm>
 #include <cmath>
@@ -434,7 +434,7 @@ void FSystemInfo::DestroyObjectsIfUnoccupied()
     for (std::vector<unsigned int>::const_iterator It = MissionObjectsCopy.begin();
          It != MissionObjectsCopy.end(); ++It)
     {
-        pub::SpaceObj::Destroy(*It, DESTROY_NORMAL);
+        pub::SpaceObj::Destroy(*It, DESTROY_VANISH);
         RemoveMissionObject(*It);
     }
 }
@@ -500,7 +500,7 @@ void FSystemInfo::DestroyMissionObjects()
     for (std::vector<unsigned int>::const_iterator It = MissionObjectsCopy.begin();
          It != MissionObjectsCopy.end(); ++It)
     {
-        pub::SpaceObj::Destroy(*It, DESTROY_NORMAL);
+        pub::SpaceObj::Destroy(*It, DESTROY_VANISH);
         RemoveMissionObject(*It);
     }
 }
@@ -862,7 +862,7 @@ void FSystemInfo::DestroyFlaggedObjectsAwayFromPlayers(float Unused)
     // The RemoveMissionObject body is inlined in retail.
     for (std::vector<unsigned int>::const_iterator It = AwayIds.begin(); It != AwayIds.end(); ++It)
     {
-        pub::SpaceObj::Destroy(*It, DESTROY_NORMAL);
+        pub::SpaceObj::Destroy(*It, DESTROY_VANISH);
         RemoveMissionObject(*It);
     }
 }
@@ -1303,7 +1303,7 @@ int FSystemInfo::RebuildTradeLanes()
     // affiliation carries over from ring to ring when a lookup fails.
     for (std::vector<FTradeLane>::iterator Lane = TradeLanes.begin(); Lane != TradeLanes.end(); ++Lane)
     {
-        unsigned int Affiliation = 0xffffffffu;
+        unsigned int Affiliation = kNoAffiliation;
         float LaneMax = 0.0f;
         for (std::vector<FTradeLaneRing>::size_type RingIndex = 0; RingIndex < Lane->Rings.size(); ++RingIndex)
         {
@@ -1395,7 +1395,7 @@ namespace
                  Source.Items.begin();
              It != Source.Items.end(); ++It)
         {
-            if ((GetFactionFeelingMask(It->first, Affiliation) & 4) != 0)   // FUN_06f350f0
+            if ((GetFactionFeelingMask(It->first, Affiliation) & kFeelingHostile) != 0)   // FUN_06f350f0
                 Out->Items.push_back(*It);
         }
     }
@@ -1502,7 +1502,7 @@ void FSystemInfo::SpawnTradeLaneAttack(FContentPlayerShip* PlayerShip, int const
     // A "TLParams" object (type 3); the result is not tested. The ref holder releases through
     // FUN_06f28e10.
     TRefHandle<FRandEncParams> Params;
-    CreateRandEncParamsByType(3, &Params.Pointer);                          // FUN_06efb8e0
+    CreateRandEncParamsByType(kRandEncParamsTL, &Params.Pointer);                          // FUN_06efb8e0
     FRandEncTLParams* Attack = static_cast<FRandEncTLParams*>(Params.Pointer);
 
     Attack->TargetTradelane = Ring.ObjectId;

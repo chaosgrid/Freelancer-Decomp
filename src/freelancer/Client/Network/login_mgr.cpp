@@ -795,7 +795,7 @@ int CLoginMgr::Login()
     G_Server->Login(Info, GetPlayerConnectionId());        // +0x48
 
     int const Result = WaitForServerResponse(&bLoginResponse, 5.0f, 60.0f);
-    if (Result != 1 || LoginStatus != 3)
+    if (Result != 1 || LoginStatus != kLoginAccepted)
     {
         return 0;
     }
@@ -812,7 +812,7 @@ int CLoginMgr::Login()
     }
 
     // +0x15c ReqDifficultyScale: 0 under "+G", else perf-option slot 6.
-    float const Scale = G_bCommandLineG ? 0.0f : GetPerfOptionSlot(6);
+    float const Scale = G_bCommandLineG ? 0.0f : GetPerfOptionSlot(kPerfSlotDifficultyScale);
     G_Server->ReqDifficultyScale(Scale, GetPlayerConnectionId());
     return Result;
 }

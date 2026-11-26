@@ -42,6 +42,16 @@ struct IObjRW;  // common_iface.h -- get_target()'s result
 //   24  LAB_062c78c0  get_target
 // Every other slot is Behavior's own entry.
 // ============================================================================
+// EvadeBehavior::EvadeMode (+0x2c), the maneuver OnUpdate picks each tick (0 = none yet; ctor and
+// OnEngage zero it).
+enum EEvadeMode
+{
+    kEvadeModeDodge = 1,          // the DodgeIdea (formation notified for EvadeDodge)
+    kEvadeModeBreak = 2,          // the BreakAwayIdea with the drawn break style (EvadeBreak)
+    kEvadeModeBreakReverse = 3,   // the BreakAwayIdea forced to kBreakStyleReverse
+    kEvadeModeMissile = 4,        // the DodgeMissileIdea against an incoming missile
+};
+
 class EvadeBehavior : public Behavior
 {
 public:

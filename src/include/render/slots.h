@@ -169,6 +169,26 @@ namespace Render
         AbilitySlot20 = 20,
     };
 
+    // IRenderPipeline::SetPipelineState / GetPipelineState ids, named after the INI keys of the
+    // property map (RP8 FUN_06d01c68; the keys are read from the [RenderPipeline] section).
+    enum EPipelineState
+    {
+        PipelineStateTexture = 0x0,
+        PipelineStateLighting = 0x1,
+        PipelineStateTextureLod = 0x2,
+        PipelineStateTextureAllow8Bit = 0x3,
+        PipelineStateTextureAllow32Bit = 0x4,
+        PipelineStateTextureAllowDxt = 0x5,
+        PipelineStateBrokenMultitexture = 0x6,
+        PipelineStateViewspaceLights = 0x7,
+        PipelineStateClearColor = 0x8,
+        PipelineStateClearZDepth = 0x9,
+        PipelineStateClearStencil = 0xA,
+        PipelineStateStateCache = 0xB,
+        PipelineStateBrokenMod2x = 0xC,
+        PipelineStateBrokenFlip = 0xD,
+    };
+
     // IRPDraw — 4 slots. Slot 3 FDUMP draw_indexed_primitive (RET 0x18).
     enum ERpDrawSlot
     {

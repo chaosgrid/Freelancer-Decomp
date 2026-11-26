@@ -60,11 +60,11 @@ enum class EMessage : int
     RtcDone               = 0x22, // IServerImpl::RTCDone: {player, rtc} (Cnd_RTCDone)
     CargoJettisoned       = 0x23, // Ship jettison request: {ship, word equip id, good, count}
     AbortMission          = 0x24, // IServerImpl::AbortMission: {player, mission}
-    // TODO(name): sent by IServerImpl::SystemSwitchOutComplete as {ship, gate, system} and
-    // for every ship that finished leaving through its dock (Ship::DockedObjId) as {ship,
-    // dock object, system}; SpaceSupport destroys Msg[0] when it is one of its system's
-    // objects, MissionObject treats it as the ship's jump.
-    Msg0x25               = 0x25,
+    // Sent by IServerImpl::SystemSwitchOutComplete as {ship, gate, system} and for every ship
+    // that finished leaving through its dock (Ship::DockedObjId) as {ship, dock object,
+    // system}; SpaceSupport destroys Msg[0] when it is one of its system's objects,
+    // MissionObject treats it as the ship's jump.
+    ShipLeftSystem        = 0x25,
     JumpInComplete        = 0x26, // Ship (vtable slot 0x74): {arg, ship} (Cnd_JumpInComplete)
     // TODO(name): StarSystem dock-list update: {ship, base, target, byte land}; SpaceSupport
     // cancels the ship's docking when land != 0.

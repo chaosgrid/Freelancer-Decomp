@@ -27,21 +27,21 @@ CAccountsDlg::CAccountsDlg(CWnd* Parent)
 // .text:00412b90
 void CAccountsDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 3, DeleteAccountButton);
-	DDX_Control(DX, 2, DeleteCharacterButton);
-	DDX_Control(DX, 1045, BannedLabel);
-	DDX_Control(DX, 1029, EditAccountButton);
-	DDX_Control(DX, 1040, AccountList);
+	DDX_Control(DX, kControlDeleteAccount, DeleteAccountButton);
+	DDX_Control(DX, kControlDeleteCharacter, DeleteCharacterButton);
+	DDX_Control(DX, kControlBannedLabel, BannedLabel);
+	DDX_Control(DX, kControlEditAccount, EditAccountButton);
+	DDX_Control(DX, kControlAccountList, AccountList);
 }
 
 // Message-map entries .rdata:0041dec8 (the AFX_MSGMAP at 0041df88 points here).
 BEGIN_MESSAGE_MAP(CAccountsDlg, CDialog)
 	ON_WM_MEASUREITEM()                             // 00412c50
-	ON_LBN_SELCHANGE(1040, &CAccountsDlg::OnSelChangeList) // 00412f00
-	ON_BN_CLICKED(1029, &CAccountsDlg::OnEditAccount)      // 00413030
-	ON_LBN_DBLCLK(1040, &CAccountsDlg::OnDblClkList)       // 00413180
-	ON_BN_CLICKED(2, &CAccountsDlg::OnDeleteCharacter)     // 00413190
-	ON_BN_CLICKED(3, &CAccountsDlg::OnDeleteAccount)       // 00413380
+	ON_LBN_SELCHANGE(kControlAccountList, &CAccountsDlg::OnSelChangeList) // 00412f00
+	ON_BN_CLICKED(kControlEditAccount, &CAccountsDlg::OnEditAccount)      // 00413030
+	ON_LBN_DBLCLK(kControlAccountList, &CAccountsDlg::OnDblClkList)       // 00413180
+	ON_BN_CLICKED(kControlDeleteCharacter, &CAccountsDlg::OnDeleteCharacter)     // 00413190
+	ON_BN_CLICKED(kControlDeleteAccount, &CAccountsDlg::OnDeleteAccount)       // 00413380
 	ON_WM_CTLCOLOR()                                // 00413440
 END_MESSAGE_MAP()
 
@@ -56,7 +56,7 @@ BOOL CAccountsDlg::OnInitDialog()
 // .text:00412c50 — rows are as tall as the list box's regular font.
 void CAccountsDlg::OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo)
 {
-	if (IDCtl != 1040)
+	if (IDCtl != kControlAccountList)
 	{
 		CDialog::OnMeasureItem(IDCtl, MeasureInfo);
 		return;

@@ -68,7 +68,7 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     AvoidRecordTimer = 0.0f;
     AvoidRecordPeriod = 1.0f;
 
-    AvoidRecordKind = 0;
+    AvoidRecordKind = kAvoidRecordNone;
     AvoidObstacleWatcher.set(nullptr);
     AvoidNudgeDirection.z = 0.0f;
     AvoidNudgeDirection.y = 0.0f;
@@ -88,7 +88,7 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     bObstacleAvoidanceEnabled = 1;
     NudgeObstacleTypeMask = -1;
     bObstacleNudgeAllowed = 1;
-    Field_250 = 0x7f0000;
+    Field_250 = OBJ_SHIP_MASK;
     bAvoidPointAllowed = 1;
     AvoidExcludeId = 0;
     Watcher1C8.set(nullptr);
@@ -195,16 +195,16 @@ void PathfindManager::SetAvoidanceAllowed(int Value, unsigned int Mask)
 {
     // FUN_062dd3d0
     unsigned char const Byte = static_cast<unsigned char>(Value);
-    if ((Mask & 2) != 0)
+    if ((Mask & kAvoidancePoint) != 0)
         bAvoidPointAllowed = Byte;
-    unsigned int const Bit0 = Mask & 1;
+    unsigned int const Bit0 = Mask & kAvoidanceObstacleNudge;
     if (Bit0 != 0)
         bObstacleNudgeAllowed = Byte;
     if (Byte != 0)
         return;
 
     // FUN_062e8ce0 on the owner's ThrustManager.
-    if (Bit0 != 0 && (AvoidRecordKind & 1) != 0)
+    if (Bit0 != 0 && (AvoidRecordKind & kAvoidRecordNudge) != 0)
     {
         Vector Zero;
         Zero.x = 0.0f;
@@ -215,7 +215,7 @@ void PathfindManager::SetAvoidanceAllowed(int Value, unsigned int Mask)
 
     // Retail assigns the +0x214 record from a default-constructed temporary; field by field
     // that is the following (the temporary's watcher branches are never taken).
-    AvoidRecordKind = 0;
+    AvoidRecordKind = kAvoidRecordNone;
     AvoidObstacleWatcher.set(nullptr);
     AvoidNudgeDirection.x = 0.0f;
     AvoidNudgeDirection.y = 0.0f;
@@ -269,7 +269,7 @@ void PathfindManager::Update(float Dt)
     }
 
     // Behaviours 6, 8, 0x13 and none drop the obstacle state (FUN_062db780 inlined).
-    if (BehaviorIndex == 6 || BehaviorIndex == 8 || BehaviorIndex == 0x13 || BehaviorIndex == -1)
+    if (BehaviorIndex == BEHAVIOR_IDLE || BehaviorIndex == BEHAVIOR_LAUNCH || BehaviorIndex == BEHAVIOR_FREE_FLIGHT || BehaviorIndex == -1)
     {
         Avoidance.ResetContact();
         Reaction.ResetState();
@@ -290,14 +290,14 @@ void PathfindManager::Update(float Dt)
 
     // A live nudge record is blended into the ThrustManager (FUN_062e8e60) when bBlendAvoidNudge
     // allows; one that has just ended hands it a zero vector (FUN_062e8ce0).
-    if ((AvoidRecordKind & 1) != 0)
+    if ((AvoidRecordKind & kAvoidRecordNudge) != 0)
     {
         if (bBlendAvoidNudge)
         {
             Owner->Sys->Thrust.BlendNudgeDirection(AvoidNudgeDirection, Dt);
         }
     }
-    else if ((PreviousRecord & 1) != 0)
+    else if ((PreviousRecord & kAvoidRecordNudge) != 0)
     {
         Vector Zero;
         Zero.x = 0.0f;
@@ -341,7 +341,7 @@ void PathfindManager::RefreshAvoidance()
 {
     // FUN_062dd580
     AvoidObstacleWatcher.set(nullptr);
-    AvoidRecordKind = 0;
+    AvoidRecordKind = kAvoidRecordNone;
     AvoidTargetPoint.z = 0.0f;
     AvoidTargetPoint.y = 0.0f;
     AvoidTargetPoint.x = 0.0f;
@@ -356,7 +356,7 @@ void PathfindManager::RefreshAvoidance()
         // A point record.
         AvoidPointContact = Avoidance.HasContact;
         AvoidObstacleWatcher.set(nullptr);
-        AvoidRecordKind = 2;
+        AvoidRecordKind = kAvoidRecordPoint;
         AvoidRecordSource = Kind;
         // Retail reads get_center_of_mass into a local that is never used.
         (void)PathfindOwnerObject(Owner)->get_center_of_mass();
@@ -397,7 +397,7 @@ void PathfindManager::RefreshAvoidance()
         Sys->Thrust.SetNudgeDirection(Direction);
     }
     AvoidNudgeDirection = Direction;
-    AvoidRecordKind = 1;
+    AvoidRecordKind = kAvoidRecordNudge;
 }
 
 int PathfindManager::SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int* OutKind)
@@ -628,12 +628,12 @@ bool PathfindManager::UserZoneContainsPoint(Vector const* ProbePoint)
     Vector SphereTarget;
     bool bHaveSphereTarget = false;
 
-    if (Zone.Mode == 0)
+    if (Zone.Mode == pub::AI::SetZoneBehaviorParams::kZoneSphere)
     {
         SphereTarget = Zone.TargetPoint;
         bHaveSphereTarget = true;
     }
-    else if (Zone.Mode == 1)
+    else if (Zone.Mode == pub::AI::SetZoneBehaviorParams::kZoneBox)
     {
         unsigned char* const Box = reinterpret_cast<unsigned char*>(&Zone.BoxRotation);
         Vector const* const BoxCenter = &Zone.BoxCenter;
@@ -659,7 +659,7 @@ bool PathfindManager::UserZoneContainsPoint(Vector const* ProbePoint)
 
         bInside = (SignedSq < 0.0f);
     }
-    else if (Zone.Mode == 2)
+    else if (Zone.Mode == pub::AI::SetZoneBehaviorParams::kZoneObject)
     {
         IObjDB* const ObjectDb = Owner->ObjectDb;
         if (ObjectDb == nullptr)
@@ -719,7 +719,7 @@ int PathfindManager::GetUserZoneApproachDirection(Vector* OutDir)
     Dir.y = 0.0f;
     Dir.z = 0.0f;
 
-    if (Mode == 2)
+    if (Mode == pub::AI::SetZoneBehaviorParams::kZoneObject)
     {
         IObjDB* const ObjectDb = Owner->ObjectDb;
         if (ObjectDb == nullptr)
@@ -732,7 +732,7 @@ int PathfindManager::GetUserZoneApproachDirection(Vector* OutDir)
         Zone.TargetPoint = Found->get_position();
     }
 
-    if (Mode == 0 || Mode == 2)
+    if (Mode == pub::AI::SetZoneBehaviorParams::kZoneSphere || Mode == pub::AI::SetZoneBehaviorParams::kZoneObject)
     {
         Vector const* const Target = &Zone.TargetPoint;
 
@@ -752,7 +752,7 @@ int PathfindManager::GetUserZoneApproachDirection(Vector* OutDir)
         Dir.y = (float)(Dir.y * InvLen);
         Dir.z = (float)(Dir.z * InvLen);
     }
-    else if (Mode == 1)
+    else if (Mode == pub::AI::SetZoneBehaviorParams::kZoneBox)
     {
         unsigned char* const Box = reinterpret_cast<unsigned char*>(&Zone.BoxRotation);
         Vector const* const BoxCenter = &Zone.BoxCenter;

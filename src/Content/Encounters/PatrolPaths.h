@@ -37,6 +37,13 @@ struct FPatrolPathSegment
     int SecondPoint;                    // +0x04 step index + 1
 };
 
+// FPatrolPath::Usage (the "usage" keys of the zone's path_label).
+enum EPathUsage
+{
+    kPathUsagePatrol = 0x1,    // "patrol"
+    kPathUsageTrade = 0x10     // "trade"
+};
+
 // Retail 0x44 bytes. Ctor FUN_06f37110; copy and dtor are member-wise (the ctor's unwind
 // funclets destroy +0x24 FUN_06f377f0, +0x14 and +0x00).
 struct FPatrolPath

@@ -104,10 +104,10 @@ namespace
                     FHardpointData ChildData;
                     if ((unsigned char)DALib::Hardpoint->GetHardpoint(ChildHandle, &ChildKey, &ChildData) != 0)
                     {
-                        if (ChildData.Type == 2 && ParentData.Type == 2)
+                        if (ChildData.Type == kJointTypeRev && ParentData.Type == kJointTypeRev)
                         {
                             FEngineJointBlock Joint;
-                            Joint.Type = 2;
+                            Joint.Type = kJointTypeRev;
                             Joint.Field_0x54 = 0;  // retail: unwritten stack (see FEngineJointBlock)
                             Joint.Field_0x58 = 0;
                             Joint.ParentPos = ParentData.Position;

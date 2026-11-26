@@ -21,6 +21,14 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "version.lib")
 
+// Language ids of the two Chinese IME families the reading-window and candidate-layout code
+// tells apart (the low word of the keyboard layout / IME id).
+enum
+{
+    kLangIdChineseTraditional = MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL),
+    kLangIdChineseSimplified = MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED),
+};
+
 // Global variables
 HWND GWindow = NULL;
 HWND GMessageWindow = NULL;
@@ -240,7 +248,7 @@ void ImeUi_SetSupportLevel(DWORD Level)
     GRequestedSupportLevel = Level;
     if (Level >= 2 && Level <= 3)
     {
-        if ((GLanguage & 0x3FF) == 0x12) // Korean
+        if ((GLanguage & 0x3FF) == LANG_KOREAN) // Korean
         {
             Level = 3;
         }
@@ -412,10 +420,10 @@ void ImeUi_CheckLanguage()
         DWORD SubLanguage = SUBLANGID(LOWORD(GLanguage));
         GbVerticalCandidates = true;
         GLanguageSymbol = L"\x4e2d";
-        if (SubLanguage != 1)
+        if (SubLanguage != SUBLANG_CHINESE_TRADITIONAL)
         {
             GLanguageSymbol = L"A";
-            if (SubLanguage == 2)
+            if (SubLanguage == SUBLANG_CHINESE_SIMPLIFIED)
             {
                 GLanguageSymbol = L"\x4e2d";
                 GbVerticalCandidates = GetImeId(0) == 0;
@@ -451,7 +459,7 @@ void ImeUi_UpdateCandidateList(HWND Window)
     GCandidateSelection = static_cast<int>(List->dwSelection);
     GCandidateCount = static_cast<int>(List->dwCount);
     DWORD Start = 0;
-    if (LOWORD(GLanguage) == 0x804 && GetImeId(0))
+    if (LOWORD(GLanguage) == kLangIdChineseSimplified && GetImeId(0))
     {
         DWORD Accumulated = 0;
         DWORD Index = 0;
@@ -474,7 +482,7 @@ void ImeUi_UpdateCandidateList(HWND Window)
         GCandidatePageSize = List->dwPageSize < 10 ? List->dwPageSize : 10;
         Start = (List->dwSelection / GCandidatePageSize) * GCandidatePageSize;
     }
-    if (LOWORD(GLanguage) == 0x804 && !GetImeId(0))
+    if (LOWORD(GLanguage) == kLangIdChineseSimplified && !GetImeId(0))
         GCandidateSelection = -1;
     else
         GCandidateSelection -= Start;
@@ -488,7 +496,7 @@ void ImeUi_UpdateCandidateList(HWND Window)
     }
     free(List);
     ImmReleaseContext(Window, Context);
-    if (PRIMARYLANGID(LOWORD(GLanguage)) == LANG_KOREAN || (LOWORD(GLanguage) == 0x404 && !GetImeId(0)))
+    if (PRIMARYLANGID(LOWORD(GLanguage)) == LANG_KOREAN || (LOWORD(GLanguage) == kLangIdChineseTraditional && !GetImeId(0)))
         GCandidateSelection = -1;
 }
 
@@ -678,7 +686,7 @@ void ImeUi_Render(bool bDrawComposition, bool bShowToolbar)
             if (Attribute <= 4)
             {
                 Background = GCompositionBackgrounds[Attribute];
-                if (Attribute == ATTR_TARGET_CONVERTED && LOWORD(GetImeId(0)) != 0x804) bTarget = true;
+                if (Attribute == ATTR_TARGET_CONVERTED && LOWORD(GetImeId(0)) != kLangIdChineseSimplified) bTarget = true;
             }
             if (GSupportLevel == 3)
             {
@@ -691,7 +699,7 @@ void ImeUi_Render(bool bDrawComposition, bool bShowToolbar)
                 if (RenderedLength < 251) GRenderedComposition[RenderedLength++] = GComposition[Index];
                 if (Index == GClientCaret) DrawCompositionCaret(PreviousX, Y, FontHeight);
             }
-            if ((bTarget && !AnchorX) || (LOWORD(GetImeId(0)) == 0x804 && Index == GCompositionCursor))
+            if ((bTarget && !AnchorX) || (LOWORD(GetImeId(0)) == kLangIdChineseSimplified && Index == GCompositionCursor))
             {
                 AnchorX = PreviousX;
                 AnchorY = Y;
@@ -746,7 +754,7 @@ void ImeUi_Render(bool bDrawComposition, bool bShowToolbar)
     else AnchorY += FontHeight;
     if (AnchorY < 0) AnchorY = 0;
     int OuterWidth;
-    if (!GbShowReading && LOWORD(GetImeId(0)) == 0x804) OuterWidth = TotalWidth + Count * Padding;
+    if (!GbShowReading && LOWORD(GetImeId(0)) == kLangIdChineseSimplified) OuterWidth = TotalWidth + Count * Padding;
     else if (GbShowReading && GbHorizontalReading) OuterWidth = MaxWidth + Padding * 2 + 2;
     else if (!GbVerticalCandidates && !GbShowReading) OuterWidth = (MaxWidth + 1) * Count + 1;
     else OuterWidth = MaxWidth + Padding * 2 + 2;
@@ -758,7 +766,7 @@ void ImeUi_Render(bool bDrawComposition, bool bShowToolbar)
     int InnerY = AnchorY + 1;
     --Right;
     --Bottom;
-    if (!GbShowReading && LOWORD(GetImeId(0)) != 0x804)
+    if (!GbShowReading && LOWORD(GetImeId(0)) != kLangIdChineseSimplified)
     {
         if (!GbVerticalCandidates)
         {
@@ -830,7 +838,7 @@ void ImeUi_Render(bool bDrawComposition, bool bShowToolbar)
             GCompositionFont->Draw(GCandidates[CandidateIndex]);
         }
         if (!GbShowReading && !GbVerticalCandidates)
-            InnerX += LOWORD(GetImeId(0)) == 0x804 ? Widths[CandidateIndex] + Padding : MaxWidth + 1;
+            InnerX += LOWORD(GetImeId(0)) == kLangIdChineseSimplified ? Widths[CandidateIndex] + Padding : MaxWidth + 1;
     }
 }
 
@@ -922,7 +930,7 @@ int ImeUi_ProcessMessage(HWND Window, UINT MessageId, WPARAM MessageParam, LPARA
                 wcscpy(GComposition, Text);
                 LONG AttributeSize = GetComposition(Context, GCS_COMPATTR, GCompositionAttributes, 256);
                 GCompositionAttributes[AttributeSize] = 0;
-                if (LOWORD(GLanguage) == 0x404 && !GetImeId(0))
+                if (LOWORD(GLanguage) == kLangIdChineseTraditional && !GetImeId(0))
                 {
                     if (!Length) GCandidateCount = 0;
                     else
@@ -1050,7 +1058,7 @@ static DWORD GetImeId(unsigned Index)
             bool bRecognized = GGetReadingString != NULL;
             static const char* Names[] = { "TINTLGNT.IME", "CINTLGNT.IME", "MSTCIPHA.IME", "PINTLGNT.IME", "MSSCIPYA.IME" };
             for (int NameIndex = 0; NameIndex < 5 && !bRecognized; ++NameIndex)
-                if (CompareStringA(0x409, NORM_IGNORECASE, FileName, -1, Names[NameIndex], -1) == CSTR_EQUAL)
+                if (CompareStringA(MAKELCID(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), SORT_DEFAULT), NORM_IGNORECASE, FileName, -1, Names[NameIndex], -1) == CSTR_EQUAL)
                     bRecognized = true;
             if (bRecognized)
             {
@@ -1067,9 +1075,9 @@ static DWORD GetImeId(unsigned Index)
                         {
                             DWORD Id = (((Version->dwFileVersionMS & 0xff) << 8) | (Version->dwFileVersionMS & 0xffff0000)) * 256;
                             bool bVersionRecognized = GGetReadingString != NULL;
-                            if (Language == 0x404)
+                            if (Language == kLangIdChineseTraditional)
                                 bVersionRecognized = bVersionRecognized || Id == 0x04020000 || Id == 0x04030000 || Id == 0x04040000 || Id == 0x05000000 || Id == 0x05010000 || Id == 0x05020000 || Id == 0x06000000;
-                            else if (Language == 0x804)
+                            else if (Language == kLangIdChineseSimplified)
                                 bVersionRecognized = bVersionRecognized || Id == 0x04010000 || Id == 0x04020000 || Id == 0x05030000;
                             if (bVersionRecognized)
                             {
@@ -1255,7 +1263,7 @@ static void UpdateReadingOrientation(DWORD Id)
         return;
     }
     GbHorizontalReading = false;
-    if (LOWORD(Id) != 0x404) return;
+    if (LOWORD(Id) != kLangIdChineseTraditional) return;
     DWORD Version = Id & 0xffff0000;
     char KeyName[260];
     lstrcpyA(KeyName, "software\\microsoft\\windows\\currentversion\\");
@@ -1308,7 +1316,7 @@ void ImeUi_SetActive(bool bInactive)
             {
                 DWORD Flags;
                 if (SUCCEEDED(Manager->GetShowFloatingStatus(&Flags))) SavedFloatingFlags = Flags;
-                if (!(SavedFloatingFlags & 0x800)) Manager->ShowFloating(8);
+                if (!(SavedFloatingFlags & TF_SFT_DESKBAND)) Manager->ShowFloating(TF_SFT_HIDDEN);
             }
             else if (SavedFloatingFlags) Manager->ShowFloating(SavedFloatingFlags);
             Manager->Release();

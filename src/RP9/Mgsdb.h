@@ -40,6 +40,37 @@ struct FMgsdbRecordSet
     FMgsdbDatabase* Owner;
 };
 
+// FUN_06d23e0a ("if <key> <op> <value>"): the kind of the key on the left, the comparison
+// operator and, for the "os" key, the value (its keywords win95 .. winxp).
+enum EMgsdbIfKind
+{
+    kMgsdbKindNumber = 0, // cpuspeed, ram, videoram, subsysid, revision and the caps keys
+    kMgsdbKindGuid = 1,   // "guid"
+    kMgsdbKindDriver = 2, // "driver" (A.B.C.D)
+    kMgsdbKindOs = 3      // "os"
+};
+
+enum EMgsdbIfOp
+{
+    kMgsdbOpEq = 0,  // == =
+    kMgsdbOpNe = 1,  // != <>
+    kMgsdbOpGt = 2,  // >
+    kMgsdbOpLt = 3,  // <
+    kMgsdbOpGe = 4,  // >= =>
+    kMgsdbOpLe = 5,  // <= =<
+    kMgsdbOpAnd = 6  // & (bit test)
+};
+
+enum EMgsdbOs
+{
+    kMgsdbOsWin95 = 0,
+    kMgsdbOsWin98 = 1,
+    kMgsdbOsWin98Se = 2,
+    kMgsdbOsWinMe = 3,
+    kMgsdbOsWin2k = 4,
+    kMgsdbOsWinXp = 5
+};
+
 // The 0x584-byte match object (vtable 06d5eaf4). Field offsets are the retail ones.
 class FMgsdbDatabase
 {

@@ -25,6 +25,20 @@ static const char* const G_NameVMeshWire = "VMeshWire";
 
 // IEngineComponent is declared in src/include/engine/engbase.h.
 
+// The Flags of IRenderer2::RenderInstance that RenderManager::RenderInstance (LAB_06c32a80)
+// acts on; the plugins' RenderInstance take further bits (0x200, 0x1000, 0x4000, 0x8000) that
+// are only passed on.
+enum ERenderInstanceFlag
+{
+    kDrawPickSwitch = 0x08,     // pick the LOD by distance (FUN_06c32040)
+    kDrawRotateOffset = 0x10,   // rotate the matrix offset by its own 3x3
+    kDrawConjugate = 0x20,      // matrix := World * matrix * World^-1
+    kDrawMatrixReady = 0x40,    // the matrix is used as given
+    kDrawKeepCurrent = 0x80,    // draw the current LOD
+    kDrawNoCull = 0x100,        // skip ICamera ClassifySphere, rank 4
+    kDrawNoChildren = 0x2000,   // do not recurse into child instances
+};
+
 // ICamera is declared in common_misc.h (slot 16 +0x40 GetViewTransform is what RendComp reads).
 struct ICamera;
 

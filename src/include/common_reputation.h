@@ -23,6 +23,10 @@
 #include <utility>
 #include <vector>
 
+// The Affiliation of a group that has none: VibeValue::Affiliation's default, and what
+// Reputation::Vibe::GetAffiliation answers for it.
+static const unsigned int kNoAffiliation = 0xffffffffu;
+
 class INI_Reader;
 // The save writer Reputation::Save writes through. Declared once, in server_savefile.h
 // (Server implements it); retail's export spells it `struct ISave` at global scope.
@@ -78,6 +82,14 @@ private:
 // the ctor (0x062ff030) and init (0x062ff060). Id is atol(nickname), else CreateID(nickname);
 // retail never stores the nickname text: get_name (0x062ff140) _ultoa's the Id into a static
 // buffer. Copy ctor, operator= and the non-virtual dtor are memberwise.
+// The values of bodypart::Sex and of the gender get_costume_gender answers: the client picks the
+// voice profile prefix "gcs_ml_" / "gcs_fm_" by it, Content the male / female name lists.
+enum ECostumeGender
+{
+    kGenderMale = 1,
+    kGenderFemale = 2,
+};
+
 struct COMMON_API bodypart
 {
     bodypart();                                     // 0x062ff030

@@ -288,7 +288,7 @@ void CRemoteClientProxy::OnConnect(long Result)
     }
     ++Client.NumClients;
     FPacketBase* Packet = nullptr;
-    if (Client.Serializer->Allocate(2, 1, &Packet) == 0)
+    if (Client.Serializer->Allocate(kPacketChannelServer, FlPacketOpcode(FLPACKET_SERVER_CONNECTRESPONSE), &Packet) == 0)
     {
         static_cast<FRpcConnectResponsePacket*>(Packet)->Value = ClientId;
         Client.PushToClient(ClientId, Packet->AsRaw());

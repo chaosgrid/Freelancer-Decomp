@@ -74,12 +74,12 @@ namespace
         // Non-zero: D3DCMP_LESSEQUAL (4), no z write; else D3DCMP_ALWAYS (8), z write on.
         if (bDepthTested != 0)
         {
-            Pipe->SetRenderState(kRsDepthFunction, 4);
+            Pipe->SetRenderState(kRsDepthFunction, D3DCMP_LESSEQUAL);
             Pipe->SetRenderState(kRsZWriteEnable, 0);
         }
         else
         {
-            Pipe->SetRenderState(kRsDepthFunction, 8);
+            Pipe->SetRenderState(kRsDepthFunction, D3DCMP_ALWAYS);
             Pipe->SetRenderState(kRsZWriteEnable, 1);
         }
     }
@@ -161,7 +161,7 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DObjectMath, ScaleMtx, Scale);
         Xform = reinterpret_cast<Transform const*>(ScaleMtx);
-        SlotFlags |= 0x30u;
+        SlotFlags |= kDrawRotateOffset | kDrawConjugate;
     }
 
     DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Xform, nullptr);
@@ -220,7 +220,7 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInsta
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DSubmitMath, ScaleMtx, Scale);
         Xform = reinterpret_cast<Transform const*>(ScaleMtx);
-        SlotFlags |= 0x30u;
+        SlotFlags |= kDrawRotateOffset | kDrawConjugate;
     }
 
     DALib::Renderer->RenderInstance(ArchAnchor, EngineInstance, 1.0f, SlotFlags, Xform, Material);
@@ -237,7 +237,7 @@ void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, InstanceIndex Engi
     // FUN_00434630.
     unsigned long OrFlags = Flags | 0x8200u;
     if (bFrontCull == 0)
-        OrFlags |= 0x2000u;
+        OrFlags |= kDrawNoChildren;
     // The material selector is the constant 1, not the depth byte.
     SubmitWin3DTintedEngineInstance(ArchAnchor, EngineInstance, 1, OrFlags, ColorRgba,
                                     bDepthTested, Scale);
@@ -290,9 +290,9 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, InstanceIndex EngineInstance
     *reinterpret_cast<unsigned long*>(FlagValue + 4) = (bParam10 != 0) ? 1u : 0u;
     Material->SetParameterValue(0xa, FlagValue);
 
-    unsigned long SlotFlags = Flags | 0x100u;
+    unsigned long SlotFlags = Flags | kDrawNoCull;
     if (bFrontCull == 0)
-        SlotFlags |= 0x2000u;
+        SlotFlags |= kDrawNoChildren;
     Transform const* Xform = nullptr;
     float ScaleMtx[12];
     if (Scale != 1.0f)
@@ -300,7 +300,7 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, InstanceIndex EngineInstance
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DSubmitMath, ScaleMtx, Scale);
         Xform = reinterpret_cast<Transform const*>(ScaleMtx);
-        SlotFlags |= 0x30u;
+        SlotFlags |= kDrawRotateOffset | kDrawConjugate;
     }
     int const Result =
         DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, SlotFlags, Xform, Material);
@@ -320,7 +320,7 @@ void SubmitWin3DOutlinedEngineInstance(void* Camera, InstanceIndex EngineInstanc
                                       Flags);
     unsigned long OrFlags = Flags | 0x8100u;
     if (bFrontCull == 0)
-        OrFlags |= 0x2000u;
+        OrFlags |= kDrawNoChildren;
     SubmitWin3DTintedEngineInstance(Camera, EngineInstance, 1, OrFlags, ColorRgba, 1, Scale);
 }
 

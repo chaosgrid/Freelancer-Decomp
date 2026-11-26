@@ -99,6 +99,15 @@ extern float GEncounterPlacementRange;
 // TU64 -- zones.
 // ---------------------------------------------------------------------------------------
 
+// FSystemZone::VignetteType, the "vignette_type" of the zone, also the bits of a random
+// mission node's allowable_zone_types (FRmMissionParams::AllowableZoneTypes).
+enum EVignetteZoneType
+{
+    kVignetteZoneOpen = 1,        // the default ("open")
+    kVignetteZoneField = 2,       // "field"
+    kVignetteZoneExclusion = 4    // "exclusion"
+};
+
 // SystemInfo +0x60 vector element, retail 0x5c bytes. Built on the stack by the zone
 // enumerator FUN_06fa77c0 and parsed by FUN_06fa7980; operator= FUN_06fa7e40, dtor
 // FUN_06f30830 (both member-wise).
@@ -456,7 +465,7 @@ struct FSystemInfo : public CommReferrable
     double GetNpcShipLifeRate(FContentNpcShip* Ship);
     // FUN_06f73dd0 (the argument is not read; caller SpaceSupport passes the tick
     // DAT_06fce770): the ids of DeferredDestroyObjects with no player ship within 10000 are
-    // destroyed (DESTROY_NORMAL) and removed (the RemoveMissionObject body inlined).
+    // destroyed (DESTROY_VANISH) and removed (the RemoveMissionObject body inlined).
     void DestroyFlaggedObjectsAwayFromPlayers(float Unused);
     // FUN_06f73fa0 (caller SpaceSupport with the tick DAT_06fce770): runs
     // down the remaining life of the NPC ships of SpaceObjs and destroys the expired ones

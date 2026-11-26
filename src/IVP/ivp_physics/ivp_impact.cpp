@@ -294,7 +294,7 @@ void IVP_Impact_System::recalc_pair_dists_except(IVP_ListManager_CorePairEntry* 
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 {
-    if (IVP_SignedLowByte(Core->MovementState) < 8)
+    if (IVP_SignedLowByte(Core->MovementState) < IVP_MT_NOT_SIM)
     {
         Core->recalc_interpolated_frame(); // FUN_06347240 (Ipion synchronize_with_rot_z)
     }

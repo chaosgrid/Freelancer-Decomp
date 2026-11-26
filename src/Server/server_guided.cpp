@@ -72,7 +72,7 @@ Guided::~Guided()
 // LAB_06cf3d70.
 unsigned int Guided::get_type_bits() const
 {
-    return 0x1000000u;
+    return OBJ_GUIDED;
 }
 
 CGuided* Guided::cguided() const
@@ -174,7 +174,7 @@ bool Guided::update(float Dt)
     // A spent lifetime (CProjectile+0xe8 below zero, or unordered) kills.
     if (!(Cg->Lifetime >= 0.0f))
     {
-        destroy(1, 0);
+        destroy(DESTROY_FUSE, 0);
         return !is_destroyed();
     }
 
@@ -183,16 +183,16 @@ bool Guided::update(float Dt)
     if (!PhySys::GetCollisionStatePhantom(Phantom))
         PhySys::SetCollisionStatePhantom(Phantom, true);
     else if (bTriggered)
-        destroy(1, TriggerObjId);
+        destroy(DESTROY_FUSE, TriggerObjId);
 
     wakeup();
 
     // Only a lock-on seeker (Munition+0x90 == 2) steers; retail tests zero, then two.
     Archetype::Munition const* const Arch =
         static_cast<Archetype::Munition const*>(Object->get_archetype());
-    if (Arch->Seeker == 0)
+    if (Arch->Seeker == Archetype::Munition::SeekerNone)
         return !is_destroyed();
-    if (Arch->Seeker != 2)
+    if (Arch->Seeker != Archetype::Munition::SeekerLock)
         return !is_destroyed();
 
     // ... and only with a target (CGuided+0xf0, the watched IObjRW).
@@ -424,9 +424,9 @@ bool Guided::destroy(int Kind, unsigned int ObjId)
     GameObject::destroy(Kind, ObjId);
 
     // Explode only on a real kill, and not one by a countermeasure (type mask 0x8000000).
-    if (Kind != 1)
+    if (Kind != DESTROY_FUSE)
         return true;
-    if (OwnerSystem->find_object(ObjId, 0x8000000u) != nullptr)
+    if (OwnerSystem->find_object(ObjId, OBJ_COUNTERMEASURE) != nullptr)
         return true;
 
     // Needs an explosion with a radius and some effect (double 0.0001 at .rdata:06d65190).
@@ -470,7 +470,7 @@ void Guided::damage_sub_obj(FSubObjDamage const& Hit, DamageList& Damage)
 // .text:06cf4240 -- Guided's +0x180, the body Mine::munition_hit ports.
 void Guided::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
 {
-    if (Hit.Munition->Seeker != 0)
+    if (Hit.Munition->Seeker != Archetype::Munition::SeekerNone)
     {
         Damage.bDestroyed = true;
         return;
@@ -512,7 +512,7 @@ void Guided::added(CObject* Obj)
 {
     CObject* const Root = GetRoot(Obj);
     unsigned int Id = 0;
-    if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & 3u) == 3u)
+    if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         Id = static_cast<CSimple*>(Root)->Id;
 
     // The owner is exempt while its owner-safe time runs (narrowing not null-tested).
@@ -574,7 +574,7 @@ int Guided::set_target(IObjRW* Target, unsigned short SubTarget, int SourceClien
         SourceClient = 0;
 
     // A non-seeking munition refuses (narrowing not null-tested).
-    if (cguided()->munitionarch()->Seeker == 0)
+    if (cguided()->munitionarch()->Seeker == Archetype::Munition::SeekerNone)
         return -3;
 
     // In single player a change from a client is only relayed.
@@ -608,7 +608,7 @@ int Guided::set_target(IObjRW* Target, unsigned short SubTarget, int SourceClien
 // .text:06d09b90.
 unsigned int Bullet::get_type_bits() const
 {
-    return 0x2000000u;
+    return OBJ_BULLET;
 }
 
 CBeam* Bullet::cbeam() const
@@ -662,7 +662,7 @@ bool Bullet::update(float Dt)
 
     // A spent lifetime (CProjectile+0xe8 below zero, or unordered) removes it quietly.
     if (!(Cb->Lifetime >= 0.0f))
-        destroy(0, 0);
+        destroy(DESTROY_VANISH, 0);
 
     return !is_destroyed();
 }
@@ -711,5 +711,5 @@ void Bullet::on_collision(FCollisionEvent const& Hit)
     OwnerSystem->munition_collision(Info);
 
     // The round is spent.
-    destroy(1, Hit.Other->get_id());
+    destroy(DESTROY_FUSE, Hit.Other->get_id());
 }

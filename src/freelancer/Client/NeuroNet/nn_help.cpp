@@ -482,17 +482,17 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
                     {
                         // A section only when the visit bit and the
                         // entry's value for it are both set.
-                        if ((VisitFlags & 4) != 0 && Entry->bShowCommodities != 0)
+                        if ((VisitFlags & kVisitCommodities) != 0 && Entry->bShowCommodities != 0)
                             bCommodities = 1;
-                        if ((VisitFlags & 8) != 0 && Entry->bShowEquipment != 0)
+                        if ((VisitFlags & kVisitEquipment) != 0 && Entry->bShowEquipment != 0)
                             bEquipment = 1;
-                        if ((VisitFlags & 0x10) != 0 && Entry->bShowShips != 0)
+                        if ((VisitFlags & kVisitShips) != 0 && Entry->bShowShips != 0)
                             bShips = 1;
                         NnHelpAppendBaseGoods(&Card, BaseId, bCommodities, bEquipment, bShips);
 
                         // The entry's extra infocard after an empty
                         // paragraph.
-                        if ((VisitFlags & 2) != 0 && Entry->ExtraIds != 0)
+                        if ((VisitFlags & kVisitExtraInfo) != 0 && Entry->ExtraIds != 0)
                         {
                             AppendText(Card, kEmptyParagraph);
                             LoadIdsIntoRdl(static_cast<unsigned>(Entry->ExtraIds), Card);
@@ -598,7 +598,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
     G_NnTextScratchB[0] = L'\0';
     wchar_t Name[0x80]; // [ESP+0x48]
 
-    if ((Visit & 1) == 0)
+    if ((Visit & kVisitShown) == 0)
     {
         // Never visited -- the type caption as the title (upper case)
         // and ids 0xd6ef as the text.
@@ -788,12 +788,12 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
                 if (InfocardMapFind(Infocard, &Entry) && DockBase != 0)
                 {
                     // The visit bits alone pick the sections here.
-                    unsigned char const bCommodities = (Visit & 4) != 0 ? 1 : 0; // [ESP+0x20]
-                    unsigned char const bEquipment = (Visit & 8) != 0 ? 1 : 0;   // [ESP+0x24]
-                    unsigned char const bShips = (Visit & 0x10) != 0 ? 1 : 0;    // [ESP+0x18]
+                    unsigned char const bCommodities = (Visit & kVisitCommodities) != 0 ? 1 : 0; // [ESP+0x20]
+                    unsigned char const bEquipment = (Visit & kVisitEquipment) != 0 ? 1 : 0;   // [ESP+0x24]
+                    unsigned char const bShips = (Visit & kVisitShips) != 0 ? 1 : 0;    // [ESP+0x18]
                     NnHelpAppendBaseGoods(&Card, DockBase, bCommodities, bEquipment, bShips);
                     AppendText(Card, kLineBreak);
-                    if ((Visit & 2) != 0 && Entry->ExtraIds != 0)
+                    if ((Visit & kVisitExtraInfo) != 0 && Entry->ExtraIds != 0)
                     {
                         LoadIdsIntoRdl(static_cast<unsigned>(Entry->ExtraIds), Card);
                         AppendText(Card, kLineBreak);

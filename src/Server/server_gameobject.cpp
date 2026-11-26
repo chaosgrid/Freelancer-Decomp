@@ -133,7 +133,7 @@ bool SrvRepairDroid::update(float Dt)
 
     // A cause-0x11 list from this droid's owner.
     DamageList Repair;
-    Repair.Cause = static_cast<DamageCause>(0x11);
+    Repair.Cause = DamageCause::RepairDroid;
     Repair.InflictorId = Owner->get_id();
     Repair.InflictorOwner = Owner->csimple()->OwnerPlayer;
 
@@ -453,7 +453,7 @@ bool SrvGun::fire(Vector const& Target)
 
     // A seeking munition (Munition+0x90) goes out as guided missiles; anything
     // else as bullets, and only outside single player.
-    if (static_cast<CEGun*>(Equip)->MunitionArch()->Seeker != 0)
+    if (static_cast<CEGun*>(Equip)->MunitionArch()->Seeker != Archetype::Munition::SeekerNone)
     {
         launch_guided(Target);                                      // vt +0x1c
         return true;
@@ -516,7 +516,7 @@ bool SrvGun::fire_unchecked(Vector const& Target)
 {
     if (!use_ammo(Target))
         return false;
-    if (static_cast<CEGun*>(Equip)->MunitionArch()->Seeker != 0)
+    if (static_cast<CEGun*>(Equip)->MunitionArch()->Seeker != Archetype::Munition::SeekerNone)
         launch_guided(Target);                                      // vt +0x1c
     return true;
 }

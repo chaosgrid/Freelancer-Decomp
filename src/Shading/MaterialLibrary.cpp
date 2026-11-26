@@ -154,7 +154,7 @@ GENRESULT DACOM_API FMaterialLibrary::AddMapRule(int Key, const char* Pattern, c
     // LAB_06ecd1d0 and LAB_06ecd3e0: 0 is a name rule; 1 is a type rule.
     char Message[0x2000];
     _snprintf(Message, sizeof(Message), "Adding material map: %s:%s:%s",
-              Key == 1 ? "Type" : "Name", Pattern, TypeName);
+              Key == kMapRuleType ? "Type" : "Name", Pattern, TypeName);
     FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
           "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialLibrary.cpp",
           0x362, Message);
@@ -163,7 +163,7 @@ GENRESULT DACOM_API FMaterialLibrary::AddMapRule(int Key, const char* Pattern, c
     std::strncpy(TypeCopy, TypeName, sizeof(TypeCopy));
     TypeCopy[sizeof(TypeCopy) - 1] = '\0';
     Rule.Key = Key;
-    Rule.bNamePattern = (Key == 0);
+    Rule.bNamePattern = (Key == kMapRuleName);
     Rule.Expression = FMaterialRegex::Compile(Pattern);
     Rule.Pattern.assign(Pattern);
     Rule.Type.assign(TypeCopy);
@@ -192,7 +192,7 @@ GENRESULT DACOM_API FMaterialLibrary::RemapType(const char* Name, const char* Ty
     for (size_t Index = 0; Index < MapRules.size(); ++Index)
     {
         const FMaterialMapRule& Rule = MapRules[Index];
-        if (Rule.Key != 0 && Rule.Key != 1)
+        if (Rule.Key != kMapRuleName && Rule.Key != kMapRuleType)
             continue;
         const char* Candidate = Rule.bNamePattern ? Name : Type;
         if (!FMaterialRegex::Search(Rule.Expression.get(), Candidate))
@@ -246,13 +246,13 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
     }
 
     FFileSystemDesc Desc = {};
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.ComponentName = "FileSystem";
     Desc.Path = "Material count";
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x08000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
     Desc.FindHandle = 0xFFFFFFFF;
     const int CountHandle = FileSystemOpenByDesc(FileSystem, &Desc);
     if (CountHandle != -1)
@@ -530,7 +530,7 @@ const char* FMaterialLibrary::ResolveType(const char* Name, const char* Type)
             if (FMaterialRegex::Search(Rule.Expression.get(), Name))
                 return Rule.Type.c_str();
         }
-        else if (Rule.Key == 1 && FMaterialRegex::Search(Rule.Expression.get(), Candidate))
+        else if (Rule.Key == kMapRuleType && FMaterialRegex::Search(Rule.Expression.get(), Candidate))
         {
             return Rule.Type.c_str();
         }
@@ -1019,9 +1019,9 @@ FMaterialLibraryRecord* DACOM_API FMaterialLibrary::CreateAfterMap(const char* N
     {
         const FBatchRule& Rule = OwnerBatcher->RuleList[Index];
         const char* Candidate = nullptr;
-        if (Rule.Kind == 1)
+        if (Rule.Kind == kBatchRuleType)
             Candidate = SelectedType;
-        else if (Rule.Kind == 2)
+        else if (Rule.Kind == kBatchRuleName)
             Candidate = NameCopy;
         if (FMaterialRegex::Search(Rule.Expression.get(), Candidate))
         {
@@ -1100,7 +1100,7 @@ GENRESULT FMaterialLibrary::ParseMaterialMap()
                 if (LastEq != nullptr)
                 {
                     char* FirstEq = std::strchr(Line, '=');
-                    int Mode = 1;
+                    int Mode = kMapRuleType;
                     char* Pattern = Line;
                     if (FirstEq != nullptr && FirstEq != LastEq)
                     {
@@ -1113,7 +1113,7 @@ GENRESULT FMaterialLibrary::ParseMaterialMap()
                                 *SelectorEnd == ' ' || *SelectorEnd == '\t'))
                             --SelectorEnd;
                         SelectorEnd[1] = '\0';
-                        Mode = _stricmp(Selector, "name") != 0 ? 1 : 0;
+                        Mode = _stricmp(Selector, "name") != 0 ? kMapRuleType : kMapRuleName;
                         Pattern = FirstEq + 1;
                     }
                     while (*Pattern == ' ' || *Pattern == '\t')

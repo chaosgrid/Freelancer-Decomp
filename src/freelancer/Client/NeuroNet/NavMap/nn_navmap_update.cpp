@@ -429,7 +429,7 @@ void NeuroNetNavMap::AnimateItems()
     for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It, ++Index)
     {
         FNavMapItem* const Item = *It;
-        if (Item->bShown == 0 || Item->Kind != 0)
+        if (Item->bShown == 0 || Item->Kind != kNavMapItemSolar)
             continue;
 
         // The phase advances and wraps while it is above 1 (the compare
@@ -668,7 +668,7 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
             unsigned char VisitFlags = 0;
             GetPlayerVisitFlagsRetail(Zone->GetId(), &VisitFlags, 1, 0); // FUN_004c4da0
             unsigned char const Visit = static_cast<unsigned char>(VisitFlags | Zone->GetVisit());
-            if ((Visit & 1) == 0)
+            if ((Visit & kVisitShown) == 0)
                 continue;
             if (bInfo != 0 && (Visit & 8) == 0)
                 continue;
@@ -821,7 +821,7 @@ FNavMapItem* NeuroNetNavMap::ItemAt(Vector const* MapPos, unsigned char bSkipWay
     for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
     {
         FNavMapItem* const Item = *It;
-        if (bSkipWaypoints != 0 && (Item->Kind == 3 || Item->Kind == 4))
+        if (bSkipWaypoints != 0 && (Item->Kind == kNavMapItemWaypoint || Item->Kind == kNavMapItemBestPath))
             continue;
         if (Item->bShown == 0)
             continue;
@@ -835,9 +835,9 @@ FNavMapItem* NeuroNetNavMap::ItemAt(Vector const* MapPos, unsigned char bSkipWay
         // (Kind 2 / 3 / 4) shrink with the zoom (over max(ZoomScale / 2, 1)), the rest follow
         // SystemScale; then the 1.05 margin.
         double Radius = static_cast<double>(Item->Size);
-        if ((Item->Type & 4) != 0)
+        if ((Item->Type & OBJ_SUN) != 0)
             Radius *= static_cast<double>(kNavMapSystemPickScale);
-        if (Item->Kind == 2 || Item->Kind == 3 || Item->Kind == 4)
+        if (Item->Kind == kNavMapItemPlayer || Item->Kind == kNavMapItemWaypoint || Item->Kind == kNavMapItemBestPath)
         {
             double Half = static_cast<double>(ZoomScale) * 0.5;
             if (Half < 1.0)
@@ -879,14 +879,14 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
     for (; Token != nullptr; Token = Token->Next)
     {
         unsigned short const Tag = Token->TypeTag;
-        if (Tag == 0x53)
+        if (Tag == FmtStr::TagSystem)
         {
             // 'S' -- the star system.
             *OutSystem = Token->Value;
             bSystemKnown = 1;
             continue;
         }
-        if (Tag == 0x4e)
+        if (Tag == FmtStr::TagNavMarker)
         {
             // 'N' -- a nav marker: {system, ?, position}.
             unsigned const* const Marker = Token->Marker->Data;
@@ -902,7 +902,7 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
             CachedWaypointHash = Hash;
             return true;
         }
-        if (Tag != 0x42)
+        if (Tag != FmtStr::TagBase)
             continue;
 
         // 'B' -- the base: the system object docking with it, searched in
@@ -960,7 +960,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         {
             // No null test of the new item, as in retail.
             FNavMapItem* const Item =
-                AddItem(3, 0, 0.0f, 0.0f, 0.0f,
+                AddItem(kNavMapItemWaypoint, 0, 0.0f, 0.0f, 0.0f,
                         static_cast<float>(static_cast<double>(WaypointMarkerSize) +
                                            static_cast<double>(WaypointMarkerSize)),
                         "NAV_waypointdiamond", 0x219b, 0, 0.0f, 0, 0);
@@ -1017,7 +1017,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         if (BestPathItems[Index] == nullptr)
         {
             FNavMapItem* const Item =
-                AddItem(4, 0, 0.0f, 0.0f, 0.0f,
+                AddItem(kNavMapItemBestPath, 0, 0.0f, 0.0f, 0.0f,
                         static_cast<float>(static_cast<double>(WaypointMarkerSize) +
                                            static_cast<double>(WaypointMarkerSize)),
                         "NAV_waypointdiamond", 0x219b, 0, 0.0f, 0, 0);
@@ -1031,10 +1031,10 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         // The record's kind (low nibble of +0x18): 0xa numbered stops,
         // 9 no number, anything else -1. No null test of the record, as in retail.
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index); // FUN_004c4ff0
-        unsigned const RecordKind = Waypoint->ObjectiveState & 0xf;
-        if (RecordKind == 0xa)
+        unsigned const RecordKind = Waypoint->ObjectiveState & kObjectiveStateMask;
+        if (RecordKind == kObjectiveStateNumbered)
             Item->Variant = NextNumber++;
-        else if (RecordKind == 9)
+        else if (RecordKind == kObjectiveStateNoNumber)
             Item->Variant = 0;
         else
             Item->Variant = -1;
@@ -1162,10 +1162,10 @@ void NeuroNetNavMap::PlaceItems()
         int const Kind = Item->Kind;
         int const Type = Item->Type;
         // Stars and objects only with a type the mask lets through.
-        if ((Kind == 0 || Kind == 1) && (SolarTypeMask & static_cast<unsigned>(Type)) == 0)
+        if ((Kind == kNavMapItemSolar || Kind == 1) && (SolarTypeMask & static_cast<unsigned>(Type)) == 0)
             continue;
 
-        if (Kind == 2)
+        if (Kind == kNavMapItemPlayer)
         {
             // The player marker pinned to the map's edge, pointing out.
             unsigned char const bWasClamped = bItemClamped;
@@ -1233,7 +1233,7 @@ void NeuroNetNavMap::PlaceItems()
         // The size -- the markers (Kind 2 / 3 / 4) shrink with the zoom
         // (during a zoom from the start distance to the end one), the rest follow SystemScale.
         double Size = static_cast<double>(Item->Size);
-        if (Kind == 2 || Kind == 3 || Kind == 4)
+        if (Kind == kNavMapItemPlayer || Kind == kNavMapItemWaypoint || Kind == kNavMapItemBestPath)
         {
             if (bTransition != 0 && bViewSwitch == 0)
             {
@@ -1263,7 +1263,7 @@ void NeuroNetNavMap::PlaceItems()
             Size *= static_cast<double>(SystemScale);
         }
         Size = Size / static_cast<double>(TwiceExtZ) * static_cast<double>(FrameX);
-        if ((Type & 4) != 0)
+        if ((Type & OBJ_SUN) != 0)
             Size *= static_cast<double>(kNavMapSystemMeshScale);
         float const MeshScale = static_cast<float>(Size * static_cast<double>(kNavMapMeshScale));
         Place.z = kNavMapItemDepth; // overwrites the frame z computed above, as retail does
@@ -1302,7 +1302,7 @@ void NeuroNetNavMap::PlaceItems()
             unsigned char VisitFlags = 0;
             GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
-            Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
+            Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
             if (bDebugShowAll != 0)
                 Item->bShown = 1;
         }
@@ -1477,14 +1477,14 @@ void NeuroNetNavMap::Update()
                 TransitionView = kNavMapViewSystem;
                 TransitionTime = 0.0f;
                 TransitionDuration = kNavMapSwitchSeconds;
-                PlayOrRewindUiSoundSlot(8); // FUN_005645c0(8)
+                PlayOrRewindUiSoundSlot(kUiSoundNavMapFade); // FUN_005645c0(8)
                 break;
             }
         }
         else
         {
             // From a system straight to the other one.
-            SetFilterMode(0); // FUN_004a0220
+            SetFilterMode(kNavMapFilterPhysical); // FUN_004a0220
             CurrentSystem = PendingSystem;
             NavMapShowSystemName(SystemNameText, CurrentSystem, SkipSystemIds);
             ZoomScale = 1.0f;
@@ -1500,8 +1500,8 @@ void NeuroNetNavMap::Update()
 
     // The hover tip -- skipped when the ToolTip was fed this frame or the
     // info card / base list / known-objects filter mode (4 / 6 / 7) is up.
-    if (!NnToolTipWasFedThisFrame() && G_NavMapFilterMode != 4 && G_NavMapFilterMode != 6 &&
-        G_NavMapFilterMode != 7)
+    if (!NnToolTipWasFedThisFrame() && G_NavMapFilterMode != kNavMapFilterLegend && G_NavMapFilterMode != kNavMapFilterInfoCard &&
+        G_NavMapFilterMode != kNavMapFilterBaseList)
     {
         Vector MapPos;
         if (MapPointUnderCursor(&MapPos))
@@ -1511,7 +1511,7 @@ void NeuroNetNavMap::Update()
             {
                 FToolTipHoverInfo Record;
                 ToolTipHoverInit(&Record); // FUN_004144b0 + FUN_00413df0(0, -1), -1 / 0 / 0
-                if (Item->Kind == 4 && Item->TooltipText.c_str()[0] != L'\0')
+                if (Item->Kind == kNavMapItemBestPath && Item->TooltipText.c_str()[0] != L'\0')
                 {
                     // A best-path marker with its own text (wcscmp against
                     // L"" at DAT_005c8ce0) shows that text, always fed.
@@ -1543,7 +1543,7 @@ void NeuroNetNavMap::Update()
                     // Only read when GetAffiliation returns 0 (it then wrote it).
                     unsigned Affiliation = 0;
                     if (Reputation::Vibe::GetAffiliation(Rep, Affiliation, false) != 0 ||
-                        Affiliation == 0xffffffffu)
+                        Affiliation == kNoAffiliation)
                     {
                         FmtStr Name1; // [esp+0xd4]
                         FmtStr Name2; // [esp+0xbc]

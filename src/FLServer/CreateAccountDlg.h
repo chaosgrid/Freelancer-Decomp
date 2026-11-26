@@ -19,6 +19,12 @@ class CCreateAccountDlg : public CDialog
 {
 public:
 	enum { IDD = 0x8a };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlName = 1037,
+		kControlPassword = 1038,
+	};
 
 	explicit CCreateAccountDlg(CWnd* Parent = nullptr);
 

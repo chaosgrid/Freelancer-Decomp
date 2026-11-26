@@ -29,6 +29,7 @@
 #include "render/IRenderPipeline.h"
 #include "render/mesh_iface.h"      // IMesh
 #include "render/rendcomp.h"        // IRenderableMesh, IRenderer2
+#include "render/slots.h"          // Render::EPipelineState
 #include "Network/server_connect.h"         // GetLocalServerInterface (DAT_0067ecd0)
 #include "soundmanager.h"           // ISoundSource
 #include "Space/Cameras/space_camera.h"           // AsCamera
@@ -127,7 +128,7 @@ FCliDynamicAsteroidGameobj::~FCliDynamicAsteroidGameobj()
 
 int FCliDynamicAsteroidGameobj::get_type(uint& OutType) const
 {
-    OutType = 0x20000000u;
+    OutType = OBJ_ASTEROID;
     return 0;
 }
 
@@ -157,7 +158,7 @@ void FCliDynamicAsteroidGameobj::OnCollision(void const* A, void const* B, FClie
     if (bActive == 0)
         return;
     CObject* const OtherObj = Other->GetObject();
-    if (OtherObj == nullptr || (static_cast<unsigned>(OtherObj->ObjectClass) & 7u) != 7u)
+    if (OtherObj == nullptr || (static_cast<unsigned>(OtherObj->ObjectClass) & CObject::ClassProjectile) != CObject::ClassProjectile)
         return;
 
     Explode(static_cast<Vector const*>(A));
@@ -212,7 +213,7 @@ void FCliDynamicAsteroidGameobj::Explode(Vector const* Pos)
 
     if (ExplosionArch == nullptr)
         return;
-    if (ExplosionArch->Process != 2)
+    if (ExplosionArch->Process != Archetype::Explosion::ProcessNone)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x84c,
               "Explosion process for dynamic asteroid should be set to NONE");
@@ -473,7 +474,7 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
                 Mesh->Release();
             return;
         }
-        Mesh->OpenFaceGroup(0, 1);
+        Mesh->OpenFaceGroup(0, kMeshOpenRead);
         if (This->Material == nullptr)
             Mesh->GetFaceGroupMaterial(&This->Material);
         Mesh->GetFaceGroupPrimitiveType(&This->PrimitiveType);
@@ -495,7 +496,7 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
         Block->Verts = static_cast<unsigned char*>(
             ::operator new(static_cast<unsigned>(Block->VertCount) * 0x2c));
         This->MeshVertTotal += static_cast<unsigned>(Block->VertCount);
-        RMesh->CopyVertexData(Block->Verts, 0x252u,
+        RMesh->CopyVertexData(Block->Verts, D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2,
                      0, Block->VertCount);
         RMesh->GetIndexCount(&Block->IndexCount);
         Block->Indices = static_cast<unsigned short*>(
@@ -704,7 +705,7 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
         ISoundSource* const Sound = static_cast<ISoundSource*>(Go->Companion[1]);
         FGameLight* const Light = static_cast<FGameLight*>(Go->Companion[3]);
         bool bLive = false;
-        if (Particle != nullptr && (Particle->Flags08 & 2u) == 0u)
+        if (Particle != nullptr && (Particle->Flags08 & kEffectFlagDeactivated) == 0u)
             bLive = true;
         else if (Sound != nullptr && Sound->IsActive() != 0)
             bLive = true;
@@ -834,7 +835,7 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         Transform World;
         std::memcpy(&World, &This->SlotPtrs[Index]->get_transform(), sizeof(World));
         int bModelview = 1;
-        Pipe->GetPipelineState(7, &bModelview);
+        Pipe->GetPipelineState(Render::PipelineStateViewspaceLights, &bModelview);
         if (bModelview != 0)
         {
             Transform Combined;

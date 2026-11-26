@@ -547,5 +547,5 @@ bool MiscUtilSphereInView(ICamera* Camera, Vector const* Center, float Radius)
     Local.x = InView.x;
     Local.y = InView.y;
     Local.z = InView.z;
-    return Camera->ClassifySphere(&Local, Radius) >= 3;
+    return Camera->ClassifySphere(&Local, Radius) >= kSphereStraddling;
 }

@@ -49,6 +49,14 @@ struct FCharSelectSingleEntry
     std::wstring Time;                  // +0x14 -- filetime_to_wstring(Info +0x228)
 };
 
+// The button commands PageCharacterSelectSingle::ProcessMessage receives with kWinMsgCommand.
+enum ECharSelectSingleCommand
+{
+    kCharSelectSingleCmdDelete = 0x3002,
+    kCharSelectSingleCmdLoad = 0x3003,
+    kCharSelectSingleCmdMainMenu = 0x300c
+};
+
 class PageCharacterSelectSingle : public UIPage::MasterWin
 {
 public:

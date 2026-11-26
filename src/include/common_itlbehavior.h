@@ -41,6 +41,16 @@
 // Secondary vtable .rdata:0x0639fe38 (RequestCB, 1 slot): LAB_062cf150 OnResult.
 // ============================================================================
 
+// InstantTradeLaneBehavior::State30 (+0x30), the state Update (LAB_062cefb0) switches on. States
+// 1 and 2 are never entered; anything above 6 runs like 1.
+enum EItlState
+{
+    kItlStateStart = 0,     // OnEngage's value: looks up the lane (get_lane_start)
+    kItlStateEnter = 3,     // lane found / request granted: go_tradelane, then directive result BEHAVIOR_INSTANT_TRADE_LANE
+    kItlStateInLane = 4,    // go_tradelane succeeded; travelling
+    kItlStateLeftLane = 5,  // the ship left the lane (event 4, bEnteringLane == 0): finishes with result 0
+    kItlStateFailed = 6,    // request refused or go_tradelane failed: finishes with result 2
+};
 // Behavior (0x2c bytes) comes first, so the RequestCB vptr lands at +0x2c and State30 at +0x30.
 class InstantTradeLaneBehavior : public Behavior, public IObjAffect::RequestCB
 {

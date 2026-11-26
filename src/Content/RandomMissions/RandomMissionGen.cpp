@@ -6,10 +6,12 @@
 
 #include "RandomMissions/RandomMissionGen.h"
 
+#include "Comms/Gcs.h"                // EVoiceRole
 #include "Core/ContentInternal.h"
 #include "Core/ContentStaticIds.h"
 #include "Encounters/RandomEncounters.h"
 #include "RandomMissions/RandomMissionDB.h"
+#include "RandomMissions/RandomMissionMachine.h"   // RmRecordFlagTarget
 #include "Bases/Cargo.h"              // GetFactionShipLineArchs (TU44 FUN_06f357d0)
 #include "Encounters/EncounterParams.h"    // FEncounterShip
 #include "Encounters/Encounters.h"         // FindFormation (FUN_06efd1a0)
@@ -613,7 +615,7 @@ void FRmDifficultyWindowList::PushBack(FRmDifficultyWindow const* Window)
 
 FRmOfferTextEntry::FRmOfferTextEntry()
     : StrId(0)
-    , Form(3)
+    , Form(kRmOfferTextDefault)
 {
 }
 
@@ -672,9 +674,9 @@ void FRmOfferText::Parse(INI_Reader* Reader)
         else
         {
             if (_stricmp(Token, "singular") == 0)
-                Entry->Form = 1;
+                Entry->Form = kRmOfferTextSingular;
             else if (_stricmp(Token, "plural") == 0)
-                Entry->Form = 2;
+                Entry->Form = kRmOfferTextPlural;
             ++Index;
         }
     }
@@ -700,7 +702,7 @@ void FRmOfferText::Build(bool bOfferGroupSingular, bool bHostileGroupSingular, F
         bool const bHas1 = std::find(Entry->Params.begin(), Entry->Params.end(), 1) !=
                            Entry->Params.end();
         bool bBuild = false;
-        if (Entry->Form == 1)
+        if (Entry->Form == kRmOfferTextSingular)
         {
             if (bHas1 && bFlag1)
                 bBuild = true;
@@ -708,7 +710,7 @@ void FRmOfferText::Build(bool bOfferGroupSingular, bool bHostileGroupSingular, F
                      Entry->Params.end())
                 bBuild = bFlag2;
         }
-        else if (Entry->Form == 2)
+        else if (Entry->Form == kRmOfferTextPlural)
         {
             if (bHas1 && !bFlag1)
                 bBuild = true;
@@ -716,7 +718,7 @@ void FRmOfferText::Build(bool bOfferGroupSingular, bool bHostileGroupSingular, F
                      Entry->Params.end())
                 bBuild = !bFlag2;
         }
-        else if (Entry->Form == 3)
+        else if (Entry->Form == kRmOfferTextDefault)
         {
             bBuild = true;
         }
@@ -875,7 +877,7 @@ void FRmCommSequence::Parse(INI_Reader* Reader)
 // FUN_06f9efb0
 FRmVignetteParams::FRmVignetteParams()
     : Weight(0.0f)
-    , AllowableZoneTypes(7)
+    , AllowableZoneTypes(kVignetteZoneOpen | kVignetteZoneField | kVignetteZoneExclusion)
 {
 }
 
@@ -966,11 +968,11 @@ char FRmVignetteParams::ParseKey(INI_Reader* Reader)
         for (unsigned int Index = 0; !Reader->is_value_empty(Index); ++Index)
         {
             if (_stricmp(Reader->get_value_string(Index), "open") == 0)
-                AllowableZoneTypes = AllowableZoneTypes | 0x1;
+                AllowableZoneTypes = AllowableZoneTypes | kVignetteZoneOpen;
             else if (_stricmp(Reader->get_value_string(Index), "field") == 0)
-                AllowableZoneTypes = AllowableZoneTypes | 0x2;
+                AllowableZoneTypes = AllowableZoneTypes | kVignetteZoneField;
             else if (_stricmp(Reader->get_value_string(Index), "exclusion") == 0)
-                AllowableZoneTypes = AllowableZoneTypes | 0x4;
+                AllowableZoneTypes = AllowableZoneTypes | kVignetteZoneExclusion;
         }
         return 1;
     }
@@ -1259,11 +1261,11 @@ bool FRmDestroySolarsFilter::SupportsTextParam(int Param) const
 {
     switch (Param)
     {
-    case 1:
+    case RmTextParamOfferGroup:
         return false;
-    case 4:
+    case RmTextParamOtherSolar:
         return bPkBigSolar;
-    case 5:
+    case RmTextParamCriticalLoot:
         return bPkDefensiveSolars;
     case 22:
         return bPkHostileShips;
@@ -1379,14 +1381,14 @@ bool FRmAssassinateFilter::SupportsTextParam(int Param) const
 {
     switch (Param)
     {
-    case 1:
-    case 3:
+    case RmTextParamOfferGroup:
+    case RmTextParamBigSolar:
     case 19:
         return Flags[RmAsnPreBattle];
     case 20:
         return Flags[RmAsnTargetSpawnsAtPreBattle];
-    case 4:
-    case 5:
+    case RmTextParamOtherSolar:
+    case RmTextParamCriticalLoot:
     case 21:
     case 24:
         return false;
@@ -1641,9 +1643,9 @@ void __cdecl LoadVoiceProperties(INI_Reader* Reader)
                 // "male" is compared case-insensitively, "female" case-sensitively.
                 char const* Value = Reader->get_value_string();
                 if (_stricmp(Value, "male") == 0)
-                    Record->Flags |= 0x1;
+                    Record->Flags |= kVoiceGenderMale;
                 else if (strcmp(Value, "female") == 0)
-                    Record->Flags |= 0x2;
+                    Record->Flags |= kVoiceGenderFemale;
             }
             else if (Reader->is_value("supports_roles"))
             {
@@ -1652,33 +1654,33 @@ void __cdecl LoadVoiceProperties(INI_Reader* Reader)
                 {
                     char const* Role = Reader->get_value_string(Index);
                     if (strcmp(Role, "combat_lev_1") == 0)
-                        Record->Flags |= 0x4000;
+                        Record->Flags |= VOICE_ROLE_COMBAT_LEV_1;
                     else if (strcmp(Role, "combat_lev_2") == 0)
-                        Record->Flags |= 0x4;
+                        Record->Flags |= VOICE_ROLE_COMBAT_LEV_2;
                     else if (strcmp(Role, "combat_lev_3") == 0)
-                        Record->Flags |= 0xc004;
+                        Record->Flags |= VOICE_ROLE_COMBAT_LEV_3;
                     else if (strcmp(Role, "scan") == 0)
-                        Record->Flags |= 0x8;
+                        Record->Flags |= VOICE_ROLE_SCAN;
                     else if (strcmp(Role, "hail_hailee") == 0)
-                        Record->Flags |= 0x10;
+                        Record->Flags |= VOICE_ROLE_HAIL_HAILEE;
                     else if (strcmp(Role, "hail_dock") == 0)
-                        Record->Flags |= 0x20;
+                        Record->Flags |= VOICE_ROLE_HAIL_DOCK;
                     else if (strcmp(Role, "dockrequest_dock") == 0)
-                        Record->Flags |= 0x40;
+                        Record->Flags |= VOICE_ROLE_DOCKREQUEST_DOCK;
                     else if (strcmp(Role, "dockrequest_docker") == 0)
-                        Record->Flags |= 0x80;
+                        Record->Flags |= VOICE_ROLE_DOCKREQUEST_DOCKER;
                     else if (strcmp(Role, "behavior") == 0)
-                        Record->Flags |= 0x100;
+                        Record->Flags |= VOICE_ROLE_BEHAVIOR;
                     else if (strcmp(Role, "misc_chatter") == 0)
-                        Record->Flags |= 0x200;
+                        Record->Flags |= VOICE_ROLE_MISC_CHATTER;
                     else if (strcmp(Role, "fidget") == 0)
-                        Record->Flags |= 0x400;
+                        Record->Flags |= VOICE_ROLE_FIDGET;
                     else if (strcmp(Role, "combat_dock") == 0)
-                        Record->Flags |= 0x800;
+                        Record->Flags |= VOICE_ROLE_COMBAT_DOCK;
                     else if (strcmp(Role, "random_mission_ship") == 0)
-                        Record->Flags |= 0x1000;
+                        Record->Flags |= VOICE_ROLE_RANDOM_MISSION_SHIP;
                     else if (strcmp(Role, "mission_commission") == 0)
-                        Record->Flags |= 0x2000;
+                        Record->Flags |= VOICE_ROLE_MISSION_COMMISSION;
                 }
             }
             else if (Reader->is_value("permutation_count"))
@@ -1987,12 +1989,12 @@ bool __cdecl BuildRmShipGroup(FRmOfferQuery const* Query, FRmShipComponent* Comp
     int OtherTargetFlags = 0;
     if (Block->bKillAllShips != 0)
     {
-        FirstTargetFlags = 2;
-        OtherTargetFlags = 2;
+        FirstTargetFlags = RmRecordFlagTarget;
+        OtherTargetFlags = RmRecordFlagTarget;
     }
     if (Block->bHasTargetShip != 0)
     {
-        FirstTargetFlags = 2;
+        FirstTargetFlags = RmRecordFlagTarget;
         OtherTargetFlags = 0;
     }
 
@@ -2224,14 +2226,14 @@ bool FRmDestroySolarsFilter::FillSolarSpawns(FRmOfferQuery const* Query,
     for (std::vector<int>::const_iterator Type = Types.begin(); Type != Types.end(); ++Type)
     {
         float Scaled = Query->Difficulty;
-        if (*Type == 0)
+        if (*Type == kRmSolarBig)
         {
             if (bHostileShipsAtInstallation)
                 Scaled = Scaled * 0.4f;
             if (bDefensiveSolars)
                 Scaled = Scaled * 0.6f;
         }
-        else if (*Type == 1)
+        else if (*Type == kRmSolarDefensive)
         {
             if (bHostileShipsAtInstallation)
                 Scaled = Scaled * 0.4f;
@@ -2268,12 +2270,12 @@ void FRmDestroySolarsFilter::SpawnSolars(
         float const Scaled = Entry->second;
 
         int Mode = 0;
-        if (Arch->SolarType == 0)
+        if (Arch->SolarType == kRmSolarBig)
         {
             if (bPkBigSolar)
                 Mode = 2;
         }
-        else if (Arch->SolarType == 1)
+        else if (Arch->SolarType == kRmSolarDefensive)
         {
             if (bPkDefensiveSolars)
                 Mode = 2;

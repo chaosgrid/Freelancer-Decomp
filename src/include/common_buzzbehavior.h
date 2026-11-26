@@ -58,6 +58,30 @@
 // FAiTarget, +0x1364 the formation-leader block, +0x1584.. its pub::AI::Personality.
 // ============================================================================
 
+// BuzzBehavior::BuzzState (+0x318), the buzz stage.
+enum EBuzzState
+{
+    kBuzzStateHeadAway = 0,
+    kBuzzStateHeadToward = 1,
+    kBuzzStatePassBy = 2,
+};
+
+// BuzzBehavior::HeadTowardStyle (+0x31c), drawn from the BuzzHeadTowardStyleWeight* keys.
+enum EBuzzHeadTowardStyle
+{
+    kBuzzHeadStraightTo = 0,
+    kBuzzHeadSlide = 1,
+    kBuzzHeadWaggle = 2,
+};
+
+// BuzzBehavior::PassByStyle (+0x320), drawn from the BuzzPassByStyleWeight* keys.
+enum EBuzzPassByStyle
+{
+    kBuzzPassBreakAway = 0,   // ticks the BreakAwayIdea
+    kBuzzPassStraightBy = 1,
+    kBuzzPassEngineKill = 2,  // ThrustManager::SetEngineActive(false)
+};
+
 class BuzzBehavior : public Behavior
 {
 public:

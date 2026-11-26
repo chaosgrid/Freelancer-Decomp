@@ -115,7 +115,7 @@ NnTextControl::~NnTextControl()
         bTyping = 0;
         G_TextControlTypingCount = G_TextControlTypingCount - 1;
         if (G_TextControlTypingCount <= 0)
-            StopUiSoundSlot(0xb);   // FUN_005646e0(0xb)
+            StopUiSoundSlot(kUiSoundTypingCharacters);   // FUN_005646e0(0xb)
         wchar_t* const Text = PendingText;
         FontStringSetScale(FontString, Width, TextDepth(this));
         FontStringSetText(FontString, Text);
@@ -328,7 +328,7 @@ bool NnTextControl::HitTest(Vector const* Ray)
     {
         WinControl* const ParentControl = ParentWin->AsWinControl();
         if (ParentControl != nullptr)
-            ParentControl->SetProperty(0x46, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            ParentControl->SetProperty(kWinNotifyTextHover, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     }
     return true;
 }
@@ -394,7 +394,7 @@ void NnTextControl::UpdateInactive()
     // LAB_0058afd0. Slot 12 on every inactive child.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
-        if ((Child->Flags & 1) == 0)
+        if ((Child->Flags & kWin3DActive) == 0)
             Child->UpdateInactive();
     }
     // The typewriter stops: the same flush as property 0x50.
@@ -403,7 +403,7 @@ void NnTextControl::UpdateInactive()
         bTyping = 0;
         G_TextControlTypingCount = G_TextControlTypingCount - 1;
         if (G_TextControlTypingCount <= 0)
-            StopUiSoundSlot(0xb);           // FUN_005646e0(0xb)
+            StopUiSoundSlot(kUiSoundTypingCharacters);           // FUN_005646e0(0xb)
         FontStringSetScale(FontString, Width, TextDepth(this));
         FontStringSetText(FontString, PendingText);             // FUN_00415860
     }
@@ -419,7 +419,7 @@ void NnTextControl::Update()
     // (FUN_0042d740).
     bool const bHasChildren =
         FontString->ChildBegin != nullptr && (FontString->ChildEnd - FontString->ChildBegin) != 0;
-    if (bTypewriter != 0 && bHasChildren && (Flags & 2) != 0 && !ShouldSkipLocalServerTick())
+    if (bTypewriter != 0 && bHasChildren && (Flags & kWin3DVisible) != 0 && !ShouldSkipLocalServerTick())
     {
         // An empty pending text takes a copy of the Font::String's text; with no text there, a
         // non-empty pending text is emptied.
@@ -471,7 +471,7 @@ void NnTextControl::Update()
                         bTyping = 0;
                         G_TextControlTypingCount = G_TextControlTypingCount - 1;
                         if (G_TextControlTypingCount <= 0)
-                            StopUiSoundSlot(0xb);
+                            StopUiSoundSlot(kUiSoundTypingCharacters);
                         FontStringSetScale(FontString, Width, TextDepth(this));
                         FontStringSetText(FontString, PendingText);
                     }
@@ -483,12 +483,12 @@ void NnTextControl::Update()
     {
         // A run in progress ends when the control is hidden or its Font::String has no child
         // slot.
-        if ((Flags & 2) == 0 || !bHasChildren)
+        if ((Flags & kWin3DVisible) == 0 || !bHasChildren)
         {
             bTyping = 0;
             G_TextControlTypingCount = G_TextControlTypingCount - 1;
             if (G_TextControlTypingCount <= 0)
-                StopUiSoundSlot(0xb);
+                StopUiSoundSlot(kUiSoundTypingCharacters);
             FontStringSetScale(FontString, Width, TextDepth(this));
             FontStringSetText(FontString, PendingText);
         }
@@ -610,7 +610,7 @@ void NnTextControl::SetPosition(Vector const* NewPosition)
     }
 
     Vector Placed = {NewPosition->x, NewPosition->y, NewPosition->z};
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         Placed.x += Attach.x;
         Placed.y += Attach.y;
@@ -662,7 +662,7 @@ void NnTextControl::Draw()
                     bTyping = 0;
                     G_TextControlTypingCount = G_TextControlTypingCount - 1;
                     if (G_TextControlTypingCount <= 0)
-                        StopUiSoundSlot(0xb);
+                        StopUiSoundSlot(kUiSoundTypingCharacters);
                     wchar_t* const Whole = PendingText;
                     Vector Sum;
                     Win3DVec3Add(&Sum, &Position, &Offset); // FUN_00423b30
@@ -829,7 +829,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // Without +0x2f4 bit 0 retail copies the Offset itself, not Local (as here).
         Vector Sum;
         Vector const* Source = &Offset;
-        if ((PositionFlags & 1) != 0)
+        if ((PositionFlags & kWinPositionAddOffset) != 0)
         {
             Sum.x = Local.x + Offset.x;
             Sum.y = Local.y + Offset.y;
@@ -840,7 +840,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         WinControl::SetPosition(&Copy); // FUN_005a0880, a direct call
         return 0;
     }
-    case 0xc:
+    case kWinPropLit:
         bHighlighted = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
     case kTextPropSetText:
@@ -881,7 +881,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             bTyping = 0;
             G_TextControlTypingCount = G_TextControlTypingCount - 1;
             if (G_TextControlTypingCount <= 0)
-                StopUiSoundSlot(0xb);
+                StopUiSoundSlot(kUiSoundTypingCharacters);
             // The pending text goes in whole; the depth is the z of FUN_00423b30.
             wchar_t* const Text = PendingText;
             float const Depth = Position.z + Offset.z;
@@ -1031,10 +1031,10 @@ void NnEditControl::Update()
 bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
 {
     // LAB_0058b7a0 (slot 20, RET 8). Only an active (Flags bit 0), editable control.
-    if ((Flags & 1) == 0 || bEditable == 0)
+    if ((Flags & kWin3DActive) == 0 || bEditable == 0)
         return false;
 
-    if (Key == 0x0d && (*Modifiers & 1) != 0)
+    if (Key == VK_RETURN && (*Modifiers & kWin3DKeyReleased) != 0)
     {
         // Enter. Without a parent nothing happens (but it is taken).
         if (Parent == nullptr)
@@ -1043,14 +1043,14 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
         CursorTimer = 0.0f;
         WinControl* const Owner = Parent->AsWinControl(); // slot 2
         if (Owner != nullptr)
-            Owner->SetProperty(0x45, reinterpret_cast<uintptr_t>(FontString->Text), 1);
+            Owner->SetProperty(kWinNotifyEditChanged, reinterpret_cast<uintptr_t>(FontString->Text), 1);
         return true;
     }
 
-    if (Key == 0x08)
+    if (Key == VK_BACK)
     {
         // Backspace.
-        if ((*Modifiers & 2) != 0)
+        if ((*Modifiers & kWin3DKeyPressed) != 0)
             return true;
         RemoveCursor(); // inline in retail
         CursorTimer = 0.0f;
@@ -1073,11 +1073,11 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
         if (Len - 1 > 0)
         {
             if (Owner != nullptr)
-                Owner->SetProperty(0x45, reinterpret_cast<uintptr_t>(FontString->Text), 0);
+                Owner->SetProperty(kWinNotifyEditChanged, reinterpret_cast<uintptr_t>(FontString->Text), 0);
         }
         else if (Owner != nullptr)
         {
-            Owner->SetProperty(0x45, 0, 0);
+            Owner->SetProperty(kWinNotifyEditChanged, 0, 0);
         }
         WideTextFree(&Copy);
         return true;
@@ -1085,12 +1085,12 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
 
     // The numeric keypad (0x60..0x69) types '0'..'9'. Enter without modifier bit 0 comes here
     // too, as the character 0x0d.
-    if (Key != 0x0d && Key >= 0x60 && Key <= 0x69)
+    if (Key != VK_RETURN && Key >= VK_NUMPAD0 && Key <= VK_NUMPAD9)
         Key -= 0x30;
 
-    if (bDigitsOnly != 0 && (Key < 0x30 || Key > 0x39))
+    if (bDigitsOnly != 0 && (Key < '0' || Key > '9'))
         return false;
-    if ((*Modifiers & 2) != 0)
+    if ((*Modifiers & kWin3DKeyPressed) != 0)
         return true;
 
     // With a maximum, a text already that long takes nothing more (the copy is measured
@@ -1126,7 +1126,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
     SetText(Copy.Text);
     WinControl* const Owner = Parent->AsWinControl();
     if (Owner != nullptr)
-        Owner->SetProperty(0x45, reinterpret_cast<uintptr_t>(FontString->Text), 0);
+        Owner->SetProperty(kWinNotifyEditChanged, reinterpret_cast<uintptr_t>(FontString->Text), 0);
     WideTextFree(&Copy);
     return true;
 }
@@ -1140,7 +1140,7 @@ intptr_t NnEditControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // The new text carries no cursor.
         bCursorShown = 0;
         return NnTextControl::SetProperty(Msg, A, B); // FUN_0058b360
-    case 0x43:
+    case kEditPropEditable:
         if (A == 0)
         {
             bEditable = 0;
@@ -1151,7 +1151,7 @@ intptr_t NnEditControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (B != 0) // unsigned: only zero keeps the old maximum
             MaxLength = static_cast<int>(B);
         return 1;
-    case 0x44:
+    case kEditPropDigitsOnly:
         bDigitsOnly = (A & 1) != 0 ? 1 : 0;
         return 1;
     default:

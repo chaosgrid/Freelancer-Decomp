@@ -154,7 +154,10 @@ struct INotify
     enum Event
     {
         DockAnimEnded             = 0x0,  // CEqObj::update_docking_animations (062aabac / 062aac5f): a docking animation reached an end; Param = unsigned char* (1 = back at the start, 0 = at the end)
+        SolarGateStateChanged     = 0x1,  // CSolar::update gate animation (csolar.cpp): Param = &int sub-code, 0 the gate opens, 2 it closes and fires, 3 it is removed
         BayStateChanged           = 0x2,  // CShip::open_bay (062b2b5b) / close_bay (062b2ca7): Param = unsigned char* (1 = opening)
+        EquipExpired              = 0x3,  // CEqObj damage list of cause LootDecay, non-cargo equipment: Param = the SubObjId; the client plays "weapon_expired"
+        CargoExpired              = 0x4,  // the same for a cargo stack; the client plays "cargo_expired"
         EquipSeparated            = 0x5,  // CAttachedEquip::Disconnect, FATE 2 (debris) with a debris object: Param = the CAttachedEquip*
         EquipDetachedInPlace      = 0x6,  // CAttachedEquip::Disconnect, FATE other than 1/2: Param = the CAttachedEquip*
         ArchGroupSeparated        = 0x7,  // CArchGroup::Destroy, FATE 2 with a debris object: Param = the CArchGroup*
@@ -521,6 +524,16 @@ public:
     CEquipTraverser(int TypeMask, bool bIncludeDestroyed);
     void Restart();
 
+    // The values of State: where the walk stands between the two lists. Traverse runs
+    // Start -> External -> SecondList -> Internal, ReverseTraverse Start -> Internal ->
+    // SecondList -> External; SecondList is "the first list is done, the other one starts next".
+    enum
+    {
+        kStateStart = 0,
+        kStateExternal = 1,
+        kStateSecondList = 2,
+        kStateInternal = 3,
+    };
     unsigned TypeMask;                // +0x00
     unsigned char bIncludeDestroyed;  // +0x04 (+0x05..+0x07: alignment padding)
     int State;                       // +0x08  0 ext-start, 1 ext, 2 int-start, 3 int

@@ -257,7 +257,7 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
 
     CharacterName->SetDrawFrame(true);
     CharacterName->SetFrameColor(ChromeColor());
-    CharacterName->SetAlignMode(2);
+    CharacterName->SetAlignMode(kRichAlignMiddle);
     CharacterName->SetLayoutFlag(false);
 
     SlideT = -1.0;
@@ -427,10 +427,10 @@ bool PageCharacterCreate::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*
     if (Msg == kWinMsgCommand)
     {
         // A button click; the name is read back whichever button it was.
-        PlayOrRewindUiSoundSlot(0);
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
         ReadNameIntoSelection();
-        bBack = (A == 0x300c);
-        bConfirm = (A == 0x300d);
+        bBack = (A == kCharCreateCmdBack);
+        bConfirm = (A == kCharCreateCmdSelectShip);
     }
     else
     {
@@ -499,7 +499,7 @@ void PageCharacterCreate::BeginLeave()
     Back->SetToolTipEnabled(false);
     SelectShip->SetToolTipEnabled(false);
 
-    PlayUiSoundSlot(0x1b);
+    PlayUiSoundSlot(kUiSoundMotionSwish);
 }
 
 void PageCharacterCreate::Update()
@@ -508,8 +508,8 @@ void PageCharacterCreate::Update()
     // SelectShip is enabled only while the name box holds text.
     unsigned char const OldFlags = SelectShip->Flags;
     unsigned char const bHasName = (CharacterName->TextDisplay.get_element_count() != 0) ? 1 : 0;
-    SelectShip->Flags = static_cast<unsigned char>((OldFlags & 0xfe) | bHasName);
-    SelectShip->bInteractive = static_cast<unsigned char>(SelectShip->Flags & 1);
+    SelectShip->Flags = static_cast<unsigned char>((OldFlags & ~kWin3DActive) | bHasName);
+    SelectShip->bInteractive = static_cast<unsigned char>(SelectShip->Flags & kWin3DActive);
 
     // The compares below follow retail's x87 tests: an unordered SlideT skips the slide-in
     // (1.0, DAT_005c89b8), counts as arrived (0.0) and plays no sound.
@@ -552,7 +552,7 @@ void PageCharacterCreate::Update()
 
         // Sound strictly between -0.8 (DAT_005d5078) and -0.1 (DAT_005d5070).
         if (SlideT > -0.8 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b);
+            PlayUiSoundSlot(kUiSoundMotionSwish);
     }
 
     if (bLeaving != 0 && LeaveDirection != 0)

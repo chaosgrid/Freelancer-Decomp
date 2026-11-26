@@ -74,7 +74,7 @@ bool SystemManagerGunGroupManager::FireAutoTurrets()
     if (bEnabled == 0)
         return false;
     SystemManager* const Sys = Owner;
-    if (Sys->Targeting.AttackState != 0)
+    if (Sys->Targeting.AttackState != TargetManager::kAttackStateEngaged)
         return false;
 
     // No spread for the player's ship.
@@ -147,7 +147,7 @@ int SystemManagerGunGroupManager::CanFireLauncherAtTarget(unsigned short Hardpoi
     unsigned char const EquipFlags = (unsigned char)Status.EquipFlags;
 
     int Result = 2;
-    if (CallResult == 0 && (Flags & 1) != 0 && (Flags & 6) == 0 && (EquipFlags & 0xa) != 0)
+    if (CallResult == 0 && (Flags & EquipStatusFlagActive) != 0 && (Flags & (EquipStatusFlagDestroyed | EquipStatusFlagDisabled)) == 0 && (EquipFlags & (LauncherStatusRefireElapsed | LauncherStatusPowerNeedsMet)) != 0)
     {
         Vector TargetPos;
         GetIfacePositionOrZero(&TargetPos, Target);
@@ -176,9 +176,9 @@ int SystemManagerGunGroupManager::CanFireLauncherAtTarget(unsigned short Hardpoi
     {
         if ((Flags & 1) == 0)
             Result = 0;
-        if ((EquipFlags & 4) != 0)
+        if ((EquipFlags & LauncherStatusInsufficientAmmo) != 0)
             Result = 4;
-        if ((EquipFlags & 8) != 0)
+        if ((EquipFlags & LauncherStatusPowerNeedsMet) != 0)
             return 3;
         if (Result != 1)
             return Result;
@@ -290,9 +290,9 @@ bool SystemManagerGunGroupManager::IsLineOfFireBlocked(IObjRW* Target, unsigned 
         if (HitObj == nullptr)
             continue;
         unsigned const HitClass = (unsigned)HitObj->ObjectClass;
-        if ((HitClass & 0x103) != 0x103)
+        if ((HitClass & CObject::ClassEqObj) != CObject::ClassEqObj)
             continue;
-        if (HitClass != 0x303 && HitClass != 0x503)
+        if (HitClass != CObject::ClassSolar && HitClass != CObject::ClassShip)
             continue;
         if (HitObj == TargetObj)
             continue;
@@ -652,7 +652,7 @@ bool SystemManagerTimerTable::HasTargetInForwardArc(float MaxAngle, float MaxRan
             Elem->Iface->get_type(Elem->CachedFlags);
             Elem->bFlagsValid = 1;
         }
-        if ((Elem->CachedFlags & 0x7f0000) == 0)
+        if ((Elem->CachedFlags & OBJ_SHIP_MASK) == 0)
             continue;
 
         Elem->RefreshPos();
@@ -757,7 +757,7 @@ unsigned SystemManagerGunGroupManager::UpdateMineDropState()
         }
 
         OwnShip()->get_equipment_status(Status, Slot.HardpointId);
-        if ((Status.EquipFlags & 0xa) != 0xa)
+        if ((Status.EquipFlags & (LauncherStatusRefireElapsed | LauncherStatusPowerNeedsMet)) != (LauncherStatusRefireElapsed | LauncherStatusPowerNeedsMet))
             continue;
 
         // The result becomes 1 before the DAT_063fca5c test.
@@ -895,9 +895,9 @@ bool SystemManagerGunGroupManager::RefreshFromPersonality()
 
     // fire_style MULTIPLE (0) -> 1, SINGLE (1) -> 0, anything else keeps it.
     int const FireStyle = Gun.FireStyle;
-    if (FireStyle == 0)
+    if (FireStyle == pub::AI::Personality::GunUseStruct::kFireStyleMultiple)
         bFireAllGuns = 1;
-    else if (FireStyle == 1)
+    else if (FireStyle == pub::AI::Personality::GunUseStruct::kFireStyleSingle)
         bFireAllGuns = 0;
 
     MissileLaunchIntervalTime = Missile.MissileLaunchIntervalTime;                 // +0x1754
@@ -947,7 +947,7 @@ bool SystemManagerGunGroupManager::HasReadyWeaponSlot()
         // Signed range test on the returned dword.
         int Classify;
         std::memcpy(&Classify, &Val, sizeof(Classify));
-        if (CallResult == 0 && Classify >= 0 && Classify <= 2)
+        if (CallResult == 0 && Classify >= 0 && Classify <= kMunitionKindTorpedo)
         {
             // Retail clears only some EquipStatus bits; zero-init is the defined
             // superset. The call's result is not tested.

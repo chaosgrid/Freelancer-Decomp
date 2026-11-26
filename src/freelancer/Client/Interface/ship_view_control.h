@@ -69,6 +69,14 @@ int ShipViewHpTypeTableCount();
 // FUN_00584720 -- DAT_00615240[Index].HpType, 0 outside 0..0x3b.
 int ShipViewHpTypeTableType(int Index);
 
+// The named bits of ShipViewControl::ViewFlags (the unnamed ones, 0x10 and 0x20, are set by the
+// Select* methods).
+enum EShipViewFlags
+{
+    kShipViewShowRect = 0x04,       // ini key show_rect
+    kShipViewShowWireframe = 0x08,  // ini key show_wireframe; also kWinPropRenderFlags
+};
+
 class ShipViewControl : public WinControl
 {
 public:

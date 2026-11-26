@@ -122,7 +122,7 @@ void IVP_Environment::fire_event_pre_collision(IVP_Event_Collision* arg)
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
         IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
-        if ((Listener->enabled_callbacks & 1) != 0)
+        if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_PRE_COLLISION) != 0)
         {
             Listener->event_pre_collision(arg);
         }
@@ -237,7 +237,7 @@ void IVP_Environment::notify_friction_created(void* arg)
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
         IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
-        if ((Listener->enabled_callbacks & 4) != 0)
+        if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) != 0)
         {
             Listener->event_friction_created(arg);
         }
@@ -249,7 +249,7 @@ void IVP_Environment::notify_friction_deleted(void* arg)
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
         IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
-        if ((Listener->enabled_callbacks & 4) != 0)
+        if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) != 0)
         {
             Listener->event_friction_deleted(arg);
         }
@@ -644,7 +644,7 @@ void IVP_Anomaly_Manager::solve_inter_penetration_simple(IVP_Real_Object* Object
 
     const float Speed = (float)(get_push_speed_penetration(Object0, Object1));
 
-    if (static_cast<int8_t>(Core0->MovementState & 0xffu) < 8)
+    if (static_cast<int8_t>(Core0->MovementState & 0xffu) < IVP_MT_NOT_SIM)
     {
         const double Factor = -((double)(Core0->Mass) * Speed);
         IVP_U_Point Impulse;
@@ -660,7 +660,7 @@ void IVP_Anomaly_Manager::solve_inter_penetration_simple(IVP_Real_Object* Object
         Object0->async_add_rot_speed_object_cs(&RotSpeed);
     }
 
-    if (static_cast<int8_t>(Core1->MovementState & 0xffu) < 8)
+    if (static_cast<int8_t>(Core1->MovementState & 0xffu) < IVP_MT_NOT_SIM)
     {
         const double Factor = (double)(Core1->Mass) * Speed;
         IVP_U_Point Impulse;
@@ -696,7 +696,7 @@ void IVP_Anomaly_Manager::inter_penetration(IVP_Ledge_Mindist* Mindist, IVP_Real
     }
 
     const IVP_Synapse_Real* const Synapse = &Mindist->synapse[Idx];
-    if (Synapse->status > 2)
+    if (Synapse->status > IVP_SYNAPSE_POLY)
     {
         solve_inter_penetration_simple(Object0, Object1);
         return;
@@ -757,7 +757,7 @@ void IVP_Anomaly_Manager::inter_penetration(IVP_Ledge_Mindist* Mindist, IVP_Real
     Dir.k[2] = NormalWs.k[2];
     const double Speed = get_push_speed_penetration(Object0, Object1);
 
-    if (!(static_cast<int8_t>(Free->core->MovementState & 0xffu) < 8))
+    if (!(static_cast<int8_t>(Free->core->MovementState & 0xffu) < IVP_MT_NOT_SIM))
     {
         return;
     }

@@ -506,7 +506,7 @@ bool FMgsdbDatabase::Match(const char* Keyword) const
 const char* FMgsdbDatabase::EvaluateIf()
 {
     unsigned long Current = 0;
-    int Kind = 0; // 0 number, 1 guid, 2 driver, 3 os
+    int Kind = kMgsdbKindNumber;
     SkipWhite();
     if (Match("cpuspeed"))
     {
@@ -550,39 +550,39 @@ const char* FMgsdbDatabase::EvaluateIf()
             }
             else if (Match("guid"))
             {
-                Kind = 1;
+                Kind = kMgsdbKindGuid;
                 Cursor_ += 4;
             }
             else if (Match("driver"))
             {
-                Kind = 2;
+                Kind = kMgsdbKindDriver;
                 Cursor_ += 6;
             }
             else if (Match("os"))
             {
                 OSVERSIONINFOA Version;
-                Version.dwOSVersionInfoSize = 0x94;
+                Version.dwOSVersionInfoSize = sizeof(Version);
 #pragma warning(push)
 #pragma warning(disable : 4996)
                 GetVersionExA(&Version);
 #pragma warning(pop)
-                if (Version.dwPlatformId == 2)
+                if (Version.dwPlatformId == VER_PLATFORM_WIN32_NT)
                 {
-                    Current = 5;
+                    Current = kMgsdbOsWinXp;
                     if (Version.dwMajorVersion == 5 && Version.dwBuildNumber < 0xA28)
-                        Current = 4;
+                        Current = kMgsdbOsWin2k;
                 }
                 else
                 {
-                    Current = 3;
+                    Current = kMgsdbOsWinMe;
                     if ((Version.dwBuildNumber & 0xFFFF) < 0x8AF)
-                        Current = 2;
+                        Current = kMgsdbOsWin98Se;
                     if ((Version.dwBuildNumber & 0xFFFF) < 1999)
-                        Current = 1;
+                        Current = kMgsdbOsWin98;
                     if ((Version.dwBuildNumber & 0xFFFF) < 0x3B7)
-                        Current = 0;
+                        Current = kMgsdbOsWin95;
                 }
-                Kind = 3;
+                Kind = kMgsdbKindOs;
                 Cursor_ += 2;
             }
             else
@@ -593,69 +593,69 @@ const char* FMgsdbDatabase::EvaluateIf()
     }
 
     SkipWhite();
-    unsigned long Op = 0;
+    unsigned long Op = kMgsdbOpEq;
     if (Cursor_[0] == '=' && Cursor_[1] == '=')
     {
         Cursor_ += 2;
-        Op = 0;
+        Op = kMgsdbOpEq;
     }
     else if (Cursor_[0] == '!' && Cursor_[1] == '=')
     {
         Cursor_ += 2;
-        Op = 1;
+        Op = kMgsdbOpNe;
     }
     else if (Cursor_[0] == '<' && Cursor_[1] == '>')
     {
         Cursor_ += 2;
-        Op = 1;
+        Op = kMgsdbOpNe;
     }
     else if (Cursor_[0] == '=' && Cursor_[1] == '>')
     {
         Cursor_ += 2;
-        Op = 4;
+        Op = kMgsdbOpGe;
     }
     else if (Cursor_[0] == '=' && Cursor_[1] == '<')
     {
         Cursor_ += 2;
-        Op = 5;
+        Op = kMgsdbOpLe;
     }
     else if (Cursor_[0] == '<' && Cursor_[1] == '=')
     {
         Cursor_ += 2;
-        Op = 5;
+        Op = kMgsdbOpLe;
     }
     else if (Cursor_[0] == '>' && Cursor_[1] == '=')
     {
         Cursor_ += 2;
-        Op = 4;
+        Op = kMgsdbOpGe;
     }
     else if (*Cursor_ == '=')
     {
         ++Cursor_;
-        Op = 0;
+        Op = kMgsdbOpEq;
     }
     else if (*Cursor_ == '>')
     {
         ++Cursor_;
-        Op = 2;
+        Op = kMgsdbOpGt;
     }
     else if (*Cursor_ == '<')
     {
         ++Cursor_;
-        Op = 3;
+        Op = kMgsdbOpLt;
     }
     else
     {
         if (*Cursor_ != '&')
             return "Unknown operator";
         ++Cursor_;
-        Op = 6;
+        Op = kMgsdbOpAnd;
     }
     SkipWhite();
 
-    if (Kind == 1)
+    if (Kind == kMgsdbKindGuid)
     {
-        if (Op >= 2)
+        if (Op >= kMgsdbOpGt)
             return "Only == or != allowed";
         unsigned long Guid[4];
         const unsigned long W1 = ReadGuidWord();
@@ -695,12 +695,12 @@ const char* FMgsdbDatabase::EvaluateIf()
             return "Invalid GUID";
         Guid[3] = B4 * 0x10000 + B3;
         const bool bEqual = memcmp(Guid, &Ident_.DeviceIdentifier, 0x10) == 0;
-        if (Op == 0)
+        if (Op == kMgsdbOpEq)
             return bEqual ? kMgsdbTrue : nullptr;
         return bEqual ? nullptr : kMgsdbTrue;
     }
 
-    if (Kind == 2)
+    if (Kind == kMgsdbKindDriver)
     {
         // A.B.C.D against DriverVersion: HighPart = A<<16 + B (signed), LowPart = C<<16 + D.
         // As in retail, the second and fourth checks test A and C again, not B and D.
@@ -722,17 +722,17 @@ const char* FMgsdbDatabase::EvaluateIf()
         const long Hi = Ident_.DriverVersion.HighPart;
         switch (Op)
         {
-        case 0:
+        case kMgsdbOpEq:
             return (Lo == RhsLo && Hi == RhsHi) ? kMgsdbTrue : nullptr;
-        case 1:
+        case kMgsdbOpNe:
             return (Lo == RhsLo && Hi == RhsHi) ? nullptr : kMgsdbTrue;
-        case 2:
+        case kMgsdbOpGt:
             return (Hi < RhsHi || (Hi <= RhsHi && Lo <= RhsLo)) ? nullptr : kMgsdbTrue;
-        case 3:
+        case kMgsdbOpLt:
             return (RhsHi < Hi || (RhsHi <= Hi && RhsLo <= Lo)) ? nullptr : kMgsdbTrue;
-        case 4:
+        case kMgsdbOpGe:
             return (Hi < RhsHi || (Hi <= RhsHi && Lo < RhsLo)) ? nullptr : kMgsdbTrue;
-        case 5:
+        case kMgsdbOpLe:
             return (RhsHi < Hi || (RhsHi <= Hi && RhsLo < Lo)) ? nullptr : kMgsdbTrue;
         default:
             return "Invalid";
@@ -740,36 +740,36 @@ const char* FMgsdbDatabase::EvaluateIf()
     }
 
     unsigned long Rhs = 0;
-    if (Kind == 3)
+    if (Kind == kMgsdbKindOs)
     {
         if (Match("win95"))
         {
-            Rhs = 0;
+            Rhs = kMgsdbOsWin95;
             Cursor_ += 5;
         }
         else if (Match("win98"))
         {
-            Rhs = 1;
+            Rhs = kMgsdbOsWin98;
             Cursor_ += 5;
         }
         else if (Match("win98se"))
         {
-            Rhs = 2;
+            Rhs = kMgsdbOsWin98Se;
             Cursor_ += 7;
         }
         else if (Match("winme"))
         {
-            Rhs = 3;
+            Rhs = kMgsdbOsWinMe;
             Cursor_ += 5;
         }
         else if (Match("win2k"))
         {
-            Rhs = 4;
+            Rhs = kMgsdbOsWin2k;
             Cursor_ += 5;
         }
         else if (Match("winxp"))
         {
-            Rhs = 5;
+            Rhs = kMgsdbOsWinXp;
             Cursor_ += 5;
         }
         else
@@ -785,19 +785,19 @@ const char* FMgsdbDatabase::EvaluateIf()
     }
     switch (Op)
     {
-    case 0:
+    case kMgsdbOpEq:
         return Current == Rhs ? kMgsdbTrue : nullptr;
-    case 1:
+    case kMgsdbOpNe:
         return Current == Rhs ? nullptr : kMgsdbTrue;
-    case 2:
+    case kMgsdbOpGt:
         return Rhs < Current ? kMgsdbTrue : nullptr;
-    case 3:
+    case kMgsdbOpLt:
         return Current < Rhs ? kMgsdbTrue : nullptr;
-    case 4:
+    case kMgsdbOpGe:
         return Current < Rhs ? nullptr : kMgsdbTrue;
-    case 5:
+    case kMgsdbOpLe:
         return Rhs < Current ? nullptr : kMgsdbTrue;
-    case 6:
+    case kMgsdbOpAnd:
         return (Current & Rhs) == 0 ? nullptr : kMgsdbTrue;
     default:
         return "Invalid";

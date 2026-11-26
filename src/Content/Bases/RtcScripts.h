@@ -15,6 +15,18 @@
 
 #include <vector>
 
+// FCharacterEncounterAction::Type, the key of the [CharacterEncounter] line.
+enum ECharacterEncounterAction
+{
+    kEncounterActionGreet = 0,     // "greet"
+    kEncounterActionWalkup = 1,    // "walkup"
+    kEncounterActionAction = 2,    // "action"
+    kEncounterActionOffer = 3,     // "offer"
+    kEncounterActionDecision = 4,  // "decision"
+    kEncounterActionAccept = 5,    // "accept"
+    kEncounterActionDecline = 6    // "decline" / "reject"
+};
+
 // FCharacterEncounter::Actions element (0x48 bytes; VC6 vector<>::insert FUN_06ed5080).
 struct FCharacterEncounterAction
 {

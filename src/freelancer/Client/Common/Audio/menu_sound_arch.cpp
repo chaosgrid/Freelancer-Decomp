@@ -53,6 +53,20 @@ namespace
     static const float kDefaultRangeMax = 300.f;
     static const unsigned kDefaultFlags = 0x10000000u;
 
+    // FClientSoundArch::Flags (+0x18). The low word holds the attenuation byte (dB, signed) and
+    // the random pitch range byte; bits 16..19 the source type (ESoundSourceType), 20 / 21 the
+    // "persistent" key (space / gameflow).
+    enum ESoundArchFlag : unsigned
+    {
+        kSoundArchPersistSpace = 0x100000,     // persistent = space
+        kSoundArchPersistGameflow = 0x200000,  // persistent = gameflow
+        kSoundArchPitchBendable = 0x1000000,   // slot 13, ini key pitch_bendable
+        kSoundArchRandomPitch = 0x2000000,     // slot 11 returns a random pitch, set by crv_pitch
+        kSoundArchStreamer = 0x4000000,        // slot 9, ini key streamer
+        kSoundArch2d = 0x8000000,              // slot 10, ini key is_2d
+        kSoundArchLodResolved = 0x20000000     // ArchResolveLod has run
+    };
+
     // Archetype::SoundImpl (vtable 0x005ca36c, 15 slots of Archetype::ISound). The slot bodies
     // are the ArchSlotN functions below; the overrides only forward to them.
     struct FClientSoundArch : Archetype::ISound
@@ -125,6 +139,16 @@ namespace
         unsigned Size;
     };
 
+    // FSoundSource::Flags (+0x0C).
+    enum ESoundSourceFlag : unsigned char
+    {
+        kSourceLoop = 0x01,
+        kSourceCockpit = 0x02,       // belongs to the cockpit / interior mix
+        kSourcePlayed = 0x04,        // played through the SoundManager (an archetype reference held)
+        kSourceStarted = 0x08,
+        kSourceTickLatched = 0x10    // StartTick holds a tick count, not an offset
+    };
+
     // Sound::Source (vtable 0x005c9fac), retail sizeof 0x30. The size is behavioural: the Heap
     // pool DAT_00667a44 has that element size and FUN_00428f80 / FUN_00428fc0 dispatch on it.
     // Sound::StreamedSource (0x40) and Sound::Source3D (0x64) derive from it below.
@@ -179,7 +203,7 @@ namespace
         void __thiscall SetPan(float NewPan) override;
         void __thiscall SetLooping(unsigned char bLooping) override
         {
-            Flags = static_cast<unsigned char>((Flags & 0xfeu) | (bLooping & 1u));
+            Flags = static_cast<unsigned char>((Flags & ~kSourceLoop) | (bLooping & 1u));
         }
         // Slots 35..37 in the Sound::Source and Sound::StreamedSource tables are the imported
         // do-nothings IDPMsgHandler::OnAddHost (RET 4, slots 35 and 36) and
@@ -504,7 +528,7 @@ namespace
                 return 0.f;
             return ArchSlot11RandomPitch(Arch->Linked);
         }
-        if ((Arch->Flags & 0x2000000u) == 0)
+        if ((Arch->Flags & kSoundArchRandomPitch) == 0)
             return 0.f;
         int const PitchRange = static_cast<signed char>((Arch->Flags >> 8) & 0xffu);
         if (PitchRange <= 0)
@@ -560,9 +584,9 @@ namespace
     // the source marks it as belonging to the cockpit/interior mix.
     float SourceModeDb(FSoundSource const* Source, int Mode)
     {
-        if (Mode == 2 && (Source->Flags & 2u) == 0)
+        if (Mode == 2 && (Source->Flags & kSourceCockpit) == 0)
             return GetClientCockpitAttenuation(); // _DAT_00667c9c
-        if (Mode == 1 && (Source->Flags & 2u) != 0)
+        if (Mode == 1 && (Source->Flags & kSourceCockpit) != 0)
             return -1e10f;
         return 0.f;
     }
@@ -581,30 +605,30 @@ namespace
         bool bDuck = false;
         switch (Source->Type)
         {
-        case 0: // audio_sfx
+        case kSoundSourceSfx:
             Base = G_AudioSfxDb;
             ModeDb = SourceModeDb(Source, Mode);
             bDuck = true;
             break;
-        case 1: // audio_interface
+        case kSoundSourceInterface:
             if (Mode == 1)
                 ModeDb = -1e10f;
             else
                 Base = G_AudioInterfaceDb;
             break;
-        case 2: // audio_voice
+        case kSoundSourceVoice:
             Base = G_AudioVoiceDb;
             break;
-        case 3: // audio_music
+        case kSoundSourceMusic:
             Base = G_AudioMusicDb;
             bDuck = true;
             break;
-        case 4: // audio_ambient
+        case kSoundSourceAmbient:
             Base = G_AudioAmbientDb;
             ModeDb = SourceModeDb(Source, Mode);
             bDuck = true;
             break;
-        case 5: // audio_voice, ducked
+        case kSoundSourceVoiceDucked:
             Base = G_AudioVoiceDb;
             bDuck = true;
             break;
@@ -665,7 +689,7 @@ namespace
 
     unsigned long DACOM_API FSoundSource::GetStartTick()
     {
-        if ((Flags & 0x10u) == 0)
+        if ((Flags & kSourceTickLatched) == 0)
             MarkStarted();
         return static_cast<unsigned long>(StartTick);
     }
@@ -864,7 +888,7 @@ namespace
     {
         if (Arch == nullptr)
             return kGrNoValue;
-        float const Scale = GetPerfOptionSlot(2);
+        float const Scale = GetPerfOptionSlot(kPerfSlotSoundMaxDistScale);
         *Out = Arch->GetRangeMax() * Scale;
         return GR_OK;
     }
@@ -1029,7 +1053,7 @@ namespace
 
     void __thiscall FSoundSource::SetStartOffset(int Offset)
     {
-        if ((Flags & 0x10u) != 0)
+        if ((Flags & kSourceTickLatched) != 0)
         {
             unsigned const Now = DALib::Sound->GetTickCountSlot();
             StartTick = static_cast<int>(Now - static_cast<unsigned>(Offset));
@@ -1050,7 +1074,7 @@ namespace
     {
         if (DALib::Sound == nullptr)
             return;
-        if ((Flags & 0x10u) != 0)
+        if ((Flags & kSourceTickLatched) != 0)
         {
             unsigned const Now = DALib::Sound->GetTickCountSlot();
             StartTick = static_cast<int>(static_cast<unsigned>(StartTick) +
@@ -1108,7 +1132,7 @@ namespace
     void ArchResolveLod(FClientSoundArch* Arch, int Lod)
     {
         // No null test.
-        Arch->Flags |= 0x20000000u;
+        Arch->Flags |= kSoundArchLodResolved;
         if (Arch->Linked == nullptr)
             Arch->Linked = Arch;
 
@@ -1164,7 +1188,7 @@ namespace
     FClientSoundArch* ArchGetLinked(FClientSoundArch* Arch)
     {
         // No null test.
-        if ((Arch->Flags & 0x20000000u) == 0)
+        if ((Arch->Flags & kSoundArchLodResolved) == 0)
             ArchResolveLod(Arch, G_SoundLod);
         return Arch->Linked;
     }
@@ -1231,13 +1255,13 @@ namespace
     // finished once start tick + slot 30 is below the SoundManager clock (slot 44, unsigned).
     unsigned char SourceIsFinished(FSoundSource* Source)
     {
-        if ((Source->Flags & 1u) != 0)
+        if ((Source->Flags & kSourceLoop) != 0)
             return 0;
-        if (Source->Arch != nullptr && (DALib::Sound != nullptr || (Source->Flags & 4u) == 0))
+        if (Source->Arch != nullptr && (DALib::Sound != nullptr || (Source->Flags & kSourcePlayed) == 0))
         {
-            if ((Source->Flags & 8u) == 0)
+            if ((Source->Flags & kSourceStarted) == 0)
                 return 0;
-            if ((Source->Flags & 4u) == 0)
+            if ((Source->Flags & kSourcePlayed) == 0)
                 return 0;
             if (Source->Arch->GetSmArchId() != -1)
             {
@@ -1260,15 +1284,15 @@ namespace
     // the same value); no test of the source or of DALib::Sound.
     void SourceMarkStarted(FSoundSource* Source)
     {
-        if ((Source->Flags & 8u) != 0)
+        if ((Source->Flags & kSourceStarted) != 0)
             return;
-        if ((Source->Flags & 4u) != 0 && (Source->Flags & 0x10u) == 0)
+        if ((Source->Flags & kSourcePlayed) != 0 && (Source->Flags & kSourceTickLatched) == 0)
         {
             unsigned const Now = DALib::Sound->GetTickCountSlot();
             Source->StartTick = static_cast<int>(Now - static_cast<unsigned>(Source->StartTick));
-            Source->Flags = static_cast<unsigned char>(Source->Flags | 0x10u);
+            Source->Flags = static_cast<unsigned char>(Source->Flags | kSourceTickLatched);
         }
-        Source->Flags = static_cast<unsigned char>(Source->Flags | 8u);
+        Source->Flags = static_cast<unsigned char>(Source->Flags | kSourceStarted);
     }
 
     void __thiscall FSoundSource::ComputeMixerScore(const Vector* Listener)
@@ -1290,30 +1314,30 @@ namespace
             bool bDuck = false;
             switch (Type)
             {
-            case 0:
+            case kSoundSourceSfx:
                 ModeDb = SourceModeDb(this, GetClientAudioMode());
                 Base = G_AudioSfxDb;
                 bDuck = true;
                 break;
-            case 1:
+            case kSoundSourceInterface:
                 if (GetClientAudioMode() == kClientAudioModeSpace)
                     ModeDb = -1e10f;
                 else
                     Base = G_AudioInterfaceDb;
                 break;
-            case 2:
+            case kSoundSourceVoice:
                 Base = G_AudioVoiceDb;
                 break;
-            case 3:
+            case kSoundSourceMusic:
                 Base = G_AudioMusicDb;
                 bDuck = true;
                 break;
-            case 4:
+            case kSoundSourceAmbient:
                 ModeDb = SourceModeDb(this, GetClientAudioMode());
                 Base = G_AudioAmbientDb;
                 bDuck = true;
                 break;
-            case 5:
+            case kSoundSourceVoiceDucked:
                 Base = G_AudioVoiceDb;
                 bDuck = true;
                 break;
@@ -1695,10 +1719,10 @@ namespace
     // held is released (vt+8).
     void SourceStopLinked(FSoundSource* Source)
     {
-        if ((Source->Flags & 4u) != 0)
+        if ((Source->Flags & kSourcePlayed) != 0)
         {
             Source->Arch->Release();
-            if ((Source->Flags & 4u) != 0)
+            if ((Source->Flags & kSourcePlayed) != 0)
                 DALib::Sound->DetachPlayKey(Source);
         }
         PlayingListErase(Source->ListNode);
@@ -1760,10 +1784,10 @@ namespace
             return 0;
         Source->Type = static_cast<int>(Linked->GetSourceType()); // slot 2
         Source->StartTick = Extra;
-        Source->Flags = static_cast<unsigned char>(Source->Flags & 0xe7u);
+        Source->Flags = static_cast<unsigned char>(Source->Flags & ~(kSourceStarted | kSourceTickLatched));
         // Flag 4 (SoundManager-played) first needs DALib::Sound and the archetype's slot 3;
         // either failing answers false before anything is linked.
-        if ((Source->Flags & 4u) != 0)
+        if ((Source->Flags & kSourcePlayed) != 0)
         {
             if (DALib::Sound == nullptr)
                 return 0;
@@ -1958,7 +1982,7 @@ namespace
         if (IsFadedOut() != 0)
             return 1;
         unsigned long const Status = DALib::Streamer->QueryStatus(StreamHandle);
-        if (Status == 4 || Status == 0)
+        if (Status == kStreamStatusFinished || Status == kStreamStatusInvalid)
             return 1;
         return SourceIsFinished(this);
     }
@@ -2043,10 +2067,10 @@ namespace
         Desc.ComponentName = "FileSystem";
         Desc.BackendName = ParentFs != nullptr ? "UTF" : "DOS";
         Desc.DataPath = RelPath;
-        Desc.Access = 0x80000000u;
-        Desc.ShareMode = 1;
-        Desc.Creation = 3;
-        Desc.Flags = 0x8000080u;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xffffffffu;
 
         return Factory->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), OutFs);
@@ -2250,9 +2274,9 @@ namespace
             // No test of the value pointer.
             char const* Value = Reader.get_value_string();
             if (_stricmp("space", Value) == 0)
-                Arch->Flags = (Arch->Flags & 0xff1fffffu) | 0x100000u;
+                Arch->Flags = (Arch->Flags & 0xff1fffffu) | kSoundArchPersistSpace;
             else if (_stricmp("gameflow", Value) == 0)
-                Arch->Flags = (Arch->Flags & 0xff2fffffu) | 0x200000u;
+                Arch->Flags = (Arch->Flags & 0xff2fffffu) | kSoundArchPersistGameflow;
             else
                 FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown 'persistent' value %s.\n",
                       kSoundArchCpp, 0x2fd, Value);
@@ -2272,24 +2296,24 @@ namespace
         if (Reader.is_value("streamer"))
         {
             unsigned const Bit = Reader.get_value_bool(0) ? 1u : 0u;
-            Arch->Flags = (Bit << 26) ^ (Arch->Flags & 0xfbffffffu);
+            Arch->Flags = (Bit << 26) ^ (Arch->Flags & ~kSoundArchStreamer);
             return true;
         }
         if (Reader.is_value("is_2d"))
         {
             unsigned const Bit = Reader.get_value_bool(0) ? 1u : 0u;
-            Arch->Flags = (Bit << 27) ^ (Arch->Flags & 0xf7ffffffu);
+            Arch->Flags = (Bit << 27) ^ (Arch->Flags & ~kSoundArch2d);
             return true;
         }
         if (Reader.is_value("pitch_bendable"))
         {
             unsigned const Bit = Reader.get_value_bool(0) ? 1u : 0u;
-            Arch->Flags = (Bit << 24) ^ (Arch->Flags & 0xfeffffffu);
+            Arch->Flags = (Bit << 24) ^ (Arch->Flags & ~kSoundArchPitchBendable);
             return true;
         }
         if (Reader.is_value("crv_pitch"))
         {
-            Arch->Flags = Arch->Flags | 0x3000000u;
+            Arch->Flags = Arch->Flags | kSoundArchPitchBendable | kSoundArchRandomPitch;
             // Retail also reads the curve's random-pitch range and stores it in the
             // Flags byte at bits 8-15 (consumed by ArchSlot11RandomPitch as `Flags >> 8`).
             float const Pitch = Reader.get_value_float(0);
@@ -3267,14 +3291,14 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
             if (Source->Update(&G_MixerListener, DeltaSeconds) == 0)
                 continue;
             unsigned char const Flags = Source->Flags;
-            if ((Flags & 4u) == 0)
+            if ((Flags & kSourcePlayed) == 0)
                 continue;
             if (!(Source->MixerScale == kMixerNoScore) && G_MixerRankedCount < kMixerMaxEntries)
             {
                 G_MixerRanked[G_MixerRankedCount] = Source;
                 ++G_MixerRankedCount;
             }
-            else if ((Flags & 8u) == 0)
+            else if ((Flags & kSourceStarted) == 0)
             {
                 Source->MarkStarted();
             }
@@ -3291,7 +3315,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         for (unsigned Index = 0; Index < G_MixerRankedCount; ++Index)
         {
             FSoundSource* const Source = G_MixerRanked[Index];
-            if ((Source->Flags & 8u) == 0)
+            if ((Source->Flags & kSourceStarted) == 0)
                 Source->MarkStarted();
         }
         DALib::Sound->ReplaceAttachedList(reinterpret_cast<void**>(G_MixerRanked),
@@ -3333,16 +3357,17 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
     else
     {
         // FUN_005b3510(4) (USE_3D_SOUNDS) against DAT_005c75dc (1.0f).
-        bool const bNo3dSounds = GetPerfOptionSlot(4) < 1.f;
+        bool const bNo3dSounds = GetPerfOptionSlot(kPerfSlotUse3dSounds) < 1.f;
         // Is2d is called even when 3D sounds are off.
         unsigned char const bIs2d = Arch->Is2d();
-        unsigned Flags = (bIs2d != 0 || bNo3dSounds) ? 0x11u : 9u;
+        unsigned Flags = (bIs2d != 0 || bNo3dSounds) ? (kSoundArchMute3dAtMaxDistance | kSoundArchPan)
+                                                      : (kSoundArchMute3dAtMaxDistance | kSoundArch3d);
         bool const bPitchBendOn = GetGameOption(kGameOptAudioGroup) != 0 &&
                                   GetGameOption(kGameOptPitchBendSounds) != 0;
         // IsPitchBendable is always called.
         unsigned char const bBendable = Arch->IsPitchBendable();
         if (bBendable != 0 && bPitchBendOn)
-            Flags |= 2u;
+            Flags |= kSoundArchFrequency;
         SmId = DALib::Sound->CreateArchetypeFromWav(static_cast<IDAComponent*>(ChildFs), Flags);
     }
 

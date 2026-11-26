@@ -74,6 +74,11 @@ namespace
     // .rdata 0x3f333333 -- the chrome dimming factor of SetViewObject's wireframe colour.
     float const kViewWireDim = 0.7f;
 
+    // The equipment families of the attached (hardpoint-mounted) equipment, without and with the shield.
+    constexpr int kAttachedNoShieldMask = EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun | EquipTypeShieldGen |
+                                          EquipTypeThruster | EquipTypeCargoPod | EquipTypeCloak;
+    constexpr int kAttachedEquipMask = kAttachedNoShieldMask | EquipTypeShield;
+
     // DAT_00611400 -- FUN_0045a7c0's 0x15 {type, ids_name} pairs.
     struct FCollisionTypeIds
     {
@@ -81,14 +86,20 @@ namespace
         unsigned Ids;
     };
 
+    typedef Archetype::CollisionGroup FCollisionGroup;
+
     FCollisionTypeIds const kCollisionTypeIds[0x15] = {
-        {0x00000000u, 0x708u}, {0x00000001u, 0x708u}, {0x00000002u, 0x709u},
-        {0x00000004u, 0x70au}, {0x00000008u, 0x70bu}, {0x00000010u, 0x70cu},
-        {0x00000020u, 0x70du}, {0x00000040u, 0x70eu}, {0x00000080u, 0x70fu},
-        {0x00000100u, 0x710u}, {0x00000200u, 0x711u}, {0x00000400u, 0x712u},
-        {0x00000800u, 0x713u}, {0x00001000u, 0x714u}, {0x00002000u, 0x715u},
-        {0x00004000u, 0x716u}, {0x00008000u, 0x717u}, {0x00010000u, 0x718u},
-        {0x00020000u, 0x719u}, {0x00040000u, 0x71au}, {0x00080000u, 0x71bu},
+        {0x00000000u, 0x708u}, {0x00000001u, 0x708u},
+        {FCollisionGroup::kGroupTypeFin, 0x709u}, {FCollisionGroup::kGroupTypeTopFin, 0x70au},
+        {FCollisionGroup::kGroupTypePortFin, 0x70bu}, {FCollisionGroup::kGroupTypeStarboardFin, 0x70cu},
+        {FCollisionGroup::kGroupTypePortWing, 0x70du}, {FCollisionGroup::kGroupTypeStarboardWing, 0x70eu},
+        {FCollisionGroup::kGroupTypeMiddleWing, 0x70fu}, {FCollisionGroup::kGroupTypeEngine, 0x710u},
+        {FCollisionGroup::kGroupTypePortEngine, 0x711u}, {FCollisionGroup::kGroupTypeMiddleEngine, 0x712u},
+        {FCollisionGroup::kGroupTypeStarboardEngine, 0x713u}, {FCollisionGroup::kGroupTypeTopEngine, 0x714u},
+        {FCollisionGroup::kGroupTypeBottomEngine, 0x715u}, {FCollisionGroup::kGroupTypeSpoiler, 0x716u},
+        {FCollisionGroup::kGroupTypeTail, 0x717u}, {FCollisionGroup::kGroupTypePortSidePanel, 0x718u},
+        {FCollisionGroup::kGroupTypeStarboardSidePanel, 0x719u}, {FCollisionGroup::kGroupTypePortArm, 0x71au},
+        {FCollisionGroup::kGroupTypeStarboardArm, 0x71bu},
     };
 
     // The inlined chain retail spells out at every use: watched -> -8 (IObjRW) -> +0xc
@@ -585,7 +596,7 @@ bool HudIsUnvisitedSolar(CSimple const* Object)
     {
         unsigned Type = 0;
         Gameobj->get_type(Type); // vt+0x88; the return value is not looked at
-        if ((Type & 0x107ffdffu) != 0 && Gameobj->bWatchListed != 0)
+        if ((Type & (OBJ_SOLAR_NO_WAYPOINT_MASK | OBJ_SHIP_MASK | OBJ_LOOT)) != 0 && Gameobj->bWatchListed != 0)
             return false;
     }
     if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
@@ -616,19 +627,19 @@ unsigned HudObjectTypeIds(CSimple const* Object)
 {
     // FUN_004d4d50.
     unsigned const Bits = Object->TypeBits;
-    if ((Bits & 0x1u) != 0)
+    if ((Bits & OBJ_MOON) != 0)
         return 0x4a0;
-    if ((Bits & 0x2u) != 0)
+    if ((Bits & OBJ_PLANET) != 0)
         return 0x4a1;
-    if ((Bits & 0x4u) != 0)
+    if ((Bits & OBJ_SUN) != 0)
         return 0x4a2;
-    if ((Bits & 0x8010u) != 0)
+    if ((Bits & (OBJ_SATELLITE | OBJ_MISSION_SATELLITE)) != 0)
         return 0x4a3;
-    if ((Bits & 0x40u) != 0)
+    if ((Bits & OBJ_JUMP_GATE) != 0)
         return 0x4a4;
-    if ((Bits & 0x80u) != 0)
+    if ((Bits & OBJ_TRADELANE_RING) != 0)
         return 0x4a5;
-    if ((Bits & 0x100u) != 0)
+    if ((Bits & OBJ_STATION) != 0)
         return 0x4a6;
     return 0x4a7;
 }
@@ -997,7 +1008,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     int const VibeId = static_cast<int>(EqObj->VibeId);
     unsigned Affiliation = 0;
     if (Reputation::Vibe::GetAffiliation(VibeId, Affiliation, false) != 0 ||
-        Affiliation == 0xffffffffu)
+        Affiliation == kNoAffiliation)
     {
         if (Name == 0)
         {
@@ -1122,7 +1133,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                     FClientGameobj* Scan = nullptr;
                     for (;;)
                     {
-                        int Kind = 2; // re-stored every pass, as retail
+                        int Kind = static_cast<int>(EClientGameobjKind::Solar); // re-stored every pass, as retail
                         Scan = Scan != nullptr ? Scan->ListNext : ClientObjDb_GetKindHead(&Kind);
                         if (Scan == nullptr)
                         {
@@ -1206,7 +1217,7 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
     {
         // Ship gameobj byte +0x18c bit 2 (bucket 1 holds ships only). No instruction in
         // freelancer.exe sets bit 2 (the other writers touch bits 0, 1 and 3 only).
-        if ((static_cast<FClientShipGameobj*>(Gameobj)->ShipFlags & 4) != 0)
+        if ((static_cast<FClientShipGameobj*>(Gameobj)->ShipFlags & kShipFlagTradeRequest) != 0)
         {
             *OutArgb = G_NnPalettePurple;
             return;
@@ -1440,7 +1451,7 @@ void HudTargetBase::HideGroupAndEquipParts()
     }
 
     // Every attached equipment (mask 0x1fe0) root other than -1, with recursion.
-    CEquipTraverser EquipWalk(0x1fe0);
+    CEquipTraverser EquipWalk(kAttachedEquipMask);
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
     {
@@ -1687,7 +1698,7 @@ void HudTargetBase::ColourEquipParts()
     // Retail calls FUN_00548eb0 here and ignores the result.
     IsPlayerShipId(EqObj->Id);
 
-    CEquipTraverser EquipWalk(0x1fe0);
+    CEquipTraverser EquipWalk(kAttachedEquipMask);
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
     {
@@ -1869,7 +1880,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     unsigned Result = 0;
 
     // Attached equipment (mask 0x1ee0).
-    CEquipTraverser EquipWalk(0x1ee0);
+    CEquipTraverser EquipWalk(kAttachedNoShieldMask);
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
     {
@@ -1969,7 +1980,7 @@ void HudTargetBase::Draw()
         // Visible children (flag bit 1); DrawViewObject right after the view panel.
         for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         {
-            if ((Child->Flags & 2) == 0)
+            if ((Child->Flags & kWin3DVisible) == 0)
             {
                 continue;
             }
@@ -1985,7 +1996,7 @@ void HudTargetBase::Draw()
     {
         for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         {
-            if ((Child->Flags & 2) == 0)
+            if ((Child->Flags & kWin3DVisible) == 0)
             {
                 continue;
             }

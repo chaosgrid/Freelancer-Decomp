@@ -146,7 +146,7 @@ namespace
 {
     // .data:00612274. Initialised to 3 in the PE; the writers are FUN_004c8120 / FUN_004c8190
     // only.
-    unsigned GSessionFlags = 3;
+    unsigned GSessionFlags = kSessionTargetPanelExpanded | kSessionStatusPanelExpanded;
 }
 
 void SetGameSessionFlags(unsigned Mask, bool bSet)

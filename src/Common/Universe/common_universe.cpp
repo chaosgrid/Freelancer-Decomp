@@ -115,14 +115,14 @@ namespace
     {
         FFileSystemDesc Desc;
         memset(&Desc, 0, sizeof(Desc));
-        Desc.Size = 0x34;
+        Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc.ComponentName = "FileSystem";
         Desc.Implementation = "DOS";
         Desc.Path = Directory;
-        Desc.Access = 0x80000000;
-        Desc.ShareMode = 1;
-        Desc.Creation = 3;
-        Desc.Flags = 0x8000080;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xFFFFFFFF;
 
         void* Object = nullptr;
@@ -421,7 +421,7 @@ namespace
                 else
                     Record->DragModifier = Value;
                 if (Value > 1.0f)
-                    Record->PropertyFlags |= 0x80000;
+                    Record->PropertyFlags |= Universe::kZonePropDrag;
             }
             else if (Reader.is_value("damage"))
             {
@@ -429,7 +429,7 @@ namespace
                 double const Value = Reader.get_value_float(0);
                 Record->Damage = (float)Value;
                 if (Value > 0.0)
-                    Record->PropertyFlags |= 0x40000;
+                    Record->PropertyFlags |= Universe::kZonePropDamage;
             }
             else if (Reader.is_value("interference"))
             {
@@ -437,18 +437,18 @@ namespace
                 double const Value = Reader.get_value_float(0);
                 Record->Interference = (float)Value;
                 if (Value != 0.0)
-                    Record->PropertyFlags |= 0x100000;
+                    Record->PropertyFlags |= Universe::kZonePropInterference;
             }
             else if (Reader.is_value("music"))
             {
                 Record->MusicId = CreateID(Reader.get_value_string());
-                Record->PropertyFlags |= 0x400000;
+                Record->PropertyFlags |= Universe::kZonePropMusic;
             }
             else if (Reader.is_value("spacedust"))
             {
                 // CacheString at +0x70.
                 Record->Spacedust = StringAlloc(Reader.get_value_string(), false);
-                Record->PropertyFlags |= 0x200000;
+                Record->PropertyFlags |= Universe::kZonePropSpacedust;
             }
             else if (Reader.is_value("spacedust_maxparticles"))
             {

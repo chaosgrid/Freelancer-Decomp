@@ -90,8 +90,14 @@ namespace
         int Type;
         int Value;
     };
-    FChatBgStageState const kChatBgStage0[] = {{1, 4}, {2, 2}, {3, 0}, {4, 4}, {5, 2}, {6, 0}, {0, 0}};
-    FChatBgStageState const kChatBgStage1[] = {{1, 1}, {2, 2}, {3, 1}, {4, 1}, {5, 2}, {6, 1}, {0, 0}};
+    FChatBgStageState const kChatBgStage0[] = {{D3DTSS_COLOROP, D3DTOP_MODULATE}, {D3DTSS_COLORARG1, D3DTA_TEXTURE},
+                                                 {D3DTSS_COLORARG2, D3DTA_DIFFUSE}, {D3DTSS_ALPHAOP, D3DTOP_MODULATE},
+                                                 {D3DTSS_ALPHAARG1, D3DTA_TEXTURE}, {D3DTSS_ALPHAARG2, D3DTA_DIFFUSE},
+                                                 {0, 0}};
+    FChatBgStageState const kChatBgStage1[] = {{D3DTSS_COLOROP, D3DTOP_DISABLE}, {D3DTSS_COLORARG1, D3DTA_TEXTURE},
+                                                 {D3DTSS_COLORARG2, D3DTA_CURRENT}, {D3DTSS_ALPHAOP, D3DTOP_DISABLE},
+                                                 {D3DTSS_ALPHAARG1, D3DTA_TEXTURE}, {D3DTSS_ALPHAARG2, D3DTA_CURRENT},
+                                                 {0, 0}};
 
     // DAT_00611578 -- the quad's vertex colour, copied byte by byte into the batch.
     unsigned char const kChatBgColor[4] = {0x00, 0x00, 0x80, 0xb0};
@@ -104,7 +110,7 @@ namespace
             Batch.Type = 1;
             Batch.Vertices = nullptr;
             Batch.VertCount = 0;
-            Batch.Fvf = 0x142;
+            Batch.Fvf = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
             Batch.Indices = nullptr;
             Batch.IndexCount = 0;
             Batch.Pipeline = DALib::Pipeline;
@@ -160,7 +166,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
         FChatBgStageState const* Entry = kChatBgStage0;
-        int Type = 1;
+        int Type = D3DTSS_COLOROP;
         for (;;)
         {
             Pipe->SetTextureStageState(0, Type, Entry->Value);
@@ -173,7 +179,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
         FChatBgStageState const* Entry = kChatBgStage1;
-        int Type = 1;
+        int Type = D3DTSS_COLOROP;
         for (;;)
         {
             Pipe->SetTextureStageState(1, Type, Entry->Value);
@@ -200,7 +206,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     // A triangle list (type 4) in quad mode -- FUN_0046eab0 turns the fourth vertex into two
     // triangles. UV repeats the tile over the box from (0, 0) to (Width, -Height).
     float const V1 = Height / TileHeight;
-    Batch->Type = 4;
+    Batch->Type = D3DPT_TRIANGLELIST;
     Batch->bCloseLoop = 0;
     Batch->bStripMode = 1;
     Batch->U = 0.0f;
@@ -550,11 +556,11 @@ void ChatTextInputDisplay::Draw()
 bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
 {
     // FUN_0045f700: key-downs of an active line only.
-    if (Record->bKeyDown != 0 && (Flags & 1) != 0)
+    if (Record->bKeyDown != 0 && (Flags & kWin3DActive) != 0)
     {
         switch (Record->Key)
         {
-        case 0x0d:
+        case VK_RETURN:
         {
             // A non-empty line is serialised and submitted; the line is cleared either way, and
             // a line opened for one message closes.
@@ -579,15 +585,15 @@ bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
             }
             return true;
         }
-        case 0x1b:
+        case VK_ESCAPE:
             ClearText();
             ChatSetInputOpen(false);
             return true;
-        case 0x26:
+        case VK_UP:
             PrevTarget();
             RebuildDisplay();
             return true;
-        case 0x28:
+        case VK_DOWN:
             NextTarget();
             RebuildDisplay();
             return true;

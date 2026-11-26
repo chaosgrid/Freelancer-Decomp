@@ -52,7 +52,7 @@ int CruiseBehavior::SetModeFromFlags()
 // Slot 7, LAB_062ce3e0.
 int CruiseBehavior::Update()
 {
-    UpdateResult = (OwnerContext != nullptr) ? 1 : 3;
+    UpdateResult = (OwnerContext != nullptr) ? kBehaviorUpdateRunning : kBehaviorUpdateAborted;
     return UpdateResult;
 }
 

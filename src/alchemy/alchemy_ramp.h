@@ -556,7 +556,7 @@ namespace AlchemyImpl
         // +0x20 LAB_062439d0.
         unsigned char DACOM_API IsIdentity() override
         {
-            return ChannelFlags_ == 0x1FFu ? 1 : 0;
+            return ChannelFlags_ == kChannelAllIdentity ? 1 : 0;
         }
 
         // +0x24 LAB_062439f0: packs 3 nibbles, no masking on write (matches

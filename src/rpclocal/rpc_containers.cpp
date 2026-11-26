@@ -1820,78 +1820,67 @@ const char* RpcHardpointCodeToName(unsigned int Code) {
 // RETURN: 0, or the direction's sticky error (0x16 encode, 0x17 decode).
 // ===========================================================================
 
-// The per-equipment-record flag byte (built at 06da3ba3, taken apart at 06da4479). Every bit
-// is a wire-width or presence switch.
-static const unsigned char kEquipFlagEquipped      = 0x01;
-static const unsigned char kEquipFlagMission       = 0x02;
-static const unsigned char kEquipFlagWideCount     = 0x04;
-static const unsigned char kEquipFlagWideId        = 0x08;
-static const unsigned char kEquipFlagHardpointText = 0x10;
-static const unsigned char kEquipFlagNoHardpoint   = 0x20;
-static const unsigned char kEquipFlagUnitStatus    = 0x40;
-static const unsigned char kEquipFlagUnitCount     = 0x80;
-
 // 06da3ba0 -- one equipment record.
 static void RpcEncodeCreateObjectEquip(FRpcMarshalStream& Stream,
                                        const FRpcEquipWireRecord* Record) {
     unsigned char Flags = 0;
     if (Record->bEquipped != 0) {
-        Flags |= kEquipFlagEquipped;
+        Flags |= kEquipRecordEquipped;
     }
     if (Record->bMission != 0) {
-        Flags |= kEquipFlagMission;
+        Flags |= kEquipRecordMission;
     }
     // A SIGNED compare on the int Count.
     if (Record->Count > 255) {
-        Flags |= kEquipFlagWideCount;
+        Flags |= kEquipRecordWideCount;
     }
     // UNSIGNED, on the ushort Id.
     if (Record->Id > 255) {
-        Flags |= kEquipFlagWideId;
+        Flags |= kEquipRecordWideId;
     }
     // No hardpoint at all, a dictionary hit, or a literal string.
     unsigned char HardpointCode = 0;
     if (Record->Hardpoint == nullptr) {
-        Flags |= kEquipFlagNoHardpoint;
+        Flags |= kEquipRecordNoHardpoint;
     } else {
         HardpointCode =
             static_cast<unsigned char>(RpcHardpointNameToCode(Record->Hardpoint) & 0xffu);
         if (HardpointCode == 0) {
-            Flags |= kEquipFlagHardpointText;
+            Flags |= kEquipRecordHardpointText;
         }
     }
     if (Record->Count == 1) {
-        Flags |= kEquipFlagUnitCount;
+        Flags |= kEquipRecordUnitCount;
     }
     // float vs double 1.0 (.rdata:06db3c58): the bit is set only on equality, so an
     // undamaged item ships no status byte.
     if (static_cast<double>(Record->Status) == 1.0) {
-        Flags |= kEquipFlagUnitStatus;
+        Flags |= kEquipRecordFullHealth;
     }
 
     Stream.PutByte(Flags);
-    if ((Flags & kEquipFlagUnitCount) == 0) {
-        if ((Flags & kEquipFlagWideCount) != 0) {
+    if ((Flags & kEquipRecordUnitCount) == 0) {
+        if ((Flags & kEquipRecordWideCount) != 0) {
             Stream.PutDword(static_cast<unsigned int>(Record->Count));
         } else {
             Stream.PutByte(static_cast<unsigned char>(
                 static_cast<unsigned int>(Record->Count) & 0xffu));
         }
     }
-    if ((Flags & kEquipFlagUnitStatus) == 0) {
+    if ((Flags & kEquipRecordFullHealth) == 0) {
         // Status * 255.0 (DAT_06db60f0), ftol, one byte.
         Stream.PutQuantized(Record->Status, FRpcMarshalStream::kPercentScale);
     }
     Stream.PutWord(Archetype::LargeIDToSmallID(Record->ArchId));
-    if ((Flags & kEquipFlagWideId) != 0) {
+    if ((Flags & kEquipRecordWideId) != 0) {
         Stream.PutWord(Record->Id);
     } else {
         Stream.PutByte(static_cast<unsigned char>(Record->Id & 0xffu));
     }
-    if ((Flags & kEquipFlagNoHardpoint) != 0) {
+    if ((Flags & kEquipRecordNoHardpoint) != 0) {
         return;
     }
-    if ((Flags & kEquipFlagHardpointText) != 0) {
+    if ((Flags & kEquipRecordHardpointText) != 0) {
         // Retail sends the LOW BYTE of HardpointSize as the length but the whole WORD's worth
         // of bytes, so a name of 256 bytes or more would ship a truncated length with a
         // full-length body. Retail's own names top out at fifteen characters; reproduced.
@@ -1914,9 +1903,9 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
     Record->bEquipped = static_cast<unsigned char>(Flags & 0x01u);
 
     unsigned int Scratch = 0;
-    if ((Flags & kEquipFlagUnitCount) != 0) {
+    if ((Flags & kEquipRecordUnitCount) != 0) {
         Record->Count = 1;
-    } else if ((Flags & kEquipFlagWideCount) != 0) {
+    } else if ((Flags & kEquipRecordWideCount) != 0) {
         if (!Stream.GetDword(Scratch)) {
             return false;
         }
@@ -1929,7 +1918,7 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
         Record->Count = static_cast<int>(Narrow);                        // zero-extended
     }
 
-    if ((Flags & kEquipFlagUnitStatus) != 0) {
+    if ((Flags & kEquipRecordFullHealth) != 0) {
         // Exactly 1.0f, the constant the encoder compared against.
         Record->Status = 1.0f;
     } else if (!Stream.GetQuantizedUnsigned(Record->Status,
@@ -1943,7 +1932,7 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
     }
     Record->ArchId = Archetype::SmallIDToLargeID(Small);
 
-    if ((Flags & kEquipFlagWideId) != 0) {
+    if ((Flags & kEquipRecordWideId) != 0) {
         if (!Stream.GetWord(Record->Id)) {
             return false;
         }
@@ -1955,14 +1944,14 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
         Record->Id = static_cast<unsigned short>(Narrow);                // zero-extended
     }
 
-    if ((Flags & kEquipFlagNoHardpoint) != 0) {
+    if ((Flags & kEquipRecordNoHardpoint) != 0) {
         // Both fields cleared again, though the record had already been zeroed.
         Record->HardpointSize = 0;
         Record->Hardpoint = nullptr;
         return true;
     }
     unsigned char Raw = 0;
-    if ((Flags & kEquipFlagHardpointText) != 0) {
+    if ((Flags & kEquipRecordHardpointText) != 0) {
         if (!Stream.GetByte(Raw)) {
             return false;
         }
@@ -2353,13 +2342,6 @@ bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize,
     return Stream.GetBytes(OutBuffer, OutSize);
 }
 
-// The CREATESHIP tail's one flag byte (built at 06d97d82, taken apart at 06d982d0). Bit 0x04
-// is a presence switch as well as a value bit: it decides between the wide display name and
-// the two flattened FmtStrs.
-static const unsigned char kCreateShipFlagUsingTradelane = 0x01;  // payload +0x7c
-static const unsigned char kCreateShipFlagMarkedBy = 0x02;        // payload +0xc8
-static const unsigned char kCreateShipFlagOwnerPlayer = 0x04;     // payload +0x9c != 0
-
 // ===========================================================================
 // The four OUTER wire slots of the create-object pair
 //
@@ -2679,15 +2661,6 @@ static const double kFireWeaponSmallScale = 127.0 / 64.0;
 static const double kFireWeaponMediumScale = 32767.0 / 8192.0;
 static const double kFireWeaponSmallInvScale = 64.0 / 127.0;      // DAT_06db6140
 static const double kFireWeaponMediumInvScale = 8192.0 / 32767.0; // DAT_06db6138
-
-static const unsigned char kFireWeaponXSmall = 0x01;
-static const unsigned char kFireWeaponXMedium = 0x02;
-static const unsigned char kFireWeaponYSmall = 0x04;
-static const unsigned char kFireWeaponYMedium = 0x08;
-static const unsigned char kFireWeaponZSmall = 0x10;
-// Read by both codecs, written nowhere. See note 1 above.
-static const unsigned char kFireWeaponZMedium = 0x20;
-static const unsigned char kFireWeaponOneHardpoint = 0x40;
 
 // The per-component width decision (06da50e8). bHasMediumTier is false for z.
 static unsigned char RpcFireWeaponPickTier(float Value, unsigned char SmallBit,
@@ -3113,16 +3086,6 @@ unsigned int FPacket_FLPACKET_CLIENT_DBGCREATESHIP::Decode(const unsigned char* 
 // common_net.h; restated so the codec's import is visible here (identical signature).
 COMMON_API bool __cdecl IsMPServer();
 
-// Sub-types, named after the IClient::SendCommonPlayerTrade* sender that sets each one.
-static const unsigned int kPlayerTradeInitiateTrade = 0x01;
-static const unsigned int kPlayerTradeTerminateTrade = 0x02;
-static const unsigned int kPlayerTradeSetTradeMoney = 0x04;
-static const unsigned int kPlayerTradeAddTradeEquip = 0x08;
-static const unsigned int kPlayerTradeDelTradeEquip = 0x10;
-static const unsigned int kPlayerTradeRequestTrade = 0x20;
-static const unsigned int kPlayerTradeAcceptTrade = 0x40;
-static const unsigned int kPlayerTradeStopTradeRequest = 0x80;
-
 // ===========================================================================
 // ch1 0x12 FLPACKET_COMMON_PLAYER_TRADE -- LAB_06da7030 / LAB_06da7430, slots +0x04 and
 // +0x08 of PTR_FUN_06db4498 (ctor FUN_06d9bad0, routing header 0x10012). Eight sub-types
@@ -3145,24 +3108,24 @@ unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Encode(unsigned char** Buffer
     bool bNeedTrailer = true;
 
     switch (Wire.SubType) {
-    case kPlayerTradeAcceptTrade:                        // 0x40
+    case kPlayerTradeAcceptTrade:
         if (!Stream.PutByte(Wire.bAccepted)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeTerminateTrade:                        // 0x02
+    case kPlayerTradeTerminateTrade:
         // The LOW BYTE of payload+0x04, and nothing more.
         if (!Stream.PutByte((unsigned char)(Wire.Reason & 0xffu))) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         bNeedTrailer = false;
         break;
-    case kPlayerTradeSetTradeMoney:                       // 0x04
+    case kPlayerTradeSetTradeMoney:
         if (!Stream.PutDword(Wire.Money)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeAddTradeEquip:                    // 0x08
+    case kPlayerTradeAddTradeEquip:
         if (!Stream.PutDword(Wire.EquipArchId) ||
             !Stream.PutDword(Wire.EquipCount) ||
             !Stream.PutFloat(Wire.EquipStatus) ||
@@ -3170,7 +3133,7 @@ unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Encode(unsigned char** Buffer
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeDelTradeEquip:                 // 0x10
+    case kPlayerTradeDelTradeEquip:
         // No status float on this branch.
         if (!Stream.PutDword(Wire.EquipArchId) ||
             !Stream.PutDword(Wire.EquipCount) ||
@@ -3178,9 +3141,9 @@ unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Encode(unsigned char** Buffer
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeInitiateTrade:                      // 0x01 / 0x80
+    case kPlayerTradeInitiateTrade:
     case kPlayerTradeStopTradeRequest:
-    case kPlayerTradeRequestTrade:                       // 0x20
+    case kPlayerTradeRequestTrade:
         // These three reserve the trailer unconditionally, with no IsMPServer test.
         Stream.Reserve(4u, FRpcMarshalStream::kEncodeOverflow);
         if (Stream.Failed()) {
@@ -3265,7 +3228,7 @@ unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Decode(const unsigned char* B
         bNeedTrailer = false;
         break;
     }
-    case kPlayerTradeSetTradeMoney:                       // 0x04
+    case kPlayerTradeSetTradeMoney:
         if (!Stream.GetDword(Wire.Money)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
@@ -3282,16 +3245,16 @@ unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Decode(const unsigned char* B
         memcpy(&Wire.EquipStatus, &Status, sizeof(float));
         break;
     }
-    case kPlayerTradeDelTradeEquip:                 // 0x10
+    case kPlayerTradeDelTradeEquip:
         if (!Stream.GetDword(Wire.EquipArchId) ||
             !Stream.GetDword(Wire.EquipCount) ||
             !Stream.GetWord(Wire.EquipId)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
         break;
-    case kPlayerTradeInitiateTrade:                      // 0x01 / 0x20
+    case kPlayerTradeInitiateTrade:
     case kPlayerTradeRequestTrade:
-    case kPlayerTradeStopTradeRequest:                         // 0x80
+    case kPlayerTradeStopTradeRequest:
         Stream.Reserve(4u, FRpcMarshalStream::kDecodeOverrun);
         if (Stream.Failed()) {
             return Stream.GetError();

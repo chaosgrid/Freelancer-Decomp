@@ -143,20 +143,21 @@ IFileSystem* AsFileSystem(void* FileSystem)
 
 bool IsTypedChannelType(unsigned long Type)
 {
-    return Type == 1 || Type == 2 || Type == 4 || Type == 6 || Type == 8;
+    return Type == G_TypedTypeScalar || Type == G_TypedTypeVector || Type == G_TypedTypeQuat ||
+           Type == G_TypedTypePosQuat || Type == G_TypedTypeBase;
 }
 
 static unsigned long TypedKindFromType(unsigned long Type)
 {
-    if (Type == 1 || Type == 2)
+    if (Type == G_TypedTypeScalar || Type == G_TypedTypeVector)
         return G_MixKindScalar;
     if (Type == 3)
         return 2;
-    if (Type == 4)
+    if (Type == G_TypedTypeQuat)
         return G_MixKindQuat;
     if (Type == 5)
         return G_MixKindVec3;
-    if (Type == 6 || Type == 8)
+    if (Type == G_TypedTypePosQuat || Type == G_TypedTypeBase)
         return G_MixKindPosQuat;
     return G_MixKindScalar;
 }
@@ -169,7 +170,7 @@ static unsigned long DACOM_API TypedBind(FTypedChannel* This, const FPlayHeader*
     This->Scale = Header->Scale;
     This->TranslationScale = Header->TranslationScale;
     This->SetTime(Header->StartTime);
-    This->PlayFlags &= ~3UL;
+    This->PlayFlags &= ~(G_ChannelPlayFlag | G_ChannelBlendFlag);
     return This->PlayFlags;
 }
 
@@ -196,7 +197,7 @@ static void TypedStoreIdentityMatrix(Matrix* Dest)
 unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
 {
     TypedBind(this, Header);
-    if (Kind != 1)
+    if (Kind != G_BindKindObject)
     {
         TypedStoreIdentityMatrix(&Orientation);
         Delta.x = 0.0f;
@@ -313,7 +314,7 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     unsigned long Flags = 0;
     This->Archetype->GetFlags(&Flags);
     const unsigned long Bytes = ChannelPayloadBytesFromFlags(Flags);
-    if (This->Kind == 0 && G_AnimEngine != nullptr)
+    if (This->Kind == G_BindKindJoint && G_AnimEngine != nullptr)
     {
         FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative(
             This->Instance);
@@ -322,21 +323,21 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
         {
             const unsigned long Case = Relative->Type - 1;
             if (Case == 0 || Case == 1)
-                MixKind = 1;
+                MixKind = G_MixKindScalar;
             else if (Case == 2)
                 MixKind = 2;
             else if (Case == 4)
-                MixKind = 3;
+                MixKind = G_MixKindVec3;
             else if (Case == 3)
-                MixKind = 4;
+                MixKind = G_MixKindQuat;
             else if (Case == 5)
-                MixKind = 7;
+                MixKind = G_MixKindPosQuat;
         }
         if (MixKind * 4 == Bytes)
             return 1;
         return 0;
     }
-    if (This->Kind == 2)
+    if (This->Kind == G_BindKindRoot)
         return Flags == G_ChannelFlagScalarOnly ? 1 : 0;
     return Bytes == 0x1C ? 1 : 0;
 }
@@ -398,7 +399,7 @@ unsigned long FScalarTypedChannel::InterpolatePose(float* Out, const float* A, c
     const double Right = B[0];
     double Sum = 0.0;
 
-    if (JointType == 2)
+    if (JointType == kJointTypeRev)
     {
         const double Delta = Right - Left;
         const double NegPi = (double)(-3.14159274f);
@@ -569,15 +570,15 @@ unsigned long DACOM_API FTypedChannel::TryBindIfTimeValid(const FPlayHeader* Hea
 // bit 1), at the end it ran into -- without advancing it.
 void FTypedChannel::ApplyFromArchetype()
 {
-    PlayFlags |= 1;
+    PlayFlags |= G_ChannelPlayFlag;
     if (Archetype == nullptr)
         return;
     unsigned long Flags = 0;
     Archetype->GetFlags(&Flags);
-    if (Flags == 8)
+    if (Flags == G_ChannelFlagScalarOnly)
         return;
     float Time = this->Time;
-    if ((PlayFlags & 2) != 0)
+    if ((PlayFlags & G_ChannelBlendFlag) != 0)
     {
         // Greater, equal and unordered Rate all take Duration; only Rate < 0 gives 0.
         if (Rate < 0.0f)
@@ -620,7 +621,7 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
     if (bWrap == 0)
     {
         Found = 0;
-        if ((Mode & 1) != 0)
+        if ((Mode & G_CollectIncludeStart) != 0)
         {
             Archetype->CollectAt(T0, Buf, Cap, &Found);
             *Count += Found;
@@ -630,7 +631,7 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
             Found = 0;
             Archetype->CollectRange(T0, T1, Buf + *Count * 2, Cap - *Count, &Found);
             *Count += Found;
-            if ((Mode & 2) != 0)
+            if ((Mode & G_CollectIncludeEnd) != 0)
             {
                 Found = 0;
                 Archetype->CollectAt(T1, Buf + *Count * 2, Cap - *Count, &Found);
@@ -648,7 +649,7 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
     else
         Span = (float)((double)Duration - T0);
     Found = 0;
-    if ((Mode & 1) != 0)
+    if ((Mode & G_CollectIncludeStart) != 0)
     {
         Archetype->CollectAt(T0, Buf, Cap, &Found);
         *Count += Found;
@@ -659,7 +660,7 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
         const float EndTime = (float)((double)Span + T0);
         Archetype->CollectRange(T0, EndTime, Buf + *Count * 2, Cap - *Count, &Found);
         *Count += Found;
-        if ((Mode & 2) != 0)
+        if ((Mode & G_CollectIncludeEnd) != 0)
         {
             Archetype->CollectAt(EndTime, Buf + *Count * 2, Cap - *Count, &Found);
             *Count += Found;
@@ -668,30 +669,30 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
 
     const unsigned long Loop = LoopFlags;
     const bool bForward = !(Rate < 0.0f);
-    if ((Loop & 2) != 0)
+    if ((Loop & G_LoopFlagLoop) != 0)
     {
         Found = 0;
         if (bForward)
-            Collect(0.0f, (float)((double)T1 - Duration), 3,
+            Collect(0.0f, (float)((double)T1 - Duration), G_CollectIncludeStart | G_CollectIncludeEnd,
                     Buf + *Count * 2, Cap - *Count, &Found);
         else
-            Collect(Duration, (float)((double)Duration + T1), 3,
+            Collect(Duration, (float)((double)Duration + T1), G_CollectIncludeStart | G_CollectIncludeEnd,
                     Buf + *Count * 2, Cap - *Count, &Found);
         *Count += Found;
         return 0;
     }
-    if ((Loop & 4) != 0)
+    if ((Loop & G_LoopFlagPingPong) != 0)
     {
         const float Turn = bForward ? Duration : 0.0f;
         Rate = -Rate;
         Found = 0;
-        Collect(Turn, (float)((double)Turn - T1), 2,
+        Collect(Turn, (float)((double)Turn - T1), G_CollectIncludeEnd,
                 Buf + *Count * 2, Cap - *Count, &Found);
         *Count += Found;
         return 0;
     }
     Time = bForward ? Duration : 0.0f;
-    PlayFlags |= 2;
+    PlayFlags |= G_ChannelBlendFlag;
     return 1;
 }
 
@@ -701,8 +702,8 @@ unsigned long FTypedChannel::Collect(float T0, float T1, unsigned long Mode, flo
 unsigned long FTypedChannel::Tick(float Dt)
 {
     unsigned long Result = 0;
-    PlayFlags |= 4;
-    if ((PlayFlags & 3) != 0)
+    PlayFlags |= G_ChannelHoldFlag;
+    if ((PlayFlags & (G_ChannelPlayFlag | G_ChannelBlendFlag)) != 0)
         return 0;
 
     const float OldTime = Time;
@@ -720,11 +721,11 @@ unsigned long FTypedChannel::Tick(float Dt)
 
     unsigned long Flags = 0;
     Archetype->GetFlags(&Flags);
-    if (Flags == 8)
+    if (Flags == G_ChannelFlagScalarOnly)
     {
         float Keys[0x40][2];
         unsigned long KeyCount = 0;
-        Result = Collect(OldTime, Time, 3, &Keys[0][0], 0x40, &KeyCount);
+        Result = Collect(OldTime, Time, G_CollectIncludeStart | G_CollectIncludeEnd, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)
             return Result;
         void* Sink = (void*)((size_t)(this->Sink));
@@ -761,13 +762,13 @@ unsigned long FTypedChannel::Tick(float Dt)
                                               (double)Wraps * Duration);
         const unsigned long Loop = LoopFlags;
         FPlayHeader Header;
-        if ((Loop & 2) != 0)
+        if ((Loop & G_LoopFlagLoop) != 0)
         {
             // The applied pose (orientation, then position) and the matrix QuaternionToMatrix
             // writes, which is copied over the orientation.
             Transform Frame;
             Matrix Rebuilt;
-            if (Kind == 1)
+            if (Kind == G_BindKindObject)
             {
                 const unsigned char bLast = Rate < 0.0f ? 0 : 1;
                 const unsigned char* FrameData = nullptr;
@@ -803,7 +804,7 @@ unsigned long FTypedChannel::Tick(float Dt)
             std::memset(&Header.BlendDuration, 0, sizeof(float));
             std::memcpy(&Header.Scale, &Scale, sizeof(float));
             std::memcpy(&Header.TranslationScale, &TranslationScale, sizeof(float));
-            Header.Transform = Kind == 1 ? &Frame : nullptr;
+            Header.Transform = Kind == G_BindKindObject ? &Frame : nullptr;
             BindHeader(&Header);
             // Rate >= 0 or unordered takes Frac.
             if (Duration != 0.0f)
@@ -814,7 +815,7 @@ unsigned long FTypedChannel::Tick(float Dt)
                     Time = Frac;
             }
         }
-        else if ((Loop & 4) != 0)
+        else if ((Loop & G_LoopFlagPingPong) != 0)
         {
             // Ping-pong: an odd number of wraps keeps the direction, an even one reverses it.
             float NewRate = Rate;
@@ -835,8 +836,8 @@ unsigned long FTypedChannel::Tick(float Dt)
         else
         {
             Time = Rate < 0.0f ? 0.0f : Duration;
-            PlayFlags |= 2;
-            if ((PlayFlags & 1) == 0)
+            PlayFlags |= G_ChannelBlendFlag;
+            if ((PlayFlags & G_ChannelPlayFlag) == 0)
                 Result = 1;
         }
     }
@@ -854,7 +855,7 @@ unsigned long FTypedChannel::Tick(float Dt)
 // LAB_0661caf0, the type-6 table's slot 8 (+0x20, .rdata:06629110).
 unsigned long FPosQuatTypedChannel::SetOverlayPos(const Vector* Target)
 {
-    if (Kind != 1)
+    if (Kind != G_BindKindObject)
         return 0;
     const float* KeyA = nullptr;
     const float* KeyB = nullptr;
@@ -941,7 +942,7 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
     float Local[7];
     Interpolate(Local, Left, Right, Alpha);
     const unsigned long Kind = this->Kind;
-    if (Kind == 1)
+    if (Kind == G_BindKindObject)
     {
         const double Factor = (double)(TranslationScale) * (double)(Scale);
         Vector Pos;
@@ -968,7 +969,7 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
         std::memcpy(&Bits, &Composed.z, sizeof(Bits));
         return Bits;
     }
-    if (Kind == 0)
+    if (Kind == G_BindKindJoint)
     {
         TypedCopyVec3(&AppliedPos.x, Local);
         AppliedQuat.w = Local[3];
@@ -1206,7 +1207,7 @@ unsigned long FPosQuatTypedChannel::Step(Vector* Out, float Dt)
     Now.y = (float)((double)(Lerp.y) * Factor);
     Now.z = (float)((double)(Lerp.z) * Factor);
 
-    if (bCrossed != 0 && (LoopFlags & 2) != 0)
+    if (bCrossed != 0 && (LoopFlags & G_LoopFlagLoop) != 0)
     {
         Vector EndA;
         TypedType6ScaledFrame(this, bReverse != 0 ? 0 : 1, &EndA);
@@ -1267,7 +1268,7 @@ unsigned long FPosQuatTypedChannel::Step(Vector* Out, float Dt)
 // LAB_0661cc40, the type-6 table's slot 9 (+0x24, .rdata:06629114).
 unsigned long FPosQuatTypedChannel::SetOverlayExtra(const Matrix* Orient)
 {
-    if (Kind != 1)
+    if (Kind != G_BindKindObject)
         return 0;
     const unsigned char* KeyA = nullptr;
     const unsigned char* KeyB = nullptr;
@@ -1360,7 +1361,7 @@ static void TypedResetPlayState(FTypedChannel* This)
     This->LoopFlags = 0;
     This->Rate = 1.0f;
     This->Scale = 1.0f;
-    This->PlayFlags &= 0xFFFFFFF8u;
+    This->PlayFlags &= ~(G_ChannelPlayFlag | G_ChannelBlendFlag | G_ChannelHoldFlag);
     This->TranslationScale = 1.0f;
 }
 
@@ -1370,7 +1371,7 @@ static void TypedResetPlayState(FTypedChannel* This)
 FTypedChannel::FTypedChannel(IChannelOwner* NewOwner)
 {
     Owner = NewOwner;
-    Kind = 2;
+    Kind = G_BindKindRoot;
     Instance = 0xFFFFFFFF;
     Sink = 0;
     SinkContext = 0;
@@ -1382,7 +1383,7 @@ FTypedChannel::FTypedChannel(IChannelOwner* NewOwner)
 FTypedChannel::FTypedChannel(FChannelArchetypeObject* NewArchetype)
 {
     Owner = nullptr;
-    Kind = 2;
+    Kind = G_BindKindRoot;
     Instance = 0xFFFFFFFF;
     Sink = 0;
     SinkContext = 0;
@@ -1406,30 +1407,30 @@ FPosQuatTypedChannel::FPosQuatTypedChannel(FChannelArchetypeObject* NewArchetype
 // The switch every creation site runs on the type (1 / 2 / 4 / 6 / 8).
 FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner* Owner)
 {
-    if (Type == 1)
+    if (Type == G_TypedTypeScalar)
         return new FScalarTypedChannel(Owner);
-    if (Type == 2)
+    if (Type == G_TypedTypeVector)
         return new FVectorTypedChannel(Owner);
-    if (Type == 4)
+    if (Type == G_TypedTypeQuat)
         return new FQuatTypedChannel(Owner);
-    if (Type == 6)
+    if (Type == G_TypedTypePosQuat)
         return new FPosQuatTypedChannel(Owner);
-    if (Type == 8)
+    if (Type == G_TypedTypeBase)
         return new FTypedChannel(Owner);
     return nullptr;
 }
 
 FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelArchetypeObject* Archetype)
 {
-    if (Type == 1)
+    if (Type == G_TypedTypeScalar)
         return new FScalarTypedChannel(Archetype);
-    if (Type == 2)
+    if (Type == G_TypedTypeVector)
         return new FVectorTypedChannel(Archetype);
-    if (Type == 4)
+    if (Type == G_TypedTypeQuat)
         return new FQuatTypedChannel(Archetype);
-    if (Type == 6)
+    if (Type == G_TypedTypePosQuat)
         return new FPosQuatTypedChannel(Archetype);
-    if (Type == 8)
+    if (Type == G_TypedTypeBase)
         return new FTypedChannel(Archetype);
     return nullptr;
 }

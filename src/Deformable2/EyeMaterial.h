@@ -120,6 +120,21 @@ static_assert(offsetof(FMaterialColors, Specular) == 0x20, "material specular +0
 static_assert(offsetof(FMaterialColors, Emissive) == 0x30, "material emissive +0x30");
 static_assert(offsetof(FMaterialColors, Power) == 0x40, "material power +0x40");
 
+// FEyeMaterial parameter ids (the rows of its property table).
+enum EEyeMaterialParam
+{
+    kEyeMaterialAmbient = 0,
+    kEyeMaterialDiffuse = 1,
+    kEyeMaterialEmissive = 2,
+    kEyeMaterialSpecular = 3,
+    kEyeMaterialSpecularPower = 4,
+    kEyeMaterialOpacity = 5,
+    kEyeMaterialTextureName = 6,
+    kEyeMaterialTextureWrap = 7,
+    kEyeMaterialTextureAddressU = 8,
+    kEyeMaterialTextureAddressV = 9,
+};
+
 // Retail vtable 06601598.
 class FEyeMaterialImpl : public IMaterial
 {

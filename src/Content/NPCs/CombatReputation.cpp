@@ -49,7 +49,7 @@ namespace
             : bValid(1)
             , SpaceObjId(0)
             , Type(0)
-            , Affiliation(0xffffffffu)
+            , Affiliation(kNoAffiliation)
             , Reputation(-1)
             , bPlayer(0)
         {
@@ -109,20 +109,20 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
 {
     FSubObjDamageEvent Event = *InEvent;
 
-    // Causes 2..7 only.
-    int const Cause = static_cast<int>(Event.Cause);
+    // Causes Gun..Mine only.
+    DamageCause const Cause = Event.Cause;
     bool bCause = false;
-    if (Cause == 2)
+    if (Cause == DamageCause::Gun)
         bCause = true;
-    if (Cause == 3)
+    if (Cause == DamageCause::GuidedHit)
         bCause = true;
-    if (Cause == 4)
+    if (Cause == DamageCause::Explosion)
         bCause = true;
-    if (Cause == 5)
+    if (Cause == DamageCause::MissileTorpedo)
         bCause = true;
-    if (Cause == 6)
+    if (Cause == DamageCause::CruiseDisrupter)
         bCause = true;
-    if (Cause != 7 && !bCause)
+    if (Cause != DamageCause::Mine && !bCause)
         return;
 
     // The attacker is a player's ship and not the victim itself.
@@ -146,23 +146,22 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
 
     int AttackerRep = -1;
     pub::SpaceObj::GetRep(Event.InflictorId, AttackerRep);
-    unsigned int AttackerAffiliation = 0xffffffffu;
+    unsigned int AttackerAffiliation = kNoAffiliation;
     pub::Reputation::GetAffiliation(AttackerRep, AttackerAffiliation);
     int VictimRep = -1;
     pub::SpaceObj::GetRep(Event.ObjId, VictimRep);
-    unsigned int VictimAffiliation = 0xffffffffu;
+    unsigned int VictimAffiliation = kNoAffiliation;
     pub::Reputation::GetAffiliation(VictimRep, VictimAffiliation);
 
-    // Type 0x2000 at no health hit on equipment type 0x800: -0.1 with empathy (x87: unordered
-    // skips).
-    if (VictimType == OBJ_DESTROYABLE_DEPOT && Event.RelativeHealth <= 0.0f && Event.EquipType == 0x800)
+    // A destroyable depot's cargo pod at no health: -0.1 with empathy (x87: unordered skips).
+    if (VictimType == OBJ_DESTROYABLE_DEPOT && Event.RelativeHealth <= 0.0f && Event.EquipType == EquipTypeCargoPod)
         ApplyFactionReputationChange(AttackerRep, -0.1f, VictimAffiliation, true);
 
     if (AttackerRep == -1)
         return;
     if (VictimRep == -1)
         return;
-    if (AttackerAffiliation == 0xffffffffu && VictimAffiliation == 0xffffffffu)
+    if (AttackerAffiliation == kNoAffiliation && VictimAffiliation == kNoAffiliation)
         return;
 
     // Both attitudes above -0.6, the victim's below 1.0 (x87: unordered goes on at the 1.0
@@ -202,8 +201,8 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
     if (!AttackerShip->FindOrAllocAttacker(Event.ObjId, &Slot))
         return;
 
-    // Causes 5 and 6 provoke at once.
-    if (Cause == 5 || Cause == 6)
+    // Missiles and cruise disruptors provoke at once.
+    if (Cause == DamageCause::MissileTorpedo || Cause == DamageCause::CruiseDisrupter)
     {
         SendDamageReputation(1, Event, System);
         pub::Reputation::SetAttitude(VictimRep, AttackerRep, -1.0f);
@@ -329,7 +328,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
             {
                 FNpcReputationScanEntry& Entry = GNpcReputationScan[Index];
                 Entry.Type = 0;
-                Entry.Affiliation = 0xffffffffu;
+                Entry.Affiliation = kNoAffiliation;
                 Entry.Reputation = -1;
                 Entry.bValid = 1;
                 Entry.bPlayer = 0;
@@ -379,7 +378,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                 Entry.Type = 0;
                 pub::SpaceObj::GetType(Entry.SpaceObjId, Entry.Type);
                 int RepResult = 0;
-                if ((Entry.Type & 0xfdff) != 0)
+                if ((Entry.Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
                 {
                     RepResult = pub::SpaceObj::GetSolarRep(Entry.SpaceObjId, Entry.Reputation);
                     if (RepResult != 0)
@@ -423,7 +422,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
             {
                 FNpcReputationScanEntry& EntryA = GNpcReputationScan[A];
                 if (EntryA.bValid == 0 || EntryA.SpaceObjId == 0
-                    || EntryA.Affiliation == 0xffffffffu)
+                    || EntryA.Affiliation == kNoAffiliation)
                 {
                     continue;
                 }
@@ -448,7 +447,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                             continue;
                         if (EntryB.bPlayer != 0 && EntryC.bPlayer != 0)
                             continue;
-                        if (EntryB.Affiliation == 0xffffffffu && EntryC.Affiliation == 0xffffffffu)
+                        if (EntryB.Affiliation == kNoAffiliation && EntryC.Affiliation == kNoAffiliation)
                             continue;
                         if ((EntryA.Type & OBJ_TRADELANE_RING) != 0)
                         {
@@ -466,7 +465,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                         float const AttitudeBC = EntryB.Attitudes[C];
                         float const AttitudeCB = EntryC.Attitudes[B];
                         bool const bHostileCB = AttitudeCB <= -0.6f;
-                        if (EntryC.Affiliation == 0xffffffffu)
+                        if (EntryC.Affiliation == kNoAffiliation)
                         {
                             if (!(AttitudeBC <= -0.6f))
                                 continue;
@@ -479,7 +478,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                         bool const bLikesC = AttitudeAC >= 0.6f;
 
                         FNpcHostilityMsg Msg;
-                        if (EntryB.Affiliation == 0xffffffffu)
+                        if (EntryB.Affiliation == kNoAffiliation)
                         {
                             if (!bLikesC)
                                 continue;

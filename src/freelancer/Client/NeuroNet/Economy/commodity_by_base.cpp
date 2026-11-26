@@ -157,7 +157,7 @@ void BuildCommodityByBaseRows(unsigned ArchId)
         unsigned char VisitFlags = 0;
         GetPlayerVisitFlagsRetail(SpaceObjectId, &VisitFlags, 0, 0);
         VisitFlags = static_cast<unsigned char>(VisitFlags | Base->SpaceObjectVisit);
-        if ((VisitFlags & 4) == 0)
+        if ((VisitFlags & kVisitCommodities) == 0)
             continue;
 
         if (G_CommodityByBaseSystemNames.find(SpaceObjectId) == G_CommodityByBaseSystemNames.end())
@@ -216,7 +216,8 @@ void SortCommodityByBaseRows(int Column)
     // FUN_00470040 -- a bubble sort until a pass swaps nothing.
     int const Count = static_cast<int>(G_CommodityByBaseRows.size());
     int const Last = Count - 1;
-    if (Column != 1 && Column != 2 && Column != 3 && Column != 4)
+    if (Column != kCommodityColumnPrice && Column != kCommodityColumnBase && Column != kCommodityColumnSystem &&
+        Column != kCommodityColumnBuySell)
         return;
     if (Last <= 0)
         return;
@@ -231,7 +232,7 @@ void SortCommodityByBaseRows(int Column)
             FCommodityByBaseRow& B = G_CommodityByBaseRows[Index + 1];
             bool bSwap = false;
 
-            if (Column == 2)
+            if (Column == kCommodityColumnBase)
             {
                 wchar_t const* NameB = CommodityByBaseName(G_CommodityByBaseBaseNames, B.SpaceObjectId);
                 wchar_t const* NameA = CommodityByBaseName(G_CommodityByBaseBaseNames, A.SpaceObjectId);
@@ -256,7 +257,7 @@ void SortCommodityByBaseRows(int Column)
                         bSwap = true;
                 }
             }
-            else if (Column == 3)
+            else if (Column == kCommodityColumnSystem)
             {
                 wchar_t const* SystemB = CommodityByBaseName(G_CommodityByBaseSystemNames, B.SpaceObjectId);
                 wchar_t const* SystemA = CommodityByBaseName(G_CommodityByBaseSystemNames, A.SpaceObjectId);
@@ -305,7 +306,7 @@ void AppendCommodityTradeReport(RenderDisplayList* Card, unsigned ArchId)
 {
     // FUN_004704d0.
     BuildCommodityByBaseRows(ArchId);
-    SortCommodityByBaseRows(1);
+    SortCommodityByBaseRows(kCommodityColumnPrice);
 
     // One line per row, built in DAT_0066fc60 with DAT_0066dc60 as scratch.
     int const Count = static_cast<int>(G_CommodityByBaseRows.size());
@@ -488,10 +489,10 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
     }
 
     BuildCommodityByBaseRows(ArchId);
-    if (SortColumn != 1)
+    if (SortColumn != kCommodityColumnPrice)
     {
-        SortColumn = 1;
-        SortCommodityByBaseRows(1);
+        SortColumn = kCommodityColumnPrice;
+        SortCommodityByBaseRows(kCommodityColumnPrice);
     }
     RefreshRows();
 
@@ -515,17 +516,17 @@ void NnCommodityByBase::RefreshRows()
         FCommodityByBaseRowControls& Controls = Rows[Line];
         if (Row >= Count)
         {
-            Controls.Base->Flags = static_cast<unsigned char>(Controls.Base->Flags & 0xfc);
-            Controls.Price->Flags = static_cast<unsigned char>(Controls.Price->Flags & 0xfc);
-            Controls.System->Flags = static_cast<unsigned char>(Controls.System->Flags & 0xfc);
-            Controls.BuySell->Flags = static_cast<unsigned char>(Controls.BuySell->Flags & 0xfc);
+            Controls.Base->Flags = static_cast<unsigned char>(Controls.Base->Flags & ~(kWin3DActive | kWin3DVisible));
+            Controls.Price->Flags = static_cast<unsigned char>(Controls.Price->Flags & ~(kWin3DActive | kWin3DVisible));
+            Controls.System->Flags = static_cast<unsigned char>(Controls.System->Flags & ~(kWin3DActive | kWin3DVisible));
+            Controls.BuySell->Flags = static_cast<unsigned char>(Controls.BuySell->Flags & ~(kWin3DActive | kWin3DVisible));
             continue;
         }
 
-        Controls.Base->Flags = static_cast<unsigned char>(Controls.Base->Flags | 3);
-        Controls.Price->Flags = static_cast<unsigned char>(Controls.Price->Flags | 3);
-        Controls.System->Flags = static_cast<unsigned char>(Controls.System->Flags | 3);
-        Controls.BuySell->Flags = static_cast<unsigned char>(Controls.BuySell->Flags | 3);
+        Controls.Base->Flags = static_cast<unsigned char>(Controls.Base->Flags | kWin3DActive | kWin3DVisible);
+        Controls.Price->Flags = static_cast<unsigned char>(Controls.Price->Flags | kWin3DActive | kWin3DVisible);
+        Controls.System->Flags = static_cast<unsigned char>(Controls.System->Flags | kWin3DActive | kWin3DVisible);
+        Controls.BuySell->Flags = static_cast<unsigned char>(Controls.BuySell->Flags | kWin3DActive | kWin3DVisible);
 
         FCommodityByBaseRow const& Data = G_CommodityByBaseRows[Row];
 
@@ -553,11 +554,11 @@ void NnCommodityByBase::RefreshRows()
     if (Extra <= 0)
     {
         Scroll->SetProperty(kWinPropDisable, 1, 0);
-        Scroll->Flags = static_cast<unsigned char>(Scroll->Flags & 0xfd);
+        Scroll->Flags = static_cast<unsigned char>(Scroll->Flags & ~kWin3DVisible);
         return;
     }
     Scroll->SetProperty(kWinPropDisable, 0, 0);
-    Scroll->Flags = static_cast<unsigned char>(Scroll->Flags | 2);
+    Scroll->Flags = static_cast<unsigned char>(Scroll->Flags | kWin3DVisible);
     Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Extra + 2));
 }
 
@@ -587,13 +588,13 @@ intptr_t NnCommodityByBase::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // A column title click returns 0.
     int Column = 0;
     if (A == reinterpret_cast<uintptr_t>(PriceTitle))
-        Column = 1;
+        Column = kCommodityColumnPrice;
     else if (A == reinterpret_cast<uintptr_t>(BaseTitle))
-        Column = 2;
+        Column = kCommodityColumnBase;
     else if (A == reinterpret_cast<uintptr_t>(SystemTitle))
-        Column = 3;
+        Column = kCommodityColumnSystem;
     else if (A == reinterpret_cast<uintptr_t>(BuySellTitle))
-        Column = 4;
+        Column = kCommodityColumnBuySell;
     if (Column != 0)
     {
         if (SortColumn != Column)

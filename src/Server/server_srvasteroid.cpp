@@ -616,8 +616,7 @@ bool MedMine::update(float Dt)
         ExplosionDamageEvent Blast;
         Blast.ExplodingObjId = get_id();
         Blast.InflictorId = get_id();
-        // 7 is not one of common_misc.h's (unsourced) DamageCause names; retail's literal.
-        Blast.Cause = static_cast<DamageCause>(7);
+        Blast.Cause = DamageCause::Mine;
         Blast.Position = get_position();
         Blast.Explosion = Explosion;
         Blast.SkipCollisionGroup = nullptr;

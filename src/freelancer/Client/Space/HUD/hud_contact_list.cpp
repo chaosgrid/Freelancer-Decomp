@@ -284,7 +284,7 @@ namespace
         }
         unsigned Type = 0;
         Gameobj->get_type(Type);
-        return (Type & 0x80u) == 0;
+        return (Type & OBJ_TRADELANE_RING) == 0;
     }
 
     // The zeroed command record, id 0x1c "select target", sent through FUN_0054bcb0.
@@ -593,7 +593,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
     Vector const TitlePos = {-0.189f, 0.043f, 0.0f};   // 0xbe418937, 0x3d3020c5
     FormationTitle = CreateTextControl("FormationTitle", "PageHeader", &TitlePos, nullptr, 0.269f,
                                        0.015f, 1.7f, 0x60d, 1, 0, 1);
-    FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & 0xfc);
+    FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & ~(kWin3DActive | kWin3DVisible));
 
     for (int Index = 0; Index < 8; ++Index)
     {
@@ -692,10 +692,10 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
     if (Mode != kTargetPanelContactList && Mode != kTargetPanelFormation)
     {
         LastPanelMode = -1;
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         return;
     }
-    Flags = static_cast<unsigned char>(Flags | 3);
+    Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
     if (Mode == LastPanelMode)
     {
         return;
@@ -705,20 +705,20 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
     if (Mode == kTargetPanelFormation)
     {
         // The formation list -- no filter buttons, the title shown.
-        ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags & 0xfc);
-        ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags & 0xfc);
-        SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags & 0xfc);
-        AllButton->Flags = static_cast<unsigned char>(AllButton->Flags & 0xfc);
-        LootButton->Flags = static_cast<unsigned char>(LootButton->Flags & 0xfc);
-        FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags | 3);
+        ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        AllButton->Flags = static_cast<unsigned char>(AllButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        LootButton->Flags = static_cast<unsigned char>(LootButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags | kWin3DActive | kWin3DVisible);
         return;
     }
-    ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags | 3);
-    ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags | 3);
-    SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags | 3);
-    LootButton->Flags = static_cast<unsigned char>(LootButton->Flags | 3);
-    AllButton->Flags = static_cast<unsigned char>(AllButton->Flags | 3);
-    FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & 0xfc);
+    ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags | kWin3DActive | kWin3DVisible);
+    ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags | kWin3DActive | kWin3DVisible);
+    SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags | kWin3DActive | kWin3DVisible);
+    LootButton->Flags = static_cast<unsigned char>(LootButton->Flags | kWin3DActive | kWin3DVisible);
+    AllButton->Flags = static_cast<unsigned char>(AllButton->Flags | kWin3DActive | kWin3DVisible);
+    FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & ~(kWin3DActive | kWin3DVisible));
 }
 
 void HUD_ContactList::Update()
@@ -789,7 +789,7 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 A == reinterpret_cast<uintptr_t>(NameTexts[Row]))
             {
                 SelectEntry(static_cast<int>(ScrollPos) + Row);
-                PlayOrRewindUiSoundSlot(0);      // FUN_005645c0(0)
+                PlayOrRewindUiSoundSlot(kUiSoundSelectItem);      // FUN_005645c0(0)
                 return 1;
             }
         }
@@ -807,7 +807,7 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             {
                 SelectEntry(static_cast<int>(ScrollPos) + Row);
                 static_cast<HudTarget*>(G_HudTargetPanel)->SetMode(kTargetPanelTarget); // FUN_004e5460
-                PlayOrRewindUiSoundSlot(0);
+                PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
                 return 1;
             }
         }
@@ -1002,7 +1002,7 @@ int HUD_ContactList::ClassifyContact(CSimple const* Object)
     {
         return kContactJumpGate;
     }
-    if ((TypeBits & 0x600de0u) != 0)
+    if ((TypeBits & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0)
     {
         return kContactStation;
     }
@@ -1014,7 +1014,7 @@ int HUD_ContactList::ClassifyContact(CSimple const* Object)
     {
         return kContactLootableDepot;
     }
-    return (TypeBits & OBJ_LOOT) != 0 ? 0xb : -1;
+    return (TypeBits & OBJ_LOOT) != 0 ? kContactLoot : -1;
 }
 
 void HUD_ContactList::AddShipEntry(CShip const* Ship, FClientGameobj* Gameobj)
@@ -1128,7 +1128,7 @@ void HUD_ContactList::RebuildContacts()
                 CShip const* const LeaderShip = AsShip(Leader->cobject());
                 if (LeaderShip != nullptr)
                 {
-                    AddShipEntry(LeaderShip, ClientObjDb_FindObject(Leader->get_id(), 1));
+                    AddShipEntry(LeaderShip, ClientObjDb_FindObject(Leader->get_id(), static_cast<int>(EClientGameobjKind::Ship)));
                     int const FollowerCount = static_cast<int>(LeaderShip->FormationFollowers.size());
                     for (int Follower = 0; Follower < FollowerCount; ++Follower)
                     {
@@ -1139,7 +1139,7 @@ void HUD_ContactList::RebuildContacts()
                             continue;
                         }
                         FClientGameobj* const Gameobj =
-                            ClientObjDb_FindObject(FollowerRw->get_id(), 1);
+                            ClientObjDb_FindObject(FollowerRw->get_id(), static_cast<int>(EClientGameobjKind::Ship));
                         if (Gameobj == nullptr)
                         {
                             continue;
@@ -1384,7 +1384,7 @@ void HUD_ContactList::RebuildContacts()
                 }
                 bool const bShown = bSolarsShown || bNear != 0;
                 unsigned const TypeBits = EqObj->TypeBits;
-                if ((TypeBits & 0x600de3u) != 0)
+                if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0)
                 {
                     if (HudIsUnvisitedSolar(EqObj))  // FUN_004d4c70
                     {
@@ -1454,7 +1454,7 @@ void HUD_ContactList::RebuildContacts()
             // Everything within 14000 of the player in the object DB's spatial bucket (mask
             // 0xfdff), large solars left out.
             ISpatialPartition* const Spatial =
-                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(0xfdff));
+                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
             Geometry::Sphere Query;
             Query.Center = PlayerPos;
             Query.Radius = kSpatialQueryRadius;
@@ -1520,7 +1520,7 @@ void HUD_ContactList::RebuildContacts()
                     }
                     bool const bShown = bSolarsShown || bNear != 0;
                     unsigned const TypeBits = Simple->TypeBits;
-                    if ((TypeBits & 0x600de3u) != 0)
+                    if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0)
                     {
                         if (HudIsUnvisitedSolar(Simple))
                         {
@@ -1748,11 +1748,11 @@ void HUD_ContactList::Draw()
     }
 
     // The selected filter button is highlighted.
-    ImportantButton->SetProperty(0xc, FilterMode == kContactFilterImportant ? 1 : 0, 0);
-    ShipsButton->SetProperty(0xc, FilterMode == kContactFilterShips ? 1 : 0, 0);
-    SolarButton->SetProperty(0xc, FilterMode == kContactFilterSolars ? 1 : 0, 0);
-    AllButton->SetProperty(0xc, FilterMode == kContactFilterAll ? 1 : 0, 0);
-    LootButton->SetProperty(0xc, FilterMode == kContactFilterLoot ? 1 : 0, 0);
+    ImportantButton->SetProperty(kWinPropLit, FilterMode == kContactFilterImportant ? 1 : 0, 0);
+    ShipsButton->SetProperty(kWinPropLit, FilterMode == kContactFilterShips ? 1 : 0, 0);
+    SolarButton->SetProperty(kWinPropLit, FilterMode == kContactFilterSolars ? 1 : 0, 0);
+    AllButton->SetProperty(kWinPropLit, FilterMode == kContactFilterAll ? 1 : 0, 0);
+    LootButton->SetProperty(kWinPropLit, FilterMode == kContactFilterLoot ? 1 : 0, 0);
 
     // Rebuild every 3 s, or when dirty. The sum stays unrounded for the compare and the
     // subtraction; a NaN falls to the dirty test.
@@ -1927,9 +1927,9 @@ void HUD_ContactList::Draw()
     int Row = 0;
     while (It != Contacts.end())
     {
-        Icons[Row]->Flags = static_cast<unsigned char>(Icons[Row]->Flags | 3);
-        RangeTexts[Row]->Flags = static_cast<unsigned char>(RangeTexts[Row]->Flags | 3);
-        NameTexts[Row]->Flags = static_cast<unsigned char>(NameTexts[Row]->Flags | 3);
+        Icons[Row]->Flags = static_cast<unsigned char>(Icons[Row]->Flags | kWin3DActive | kWin3DVisible);
+        RangeTexts[Row]->Flags = static_cast<unsigned char>(RangeTexts[Row]->Flags | kWin3DActive | kWin3DVisible);
+        NameTexts[Row]->Flags = static_cast<unsigned char>(NameTexts[Row]->Flags | kWin3DActive | kWin3DVisible);
 
         FHudContactEntry& Entry = *It;
         IObjRW* const Obj = Entry.Object();
@@ -2294,9 +2294,9 @@ void HUD_ContactList::Draw()
     // The rows past the end are hidden.
     for (int Hidden = Row; Hidden < 8; ++Hidden)
     {
-        RangeTexts[Hidden]->Flags = static_cast<unsigned char>(RangeTexts[Hidden]->Flags & 0xfc);
-        NameTexts[Hidden]->Flags = static_cast<unsigned char>(NameTexts[Hidden]->Flags & 0xfc);
-        Icons[Hidden]->Flags = static_cast<unsigned char>(Icons[Hidden]->Flags & 0xfc);
+        RangeTexts[Hidden]->Flags = static_cast<unsigned char>(RangeTexts[Hidden]->Flags & ~(kWin3DActive | kWin3DVisible));
+        NameTexts[Hidden]->Flags = static_cast<unsigned char>(NameTexts[Hidden]->Flags & ~(kWin3DActive | kWin3DVisible));
+        Icons[Hidden]->Flags = static_cast<unsigned char>(Icons[Hidden]->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(static_cast<int>(Contacts.size()) - 1));

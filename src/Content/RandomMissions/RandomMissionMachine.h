@@ -128,6 +128,13 @@ enum ERmRecordState
     RmRecordDestroyedOther = 4,     // a loot record's message 0x39 with any other cause
 };
 
+// FRmSpawnRecord::Flags (the Mask argument of the machines' Query and of SetTargetRecords).
+enum ERmRecordFlags
+{
+    RmRecordFlagTarget = 0x2,   // the record is a mission target: FRmShipSpawn::TargetFlags (kill all
+                                // ships / the target ship), the critical loot, the vignette's flagged ships
+};
+
 class FRmSpawnRecord
 {
 public:

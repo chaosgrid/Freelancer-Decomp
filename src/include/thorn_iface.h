@@ -54,6 +54,7 @@ static const int kThornEntityHardpoint = 8;
 static const int kThornEntityScene = 9;
 static const int kThornEntitySubScene = 10;
 static const int kThornEntityMotionPath = 11;
+static const int kThornEntityDeleted = 12; // script keyword DELETED; never a live entity
 static const int kThornEntityPsys = 13;
 
 // Event types (event descriptor +0x00), the switch at thorn.dll 0x06f25953.
@@ -78,6 +79,16 @@ static const int kThornTypeFogPropAnim = 16;
 static const int kThornTypeReverbPropAnim = 17;
 static const int kThornTypeFloorHeightAnim = 18;
 static const int kThornTypeSubtitle = 19;
+// Script keyword START: a SOUND primary becomes START_SOUND, any other START_MOTION (the load parser).
+static const int kThornTypeScriptStart = 23;
+
+// FThornLightProps::Type, the script keywords L_POINT / L_SPOT / L_DIRECT.
+enum EThornLightType
+{
+    kThornLightPoint = 1,
+    kThornLightSpot = 2,
+    kThornLightDirect = 3,
+};
 
 // FUN_06f27fe0 param_2: 0x24 dwords. Color = _ftol ints; cutoff/theta stored in radians.
 // The LIGHT entity's descriptor tail (+0x44) and the light event's target.
@@ -117,6 +128,33 @@ struct FThornMotionPathDesc
 {
     const char* PathType;
     IPersistString* MotionPath;
+};
+
+// FThornEntitySnap::Flags bits, the script keywords of an entity's `flags` key. Bits 2, 4 and 8
+// mean something different per entity type.
+enum EThornEntityFlag
+{
+    kThornEntityFlagReference = 0x01,         // REFERENCE
+    kThornEntityFlagHidden = 0x10,            // HIDDEN
+    kThornEntityFlagLitAmbient = 0x02,        // LIT_AMBIENT: COMPOUND / DEFORMABLE / PSYS
+    kThornEntityFlagLitDynamic = 0x04,        // LIT_DYNAMIC: COMPOUND / DEFORMABLE / PSYS
+    kThornEntityFlagSoundSpatial = 0x02,      // SPATIAL: SOUND
+    kThornEntityFlagSoundStream = 0x04,       // STREAM: SOUND
+    kThornEntityFlagSoundLoop = 0x08,         // LOOP: SOUND
+    kThornEntityFlagFogPropsRemoved = 0x20,   // FOG_PROPS_REMOVED: SCENE
+};
+
+// Axis ids of a SCENE's up / front and of LOOK_AT / axis-rotation events, the script keywords
+// X_AXIS .. NEG_Z_AXIS. 6 in a scene descriptor means "not given" (replaced when the entity is built).
+enum EThornAxis
+{
+    kThornAxisX = 0,
+    kThornAxisY = 1,
+    kThornAxisZ = 2,
+    kThornAxisNegX = 3,
+    kThornAxisNegY = 4,
+    kThornAxisNegZ = 5,
+    kThornAxisUnset = 6,
 };
 
 // An entity descriptor: IScriptEngine slots 8 / 9 hand out the one the entity holds, slots
@@ -370,6 +408,27 @@ struct FThornConnectEventDesc
 static_assert(sizeof(void*) != 4 || sizeof(FThornConnectEventDesc) == 0x34,
               "FUN_00451e50 reads the descriptor up to +0x30");
 
+// FThornFog8::Mode, the script keywords F_NONE / F_EXP / F_EXP2 / F_LINEAR.
+enum EThornFogMode
+{
+    kThornFogNone = 0,
+    kThornFogExp = 1,
+    kThornFogExp2 = 2,
+    kThornFogLinear = 3,
+};
+
+// Fog property bits of a SCENE's fog keys and of START_FOG_PROP_ANIM masks.
+enum EThornFogBit
+{
+    kThornFogBitOn = 0x01,      // fogon
+    kThornFogBitTable = 0x02,   // fogtable
+    kThornFogBitColor = 0x04,   // fogcolor
+    kThornFogBitMode = 0x08,    // fogmode
+    kThornFogBitStart = 0x10,   // fogstart
+    kThornFogBitEnd = 0x20,     // fogend
+    kThornFogBitDensity = 0x40, // fogdensity
+};
+
 // Event+0x58 / capture+0x78 / entity+0x138: 8 dword fog record (FUN_06f27c50 / FUN_06f48de0).
 struct FThornFog8
 {
@@ -415,6 +474,15 @@ struct FThornLightEventDesc
 static_assert(sizeof(void*) != 4 || sizeof(FThornLightEventDesc) == 0xc0,
               "LIGHT descriptor forty-eight words");
 
+// Reverb property bits of a SCENE's reverb keys and of START_REVERB_PROP_ANIM masks.
+enum EThornReverbBit
+{
+    kThornReverbBitEnvironment = 0x1, // env
+    kThornReverbBitVolume = 0x2,      // vol
+    kThornReverbBitDecay = 0x4,       // decay
+    kThornReverbBitDamping = 0x8,     // damping
+};
+
 // REVERB_PROP_ANIM: 49150 copies mask plus four raw words; 4a6d0
 // in table 5b3cc exposes environment integer bits and three floats.
 struct FThornReverb4
@@ -436,6 +504,19 @@ struct FThornReverbEventDesc
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornReverbEventDesc) == 0x40,
               "REVERB descriptor sixteen words");
+
+// Audio property bits of START_AUDIO_PROP_ANIM masks (the `audioprops` keys).
+enum EThornAudioBit
+{
+    kThornAudioBitAttenuation = 0x01, // attenuation
+    kThornAudioBitPan = 0x02,         // pan
+    kThornAudioBitDmin = 0x04,        // dmin
+    kThornAudioBitDmax = 0x08,        // dmax
+    kThornAudioBitAin = 0x10,         // ain
+    kThornAudioBitAout = 0x20,        // aout
+    kThornAudioBitAtout = 0x40,       // atout
+    kThornAudioBitRmix = 0x80,        // rmix
+};
 
 // AUDIO_PROP_ANIM: 47280 copies mask and eight raw target words;
 // 4a540 returns the complete twenty-word descriptor. ain/aout retain integer bits.
@@ -462,6 +543,12 @@ struct FThornAudioPropEventDesc
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornAudioPropEventDesc) == 0x50,
               "AUDIO_PROP descriptor common + mask + eight raw words");
+
+// START_PSYS_PROP_ANIM mask bit: the `psysprops` key sparam.
+enum EThornPsysBit
+{
+    kThornPsysBitSparam = 0x1,
+};
 
 // PSYS_PROP_ANIM: 48920 stores mask and sparam; the 4a670 getter
 // in table 5b38c exposes both after the common eleven words.

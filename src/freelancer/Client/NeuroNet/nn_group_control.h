@@ -127,6 +127,32 @@ private:
     NnGroupControl& operator=(NnGroupControl const&) = delete;
 };
 
+// The opcode of a group-channel record. The client sends 0 / 1 / 2 (NnGroupSendWireMessage,
+// the accept and leave buttons); FUN_00463630 handles the answers the server sends (0 / 1 / 2
+// arriving at a client is an error) and says what each one means in the chat line it prints.
+enum EGroupWireOpcode
+{
+    kGroupOpInvite = 0,              // ask a player to join (HUD_Target's invite command)
+    kGroupOpLeave = 1,               // leave the group (own connection id)
+    kGroupOpAccept = 2,              // accept the invitation
+    kGroupOpInviteSent = 3,
+    kGroupOpInviteFrom = 4,          // an invitation arrived: queued as a request
+    kGroupOpJoinedGroup = 5,
+    kGroupOpNewMember = 6,
+    kGroupOpLeftGroup = 7,
+    kGroupOpMemberLeft = 8,
+    kGroupOpCannotInviteSelf = 9,
+    kGroupOpGroupFull = 0xa,
+    kGroupOpAlreadyInYourGroup = 0xb,
+    kGroupOpCannotJoinOwnGroup = 0xc,
+    kGroupOpNotInvited = 0xd,
+    kGroupOpAlreadyMember = 0xe,
+    kGroupOpAbortMission = 0xf,      // the player's own id: "abort mission"; another's: join failed (mission)
+    kGroupOpGroupNowFull = 0x10,
+    kGroupOpNotInGroup = 0x12,
+    kGroupOpPlayerDied = 0x14
+};
+
 // FUN_0045e360 (cdecl) -- one 8-byte group-channel record {Opcode, Player's low word} from this
 // player (G_ChatServer SubmitChat to G_ChatIdGroupInvite, system id -1); nothing without a chat
 // server. Caller: HUD_Target's invite command 0xc9 (opcode 0 with the target's owner). LAB_00462bd0 builds the same record inline for opcodes 1 and 2.

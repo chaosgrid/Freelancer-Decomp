@@ -290,7 +290,7 @@ namespace
             return;
 
         float BestFeeling = kAffiliationJoinFeeling;
-        unsigned NewAffiliation = 0xffffffffu;
+        unsigned NewAffiliation = kNoAffiliation;
         std::vector<Reputation::Vibe::GroupFeeling>::const_iterator It = V.GroupFeelings.begin();
         for (; It != V.GroupFeelings.end(); ++It)
         {
@@ -340,7 +340,7 @@ std::map<unsigned int, unsigned int>* __cdecl Reputation::GetChangedAffiliationC
 }
 
 Reputation::Vibe::VibeValue::VibeValue()
-    : Affiliation(0xffffffffu)
+    : Affiliation(kNoAffiliation)
     , AttitudeTowardsPlayer(0.0f)
     , ClientID(0)
     , AffiliationGroup(nullptr)
@@ -382,7 +382,7 @@ void Reputation::Vibe::VibeValue::CopyFieldsFrom(VibeValue const& Other)
 }
 
 Reputation::Vibe::VibeValue::VibeValue(VibeValue const& Other)
-    : Affiliation(0xffffffffu)
+    : Affiliation(kNoAffiliation)
     , AttitudeTowardsPlayer(Other.AttitudeTowardsPlayer)
     , ClientID(0)
     , AffiliationGroup(nullptr)
@@ -738,7 +738,7 @@ int __cdecl Reputation::Vibe::SetGroupFeelingsTowards(int const& GroupId, unsign
 
     if (V->ClientID == 0)
         return Result;
-    if (V->Affiliation != 0xffffffffu)
+    if (V->Affiliation != kNoAffiliation)
     {
         float Own = 0.0f;
         std::size_t Index = 0;
@@ -752,7 +752,7 @@ int __cdecl Reputation::Vibe::SetGroupFeelingsTowards(int const& GroupId, unsign
         }
         if (!(Own <= kAffiliationKeepFeeling))
             return Result;
-        V->Affiliation = 0xffffffffu;
+        V->Affiliation = kNoAffiliation;
     }
     UpdatePlayerAffiliation(*V);
     return Result;
@@ -848,7 +848,7 @@ namespace
 
         float Base = 0.0f;
         FGroup const* FromGroup = (FGroup const*)From.AffiliationGroup;
-        if (FromGroup != nullptr && To.Affiliation != 0xffffffffu)
+        if (FromGroup != nullptr && To.Affiliation != kNoAffiliation)
         {
             if (From.Affiliation == To.Affiliation)
             {
@@ -865,7 +865,7 @@ namespace
             Base = 0.0f;
 
         float Override = 0.0f;
-        if (From.Affiliation != 0xffffffffu)
+        if (From.Affiliation != kNoAffiliation)
         {
             for (std::size_t i = 0; i < To.GroupFeelings.size(); ++i)
             {
@@ -924,7 +924,7 @@ namespace
     // lookup BlendAttitudeRaw inlines.
     float FindGroupFeelingOverride(Reputation::Vibe::VibeValue const& Owner, unsigned SourceAffiliation)
     {
-        if (SourceAffiliation == 0xffffffffu)
+        if (SourceAffiliation == kNoAffiliation)
             return 0.0f;
 
         for (std::size_t i = 0; i < Owner.GroupFeelings.size(); ++i)
@@ -997,7 +997,7 @@ int __cdecl Reputation::Vibe::AdjustAttitude(int const& FromGroupId, int const& 
         Node->GroupId = ToId;
     }
 
-    unsigned FromAffiliation = 0xffffffffu;
+    unsigned FromAffiliation = kNoAffiliation;
     VibeValue const* FromAgain = FindVibe(FromGroupId);
     if (FromAgain != nullptr)
         FromAffiliation = FromAgain->Affiliation;

@@ -48,11 +48,43 @@ class Transform;
 // AmbientScriptDescription / AmbientScriptProperties are defined in common_goods.h.
 
 // MissionMessageType — used in Player::DisplayMissionMessage
+// The client (StoryStarOnMissionMessage, FUN_004b9c60) acts on the value: 0 and 1 queue the
+// message under the "Mission Result: Failure" / "Mission Result: Success" heading (ids 0x412 /
+// 0x4cf) and open the mission log, 2 and 3 clear the pending objectives first (3 with the
+// success heading), 7 / 8 / 9 are the OBJECTIVE / HISTORY / OBJECTIVE_HISTORY keywords of the
+// mission scripts, 0xa prunes the history.
 enum MissionMessageType {
-    MISSION_MSG_TYPE_0 = 0,
-    MISSION_MSG_TYPE_1 = 1,
+    MISSION_MSG_FAILURE = 0,
+    MISSION_MSG_SUCCESS = 1,
     MISSION_MSG_TYPE_2 = 2,
     MISSION_MSG_TYPE_3 = 3,
+    MISSION_MSG_OBJECTIVE = 7,
+    MISSION_MSG_HISTORY = 8,
+    MISSION_MSG_OBJECTIVE_HISTORY = 9,
+    MISSION_MSG_PRUNE_HISTORY = 0xa,
+};
+
+// The State of pub::Player::SetMissionObjectiveState: the script keywords of Content's
+// Act_SetNNState (ACTIVE, FAILED, COMPLETE, INACTIVE). The client's best path list keeps the
+// state in the low nibble of FBestPathWaypoint::ObjectiveState (3 = COMPLETE; 9 and 0xa are the
+// list kinds of EObjectiveState).
+enum ENnObjectiveState
+{
+    kNnObjectiveActive = 1,      // ACTIVE
+    kNnObjectiveFailed = 2,      // FAILED
+    kNnObjectiveComplete = 3,    // COMPLETE
+    kNnObjectiveInactive = 4     // INACTIVE
+};
+
+// The Buttons bits of pub::Player::PopUpDialog (and the Pressed button of the message 0x30):
+// Content's Act_PopUpDialog YES_NO is 3, YES_NO_LATER 7, CLOSE 8; the Cnd_PopUpDialog keywords
+// YES, NO, LATER, CLOSE name the bits.
+enum EPopUpButton
+{
+    kPopUpButtonYes = 1,
+    kPopUpButtonNo = 2,
+    kPopUpButtonLater = 4,
+    kPopUpButtonClose = 8    // OK in the client's dialog
 };
 
 // DOCK_HOST_RESPONSE — used in SpaceObj::Dock
@@ -74,12 +106,15 @@ enum DOCK_HOST_RESPONSE {
 
 // EQInfo and TerminalInfo are declared in server_cobject.h under pub::SpaceObj namespace
 
-// ZoneShape — used in Zone::GetShape
+// ZoneShape — used in Zone::GetShape, which answers IZone::Shape: the values are
+// Universe::IZone's EZoneShape (the zone "shape" keyword table, 0 = invalid).
 enum ZoneShape {
-    ZONE_SHAPE_SPHERE = 0,
-    ZONE_SHAPE_BOX = 1,
-    ZONE_SHAPE_CYLINDER = 2,
-    ZONE_SHAPE_RING = 3,
+    ZONE_SHAPE_SPHERE = 1,
+    ZONE_SHAPE_ELLIPSOID = 2,
+    ZONE_SHAPE_BOX = 3,
+    ZONE_SHAPE_CYLINDER = 4,
+    ZONE_SHAPE_RING = 5,
+    ZONE_SHAPE_MESH = 6,
 };
 
 // MVEmptyReason — used in GF::ReportWhyMissionVendorEmpty

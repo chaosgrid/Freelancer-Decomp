@@ -123,11 +123,11 @@ bool NnRolloverControl::Create(Win3D* NewParent, void* /*Data*/)
     // FUN_004b54d0 (RET 8).
     Win3DReparent(this, NewParent); // FUN_0059dd00
     Win3DRegister(this);            // FUN_0059dbf0
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     InitTextDefaults(); // FUN_005a1c50
     Width = 0.1f;       // +0xb4 = 0x3dcccccd
     Height = 0.1f;      // +0xb8
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
     DrawSubLayer = 7;         // +0x78
     FlagE0 = 0;               // +0xe0
     TextScale = 0.0011f;      // +0xb0 = 0x3a902de0
@@ -179,7 +179,7 @@ bool NnRolloverControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*
     // LAB_004b5700 (RET 0xc).
     if (Msg != kWinMsgHide)
         return false;
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
     return true;
 }
 
@@ -188,7 +188,7 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
     // FUN_004b5600 (RET 8, the frame time as a double).
     if (GetClientMouseCursorDrawFlag() == 0) // FUN_0041dd90
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         HoldSeconds = 0.0f;
         return;
     }
@@ -197,7 +197,7 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
     {
         // Hidden: the grace time runs down while positive and is clamped to 0 when the
         // unrounded difference goes below 0.
-        Flags = static_cast<unsigned char>(Flags & 0xfe);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DActive);
         if (HiddenGrace > 0.0f)
         {
             double const Left = static_cast<double>(HiddenGrace) - DeltaSeconds;
@@ -238,7 +238,7 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
             return;
         HoldSeconds = 0.0f;
     }
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
 }
 
 void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
@@ -248,7 +248,7 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
         return;
     if (GetClientMouseCursorDrawFlag() == 0)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
     if (!IsRolloverEnabled())
@@ -316,7 +316,7 @@ void NnRolloverControl::ShowHover(FToolTipHoverInfo const* Info, float Hold)
         return;
     if (GetClientMouseCursorDrawFlag() == 0)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
     if (!IsRolloverEnabled())
@@ -357,7 +357,7 @@ void NnRolloverControl::ShowHoverAt(FToolTipHoverInfo const* Info, float Hold, f
         return;
     if (GetClientMouseCursorDrawFlag() == 0)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
     if (!IsRolloverEnabled())
@@ -472,14 +472,14 @@ void NnRolloverControl::Draw()
 void NnRolloverControl::HideRollover()
 {
     HoldSeconds = 0.0f;
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
 }
 
 Win3D* RolloverFactory::Create(Win3D* Parent, void* Payload)
 {
     // FUN_004b6630: operator new(0x18c); the singleton is DAT_00672288.
     NnRolloverControl* const Tip = new NnRolloverControl();
-    Tip->Flags = static_cast<unsigned char>(Tip->Flags & 0xfd);
+    Tip->Flags = static_cast<unsigned char>(Tip->Flags & ~kWin3DVisible);
     G_RolloverSingleton = Tip;
     Tip->ClassName = ClassName;
     if (!Tip->Create(Parent, Payload))

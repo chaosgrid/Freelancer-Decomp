@@ -431,7 +431,7 @@ unsigned int FFactionNames::GetRankDesig(int const* Level) const
 // FUN_06f51520.
 bool FFactionNames::PickPilotName(int* OutFirst, int* OutLast, int Gender, bool bReserve)
 {
-    FFactionNameList const* FirstNames = (Gender == 1) ? &MaleFirstNames : &FemaleFirstNames;
+    FFactionNameList const* FirstNames = (Gender == kGenderMale) ? &MaleFirstNames : &FemaleFirstNames;
     int const FirstCount = FirstNames->Count;
     int const LastCount = LastNames.Count;
     int First = 0;

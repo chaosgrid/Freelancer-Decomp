@@ -37,6 +37,15 @@ class UiRichTextWin;
 class UiScroll;
 class UiTextMsgButton;
 
+// The button commands PageServerSelect::ProcessMessage receives with kWinMsgCommand.
+enum EServerSelectCommand
+{
+    kServerCmdMainMenu = 0x3e9,
+    kServerCmdSetFilter = 0x3ea,
+    kServerCmdRefresh = 0x3eb,
+    kServerCmdConnect = 0x3003
+};
+
 class PageServerSelect : public UIPage::MasterWin
 {
 public:

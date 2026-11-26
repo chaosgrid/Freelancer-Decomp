@@ -120,6 +120,25 @@ struct FArchMapEntry
     FSoundArchetype* Archetype;
 };
 
+// FSoundInstanceNode::StatusFlags.
+enum EInstanceStatus
+{
+    kInstanceHardware = 0x1,      // playing in a hardware buffer
+    kInstanceNotify = 0x2,        // loop-end notification armed (SetupInstanceNotify)
+    kInstanceSoftware = 0x4,      // DSBCAPS_LOCSOFTWARE buffer
+    kInstanceWantHardware = 0x8,  // MaybeMigrateHwSw picked hardware
+    kInstance3d = 0x10,           // has an IDirectSound3DBuffer
+    kInstanceFrequency = 0x20,    // frequency control works
+    kInstanceStarted = 0x40,      // Play has been issued
+};
+
+// QuerySupport result bits of IKsPropertySet (KSPROPERTY_SUPPORT_GET / _SET).
+enum EKsPropertySupport
+{
+    kKsPropertySupportGet = 0x1,
+    kKsPropertySupportSet = 0x2,
+};
+
 // Instance list node 0x60 (FUN_06ee7d50). Payload starts at +8.
 struct FSoundInstanceNode
 {

@@ -42,6 +42,15 @@ class RichTextWin;
 class ScrollControl;
 class ShipViewControl;
 
+// NnTrade::Mode / SetMode's argument (+0x390): which panel the middle of the window shows.
+enum ENnTradePanel
+{
+    kTradePanelListsOnly = 1,       // everything but the two lists hidden
+    kTradePanelOffers = 2,          // the arrow, the title, the offer list and "accept trade"
+    kTradePanelQuantity = 3,        // the quantity panel replaces the offer list
+    kTradePanelQuantityRecheck = 4  // SetMode argument only: the quantity panel again, its limits re-checked (stored as 3)
+};
+
 class NnTrade : public WinControl, public EventHandler
 {
 public:

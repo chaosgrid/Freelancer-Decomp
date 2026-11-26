@@ -116,12 +116,12 @@ char const* MissionVendorProperties::get_icon_texture() const
 {
     switch (MissionClass)
     {
-    case 1: return "MIS_destroy";
-    case 2: return "MIS_destroyinstallation";
-    case 3: return "MIS_assassinate";
-    case 4: return "MIS_destroycontraband";
-    case 5: return "MIS_bountyoffer";
-    case 6: return "MIS_retrievemissingitem";
+    case kMissionClassDestroy: return "MIS_destroy";
+    case kMissionClassDestroyInstallation: return "MIS_destroyinstallation";
+    case kMissionClassAssassinate: return "MIS_assassinate";
+    case kMissionClassDestroyContraband: return "MIS_destroycontraband";
+    case kMissionClassBountyOffer: return "MIS_bountyoffer";
+    case kMissionClassRetrieveMissingItem: return "MIS_retrievemissingitem";
     default: return nullptr;
     }
 }

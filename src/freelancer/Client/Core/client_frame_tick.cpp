@@ -83,9 +83,9 @@ namespace
         // frame runs with the one the device left (DAT_0061084c).
         if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
         {
-            if (G_FpuPrecisionFound == 0x18)
+            if (G_FpuPrecisionFound == 24)
                 _control87(_PC_24, _MCW_PC);
-            else if (G_FpuPrecisionFound == 0x35)
+            else if (G_FpuPrecisionFound == 53)
                 _control87(_PC_53, _MCW_PC);
             else
                 _control87(0, 0);
@@ -110,9 +110,9 @@ namespace
         }
 
         // color_bpp is DAT_00679bd0, G_bRenderDither DAT_0061085c.
-        const int DitherEnable = (g_display.color_bpp == 0x10 && G_bRenderDither != 0) ? 1 : 0;
+        const int DitherEnable = (g_display.color_bpp == 16 && G_bRenderDither != 0) ? 1 : 0;
         FramePipeline()->SetRenderState(D3DRS_DITHERENABLE, DitherEnable);
-        FramePipeline()->SetTextureStageState(0, 0x12, G_RenderMipFilter); // DAT_00610860
+        FramePipeline()->SetTextureStageState(0, D3DTSS_MIPFILTER, G_RenderMipFilter); // DAT_00610860
 
         return G_bRenderFrameBegun;
     }
@@ -146,9 +146,9 @@ namespace
         // anything else.
         if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
         {
-            if (G_FpuPrecisionWanted == 0x18)
+            if (G_FpuPrecisionWanted == 24)
                 _control87(_PC_24, _MCW_PC);
-            else if (G_FpuPrecisionWanted == 0x35)
+            else if (G_FpuPrecisionWanted == 53)
                 _control87(_PC_53, _MCW_PC);
             else
                 _control87(0, 0);

@@ -65,6 +65,7 @@
 #include "common_goods.h"
 #include "common_misc.h"
 #include "server_exports.h"
+#include "server_cobject.h"   // DestroyType (GameObject::destroy Kind)
 
 class StarSystem;   // server_sysdb.h -- retail GameObject+0x28 points at one
 class GameObject;
@@ -249,6 +250,20 @@ struct FDeathFuseEvent
     float Lifetime;                          // +0x0c  zeroed before the dispatch
 };
 static_assert(sizeof(FDeathFuseEvent) == 0x10, "FDeathFuseEvent is four dwords");
+
+// The CEquipTraverser type masks Server.dll walks with: CAttachedEquip's family (the guns,
+// dropper, shield, shield generator, thruster, cargo pod and cloak), the same without the
+// shield, and every external type.
+enum EServerEquipMask
+{
+    kEquipMaskAttachedNoShield = EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun |
+                                 EquipTypeShieldGen | EquipTypeThruster | EquipTypeCargoPod |
+                                 EquipTypeCloak,                                   // 0x1ee0
+    kEquipMaskAttached = kEquipMaskAttachedNoShield | EquipTypeShield,             // 0x1fe0
+    kEquipMaskExternal = kEquipMaskAttached | EquipTypeLight | EquipTypeAttachedFX, // 0x1fe3
+};
+static_assert(kEquipMaskAttachedNoShield == 0x1ee0 && kEquipMaskAttached == 0x1fe0 &&
+                  kEquipMaskExternal == 0x1fe3, "the retail traverser masks");
 
 // ---------------------------------------------------------------------------
 // GameObject -- the base wrapper. .text:06cee360.

@@ -411,7 +411,7 @@ void CAsteroidSystem::update(IObjDB* ObjDb, float Dt)
             unsigned Unused1;
             unsigned Mask;
         };
-        FIterState Cursor = { 0, 0, 0x7f0000u };
+        FIterState Cursor = { 0, 0, OBJ_SHIP_MASK };
 
         while (GAsteroidObserverScan)
         {

@@ -39,6 +39,7 @@
 #include <vector>
 #include "../include/server_iserverimpl.h"   // IServerImpl, Server
 #include "../include/server_gameobject.h"
+#include "../include/server_chat.h"
 #include "../include/common_goods.h"
 #include "../include/server_basedb.h"
 #include <cstdarg>
@@ -185,25 +186,25 @@ static void ChatGroup_Invite(unsigned int Inviter, unsigned int Invitee, const w
     }
 
     if (InviterSlot.client_id == InviteeSlot.client_id) {
-        ChatGroup_Send(Inviter, 0x9, InviterSlot.client_id);  // inviting yourself
+        ChatGroup_Send(Inviter, kGroupMsgCannotInviteSelf, InviterSlot.client_id);  // inviting yourself
         return;
     }
     if (InviteeSlot.group_mission_id != 0) {
-        ChatGroup_Send(InviterSlot.client_id, 0xf, InviteeSlot.client_id);
+        ChatGroup_Send(InviterSlot.client_id, kGroupMsgJoinFailedMission, InviteeSlot.client_id);
         return;
     }
     if (Group->GetMemberCount() >= 8) {
-        ChatGroup_Send(Inviter, 0xa, InviterSlot.client_id);  // group full
+        ChatGroup_Send(Inviter, kGroupMsgGroupFull, InviterSlot.client_id);  // group full
         return;
     }
     if (Group->IsMember(InviteeSlot.client_id)) {
-        ChatGroup_Send(Inviter, 0xb, InviteeSlot.client_id);  // already a member
+        ChatGroup_Send(Inviter, kGroupMsgAlreadyInYourGroup, InviteeSlot.client_id);  // already a member
         return;
     }
     // Retail re-reads the inviter's group_ptr here rather than reusing the local.
     static_cast<CPlayerGroup*>(InviterSlot.group_ptr)->AddInvite(InviteeSlot.client_id);
-    ChatGroup_Send(Inviter, 0x3, InviteeSlot.client_id);
-    ChatGroup_Send(InviteeSlot.client_id, 0x4, Inviter);
+    ChatGroup_Send(Inviter, kGroupMsgInviteSent, InviteeSlot.client_id);
+    ChatGroup_Send(InviteeSlot.client_id, kGroupMsgInviteReceived, Inviter);
 }
 
 // FUN_06d1a2e0 (cdecl): Joiner accepts Inviter's invitation.
@@ -224,28 +225,28 @@ static void ChatGroup_Join(unsigned int Joiner, unsigned int Inviter, const wcha
     CPlayerGroup* const Group = static_cast<CPlayerGroup*>(InviterSlot.group_ptr);
 
     if (JoinerSlot.client_id == InviterSlot.client_id) {
-        ChatGroup_Send(Joiner, 0xc, JoinerSlot.client_id);
+        ChatGroup_Send(Joiner, kGroupMsgCannotJoinOwnGroup, JoinerSlot.client_id);
         return;
     }
     if (Group == nullptr || !Group->IsInvited(JoinerSlot.client_id)) {
-        ChatGroup_Send(Joiner, 0xd, JoinerSlot.client_id);
+        ChatGroup_Send(Joiner, kGroupMsgNotInvited, JoinerSlot.client_id);
         return;
     }
     if (Group->IsMember(JoinerSlot.client_id)) {
-        ChatGroup_Send(Joiner, 0xe, InviterSlot.client_id);
+        ChatGroup_Send(Joiner, kGroupMsgAlreadyMember, InviterSlot.client_id);
         return;
     }
     if (JoinerSlot.group_mission_id != 0) {
-        ChatGroup_Send(JoinerSlot.client_id, 0xf, JoinerSlot.client_id);
+        ChatGroup_Send(JoinerSlot.client_id, kGroupMsgJoinFailedMission, JoinerSlot.client_id);
         return;
     }
     if (Group->GetMemberCount() >= 8) {
-        ChatGroup_Send(Joiner, 0x10, InviterSlot.client_id);
+        ChatGroup_Send(Joiner, kGroupMsgGroupNowFull, InviterSlot.client_id);
         return;
     }
     if (OldGroup != nullptr)
         OldGroup->DelMember(JoinerSlot.client_id);
-    ChatGroup_Send(JoinerSlot.client_id, 0x5, InviterSlot.client_id);
+    ChatGroup_Send(JoinerSlot.client_id, kGroupMsgJoinedGroup, InviterSlot.client_id);
     Group->AddMember(JoinerSlot.client_id);
     Group->DelInvite(JoinerSlot.client_id);
 }
@@ -260,7 +261,7 @@ static void ChatGroup_Leave(unsigned int Player)
         Group->DelMember(Slot.client_id);
         return;
     }
-    ChatGroup_Send(Slot.client_id, 0x12, Slot.client_id);
+    ChatGroup_Send(Slot.client_id, kGroupMsgNotInGroup, Slot.client_id);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,13 +553,13 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
             return;
         const unsigned int* const Control = static_cast<const unsigned int*>(Data);
         switch (Control[0]) {
-        case 0:
+        case kGroupMsgInvite:
             ChatGroup_Invite(Sender.GetPlayerId(), Control[1], nullptr);
             return;
-        case 1:
+        case kGroupMsgLeave:
             ChatGroup_Leave(Sender.GetPlayerId());
             return;
-        case 2:
+        case kGroupMsgJoin:
             ChatGroup_Join(Sender.GetPlayerId(), Control[1], nullptr);
             return;
         default:

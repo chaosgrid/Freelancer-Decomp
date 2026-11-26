@@ -147,8 +147,8 @@ void BeamEffectSetHitFlags(FBeamEffect* This, bool bHit, bool bHitPlayer)
 {
     // FUN_004fc8f0: ((arg1 << 1) ^ f) & 2 ^ f, then ((arg2 << 2) ^ that) & 4 ^ that.
     unsigned char Flags = This->Flags70;
-    Flags = static_cast<unsigned char>(((((bHit ? 1u : 0u) << 1) ^ Flags) & 2u) ^ Flags);
-    Flags = static_cast<unsigned char>(((((bHitPlayer ? 1u : 0u) << 2) ^ Flags) & 4u) ^ Flags);
+    Flags = static_cast<unsigned char>(((((bHit ? 1u : 0u) << 1) ^ Flags) & kBeamFlagHit) ^ Flags);
+    Flags = static_cast<unsigned char>(((((bHitPlayer ? 1u : 0u) << 2) ^ Flags) & kBeamFlagHitPlayer) ^ Flags);
     This->Flags70 = Flags;
 }
 
@@ -444,7 +444,7 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
             // Still alive: a particle without the dead bit (Flags08 & 2), else an active sound,
             // else a light with no animation keys (+0xd4).
             bool bAlive = false;
-            if (Particle != nullptr && (Particle->Flags08 & 2u) == 0u)
+            if (Particle != nullptr && (Particle->Flags08 & kEffectFlagDeactivated) == 0u)
                 bAlive = true;
             else if (Sound != nullptr && Sound->IsActive() != 0)
                 bAlive = true;
@@ -516,7 +516,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
 {
     // FUN_0053f340 (on the Beam gameobj). The class & 7 object's archetype companion (no null
     // test on the object); a null companion goes straight to Projectile's slot 92.
-    Archetype::ICliObj* const Companion = NarrowBeamObject(This, 0x7u)->Archetype->Companion;
+    Archetype::ICliObj* const Companion = NarrowBeamObject(This, CObject::ClassProjectile)->Archetype->Companion;
     if (Companion != nullptr)
     {
         Transform LocalXform;
@@ -529,7 +529,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
             // transpose(CBeam orientation, class & 0x67, no null test) x LookMatrix(*LookDir).
             Matrix const Look = LookMatrix(*LookDir);
             Matrix OwnerOri;
-            CopyOwnerOrientation(&OwnerOri, NarrowBeamObject(This, 0x67u));
+            CopyOwnerOrientation(&OwnerOri, NarrowBeamObject(This, CObject::ClassBeam));
             Matrix OwnerT;
             MatrixStore9(&OwnerT, OwnerOri.E[0][0], OwnerOri.E[1][0], OwnerOri.E[2][0],
                          OwnerOri.E[0][1], OwnerOri.E[1][1], OwnerOri.E[2][1], OwnerOri.E[0][2],
@@ -564,7 +564,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
                 This->BeamAlloc = Beam;
                 // Flags70 bit 3 = bUseLookDir; no null test on the allocation.
                 Beam->Flags70 = static_cast<unsigned char>(
-                    (((bUseLookDir << 3) ^ Beam->Flags70) & 8) ^ Beam->Flags70);
+                    (((bUseLookDir << 3) ^ Beam->Flags70) & kBeamFlagUseLookDir) ^ Beam->Flags70);
                 This->Companion[2] = This->BeamAlloc;
                 BeamEffectAddRef(This->BeamAlloc);
             }
@@ -586,7 +586,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
                 FBeamEffect* const StartBeam = static_cast<FBeamEffect*>(This->Companion[2]);
                 if (BeamEffectStart(StartBeam, EffectArch) != 0)
                 {
-                    float const Speed = OwnerVelocityLength(NarrowBeamObject(This, 0x67u));
+                    float const Speed = OwnerVelocityLength(NarrowBeamObject(This, CObject::ClassBeam));
                     BeamEffectSetProgressFromSpeed(This->BeamAlloc, Speed);
                 }
                 else
@@ -625,7 +625,7 @@ void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target)
 
         // The CBeam (class & 0x67) is initialised with the barrel's position, orientation and
         // velocity and the owner's CSimple id.
-        CProjectile* const BeamObj = static_cast<CProjectile*>(NarrowBeamObject(Beam, 0x67u));
+        CProjectile* const BeamObj = static_cast<CProjectile*>(NarrowBeamObject(Beam, CObject::ClassBeam));
         CProjectile::CreateParms Parms;
         Parms.Id = 0;
         Parms.ObjDb = GetClientObjDb();
@@ -1396,20 +1396,20 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
 
     switch (Sub)
     {
-    case 0:
+    case kActivateSubOpDeactivate:
         CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, 0, PlayerId);
         return 0;
-    case 1:
+    case kActivateSubOpActivate:
         CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, 1, PlayerId);
         return 0;
-    case 2:
+    case kActivateSubOpToggle:
     {
         unsigned char const Active = Equip->IsActive() ? 1 : 0;
         CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, static_cast<unsigned char>(1 - Active),
                              PlayerId);
         return 0;
     }
-    case 3:
+    case kActivateSubOpExclusive:
     {
         // Mute group: activate this, deactivate others of same Type mask.
         CEquipTraverser Trav(static_cast<int>(Equip->Type));
@@ -1430,7 +1430,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
         }
         return 0;
     }
-    case 4:
+    case kActivateSubOpSyncType:
     {
         // Sync all of Type to this equip's IsActive state.
         unsigned char const Want = Equip->IsActive() ? 1 : 0;
@@ -1468,8 +1468,9 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
     if (Ship == nullptr)
         return;
 
-    // 0x1fe0 = launcher family mask (gun/mine/cm droppers etc.).
-    constexpr int kLauncherMask = 0x1fe0;
+    // The launcher family (gun, mine and countermeasure droppers, shields, thrusters, ...).
+    constexpr int kLauncherMask = EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun | EquipTypeShield |
+                                  EquipTypeShieldGen | EquipTypeThruster | EquipTypeCargoPod | EquipTypeCloak;
 
     if (Packet->Op == USER_NEXT_ITEM)
     {
@@ -1491,7 +1492,7 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
         if (Next != nullptr && Next != First)
             Hp = Next->Id;
         // +0x14 = 3, the id zero-extended into the +0x10 dword.
-        Packet->ActivateSubOp = 3;
+        Packet->ActivateSubOp = kActivateSubOpExclusive;
         Packet->HardpointId = Hp;
         Packet->Pad12 = 0;
         return;
@@ -1517,7 +1518,7 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
         if (Next != nullptr && Next != First)
             Hp = Next->Id;
         // +0x14 = 3, the id zero-extended into the +0x10 dword.
-        Packet->ActivateSubOp = 3;
+        Packet->ActivateSubOp = kActivateSubOpExclusive;
         Packet->HardpointId = Hp;
         Packet->Pad12 = 0;
     }
@@ -1713,7 +1714,7 @@ namespace
     bool LauncherCompanionAlive(void* const* Companion)
     {
         FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
-        if (Effect != nullptr && (Effect->Flags08 & 2u) == 0)
+        if (Effect != nullptr && (Effect->Flags08 & kEffectFlagDeactivated) == 0)
             return true;
         ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
         if (Sound != nullptr && Sound->IsActive() != 0)

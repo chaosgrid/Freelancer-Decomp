@@ -407,7 +407,7 @@ namespace
             Template.FlagsHi = 0;                                       // +0x0c
 
             // A ball (object_type 3) keeps its radius.
-            if (Body->object_type == 3)
+            if (Body->object_type == IVP_BALL)
                 Template.ExtraRadius = Body->extra_radius;
 
             IVP_Split_Object_From_Core(Body, &Template);

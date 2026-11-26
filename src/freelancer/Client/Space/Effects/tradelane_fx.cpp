@@ -482,7 +482,7 @@ namespace
         TlWatchedGameobj(Ring)->get_status(Health);
         if (Health == 0.0f)
             return nullptr;
-        return ClientObjDb_FindObject(NextId, 2);
+        return ClientObjDb_FindObject(NextId, static_cast<int>(EClientGameobjKind::Solar));
     }
 
     // FUN_005139d0 (the node is never read): the player's tunnel companion
@@ -493,7 +493,7 @@ namespace
         if (Ship == TlPlayerGameobj())
         {
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
-            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & 0xbfu);
+            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
         void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
         if (CreateEffectCompanionAlive(Lane) != 0)
@@ -534,15 +534,15 @@ namespace
     {
         bool const bPlayer = Ship == TlPlayerGameobj();
         Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
-        if ((TlShipFlags184(Ship) & 0x20u) != 0)
+        if ((TlShipFlags184(Ship) & kTradeLaneFlagTravelFx) != 0)
             return;
-        TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) | 0x20u);
+        TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) | kTradeLaneFlagTravelFx);
         if (bPlayer)
         {
             Transform const& RingXform = TlWatchedGameobj(Ring)->get_transform();
             Transform Xform;
             std::memcpy(&Xform.Rotation, &RingXform.Rotation, sizeof(Xform.Rotation));
-            if ((TlShipFlags184(Ship) & 1u) == 0)
+            if ((TlShipFlags184(Ship) & kTradeLaneFlagSideKey) == 0)
             {
                 Xform.Rotation.E[0][2] = -Xform.Rotation.E[0][2];
                 Xform.Rotation.E[1][2] = -Xform.Rotation.E[1][2];
@@ -584,7 +584,7 @@ namespace
         FClientGameobj* const RingGo = TlWatchedGameobj(Ring);
         Vector HpLocal;
         TradeLaneRingLaneHardpoint(&HpLocal, RingGo,
-                                   static_cast<unsigned char>(TlShipFlags184(Ship) & 1u));
+                                   static_cast<unsigned char>(TlShipFlags184(Ship) & kTradeLaneFlagSideKey));
         Transform const* const RingXform = &RingGo->get_transform();
         Vector HpWorld;
         TlMath()->TransformXform(HpWorld, *RingXform, HpLocal);
@@ -624,7 +624,7 @@ namespace
                 }
             }
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
-            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & 0xbfu);
+            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
         void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
         if (CreateEffectCompanionAlive(Lane) != 0)
@@ -658,7 +658,7 @@ namespace
         Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
         if (bPlayer)
         {
-            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & 0xbfu);
+            TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
         }
         void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
@@ -705,7 +705,7 @@ namespace
         {
             if (Old == Ring)
             {
-                if ((TlShipFlags184(Ship) & 0x80u) != 0)
+                if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
                     TlOneshot14750(Ring, Ship);
                 return;
             }
@@ -716,7 +716,7 @@ namespace
             }
             else
             {
-                if ((TlShipFlags184(Ship) & 0x80u) != 0)
+                if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
                     TlLeaveOneshot14f20(Old, Ship);
                 TlShipLeaveRingEffects(Old, Ship);
                 TlShipListErase(Old, Node);
@@ -724,7 +724,7 @@ namespace
         }
         TlShipRingPtr(Ship) = Ring;
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) & 0xfau);
-        if ((TlShipFlags184(Ship) & 0x80u) != 0)
+        if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
             TlOneshot14750(Ring, Ship);
         TlShipListPushBack(Ring, Ship->get_id());
     }
@@ -747,7 +747,7 @@ namespace
         while (Node != Head)
         {
             FTlShipListNode* const Next = Node->Next;
-            FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, 1);
+            FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, static_cast<int>(EClientGameobjKind::Ship));
             if (Ship == nullptr)
             {
                 TlShipListErase(Ring, Node);
@@ -771,7 +771,7 @@ namespace
             float const Dist = static_cast<float>(TlVecLength(&Delta));
 
             double Speed = 2500.0; // DAT_005db7d8
-            if ((TlShipFlags184(Ship) & 0x80u) == 0)
+            if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) == 0)
             {
                 Vector const Velocity = Ship->get_velocity();
                 Vector V;
@@ -792,7 +792,7 @@ namespace
                     TlOneshot14750(Ring, Ship);
             }
 
-            if ((TlShipFlags184(Ship) & 0x80u) == 0)
+            if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) == 0)
             {
                 if (Dist < NearestDist)
                 {
@@ -827,8 +827,8 @@ namespace
                 {
                     FTradeLaneRingRuntime* const NewRing =
                         TradeLaneRingFindOrCreate(NextRing, Ring->SideKey, true);
-                    if ((TlShipFlags184(Ship) & 0x20u) != 0 && Ship == TlPlayerGameobj())
-                        TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) | 0x40u);
+                    if ((TlShipFlags184(Ship) & kTradeLaneFlagTravelFx) != 0 && Ship == TlPlayerGameobj())
+                        TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) | kTradeLaneFlagTunnelFx);
                     TlAssignShipToRing(NewRing, Ship);
                 }
                 else
@@ -904,7 +904,7 @@ namespace
             FTlShipListNode* Node = Head->Next;
             while (Node != Head)
             {
-                FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, 1);
+                FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, static_cast<int>(EClientGameobjKind::Ship));
                 if (Ship != nullptr)
                     TlShipLeaveRingEffects(Ring, Ship);
                 TlShipListErase(Ring, Node);
@@ -925,7 +925,7 @@ namespace
             FTlShipListNode* Node = Head->Next;
             while (Node != Head)
             {
-                FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, 1);
+                FClientGameobj* const Ship = ClientObjDb_FindObject(Node->ShipId, static_cast<int>(EClientGameobjKind::Ship));
                 if (Ship != nullptr)
                     TlShipLeaveRingEffects(Ring, Ship);
                 TlShipListErase(Ring, Node);
@@ -962,7 +962,7 @@ namespace
             TlBadThings();
             return;
         }
-        if ((TlShipFlags184(Ship) & 0x80u) != 0 && (TlShipFlags185(Ship) & 4u) == 0)
+        if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0 && (TlShipFlags185(Ship) & 4u) == 0)
             TlLeaveOneshot14f20(Ring, Ship);
         TlShipLeaveRingEffects(Ring, Ship);
         TlShipListErase(Ring, Node);
@@ -985,7 +985,7 @@ namespace
         if (Behavior == nullptr)
             return;
         FBehaviorManagerEvent Event;
-        Event.Type = 4;
+        Event.Type = FBehaviorManagerEvent::kEventTradelane;
         Event.Data = Block;
         Behavior->OnEvent(&Event);
     }
@@ -1150,7 +1150,7 @@ bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRin
             else
             {
                 // The FUN_005139d0 body is inlined in retail.
-                if ((TlShipFlags184(Ship) & 0x80u) != 0)
+                if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
                     TlLeaveOneshot14f20(Old, Ship);
                 TlShipLeaveRingEffects(Old, Ship);
                 TlShipListErase(Old, Node);
@@ -1164,8 +1164,8 @@ bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRin
     ExitRing->get_ring_side(Ship->get_transform(), &bRingSide);
     unsigned char Flags = TlShipFlags184(Ship);
     unsigned char const SideBit = static_cast<unsigned char>((bRingSide ? 1u : 0u) << 1);
-    Flags = static_cast<unsigned char>((((SideBit ^ Flags) & 2u) ^ Flags) | 0x80u);
-    Flags = static_cast<unsigned char>(((NewRing->SideKey ^ Flags) & 1u) ^ Flags);
+    Flags = static_cast<unsigned char>((((SideBit ^ Flags) & kTradeLaneFlagRingSide) ^ Flags) | kTradeLaneFlagRiding);
+    Flags = static_cast<unsigned char>(((NewRing->SideKey ^ Flags) & kTradeLaneFlagSideKey) ^ Flags);
     TlShipFlags184(Ship) = Flags;
     if (SideByte != 0)
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) | 2u);
@@ -1175,7 +1175,7 @@ bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRin
     {
         if (Current == NewRing)
         {
-            if ((TlShipFlags184(Ship) & 0x80u) != 0)
+            if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
                 TlOneshot14750(NewRing, Ship);
             return true;
         }
@@ -1184,7 +1184,7 @@ bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRin
 
     TlShipRingPtr(Ship) = NewRing;
     TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) & 0xfau);
-    if ((TlShipFlags184(Ship) & 0x80u) != 0)
+    if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
         TlOneshot14750(NewRing, Ship);
     TlShipListPushBack(NewRing, Ship->get_id());
     return true;
@@ -1213,7 +1213,7 @@ void TradeLaneDetachTick(float Dt)
     {
         CShip* const PlayerShip = TlNarrowShip(Player);
         if (PlayerShip != nullptr && !PlayerShip->is_using_tradelane() &&
-            (TlShipFlags184(Player) & 0x80u) != 0)
+            (TlShipFlags184(Player) & kTradeLaneFlagRiding) != 0)
         {
             FTradeLaneRingRuntime* const Ring = TlShipRingPtr(Player);
             if (Ring != nullptr)
@@ -1225,7 +1225,7 @@ void TradeLaneDetachTick(float Dt)
                 }
                 else
                 {
-                    if ((TlShipFlags184(Player) & 0x80u) != 0)
+                    if ((TlShipFlags184(Player) & kTradeLaneFlagRiding) != 0)
                         TlLeaveOneshot14f20(Ring, Player);
                     TlShipLeaveRingEffects(Ring, Player);
                     TlShipListErase(Ring, Node);
@@ -1278,7 +1278,7 @@ void TradeLaneShutdown()
             FTlShipListNode* Entry = Head->Next;
             while (Entry != Head)
             {
-                FClientGameobj* const Ship = ClientObjDb_FindObject(Entry->ShipId, 1);
+                FClientGameobj* const Ship = ClientObjDb_FindObject(Entry->ShipId, static_cast<int>(EClientGameobjKind::Ship));
                 if (Ship != nullptr)
                     TlShipLeaveRingEffects(Node, Ship);
                 TlShipListErase(Node, Entry);
@@ -1305,7 +1305,7 @@ void TradeLaneShutdown()
 void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool bActivate)
 {
     // FUN_00516060.
-    FClientGameobj* const Ship = ClientObjDb_FindObject(ShipId, 1);
+    FClientGameobj* const Ship = ClientObjDb_FindObject(ShipId, static_cast<int>(EClientGameobjKind::Ship));
     if (Ship == nullptr)
         return;
 
@@ -1320,7 +1320,7 @@ void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool
             TlBadThings();
             return;
         }
-        if ((TlShipFlags184(Ship) & 0x80u) != 0)
+        if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
             TlLeaveOneshot14f20(Ring, Ship);
         TlShipLeaveRingEffects(Ring, Ship);
         TlShipListErase(Ring, Node);
@@ -1345,7 +1345,7 @@ void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool
             }
             else
             {
-                if ((TlShipFlags184(Ship) & 0x80u) != 0)
+                if ((TlShipFlags184(Ship) & kTradeLaneFlagRiding) != 0)
                     TlLeaveOneshot14f20(Old, Ship);
                 TlShipLeaveRingEffects(Old, Ship);
                 TlShipListErase(Old, Node);
@@ -1471,15 +1471,15 @@ void TradeLaneIClientGoTradelane(XGoTradelane const* Info)
     Block.ExitId = Info->TradelaneRing2;
     TlNotifyPlayerBehavior(&Block);
 
-    FClientGameobj* const Ship = ClientObjDb_FindObject(Info->ObjectId, 1);
+    FClientGameobj* const Ship = ClientObjDb_FindObject(Info->ObjectId, static_cast<int>(EClientGameobjKind::Ship));
     if (Ship != nullptr)
     {
         CShip* const ShipObj = TlNarrowShip(Ship);
         if (ShipObj != nullptr)
             ShipObj->use_tradelane(true);
     }
-    FClientGameobj* const Ring1 = ClientObjDb_FindObject(Info->TradelaneRing1, 2);
-    FClientGameobj* const Ring2 = ClientObjDb_FindObject(Info->TradelaneRing2, 2);
+    FClientGameobj* const Ring1 = ClientObjDb_FindObject(Info->TradelaneRing1, static_cast<int>(EClientGameobjKind::Solar));
+    FClientGameobj* const Ring2 = ClientObjDb_FindObject(Info->TradelaneRing2, static_cast<int>(EClientGameobjKind::Solar));
     if (Ship != nullptr && Ring1 != nullptr && Ring2 != nullptr)
         TradeLaneStartCommand(Ring1, Ring2, Ship, static_cast<unsigned char>(Info->bMidLane));
 }
@@ -1499,7 +1499,7 @@ void TradeLaneIClientStopTradelane(unsigned ShipId, unsigned EntranceId)
     Block.ExitId = 0;
     TlNotifyPlayerBehavior(&Block);
 
-    FClientGameobj* const Ship = ClientObjDb_FindObject(ShipId, 1);
+    FClientGameobj* const Ship = ClientObjDb_FindObject(ShipId, static_cast<int>(EClientGameobjKind::Ship));
     if (Ship == nullptr)
         return;
     CShip* const ShipObj = TlNarrowShip(Ship);

@@ -201,7 +201,7 @@ void GameObject::on_object_left_system(unsigned int ObjId)
     Payload[1] = 0;
     Payload[2] = ObjId;
     FBehaviorManagerEvent Event;
-    Event.Type = 3;
+    Event.Type = FBehaviorManagerEvent::kEventObjectLeftSystem;
     Event.Data = Payload;
     Behavior->OnEvent(&Event);
 }
@@ -431,7 +431,7 @@ void GameObject::apply_damage_list(DamageList& Damage)
     }
 
     if (Damage.bDestroyed && !is_destroyed() && !is_damage_blocked(Damage))
-        destroy(1, Damage.InflictorId);
+        destroy(DESTROY_FUSE, Damage.InflictorId);
 
     set_in_damage_callback(false);
 }
@@ -528,7 +528,7 @@ CObject* GameObject::cobj() const
     CObject* Obj = Object;
     if (Obj == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 3u) != 3u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return nullptr;
     return Obj;
 }

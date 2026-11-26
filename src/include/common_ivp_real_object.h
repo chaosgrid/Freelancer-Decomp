@@ -424,6 +424,15 @@ static_assert(offsetof(IVP_RealObjectConstructionTemplate, ClientData) == 0x54, 
 // ============================================================================
 class IVP_Cluster;
 
+// IVP_Object::object_type: the retail constructors store 1 (IVP_Cluster, 06345760), 2
+// (IVP_Polygon, 06362280) and 3 (IVP_Ball, 06362570); the switches on it trap on anything else.
+enum IVP_OBJECT_TYPE
+{
+    IVP_CLUSTER = 1,
+    IVP_POLYGON = 2,
+    IVP_BALL = 3,
+};
+
 class IVP_Object
 {
 public:
@@ -446,7 +455,7 @@ public:
     // +0x08, +0x14, +0x04 and stores Environment at +0x18.
     void init_object_core(IVP_Environment* Environment);
 
-    int32_t          object_type;  // +0x04 1 = cluster (06345760), 2 = IVP_Polygon (06362280), 3 = IVP_Ball (06362570)
+    int32_t          object_type;  // +0x04 IVP_OBJECT_TYPE
     IVP_Object*      next_object;  // +0x08 next_in_cluster (toward the oldest child)
     IVP_Object*      prev_object;  // +0x0C prev_in_cluster (toward IVP_Cluster::first_object)
     IVP_Cluster*     parent;       // +0x10 father_cluster; null for the root cluster

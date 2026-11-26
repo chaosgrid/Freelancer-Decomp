@@ -58,6 +58,18 @@ public:
     virtual ~IVP_Ray_Hit_Listener() {}
 };
 
+// check_ray_against_box (FUN_06349c30): the Cohen-Sutherland out-code of a ray end point against
+// the box [Min, Max] (a bit set when the point lies below Min / above Max on that axis).
+enum EIVP_RayBoxOutCode
+{
+    IVP_RAY_OUT_BELOW_X = 0x01,
+    IVP_RAY_OUT_ABOVE_X = 0x02,
+    IVP_RAY_OUT_BELOW_Y = 0x04,
+    IVP_RAY_OUT_ABOVE_Y = 0x08,
+    IVP_RAY_OUT_BELOW_Z = 0x10,
+    IVP_RAY_OUT_ABOVE_Z = 0x20,
+};
+
 class IVP_Ray_Solver : public IVP_Ray_Hit_Listener
 {
 public:

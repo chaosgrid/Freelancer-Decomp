@@ -30,5 +30,5 @@ bool NullBehavior::SetContext(void* /*Param1*/, void* /*Param2*/, void* /*Param3
 // Slot 7, ICF-folded with Archetype::Solar::get_class_type.
 int NullBehavior::Update()
 {
-    return 2;
+    return kBehaviorUpdateFinished;
 }

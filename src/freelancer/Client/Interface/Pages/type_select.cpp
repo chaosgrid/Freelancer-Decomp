@@ -195,7 +195,7 @@ bool TypeSelect::Create(Win3D* NewParent, void* /*Data*/)
     AnimTime = 1.0;
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
 
     if (SensApi == nullptr)
     {
@@ -356,7 +356,7 @@ void TypeSelect::Update()
         if (!(AnimTime > -0.80000000000000004))
             return;
         if (AnimTime < -0.10000000000000001)
-            PlayUiSoundSlot(0x1b); // "ui_motion_swish"
+            PlayUiSoundSlot(kUiSoundMotionSwish);
         return;
     }
 
@@ -367,7 +367,7 @@ void TypeSelect::Update()
 
     // DAT_005e28b8 / DAT_005c8ba8.
     if (AnimTime < 0.0 && AnimTime > -0.40000000000000002)
-        PlayUiSoundSlot(0x1b);
+        PlayUiSoundSlot(kUiSoundMotionSwish);
 
     // At or below -0.9 (DAT_005e1b90) the column is hidden; on the second such frame the
     // pending command becomes the next state.
@@ -399,7 +399,7 @@ bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
     // FUN_00566bd0.
     if (Msg != kWinMsgCommand)
         return false;
-    PlayOrRewindUiSoundSlot(0);
+    PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
 
     switch (A)
     {

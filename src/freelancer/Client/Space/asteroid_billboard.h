@@ -57,6 +57,14 @@ struct FBillboardSavedVertex
 static_assert(sizeof(FBillboardSavedVertex) == 0x18, "saved vertex 0x18");
 
 // DAT_006797d0, 0x84 bytes.
+// FAsteroidBillboardBatch::Flags (+0x58).
+enum EBillboardBatchFlag
+{
+    kBillboardFlagSaveFirst = 0x1, // the next vertex is kept as the loop's first (Saved[0])
+    kBillboardFlagCloseLoop = 0x2, // flush writes the saved first vertex once more
+    kBillboardFlagQuads = 0x4      // vertices 0 and 2 of each four are saved and rewritten, turning the quad into two triangles
+};
+
 class FAsteroidBillboardBatch
 {
 public:

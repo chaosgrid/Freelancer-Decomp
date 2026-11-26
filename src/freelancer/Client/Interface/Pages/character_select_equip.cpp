@@ -398,7 +398,7 @@ void SetPlayerCreditsRetail(unsigned Credits, int bFromCharacterSelect)
     // old one, a signed compare.
     if (bFromCharacterSelect == 0
         && static_cast<int>(Credits) > static_cast<int>(G_PlayerCredits))
-        PlayOrRewindUiSoundSlot(0x26);
+        PlayOrRewindUiSoundSlot(kUiSoundReceiveMoney);
     G_PlayerCredits = Credits;
 }
 
@@ -433,7 +433,7 @@ namespace
         unsigned char Flags = System->GetVisit();
         if ((Flags & 0x81u) != 0)
             return;
-        Flags = static_cast<unsigned char>(Flags | 1u);
+        Flags = static_cast<unsigned char>(Flags | kVisitShown);
         SetPlayerVisitFlagsRetail(G_PlayerStarSystemId, Flags, true);
     }
 }

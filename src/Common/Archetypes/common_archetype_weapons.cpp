@@ -36,10 +36,10 @@ namespace Archetype
     {
         unsigned LookupHpType(char const* Name)
         {
-            unsigned Value = 4;
+            unsigned Value = HpTypeGun;
             if (TryLookupHpType(Name, &Value))
                 return Value;
-            return 4;
+            return HpTypeGun;
         }
     }
 
@@ -531,7 +531,7 @@ namespace Archetype
         , SeekerFovCos(1.0f)
         , MaxAngularVelocity(100.0f)
         , DetonationDistSq(0.0f)
-        , HpType(4)
+        , HpType(HpTypeGun)
         , bCruiseDisruptor(false)
     {
         WeaponType.clear();
@@ -539,7 +539,7 @@ namespace Archetype
         PadAd[0] = 0;
         PadAd[1] = 0;
         PadAd[2] = 0;
-        ObjectType = 0x2000000;
+        ObjectType = OBJ_BULLET;
     }
 
     bool Munition::read(INI_Reader& Reader)
@@ -583,9 +583,9 @@ namespace Archetype
                 Seeker = SeekerNone;
 
             if (Seeker != SeekerNone)
-                ObjectType = 0x1000000;
+                ObjectType = OBJ_GUIDED;
             else
-                ObjectType = 0x2000000;
+                ObjectType = OBJ_BULLET;
             return true;
         }
 
@@ -757,7 +757,7 @@ namespace Archetype
         , TopSpeed(40.0f)
     {
         bRequiresAmmo = true;
-        ObjectType = 0x4000000;
+        ObjectType = OBJ_MINE;
     }
 
     bool Mine::read(INI_Reader& Reader)

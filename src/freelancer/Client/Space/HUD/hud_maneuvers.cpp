@@ -7,6 +7,7 @@
 #include "Space/HUD/hud_maneuvers.h"
 
 #include "common_cobject.h"
+#include "common_facebehavior.h"
 #include "common_id.h"
 #include "common_ini.h"
 #include "common_pub.h"
@@ -51,10 +52,10 @@ namespace
 
     // DAT_00612638 -- the behaviour name -> button command table (four entries).
     FHudNamedValue const kManeuverCommands[4] = {
-        {"Dock", 0x79},
-        {"Goto", 0x7a},
-        {"Formation", 0x7f},
-        {"FreeFlight", 0xc6},
+        {"Dock", USER_MANEUVER_DOCK},
+        {"Goto", USER_MANEUVER_GOTO},
+        {"Formation", USER_MANEUVER_FORMATION},
+        {"FreeFlight", USER_MANEUVER_FREE_FLIGHT},
     };
 
     // DAT_006125fc -- the four buttons' rest offsets.
@@ -284,13 +285,19 @@ bool HUD_Maneuvers::Create(Win3D* NewParent, void* Data)
     Vector const CruisePos = {0.0f, 0.297f, 0.0f};           // 0x3e981062
     CruiseButton = CreateButtonControl("ManeuverCruiseButton", "interface\\HUD\\hud_mnvrwarp.3db",
                                        nullptr, "ui_select_item", nullptr, &CruisePos, nullptr,
-                                       &ButtonHalf, 0, 1, 0, 0, 0xbf9, 0, 0x45);
+                                       &ButtonHalf, 0, 1, 0, 0, 0xbf9, 0, USER_CRUISE);
     CruiseButton->SetProperty(kWinPropHide, 1, 0);
 
     // Registered in this order.
     unsigned const Commands[0x18] = {
-        0x74, 0x76, 0x79, 0x7a, 0x7b, 0x77, 0x78, 0x7e, 0x7f, 0x80, 0xc6, 0x45,
-        0x81, 0x82, 0x83, 0x84, 0x86, 0x85, 0x87, 0x88, 0x43, 0x44, 0x04, 0x0f,
+        USER_MANEUVER_TRAIL, USER_MANEUVER_EVADE, USER_MANEUVER_DOCK, USER_MANEUVER_GOTO,
+        USER_MANEUVER_FACE, USER_MANEUVER_ENGINEKILL, USER_MANEUVER_BRAKE_REVERSE,
+        USER_MANEUVER_DRASTIC_EVADE, USER_MANEUVER_FORMATION, USER_MANEUVER_STRAFE,
+        USER_MANEUVER_FREE_FLIGHT, USER_CRUISE,
+        USER_MANEUVER_TRAIL_CLOSER, USER_MANEUVER_TRAIL_FARTHER, USER_MANEUVER_CORKSCREW_EVADE,
+        USER_MANEUVER_SLIDE_EVADE, USER_MANEUVER_SLIDE_EVADE_RIGHT, USER_MANEUVER_SLIDE_EVADE_LEFT,
+        USER_MANEUVER_SLIDE_EVADE_UP, USER_MANEUVER_SLIDE_EVADE_DOWN, USER_INC_THROTTLE,
+        USER_DEC_THROTTLE, USER_WHEEL, USER_CANCEL,
     };
     for (unsigned i = 0; i < 0x18; ++i)
         RegisterEvent(Commands[i]);
@@ -334,7 +341,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
     {
     case USER_MANEUVER_TRAIL_CLOSER:
         // Trail closer; the unrounded difference is compared.
-        if (Current == 3)
+        if (Current == BEHAVIOR_TRAIL)
         {
             double const Closer = static_cast<double>(TrailDistance) - 20.0;   // DAT_005d8290
             TrailDistance = static_cast<float>(Closer);
@@ -346,7 +353,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
 
     case USER_MANEUVER_TRAIL_FARTHER:
         // Trail farther; clamped only when above 2000.
-        if (Current == 3)
+        if (Current == BEHAVIOR_TRAIL)
         {
             double const Farther = 20.0 + static_cast<double>(TrailDistance);
             TrailDistance = static_cast<float>(Farther);
@@ -357,7 +364,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         return true;
 
     case USER_MANEUVER_CORKSCREW_EVADE:
-        RequestManeuver(5, false);
+        RequestManeuver(BEHAVIOR_EVADE, false);
         return true;
 
     case USER_MANEUVER_SLIDE_EVADE_LEFT:
@@ -417,9 +424,9 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
             return true;
         bool bCancelled = false;
         int const Now = PlayerShipNow->get_behavior_interface()->CurrentBehaviorIndex;
-        if (Now != -1 && Now != 0x13)
+        if (Now != -1 && Now != BEHAVIOR_FREE_FLIGHT)
         {
-            if (!RequestManeuver(0x13, false))
+            if (!RequestManeuver(BEHAVIOR_FREE_FLIGHT, false))
                 return false;
             bCancelled = true;
         }
@@ -523,7 +530,7 @@ bool HUD_Maneuvers::OnResult(int Param1, int Param2, int Param3)
     if (Param2 == 0)
     {
         FormationState = 2;
-        RequestManeuver(0xa, true);
+        RequestManeuver(BEHAVIOR_FORMATION, true);
         return false;
     }
     if (Param2 == -1)
@@ -661,7 +668,7 @@ void HUD_Maneuvers::UpdateButtons()
         // EvalSkip for it -- which a disrupted trade-lane dock and the current behaviour still
         // pass.
         bool bAvailable = true;
-        if ((Id == -1 || Id == 0x12) && Current != Id)
+        if ((Id == -1 || Id == BEHAVIOR_DRASTIC_EVADE) && Current != Id)
         {
             bAvailable = false;
         }
@@ -682,7 +689,7 @@ void HUD_Maneuvers::UpdateButtons()
             LastShown = Maneuver;
             Button->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 0);
             bool const bCurrent = Maneuver->BehaviorId == Current;
-            Button->SetProperty(0xc, bCurrent ? 1u : 0u, 0);
+            Button->SetProperty(kWinPropLit, bCurrent ? 1u : 0u, 0);
 
             bool bGray = bCurrent;
             if (!bGray && !HudIsMousePickBlocked())
@@ -780,7 +787,7 @@ void HUD_Maneuvers::UpdateTabAndCruise(int BehaviorId)
     Offset.y = 0.297f;                          // 0x3e981062
     Offset.z = 0.0f;
     CruiseButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
-    CruiseButton->SetProperty(0xc, GetPlayerEngineCruiseActive() ? 1u : 0u, 0);
+    CruiseButton->SetProperty(kWinPropLit, GetPlayerEngineCruiseActive() ? 1u : 0u, 0);
 }
 
 bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
@@ -800,16 +807,16 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
     switch (BehaviorId)
     {
     case -1:
-    case 0x13:
+    case BEHAVIOR_FREE_FLIGHT:
     {
         // Free flight -- {1, 0, 0x13} with no op, then the steering reset.
-        IDirectiveInfo const FreeFlight = MakeDirectiveInfo(1, 0x13);
+        IDirectiveInfo const FreeFlight = MakeDirectiveInfo(1, BEHAVIOR_FREE_FLIGHT);
         bResult = Behavior->set_current_directive(FreeFlight, nullptr);
         ResetPlayerBehaviorDirection();
         break;
     }
 
-    case 3:
+    case BEHAVIOR_TRAIL:
     {
         // Trail the ship's target.
         pub::AI::DirectiveTrailOp Op;
@@ -823,7 +830,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         break;
     }
 
-    case 0xd:
+    case BEHAVIOR_STRAFE:
     {
         // Strafe past the target.
         pub::AI::DirectiveStrafeOp Op;
@@ -835,7 +842,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         break;
     }
 
-    case 0xf:
+    case BEHAVIOR_FACE:
     {
         // Face the target (mode 1), or a point 10000 ahead (mode 2, DAT_005ca21c).
         pub::AI::DirectiveFaceOp Op;
@@ -843,14 +850,14 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         if (Target != nullptr)
         {
             Op.TargetId = Target->get_id();
-            Op.Mode = 1;
+            Op.Mode = kFaceKindObject;
             Op.bKillEngine = 1;
         }
         else
         {
             float Point[3];
             PointAlongShipZ(Ship, -10000.0f, Point);
-            Op.Mode = 2;
+            Op.Mode = kFaceKindPoint;
             Op.TargetId = 0;
             Op.bKillEngine = 1;
             Op.FacePoint.x = Point[0];
@@ -861,7 +868,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         break;
     }
 
-    case 2:
+    case BEHAVIOR_GOTO:
     {
         // Go to the target, or to a point 100000 ahead (DAT_005d8460).
         pub::AI::DirectiveGotoOp Op;
@@ -869,7 +876,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         IObjRW* const Target = Ship->get_target();
         if (Target != nullptr)
         {
-            Op.GotoKind = 0;
+            Op.GotoKind = kGotoKindObject;
             Op.TargetId = static_cast<int32_t>(Target->get_id());
             float Radius = 0.0f;
             Vector Center;
@@ -879,28 +886,28 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
             unsigned Type = 0;
             Target->get_type(Type);
             float Factor = 1.0f;
-            if ((Type & 0x30000u) != 0)
+            if ((Type & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0)
                 Factor = 5.0f;                                     // DAT_005d8464
-            else if ((Type & 0x140000u) != 0)
+            else if ((Type & (OBJ_GUNBOAT | OBJ_TRANSPORT)) != 0)
                 Factor = 2.0f;                                     // DAT_005d55b4
-            else if ((Type & 0x680000u) != 0)
+            else if ((Type & (OBJ_CRUISER | OBJ_CAPITAL | OBJ_MINING)) != 0)
                 Factor = 1.0f;                                     // DAT_005c75dc
-            else if ((Type & 0xfu) != 0)
+            else if ((Type & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_BLACKHOLE)) != 0)
                 Factor = 0.5f;                                     // DAT_005c75e0
-            else if ((Type & 0xfdffu) != 0)
+            else if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
                 Factor = 1.0f;                                     // DAT_005c75dc
             double const Range = static_cast<double>(Factor) * static_cast<double>(Radius);
             Op.ArrivalRange = static_cast<float>(Range);
             if (Range < 100.0)                                     // DAT_005ca320
                 Op.ArrivalRange = 100.0f;
-            if (Type == 0x200u)
+            if (Type == OBJ_WAYPOINT)
                 Op.ArrivalRange = 100.0f;
-            else if (Type == 0x80u)
+            else if (Type == OBJ_TRADELANE_RING)
                 Op.ArrivalRange = 750.0f;                              // 0x443b8000
         }
         else
         {
-            Op.GotoKind = 1;
+            Op.GotoKind = kGotoKindPoint;
             Op.ArrivalRange = 500.0f;                                  // 0x43fa0000
             float Point[3];
             PointAlongShipZ(Ship, -100000.0f, Point);
@@ -914,7 +921,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         break;
     }
 
-    case 0xa:
+    case BEHAVIOR_FORMATION:
     {
         // Formation.
         if (bFlag)
@@ -938,19 +945,19 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         if (Leader != nullptr)
             FormationTarget.set(static_cast<Watchable const*>(Leader));
         FormationState = 1;
-        if (Behavior->CurrentBehaviorIndex == 7)
+        if (Behavior->CurrentBehaviorIndex == BEHAVIOR_DOCK)
         {
             IDirectiveInfo const Undock = MakeDirectiveInfo(0, BehaviorId);
             Behavior->set_current_directive(Undock, nullptr);
         }
         unsigned const TargetId = WatchedObjRw(FormationTarget)->get_id();
         IObjRW* const Self = WatchedObjRw(HUDItem::Target);
-        static_cast<IObjAffect*>(Self)->request_event(1, &TargetId, &kFormationRequestSecondId, 0,
+        static_cast<IObjAffect*>(Self)->request_event(kRequestEventFormation, &TargetId, &kFormationRequestSecondId, 0,
                                                 static_cast<IObjAffect::RequestCB*>(this));
         return true;
     }
 
-    case 7:
+    case BEHAVIOR_DOCK:
     {
         // Dock with the target.
         pub::AI::DirectiveDockOp Op;
@@ -962,8 +969,8 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         break;
     }
 
-    case 0xc:
-    case 0x10:
+    case BEHAVIOR_CRUISE:
+    case BEHAVIOR_LOOT:
         // The directive with no op.
         bResult = Behavior->set_current_directive(Info, nullptr);
         break;
@@ -1011,7 +1018,7 @@ void HUD_Maneuvers::ActivateManeuver(FHudManeuver* Maneuver)
     if (Current == Id)
     {
         // The running maneuver again -- re-sent unless it is none / free flight.
-        if (Current == -1 || Current == 0x13)
+        if (Current == -1 || Current == BEHAVIOR_FREE_FLIGHT)
             return;
         RequestManeuver(Id, false);
         return;
@@ -1089,7 +1096,7 @@ bool HUD_Maneuvers::IsTargetTradeLaneDisrupted()
     if (Target->get_type(Type) != 0)
         return false;
     // Type bit 0x80: a trade-lane ring.
-    if ((Type & 0x80u) == 0)
+    if ((Type & OBJ_TRADELANE_RING) == 0)
         return false;
     CObject const* const Object = Target->cobject();
     if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)

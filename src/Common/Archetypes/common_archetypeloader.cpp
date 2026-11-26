@@ -29,31 +29,31 @@ namespace
     };
 
     FEquipmentKind const kEquipmentKinds[] = {
-        { "LootCrate", 8 },
-        { "Commodity", 0xA },
-        { "Power", 0xB },
-        { "Engine", 0xC },
-        { "Armor", 0x22 },
-        { "Shield", 0xD },
-        { "ShieldGenerator", 0xE },
-        { "Thruster", 0xF },
-        { "Gun", 0x11 },
-        { "MineDropper", 0x12 },
-        { "CounterMeasureDropper", 0x13 },
-        { "Scanner", 0x14 },
-        { "Light", 0x15 },
-        { "Tractor", 0x16 },
-        { "CargoPod", 9 },
-        { "AttachedFX", 0x17 },
-        { "InternalFX", 0x18 },
-        { "TradeLane", 0x1D },
-        { "RepairDroid", 0x19 },
-        { "RepairKit", 0x1A },
-        { "ShieldBattery", 0x1B },
-        { "CloakingDevice", 0x1C },
-        { "Munition", 0x1F },
-        { "Mine", 0x20 },
-        { "CounterMeasure", 0x21 },
+        { "LootCrate", Archetype::AClassLootCrate },
+        { "Commodity", Archetype::AClassCommodity },
+        { "Power", Archetype::AClassPower },
+        { "Engine", Archetype::AClassEngine },
+        { "Armor", Archetype::AClassArmor },
+        { "Shield", Archetype::AClassShield },
+        { "ShieldGenerator", Archetype::AClassShieldGenerator },
+        { "Thruster", Archetype::AClassThruster },
+        { "Gun", Archetype::AClassGun },
+        { "MineDropper", Archetype::AClassMineDropper },
+        { "CounterMeasureDropper", Archetype::AClassCounterMeasureDropper },
+        { "Scanner", Archetype::AClassScanner },
+        { "Light", Archetype::AClassLight },
+        { "Tractor", Archetype::AClassTractor },
+        { "CargoPod", Archetype::AClassCargoPod },
+        { "AttachedFX", Archetype::AClassAttachedFX },
+        { "InternalFX", Archetype::AClassInternalFX },
+        { "TradeLane", Archetype::AClassTradeLane },
+        { "RepairDroid", Archetype::AClassRepairDroid },
+        { "RepairKit", Archetype::AClassRepairKit },
+        { "ShieldBattery", Archetype::AClassShieldBattery },
+        { "CloakingDevice", Archetype::AClassCloakingDevice },
+        { "Munition", Archetype::AClassMunition },
+        { "Mine", Archetype::AClassMine },
+        { "CounterMeasure", Archetype::AClassCounterMeasure },
     };
 
     FEquipmentKind const* MatchEquipmentKind(INI_Reader& Reader)
@@ -73,31 +73,31 @@ namespace
     {
         switch (FactoryTypeId)
         {
-        case 0x08: return new Archetype::LootCrate(Companion);
-        case 0x0A: return new Archetype::Commodity(Companion);
-        case 0x0B: return new Archetype::Power(Companion);
-        case 0x0C: return new Archetype::Engine(Companion);
-        case 0x22: return new Archetype::Armor(Companion);
-        case 0x0D: return new Archetype::Shield(Companion);
-        case 0x0E: return new Archetype::ShieldGenerator(Companion);
-        case 0x0F: return new Archetype::Thruster(Companion);
-        case 0x11: return new Archetype::Gun(Companion);
-        case 0x12: return new Archetype::MineDropper(Companion);
-        case 0x13: return new Archetype::CounterMeasureDropper(Companion);
-        case 0x14: return new Archetype::Scanner(Companion);
-        case 0x15: return new Archetype::Light(Companion);
-        case 0x16: return new Archetype::Tractor(Companion);
-        case 0x09: return new Archetype::CargoPod(Companion);
-        case 0x17: return new Archetype::AttachedFXEquip(Companion);
-        case 0x18: return new Archetype::InternalFXEquip(Companion);
-        case 0x1D: return new Archetype::TradeLaneEquip(Companion);
-        case 0x19: return new Archetype::RepairDroid(Companion);
-        case 0x1A: return new Archetype::RepairKit(Companion);
-        case 0x1B: return new Archetype::ShieldBattery(Companion);
-        case 0x1C: return new Archetype::CloakingDevice(Companion);
-        case 0x1F: return new Archetype::Munition(Companion);
-        case 0x20: return new Archetype::Mine(Companion);
-        case 0x21:
+        case Archetype::AClassLootCrate: return new Archetype::LootCrate(Companion);
+        case Archetype::AClassCommodity: return new Archetype::Commodity(Companion);
+        case Archetype::AClassPower: return new Archetype::Power(Companion);
+        case Archetype::AClassEngine: return new Archetype::Engine(Companion);
+        case Archetype::AClassArmor: return new Archetype::Armor(Companion);
+        case Archetype::AClassShield: return new Archetype::Shield(Companion);
+        case Archetype::AClassShieldGenerator: return new Archetype::ShieldGenerator(Companion);
+        case Archetype::AClassThruster: return new Archetype::Thruster(Companion);
+        case Archetype::AClassGun: return new Archetype::Gun(Companion);
+        case Archetype::AClassMineDropper: return new Archetype::MineDropper(Companion);
+        case Archetype::AClassCounterMeasureDropper: return new Archetype::CounterMeasureDropper(Companion);
+        case Archetype::AClassScanner: return new Archetype::Scanner(Companion);
+        case Archetype::AClassLight: return new Archetype::Light(Companion);
+        case Archetype::AClassTractor: return new Archetype::Tractor(Companion);
+        case Archetype::AClassCargoPod: return new Archetype::CargoPod(Companion);
+        case Archetype::AClassAttachedFX: return new Archetype::AttachedFXEquip(Companion);
+        case Archetype::AClassInternalFX: return new Archetype::InternalFXEquip(Companion);
+        case Archetype::AClassTradeLane: return new Archetype::TradeLaneEquip(Companion);
+        case Archetype::AClassRepairDroid: return new Archetype::RepairDroid(Companion);
+        case Archetype::AClassRepairKit: return new Archetype::RepairKit(Companion);
+        case Archetype::AClassShieldBattery: return new Archetype::ShieldBattery(Companion);
+        case Archetype::AClassCloakingDevice: return new Archetype::CloakingDevice(Companion);
+        case Archetype::AClassMunition: return new Archetype::Munition(Companion);
+        case Archetype::AClassMine: return new Archetype::Mine(Companion);
+        case Archetype::AClassCounterMeasure:
         default:   return new Archetype::CounterMeasure(Companion); // the table holds no other id
         }
     }

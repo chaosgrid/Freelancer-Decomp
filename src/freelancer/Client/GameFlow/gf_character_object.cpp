@@ -404,7 +404,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     Props = Desc.Props;
     Placement = Desc.Placement;
     PlacementIndex = Desc.PlacementIndex;
-    bSharedDeform = (Props.CharType == 1) ? 1 : 0;
+    bSharedDeform = (Props.CharType == kSetpointCharPc) ? 1 : 0;
     Role = kCharacterRoleNone;
 
     // The role from the placement's setpoint segment.
@@ -572,7 +572,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     if (OwnScript != nullptr && Random > 0.0f)
         OwnScript->AdvanceCurrent(Random);
 
-    RenderMode = 0;
+    RenderMode = kRoomRenderMesh;
     LightGroup = 0;
     Layer = 0;
 }
@@ -951,17 +951,17 @@ void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Poi
             else
             {
                 unsigned const Kind = Behavior->DialogType;
-                if (Kind == 0)
+                if (Kind == kDialogBlowoff)
                     Cursor = "talk_blowoff";
-                else if (Kind == 1)
+                else if (Kind == kDialogBribe)
                     Cursor = "talk_bribe";
-                else if (Kind == 2)
+                else if (Kind == kDialogRumor)
                     Cursor = "talk_rumor";
-                else if (Kind == 3)
+                else if (Kind == kDialogMission)
                     Cursor = "talk_mission";
-                else if (Kind == 4)
+                else if (Kind == kDialogInfo)
                     Cursor = "talk_info";
-                else if (Kind == 5)
+                else if (Kind == kDialogStory)
                     Cursor = "talk_story";
             }
         }
@@ -1118,9 +1118,9 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
 
     // DAT_005cbb64 / DAT_005cbb5c.
     int const Gender = GetCostumeDescriptions()->get_costume_gender(Props.Cost);
-    if (Gender == 1)
+    if (Gender == kGenderMale)
         strcpy(G_BgcsContextBuffer, "gcs_ml_");
-    else if (Gender == 2)
+    else if (Gender == kGenderFemale)
         strcpy(G_BgcsContextBuffer, "gcs_fm_");
     else
     {

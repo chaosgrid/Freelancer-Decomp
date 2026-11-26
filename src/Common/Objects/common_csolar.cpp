@@ -131,7 +131,9 @@ void CSolar::init(CreateParms const& Parms)
     DockingPointBaseId = DockWithBaseId;                           // +0x164
 
     // Diagnostic only.
-    if ((TypeBits & 0x600d60) != 0 && (TypeBits & OBJ_PLANET) == 0 &&
+    if ((TypeBits & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_STATION | OBJ_AIRLOCK_GATE |
+                     OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0 &&
+        (TypeBits & OBJ_PLANET) == 0 &&
         (DockWithBaseId & 0x3fffffff) == 0 && (DestSystem & 0x3fffffff) == 0)
     {
         FDUMP(kFdumpError,
@@ -442,7 +444,7 @@ void CSolar::update_system_gate(float Dt)
         case 4:
             // Code 0 is sent before the state and timer reset.
             Code = 0;
-            notify((INotify::Event)1, &Code);
+            notify(INotify::SolarGateStateChanged, &Code);
             GateAnimState = 0;
             GateAnimTimer = 0.0f;
             return;
@@ -463,7 +465,7 @@ void CSolar::update_system_gate(float Dt)
         case 2:
             GateAnimState = 1;
             Code = 1;
-            notify((INotify::Event)1, &Code);
+            notify(INotify::SolarGateStateChanged, &Code);
             return;
 
         default:                                                   // case 1, above 4
@@ -492,7 +494,7 @@ void CSolar::update_system_gate(float Dt)
         }
         // Code before state here; state before code in case 3.
         Code = 2;
-        notify((INotify::Event)1, &Code);
+        notify(INotify::SolarGateStateChanged, &Code);
         GateAnimState = 3;
         return;
 
@@ -502,7 +504,7 @@ void CSolar::update_system_gate(float Dt)
             return;
         GateAnimState = 4;
         Code = 3;
-        notify((INotify::Event)1, &Code);
+        notify(INotify::SolarGateStateChanged, &Code);
         return;
 
     default:                                                       // above 3

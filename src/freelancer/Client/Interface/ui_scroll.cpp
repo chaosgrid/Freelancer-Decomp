@@ -529,10 +529,10 @@ void UiScroll::BeginDraw()
     Win3DBindModelview(nullptr, &Placement);
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 0);
-    DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, 5);
-    DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 6);
+    DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
 }
 
@@ -623,7 +623,7 @@ void UiScroll::DrawArrowHorizontal(FScrollHitRect const* Rect, bool bDraw, bool 
 void UiScroll::Draw()
 {
     // LAB_00596450. Nothing with display option 0x16 off.
-    if (GetGameOption(0x16) == 0)
+    if (GetGameOption(kGameOptDrawScrollBarControls) == 0)
         return;
 
     // The four colours are rewritten every frame: the custom colour, or DAT_00679bb0 (read four

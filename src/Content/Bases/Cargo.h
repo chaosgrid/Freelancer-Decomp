@@ -63,6 +63,14 @@ FCargoPick const* __cdecl PickWeightedCargo(std::vector<FCargoPick> const* Picks
 void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
                            std::vector<FCargoPick>* Out);
 
+// The feeling masks GetFactionFeelingMask / GetVibeFeelingMask return.
+enum EFeelingMask
+{
+    kFeelingFriendly = 1,   // reputation >= 0.2
+    kFeelingNeutral = 2,    // above -0.2
+    kFeelingHostile = 4     // below that (and NaN)
+};
+
 // FUN_06f350f0: pub::Reputation::GetReputation(From, To) (group / group) >= 0.2 -> 1
 // (friendly), > -0.2 -> 2 (neutral), else 4 (hostile). Callers TU29 06ef4559, TU58 06f787f4 /
 // 06f788f4.

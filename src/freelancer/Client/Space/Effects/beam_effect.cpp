@@ -149,13 +149,13 @@ unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
         return 0;
 
     // Retail hardcodes EFT_CODE_PROJ_EFFECT (0x2c) for the beam bucket.
-    constexpr unsigned kBeamEffectTypeId = 0x2cu;
+    constexpr unsigned kBeamEffectTypeId = EFT_CODE_PROJ_EFFECT;
     This->EffectTypeId = kBeamEffectTypeId;
     FEffectTypeInfo* TypeInfo = EffectTypeInfoByIndex(static_cast<int>(kBeamEffectTypeId));
     if (TypeInfo != nullptr)
         This->Priority = TypeInfo->Priority;
 
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 & 0xfdu);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 & ~kEffectFlagDeactivated);
     // Inlined FUN_004f7af0.
     EffectTypeListLink(This);
 
@@ -178,7 +178,7 @@ unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
     // Texture miss: frozen and marked dead.
     EffectTypeListLink(This);
     EffectFreezeToWorld(AsEffect(This));
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
     return 0;
 }
 
@@ -213,11 +213,11 @@ void FBeamEffect::Kill()
     FBeamEffect* const This = this;
     FEffectBase* const Base = AsEffect(This);
 
-    if ((This->Flags70 & 2u) != 0u)
+    if ((This->Flags70 & kBeamFlagHit) != 0u)
     {
         EffectTypeListLink(This);
         EffectFreezeToWorld(Base);
-        This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+        This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return;
     }
 
@@ -228,7 +228,7 @@ void FBeamEffect::Kill()
         {
             EffectTypeListLink(This);
             EffectFreezeToWorld(Base);
-            This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+            This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         }
         else
         {
@@ -254,14 +254,14 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     FBeamEffect* const This = this;
     // No code_beam texture: the visibility bit as it stands.
     if (G_BeamEffectTexture == nullptr)
-        return static_cast<unsigned char>(This->Flags70 & 1u);
+        return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
 
     // Below the perf level (or unordered) the beam is killed (FUN_004f7bd0 inlined).
     float const Perf = GetPerfGenericEffectPerf();
     if (!(This->Priority >= Perf))
     {
         EffectKill(AsEffect(This));
-        return static_cast<unsigned char>(This->Flags70 & 1u);
+        return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
     }
 
     Vector WorldPos;
@@ -277,7 +277,7 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     float const NegZ = -ViewPos.z;
     float const FarEdge = NegZ + Radius;
     if (!(CamIface->GetZNear() < FarEdge))
-        return static_cast<unsigned char>(This->Flags70 & 1u);
+        return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
 
     // The pbubble test: NegZ - Radius must be strictly inside Near + (Far - Near) * (1 - perf)
     // (NaN leaves).
@@ -288,7 +288,7 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
                                 static_cast<float>(1.0 - static_cast<double>(Perf)) +
                             TypeInfo->PbubbleNear;
     if (!(Threshold > NearDistance))
-        return static_cast<unsigned char>(This->Flags70 & 1u);
+        return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
 
     // The two side planes (camera +0x80/+0x88 and +0x90/+0x94): outside when the plane distance
     // is greater than the radius or NaN.
@@ -296,12 +296,12 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     float const DistY = fabsf(ViewPos.y) * Cam->PlaneY[1] + ViewPos.z * Cam->PlaneY[2];
     if (!(DistX <= Radius) || !(DistY <= Radius))
     {
-        This->Flags70 = static_cast<unsigned char>(This->Flags70 & 0xfeu);
-        return static_cast<unsigned char>(This->Flags70 & 1u);
+        This->Flags70 = static_cast<unsigned char>(This->Flags70 & ~kBeamFlagVisible);
+        return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
     }
 
-    This->Flags70 = static_cast<unsigned char>(This->Flags70 | 1u);
-    return static_cast<unsigned char>(This->Flags70 & 1u);
+    This->Flags70 = static_cast<unsigned char>(This->Flags70 | kBeamFlagVisible);
+    return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
 }
 
 unsigned char BeamEffectUpdateVisibility(FBeamEffect* This, float Dt, FSpaceCamera* Cam)
@@ -336,7 +336,7 @@ unsigned char FBeamEffect::TickDraw(float Dt, FSpaceCamera* Cam)
 
     // FUN_004f7bd0 inlined, then the dead bit retail sets again (already set by the kill).
     EffectKill(AsEffect(This));
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
     return 0;
 }
 
@@ -349,7 +349,7 @@ unsigned char BeamEffectTickDraw(FBeamEffect* This, float Dt, FSpaceCamera* Cam)
 unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
 {
     FBeamEffect* const This = this;
-    This->Flags70 = static_cast<unsigned char>(This->Flags70 & 0xfeu);
+    This->Flags70 = static_cast<unsigned char>(This->Flags70 & ~kBeamFlagVisible);
     if (!BeamGeometryOptionEnabled())
         return 0;
 
@@ -387,7 +387,7 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
 
     FBeamEffectArch* const Arch = This->Arch;
 
-    if ((This->Flags70 & 2u) != 0u)
+    if ((This->Flags70 & kBeamFlagHit) != 0u)
     {
         BeamEffectBuildSingleSegment(This, UseXform, 0.0f, Intensity);
         return 1;
@@ -418,7 +418,7 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform,
     FEffectVertexBatch* const Batch = &G_EffectVertexBatch;
 
     float NearR = Arch->RadiusNear;
-    if (T == 0.0f && (This->Flags70 & 8u) != 0u)
+    if (T == 0.0f && (This->Flags70 & kBeamFlagUseLookDir) != 0u)
     {
         if (!IsFirstPersonCameraCurrent())
             NearR = Arch->RadiusNearAlt;

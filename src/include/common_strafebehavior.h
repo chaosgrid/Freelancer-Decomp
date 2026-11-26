@@ -28,6 +28,14 @@ struct IObjInspect;          // common_iface.h -- SelectStrafePoint's second arg
 //   10  LAB_062c96e0  OnApplyDirective
 // Every other slot is Behavior's own entry.
 // ============================================================================
+// StrafeBehavior::StrafeMode48 (+0x48) and the Mode argument of SelectStrafePoint.
+enum EStrafeMode
+{
+    kStrafeModeAttack = 0,    // run at the target (scale ScaleNear58 / ScaleFar5c); re-picks at TriggerRange2c
+    kStrafeModeRunAway = 1,   // fly to the point StrafeDistance34 off to the side
+    kStrafeModeStart = 2,     // ctor / SetContext / OnEngage value: Update picks the first attack point
+};
+
 class StrafeBehavior : public Behavior
 {
 public:

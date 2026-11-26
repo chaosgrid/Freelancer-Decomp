@@ -14,6 +14,9 @@
 
 namespace MemoryDiagnostics
 {
+	// GFlags "Create user mode stack trace database" bit of the image's GlobalFlag (ReadUst).
+	const unsigned long kGlobalFlagUserStackTraceDb = 0x1000;
+
 	std::wstring ErrorText(DWORD Code)
 	{
 		wchar_t* Buffer = nullptr;
@@ -171,7 +174,7 @@ namespace MemoryDiagnostics
 			if (End == Text.c_str()) { Error = L"Failed to parse GlobalFlag."; return false; }
 		}
 		else { Error = L"Unexpected GlobalFlag value type."; return false; }
-		bEnabled = (Flags & 0x1000) != 0;
+		bEnabled = (Flags & kGlobalFlagUserStackTraceDb) != 0;
 		return true;
 	}
 

@@ -93,10 +93,10 @@ void ImeFocusDrawPass()
 
     int SavedStage0Type10 = 0;
     int SavedStage0Type11 = 0;
-    DALib::Pipeline->GetTextureStageState(0, 0x10, &SavedStage0Type10);
-    DALib::Pipeline->GetTextureStageState(0, 0x11, &SavedStage0Type11);
-    DALib::Pipeline->SetTextureStageState(0, 0x10, 1);
-    DALib::Pipeline->SetTextureStageState(0, 0x11, 1);
+    DALib::Pipeline->GetTextureStageState(0, D3DTSS_MAGFILTER, &SavedStage0Type10);
+    DALib::Pipeline->GetTextureStageState(0, D3DTSS_MINFILTER, &SavedStage0Type11);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
 
     FScreenQuadRenderStateSaver const SaverA(DALib::Pipeline, 0x17, 8);
     FScreenQuadRenderStateSaver const SaverB(DALib::Pipeline, 0xe, 0);
@@ -108,8 +108,8 @@ void ImeFocusDrawPass()
     ScreenQuadFlush(DALib::Pipeline, G_ImeBackgroundKey);
     ScreenQuadFlush(DALib::Pipeline, G_ImeTextKey);
 
-    DALib::Pipeline->SetTextureStageState(0, 0x10, SavedStage0Type10);
-    DALib::Pipeline->SetTextureStageState(0, 0x11, SavedStage0Type11);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MAGFILTER, SavedStage0Type10);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MINFILTER, SavedStage0Type11);
 
     Win3DEnable(kWin3DCullFace);
 

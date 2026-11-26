@@ -493,7 +493,7 @@ namespace
         for (std::list<std::pair<unsigned int, float>>::iterator It = Copy.begin();
              It != Copy.end(); ++It)
         {
-            if ((GetVibeFeelingMask(It->first, Vibe) & 4) != 0)
+            if ((GetVibeFeelingMask(It->first, Vibe) & kFeelingHostile) != 0)
                 Allowed->push_back(*It);
         }
     }
@@ -553,7 +553,7 @@ namespace
 // LAB_06f5e540.
 int FRandEncTLParams::GetType()
 {
-    return 3;
+    return kRandEncParamsTL;
 }
 
 // FUN_06f83af0: pub::SpaceObj::DrainShields on the ring (+0xb4, result not read), then with
@@ -827,17 +827,17 @@ void FRandEncTLParams::Dump(FILE* File)
 // LAB_06ee9660.
 int FRandEncSPParams::GetType()
 {
-    return 2;
+    return kRandEncParamsSP;
 }
 
 // FUN_06f80f10. "time" prints +0xb8 before +0xb4.
 void FRandEncSPParams::Dump(FILE* File)
 {
     std::fprintf(File, "encounter_type = %s\n", "SP_Attack");
-    if (ActivationType == 2)
+    if (ActivationType == kRandEncActivationTime)
         std::fprintf(File, "activation_type = time, %f, %f\n",
                      static_cast<double>(ActivationTime[1]), static_cast<double>(ActivationTime[0]));
-    else if (ActivationType == 1)
+    else if (ActivationType == kRandEncActivationLocation)
         std::fprintf(File, "activation_type = location, %f, %f, %f, %d\n",
                      static_cast<double>(ActivationLocation.x),
                      static_cast<double>(ActivationLocation.y),
@@ -1246,9 +1246,9 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
     }
 
     // The activation. An unset type becomes "time".
-    if (Space->ActivationType == 0)
-        Space->ActivationType = 2;
-    if (Space->ActivationType == 2)
+    if (Space->ActivationType == kRandEncActivationTimeCumulative)
+        Space->ActivationType = kRandEncActivationTime;
+    if (Space->ActivationType == kRandEncActivationTime)
     {
         // Only an exact 0 (DAT_06fb444c) picks the threshold between the ftol'd bounds
         // ([0] high, [1] low).
@@ -1273,7 +1273,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
             bTrigger = true;
         }
     }
-    else if (Space->ActivationType == 1)
+    else if (Space->ActivationType == kRandEncActivationLocation)
     {
         // Fires unless the (squared) range is below the squared distance (or unordered).
         double const DistanceSq =
@@ -1434,7 +1434,7 @@ void FRandEncSPPopulator::Parse(INI_Reader* Reader, FRandEncParams* Params)
                 char const* const Type = Reader->get_value_string(0);
                 if (_stricmp(Type, "location") == 0)
                 {
-                    if (Space->ActivationType == 0)
+                    if (Space->ActivationType == kRandEncActivationTimeCumulative)
                     {
                         Space->ActivationLocation.x = Reader->get_value_float(1);
                         Space->ActivationLocation.y = Reader->get_value_float(2);
@@ -1442,10 +1442,10 @@ void FRandEncSPPopulator::Parse(INI_Reader* Reader, FRandEncParams* Params)
                         double const Range = Reader->get_value_float(4);
                         Space->ActivationRange =
                             static_cast<int>(Reader->get_value_float(4) * Range);   // ftol
-                        Space->ActivationType = 1;
+                        Space->ActivationType = kRandEncActivationLocation;
                     }
                 }
-                else if (_stricmp(Type, "time") == 0 && Space->ActivationType == 0)
+                else if (_stricmp(Type, "time") == 0 && Space->ActivationType == kRandEncActivationTimeCumulative)
                 {
                     // [1] = value 1, [0] = value 2; the start time is a (rand() * range) >> 15
                     // pick between their truncations, converted as an unsigned 64-bit value.
@@ -1454,7 +1454,7 @@ void FRandEncSPPopulator::Parse(INI_Reader* Reader, FRandEncParams* Params)
                     int const High = static_cast<int>(Space->ActivationTime[0]);
                     int const Low = static_cast<int>(Space->ActivationTime[1]);
                     int const Picked = std::rand() * (High - Low + 1) / 32768 + Low;
-                    Space->ActivationType = 2;
+                    Space->ActivationType = kRandEncActivationTime;
                     Space->CumulativeTime = static_cast<float>(
                         static_cast<long long>(static_cast<unsigned int>(Picked)));
                 }

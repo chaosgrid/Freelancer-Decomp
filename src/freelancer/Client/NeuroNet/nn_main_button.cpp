@@ -65,17 +65,17 @@ namespace
     {
         switch (PanelId)
         {
-        case 0x66:
+        case USER_INVENTORY:
             return 1;
-        case 0x67:
+        case USER_STORY_STAR:
             return 2;
-        case 0x65:
+        case USER_PLAYER_STATS:
             return 3;
-        case 0x6a:
+        case USER_HELP:
             return 4;
-        case 0x68:
+        case USER_CHAT_WINDOW:
             return 5;
-        case 0x69:
+        case USER_GROUP_WINDOW:
             return 6;
         default:
             return 0;
@@ -88,19 +88,19 @@ namespace
     {
         switch (PanelId)
         {
-        case 0x63:
+        case USER_NAV_MAP:
             return "NeuroNetNavMap";
-        case 0x66:
+        case USER_INVENTORY:
             return "NN_Inventory";
-        case 0x67:
+        case USER_STORY_STAR:
             return "NeuroNetStoryStar";
-        case 0x65:
+        case USER_PLAYER_STATS:
             return "NN_PlayerInfo";
-        case 0x6a:
+        case USER_HELP:
             return "NN_Help";
-        case 0x68:
+        case USER_CHAT_WINDOW:
             return "ChatControl";
-        case 0x69:
+        case USER_GROUP_WINDOW:
             return "NN_GroupControl";
         default:
             return nullptr;
@@ -125,14 +125,14 @@ namespace
         Button->HomeOffset.x = Position.x;
         Button->HomeOffset.y = Position.y;
         Button->HomeOffset.z = Position.z;
-        Button->Flags = static_cast<unsigned char>(Button->Flags & 0xfc);
+        Button->Flags = static_cast<unsigned char>(Button->Flags & ~(kWin3DActive | kWin3DVisible));
 
         WinControl* const Root =
             Bar->CreateButtonControl(RootName, MeshPath, nullptr, "ui_select_item", nullptr,
                                      &Position, nullptr, &HalfExtents, 0, 0, 0, 0, ToolTipIds, 0,
                                      CommandId);
         *OutRoot = Root;
-        Root->SetProperty(0x36, 1, 0);
+        Root->SetProperty(kButtonPropSpin, 1, 0);
     }
 
     void NnSetVector(Vector* Out, unsigned XBits, unsigned YBits, unsigned ZBits)
@@ -197,32 +197,32 @@ bool NN_MainButton::Create(Win3D* NewParent, void* Data)
     // The five common pairs: y 0.459, z -1.25, half size 0.018.
     NnMainButtonCreatePair(this, "NNNavmapButton", "NNNavmapButtonRoot",
                            "interface\\NeuroNet\\icons\\NN_Map.3db", NnFloatBits(0x3ee978d6),
-                           0x3fc, 0x63, &NavmapButton, &NavmapRoot);
+                           0x3fc, USER_NAV_MAP, &NavmapButton, &NavmapRoot);
     NnMainButtonCreatePair(this, "NNInventoryButton", "NNInventoryButtonRoot",
                            "interface\\NeuroNet\\icons\\NN_Inventory.3db",
-                           NnFloatBits(0x3f010625), 0x3ed, 0x66, &InventoryButton,
+                           NnFloatBits(0x3f010625), 0x3ed, USER_INVENTORY, &InventoryButton,
                            &InventoryRoot);
     NnMainButtonCreatePair(this, "NNMissionLogButton", "NNMissionLogButtonRoot",
                            "interface\\NeuroNet\\icons\\NN_storystar.3db",
-                           NnFloatBits(0x3ed0e561), 0x421, 0x67, &MissionLogButton,
+                           NnFloatBits(0x3ed0e561), 0x421, USER_STORY_STAR, &MissionLogButton,
                            &MissionLogRoot);
     NnMainButtonCreatePair(this, "NNPlayerInfoButton", "NNPlayerInfoButtonRoot",
                            "interface\\NeuroNet\\icons\\NN_PlayerStatus.3db",
-                           NnFloatBits(0x3f0d4fe0), 0x55f, 0x65, &PlayerInfoButton,
+                           NnFloatBits(0x3f0d4fe0), 0x55f, USER_PLAYER_STATS, &PlayerInfoButton,
                            &PlayerInfoRoot);
     NnMainButtonCreatePair(this, "NNHelpButton", "NNHelpButtonRoot",
                            "interface\\NeuroNet\\icons\\NN_info.3db", NnFloatBits(0x3f19999a),
-                           0x570, 0x6a, &HelpButton, &HelpRoot);
+                           0x570, USER_HELP, &HelpButton, &HelpRoot);
 
     // Multiplayer adds chat and group.
     if (!SinglePlayer())
     {
         NnMainButtonCreatePair(this, "NNChatButton", "NNChatButtonRoot",
                                "interface\\NeuroNet\\icons\\NN_Chat.3db", NnFloatBits(0x3eb851ec),
-                               0x435, 0x68, &ChatButton, &ChatRoot);
+                               0x435, USER_CHAT_WINDOW, &ChatButton, &ChatRoot);
         NnMainButtonCreatePair(this, "NNGroupButton", "NNGroupButtonRoot",
                                "interface\\NeuroNet\\icons\\NN_request.3db",
-                               NnFloatBits(0x3e9fbe78), 0x560, 0x69, &GroupButton, &GroupRoot);
+                               NnFloatBits(0x3e9fbe78), 0x560, USER_GROUP_WINDOW, &GroupButton, &GroupRoot);
     }
     else
     {
@@ -233,7 +233,9 @@ bool NN_MainButton::Create(Win3D* NewParent, void* Data)
     }
 
     // FUN_005760d0 on the Event::Handler face.
-    unsigned const Events[9] = {0x63, 0x66, 0x67, 0x65, 0x6a, 0x68, 0x69, 0x6e, 0x6b};
+    unsigned const Events[9] = {USER_NAV_MAP, USER_INVENTORY, USER_STORY_STAR, USER_PLAYER_STATS, USER_HELP,
+                                  USER_CHAT_WINDOW, USER_GROUP_WINDOW, USER_DISPLAY_LAST_OBJECTIVE,
+                                  USER_INVENTORY_CLOSE};
     for (int Index = 0; Index < 9; ++Index)
     {
         RegisterEvent(Events[Index]);
@@ -302,7 +304,7 @@ void NN_MainButton::Update()
         SetClientMouseCursorDrawFlag(1);
         MouseSetCursor("Arrow", false);
         G_bNnScreenUp = false;
-        OnEvent(0x67);
+        OnEvent(USER_STORY_STAR);
         G_bNnScreenUp = true;
     }
 
@@ -428,7 +430,7 @@ bool NN_MainButton::OnEvent(unsigned MsgId)
             return true;
         }
         bInventoryAfterDealer = 0;
-        OpenPanel(Buttons[1], 0x66);
+        OpenPanel(Buttons[1], USER_INVENTORY);
         return true;
 
     case USER_NAV_MAP:
@@ -482,7 +484,7 @@ void NN_MainButton::OnMoveFinished()
     // A closing button is back home: hide it.
     if (ClosingButton != nullptr)
     {
-        ClosingButton->Flags = static_cast<unsigned char>(ClosingButton->Flags & 0xfc);
+        ClosingButton->Flags = static_cast<unsigned char>(ClosingButton->Flags & ~(kWin3DActive | kWin3DVisible));
         ClosingButton = nullptr;
         UpdateRootHighlights();
     }
@@ -543,7 +545,7 @@ void NN_MainButton::OnScaleFinished()
     }
 
     // The background has grown. It stays only for the inventory in the normal layout.
-    if (OpenPanelId != 0x66 || bInfoCardLayout != 0)
+    if (OpenPanelId != USER_INVENTORY || bInfoCardLayout != 0)
     {
         if (ScaledBackground != nullptr)
         {
@@ -563,7 +565,7 @@ void NN_MainButton::OnScaleFinished()
     // a window.
     if (bForceMissionLog == 0 && G_bNnScreenUp)
     {
-        OpenButton->Flags = static_cast<unsigned char>(OpenButton->Flags & 0xfc);
+        OpenButton->Flags = static_cast<unsigned char>(OpenButton->Flags & ~(kWin3DActive | kWin3DVisible));
         OpenButton = nullptr;
         UpdateRootHighlights();
         return;
@@ -587,8 +589,8 @@ void NN_MainButton::OnScaleFinished()
 
     OpenButton->SetPosition(&PanelOrigin[NnPanelSlot(OpenPanelId)]);
     Window->ProcessMessage(kWinMsgShow, 0, 0);
-    Window->Flags = static_cast<unsigned char>(Window->Flags | 3);
-    PlayOrRewindUiSoundSlot(2);
+    Window->Flags = static_cast<unsigned char>(Window->Flags | kWin3DActive | kWin3DVisible);
+    PlayOrRewindUiSoundSlot(kUiSoundWindowOpen);
     HudPushCancelHandler(AsHudCmdHandler(), 0);
     UpdateRootHighlights();
 }
@@ -646,8 +648,8 @@ void NN_MainButton::OpenPanel(WinControl* Button, int PanelId)
 
     // Slide the button from its rest offset to the slot's open target ({0, -0.075, -1.25} in
     // the info-card layout).
-    PlayOrRewindUiSoundSlot(0x1b);
-    Button->Flags = static_cast<unsigned char>(Button->Flags | 3);
+    PlayOrRewindUiSoundSlot(kUiSoundMotionSwish);
+    Button->Flags = static_cast<unsigned char>(Button->Flags | kWin3DActive | kWin3DVisible);
     ButtonMover::Start(kAnimSeconds);
     int const Slot = NnPanelSlot(PanelId);
     Vector Target;
@@ -675,7 +677,7 @@ void NN_MainButton::ResetPanel()
     // FUN_0045cef0.
     if (OpenButton != nullptr)
     {
-        OpenButton->Flags = static_cast<unsigned char>(OpenButton->Flags & 0xfc);
+        OpenButton->Flags = static_cast<unsigned char>(OpenButton->Flags & ~(kWin3DActive | kWin3DVisible));
     }
     OpenButton = nullptr;
     if (ScaledBackground != nullptr)
@@ -699,7 +701,7 @@ void NN_MainButton::ClosePanel()
         return;
     }
 
-    PlayOrRewindUiSoundSlot(0x1b);
+    PlayOrRewindUiSoundSlot(kUiSoundMotionSwish);
     ClosingButton = OpenButton;
     ClosingPanelId = OpenPanelId;
     ClosingToolTipIds = SavedToolTipIds;
@@ -807,13 +809,13 @@ void NN_MainButton::SetGroupButtonMesh(int Mode)
     char const* Path = nullptr;
     switch (Mode)
     {
-    case 0:
+    case kGroupButtonMeshRequest:
         Path = "interface\\NeuroNet\\icons\\NN_request.3db"; // 0x005ceb1c
         break;
-    case 1:
+    case kGroupButtonMeshTradeRequest:
         Path = "interface\\NeuroNet\\icons\\NN_traderequest.3db"; // 0x005cedd8
         break;
-    case 2:
+    case kGroupButtonMeshGroupRequest:
         Path = "interface\\NeuroNet\\icons\\NN_grouprequest.3db"; // 0x005cee08
         break;
     default:
@@ -896,6 +898,6 @@ void NN_MainButton::UpdateRootHighlights()
             continue;
         }
         bool const bLit = Buttons[Index] == OpenButton || Buttons[Index] == ClosingButton;
-        Root->SetProperty(0xc, bLit ? 1u : 0u, 0);
+        Root->SetProperty(kWinPropLit, bLit ? 1u : 0u, 0);
     }
 }

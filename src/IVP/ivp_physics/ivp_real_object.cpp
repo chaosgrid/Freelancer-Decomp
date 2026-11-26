@@ -411,7 +411,7 @@ IVP_Cluster::IVP_Cluster(IVP_Environment* Environment)
     : IVP_Object(Environment)
 {
     first_object = nullptr;
-    object_type = 1;
+    object_type = IVP_CLUSTER;
 }
 
 // FUN_06345790: deletes first_object (slot 0) until it reads null.
@@ -516,7 +516,7 @@ IVP_Real_Object::IVP_Real_Object(IVP_Cluster* Father, IVP_SurfaceManager* Surfac
     }
     else
     {
-        flags = (flags & 0xffffff08u) | 0x8u;
+        flags = (flags & 0xffffff08u) | IVP_MT_NOT_SIM;
     }
 
     material = Parms->Material; // +0x8c
@@ -630,7 +630,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Cache_Object_Manager::get_cache_object(IVP_Real_Ob
     Owner->cache_object = Slot;
     Slot->LastRefreshTick = 0;
 
-    if (int8_t(Owner->flags & 0xff) >= 8)
+    if (int8_t(Owner->flags & 0xff) >= IVP_MT_NOT_SIM)
         IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
@@ -645,7 +645,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::ResolveNarrowPhaseCacheSlot()
     IVP_NarrowPhaseCacheSlot* Slot = cache_object;
     ++Slot->RefCount;
 
-    if (int8_t(flags & 0xff) < 8 && environment->sim_step_count > Slot->LastRefreshTick)
+    if (int8_t(flags & 0xff) < IVP_MT_NOT_SIM && environment->sim_step_count > Slot->LastRefreshTick)
         IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
@@ -659,7 +659,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::get_cache_object_no_lock()
         cache_object = environment->cache_object_manager->get_cache_object(this); // FUN_0634d530
 
     IVP_NarrowPhaseCacheSlot* Slot = cache_object;
-    if (int8_t(flags & 0xff) < 8 && environment->sim_step_count > Slot->LastRefreshTick)
+    if (int8_t(flags & 0xff) < IVP_MT_NOT_SIM && environment->sim_step_count > Slot->LastRefreshTick)
         IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
@@ -1196,7 +1196,7 @@ void IVP_Real_Object::async_push_object_ws(const IVP_U_Point* PositionWs, const 
 // FUN_06344dc0 (ensure_in_simulation), 0634380f.
 void IVP_Real_Object::ReviveFrictionCoreIfSleeping()
 {
-    if ((flags & 0xFF) == 8)
+    if ((flags & 0xFF) == IVP_MT_NOT_SIM)
     {
         friction_core->revive_sleeping_core();
     }
@@ -1427,7 +1427,7 @@ IVP_Polygon::IVP_Polygon(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager
                          const IVP_U_Point* InitialPosition)
     : IVP_Real_Object(Father, SurfaceManager, Parms, InitialOrientationOrNull, InitialPosition)
 {
-    object_type = 2;
+    object_type = IVP_POLYGON;
 
     // A plain dword copy (IVP_Ball adds its radius).
     extra_radius = Parms->ExtraRadius;
@@ -1449,7 +1449,7 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
     // field below.
     : IVP_Real_Object(Father, nullptr, Parms, InitialOrientationOrNull, InitialPosition)
 {
-    object_type = 3;
+    object_type = IVP_BALL;
 
     // The only user of the module's default surface manager in Common.dll.
     surface_manager = &g_IVP_DefaultSurfaceManager; // +0x80
@@ -1513,11 +1513,11 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
     // UpperLimitRadius / MaxSurfaceDeviation addends (FUN_06346870).
     float SurfaceRadius = 0.0f;
     float MaxSurfaceDeviationValue = 0.0f;
-    if (ObjectType == 3)
+    if (ObjectType == IVP_BALL)
     {
         // Both 0.0f.
     }
-    else if (ObjectType == 2)
+    else if (ObjectType == IVP_POLYGON)
     {
         // Slot 2 (adapter LAB_0634acb0): D = |Inner.center - centre|; writes
         // D + Inner.radius to the first output and D + kind * radius *
@@ -1554,7 +1554,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
             Core->RotInertia.z = Template->InertiaBoxVector.z;
             bScaled = false;
         }
-        else if (ObjectType == 2)
+        else if (ObjectType == IVP_POLYGON)
         {
             // Surface manager slot 3 (adapter LAB_0634ac90). No null test.
             IVP_U_Point Scratch;
@@ -1563,7 +1563,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
             ScaleScratch[1] = Scratch.y;
             ScaleScratch[2] = Scratch.z;
         }
-        else if (ObjectType == 3)
+        else if (ObjectType == IVP_BALL)
         {
             // r*r*0.4f as one x87 product, stored to all three slots.
             const float SphereCoefficient = BitsToFloat(0x3ecccccd); // DAT_063a5458 == 0.4f
@@ -1723,7 +1723,7 @@ void IVP_RealObjectConstructionTemplate::set_long_name(const char* Name)
 // FUN_06344dc0: tail-jumps to FUN_063450e0 when core's movement byte is 8.
 void IVP_Real_Object::ensure_in_simulation()
 {
-    if (static_cast<uint8_t>(core->MovementState & 0xffu) == 8)
+    if (static_cast<uint8_t>(core->MovementState & 0xffu) == IVP_MT_NOT_SIM)
         ReviveFrictionCoreIfSleeping();
 }
 
@@ -1740,7 +1740,7 @@ void IVP_Real_Object::disable_simulation()
         return;
     if ((Core->Flags & IVP_CORE_IS_IN_WAKEUP_VEC) != 0)
         Core->Environment->dequeue_core(Core);
-    if (static_cast<int8_t>(Core->MovementState & 0xffu) >= 8)
+    if (static_cast<int8_t>(Core->MovementState & 0xffu) >= IVP_MT_NOT_SIM)
         return;
 
     for (int32_t Index = static_cast<int32_t>(Core->Objects.n_elems) - 1; Index >= 0; --Index)
@@ -1843,8 +1843,8 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
         Distance = (float)(std::sqrt((Dz * Dz + Dy * Dy) + Dx * Dx));
     }
 
-    const bool bHostSimulated = static_cast<int8_t>(Host->flags & 0xffu) < 8;
-    const bool bObjectSimulated = static_cast<int8_t>(Object->flags & 0xffu) < 8;
+    const bool bHostSimulated = static_cast<int8_t>(Host->flags & 0xffu) < IVP_MT_NOT_SIM;
+    const bool bObjectSimulated = static_cast<int8_t>(Object->flags & 0xffu) < IVP_MT_NOT_SIM;
     if (bHostSimulated && !bObjectSimulated)
         Object->ReviveFrictionCoreIfSleeping();
     else if (!bHostSimulated && bObjectSimulated)
@@ -1920,7 +1920,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     else if (OldCore != nullptr)
         OldCore->refresh_contact_points();
 
-    Object->flags = (Object->flags & 0xffffff08u) | 8u;
+    Object->flags = (Object->flags & 0xffffff08u) | IVP_MT_NOT_SIM;
     IVP_Core* NewCore = new IVP_Core(Object, &Quat, &Position, 0, Template->FlagsLo);
     Object->core = NewCore;
     Object->friction_core = NewCore;
@@ -1935,7 +1935,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     // Retail quirk kept: OldCore is null here when the old core held only this
     // object, and retail still reads its +0x60 (an access violation), so retail
     // only ever splits objects out of cores holding two or more.
-    if (static_cast<int8_t>(OldCore->MovementState & 0xffu) >= 8)
+    if (static_cast<int8_t>(OldCore->MovementState & 0xffu) >= IVP_MT_NOT_SIM)
         return;
 
     // Object->core is re-read each time, as in retail.

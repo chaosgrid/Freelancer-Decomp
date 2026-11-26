@@ -28,6 +28,18 @@
 // LaunchThrottleScale = 15.0f. Retail size 0x234.
 // ============================================================================
 
+// LaunchBehavior::ModeState164 (+0x164), the state Update (LAB_062cd950) steps through. 0 until
+// Engage sets 1.
+enum ELaunchState
+{
+    kLaunchStateDwell = 1,          // waits LaunchDwellDuration in the bay
+    kLaunchStatePlanApproach = 2,   // ComputeLaunchApproachTransform (the dock hardpoints)
+    kLaunchStateAwaitPort = 3,      // DockPortIndex >= 0 starts the launch sequence, -1 retries, -2 gives up
+    kLaunchStateExitBay = 4,        // flies out through DockPointB
+    kLaunchStateFlyOut = 5,         // flies to DockPointC; leaves, or turns around when bFlipHeadingOnExit
+    kLaunchStateTurnAround = 6,     // faces LaunchBasis, then leaves
+};
+
 class LaunchBehavior : public Behavior
 {
 public:

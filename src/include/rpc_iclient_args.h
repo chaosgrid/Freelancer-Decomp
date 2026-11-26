@@ -190,8 +190,18 @@ struct FRpcDirectiveBlock {
 };
 static_assert(sizeof(FRpcDirectiveBlock) == 0x0c, "FUN_06d8f510 moves exactly three dwords");
 
+// The values of FPayloadServerSetDirective::DirectiveKind.
+enum EServerDirectiveKind {
+    kDirectiveKindCancel = 0,
+    kDirectiveKindDelay = 1,
+    kDirectiveKindDock = 2,
+    kDirectiveKindFollow = 3,
+    kDirectiveKindGoto = 4,
+    kDirectiveKindIdle = 5,
+};
+
 struct FPayloadServerSetDirective {
-    unsigned int DirectiveKind;        // +0x00  directive kind 0..5 (see above); never seeded
+    unsigned int DirectiveKind;        // +0x00  EServerDirectiveKind (see above); never seeded
     unsigned int Field_0x04;        // +0x04  always 0 from SubmitDirective
     unsigned char bDockApproachCleared;       // +0x08  a byte on both sides (06d8a4b4); dock op+0x14
     unsigned char Pad_0x09[3];      // +0x09  retail leaves these three bytes untouched
@@ -334,6 +344,12 @@ static_assert(sizeof(FServerSetMissionObjectivesInfo) == 0x40,
 // LAB_0053d9d0 reads CameraMode as 1 = keep the camera transform, 2 = identity orientation
 // at the position.
 // ---------------------------------------------------------------------------
+// FServerRequestSpaceScriptInfo::CameraMode (the client's LAB_0053d9d0 handler).
+enum ERequestSpaceScriptCameraMode : unsigned int
+{
+    kRequestSpaceScriptCameraKeepTransform = 1,   // keep the camera transform
+    kRequestSpaceScriptCameraIdentity = 2,        // identity orientation at the position
+};
 // 0x104: Server.dll's safe_strcpy bound and the rpclocal receiver's string local.
 const unsigned int kRequestSpaceScriptNameSize = 0x104;
 
@@ -490,3 +506,10 @@ const unsigned int kPlayerListKindClear = 0u;   // slot 112 SendServerPlayerList
 const unsigned int kPlayerListKindEntry = 1u;   // slot 110 SendServerPlayerListAdd
 const unsigned int kPlayerListKindDrop  = 2u;   // slot 111 SendServerPlayerListRemove
 const unsigned int kPlayerListKindNone  = 3u;   // the constructors' seed
+
+// FLPACKET_SERVER_LOADHINT: the receivers (rpclocal caseD_4d 06d81ba3, RemoteServer caseD_4d 06bd1c93)
+// build a hint only for the BaseHint::Kind that CostumeHint's constructor (COMMON 0xb1370) seeds.
+enum ELoadHintKind : unsigned int
+{
+    kLoadHintKindCostume = 1,
+};

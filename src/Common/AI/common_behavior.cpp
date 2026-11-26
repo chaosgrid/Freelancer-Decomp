@@ -37,7 +37,7 @@ float Behavior_GetProjectedThrottle(IObjInspect const* Obj, float Value, ThrustE
 // site has already called through the same pointer.
 void Behavior_ReleaseDirectiveTarget(Behavior* Target)
 {
-    Target->Flags28 = static_cast<unsigned char>((Target->Flags28 & 0xfd) | 0x01);
+    Target->Flags28 = static_cast<unsigned char>((Target->Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
 }
 
 // FUN_062e5af0. Same shape as Behavior_GetProjectedThrottle, slot 0xd8 (get_speed).
@@ -227,9 +227,9 @@ Behavior::Behavior(int InTypeId)
     ObjectDb = nullptr;
     DeltaTime = 0.0f;
     Flag29 = 0;
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfc);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~(kBehaviorFlagDisengageRequested | kBehaviorFlagDirectiveAccepted));
     Readiness = 2;
-    UpdateResult = 1;
+    UpdateResult = kBehaviorUpdateRunning;
 }
 
 // Vtable slot 2 (+0x08), 0x0629afd0.
@@ -242,15 +242,15 @@ void Behavior::SetObjectDb(IObjDB* InObjectDb)
 // IBehaviorManager::set_current_directive.
 void Behavior::cancel_notify()
 {
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
 }
 
 // Vtable slot 3 (+0x0c), FUN_062d20d0.
 void Behavior::OnEngage()
 {
     Readiness = 1;
-    UpdateResult = 1;
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfe);
+    UpdateResult = kBehaviorUpdateRunning;
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDisengageRequested);
     DeltaTime = 0.0f;
 }
 
@@ -323,7 +323,7 @@ void Behavior::set_afterburner(bool bOn)
 
     Thrust->SetThrustersActive(true);
 
-    Thrust->SetThrottle(1.0f, bTradeLane ? 2 : 0);
+    Thrust->SetThrottle(1.0f, bTradeLane ? kThrottleModeCruise : kThrottleModeEngine);
 }
 
 // ----------------------------------------------------------------------------

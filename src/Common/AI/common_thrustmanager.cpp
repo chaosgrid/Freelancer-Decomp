@@ -104,7 +104,7 @@ bool ThrustManager::CheckSteeringGate()
     if (Owner->SelfTarget.Iface->is_player())
     {
         int const BehaviorIndex = Owner->Owner->CurrentBehaviorIndex;
-        if (BehaviorIndex == 10 || BehaviorIndex == 7)
+        if (BehaviorIndex == BEHAVIOR_FORMATION || BehaviorIndex == BEHAVIOR_DOCK)
             return true;
     }
 
@@ -224,12 +224,12 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
     (void)ObjInspectOf(OwnerShip())->is_player();
 
     float Clamped = (Throttle > MaxThrottle) ? MaxThrottle : Throttle;
-    int const EffectiveMode = (bCruiseUnobstructed == 0 && Mode == 2) ? 0 : Mode;
+    int const EffectiveMode = (bCruiseUnobstructed == 0 && Mode == kThrottleModeCruise) ? kThrottleModeEngine : Mode;
 
-    if (EffectiveMode != 0 && EffectiveMode != 2)
+    if (EffectiveMode != kThrottleModeEngine && EffectiveMode != kThrottleModeCruise)
         return true;
 
-    if (EffectiveMode == 2)
+    if (EffectiveMode == kThrottleModeCruise)
     {
         // DAT_063a07a0 / DAT_06399408.
         if (Clamped > 1.2f) Clamped = 1.2f;

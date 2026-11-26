@@ -32,6 +32,14 @@ struct FSpacePopExclusionSphere
 // spheres; static init LAB_06f5a4e0, atexit FUN_06f5a510.
 extern std::vector<FSpacePopExclusionSphere> GSpacePopExclusionSpheres;
 
+// FSpawnRequest::ZoneList, the zone list of FUN_06f5b000 a heartbeat request serves.
+enum ESpawnZoneList
+{
+    kSpawnZonesAtShip = 0,     // the zones at the ship (also every arrival)
+    kSpawnZonesAdditive = 1,   // the additive zones within 2000
+    kSpawnZonesAhead = 2       // the zones ahead of the ship
+};
+
 // The population request SpacePop hands to the zone populations (TU30 FUN_06ef95d0 /
 // FUN_06ef9a60) and through them to the encounter spawner (TU29 FUN_06ef54e0), retail 0x5c
 // bytes on the stack of its builders. Ctor TU53 FUN_06f63a80 (all five callers are SpacePop);

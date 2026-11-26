@@ -148,11 +148,11 @@ bool LootBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     Tractor.EquipId = SUBOBJ_ID_NONE;
     Tractor.Pad = 0;
     IObjRW* const Ship = OwnShip(SysMgr);
-    if (Ship->find_equipment(&Tractor.EquipId, 1, 0x100000) == 0)  // tractor class
+    if (Ship->find_equipment(&Tractor.EquipId, 1, EquipTypeTractor) == 0)  // tractor class
     {
         bHasTractor164 = 1;
         if (OwnShip(SysMgr)->get_equipment_val(Tractor, Tractor.EquipId,
-                                                  static_cast<EquipmentValType>(5), 0.0f) == 0)
+                                                  EquipValRange, 0.0f) == 0)
         {
             // Double 0.75 (.rdata:0639fe28), rounded once.
             TractorReach168 = static_cast<float>(static_cast<double>(Tractor.Value) * 0.75);
@@ -189,7 +189,7 @@ int LootBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     // Only with a tractor and the TargetManager in attack state 2.
-    if (bHasTractor164 != 0 && SysMgr->Targeting.AttackState == 2)
+    if (bHasTractor164 != 0 && SysMgr->Targeting.AttackState == TargetManager::kAttackStateCombatOver)
     {
         if (WatchedObject(Target.Watcher) == nullptr)
             (void)AcquireLootTarget(&Target);
@@ -216,7 +216,7 @@ bool LootBehavior::IsLootUnclaimed(IObjRW* Loot)
 
     // Every ship-class object in the owner's scan list (FUN_062e74e0).
     ScanList const* List = nullptr;
-    (void)SysMgr->Timers.GetOwnScanList(List, 0x7f0000);
+    (void)SysMgr->Timers.GetOwnScanList(List, OBJ_SHIP_MASK);
     if (List == nullptr)
         return false;
 
@@ -236,7 +236,7 @@ bool LootBehavior::IsLootUnclaimed(IObjRW* Loot)
             const_cast<CEqObj*>(static_cast<CEqObj const*>(OtherShip))->get_behavior_interface();
         if (Manager == nullptr)
             continue;
-        if (Manager->CurrentBehaviorIndex != 0x10)                  // currently looting
+        if (Manager->CurrentBehaviorIndex != BEHAVIOR_LOOT)                  // currently looting
             continue;
         // Its LootBehavior (dispatch slot 16, +0x1b4) chases this loot.
         LootBehavior const* const OtherLoot = static_cast<LootBehavior const*>(Manager->BehaviorDispatchTable[16]);
@@ -263,7 +263,7 @@ bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
     IObjRW* Best = nullptr;
     float BestDistance = 3.40282347e+38f;                           // 0x7f7fffff
     ScanList const* List = nullptr;
-    (void)Sys->Timers.GetOwnScanList(List, 0x10000000);   // loot class
+    (void)Sys->Timers.GetOwnScanList(List, OBJ_LOOT);   // loot class
     if (List == nullptr)
         return false;
 
@@ -282,11 +282,11 @@ bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
             break;
 
         int const Kind = static_cast<int>(Loot->ContentsArch->get_class_type());
-        if (Kind == 0xa)
+        if (Kind == Archetype::AClassCommodity)
         {
             // Commodities need loot flag bit 0 and, when the personality lists goods
             // (+0x1904 count, +0x1908 ids), the candidate's good among them.
-            if ((Job.LootPreference & 1) == 0)
+            if ((Job.LootPreference & pub::AI::Personality::JobStruct::kLootPrefCommodities) == 0)
                 break;
             int const ListCount = Job.ScanForCargoCount;
             if (ListCount > 0)
@@ -304,9 +304,9 @@ bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
                 }
             }
         }
-        else if (Kind == 0x1a || Kind == 0x1b)
+        else if (Kind == Archetype::AClassRepairKit || Kind == Archetype::AClassShieldBattery)
         {
-            if ((Job.LootPreference & 4) == 0)
+            if ((Job.LootPreference & pub::AI::Personality::JobStruct::kLootPrefPotions) == 0)
                 break;
         }
 
@@ -340,14 +340,14 @@ int LootBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     IObjRW* const Loot = WatchedObject(Target.Watcher);
     if (Loot == nullptr)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     SystemManager* const Sys = SysMgr;
@@ -355,8 +355,8 @@ int LootBehavior::OnUpdate()
     {
         Target.Watcher.set(nullptr);
         Target.bDirected = 0;
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // The FAiTarget type refresh (guard set after the call).
@@ -369,7 +369,7 @@ int LootBehavior::OnUpdate()
     // `(x & 0x10000) | 0x20000` is never zero, so the block below (a distance gate on
     // TractorReach168, then Move.Commit and FUN_062ecd90, or the release exit) is unreachable
     // in retail; it is kept behind the same constant test.
-    if ((((Nav->CachedFlags & 0x10000u) | 0x20000u)) == 0)
+    if ((((Nav->CachedFlags & OBJ_FIGHTER) | OBJ_FREIGHTER)) == 0)
     {
         IObjRW* const Ship = OwnShip(Sys);
         double const Distance = FastDistance(Ship->get_position(), Loot->get_position());
@@ -378,14 +378,14 @@ int LootBehavior::OnUpdate()
             Move.Commit();
             if (!TractorActivate(Sys, Loot))
             {
-                UpdateResult = 1;
-                return 1;
+                UpdateResult = kBehaviorUpdateRunning;
+                return kBehaviorUpdateRunning;
             }
         }
         Target.Watcher.set(nullptr);
         Target.bDirected = 0;
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // Fly within tractor reach, then face the loot and tractor it in.
@@ -397,15 +397,15 @@ int LootBehavior::OnUpdate()
         Move.Commit();
         Face.SetWatchObject(Loot);                                  // FUN_062d7510
         if (Face.Update(DeltaTime) == 1 && TractorActivate(Sys, Loot))
-            return 2;                                               // UpdateResult not written
+            return kBehaviorUpdateFinished;                                               // UpdateResult not written
     }
     else
     {
         Face.SetWatchObject(Loot);
         Face.Update(DeltaTime);
     }
-    UpdateResult = 1;
-    return 1;
+    UpdateResult = kBehaviorUpdateRunning;
+    return kBehaviorUpdateRunning;
 }
 
 // ----------------------------------------------------------------------------
@@ -420,10 +420,10 @@ bool LootBehavior::OnApplyDirective(void* DirectiveOp)
     if (WatchedObject(Target.Watcher) != nullptr)
     {
         Target.bDirected = 1;
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
         return true;
     }
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     Flag16c = Op->Field_10;
     return false;
 }

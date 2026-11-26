@@ -93,7 +93,7 @@ namespace
 {
     // DAT_006752f0.. — five growable pointer vectors.
     constexpr unsigned kDrawBucketCount = 5;
-    constexpr unsigned kObjDbTypeMask = 0xfdffu;
+    constexpr unsigned kObjDbTypeMask = OBJ_SOLAR_NO_WAYPOINT_MASK;
     // DAT_00613ec8 — Fill query radius.
     constexpr float kObjDbFillRange = 10000.0f;
     // DAT_005dc35c — DistSq threshold for near/far bucket bit.
@@ -194,7 +194,7 @@ namespace
     }
     // DAT_0067524c / DAT_00675244 / DAT_00675248 / DAT_00675230 — field enclosure.
     // 4c: 0=none, 1=partial, 2=fully inside. 44: selected field object. 48: radius². 30: best score.
-    int G_FieldEnclosure = 0;
+    int G_FieldEnclosure = kFieldEnclosureNone;
     FNebulaEffect* G_FieldController = nullptr;
     float G_FieldRadiusSq = 0.0f;
     // DAT_00675230 is seeded at load by the static initializer LAB_0051b2d0 to DAT_006164d0
@@ -314,7 +314,7 @@ namespace
         G_FieldBestScore = static_cast<float>(static_cast<double>(G_SpaceDrawRange) *
                                               G_SpaceDrawRange);
         G_FieldController = nullptr;
-        G_FieldEnclosure = 0;
+        G_FieldEnclosure = kFieldEnclosureNone;
         G_FieldRadiusSq = 0.0f;
 
         // [EFFECTS] and NEBULA.
@@ -370,7 +370,7 @@ namespace
             }
 
             // Once a controller level is set, every further nebula is deferred with its score.
-            if (G_FieldEnclosure != 0)
+            if (G_FieldEnclosure != kFieldEnclosureNone)
             {
                 PushNebulaZItem(Score, Field);
                 continue;
@@ -381,7 +381,7 @@ namespace
             // Fully inside: quality 2, the queue emptied (FUN_0051ed20), done.
             if (Enclose >= 1.0f)
             {
-                G_FieldEnclosure = 2;
+                G_FieldEnclosure = kFieldEnclosureInside;
                 G_FieldController = Field;
                 const double Radius = Field->GetFogEnd();
                 G_FieldRadiusSq = static_cast<float>(Radius * Radius);
@@ -395,7 +395,7 @@ namespace
             {
                 if (G_FieldController != nullptr)
                     PushNebulaZItem(G_FieldBestScore, G_FieldController);
-                G_FieldEnclosure = 1;
+                G_FieldEnclosure = kFieldEnclosurePartial;
                 G_FieldController = Field;
                 const double Radius = Field->GetFogEnd();
                 G_FieldRadiusSq = static_cast<float>(Radius * Radius);
@@ -647,7 +647,7 @@ namespace
         for (FEngineLight* Light = EngineLightGameListHead(); Light != nullptr;
              Light = EngineLightGameListNext(Light))
         {
-            if ((Light->Flags & 8u) == 0)
+            if ((Light->Flags & kLightFlagEnabled) == 0)
                 continue;
             int Record[5];
             Record[0] = 0;
@@ -805,7 +805,7 @@ namespace
             if (FilterCount >= MaxSlots)
                 break;
             FLightGridPayload* const Pay = Sorted[I];
-            if (Flag == 0 && (Pay->Light->Flags & 1u) != 0)
+            if (Flag == 0 && (Pay->Light->Flags & kLightFlagDynamic) != 0)
                 continue;
             double const Dx = static_cast<double>(Pos3[0]) - static_cast<double>(Pay->Ix);
             double const Dz = static_cast<double>(Pos3[2]) - static_cast<double>(Pay->Iz);
@@ -972,7 +972,7 @@ namespace
 
         unsigned Type;
         Self->get_type(Type);
-        unsigned char Flag = static_cast<unsigned char>(((Type & 0x807u) == 0) ? 1 : 0);
+        unsigned char Flag = static_cast<unsigned char>(((Type & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_JUMP_HOLE)) == 0) ? 1 : 0);
         if (EffectPerfOneMinus() < 0.999)
             Flag = 0;
 
@@ -1066,7 +1066,7 @@ namespace
             // Far -- only a ManagerKind 2 object (a solar), and only outside a field's core.
             if (Go->ManagerKind != EClientGameobjKind::Solar)
                 return;
-            if (G_FieldEnclosure == 2)
+            if (G_FieldEnclosure == kFieldEnclosureInside)
                 return;
 
             // The LOD pick (no cached LOD) against the 250000 far plane, then the plane back to
@@ -1133,13 +1133,13 @@ namespace
                     Bucket = 1;
             }
 
-            if (G_FieldEnclosure == 2)
+            if (G_FieldEnclosure == kFieldEnclosureInside)
             {
                 // Above (or unordered) goes on.
                 if (E <= 0.0f)
                     return;
             }
-            else if (G_FieldEnclosure == 0)
+            else if (G_FieldEnclosure == kFieldEnclosureNone)
             {
                 if (E >= 1.0f)
                     return;
@@ -1162,7 +1162,7 @@ namespace
 
         // >= and unordered keep the bucket.
         if (DistSq < kNearBucketDistSq)
-            Bucket = (G_FieldEnclosure != 0) ? 1u : 0u;
+            Bucket = (G_FieldEnclosure != kFieldEnclosureNone) ? 1u : 0u;
 
         // A CEqObj whose archetype has the nomad byte (+0x80) set goes three buckets up.
         CObject* const Obj = Go->Object;
@@ -1491,7 +1491,7 @@ namespace
         int SavedRs17 = 0;
         int SavedRs1a = 0;
         Pipe->GetRenderState(D3DRS_ZFUNC, &SavedRs17);
-        Pipe->SetRenderState(D3DRS_ZFUNC, 4);
+        Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         Pipe->GetRenderState(D3DRS_DITHERENABLE, &SavedRs1a);
         Pipe->SetRenderState(D3DRS_DITHERENABLE, 0);
 
@@ -1519,7 +1519,7 @@ namespace
 
         unsigned char bDidBeamBatch = 0;
 
-        if (TypeIndex < 0x2b)
+        if (TypeIndex < EFT_CUSTOM_EFFECTS)
         {
             if (GetGameOption(kGameOptParticles) != 0 && Alchemy != nullptr)
             {
@@ -1532,7 +1532,7 @@ namespace
                     }
                     else
                     {
-                        for (int T = 0; T < 0x2b; ++T)
+                        for (int T = 0; T < EFT_CUSTOM_EFFECTS; ++T)
                             EffectTypeBucketWalk(Cam, ClampedDt, T);
                     }
                     Alchemy->EndDraw();
@@ -1557,7 +1557,7 @@ namespace
                 EffectVertexBatchGrowVertices(&G_EffectVertexBatch);
                 EffectVertexBatchEnsureIndices(&G_EffectVertexBatch, 1);
             }
-            for (int T = 0x2c; T < 0x2f; ++T)
+            for (int T = EFT_CODE_PROJ_EFFECT; T < kEffectTypeCount; ++T)
                 EffectTypeBucketWalk(Cam, ClampedDt, T);
             if (bDidBeamBatch != 0)
             {
@@ -1568,7 +1568,7 @@ namespace
         // Two more savers: 0x17 -> 4, 0xe -> 0.
         int SavedRs17Inner = 0;
         Pipe->GetRenderState(D3DRS_ZFUNC, &SavedRs17Inner);
-        Pipe->SetRenderState(D3DRS_ZFUNC, 4);
+        Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         int SavedRs0e = 0;
         Pipe->GetRenderState(D3DRS_ZWRITEENABLE, &SavedRs0e);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
@@ -1578,8 +1578,9 @@ namespace
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, SavedRs0e);
         Pipe->SetRenderState(D3DRS_ZFUNC, SavedRs17Inner);
 
-        // The 2 is a literal, not the beam flag. No null check.
-        DALib::MaterialBatcher->SetBinSortKind(1u, reinterpret_cast<void*>(static_cast<uintptr_t>(2u)));
+        // The sort kind is a literal, not the beam flag. No null check.
+        DALib::MaterialBatcher->SetBinSortKind(
+            1u, reinterpret_cast<void*>(static_cast<uintptr_t>(kBatchSortAscending)));
 
         Pipe->SetRenderState(D3DRS_DITHERENABLE, SavedRs1a);
         Pipe->SetRenderState(D3DRS_ZFUNC, SavedRs17);
@@ -1675,10 +1676,10 @@ namespace
         CameraSetNearFar(Cam, Camera->GetZNear(), G_DrawCtxZFar);
         Pipe->SetRenderState(D3DRS_ZENABLE, 1);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-        Pipe->SetRenderState(D3DRS_ZFUNC, 4);
+        Pipe->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 
         // DAT_0067524c non-zero -> the in-field path.
-        if (G_FieldEnclosure == 0)
+        if (G_FieldEnclosure == kFieldEnclosureNone)
         {
             if (G_FieldController != nullptr)
             {
@@ -1702,7 +1703,7 @@ namespace
         DrainBucket(Cam, 3, false);
 
         // Partial enclosure.
-        if (G_FieldEnclosure == 1)
+        if (G_FieldEnclosure == kFieldEnclosurePartial)
         {
             CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
             G_FieldController->DrawFogShell(Cam);
@@ -1724,7 +1725,7 @@ namespace
             Star->DrawBillboard(Cam, A, B);
         }
 
-        if (G_FieldEnclosure == 1)
+        if (G_FieldEnclosure == kFieldEnclosurePartial)
         {
             CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
             G_FieldController->DrawExteriorBitsPass(Cam);
@@ -1983,7 +1984,7 @@ namespace
                 float ViewCenter3[3] = {ViewCenter.x, ViewCenter.y, ViewCenter.z};
                 unsigned short const Class =
                     static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)ViewCenter3, Radius));
-                if (Class < 3)
+                if (Class < kSphereStraddling)
                     continue;
 
                 // Kept as a double.
@@ -2077,7 +2078,7 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
     const int Classify = Cam->ClassifySphere(&ViewPoint, Radius);
     unsigned short LodLow = static_cast<unsigned short>(Classify);
     unsigned short LodHigh = 0xffffu;
-    if (LodLow >= 3)
+    if (LodLow >= kSphereStraddling)
     {
         LodHigh = 0;
         const float DistSq = static_cast<float>(
@@ -2178,7 +2179,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     long const Inst = Self->get_index();
 
     // FUN_005b3510(0) above 0 (NaN skips).
-    if (GetPerfOptionSlot(0) > 0.0f && Hi < 1 && Extra == nullptr)
+    if (GetPerfOptionSlot(kPerfSlotUseEnvironmentMaps) > 0.0f && Hi < 1 && Extra == nullptr)
     {
         // The companion's envmap name is read with no test; an empty name skips.
         Archetype::ICliObj* Companion = nullptr;
@@ -2317,8 +2318,8 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             // FUN_0042d680 is read afresh for each call.
             if (GetGameOption(kGameOptEffectsGroup) != 0)
             {
-                SpaceEffectsDrawFrame(Cam, static_cast<float>(GetClientFrameTimeCapped()), 0x25);
-                SpaceEffectsDrawFrame(Cam, static_cast<float>(GetClientFrameTimeCapped()), 0x1b);
+                SpaceEffectsDrawFrame(Cam, static_cast<float>(GetClientFrameTimeCapped()), EFT_JUMP_EFFECTS);
+                SpaceEffectsDrawFrame(Cam, static_cast<float>(GetClientFrameTimeCapped()), EFT_ENGINE_FIRE);
             }
 
             // FUN_00504880's colour, when there is one, becomes the clear colour; +0xbc = 0 on
@@ -2329,7 +2330,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
                 const unsigned char B2 = Rgb[2];
                 const unsigned char B1 = Rgb[1];
                 const unsigned char B0 = Rgb[0];
-                Gc->Flags = static_cast<unsigned char>(Gc->Flags | 0x1u);
+                Gc->Flags = static_cast<unsigned char>(Gc->Flags | kGameCameraClearColour);
                 Gc->ClearColor[0] = B0;
                 Gc->ClearColor[1] = B1;
                 Gc->ClearColor[2] = B2;
@@ -2357,7 +2358,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
 
     // Outside a field's core, the far helpers enqueue against the
     // 250000 far plane (DAT_00610534), which then drops back to DAT_006164d4.
-    if (G_FieldEnclosure != 2)
+    if (G_FieldEnclosure != kFieldEnclosureInside)
     {
         CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
         EnqueueAsteroidFarHelpers(Cam);   // FUN_0051ba20
@@ -2371,7 +2372,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     // The pass's far plane -- DAT_006164d4, or inside a field's core the controller's vt+0x44
     // (handed DAT_006164d4, which it ignores); only a strictly larger value is cut back.
     float Far;
-    if (G_FieldEnclosure != 2)
+    if (G_FieldEnclosure != kFieldEnclosureInside)
     {
         Far = G_SpaceDrawFar;
     }
@@ -2437,7 +2438,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     // Layer bit 0x40 with SOLAR and [OBJECTS] -- every large solar (FUN_00540a00 /
     // FUN_00540a20); with PLANETS off, one whose solar TypeBits has any of bits 0..2 is left
     // out. The narrowed solar pointer is read without a test.
-    if ((LayerFlags & 0x40u) != 0 && GetGameOption(kGameOptSolar) != 0 &&
+    if ((LayerFlags & kSceneLayerSolars) != 0 && GetGameOption(kGameOptSolar) != 0 &&
         GetGameOption(kGameOptObjectsGroup) != 0)
     {
         size_t It = 0;
@@ -2462,9 +2463,9 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     // bit 0x800 + DEBRIS -> 7; bit 0x400 + DEBRIS -> 10.
     if (GetGameOption(kGameOptObjectsGroup) != 0)
     {
-        if ((LayerFlags & 0x20u) != 0 && GetGameOption(kGameOptShips) != 0)
+        if ((LayerFlags & kSceneLayerShips) != 0 && GetGameOption(kGameOptShips) != 0)
             EnqueueByManagerKind(EClientGameobjKind::Ship, Cam);
-        const unsigned ProjectileLayer = LayerFlags & 0x80u; // kept across the calls
+        const unsigned ProjectileLayer = LayerFlags & kSceneLayerProjectiles; // kept across the calls
         if (ProjectileLayer != 0 && GetGameOption(kGameOptProjectiles) != 0)
             EnqueueByManagerKind(EClientGameobjKind::Guided, Cam);
         if (ProjectileLayer != 0)
@@ -2474,24 +2475,24 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             if (GetGameOption(kGameOptProjectiles) != 0)
                 EnqueueByManagerKind(EClientGameobjKind::CounterMeasure, Cam);
         }
-        if ((LayerFlags & 0x800u) != 0 && GetGameOption(kGameOptDebris) != 0)
+        if ((LayerFlags & kSceneLayerLoot) != 0 && GetGameOption(kGameOptDebris) != 0)
             EnqueueByManagerKind(EClientGameobjKind::Loot, Cam);
-        if ((LayerFlags & 0x400u) != 0 && GetGameOption(kGameOptDebris) != 0)
+        if ((LayerFlags & kSceneLayerDebris) != 0 && GetGameOption(kGameOptDebris) != 0)
             EnqueueByManagerKind(EClientGameobjKind::Debris, Cam);
     }
 
     SortBuckets(); // FUN_0051eda0
-    Pipe->SetRenderState(D3DRS_CULLMODE, 2);
+    Pipe->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
 
     // The background star sphere, unless the camera sits fully inside a
     // nebula (DAT_0067524c == 2), BACKGROUND (option 0x19) is off, or layer bit 0 is clear.
 #ifdef FREELANCER_RP9
     // Port-only: while the volumetric nebula is drawn with real_background, also fully inside
     // (its haze fogs the stars with distance instead).
-    if ((G_FieldEnclosure != 2 || NebulaVolume::ShowsRealBackground()) &&
-        GetGameOption(kGameOptBackgroundGroup) != 0 && (LayerFlags & 1u) != 0)
+    if ((G_FieldEnclosure != kFieldEnclosureInside || NebulaVolume::ShowsRealBackground()) &&
+        GetGameOption(kGameOptBackgroundGroup) != 0 && (LayerFlags & kSceneLayerBackground) != 0)
 #else
-    if (G_FieldEnclosure != 2 && GetGameOption(kGameOptBackgroundGroup) != 0 && (LayerFlags & 1u) != 0)
+    if (G_FieldEnclosure != kFieldEnclosureInside && GetGameOption(kGameOptBackgroundGroup) != 0 && (LayerFlags & kSceneLayerBackground) != 0)
 #endif
         StarSphereDraw(Cam); // FUN_00552e70
 
@@ -2505,13 +2506,13 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
 #endif
 
     // Layer bit 0x100 -- the effects.
-    if ((LayerFlags & 0x100u) != 0)
+    if ((LayerFlags & kSceneLayerEffects) != 0)
     {
         EngineLightClearRegisteredList(); // FUN_004101e0
         Pipe->SetRenderState(D3DRS_LIGHTING, 0);
         if (GetGameOption(kGameOptEffectsGroup) != 0)
         {
-            if (G_FieldEnclosure != 0)
+            if (G_FieldEnclosure != kFieldEnclosureNone)
             {
                 // FUN_00422440 with a black fog colour; the fog end is evaluated first.
                 float Rgb[3] = {0.0f, 0.0f, 0.0f};
@@ -2562,7 +2563,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             }
         }
     }
-    Gc->Flags = static_cast<unsigned char>(Gc->Flags | 0x1u);
+    Gc->Flags = static_cast<unsigned char>(Gc->Flags | kGameCameraClearColour);
     Gc->ClearColor[0] = ClearR;
     Gc->ClearColor[1] = ClearG;
     Gc->ClearColor[2] = ClearB;
@@ -2596,11 +2597,11 @@ void SpaceEnvFxBeginCockpitPass(FSpaceCamera* Cam)
 {
     // FUN_0051c970 (thiscall on the camera). Only with options 0x25, 0x24 and 0x28 all on, in
     // that order, each result tested before the next is read.
-    if (GetGameOption(0x25) == 0)
+    if (GetGameOption(kGameOptEffectsGroup) == 0)
         return;
-    if (GetGameOption(0x24) == 0)
+    if (GetGameOption(kGameOptSun) == 0)
         return;
-    if (GetGameOption(0x28) == 0)
+    if (GetGameOption(kGameOptSunEffects) == 0)
         return;
 
     // Every entry of FUN_0050c620()'s list. Fully inside a
@@ -2610,7 +2611,7 @@ void SpaceEnvFxBeginCockpitPass(FSpaceCamera* Cam)
     for (FStarSphereListNode* N = Sent->Next; N != Sent; N = N->Next)
     {
         FStarSphere* const Item = N->Sphere;
-        if (G_FieldEnclosure == 2)
+        if (G_FieldEnclosure == kFieldEnclosureInside)
         {
             Item->ZoneOcclusion = 1.0f;
         }
@@ -2625,11 +2626,11 @@ void SpaceEnvFxEndCockpitPass(FSpaceCamera* Cam)
 {
     // FUN_0051c9e0 (thiscall on the camera): the same three option tests, then slot 0x14 with
     // (camera, 1.0f) on every entry -- no field-quality branch here.
-    if (GetGameOption(0x25) == 0)
+    if (GetGameOption(kGameOptEffectsGroup) == 0)
         return;
-    if (GetGameOption(0x24) == 0)
+    if (GetGameOption(kGameOptSun) == 0)
         return;
-    if (GetGameOption(0x28) == 0)
+    if (GetGameOption(kGameOptSunEffects) == 0)
         return;
 
     FStarSphereListNode* const Sent = StarSphereList()->Sentinel;

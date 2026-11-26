@@ -86,13 +86,13 @@ namespace
             return false;
         FFileSystemDesc Desc;
         memset(&Desc, 0, sizeof(Desc));
-        Desc.Size = 0x34;
+        Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc.ComponentName = "FileSystem";
         Desc.Path = Path;
-        Desc.Access = 0x80000000; // GENERIC_READ
-        Desc.ShareMode = 1;       // FILE_SHARE_READ
-        Desc.Creation = 3;        // OPEN_EXISTING
-        Desc.Flags = 0x8000080;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xFFFFFFFF;
         const int Handle = FileSystem->OpenByDesc(&Desc);
         if (Handle == -1)
@@ -914,7 +914,7 @@ GENRESULT DACOM_API FDirectX9::CreateExRenderTarget(const FRPExRenderTargetDesc*
     Target->Kind = Rp9ExTextureRenderTarget;
     Target->Format = Desc->Format;
     Target->TargetDesc = *Desc;
-    if (Device_ != nullptr && (DeviceReady_ & 1) != 0)
+    if (Device_ != nullptr && (DeviceReady_ & DeviceReadyBuffers) != 0)
     {
         const HRESULT Hr =
             CreateRenderTargetGpu(Device_, Target, Ex_->BackBufferWidth, Ex_->BackBufferHeight);
@@ -1058,7 +1058,9 @@ GENRESULT DACOM_API FDirectX9::BeginExPass(const FRPExPassDesc* Desc)
     ExSetPassState(this, D3DRS_STENCILENABLE, FALSE);
     ExSetPassState(this, D3DRS_CULLMODE, D3DCULL_NONE);
     ExSetPassState(this, D3DRS_LIGHTING, FALSE);
-    ExSetPassState(this, D3DRS_COLORWRITEENABLE, 0xF);
+    ExSetPassState(this, D3DRS_COLORWRITEENABLE,
+                   D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE |
+                       D3DCOLORWRITEENABLE_ALPHA);
 
     const HRESULT Hr = ExSelectTarget(this, Target, (Desc->Flags & RPExPassKeepDepth) != 0);
     if (FAILED(Hr))

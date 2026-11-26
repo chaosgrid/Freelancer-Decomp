@@ -843,10 +843,10 @@ int MissionLogEntrySize(FmtStr const& Entry) {
     int Size = 6;
     for (FmtStr::Val const* Node = Entry.Head; Node != nullptr; Node = Node->Next) {
         int const Tag = Node->TypeTag;
-        if (Tag == 0x21)
+        if (Tag == FmtStr::TagFmtStr)
             Size += MissionLogEntrySize(*Node->Subtree) + 3;
         else
-            Size += (Tag == 0x4e) ? 0x17 : 7;
+            Size += (Tag == FmtStr::TagNavMarker) ? 0x17 : 7;
     }
     return Size;
 }

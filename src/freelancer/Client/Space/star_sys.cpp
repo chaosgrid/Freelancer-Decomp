@@ -100,7 +100,16 @@ namespace
     Universe::ISystem const* G_System = nullptr;
 
     // DAT_00679958..70 -- music state machine.
-    int G_MusicState = 0;                    // DAT_00679958
+    // G_MusicState: the track the music state machine plays.
+    enum EMusicState
+    {
+        kMusicStateSpace = 0,
+        kMusicStateDanger = 1,
+        kMusicStateBattle = 2,
+        kMusicStateOverride = 3,
+        kMusicStateSilent = 4 // the player's ship is jumping
+    };
+    int G_MusicState = kMusicStateSpace;     // DAT_00679958
     unsigned G_MusicTrack = 0;               // DAT_0067995c
     unsigned char G_bMusicCrossFading = 0;   // DAT_00679960
     float G_MusicCrossFadeTime = 0.0f;       // DAT_00679964
@@ -135,6 +144,12 @@ namespace
     // ------------------------------------------------------------ FUN_00553100
     // Pin one [Object] archetype of the system file: resolve it by kind (0 simple, 2 solar,
     // 4 asteroid), build the companion's material cache, AddRef, remember it.
+    enum EPreloadArchKind
+    {
+        kPreloadArchSimple = 0,
+        kPreloadArchSolar = 2,
+        kPreloadArchAsteroid = 4
+    };
     void PreloadObjectArchetype(char const* Name, int Kind)
     {
         // A miss on a solar/asteroid lookup, and an unknown Kind, leave the NAME pointer in the
@@ -142,13 +157,13 @@ namespace
         // reproduces that exactly.
         Archetype::Root* Arch =
             reinterpret_cast<Archetype::Root*>(const_cast<char*>(Name));
-        if (Kind == 0)
+        if (Kind == kPreloadArchSimple)
         {
             ID_String Nick;
             Nick.Id = CreateID(Name);
             Arch = Archetype::GetSimple(Archetype::GetSimpleID(Nick));
         }
-        else if (Kind == 2)
+        else if (Kind == kPreloadArchSolar)
         {
             ID_String Nick;
             Nick.Id = CreateID(Name);
@@ -159,7 +174,7 @@ namespace
                 FDUMP(kFdumpError, "%s(%d) : *** ERROR: unknown Solar archetype (%s)\n",
                       kStarSysFile, 0x8a, Name);
         }
-        else if (Kind == 4)
+        else if (Kind == kPreloadArchAsteroid)
         {
             ID_String Nick;
             Nick.Id = CreateID(Name);
@@ -217,7 +232,7 @@ namespace
                 while (Reader.read_value())
                 {
                     if (Reader.is_value("archetype"))
-                        PreloadObjectArchetype(Reader.get_value_string(), 2);
+                        PreloadObjectArchetype(Reader.get_value_string(), kPreloadArchSolar);
                 }
             }
         }
@@ -621,24 +636,24 @@ namespace
     // ------------------------------------------------------------ FUN_00552ea0
     void StarSphereRender(FStarSphereBackground* This, void* Camera)
     {
-        if (GetGameOption(0x19) == 0)
+        if (GetGameOption(kGameOptBackgroundGroup) == 0)
             return;
 
         if (This->DesiredQuality != This->CurrentQuality)
         {
             switch (This->DesiredQuality)
             {
-            case 1:
+            case kStarSphereQualityNebulae:
                 StarSphereLoadLayer(&This->Layers[0]);
                 ClientMeshHolderRelease(&This->Layers[1].Holder);
                 ClientMeshHolderRelease(&This->Layers[2].Holder);
                 break;
-            case 2:
+            case kStarSphereQualityBasicStars:
                 StarSphereLoadLayer(&This->Layers[0]);
                 StarSphereLoadLayer(&This->Layers[1]);
                 ClientMeshHolderRelease(&This->Layers[2].Holder);
                 break;
-            case 3:
+            case kStarSphereQualityComplexStars:
                 StarSphereLoadLayer(&This->Layers[0]);
                 ClientMeshHolderRelease(&This->Layers[1].Holder);
                 StarSphereLoadLayer(&This->Layers[2]);
@@ -686,8 +701,8 @@ FStarSphereBackground::FStarSphereBackground()
         MeshHolderConstruct(&Layers[I].Holder);
         Layers[I].Name.clear();
     }
-    CurrentQuality = 0;
-    DesiredQuality = 3;
+    CurrentQuality = kStarSphereQualityOff;
+    DesiredQuality = kStarSphereQualityComplexStars;
 }
 
 FStarSphereBackground::~FStarSphereBackground()
@@ -699,7 +714,7 @@ FStarSphereBackground::~FStarSphereBackground()
 void StarSphereDraw(void* Camera)
 {
     // FUN_00552e70
-    if (GetGameOption(0x19) != 0 && GetGameOption(0x1a) != 0)
+    if (GetGameOption(kGameOptBackgroundGroup) != 0 && GetGameOption(kGameOptStars) != 0)
         StarSphereRender(&G_StarSphereBackground, Camera);
 }
 
@@ -710,17 +725,17 @@ void StarSphereApplyDetail(float Value)
     double const V = static_cast<double>(Value);
     if (V > 0.75)
     {
-        G_StarSphereBackground.DesiredQuality = 3;
+        G_StarSphereBackground.DesiredQuality = kStarSphereQualityComplexStars;
         return;
     }
     if (V > 0.5)
     {
-        G_StarSphereBackground.DesiredQuality = 2;
+        G_StarSphereBackground.DesiredQuality = kStarSphereQualityBasicStars;
         return;
     }
-    G_StarSphereBackground.DesiredQuality = 1;
+    G_StarSphereBackground.DesiredQuality = kStarSphereQualityNebulae;
     if (!(V > 0.001))
-        G_StarSphereBackground.DesiredQuality = 0;
+        G_StarSphereBackground.DesiredQuality = kStarSphereQualityOff;
 }
 
 // ------------------------------------------------------------------------ StarSys
@@ -747,7 +762,7 @@ FNebulaEffect* StarSysFindNebula(Vector const* Pos, float* OutFactor, FNebulaEff
 {
     // FUN_005553b0.
     float* const PosFloats = const_cast<float*>(reinterpret_cast<float const*>(Pos));
-    if (GetGameOption(0x25) != 0 && GetGameOption(0x27) != 0)
+    if (GetGameOption(kGameOptEffectsGroup) != 0 && GetGameOption(kGameOptNebula) != 0)
     {
         if (Hint != nullptr)
         {
@@ -804,7 +819,7 @@ unsigned char const* StarSysSpaceColor()
 unsigned char const* StarSysAmbientColor()
 {
     // FUN_00555470: base + AMBIENT (option 0x3b), clamped at 0xff only (JG).
-    int const Ambient = GetGameOption(0x3b);
+    int const Ambient = GetGameOption(kGameOptAmbient);
     for (int I = 0; I < 3; ++I)
     {
         int const Sum = static_cast<int>(G_StarSysAmbientRgb[I]) + Ambient;
@@ -837,7 +852,7 @@ void StarSysEnter(unsigned SystemId)
     G_MusicSystemSpace = 0;
     G_MusicOverrideNoFade = 1;
     G_MusicOverrideFade = -1.0f;
-    G_MusicState = 0;
+    G_MusicState = kMusicStateSpace;
     G_MusicTrack = 0;
     G_bMusicCrossFading = 0;
     G_MusicCrossFadeTime = 0.0f;
@@ -915,7 +930,7 @@ void StarSysLeave(IObjRW* Player)
     ClientMeshHolderRelease(&G_StarSphereBackground.Layers[0].Holder);
     ClientMeshHolderRelease(&G_StarSphereBackground.Layers[1].Holder);
     ClientMeshHolderRelease(&G_StarSphereBackground.Layers[2].Holder);
-    G_StarSphereBackground.CurrentQuality = 0;
+    G_StarSphereBackground.CurrentQuality = kStarSphereQualityOff;
     RefreshLoadingProgress();
 
     SpaceDustShutdown(); // FUN_0054be20
@@ -952,10 +967,10 @@ void StarSysUpdate(float Dt)
               "No active camera available upon StarSys update");
     }
 
-    if (GetGameOption(0x25) != 0)
+    if (GetGameOption(kGameOptEffectsGroup) != 0)
     {
         // Every nebula through its vtable slot 2 with (camera, dt).
-        if (GetGameOption(0x27) != 0 && !G_Nebulae.empty())
+        if (GetGameOption(kGameOptNebula) != 0 && !G_Nebulae.empty())
         {
             for (std::list<FNebulaEffect*>::iterator It = G_Nebulae.begin();
                  It != G_Nebulae.end(); ++It)
@@ -966,7 +981,7 @@ void StarSysUpdate(float Dt)
 
     if (static_cast<int>(CliAsteroidRegistryCount()) > 0) // FUN_005201c0
     {
-        if (!SinglePlayer() && GetGameOption(0x21) != 0)
+        if (!SinglePlayer() && GetGameOption(kGameOptAsteroids) != 0)
             CmnAsteroid::Update(GetClientObjDb(), Dt);
         CliAsteroidUpdateFields(Camera, Dt); // FUN_00520130
     }
@@ -997,7 +1012,7 @@ void StarSysUpdate(float Dt)
             // ISystem slot 12 (+0x30): the zone at the player's position with mask 0x400000;
             // its slot 29 (+0x74) music replaces the system's space track.
             Universe::IZone const* const Zone =
-                G_System->GetSmallestZoneWithPropertiesAt(&Player->get_position(), 0x400000);
+                G_System->GetSmallestZoneWithPropertiesAt(&Player->get_position(), Universe::kZonePropMusic);
             if (Zone != nullptr)
             {
                 ID_String const ZoneMusic = Zone->GetMusic();
@@ -1007,7 +1022,7 @@ void StarSysUpdate(float Dt)
         }
     }
 
-    bool const bWasBattle = G_MusicState == 2;
+    bool const bWasBattle = G_MusicState == kMusicStateBattle;
     bool const bBattleHit = G_bMusicBattleHit == 1;
     G_bMusicBattleHit = 0;
 
@@ -1060,15 +1075,15 @@ void StarSysUpdate(float Dt)
         G_MusicDangerScanTime = 0.0f;
     }
 
-    int State = 0;
+    int State = kMusicStateSpace;
     if (bBattleHit)
-        State = 2;
+        State = kMusicStateBattle;
     else if (G_bMusicDanger != 0)
-        State = 1;
+        State = kMusicStateDanger;
     else
-        State = bPlayerFlag ? 4 : 0;
+        State = bPlayerFlag ? kMusicStateSilent : kMusicStateSpace;
     if (OverrideTrack != 0)
-        State = 3;
+        State = kMusicStateOverride;
 
     if (State != G_MusicState)
     {
@@ -1080,20 +1095,20 @@ void StarSysUpdate(float Dt)
     unsigned Track = 0;
     switch (G_MusicState)
     {
-    case 0:
+    case kMusicStateSpace:
         Track = SpaceTrack;
         break;
-    case 1:
+    case kMusicStateDanger:
         Track = DangerTrack;
         break;
-    case 2:
+    case kMusicStateBattle:
         Track = BattleTrack;
         break;
-    case 3:
+    case kMusicStateOverride:
         Track = OverrideTrack;
         break;
     default:
-        Track = 0; // 4 and anything else: silence
+        Track = 0; // kMusicStateSilent and anything else
         break;
     }
 

@@ -242,12 +242,18 @@ static_assert(sizeof(Heap) == 0x10, "Heap sizeof 0x10");
 //   6    = CruiseDisrupter (guided splash blast, bCruiseDisruptor != 0; drops cruise)
 //   7    = Mine (mine explosion blast)
 //   8    = ZoneDamage (Ship::tick_zone_damage 0x06d01250; FLHook: Suicide)
+//   0x11 = RepairDroid (SrvRepairDroid::update's repair list)
+//   0x12 = RepairKit (EqObj::use_repair_kits)
+//   0x13 = ShieldBattery (EqObj::use_shield_batteries; a cause-0x13 list boosts the shield)
 //   0x14 = LootDecay (loot expiration / equipment removal notify, 0x062abb06)
 //   0x15 = Fuse (fuse damage / disruptor)
 //   0x16 = CargoPodJettison (cargo pod jettison destruction)
 //   0x17 = DrainShields (pub::SpaceObj::DrainShields, 0x06cf89d6)
 //   0x18 = Pending (GameObject::PendingDamage default / Admin, 0x06cee452)
 //   0x19 = InitialSync (StarSystem::add_player / initial damage-state sync, 0x06cf61d2, 0x06d07f8a)
+//   0x1a = WeaponRecovery (EqObj::update restores a weapons-offline hull and the disabled launchers after 60 s)
+// The causes below 0x10 are the combat ones: they are what a lit death fuse and
+// GameObject::is_damage_blocked test (`< 0x10` / `>= 0x10`).
 //   0xC0 = DummyDisrupter (FLSDK sentinel)
 enum class DamageCause : int
 {
@@ -260,12 +266,16 @@ enum class DamageCause : int
     CruiseDisrupter = 6,
     Mine = 7,
     ZoneDamage = 8,
+    RepairDroid = 0x11,
+    RepairKit = 0x12,
+    ShieldBattery = 0x13,
     LootDecay = 0x14,
     Fuse = 0x15,
     CargoPodJettison = 0x16,
     DrainShields = 0x17,
     Pending = 0x18,
     InitialSync = 0x19,
+    WeaponRecovery = 0x1a,
     DummyDisrupter = 0xC0,
 };
 
@@ -487,6 +497,16 @@ COMMON_API bool __cdecl GetScreenShotPath(char* const Dest);
 COMMON_API void __cdecl DAEngine_create_filesystem(char const* Path, IFileSystem** Out,
                                         char const* Implementation);
 COMMON_API void __cdecl DAEngine_release_filesystem(IFileSystem** Filesys);
+
+// The answers of ICamera::ClassifySphere (FSpaceCamera FUN_0040ffe0 answers 1, 3 and 4; the
+// room camera LAB_00556780 also 2).
+enum ESphereClass
+{
+    kSphereOutside = 1,
+    kSphereTooSmall = 2,    // inside the frustum but too small on screen
+    kSphereStraddling = 3,  // crosses a frustum plane
+    kSphereInside = 4,
+};
 
 // "1.11_ICamera" -- the client camera. Two classes in freelancer.exe implement it:
 //   * the 20-slot table PTR_LAB_005c8944 (0x005c8944..0x005c8990), which is the one

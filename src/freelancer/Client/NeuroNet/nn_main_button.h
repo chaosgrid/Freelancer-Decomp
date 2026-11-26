@@ -47,6 +47,14 @@
 #include "Core/event_handler.h"
 #include "Interface/wincontrol_base.h"
 
+// NN_MainButton::SetGroupButtonMesh's argument: the group button's icon mesh.
+enum EGroupButtonMesh
+{
+    kGroupButtonMeshRequest = 0,       // NN_request.3db, the plain icon
+    kGroupButtonMeshTradeRequest = 1,  // NN_traderequest.3db
+    kGroupButtonMeshGroupRequest = 2   // NN_grouprequest.3db
+};
+
 class NN_MainButton : public WinControl, public EventHandler, public ButtonMover, public ButtonScaler
 {
 public:

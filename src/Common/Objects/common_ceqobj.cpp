@@ -507,7 +507,7 @@ CEqObj::DockAnimInfo::DockAnimInfo()
 bool CEqObj::is_targetable() const
 {
     // FUN_06287240. CloakPercent (+0x140) NaN counts as targetable.
-    if ((FlagsA0 & 1) == 0)
+    if ((FlagsA0 & kSimpleFlagTargetable) == 0)
         return false;
     return !(CloakPercent >= 1.0f);
 }
@@ -625,7 +625,8 @@ int CEqObj::update(float Dt, unsigned Flags)
     }
 
     // Mask 0xff3efffc. Update is vtable +0x24.
-    CEquipTraverser Trav(-0xc10004);
+    CEquipTraverser Trav((int)~(EquipTypeLight | EquipTypeAttachedFX | EquipTypeCargo |
+                                EquipTypeInternalFX | EquipTypeTradeLane));
     CEquip* Item = EquipManager.Traverse(Trav);
     while (Item != nullptr)
     {
@@ -1328,7 +1329,7 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
 
             // Cause 0x14. Event 4 for cargo, else 3, with the SubObjId as the context.
             if (Damage.Cause == DamageCause::LootDecay)
-                notify((INotify::Event)(Equip->Type == EquipTypeCargo ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
+                notify((Equip->Type == EquipTypeCargo ? INotify::CargoExpired : INotify::EquipExpired), (void*)(unsigned)Entry.SubObjId);
 
 
             CAttachedEquip* Attached = CAttachedEquip::cast(Equip);

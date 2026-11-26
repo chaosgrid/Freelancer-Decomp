@@ -96,7 +96,7 @@ public:
     // Native inline field write (e.g. RC06b55477..06b554b2): Advance, then snapshot the
     // destination, copy, and commit Ptr=cached+Width. The cursor is never restored.
     bool Put(const void* Value, unsigned int Width) {
-        if (!Advance(Width, 0x16u)) return false;
+        if (!Advance(Width, kPacketEncodeOverflow)) return false;
         const unsigned int Destination = Packet.MarshalPtr;
         if (Width != 0) std::memcpy(reinterpret_cast<void*>(Destination), Value, Width);
         Packet.MarshalPtr = Destination + Width;
@@ -124,7 +124,7 @@ public:
     // Variable-length encode block (e.g. COMMON11 RC06b65ed2..06b65f25): reserve,
     // then the cached REP copy and commit above. Fixed scalar fields use Put.
     bool PutBlock(const void* Value, unsigned int Width) {
-        if (!Advance(Width, 0x16u)) return false;
+        if (!Advance(Width, kPacketEncodeOverflow)) return false;
         PutReserved(Value, Width);
         return true;
     }
@@ -141,7 +141,7 @@ public:
     // whereas its decoder uses integer MOV. Keep x87 signaling-NaN quieting and
     // exception behavior as well as ordinary float32 bytes.
     bool PutFloat(const float& Value) {
-        if (!Advance(4u, 0x16u)) return false;
+        if (!Advance(4u, kPacketEncodeOverflow)) return false;
         const float* Source = &Value;
         const unsigned int Cached = Packet.MarshalPtr;
         float* Destination = reinterpret_cast<float*>(Cached);
@@ -156,7 +156,7 @@ public:
     }
 
     bool Get(void* Value, unsigned int Width) {
-        if (!Advance(Width, 0x17u)) return false;
+        if (!Advance(Width, kPacketDecodeOverrun)) return false;
         if (Width != 0) std::memcpy(Value, reinterpret_cast<const void*>(Packet.MarshalPtr), Width);
         Packet.MarshalPtr += Width;
         return true;
@@ -165,7 +165,7 @@ public:
     // Some FIREWEAPON x87 branches commit the moving pointer only after FSTP;
     // others commit before it. Keep that ordering on an unmasked FP exception.
     bool GetBeforePointerCommit(void* Value, unsigned int Width) {
-        if (!Advance(Width, 0x17u)) return false;
+        if (!Advance(Width, kPacketDecodeOverrun)) return false;
         std::memcpy(Value, reinterpret_cast<const void*>(Packet.MarshalPtr), Width);
         return true;
     }
@@ -215,7 +215,7 @@ inline unsigned int RpcWireEncodeScalar(FPacketBase& Packet, const T& Value,
     // reservation returns literal 0x16 without rewriting the sticky Error.
     FRpcWireStream Stream(Packet, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Value, sizeof(T))) return 0x16u;
+    if (!Stream.Put(&Value, sizeof(T))) return kPacketEncodeOverflow;
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -225,7 +225,7 @@ inline unsigned int RpcWireEncodeScalar<float>(FPacketBase& Packet, const float&
     // RC06b5aa00 / RS06c07a90 (REQHULLSTATUS): FLD/FSTP into the cached destination.
     FRpcWireStream Stream(Packet, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.PutFloat(Value)) return 0x16u;
+    if (!Stream.PutFloat(Value)) return kPacketEncodeOverflow;
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -268,24 +268,24 @@ public:
     T Value;
 };
 
-class FRpcConnectResponsePacket : public FRpcScalarPacket<0x20001u, unsigned int> {
+class FRpcConnectResponsePacket : public FRpcScalarPacket<FLPACKET_SERVER_CONNECTRESPONSE, unsigned int> {
 public:
     void Dump(std::ostream& Out) const override;
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcConnectResponsePacket>(OutPacket);
     }
 };
-class FRpcLoginResponsePacket : public FRpcScalarPacket<0x20002u, unsigned char> {
+class FRpcLoginResponsePacket : public FRpcScalarPacket<FLPACKET_SERVER_LOGINRESPONSE, unsigned char> {
 public:
     void Dump(std::ostream& Out) const override;
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcLoginResponsePacket>(OutPacket);
     }
 };
-using FRpcSetShipArchPacket = FRpcScalarPacket<0x20023u, unsigned int>;
-using FRpcSetHullStatusPacket = FRpcScalarPacket<0x20049u, float>;
-using FRpcRequestChangeCashPacket = FRpcScalarPacket<0x3001cu, int, false>;
-using FRpcRequestSetCashPacket = FRpcScalarPacket<0x3001bu, int, false>;
+using FRpcSetShipArchPacket = FRpcScalarPacket<FLPACKET_SERVER_SETSHIPARCH, unsigned int>;
+using FRpcSetHullStatusPacket = FRpcScalarPacket<FLPACKET_SERVER_SETHULLSTATUS, float>;
+using FRpcRequestChangeCashPacket = FRpcScalarPacket<FLPACKET_CLIENT_REQCHANGECASH, int, false>;
+using FRpcRequestSetCashPacket = FRpcScalarPacket<FLPACKET_CLIENT_REQSETCASH, int, false>;
 
 class FRpcSaveGamePacket : public FPacketBase {
 public:
@@ -323,7 +323,7 @@ public:
 
 class FRpcMissionResponsePacket : public FPacketBase {
 public:
-    FRpcMissionResponsePacket() : FPacketBase(0x30014u) {}
+    FRpcMissionResponsePacket() : FPacketBase(FLPACKET_CLIENT_MISSIONRESPONSE) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -337,10 +337,10 @@ public:
     unsigned char bAccepted;
 };
 
-using FRpcGfSelectObjectPacket = FRpcScalarPacket<0x30013u, unsigned int, false>;
-using FRpcAbortMissionPacket = FRpcScalarPacket<0x30041u, unsigned int, false>;
-using FRpcRtcDonePacket = FRpcScalarPacket<0x30047u, unsigned int>;
-using FRpcMissionSaveBPacket = FRpcScalarPacket<0x30045u, unsigned int, false>;
+using FRpcGfSelectObjectPacket = FRpcScalarPacket<FLPACKET_CLIENT_GFSELECTOBJECT, unsigned int, false>;
+using FRpcAbortMissionPacket = FRpcScalarPacket<FLPACKET_CLIENT_ABORT_MISSION, unsigned int, false>;
+using FRpcRtcDonePacket = FRpcScalarPacket<FLPACKET_CLIENT_RTCDONE, unsigned int>;
+using FRpcMissionSaveBPacket = FRpcScalarPacket<FLPACKET_CLIENT_MISSIONSAVEB, unsigned int, false>;
 
 // Each field has its own cursor reservation and can be committed before a later
 // field fails. Pointer lists describe native scalar fields, never object layout.
@@ -424,16 +424,16 @@ public:
     unsigned int Field_0x0c;
 };
 
-using FRpcLaunchCompletePacket = FRpcClientDwordPairPacket<0x3003eu>;
-using FRpcJumpInCompletePacket = FRpcClientDwordPairPacket<0x30043u, true>;
-using FRpcGfGoodSellPacket = FRpcClientDwordTriplePacket<0x30011u>;
-using FRpcHailPacket = FRpcClientDwordTriplePacket<0x3003fu, true>;
-using FRpcGfGoodBuyPacket = FRpcClientDwordQuadPacket<0x30012u>;
-using FRpcCommCompletePacket = FRpcClientDwordQuadPacket<0x30037u>;
+using FRpcLaunchCompletePacket = FRpcClientDwordPairPacket<FLPACKET_CLIENT_LAUNCHCOMPLETE>;
+using FRpcJumpInCompletePacket = FRpcClientDwordPairPacket<FLPACKET_CLIENT_JUMPINCOMPLETE, true>;
+using FRpcGfGoodSellPacket = FRpcClientDwordTriplePacket<FLPACKET_CLIENT_GFGOODSELL>;
+using FRpcHailPacket = FRpcClientDwordTriplePacket<FLPACKET_CLIENT_HAIL, true>;
+using FRpcGfGoodBuyPacket = FRpcClientDwordQuadPacket<FLPACKET_CLIENT_GFGOODBUY>;
+using FRpcCommCompletePacket = FRpcClientDwordQuadPacket<FLPACKET_CLIENT_COMMCOMPLETE>;
 
-using FRpcDockPacket = FRpcScalarPacket<0x30024u, unsigned int, false>;
-using FRpcCargoScanPacket = FRpcClientDwordPairPacket<0x3002bu>;
-using FRpcGfGoodVaporizedPacket = FRpcClientDwordTriplePacket<0x3003cu>;
+using FRpcDockPacket = FRpcScalarPacket<FLPACKET_CLIENT_DOCK, unsigned int, false>;
+using FRpcCargoScanPacket = FRpcClientDwordPairPacket<FLPACKET_CLIENT_CARGOSCAN>;
+using FRpcGfGoodVaporizedPacket = FRpcClientDwordTriplePacket<FLPACKET_CLIENT_GFGOODVAPORIZED>;
 
 class FRpcMunitionCollisionPacket : public FPacketBase {
 public:
@@ -558,7 +558,7 @@ public:
 
 class FRpcRequestEquipmentPacket : public FRpcServerEquipListPacketBase {
 public:
-    FRpcRequestEquipmentPacket() : FRpcServerEquipListPacketBase(0x30016u) {}
+    FRpcRequestEquipmentPacket() : FRpcServerEquipListPacketBase(FLPACKET_CLIENT_REQEQUIPMENT) {}
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcRequestEquipmentPacket>(OutPacket);
     }
@@ -566,7 +566,7 @@ public:
 
 class FRpcRequestCargoPacket : public FRpcServerEquipListPacketBase {
 public:
-    FRpcRequestCargoPacket() : FRpcServerEquipListPacketBase(0x30017u) {}
+    FRpcRequestCargoPacket() : FRpcServerEquipListPacketBase(FLPACKET_CLIENT_REQCARGO) {}
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcRequestCargoPacket>(OutPacket);
     }
@@ -574,7 +574,7 @@ public:
 
 class FRpcRequestCollisionGroupsPacket : public FPacketBase {
 public:
-    FRpcRequestCollisionGroupsPacket() : FPacketBase(0x30036u) {}
+    FRpcRequestCollisionGroupsPacket() : FPacketBase(FLPACKET_CLIENT_REQCOLLISIONGROUPS) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -587,10 +587,10 @@ public:
     std::list<CollisionGroupDesc> Groups;
 };
 
-using FRpcRequestShipArchPacket = FRpcScalarPacket<0x30015u, unsigned int, false>;
-using FRpcRequestHullStatusPacket = FRpcScalarPacket<0x3003bu, float>;
-using FRpcInterfaceItemUsedPacket = FRpcScalarPacket<0x30035u, unsigned int, false>;
-class FRpcRequestDifficultyScalePacket : public FRpcScalarPacket<0x30046u, float, false> {
+using FRpcRequestShipArchPacket = FRpcScalarPacket<FLPACKET_CLIENT_REQSHIPARCH, unsigned int, false>;
+using FRpcRequestHullStatusPacket = FRpcScalarPacket<FLPACKET_CLIENT_REQHULLSTATUS, float>;
+using FRpcInterfaceItemUsedPacket = FRpcScalarPacket<FLPACKET_CLIENT_INTERFACEITEMUSED, unsigned int, false>;
+class FRpcRequestDifficultyScalePacket : public FRpcScalarPacket<FLPACKET_CLIENT_REQDIFFICULTYSCALE, float, false> {
 public:
     FRpcRequestDifficultyScalePacket() { Value = 1.0f; }
     static int Factory(FPacketBase** OutPacket) {
@@ -663,7 +663,7 @@ protected:
 
 class FRpcRequestAddItemPacket : public FRpcItemChangePacketBase {
 public:
-    FRpcRequestAddItemPacket() : FRpcItemChangePacketBase(0x30018u), ArchId(0) {}
+    FRpcRequestAddItemPacket() : FRpcItemChangePacketBase(FLPACKET_CLIENT_REQADDITEM), ArchId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         return EncodeFields(ArchId, BufferHolder, Capacity, OutLength);
@@ -680,7 +680,7 @@ public:
 
 class FRpcRequestModifyItemPacket : public FRpcItemChangePacketBase {
 public:
-    FRpcRequestModifyItemPacket() : FRpcItemChangePacketBase(0x3001au), EquipId(0) {}
+    FRpcRequestModifyItemPacket() : FRpcItemChangePacketBase(FLPACKET_CLIENT_REQMODIFYITEM), EquipId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         return EncodeFields(EquipId, BufferHolder, Capacity, OutLength);
@@ -695,13 +695,13 @@ public:
     unsigned int EquipId;
 };
 
-using FRpcEnterBasePacket = FRpcScalarPacket<0x30007u, unsigned int, false>;
-using FRpcExitBasePacket = FRpcScalarPacket<0x3000du, unsigned int, false>;
-using FRpcEnterLocationPacket = FRpcScalarPacket<0x3000eu, unsigned int, false>;
-using FRpcExitLocationPacket = FRpcScalarPacket<0x3000fu, unsigned int, false>;
-using FRpcSystemSwitchOutCompletePacket = FRpcScalarPacket<0x3000bu, unsigned int, false>;
+using FRpcEnterBasePacket = FRpcScalarPacket<FLPACKET_CLIENT_ENTERBASE, unsigned int, false>;
+using FRpcExitBasePacket = FRpcScalarPacket<FLPACKET_CLIENT_EXITBASE, unsigned int, false>;
+using FRpcEnterLocationPacket = FRpcScalarPacket<FLPACKET_CLIENT_ENTERLOCATION, unsigned int, false>;
+using FRpcExitLocationPacket = FRpcScalarPacket<FLPACKET_CLIENT_EXITLOCATION, unsigned int, false>;
+using FRpcSystemSwitchOutCompletePacket = FRpcScalarPacket<FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE, unsigned int, false>;
 
-class FRpcRequestLaunchPacket : public FRpcScalarPacket<0x30004u, unsigned int, false> {
+class FRpcRequestLaunchPacket : public FRpcScalarPacket<FLPACKET_CLIENT_REQUESTLAUNCH, unsigned int, false> {
 public:
     void Dump(std::ostream& Out) const override;
     static int Factory(FPacketBase** OutPacket) {
@@ -727,8 +727,8 @@ public:
         return RpcWirePacketFactory<FRpcClientInfoRequestPacket>(OutPacket);
     }
 };
-using FRpcRequestBaseInfoPacket = FRpcClientInfoRequestPacket<0x30008u>;
-using FRpcRequestLocationInfoPacket = FRpcClientInfoRequestPacket<0x30009u>;
+using FRpcRequestBaseInfoPacket = FRpcClientInfoRequestPacket<FLPACKET_CLIENT_REQUESTBASEINFO>;
+using FRpcRequestLocationInfoPacket = FRpcClientInfoRequestPacket<FLPACKET_CLIENT_REQUESTLOCATIONINFO>;
 
 template<unsigned int Id>
 class FRpcEmptyPacket : public FPacketBase {
@@ -738,11 +738,11 @@ public:
         return RpcWirePacketFactory<FRpcEmptyPacket>(OutPacket);
     }
 };
-using FRpcRequestCharInfoPacket = FRpcEmptyPacket<0x30005u>;
-using FRpcRequestNewCharInfoPacket = FRpcEmptyPacket<0x30038u>;
-using FRpcSkipAutosavePacket = FRpcEmptyPacket<0x30042u>;
-using FRpcRequestCreateShipPacket = FRpcEmptyPacket<0x30010u>;
-using FRpcGfRequestShipInfoPacket = FRpcEmptyPacket<0x3000au>;
+using FRpcRequestCharInfoPacket = FRpcEmptyPacket<FLPACKET_CLIENT_REQUESTCHARINFO>;
+using FRpcRequestNewCharInfoPacket = FRpcEmptyPacket<FLPACKET_CLIENT_REQUESTNEWCHARINFO>;
+using FRpcSkipAutosavePacket = FRpcEmptyPacket<FLPACKET_CLIENT_SKIP_AUTOSAVE>;
+using FRpcRequestCreateShipPacket = FRpcEmptyPacket<FLPACKET_CLIENT_REQUESTCREATESHIP>;
+using FRpcGfRequestShipInfoPacket = FRpcEmptyPacket<FLPACKET_CLIENT_GFREQUESTSHIPINFO>;
 
 class FRpcDebugCreateShipPacket : public FPacketBase {
 public:
@@ -799,7 +799,7 @@ public:
 
 class FRpcDebugDestroyObjectPacket : public FPacketBase {
 public:
-    FRpcDebugDestroyObjectPacket() : FPacketBase(0x30025u) {}
+    FRpcDebugDestroyObjectPacket() : FPacketBase(FLPACKET_CLIENT_DBGDESTROYOBJECT) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -813,7 +813,7 @@ public:
 
 class FRpcDebugConsolePacket : public FPacketBase {
 public:
-    FRpcDebugConsolePacket() : FPacketBase(0x3002du), Field_0x00(0) {}
+    FRpcDebugConsolePacket() : FPacketBase(FLPACKET_CLIENT_DBGCONSOLE), Field_0x00(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -828,7 +828,7 @@ public:
 class FRpcDebugRelocateShipPacket : public FPacketBase {
 public:
     FRpcDebugRelocateShipPacket()
-        : FPacketBase(0x30030u), Position{0.0f, 0.0f, 0.0f} {}
+        : FPacketBase(FLPACKET_CLIENT_DBGRELOCATE_SHIP), Position{0.0f, 0.0f, 0.0f} {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -842,7 +842,7 @@ public:
 
 class FRpcDebugFreeSystemPacket : public FPacketBase {
 public:
-    FRpcDebugFreeSystemPacket() : FPacketBase(0x3002eu) {}
+    FRpcDebugFreeSystemPacket() : FPacketBase(FLPACKET_CLIENT_DBGFREESYSTEM) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -870,8 +870,8 @@ public:
         return RpcWirePacketFactory<FRpcCharacterIdPacket>(OutPacket);
     }
 };
-using FRpcSelectCharacterPacket = FRpcCharacterIdPacket<0x30006u>;
-using FRpcDestroyCharacterPacket = FRpcCharacterIdPacket<0x3003au>;
+using FRpcSelectCharacterPacket = FRpcCharacterIdPacket<FLPACKET_CLIENT_SELECTCHARACTER>;
+using FRpcDestroyCharacterPacket = FRpcCharacterIdPacket<FLPACKET_CLIENT_DESTROYCHAR>;
 
 class FRpcCreateNewCharacterPacket : public FPacketBase {
 public:
@@ -927,14 +927,14 @@ public:
     }
 };
 
-using FRpcSetWeaponGroupPacket = FRpcCommonBufferPacket<0x10011u, true>;
-using FRpcSetVisitedStatePacket = FRpcCommonBufferPacket<0x10013u>;
-using FRpcRequestBestPathPacket = FRpcCommonBufferPacket<0x10016u>;
-using FRpcRequestPlayerStatsPacket = FRpcCommonBufferPacket<0x10018u>;
-using FRpcRequestGroupPositionsPacket = FRpcCommonBufferPacket<0x10017u>;
-using FRpcSetMissionLogPacket = FRpcCommonBufferPacket<0x10019u>;
-using FRpcSetInterfaceStatePacket = FRpcCommonBufferPacket<0x1001cu>;
-using FRpcRequestRankLevelPacket = FRpcCommonBufferPacket<0x1001au>;
+using FRpcSetWeaponGroupPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_SET_WEAPON_GROUP, true>;
+using FRpcSetVisitedStatePacket = FRpcCommonBufferPacket<FLPACKET_COMMON_SET_VISITED_STATE>;
+using FRpcRequestBestPathPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_REQUEST_BEST_PATH>;
+using FRpcRequestPlayerStatsPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_REQUEST_PLAYER_STATS>;
+using FRpcRequestGroupPositionsPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_REQUEST_GROUP_POSITIONS>;
+using FRpcSetMissionLogPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_SET_MISSION_LOG>;
+using FRpcSetInterfaceStatePacket = FRpcCommonBufferPacket<FLPACKET_COMMON_SET_INTERFACE_STATE>;
+using FRpcRequestRankLevelPacket = FRpcCommonBufferPacket<FLPACKET_COMMON_REQUEST_RANK_LEVEL>;
 
 class FRpcUpdateObjectPacket : public FPacketBase {
 public:
@@ -1079,15 +1079,15 @@ public:
 
 class FRpcActivateEquipPacket : public FPacketBase {
 public:
-    FRpcActivateEquipPacket() : FPacketBase(0x10008u), EquipId(0) {}
+    FRpcActivateEquipPacket() : FPacketBase(FLPACKET_COMMON_ACTIVATEEQUIP), EquipId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         // RC06b67c60 / RS06bfef50: every failed reservation returns literal 0x16.
         FRpcWireStream Stream(*this, BufferHolder, Capacity);
         Stream.PutHeader();
-        if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
-        if (!Stream.Put(&EquipId, 2u)) return 0x16u;
-        if (!Stream.Put(&bActive, 1u)) return 0x16u;
+        if (!Stream.Put(&ObjectId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&EquipId, 2u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&bActive, 1u)) return kPacketEncodeOverflow;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1106,15 +1106,15 @@ public:
 
 class FRpcActivateCruisePacket : public FPacketBase {
 public:
-    FRpcActivateCruisePacket() : FPacketBase(0x1000eu) {}
+    FRpcActivateCruisePacket() : FPacketBase(FLPACKET_COMMON_ACTIVATECRUISE) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         // RC06b67f10 / RS06bff200: every failed reservation returns literal 0x16.
         FRpcWireStream Stream(*this, BufferHolder, Capacity);
         Stream.PutHeader();
-        if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
-        if (!Stream.Put(&bActive, 1u)) return 0x16u;
-        if (!Stream.Put(&bDisruptCruise, 1u)) return 0x16u;
+        if (!Stream.Put(&ObjectId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&bActive, 1u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&bDisruptCruise, 1u)) return kPacketEncodeOverflow;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1132,14 +1132,14 @@ public:
 
 class FRpcActivateThrustersPacket : public FPacketBase {
 public:
-    FRpcActivateThrustersPacket() : FPacketBase(0x10015u) {}
+    FRpcActivateThrustersPacket() : FPacketBase(FLPACKET_COMMON_ACTIVATETHRUSTERS) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         // RC06b686f0 / RS06bff9e0: every failed reservation returns literal 0x16.
         FRpcWireStream Stream(*this, BufferHolder, Capacity);
         Stream.PutHeader();
-        if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
-        if (!Stream.Put(&bActive, 1u)) return 0x16u;
+        if (!Stream.Put(&ObjectId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&bActive, 1u)) return kPacketEncodeOverflow;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1155,16 +1155,16 @@ public:
 
 class FRpcSetTargetPacket : public FPacketBase {
 public:
-    FRpcSetTargetPacket() : FPacketBase(0x10004u), SubObjId(0), TargetSubObjId(0) {}
+    FRpcSetTargetPacket() : FPacketBase(FLPACKET_COMMON_SETTARGET), SubObjId(0), TargetSubObjId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         // RC06b68980 / RS06bffc70: every failure returns EBP=0x16 (06b689d7).
         FRpcWireStream Stream(*this, BufferHolder, Capacity);
         Stream.PutHeader();
-        if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
-        if (!Stream.Put(&TargetId, 4u)) return 0x16u;
-        if (!Stream.Put(&SubObjId, 2u)) return 0x16u;
-        if (!Stream.Put(&TargetSubObjId, 2u)) return 0x16u;
+        if (!Stream.Put(&ObjectId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&TargetId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&SubObjId, 2u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&TargetSubObjId, 2u)) return kPacketEncodeOverflow;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1184,15 +1184,15 @@ public:
 
 class FRpcStopTradeLanePacket : public FPacketBase {
 public:
-    FRpcStopTradeLanePacket() : FPacketBase(0x10010u), ShipId(0), TradeLaneRing1(0), TradeLaneRing2(0) {}
+    FRpcStopTradeLanePacket() : FPacketBase(FLPACKET_COMMON_STOPTRADELANE), ShipId(0), TradeLaneRing1(0), TradeLaneRing2(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override {
         // RC06b68440 / RS06bff730: every failed reservation returns literal 0x16.
         FRpcWireStream Stream(*this, BufferHolder, Capacity);
         Stream.PutHeader();
-        if (!Stream.Put(&ShipId, 4u)) return 0x16u;
-        if (!Stream.Put(&TradeLaneRing1, 4u)) return 0x16u;
-        if (!Stream.Put(&TradeLaneRing2, 4u)) return 0x16u;
+        if (!Stream.Put(&ShipId, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&TradeLaneRing1, 4u)) return kPacketEncodeOverflow;
+        if (!Stream.Put(&TradeLaneRing2, 4u)) return kPacketEncodeOverflow;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1212,171 +1212,171 @@ public:
 // The registrator's native null/return contract is recovered separately.
 inline int RpcRegisterCommonScalarPackets(FPacketSerializer* Serializer) {
     if (Serializer == nullptr) return 4;
-    Serializer->RegisterType(0x10002u, "FLPACKET_COMMON_FIREWEAPON",
+    Serializer->RegisterType(FLPACKET_COMMON_FIREWEAPON, "FLPACKET_COMMON_FIREWEAPON",
         &RpcWirePacketFactory<FRpcFireWeaponPacket>);
-    Serializer->RegisterType(0x10001u, "FLPACKET_COMMON_UPDATEOBJECT",
+    Serializer->RegisterType(FLPACKET_COMMON_UPDATEOBJECT, "FLPACKET_COMMON_UPDATEOBJECT",
         &FRpcUpdateObjectPacket::Factory);
-    Serializer->RegisterType(0x10005u, "FLPACKET_COMMON_CHATMSG",
+    Serializer->RegisterType(FLPACKET_COMMON_CHATMSG, "FLPACKET_COMMON_CHATMSG",
         &FRpcChatMsgPacket::Factory);
-    Serializer->RegisterType(0x10008u, "FLPACKET_COMMON_ACTIVATEEQUIP",
+    Serializer->RegisterType(FLPACKET_COMMON_ACTIVATEEQUIP, "FLPACKET_COMMON_ACTIVATEEQUIP",
         &RpcWirePacketFactory<FRpcActivateEquipPacket>);
-    Serializer->RegisterType(0x10004u, "FLPACKET_COMMON_SETTARGET",
+    Serializer->RegisterType(FLPACKET_COMMON_SETTARGET, "FLPACKET_COMMON_SETTARGET",
         &RpcWirePacketFactory<FRpcSetTargetPacket>);
-    Serializer->RegisterType(0x1000eu, "FLPACKET_COMMON_ACTIVATECRUISE",
+    Serializer->RegisterType(FLPACKET_COMMON_ACTIVATECRUISE, "FLPACKET_COMMON_ACTIVATECRUISE",
         &RpcWirePacketFactory<FRpcActivateCruisePacket>);
-    Serializer->RegisterType(0x10015u, "FLPACKET_COMMON_ACTIVATETHRUSTERS",
+    Serializer->RegisterType(FLPACKET_COMMON_ACTIVATETHRUSTERS, "FLPACKET_COMMON_ACTIVATETHRUSTERS",
         &RpcWirePacketFactory<FRpcActivateThrustersPacket>);
-    Serializer->RegisterType(0x1000fu, "FLPACKET_COMMON_GOTRADELANE",
+    Serializer->RegisterType(FLPACKET_COMMON_GOTRADELANE, "FLPACKET_COMMON_GOTRADELANE",
         &RpcWirePacketFactory<FRpcGoTradeLanePacket>);
-    Serializer->RegisterType(0x10010u, "FLPACKET_COMMON_STOPTRADELANE",
+    Serializer->RegisterType(FLPACKET_COMMON_STOPTRADELANE, "FLPACKET_COMMON_STOPTRADELANE",
         &RpcWirePacketFactory<FRpcStopTradeLanePacket>);
-    Serializer->RegisterType(0x10011u, "FLPACKET_COMMON_SET_WEAPON_GROUP",
+    Serializer->RegisterType(FLPACKET_COMMON_SET_WEAPON_GROUP, "FLPACKET_COMMON_SET_WEAPON_GROUP",
         &FRpcSetWeaponGroupPacket::Factory);
-    Serializer->RegisterType(0x10012u, "FLPACKET_COMMON_PLAYER_TRADE",
+    Serializer->RegisterType(FLPACKET_COMMON_PLAYER_TRADE, "FLPACKET_COMMON_PLAYER_TRADE",
         &FRpcPlayerTradePacket::Factory);
-    Serializer->RegisterType(0x10013u, "FLPACKET_COMMON_SET_VISITED_STATE",
+    Serializer->RegisterType(FLPACKET_COMMON_SET_VISITED_STATE, "FLPACKET_COMMON_SET_VISITED_STATE",
         &FRpcSetVisitedStatePacket::Factory);
-    Serializer->RegisterType(0x10014u, "FLPACKET_COMMON_JETTISONCARGO",
+    Serializer->RegisterType(FLPACKET_COMMON_JETTISONCARGO, "FLPACKET_COMMON_JETTISONCARGO",
         &RpcWirePacketFactory<FRpcJettisonCargoPacket>);
-    Serializer->RegisterType(0x10016u, "FLPACKET_COMMON_REQUEST_BEST_PATH",
+    Serializer->RegisterType(FLPACKET_COMMON_REQUEST_BEST_PATH, "FLPACKET_COMMON_REQUEST_BEST_PATH",
         &FRpcRequestBestPathPacket::Factory);
-    Serializer->RegisterType(0x10018u, "FLPACKET_COMMON_REQUEST_PLAYER_STATS",
+    Serializer->RegisterType(FLPACKET_COMMON_REQUEST_PLAYER_STATS, "FLPACKET_COMMON_REQUEST_PLAYER_STATS",
         &FRpcRequestPlayerStatsPacket::Factory);
-    Serializer->RegisterType(0x1001bu, "FLPACKET_COMMON_POP_UP_DIALOG",
+    Serializer->RegisterType(FLPACKET_COMMON_POP_UP_DIALOG, "FLPACKET_COMMON_POP_UP_DIALOG",
         &FRpcPopUpDialogPacket::Factory);
-    Serializer->RegisterType(0x10017u, "FLPACKET_COMMON_REQUEST_GROUP_POSITIONS",
+    Serializer->RegisterType(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS, "FLPACKET_COMMON_REQUEST_GROUP_POSITIONS",
         &FRpcRequestGroupPositionsPacket::Factory);
-    Serializer->RegisterType(0x10019u, "FLPACKET_COMMON_SET_MISSION_LOG",
+    Serializer->RegisterType(FLPACKET_COMMON_SET_MISSION_LOG, "FLPACKET_COMMON_SET_MISSION_LOG",
         &FRpcSetMissionLogPacket::Factory);
-    Serializer->RegisterType(0x1001au, "FLPACKET_COMMON_REQUEST_RANK_LEVEL",
+    Serializer->RegisterType(FLPACKET_COMMON_REQUEST_RANK_LEVEL, "FLPACKET_COMMON_REQUEST_RANK_LEVEL",
         &FRpcRequestRankLevelPacket::Factory);
-    Serializer->RegisterType(0x1001cu, "FLPACKET_COMMON_SET_INTERFACE_STATE",
+    Serializer->RegisterType(FLPACKET_COMMON_SET_INTERFACE_STATE, "FLPACKET_COMMON_SET_INTERFACE_STATE",
         &FRpcSetInterfaceStatePacket::Factory);
-    Serializer->RegisterType(0x1001du, "FLPACKET_COMMON_TRACTOROBJECTS",
+    Serializer->RegisterType(FLPACKET_COMMON_TRACTOROBJECTS, "FLPACKET_COMMON_TRACTOROBJECTS",
         &RpcWirePacketFactory<FRpcTractorObjectsPacket>);
     return 0;
 }
 
 inline int RpcRegisterClientScalarPackets(FPacketSerializer* Serializer) {
     if (Serializer == nullptr) return 4;
-    Serializer->RegisterType(0x3001cu, "FLPACKET_CLIENT_REQCHANGECASH",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQCHANGECASH, "FLPACKET_CLIENT_REQCHANGECASH",
         &FRpcRequestChangeCashPacket::Factory);
-    Serializer->RegisterType(0x3001bu, "FLPACKET_CLIENT_REQSETCASH",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQSETCASH, "FLPACKET_CLIENT_REQSETCASH",
         &FRpcRequestSetCashPacket::Factory);
-    Serializer->RegisterType(0x30019u, "FLPACKET_CLIENT_REQREMOVEITEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQREMOVEITEM, "FLPACKET_CLIENT_REQREMOVEITEM",
         &FRpcRequestRemoveItemPacket::Factory);
-    Serializer->RegisterType(0x3001au, "FLPACKET_CLIENT_REQMODIFYITEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQMODIFYITEM, "FLPACKET_CLIENT_REQMODIFYITEM",
         &FRpcRequestModifyItemPacket::Factory);
-    Serializer->RegisterType(0x30017u, "FLPACKET_CLIENT_REQCARGO",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQCARGO, "FLPACKET_CLIENT_REQCARGO",
         &FRpcRequestCargoPacket::Factory);
-    Serializer->RegisterType(0x30018u, "FLPACKET_CLIENT_REQADDITEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQADDITEM, "FLPACKET_CLIENT_REQADDITEM",
         &FRpcRequestAddItemPacket::Factory);
-    Serializer->RegisterType(0x30015u, "FLPACKET_CLIENT_REQSHIPARCH",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQSHIPARCH, "FLPACKET_CLIENT_REQSHIPARCH",
         &FRpcRequestShipArchPacket::Factory);
-    Serializer->RegisterType(0x30016u, "FLPACKET_CLIENT_REQEQUIPMENT",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQEQUIPMENT, "FLPACKET_CLIENT_REQEQUIPMENT",
         &FRpcRequestEquipmentPacket::Factory);
-    Serializer->RegisterType(0x30003u, "FLPACKET_CLIENT_MUNCOLLISION",
+    Serializer->RegisterType(FLPACKET_CLIENT_MUNCOLLISION, "FLPACKET_CLIENT_MUNCOLLISION",
         &FRpcMunitionCollisionPacket::Factory);
-    Serializer->RegisterType(0x3003du, "FLPACKET_CLIENT_BADLANDSOBJCOLLISION",
+    Serializer->RegisterType(FLPACKET_CLIENT_BADLANDSOBJCOLLISION, "FLPACKET_CLIENT_BADLANDSOBJCOLLISION",
         &FRpcBadlandsObjectCollisionPacket::Factory);
-    Serializer->RegisterType(0x3000cu, "FLPACKET_CLIENT_OBJCOLLISION",
+    Serializer->RegisterType(FLPACKET_CLIENT_OBJCOLLISION, "FLPACKET_CLIENT_OBJCOLLISION",
         &FRpcObjectCollisionPacket::Factory);
-    Serializer->RegisterType(0x30031u, "FLPACKET_CLIENT_REQUEST_EVENT",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUEST_EVENT, "FLPACKET_CLIENT_REQUEST_EVENT",
         &FRpcRequestEventPacket::Factory);
-    Serializer->RegisterType(0x30032u, "FLPACKET_CLIENT_REQUEST_CANCEL",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUEST_CANCEL, "FLPACKET_CLIENT_REQUEST_CANCEL",
         &FRpcRequestCancelPacket::Factory);
-    Serializer->RegisterType(0x3002bu, "FLPACKET_CLIENT_CARGOSCAN",
+    Serializer->RegisterType(FLPACKET_CLIENT_CARGOSCAN, "FLPACKET_CLIENT_CARGOSCAN",
         &FRpcCargoScanPacket::Factory);
-    Serializer->RegisterType(0x30004u, "FLPACKET_CLIENT_REQUESTLAUNCH",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTLAUNCH, "FLPACKET_CLIENT_REQUESTLAUNCH",
         &FRpcRequestLaunchPacket::Factory);
-    Serializer->RegisterType(0x30005u, "FLPACKET_CLIENT_REQUESTCHARINFO",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTCHARINFO, "FLPACKET_CLIENT_REQUESTCHARINFO",
         &FRpcRequestCharInfoPacket::Factory);
-    Serializer->RegisterType(0x30042u, "FLPACKET_CLIENT_SKIP_AUTOSAVE",
+    Serializer->RegisterType(FLPACKET_CLIENT_SKIP_AUTOSAVE, "FLPACKET_CLIENT_SKIP_AUTOSAVE",
         &FRpcSkipAutosavePacket::Factory);
-    Serializer->RegisterType(0x30006u, "FLPACKET_CLIENT_SELECTCHARACTER",
+    Serializer->RegisterType(FLPACKET_CLIENT_SELECTCHARACTER, "FLPACKET_CLIENT_SELECTCHARACTER",
         &FRpcSelectCharacterPacket::Factory);
-    Serializer->RegisterType(0x30037u, "FLPACKET_CLIENT_COMMCOMPLETE",
+    Serializer->RegisterType(FLPACKET_CLIENT_COMMCOMPLETE, "FLPACKET_CLIENT_COMMCOMPLETE",
         &FRpcCommCompletePacket::Factory);
-    Serializer->RegisterType(0x30038u, "FLPACKET_CLIENT_REQUESTNEWCHARINFO",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTNEWCHARINFO, "FLPACKET_CLIENT_REQUESTNEWCHARINFO",
         &FRpcRequestNewCharInfoPacket::Factory);
-    Serializer->RegisterType(0x30039u, "FLPACKET_CLIENT_CREATENEWCHAR",
+    Serializer->RegisterType(FLPACKET_CLIENT_CREATENEWCHAR, "FLPACKET_CLIENT_CREATENEWCHAR",
         &FRpcCreateNewCharacterPacket::Factory);
-    Serializer->RegisterType(0x3003au, "FLPACKET_CLIENT_DESTROYCHAR",
+    Serializer->RegisterType(FLPACKET_CLIENT_DESTROYCHAR, "FLPACKET_CLIENT_DESTROYCHAR",
         &FRpcDestroyCharacterPacket::Factory);
-    Serializer->RegisterType(0x30001u, "FLPACKET_CLIENT_LOGIN", &FRpcClientLoginPacket::Factory);
-    Serializer->RegisterType(0x30007u, "FLPACKET_CLIENT_ENTERBASE",
+    Serializer->RegisterType(FLPACKET_CLIENT_LOGIN, "FLPACKET_CLIENT_LOGIN", &FRpcClientLoginPacket::Factory);
+    Serializer->RegisterType(FLPACKET_CLIENT_ENTERBASE, "FLPACKET_CLIENT_ENTERBASE",
         &FRpcEnterBasePacket::Factory);
-    Serializer->RegisterType(0x30008u, "FLPACKET_CLIENT_REQUESTBASEINFO",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTBASEINFO, "FLPACKET_CLIENT_REQUESTBASEINFO",
         &FRpcRequestBaseInfoPacket::Factory);
-    Serializer->RegisterType(0x30009u, "FLPACKET_CLIENT_REQUESTLOCATIONINFO",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTLOCATIONINFO, "FLPACKET_CLIENT_REQUESTLOCATIONINFO",
         &FRpcRequestLocationInfoPacket::Factory);
-    Serializer->RegisterType(0x3000au, "FLPACKET_CLIENT_GFREQUESTSHIPINFO",
+    Serializer->RegisterType(FLPACKET_CLIENT_GFREQUESTSHIPINFO, "FLPACKET_CLIENT_GFREQUESTSHIPINFO",
         &FRpcGfRequestShipInfoPacket::Factory);
-    Serializer->RegisterType(0x3000bu, "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE",
+    Serializer->RegisterType(FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE, "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE",
         &FRpcSystemSwitchOutCompletePacket::Factory);
-    Serializer->RegisterType(0x3000du, "FLPACKET_CLIENT_EXITBASE",
+    Serializer->RegisterType(FLPACKET_CLIENT_EXITBASE, "FLPACKET_CLIENT_EXITBASE",
         &FRpcExitBasePacket::Factory);
-    Serializer->RegisterType(0x3000eu, "FLPACKET_CLIENT_ENTERLOCATION",
+    Serializer->RegisterType(FLPACKET_CLIENT_ENTERLOCATION, "FLPACKET_CLIENT_ENTERLOCATION",
         &FRpcEnterLocationPacket::Factory);
-    Serializer->RegisterType(0x3000fu, "FLPACKET_CLIENT_EXITLOCATION",
+    Serializer->RegisterType(FLPACKET_CLIENT_EXITLOCATION, "FLPACKET_CLIENT_EXITLOCATION",
         &FRpcExitLocationPacket::Factory);
-    Serializer->RegisterType(0x30010u, "FLPACKET_CLIENT_REQUESTCREATESHIP",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUESTCREATESHIP, "FLPACKET_CLIENT_REQUESTCREATESHIP",
         &FRpcRequestCreateShipPacket::Factory);
-    Serializer->RegisterType(0x30035u, "FLPACKET_CLIENT_INTERFACEITEMUSED",
+    Serializer->RegisterType(FLPACKET_CLIENT_INTERFACEITEMUSED, "FLPACKET_CLIENT_INTERFACEITEMUSED",
         &FRpcInterfaceItemUsedPacket::Factory);
-    Serializer->RegisterType(0x30047u, "FLPACKET_CLIENT_RTCDONE",
+    Serializer->RegisterType(FLPACKET_CLIENT_RTCDONE, "FLPACKET_CLIENT_RTCDONE",
         &FRpcRtcDonePacket::Factory);
-    Serializer->RegisterType(0x30041u, "FLPACKET_CLIENT_ABORT_MISSION",
+    Serializer->RegisterType(FLPACKET_CLIENT_ABORT_MISSION, "FLPACKET_CLIENT_ABORT_MISSION",
         &FRpcAbortMissionPacket::Factory);
-    Serializer->RegisterType(0x3003eu, "FLPACKET_CLIENT_LAUNCHCOMPLETE",
+    Serializer->RegisterType(FLPACKET_CLIENT_LAUNCHCOMPLETE, "FLPACKET_CLIENT_LAUNCHCOMPLETE",
         &FRpcLaunchCompletePacket::Factory);
-    Serializer->RegisterType(0x30043u, "FLPACKET_CLIENT_JUMPINCOMPLETE",
+    Serializer->RegisterType(FLPACKET_CLIENT_JUMPINCOMPLETE, "FLPACKET_CLIENT_JUMPINCOMPLETE",
         &FRpcJumpInCompletePacket::Factory);
-    Serializer->RegisterType(0x3003fu, "FLPACKET_CLIENT_HAIL",
+    Serializer->RegisterType(FLPACKET_CLIENT_HAIL, "FLPACKET_CLIENT_HAIL",
         &FRpcHailPacket::Factory);
-    Serializer->RegisterType(0x30012u, "FLPACKET_CLIENT_GFGOODBUY",
+    Serializer->RegisterType(FLPACKET_CLIENT_GFGOODBUY, "FLPACKET_CLIENT_GFGOODBUY",
         &FRpcGfGoodBuyPacket::Factory);
-    Serializer->RegisterType(0x30011u, "FLPACKET_CLIENT_GFGOODSELL",
+    Serializer->RegisterType(FLPACKET_CLIENT_GFGOODSELL, "FLPACKET_CLIENT_GFGOODSELL",
         &FRpcGfGoodSellPacket::Factory);
-    Serializer->RegisterType(0x3003cu, "FLPACKET_CLIENT_GFGOODVAPORIZED",
+    Serializer->RegisterType(FLPACKET_CLIENT_GFGOODVAPORIZED, "FLPACKET_CLIENT_GFGOODVAPORIZED",
         &FRpcGfGoodVaporizedPacket::Factory);
-    Serializer->RegisterType(0x30013u, "FLPACKET_CLIENT_GFSELECTOBJECT",
+    Serializer->RegisterType(FLPACKET_CLIENT_GFSELECTOBJECT, "FLPACKET_CLIENT_GFSELECTOBJECT",
         &FRpcGfSelectObjectPacket::Factory);
-    Serializer->RegisterType(0x3001eu, "FLPACKET_CLIENT_SAVEGAME",
+    Serializer->RegisterType(FLPACKET_CLIENT_SAVEGAME, "FLPACKET_CLIENT_SAVEGAME",
         &FRpcSaveGamePacket::Factory);
-    Serializer->RegisterType(0x30020u, "FLPACKET_CLIENT_MINEASTEROID",
+    Serializer->RegisterType(FLPACKET_CLIENT_MINEASTEROID, "FLPACKET_CLIENT_MINEASTEROID",
         &FRpcMineAsteroidPacket::Factory);
-    Serializer->RegisterType(0x30014u, "FLPACKET_CLIENT_MISSIONRESPONSE",
+    Serializer->RegisterType(FLPACKET_CLIENT_MISSIONRESPONSE, "FLPACKET_CLIENT_MISSIONRESPONSE",
         &FRpcMissionResponsePacket::Factory);
-    Serializer->RegisterType(0x30027u, "FLPACKET_CLIENT_TRADERESPONSE",
+    Serializer->RegisterType(FLPACKET_CLIENT_TRADERESPONSE, "FLPACKET_CLIENT_TRADERESPONSE",
         &FRpcTradeResponsePacket::Factory);
-    Serializer->RegisterType(0x30022u, "FLPACKET_CLIENT_DBGCREATESHIP",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGCREATESHIP, "FLPACKET_CLIENT_DBGCREATESHIP",
         &FRpcDebugCreateShipPacket::Factory);
-    Serializer->RegisterType(0x30023u, "FLPACKET_CLIENT_DBGLOADSYSTEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGLOADSYSTEM, "FLPACKET_CLIENT_DBGLOADSYSTEM",
         &FRpcDebugLoadSystemPacket::Factory);
-    Serializer->RegisterType(0x3002eu, "FLPACKET_CLIENT_DBGFREESYSTEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGFREESYSTEM, "FLPACKET_CLIENT_DBGFREESYSTEM",
         &FRpcDebugFreeSystemPacket::Factory);
-    Serializer->RegisterType(0x30024u, "FLPACKET_CLIENT_DOCK",
+    Serializer->RegisterType(FLPACKET_CLIENT_DOCK, "FLPACKET_CLIENT_DOCK",
         &FRpcDockPacket::Factory);
-    Serializer->RegisterType(0x3002du, "FLPACKET_CLIENT_DBGCONSOLE",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGCONSOLE, "FLPACKET_CLIENT_DBGCONSOLE",
         &FRpcDebugConsolePacket::Factory);
-    Serializer->RegisterType(0x30025u, "FLPACKET_CLIENT_DBGDESTROYOBJECT",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGDESTROYOBJECT, "FLPACKET_CLIENT_DBGDESTROYOBJECT",
         &FRpcDebugDestroyObjectPacket::Factory);
-    Serializer->RegisterType(0x30030u, "FLPACKET_CLIENT_DBGRELOCATE_SHIP",
+    Serializer->RegisterType(FLPACKET_CLIENT_DBGRELOCATE_SHIP, "FLPACKET_CLIENT_DBGRELOCATE_SHIP",
         &FRpcDebugRelocateShipPacket::Factory);
-    Serializer->RegisterType(0x3002fu, "FLPACKET_CLIENT_SETMANEUVER",
+    Serializer->RegisterType(FLPACKET_CLIENT_SETMANEUVER, "FLPACKET_CLIENT_SETMANEUVER",
         &FRpcSetManeuverPacket::Factory);
-    Serializer->RegisterType(0x30036u, "FLPACKET_CLIENT_REQCOLLISIONGROUPS",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQCOLLISIONGROUPS, "FLPACKET_CLIENT_REQCOLLISIONGROUPS",
         &FRpcRequestCollisionGroupsPacket::Factory);
-    Serializer->RegisterType(0x3003bu, "FLPACKET_CLIENT_REQHULLSTATUS",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQHULLSTATUS, "FLPACKET_CLIENT_REQHULLSTATUS",
         &FRpcRequestHullStatusPacket::Factory);
-    Serializer->RegisterType(0x30040u, "FLPACKET_CLIENT_REQUEST_USE_ITEM",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQUEST_USE_ITEM, "FLPACKET_CLIENT_REQUEST_USE_ITEM",
         &FRpcRequestUseItemPacket::Factory);
-    Serializer->RegisterType(0x30044u, "FLPACKET_CLIENT_REQINVINCIBILITY",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQINVINCIBILITY, "FLPACKET_CLIENT_REQINVINCIBILITY",
         &FRpcRequestInvincibilityPacket::Factory);
-    Serializer->RegisterType(0x30045u, "FLPACKET_CLIENT_MISSIONSAVEB",
+    Serializer->RegisterType(FLPACKET_CLIENT_MISSIONSAVEB, "FLPACKET_CLIENT_MISSIONSAVEB",
         &FRpcMissionSaveBPacket::Factory);
-    Serializer->RegisterType(0x30046u, "FLPACKET_CLIENT_REQDIFFICULTYSCALE",
+    Serializer->RegisterType(FLPACKET_CLIENT_REQDIFFICULTYSCALE, "FLPACKET_CLIENT_REQDIFFICULTYSCALE",
         &FRpcRequestDifficultyScalePacket::Factory);
     return 0;
 }

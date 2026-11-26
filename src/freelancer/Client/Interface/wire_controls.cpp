@@ -168,7 +168,7 @@ void WireStaticControl::SetPosition(Vector const* NewPosition)
     bAttached = 1;
 
     Vector Placed;
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         Vector Attach;
         GetAttachPosition(&Attach); // slot 41
@@ -184,7 +184,7 @@ void WireStaticControl::SetPosition(Vector const* NewPosition)
     }
     WinControl::SetPosition(&Placed); // FUN_005a0880
 
-    if ((PositionFlags & 1) != 0)
+    if ((PositionFlags & kWinPositionAddOffset) != 0)
     {
         WireCenter[0] = Offset.x + Position.x;
         WireCenter[1] = Offset.y + Position.y;
@@ -216,7 +216,7 @@ bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
     // FUN_005a3ea0: re-placing the parent at its own position positions this control with it.
     Win3DReparent(this, NewParent); // FUN_0059dd00
     Win3DRegister(this);            // FUN_0059dbf0
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     if (Parent != nullptr)
         Parent->SetPosition(&Parent->Position);
     return true;
@@ -322,7 +322,7 @@ void WireStaticControl::Draw()
                               static_cast<unsigned long>(Rgba[2]);
 
     // Bit 2, the bottom edge, (-hx, -hy) -> (hx, -hy).
-    if ((EdgeMask & 0x4) != 0)
+    if ((EdgeMask & kWireEdgeBottom) != 0)
     {
         Vector const To = {Center[0] + CornerB[0], Center[1] + CornerB[1],
                            Center[2] + CornerB[2]};
@@ -333,7 +333,7 @@ void WireStaticControl::Draw()
     // Bit 1, the right edge, (hx, -hy) -> (hx, hy).
     CornerA[0] = -CornerA[0];
     CornerA[1] = -CornerA[1];
-    if ((EdgeMask & 0x2) != 0)
+    if ((EdgeMask & kWireEdgeRight) != 0)
     {
         Vector const To = {Center[0] + CornerA[0], Center[1] + CornerA[1],
                            Center[2] + CornerA[2]};
@@ -344,7 +344,7 @@ void WireStaticControl::Draw()
     // Bit 0, the top edge, (hx, hy) -> (-hx, hy).
     CornerB[0] = -CornerB[0];
     CornerB[1] = -CornerB[1];
-    if ((EdgeMask & 0x1) != 0)
+    if ((EdgeMask & kWireEdgeTop) != 0)
     {
         Vector const To = {Center[0] + CornerB[0], Center[1] + CornerB[1],
                            Center[2] + CornerB[2]};
@@ -356,7 +356,7 @@ void WireStaticControl::Draw()
     CornerA[0] = -HalfExtents.x;
     CornerA[1] = -HalfExtents.y;
     CornerA[2] = -HalfExtents.z;
-    if ((EdgeMask & 0x8) != 0)
+    if ((EdgeMask & kWireEdgeLeft) != 0)
     {
         Vector const To = {CornerA[0] + Center[0], CornerA[1] + Center[1],
                            CornerA[2] + Center[2]};
@@ -388,7 +388,7 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_005a3b00.
     switch (Msg)
     {
-    case 0x0c:
+    case kWinPropLit:
         WireState = static_cast<unsigned char>((WireState & ~kWireLit) | ((A != 0) ? kWireLit : 0));
         return 0;
     case kWinNotifyHighlight:
@@ -401,7 +401,7 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         memcpy(Colour, reinterpret_cast<void const*>(A), sizeof(Colour));
         bUseColour = (B == 1) ? 1 : 0;
         return 0;
-    case 0x34:
+    case kWinPropDrawInactive:
         WireState = static_cast<unsigned char>(WireState & ~kWireDrawInactive);
         if (A != 0)
             WireState = static_cast<unsigned char>(WireState | kWireDrawInactive);
@@ -421,7 +421,7 @@ void WireStaticControl::Init(Vector const* NewOffset, Vector const* NewHalfExten
                              int NewToolTipIds, unsigned NewEdgeMask)
 {
     // FUN_005a3360.
-    EdgeMask = (NewEdgeMask != 0) ? NewEdgeMask : 0xf;
+    EdgeMask = (NewEdgeMask != 0) ? NewEdgeMask : kWireEdgeAll;
     Offset.x = NewOffset->x;
     Offset.y = NewOffset->y;
     Offset.z = NewOffset->z;
@@ -648,7 +648,7 @@ void WireButtonControl::ShowToolTip()
 intptr_t WireButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_005a4690.
-    if (Msg == 0x2e)
+    if (Msg == kButtonPropGetCommand)
     {
         *reinterpret_cast<int*>(A) = CommandId;
         return 0;
@@ -723,7 +723,7 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, Vector const* New
                          HalfExtents.y + HalfExtents.y);                // FUN_00579cc0
     TextWin->SetAutoScrollbar(false);                                     // FUN_005799f0
     TextWin->SetNeverHit(true);                                           // FUN_00579880
-    TextWin->SetAlignMode(2);                                             // FUN_00579a60
+    TextWin->SetAlignMode(kRichAlignMiddle);                                             // FUN_00579a60
 
     if (CaptionIds == 0)
         return;
@@ -767,31 +767,31 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
         if (Next == nullptr || (Next->Flags & kWin3DVisible) == 0 || (Next->Flags & kWin3DActive) == 0
             || (Cur->WireState & kWireLit) != 0 || bAlone != 0)
         {
-            Cur->EdgeMask = 0xf;
+            Cur->EdgeMask = kWireEdgeAll;
         }
         else if (bFocused == 0 && (Cur->WireState & kWireHovered) == 0)
         {
             if (Prev != nullptr && (Prev->WireState & (kWireHovered | kWireFocused | kWireLit)) != 0)
-                Cur->EdgeMask = 0xa;
+                Cur->EdgeMask = kWireEdgeRight | kWireEdgeLeft;
             else
-                Cur->EdgeMask = 0xb;
+                Cur->EdgeMask = kWireEdgeTop | kWireEdgeRight | kWireEdgeLeft;
         }
         else
         {
-            Cur->EdgeMask = 0xa;
+            Cur->EdgeMask = kWireEdgeRight | kWireEdgeLeft;
             if (Prev == nullptr || (Prev->WireState & kWireLit) == 0)
-                Cur->EdgeMask = 0xb;
+                Cur->EdgeMask = kWireEdgeTop | kWireEdgeRight | kWireEdgeLeft;
             if ((Next->WireState & kWireLit) == 0)
-                Cur->EdgeMask |= 4;
+                Cur->EdgeMask |= kWireEdgeBottom;
         }
 
         // A coloured control below an uncoloured one takes over the shared edge: the previous
         // one gets its bottom edge, this one loses its top edge.
-        if (Prev != nullptr && (Prev->EdgeMask & 4) == 0 && (Cur->EdgeMask & 1) != 0
-            && Prev->bUseColour == 0 && Cur->bUseColour != 0)
+        if (Prev != nullptr && (Prev->EdgeMask & kWireEdgeBottom) == 0 &&
+            (Cur->EdgeMask & kWireEdgeTop) != 0 && Prev->bUseColour == 0 && Cur->bUseColour != 0)
         {
-            Prev->EdgeMask |= 4;
-            Cur->EdgeMask &= ~1u;
+            Prev->EdgeMask |= kWireEdgeBottom;
+            Cur->EdgeMask &= ~static_cast<unsigned>(kWireEdgeTop);
         }
 
         Prev = Cur;

@@ -48,10 +48,10 @@ namespace
         Desc->Size = 0x34;
         Desc->ComponentName = "FileSystem";
         Desc->DataPath = Path;
-        Desc->Access = 0x80000000u;
-        Desc->ShareMode = 1;
-        Desc->Creation = 3;
-        Desc->Flags = 0x8000080u;
+        Desc->Access = GENERIC_READ;
+        Desc->ShareMode = FILE_SHARE_READ;
+        Desc->Creation = OPEN_EXISTING;
+        Desc->Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc->FindHandle = 0xffffffffu;
     }
 
@@ -153,10 +153,10 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = Path;
-    Desc.Access = 0x80000000u;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080u;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
 
     void* FsOut = nullptr;

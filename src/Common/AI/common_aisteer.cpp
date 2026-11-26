@@ -591,7 +591,7 @@ namespace
 bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix& WorkingFrame, Vector& BankVector, unsigned char Mode)
 {
     // FAiTarget::GetFlags inlined; bit 0x30000 required.
-    if ((Elem->GetFlags() & 0x30000) == 0)
+    if ((Elem->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) == 0)
         return false;
 
     bool bSteered = false;

@@ -183,5 +183,5 @@ bool FContentSpaceObj::FindOrAllocAttacker(unsigned int VictimId, FSpaceObjAttac
 // FUN_06f34670 (result dropped).
 void FContentSpaceObj::DestroySpaceObj()
 {
-    pub::SpaceObj::Destroy(SpaceObjId, DESTROY_NORMAL);
+    pub::SpaceObj::Destroy(SpaceObjId, DESTROY_VANISH);
 }

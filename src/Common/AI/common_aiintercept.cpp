@@ -133,8 +133,8 @@ bool IsWithinInterceptRange(FAiTarget* Elem, FAiTarget* Target, float Threshold)
     // FAiTarget::GetFlags inlined twice by retail; the target's flags are read only
     // when Elem's have 0x30000.
     bool HaveBoth = false;
-    if ((Elem->GetFlags() & 0x30000) != 0)
-        HaveBoth = (Target->GetFlags() & 0x30000) != 0;
+    if ((Elem->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0)
+        HaveBoth = (Target->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0;
 
     // Unrounded clearance; less or equal is in range, unordered is not.
     double const Clearance = HaveBoth
@@ -147,8 +147,8 @@ bool IsWithinInterceptRange(FAiTarget* Elem, FAiTarget* Target, float Threshold)
 double GetInterceptClearance(FAiTarget* Elem, FAiTarget* Target)
 {
     bool HaveBoth = false;
-    if ((Elem->GetFlags() & 0x30000) != 0)
-        HaveBoth = (Target->GetFlags() & 0x30000) != 0;
+    if ((Elem->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0)
+        HaveBoth = (Target->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0;
 
     return HaveBoth
         ? ComputeCachedRadialClearance(Elem, Target)
@@ -165,9 +165,9 @@ bool IsWithinInterceptRangeOfIface(FAiTarget* Elem, IObjInspect const* TargetIfa
     unsigned TargetFlags = 0;
     TargetIface->get_type(TargetFlags);
 
-    bool const ElemHasFlag = (Elem->GetFlags() & 0x30000) != 0;
+    bool const ElemHasFlag = (Elem->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0;
 
-    bool const UseCached = (ElemHasFlag && (TargetFlags & 0x30000) != 0) || (TargetFlags & 0x207) != 0;
+    bool const UseCached = (ElemHasFlag && (TargetFlags & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0) || (TargetFlags & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_WAYPOINT)) != 0;
 
     // Unrounded from here to the final compare.
     double Clearance;
@@ -214,8 +214,8 @@ double GetInterceptClearanceOfIface(FAiTarget* Elem, IObjInspect const* TargetIf
     unsigned TargetFlags = 0;
     TargetIface->get_type(TargetFlags);
 
-    bool const ElemHasFlag = (Elem->GetFlags() & 0x30000) != 0;
-    bool const UseCached = (ElemHasFlag && (TargetFlags & 0x30000) != 0) || (TargetFlags & 0x207) != 0;
+    bool const ElemHasFlag = (Elem->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0;
+    bool const UseCached = (ElemHasFlag && (TargetFlags & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0) || (TargetFlags & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_WAYPOINT)) != 0;
 
     if (!UseCached)
     {

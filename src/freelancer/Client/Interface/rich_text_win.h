@@ -86,6 +86,15 @@ struct FRichTextSurface
     int Height;              // +0x10
 };
 
+// BaseRichTextWin::AlignMode (SetAlignMode): where the text sits vertically in the window.
+enum ERichTextAlign
+{
+    kRichAlignScroll = 0,    // the vertical scroll position decides
+    kRichAlignTop = 1,       // origin 0
+    kRichAlignMiddle = 2,    // the layout centred
+    kRichAlignBottom = 3     // the layout end at the window bottom
+};
+
 class BaseRichTextWin : public WinControl
 {
 public:
@@ -292,6 +301,14 @@ static_assert(offsetof(RichTextWin, LayoutFlag) == 0x494, "RichTextWin +0x494");
 //   password mode, +0x50c case mode, +0x510 max length, +0x514 set<wchar_t> filter,
 //   +0x528 replacement character ('_'), +0x52a filter is an allow list, +0x52b IME enabled,
 //   +0x52c FLImeInputBox*.
+
+// RichTextEditWin::CaseMode (SetCaseMode): the case typed and set characters are folded to.
+enum ERichTextCase
+{
+    kRichCaseKeep = 0,
+    kRichCaseUpper = 1,
+    kRichCaseLower = 2
+};
 
 // +0x4c4 element (0xc bytes in retail: the character, two bytes of padding and an 8-byte
 // TextRenderAttributes of which every copy moves only the first dword).

@@ -169,13 +169,13 @@ void CELauncher::GetStatus(EquipStatus& OutStatus) const
     {
         if (GetAmmoCount() == 0)
         {
-            OutStatus.EquipFlags |= 4;
+            OutStatus.EquipFlags |= LauncherStatusInsufficientAmmo;
             return;
         }
         if (PowerNeedsMet())
-            OutStatus.EquipFlags |= 8;
+            OutStatus.EquipFlags |= LauncherStatusPowerNeedsMet;
         if (RefireDelayElapsed())
-            OutStatus.EquipFlags |= 2;
+            OutStatus.EquipFlags |= LauncherStatusRefireElapsed;
     }
 }
 

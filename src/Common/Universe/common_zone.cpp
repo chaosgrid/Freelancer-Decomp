@@ -839,6 +839,14 @@ namespace
         return Plane;
     }
 
+    // The result of EllipsoidPlaneSide, and the side a sphere is classified on in
+    // FrustumCullsSphere.
+    enum EPlaneSide
+    {
+        kPlaneSideStraddle = 0,
+        kPlaneSideFront = 1,
+        kPlaneSideBehind = 2,
+    };
     // FUN_0633cb50 (thiscall on the ellipsoid): which side of Plane the ellipsoid lies -- 0 when
     // it straddles (or unordered), 2 behind, 1 in front. The transpose is built with
     // FUN_06284f70.
@@ -859,10 +867,10 @@ namespace
                                (double)(Spread.x) * Plane.Normal.x) +
                               (double)(Spread.y) * Plane.Normal.y;
         if (!(Extent <= Dist * Dist))
-            return 0;
+            return kPlaneSideStraddle;
         if (Dist < 0.0f)
-            return 2;
-        return 1;
+            return kPlaneSideBehind;
+        return kPlaneSideFront;
     }
 
     // FUN_0633d1e0 (cdecl): true when the sphere lies wholly on the outer side of one of the six
@@ -923,12 +931,12 @@ namespace
                                   (double)(Plane.Normal.z) * Sphere.Center.z) +
                                  (double)(Plane.Normal.y) * Sphere.Center.y) - Plane.D;
             double const Radius = Sphere.Radius;
-            int Side = 0;
+            int Side = kPlaneSideStraddle;
             if (Dist > Radius)
-                Side = 1;
+                Side = kPlaneSideFront;
             else if (Dist < -Radius)
-                Side = 2;
-            if (Side == 2)
+                Side = kPlaneSideBehind;
+            if (Side == kPlaneSideBehind)
                 return true;
         }
         return false;
@@ -1040,7 +1048,7 @@ namespace
         Vector const Dir = bHorizontal ? MakeVector(Sin, 0.0f, NegCos) : MakeVector(0.0f, Sin, NegCos);
         FCullPlane Plane;
         CullPlaneSet(Plane, Center, Dir);
-        return EllipsoidPlaneSide(Ellipsoid, Plane) == 1;
+        return EllipsoidPlaneSide(Ellipsoid, Plane) == kPlaneSideFront;
     }
 }
 
@@ -1903,15 +1911,17 @@ bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const
     {
         FCullPlane const Plane = FrustumPlane(Frustum, Index);
         Sides[Index] = EllipsoidPlaneSide(Ellipsoid, Plane);
-        if (Sides[Index] == 2)
+        if (Sides[Index] == kPlaneSideBehind)
             return true;
     }
-    if (Sides[1] != 0)
+    if (Sides[1] != kPlaneSideStraddle)
         return false;
 
     // Bit 0..3 = side 2..5 straddles.
-    unsigned const Straddle = (Sides[2] == 0 ? 1u : 0u) | (Sides[3] == 0 ? 2u : 0u) |
-                              (Sides[4] == 0 ? 4u : 0u) | (Sides[5] == 0 ? 8u : 0u);
+    unsigned const Straddle = (Sides[2] == kPlaneSideStraddle ? 1u : 0u) |
+                              (Sides[3] == kPlaneSideStraddle ? 2u : 0u) |
+                              (Sides[4] == kPlaneSideStraddle ? 4u : 0u) |
+                              (Sides[5] == kPlaneSideStraddle ? 8u : 0u);
     float const Distance = Frustum.Distance;
     Vector const Back = VecNegate(FrustumColumn(Frustum, 2));
 

@@ -136,8 +136,8 @@ namespace
     {
         if (Stream->bWantPlay == 0)
             Stream->bWantPlay = 1;
-        if (Stream->State == 1 || Stream->State == 8 || Stream->State == 9)
-            Stream->State = 2;
+        if (Stream->State == kStreamReady || Stream->State == kStreamEnded || Stream->State == kStreamStopped)
+            Stream->State = kStreamPriming;
     }
 
     // FUN_06ef1d70: the buffer's value when it answers, else the cached +0x88.
@@ -185,14 +185,14 @@ namespace
     GENRESULT CreateFileSystem(const char* Path, IDAComponent** Out)
     {
         FFileSystemAggDesc Desc = {};
-        Desc.Size = 0x34;
+        Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc.ComponentName = "FileSystem";
         Desc.DataPath = Path;
-        Desc.Access = 0x80000000;
-        Desc.ShareMode = 1;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
         Desc.Security = 0;
-        Desc.Creation = 3;
-        Desc.Flags = 0x8000080;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xFFFFFFFF;
         ICOManager* Dacom = DACOM_Acquire();
         return Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
@@ -329,13 +329,13 @@ namespace
             return;
         }
         FFileSystemAggDesc Desc = {};
-        Desc.Size = 0x34;
+        Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc.ComponentName = "FileSystem";
         Desc.DataPath = Stream->Path;
-        Desc.Access = 0x80000000;
-        Desc.ShareMode = 1;
-        Desc.Creation = 3;
-        Desc.Flags = 0x8000080;
+        Desc.Access = GENERIC_READ;
+        Desc.ShareMode = FILE_SHARE_READ;
+        Desc.Creation = OPEN_EXISTING;
+        Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc.FindHandle = 0xFFFFFFFF;
         Stream->FileHandle = static_cast<IFileSystem*>(Stream->FileSystem) // +0x7C
                                  ->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc));
@@ -344,7 +344,7 @@ namespace
     // retail FUN_06ef1040 — play cursor, not the buffer pointer
     unsigned long GetPlayCursor(FStreamingSound* Stream)
     {
-        if (Stream->State != 2 && Stream->State != 3 && Stream->State != 6)
+        if (Stream->State != kStreamPriming && Stream->State != kStreamPlaying && Stream->State != kStreamDraining)
             return 0;
         if (Stream->Buffer == nullptr)
             return 0;
@@ -370,7 +370,7 @@ namespace
     {
         *Lock1 = 0;
         *Lock2 = 0;
-        if (Stream->State != 2 && Stream->State != 3)
+        if (Stream->State != kStreamPriming && Stream->State != kStreamPlaying)
             return 0;
         const unsigned long Play = GetPlayCursor(Stream);
         const unsigned long Write = Stream->WriteCursor;
@@ -515,7 +515,7 @@ namespace
         if (Stream->AcmHeader.pbSrc == nullptr || Stream->AcmHeader.cbSrcLength == 0)
             return 0;
         WAVEFORMATEX* Fmt = reinterpret_cast<WAVEFORMATEX*>(Stream->FmtBlob);
-        if (Fmt->wFormatTag == 0x55 &&
+        if (Fmt->wFormatTag == WAVE_FORMAT_MPEGLAYER3 &&
             Stream->AcmHeader.pbSrc == Stream->DataPtr && Stream->EncoderDelayBytes == -1)
             Stream->EncoderDelayBytes = static_cast<long>(PcmFrameBytes(Stream) * Stream->TrimSamples);
         Stream->AcmHeader.cbDstLength = DestBytes;
@@ -597,7 +597,7 @@ namespace
             Stream->DrainEndCursor = 0xFFFFFFFF;
             return;
         }
-        Stream->State = 6;
+        Stream->State = kStreamDraining;
         Stream->DrainStartCursor = GetPlayCursor(Stream);
         Stream->DrainEndCursor = Stream->WriteCursor;
         Stream->SilenceBytes = Stream->BytesPerSec >> 2;
@@ -748,7 +748,7 @@ namespace
     // retail FUN_06ef27a0
     void FillStreamEntry(FStreamingSound* Stream, unsigned long Want)
     {
-        if (Stream->State != 2 && Stream->State != 3)
+        if (Stream->State != kStreamPriming && Stream->State != kStreamPlaying)
             return;
         unsigned long Lock1 = 0;
         unsigned long Lock2 = 0;
@@ -769,11 +769,11 @@ namespace
     void StreamingSoundStop(FStreamingSound* Stream)
     {
         Stream->bWantPlay = 0;
-        if (Stream->State == 2 || Stream->State == 3 || Stream->State == 6)
+        if (Stream->State == kStreamPriming || Stream->State == kStreamPlaying || Stream->State == kStreamDraining)
         {
             if (Stream->Buffer != nullptr)
                 Stream->Buffer->Stop();
-            Stream->State = 9;
+            Stream->State = kStreamStopped;
         }
     }
 
@@ -782,7 +782,7 @@ namespace
     // the float locals are retail's FSTP float points (see docs/re/audio.md).
     void PrefillAndPlay(FStreamingSound* Stream)
     {
-        Stream->State = 2;
+        Stream->State = kStreamPriming;
         Stream->bWantPlay = 1;
         // Threshold (+0xC4) clamped to 1.0, compared as a double.
         float Thresh = Stream->Threshold;
@@ -819,37 +819,37 @@ namespace
         }
         if (Stream->Buffer == nullptr)
         {
-            Stream->State = 0;
+            Stream->State = kStreamIdle;
             Fdump(kFdumpError, 0x265, "StreamingSound: invalid sound buffer");
             return;
         }
         const HRESULT Hr = Stream->Buffer->Play(0, 0, DSBPLAY_LOOPING);
         if (Hr != 0)
         {
-            Stream->State = 0;
+            Stream->State = kStreamIdle;
             Fdump(kFdumpError, 0x25F, "StreamingSound: failed to play");
             return;
         }
-        if (Stream->State == 2)
-            Stream->State = 3;
+        if (Stream->State == kStreamPriming)
+            Stream->State = kStreamPlaying;
     }
 
     // retail FUN_06ef1b70
     unsigned char PumpHandle(FStreamingSound* Stream)
     {
-        if (Stream->State == 2)
+        if (Stream->State == kStreamPriming)
         {
             if (Stream->bWantPlay != 0)
                 PrefillAndPlay(Stream);
         }
-        else if (Stream->State == 8 || Stream->State == 9)
+        else if (Stream->State == kStreamEnded || Stream->State == kStreamStopped)
             Stream->bWantPlay = 0;
-        else if (Stream->State == 6)
+        else if (Stream->State == kStreamDraining)
         {
             if (Stream->Buffer == nullptr)
             {
                 Fdump(kFdumpError, 0x282, "StreamingSound: missing buffer?");
-                Stream->State = 8;
+                Stream->State = kStreamEnded;
                 return 0;
             }
             if (Stream->DrainEndCursor == 0xFFFFFFFFu && DecodeHeapExhausted(Stream) != 0)
@@ -879,11 +879,11 @@ namespace
             else
             {
                 StreamingSoundStop(Stream);
-                Stream->State = 8;
+                Stream->State = kStreamEnded;
             }
         }
         // No buffer test.
-        if (Stream->State == 2 || Stream->State == 3 || Stream->State == 6)
+        if (Stream->State == kStreamPriming || Stream->State == kStreamPlaying || Stream->State == kStreamDraining)
         {
             Stream->Buffer->SetVolume(Stream->Volume);
             Stream->Buffer->SetPan(Stream->Pan);
@@ -1114,7 +1114,7 @@ bool FSoundStreamer::OpenOwnDirectSound()
 
 int DACOM_API FSoundStreamer::InitializeDevice(FStreamerInitDesc* Desc)
 {
-    if (Desc == nullptr || Desc->Size != 0x18)
+    if (Desc == nullptr || Desc->Size != sizeof(FStreamerInitDesc))
     {
         FdumpStreamer(kFdumpError, 0x1A5, "SoundStreamer - Invalid parameters."); // 06efe254
         return 0;
@@ -1150,7 +1150,7 @@ int DACOM_API FSoundStreamer::InitializeDevice(FStreamerInitDesc* Desc)
     SetThreadPriority(WorkerThread, THREAD_PRIORITY_HIGHEST);
 
     int Wait = 500;
-    while ((ThreadFlags & 3) == 0)
+    while ((ThreadFlags & (kStreamerThreadStarted | kStreamerThreadExited)) == 0)
     {
         Sleep(10);
         --Wait;
@@ -1187,7 +1187,7 @@ void FSoundStreamer::ShutdownDevice()
 
     if (WorkerThread != nullptr)
     {
-        ThreadFlags |= 0x80;
+        ThreadFlags |= kStreamerThreadStop;
         WaitForSingleObject(WorkerThread, 2000);
         CloseHandle(WorkerThread);
         WorkerThread = nullptr;
@@ -1270,7 +1270,7 @@ void FSoundStreamer::ReleaseStreamResources(FStreamingSound* Stream)
         acmStreamClose(Stream->AcmStream, 0);
         Stream->AcmStream = nullptr;
     }
-    Stream->State = 0;
+    Stream->State = kStreamIdle;
     // FUN_06ef3ea0: +0xA8 freed again when still set (no ACM stream but a decode heap).
     if (Stream->DecodeHeap != nullptr)
     {
@@ -1346,7 +1346,7 @@ void FSoundStreamer::MovePendingActive()
     while (Scan != ActiveEnd)
     {
         FStreamingSound* Stream = *Scan;
-        if (Stream->State == 2 || Stream->State == 3 || Stream->State == 6)
+        if (Stream->State == kStreamPriming || Stream->State == kStreamPlaying || Stream->State == kStreamDraining)
         {
             ++Scan;
             continue;
@@ -1359,7 +1359,7 @@ void FSoundStreamer::MovePendingActive()
     while (Scan != PendingEnd)
     {
         FStreamingSound* Stream = *Scan;
-        if (Stream->State != 2 && Stream->State != 3 && Stream->State != 6)
+        if (Stream->State != kStreamPriming && Stream->State != kStreamPlaying && Stream->State != kStreamDraining)
         {
             ++Scan;
             continue;
@@ -1373,7 +1373,7 @@ void FSoundStreamer::MovePendingActive()
 
 unsigned long FSoundStreamer::PumpStreams()
 {
-    ThreadFlags |= 1;
+    ThreadFlags |= kStreamerThreadStarted;
     while (static_cast<char>(ThreadFlags) >= 0)
     {
         if (ActiveBegin != nullptr && ActiveBegin != ActiveEnd)
@@ -1393,7 +1393,7 @@ unsigned long FSoundStreamer::PumpStreams()
                 if (Stream == nullptr)
                     continue;
                 PumpOneStream(Stream);
-                if (Stream->State != 3 && Stream->State != 2)
+                if (Stream->State != kStreamPlaying && Stream->State != kStreamPriming)
                     continue;
                 const unsigned long Buffered = GetBufferedBytes(Stream);
                 // A zero rate gives inf/NaN, which fails both '<' tests below, as in retail.
@@ -1442,7 +1442,7 @@ unsigned long FSoundStreamer::PumpStreams()
         MovePendingActive();
         Sleep(0x28);
     }
-    ThreadFlags |= 2;
+    ThreadFlags |= kStreamerThreadExited;
     return 1;
 }
 
@@ -1451,7 +1451,7 @@ bool FSoundStreamer::LoadWav(FStreamingSound* Stream, const char* Path, IDACompo
     // FUN_06ef1560: retail's arguments are the streamer's DirectSound (+8) and Gain (+0x18).
     (void)Path;
     (void)FileSystem;
-    if (Stream->bBufferReady != 0 || Stream->State != 0)
+    if (Stream->bBufferReady != 0 || Stream->State != kStreamIdle)
         return false;
     if (DirectSound == nullptr)
         return false;
@@ -1591,7 +1591,7 @@ bool FSoundStreamer::LoadWav(FStreamingSound* Stream, const char* Path, IDACompo
     Stream->DecodeFilled = 0;
     Stream->Buffer->SetVolume(Stream->Volume);
     Stream->Buffer->SetPan(Stream->Pan);
-    Stream->State = 1;
+    Stream->State = kStreamReady;
     Stream->bBufferReady = 1;
     return true;
 }
@@ -1627,7 +1627,7 @@ void* DACOM_API FSoundStreamer::CreateStream(const char* Path, IDAComponent* Fil
         // A missing path or a directory returns -1, not null.
         Name = Path;
         const unsigned long Attrs = FileSystemAttributes(FileSystem, Path);
-        if (Attrs == static_cast<unsigned long>(-1) || (Attrs & 0x10) != 0)
+        if (Attrs == static_cast<unsigned long>(-1) || (Attrs & FILE_ATTRIBUTE_DIRECTORY) != 0)
             return reinterpret_cast<void*>(static_cast<uintptr_t>(0xFFFFFFFFu));
     }
 
@@ -1748,18 +1748,18 @@ unsigned long DACOM_API FSoundStreamer::QueryStatus(void* Handle)
         return 0;
     switch (Stream->State - 1)
     {
-    case 0:
-    case 1:
-    case 8:
-        return 2;
-    case 2:
-    case 5:
+    case kStreamReady - 1:
+    case kStreamPriming - 1:
+    case kStreamStopped - 1:
+        return kStreamStatusNotPlaying;
+    case kStreamPlaying - 1:
+    case kStreamDraining - 1:
     case 6:
-        return 1;
+        return kStreamStatusPlaying;
     case 4:
         return 3;
-    case 7:
-        return 4;
+    case kStreamEnded - 1:
+        return kStreamStatusFinished;
     default:
         return 0;
     }

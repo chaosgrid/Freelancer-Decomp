@@ -212,7 +212,7 @@ bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Gender, FContentNpc
     if (FactionProps == nullptr)
         return false;
     FactionProps->PickSpaceCostume(Gender, &Params->CommCostume);
-    FactionProps->PickVoice(static_cast<unsigned int>((Gender != 1) ? 1 : 0) + 1, &Params->Voice);
+    FactionProps->PickVoice(static_cast<unsigned int>((Gender != kGenderMale) ? 1 : 0) + 1, &Params->Voice);
     return true;
 }
 
@@ -345,7 +345,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     FGuideDescBase* Desc = Params->GuideDesc;
     if (Desc != nullptr)
     {
-        if (Desc->Type == 0)
+        if (Desc->Type == GUIDE_TYPE_NONE)
         {
             if (Guide != nullptr)
             {
@@ -376,7 +376,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
                 }
             }
             // CreateGuide is FUN_06f05f00; no null check before Start().
-            if (Desc->Type != 0)
+            if (Desc->Type != GUIDE_TYPE_NONE)
             {
                 CreateGuide(Desc, &Guide.Pointer);
                 if (bStart && Directives.Items.empty())
@@ -388,7 +388,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     FleePosition.x = 0.0f;
     FleePosition.y = 0.0f;
     FleePosition.z = 0.0f;
-    FleeState = 0;
+    FleeState = kFleeStateGuide;
     FleeObjectId = 0;
     FleeDistance = 0.0f;
 }
@@ -461,21 +461,21 @@ void FContentNpcShip::tether_object_event(uint ObjectId1, uint ObjectId2, Tether
     Line.Data[0] = '\0';
     switch (static_cast<int>(Status))
     {
-    case 1:     // "bc_enter_near_teth" (PTR 06fce5a0)
+    case TetherEnterNear:     // "bc_enter_near_teth" (PTR 06fce5a0)
         if (PickVoiceLine("bc_enter_near_teth", "", Voice, &Line) == 0)
             LineId = pub::GetNicknameId(Line.Data);
         GNpcShipEvents.StartTimer(this, 1.0f);
         break;
-    case 2:     // "bc_enter_far_teth" (PTR 06fce5a4)
+    case TetherEnterFar:     // "bc_enter_far_teth" (PTR 06fce5a4)
         if (PickVoiceLine("bc_enter_far_teth", "", Voice, &Line) == 0)
             LineId = pub::GetNicknameId(Line.Data);
         GNpcShipEvents.StartTimer(this, 1.0f);
         break;
-    case 3:     // "bc_exit_far_teth" (PTR 06fce5a8)
+    case TetherExitFar:     // "bc_exit_far_teth" (PTR 06fce5a8)
         if (PickVoiceLine("bc_exit_far_teth", "", Voice, &Line) == 0)
             LineId = pub::GetNicknameId(Line.Data);
         GNpcShipEvents.SetCommLine(this, LineId);
-        GNpcShipEvents.QueueTetherEvent(this, ObjectId2, 3, &Position);
+        GNpcShipEvents.QueueTetherEvent(this, ObjectId2, TetherExitFar, &Position);
         break;
     default:
         break;
@@ -514,24 +514,24 @@ void FContentNpcShip::lead_object_event(uint ObjectId1, uint ObjectId2, LeadProg
             bool bSendComm = true;
             switch (static_cast<int>(ProgressValue))
             {
-            case 1:     // "bc_goto_pos"
+            case LeadGotoPos:     // "bc_goto_pos"
                 if (PickVoiceLine("bc_goto_pos", "", Voice, &Line) == 0)
                     LineId = pub::GetNicknameId(Line.Data);
                 GNpcShipEvents.StartTimer(this, 1.0f);
                 break;
-            case 2:     // "bc_goto_flat"
-                if (GNpcShipEvents.LastLeadProgress == 7)
+            case LeadGotoFlat:     // "bc_goto_flat"
+                if (GNpcShipEvents.LastLeadProgress == LeadFollowFlat)
                     break;
                 if (PickVoiceLine("bc_goto_flat", "", Voice, &Line) == 0)
                     LineId = pub::GetNicknameId(Line.Data);
                 GNpcShipEvents.StartTimer(this, 1.0f);
                 break;
-            case 3:     // "bc_goto_neg"
-            case 6:     // "bc_follow_pos_app_off"
-            case 8:     // "bc_follow_neg"
+            case LeadGotoNeg:     // "bc_goto_neg"
+            case LeadFollowPosAppOff:     // "bc_follow_pos_app_off"
+            case LeadFollowNeg:     // "bc_follow_neg"
             {
-                char const* const Name = ProgressValue == 3 ? "bc_goto_neg" :
-                                         ProgressValue == 6 ? "bc_follow_pos_app_off" :
+                char const* const Name = ProgressValue == LeadGotoNeg ? "bc_goto_neg" :
+                                         ProgressValue == LeadFollowPosAppOff ? "bc_follow_pos_app_off" :
                                                               "bc_follow_neg";
                 if (PickVoiceLine(Name, "", Voice, &Line) == 0)
                     LineId = pub::GetNicknameId(Line.Data);
@@ -539,16 +539,16 @@ void FContentNpcShip::lead_object_event(uint ObjectId1, uint ObjectId2, LeadProg
                 GNpcShipEvents.QueueLeadEvent(this, ObjectId2, ProgressValue, Value, &Position);
                 break;
             }
-            case 7:     // "bc_follow_flat"
-                if (GNpcShipEvents.LastLeadProgress == 2)
+            case LeadFollowFlat:     // "bc_follow_flat"
+                if (GNpcShipEvents.LastLeadProgress == LeadGotoFlat)
                     break;
                 if (PickVoiceLine("bc_follow_flat", "", Voice, &Line) == 0)
                     LineId = pub::GetNicknameId(Line.Data);
                 GNpcShipEvents.SetCommLine(this, LineId);
                 GNpcShipEvents.QueueLeadEvent(this, ObjectId2, ProgressValue, Value, &Position);
                 break;
-            case 4:
-            case 5:
+            case LeadSelf:
+            case LeadFollowPos:
                 GNpcShipEvents.StartTimer(this, 1.0f);
                 bSendComm = false;
                 break;
@@ -593,7 +593,7 @@ bool FContentNpcShip::request_flee_destination(uint ObjectId, FleeReason Reason,
     bool bResult = false;
     switch (FleeState)
     {
-    case 0:
+    case kFleeStateGuide:
         if (Guide != nullptr)
         {
             bResult = Guide->RequestFleeDestination(OutType, OutPosition, OutParam, OutFloat);
@@ -637,20 +637,20 @@ bool FContentNpcShip::request_flee_destination(uint ObjectId, FleeReason Reason,
             }
         }
         break;
-    case 1:
-        OutType = static_cast<FleeDestinationType>(3);
+    case kFleeStatePosition:
+        OutType = FleeDestPoint;
         OutPosition = FleePosition;
         OutFloat = FleeDistance;
         bResult = true;
         break;
-    case 2:
-        OutType = static_cast<FleeDestinationType>(1);
+    case kFleeStateObject:
+        OutType = FleeDestObject;
         OutParam = FleeObjectId;
         OutFloat = FleeDistance;
         bResult = true;
         break;
-    case 3:
-        OutType = static_cast<FleeDestinationType>(2);
+    case kFleeStateObjectType3:
+        OutType = FleeDestDock;
         OutParam = FleeObjectId;
         OutFloat = FleeDistance;
         bResult = true;
@@ -683,7 +683,7 @@ void FContentNpcShip::combat_state_notification(CSNType Type, uint Param1, uint 
     Msg.Param1 = Param1;
     Msg.Param2 = Param2;
     Msg.SystemId = GetSystem()->SystemId;
-    bInCombat = (Type == 0) ? 1 : 0;
+    bInCombat = (Type == CSNEngage) ? 1 : 0;
     unsigned int Controller = 0;
     pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::CombatState, &Msg);
 }
@@ -701,11 +701,11 @@ void FContentNpcShip::combat_drift_event()
 // LAB_06f34cb0.
 pub::AI::ContentCallback::CreationType FContentNpcShip::get_creation_type()
 {
-    if (CreationKind == 0)
-        return CreationType2;
-    if (CreationKind == 2)
-        return CreationType0;
-    return CreationKind == 1 ? CreationType1 : CreationType3;
+    if (CreationKind == kNpcCreationMission)
+        return CreationMission;
+    if (CreationKind == kNpcCreationEncounter)
+        return CreationEncounter;
+    return CreationKind == kNpcCreationRandomMission ? CreationRandomMission : CreationNone;
 }
 
 // FUN_06f33e80.
@@ -717,7 +717,7 @@ bool FContentNpcShip::IsSpacePopShip() const
 // FUN_06f33ea0.
 void FContentNpcShip::SetFleePosition(Vector const* Position, float const* Distance)
 {
-    FleeState = 1;
+    FleeState = kFleeStatePosition;
     FleePosition = *Position;
     FleeDistance = *Distance;
 }
@@ -727,7 +727,7 @@ void FContentNpcShip::SetFleeObject(unsigned int const* ObjectId, float const* D
 {
     FleeObjectId = *ObjectId;
     FleeDistance = *Distance;
-    FleeState = bType3 ? 3 : 2;
+    FleeState = bType3 ? kFleeStateObjectType3 : kFleeStateObject;
 }
 
 // FUN_06f33f20; the game time is FUN_06efec10.
@@ -743,7 +743,7 @@ void FContentNpcShip::ClearFlee()
     FleePosition.x = 0.0f;
     FleePosition.y = 0.0f;
     FleePosition.z = 0.0f;
-    FleeState = 0;
+    FleeState = kFleeStateGuide;
     FleeObjectId = 0;
     FleeDistance = 0.0f;
 }
@@ -852,7 +852,7 @@ void FContentNpcShip::SetGuideFromDesc(FGuideDescBase* Desc, bool bStart)
         }
     }
     // No null check before Start().
-    if (Desc->Type == 0)
+    if (Desc->Type == GUIDE_TYPE_NONE)
         return;
     CreateGuide(Desc, &Guide.Pointer);
     if (bStart && Directives.Items.empty())
@@ -983,25 +983,25 @@ void FNpcShipEventList::HandleMessage(pub::Controller::EMessage MsgId, void cons
         FContentNpcShip* Ship = It->Ship;
         switch (It->Kind)
         {
-        case 0:
+        case kNpcShipEventUnmuteComm:
             Ship->SetCommMuted(false);
             It->TimerId = 0;
             break;
-        case 1:
+        case kNpcShipEventLead:
             LastLeadProgress = 0;
             Ship->lead_object_event(Ship->SpaceObjId, It->ObjectId,
                                     static_cast<pub::AI::ContentCallback::LeadProgressType>(It->LeadProgress),
                                     It->Value, It->Position);
             It->TimerId = 0;
             break;
-        case 2:
+        case kNpcShipEventFollow:
             LastFollowStatus = 0;
             Ship->follow_event(Ship->SpaceObjId, It->ObjectId,
                                static_cast<pub::AI::ContentCallback::FollowStatusType>(It->FollowStatus),
                                It->Value);
             It->TimerId = 0;
             break;
-        case 3:
+        case kNpcShipEventTether:
             LastTetherStatus = 0;
             Ship->tether_object_event(Ship->SpaceObjId, It->ObjectId,
                                       static_cast<pub::AI::ContentCallback::TetherStatusType>(It->TetherStatus),
@@ -1050,7 +1050,7 @@ void FNpcShipEventList::StartTimer(FContentNpcShip* Ship, float Delay)
     if (Found != Events.end())
     {
         Found->TimerId = Id;
-        Found->Kind = 0;
+        Found->Kind = kNpcShipEventUnmuteComm;
     }
     else
     {
@@ -1058,7 +1058,7 @@ void FNpcShipEventList::StartTimer(FContentNpcShip* Ship, float Delay)
         Event.Ship = Ship;
         Event.CommLineId = 0;
         Event.TimerId = Id;
-        Event.Kind = 0;
+        Event.Kind = kNpcShipEventUnmuteComm;
         Events.push_back(Event);
     }
 
@@ -1080,7 +1080,7 @@ void FNpcShipEventList::QueueLeadEvent(FContentNpcShip* Ship, unsigned int Objec
     if (Found != Events.end())
     {
         Found->ObjectId = ObjectId;
-        Found->Kind = 1;
+        Found->Kind = kNpcShipEventLead;
         Found->TimerId = Id;
         Found->LeadProgress = Progress;
         Found->Value = Value;
@@ -1096,7 +1096,7 @@ void FNpcShipEventList::QueueLeadEvent(FContentNpcShip* Ship, unsigned int Objec
         Event.LeadProgress = Progress;
         Event.Value = Value;
         Event.Position = *Position;
-        Event.Kind = 1;
+        Event.Kind = kNpcShipEventLead;
         Events.push_back(Event);
     }
 
@@ -1115,7 +1115,7 @@ void FNpcShipEventList::QueueTetherEvent(FContentNpcShip* Ship, unsigned int Obj
     std::list<FNpcShipEvent>::iterator Found = FindShipEvent(Events, Ship);
     if (Found != Events.end())
     {
-        Found->Kind = 3;
+        Found->Kind = kNpcShipEventTether;
         Found->ObjectId = ObjectId;
         Found->TimerId = Id;
         Found->TetherStatus = Status;
@@ -1130,7 +1130,7 @@ void FNpcShipEventList::QueueTetherEvent(FContentNpcShip* Ship, unsigned int Obj
         Event.ObjectId = ObjectId;
         Event.TetherStatus = Status;
         Event.Position = *Position;
-        Event.Kind = 3;
+        Event.Kind = kNpcShipEventTether;
         Events.push_back(Event);
     }
 

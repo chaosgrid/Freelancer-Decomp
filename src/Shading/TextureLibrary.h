@@ -27,7 +27,7 @@ struct FTexturePlayback
 
     FTexturePlayback() : Source(nullptr), LocalRate(0.0f), bUseLocalRate(false),
         PlaybackDirection(1.0f), CurrentFrame(0), FrameCount(0), ElapsedTime(0.0),
-        TotalDuration(0.0), RefCount(0), WrapMode(1) {}
+        TotalDuration(0.0), RefCount(0), WrapMode(kTextureWrapLoop) {}
 };
 
 // Named group owns playback IDs, independently of canonical name records.

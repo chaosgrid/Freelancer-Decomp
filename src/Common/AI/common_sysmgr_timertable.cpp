@@ -282,7 +282,7 @@ bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Ow
     // Retail re-reads the watcher here.
     IObjRW* const Object = ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()));
     // The scanner equipment id the AI target list rebuild is gated on.
-    if (static_cast<IObjInspect*>(Object)->find_equipment(&Self->ScannerEquipId, 1, 0x80000) != 0)
+    if (static_cast<IObjInspect*>(Object)->find_equipment(&Self->ScannerEquipId, 1, EquipTypeScanner) != 0)
         return false;
 
     float HitPts = 0.0f;

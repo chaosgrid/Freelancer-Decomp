@@ -60,8 +60,8 @@ MoveIdea::MoveIdea()
     , MaxThrustBearing(3.14159274f)      // 0x40490fdb
     , ArrivalRange(200.0f)
     , Throttle(1.0f)
-    , StopStyle(0)
-    , TargetKind48(0)
+    , StopStyle(kMoveStopThrottleCut)
+    , TargetKind48(kMoveTargetNone)
     , Offset4c{}
     , Field58(0)
     , bKillEngineOffBearing(1)
@@ -138,13 +138,13 @@ int MoveIdea::Update(float DeltaTime)
     Watchable const* const RawBlock = Watcher.target();
     IObjRW const* const WatchedOuter = ObjRwFromWatchable(const_cast<Watchable*>(RawBlock));
 
-    if (TargetKind48 == 1)
+    if (TargetKind48 == kMoveTargetObject)
     {
         // FUN_062e4bb0; the unrounded clearance squared, rounded once.
         double const Clearance = NavInterceptClearanceOfIface(Nav, WatchedOuter);
         BestDistSq = static_cast<float>(Clearance * Clearance);
     }
-    else if (TargetKind48 == 2)
+    else if (TargetKind48 == kMoveTargetPoint)
     {
         // (dz*dz + dy*dy) + dx*dx in double; rounded once.
         double const Dx = static_cast<double>(Lead.x) - Position.x;
@@ -171,15 +171,15 @@ int MoveIdea::Update(float DeltaTime)
     {
         Goal = *reinterpret_cast<Vector const*>(SlotBlock + 0x18);
     }
-    else if (TargetKind48 == 1)
+    else if (TargetKind48 == kMoveTargetObject)
     {
         GetIfacePositionOrZero(&Goal, WatchedOuter);
     }
-    else if (TargetKind48 == 2)
+    else if (TargetKind48 == kMoveTargetPoint)
     {
         Goal = Position;
     }
-    else if (TargetKind48 == 3)
+    else if (TargetKind48 == kMoveTargetDirection)
     {
         // A point 10 km (DAT_0639f7a4 == 10000.0f) down the requested direction.
         // z's product is rounded to float first; x's and y's stay unrounded until
@@ -193,31 +193,31 @@ int MoveIdea::Update(float DeltaTime)
 
     // Leaving cruise: threshold 3.0f (DAT_063a0408) * 300.0 (DAT_063a0470), squared,
     // against BestDistSq.
-    if (Mode == 2 && StopStyle != 2)
+    if (Mode == kMoveModeCruise && StopStyle != kMoveStopFlyThrough)
     {
         double const Threshold = 3.0 * 300.0;
         if (Threshold * Threshold > static_cast<double>(BestDistSq))
         {
-            Mode = 0;
+            Mode = kMoveModeEngine;
         }
     }
 
     // StopStyle selects the stopping-speed query; StopStyle >= 2 leaves 0.0f
     // (DAT_06399408).
     float Speed = 0.0f;
-    if (StopStyle == 0 || StopStyle == 1)
+    if (StopStyle == kMoveStopThrottleCut || StopStyle == kMoveStopIdea)
     {
         Vector const Velocity = Handle->SelfTarget.Iface->get_velocity();
         float const Magnitude = static_cast<float>(VelocityMagnitude(Velocity));
 
-        if (StopStyle == 0)
+        if (StopStyle == kMoveStopThrottleCut)
         {
             Speed = Behavior_GetCoastDistance(Object, Magnitude);   // FUN_062e5ab0
         }
         else
         {
             // FUN_062e58f0(Object, -1.0f, Magnitude, 0.0f, Type).
-            ThrustEquipType const Type = (Mode == 1) ? ThrustEquipTradelane : ThrustEquipEngine;
+            ThrustEquipType const Type = (Mode == kMoveModeTradelane) ? ThrustEquipTradelane : ThrustEquipEngine;
             Speed = Behavior_GetDistanceTravelled(ObjInspectOf(Object), -1.0f, Magnitude, 0.0f, Type);
         }
     }
@@ -255,11 +255,11 @@ int MoveIdea::Update(float DeltaTime)
             {
                 Handle->Thrust.engage_cruise(false);
 
-                if (StopStyle == 0)
+                if (StopStyle == kMoveStopThrottleCut)
                 {
-                    Handle->Thrust.SetThrottle(0.0f, 2);
+                    Handle->Thrust.SetThrottle(0.0f, kThrottleModeCruise);
                 }
-                else if (StopStyle == 1)
+                else if (StopStyle == kMoveStopIdea)
                 {
                     EmbeddedStop.Update(DeltaTime);
                 }
@@ -271,7 +271,7 @@ int MoveIdea::Update(float DeltaTime)
         double const Bearing = BearingAngleToPoint(Object, Goal);
         if (Bearing < MaxThrustBearing)
         {
-            Handle->Thrust.SetThrottle(Throttle, 2);
+            Handle->Thrust.SetThrottle(Throttle, kThrottleModeCruise);
         }
         else
         {
@@ -316,12 +316,12 @@ int MoveIdea::Update(float DeltaTime)
         // the other two arms use.
         if (VelocityMagnitude(Velocity) > static_cast<double>(0.1f))
         {
-            if (StopStyle == 0)
+            if (StopStyle == kMoveStopThrottleCut)
             {
-                Handle->Thrust.SetThrottle(0.0f, 0);
+                Handle->Thrust.SetThrottle(0.0f, kThrottleModeEngine);
                 Handle->Thrust.SetEngineActive(true);
             }
-            else if (StopStyle == 1)
+            else if (StopStyle == kMoveStopIdea)
             {
                 EmbeddedStop.Update(DeltaTime);
             }
@@ -333,7 +333,7 @@ int MoveIdea::Update(float DeltaTime)
     double const Bearing = BearingAngleToPoint(Object, Goal);
     if (!(Bearing < MaxThrustBearing))
     {
-        Handle->Thrust.SetThrottle(0.0f, 0);
+        Handle->Thrust.SetThrottle(0.0f, kThrottleModeEngine);
         Handle->Thrust.SetEngineActive(bKillEngineOffBearing == 0);
         return Result;
     }
@@ -362,7 +362,7 @@ int MoveIdea::Update(float DeltaTime)
     }
 
     // The one call whose result retail tests: false (the gate refused) returns 2.
-    if (Handle->Thrust.SetThrottle(Speed2, 0))
+    if (Handle->Thrust.SetThrottle(Speed2, kThrottleModeEngine))
     {
         return Result;
     }
@@ -376,10 +376,10 @@ void MoveIdea::Commit()
     Handle->Thrust.SetNudgeDirection(ZeroVector);
 
     // Signed range test on StopStyle.
-    if (Mode != 1 && StopStyle >= 0 && StopStyle <= 1)
+    if (Mode != kMoveModeTradelane && StopStyle >= kMoveStopThrottleCut && StopStyle <= kMoveStopIdea)
     {
-        Handle->Thrust.SetThrottle(0.0f, 0);
-        Handle->Thrust.SetThrottle(0.0f, 2);
+        Handle->Thrust.SetThrottle(0.0f, kThrottleModeEngine);
+        Handle->Thrust.SetThrottle(0.0f, kThrottleModeCruise);
     }
 
     // Unconditional: zero Pathfind's +0x64 dword and +0x200..+0x208 Vector,
@@ -400,7 +400,7 @@ void MoveIdea::Commit()
 // FUN_062d5840, RET 4.
 void MoveIdea::SetPosition(Vector const& Pos)
 {
-    TargetKind48 = 2;
+    TargetKind48 = kMoveTargetPoint;
     Position = Pos;
 
     // Mirror into Pathfind+0x200, re-read from Position (not Pos).
@@ -414,7 +414,7 @@ void MoveIdea::SetPosition(Vector const& Pos)
 // FUN_062d5890, RET 4.
 void MoveIdea::SetDirection(Vector const& Dir)
 {
-    TargetKind48 = 3;
+    TargetKind48 = kMoveTargetDirection;
     Direction = Dir;
     NormalizeInPlace(Direction);
 }
@@ -424,7 +424,7 @@ void MoveIdea::SetDirection(Vector const& Dir)
 void MoveIdea::SetDirectionFrom(Matrix const* Src)
 {
 
-    TargetKind48 = 3;
+    TargetKind48 = kMoveTargetDirection;
 
     // All three loads happen before any store (matters only if Src aliased
     // Direction).
@@ -446,7 +446,7 @@ void MoveIdea::SetWatchObject(void const* Object2)
 
     if (Object2 == nullptr)
     {
-        TargetKind48 = 0;
+        TargetKind48 = kMoveTargetNone;
         Watcher.set(nullptr);
         *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
         Vector* const Dest = reinterpret_cast<Vector*>(Slots + 0x200);
@@ -457,7 +457,7 @@ void MoveIdea::SetWatchObject(void const* Object2)
     }
 
     // IObjRW -> Watchable adjustment.
-    TargetKind48 = 1;
+    TargetKind48 = kMoveTargetObject;
     Watcher.set(reinterpret_cast<Watchable const*>(
         static_cast<unsigned char const*>(Object2) + 8));
 
@@ -481,22 +481,22 @@ void MoveIdea::SetMode(int NewMode)
     {
         ThrustManager* const Thrust = &Handle->Thrust;
 
-        if (Old == 2)
+        if (Old == kMoveModeCruise)
         {
-            Thrust->SetThrottle(0.0f, 2);
+            Thrust->SetThrottle(0.0f, kThrottleModeCruise);
             Mode = NewMode;
             return;
         }
 
-        if (Old == 0 && NewMode != 2)
+        if (Old == kMoveModeEngine && NewMode != kMoveModeCruise)
         {
-            Thrust->SetThrottle(0.0f, 0);
+            Thrust->SetThrottle(0.0f, kThrottleModeEngine);
             Mode = NewMode;
             return;
         }
 
         // Only Old == 1 reaches the zero nudge, then falls through to the tail.
-        if (Old == 1)
+        if (Old == kMoveModeTradelane)
         {
             Vector const ZeroVector{ 0.0f, 0.0f, 0.0f };
             Thrust->SetNudgeDirection(ZeroVector);
@@ -537,9 +537,9 @@ void MoveIdea::SetThrottleScale(float Value)
     ThrustEquipType Type;
     switch (Mode)
     {
-    case 0:  Type = ThrustEquipEngine;    break;
-    case 1:  Type = ThrustEquipTradelane; break;
-    case 2:  Type = ThrustEquipCruise;    break;
+    case kMoveModeEngine:     Type = ThrustEquipEngine;    break;
+    case kMoveModeTradelane:  Type = ThrustEquipTradelane; break;
+    case kMoveModeCruise:     Type = ThrustEquipCruise;    break;
     default:
     {
         int ValueBits;

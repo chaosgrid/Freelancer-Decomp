@@ -226,6 +226,15 @@ private:
     FUiFastTableTip& operator=(FUiFastTableTip const&) = delete;
 };
 
+// UiFastTable::TipMode (SetTipMode): what one tooltip record belongs to.
+enum EUiTableTipMode
+{
+    kTableTipSingle = 0,   // the one HoverInfo of the control
+    kTableTipColumn = 1,   // one record per column
+    kTableTipRow = 2,      // one per row
+    kTableTipCell = 3      // one per cell
+};
+
 class UiFastTable : public BaseRichTextWin
 {
 public:

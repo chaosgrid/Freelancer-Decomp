@@ -15,7 +15,8 @@
 #include "NPCs/NpcShip.h"              // FContentNpcShip
 #include "Encounters/SpacePaths.h"           // BuildNnPath, BuildPathDirectives, FindEntryRing, FastLength
 #include "Universe/SystemInfo.h"
-#include "common_server.h"        // pub::SpaceObj, pub::AI::lock_maneuvers, pub::GetNicknameId
+#include "common_iface.h"         // BEHAVIOR_DOCK
+#include "common_server.h"        // pub::SpaceObj,pub::AI::lock_maneuvers, pub::GetNicknameId
 #include "Core/ContentInternal.h"      // SubtractVectors (FUN_06eeaee0)
 
 #include <cstdint>
@@ -193,7 +194,7 @@ FNnPathLeg FGotoGuide::GetFirstLeg() const
 // LAB_06f087e0.
 void FGotoGuide::Reset()
 {
-    State = 1;
+    State = kGotoStart;
     PrevState = 0;
 }
 
@@ -254,52 +255,52 @@ bool FGotoGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinatio
             break;
         switch (PrevState)
         {
-        case 2:
+        case kGotoApproach:
         {
             // The leg start is the destination when the length is 1500 or more, or NaN.
             Vector const ShipPosition = GetShipPosition(Ship);
             if (!(FastLength(DistanceSquaredZyx(ShipPosition, Leg.PointA)) < 1500.0f))
             {
-                OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+                OutType = pub::AI::ContentCallback::FleeDestPoint;
                 OutPosition = Leg.PointA;
                 OutFloat = 1500.0f;                                     // DAT_06fb8108
                 bFound = true;
             }
             else
             {
-                SetState(6);
+                SetState(kGotoLeadToLegEnd);
             }
             break;
         }
-        case 3:
-        case 5:
-            OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+        case kGotoWaitForTarget:
+        case kGotoLeadToWaypoint:
+            OutType = pub::AI::ContentCallback::FleeDestPoint;
             OutPosition = Leg.PointB;
             OutFloat = 1500.0f;
             bFound = true;
             break;
-        case 6:
+        case kGotoLeadToLegEnd:
         {
             Vector const ShipPosition = GetShipPosition(Ship);
             if (!(FastLength(DistanceSquaredZyx(ShipPosition, Leg.PointB)) < 1500.0f))
             {
-                OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+                OutType = pub::AI::ContentCallback::FleeDestPoint;
                 OutPosition = Leg.PointB;
                 OutFloat = 1500.0f;
                 bFound = true;
             }
             else
             {
-                SetState(9);
+                SetState(kGotoLegDone);
             }
             break;
         }
-        case 9:
+        case kGotoLegDone:
             Path.pop_front();                                           // FUN_06ecfe80
             if (!Path.empty())
-                SetState(2);
+                SetState(kGotoApproach);
             else
-                SetState(10);
+                SetState(kGotoDestination);
             break;
         default:
             bFound = false;
@@ -312,11 +313,11 @@ bool FGotoGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinatio
 // FUN_06f08800 (RET 8).
 bool FGotoGuide::IsTargetOnPath(int Kind, unsigned int ObjectId)
 {
-    if (Kind != 7)
+    if (Kind != BEHAVIOR_DOCK)
         return IsTargetInShipGroup(Ship, TargetId);
 
     FNnPathLeg const Leg = GetFirstLeg();
-    if (Leg.Kind != 0)
+    if (Leg.Kind != kNnPathLegTradeLane)
         return false;
     FSystemInfo* System = Ship->GetSystem();
     if (System == nullptr)
@@ -338,7 +339,7 @@ bool FGotoGuide::IsTargetOnPath(int Kind, unsigned int ObjectId)
 bool FGotoGuide::FindLaneEntryNearTarget()
 {
     FNnPathLeg const Leg = GetFirstLeg();
-    if (Leg.Kind != 0)
+    if (Leg.Kind != kNnPathLegTradeLane)
         return false;
     Vector TargetPosition;
     Matrix Orientation;
@@ -408,11 +409,11 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         return;
 
     FNnPathLeg Leg = {};
-    Leg.Kind = 1;
+    Leg.Kind = kNnPathLegFlight;
     if (!Path.empty())
         Leg = Path.front();
     else
-        SetState(10);
+        SetState(kGotoDestination);
 
     double const ApproachSquared = static_cast<double>(ApproachRange) * ApproachRange;
     unsigned int const* Ids = static_cast<unsigned int const*>(Parms);
@@ -423,28 +424,28 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         if (Ids[0] == TargetId)
             pub::AI::lock_maneuvers(TargetId, false);
         // Skipped when r^2 >= distance or NaN.
-        if (Ids[0] == Ship->SpaceObjId && State == 7 &&
+        if (Ids[0] == Ship->SpaceObjId && State == kGotoTradeLane &&
             ApproachSquared < DistanceSquaredZyx(GetShipPosition(Ship), Leg.PointB))
-            SetState(3);
+            SetState(kGotoWaitForTarget);
         break;
     case EMessage::TradelaneEnter:
-        if (Ids[0] == TargetId && IsTargetOnPath(7, Ids[1]))
+        if (Ids[0] == TargetId && IsTargetOnPath(BEHAVIOR_DOCK, Ids[1]))
             pub::AI::lock_maneuvers(TargetId, true);
         break;
     case EMessage::TradelaneRequest:
-        if (State >= 2 && State <= 5 && Ids[0] == TargetId && IsTargetOnPath(7, Ids[1]))
-            SetState(7);
+        if (State >= kGotoApproach && State <= kGotoLeadToWaypoint && Ids[0] == TargetId && IsTargetOnPath(BEHAVIOR_DOCK, Ids[1]))
+            SetState(kGotoTradeLane);
         break;
     case EMessage::FormationRequest:
-        if (State == 3 && TargetId == Ids[0] && Ship->SpaceObjId == Ids[1])
+        if (State == kGotoWaitForTarget && TargetId == Ids[0] && Ship->SpaceObjId == Ids[1])
         {
-            PrevState = 3;
-            State = 7;
+            PrevState = kGotoWaitForTarget;
+            State = kGotoTradeLane;
             bRestart = true;
         }
         break;
     case EMessage::ObjectDestroyed:
-        if (State != 4)
+        if (State != kGotoCombat)
             break;
         for (std::list<unsigned int>::iterator It = CombatIds.begin(); It != CombatIds.end(); ++It)
         {
@@ -471,9 +472,9 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         int const Type = static_cast<int>(Ids[0]);
         unsigned int const A = Ids[1];
         unsigned int const B = Ids[2];
-        if (State == 4)
+        if (State == kGotoCombat)
         {
-            if (Type == 4 || Type == 3)
+            if (Type == pub::AI::ContentCallback::CSNCombatOver || Type == 3)
             {
                 for (std::list<unsigned int>::iterator It = CombatIds.begin();
                      It != CombatIds.end(); ++It)
@@ -514,7 +515,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
                 CombatIds.push_back(A);                                 // FUN_06eb6740
             break;
         }
-        if (State != 2 && State != 3 && State != 5 && State != 7)
+        if (State != kGotoApproach && State != kGotoWaitForTarget && State != kGotoLeadToWaypoint && State != kGotoTradeLane)
             break;
         if (Type != 0)
             break;
@@ -531,10 +532,10 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         }
         if (!bKnown)
             CombatIds.push_back(A);
-        if (State == 7)
-            State = 3;
+        if (State == kGotoTradeLane)
+            State = kGotoWaitForTarget;
         Ship->SetCommMuted(true);
-        SetState(4);
+        SetState(kGotoCombat);
         break;
     }
     case EMessage::Heartbeat:
@@ -557,10 +558,10 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
 {
     switch (State)
     {
-    case 1:
-        SetState(2);
+    case kGotoStart:
+        SetState(kGotoApproach);
         break;
-    case 2:
+    case kGotoApproach:
     {
         // Retail sums (x*x + z*z) + y*y here, unlike DistanceSquaredZyx; not within reach
         // when r^2 <= distance or NaN.
@@ -572,51 +573,51 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
         if (!(ApproachSquared > DistanceSquared))
         {
             if (FindLegPointNearTarget())
-                SetState(8);
+                SetState(kGotoFollowPath);
             break;
         }
-        if (Leg.Kind == 0)
+        if (Leg.Kind == kNnPathLegTradeLane)
         {
             FContentPlayerState* Player = FindContentPlayerStateByShip(&TargetId);   // FUN_06f49bc0
             if (Player == nullptr)
                 break;
             if (IsTargetOnPath(static_cast<int>(Player->GetManeuverBehaviorId()), Player->GetManeuverTargetId()))
             {
-                SetState(7);
+                SetState(kGotoTradeLane);
                 break;
             }
             SendGuideComm(Ship, TargetId, "mb_gg_cmd_enter_tl");
-            SetState(3);
+            SetState(kGotoWaitForTarget);
         }
-        else if (Leg.Kind == 1)
+        else if (Leg.Kind == kNnPathLegFlight)
         {
-            SetState(6);
+            SetState(kGotoLeadToLegEnd);
         }
         break;
     }
-    case 3:
+    case kGotoWaitForTarget:
     {
         bool bNear = FindLaneEntryNearTarget() || IsTargetInShipGroup(Ship, TargetId);
         if (bNear && !Ship->IsInShipClass(&GGuideLargeShipsClass))      // FUN_06f575d0
         {
             Timer = 0.0f;
             NagCount = 0;
-            SetState(5);
+            SetState(kGotoLeadToWaypoint);
         }
         else if (FindLegPointNearTarget())
         {
             Timer = 0.0f;
             NagCount = 0;
-            SetState(8);
+            SetState(kGotoFollowPath);
         }
         else if (!(Timer < 30.0f))                                      // DAT_06fb8104
         {
             if (NagCount >= 5)
             {
-                if (Leg.Kind == 0)
-                    SetState(7);
-                else if (Leg.Kind == 1)
-                    SetState(6);
+                if (Leg.Kind == kNnPathLegTradeLane)
+                    SetState(kGotoTradeLane);
+                else if (Leg.Kind == kNnPathLegFlight)
+                    SetState(kGotoLeadToLegEnd);
             }
             else
             {
@@ -628,30 +629,30 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
         Timer = static_cast<float>(static_cast<double>(Timer) + DeltaSeconds);
         break;
     }
-    case 5:
+    case kGotoLeadToWaypoint:
     {
         FContentPlayerState* Player = FindContentPlayerStateByShip(&TargetId);
         if (!FindLaneEntryNearTarget() && !IsTargetInShipGroup(Ship, TargetId))
         {
-            SetState(3);
+            SetState(kGotoWaitForTarget);
             break;
         }
         if (Player != nullptr &&
             IsTargetOnPath(static_cast<int>(Player->GetManeuverBehaviorId()), Player->GetManeuverTargetId()))
         {
-            SetState(7);
+            SetState(kGotoTradeLane);
             break;
         }
         if (ApproachSquared > DistanceSquaredZyx(GetShipPosition(Ship), Leg.PointB))
-            SetState(9);
+            SetState(kGotoLegDone);
         break;
     }
-    case 6:
-    case 7:
+    case kGotoLeadToLegEnd:
+    case kGotoTradeLane:
         if (ApproachSquared > DistanceSquaredZyx(GetShipPosition(Ship), Leg.PointB))
-            SetState(9);
+            SetState(kGotoLegDone);
         break;
-    case 8:
+    case kGotoFollowPath:
         if (ApproachSquared > DistanceSquaredZyx(GetShipPosition(Ship), Waypoint))
         {
             FSystemInfo* System = Ship->GetSystem();
@@ -662,17 +663,17 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
                 Vector const ShipPosition = GetShipPosition(Ship);
                 BuildNnPath(System, &ShipPosition, &Destination, &Path, 0x19, &PathRange, 0);
             }
-            SetState(2);
+            SetState(kGotoApproach);
         }
         break;
-    case 9:
+    case kGotoLegDone:
     {
         FSystemInfo* System = Ship->GetSystem();
         FContentSpaceObj* Target = System != nullptr ? System->FindShip(TargetId) : nullptr;
         if (FindLegPointNearTarget())
         {
             bNodeEndSent = false;
-            SetState(8);
+            SetState(kGotoFollowPath);
             break;
         }
         if (Target != nullptr)
@@ -688,9 +689,9 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
                 bNodeEndSent = false;
                 Path.pop_front();                                       // FUN_06ecfe80
                 if (!Path.empty())
-                    SetState(2);
+                    SetState(kGotoApproach);
                 else
-                    SetState(10);
+                    SetState(kGotoDestination);
                 break;
             }
         }
@@ -700,7 +701,7 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
         SendGuideComm(Ship, TargetId, "mb_gg_cmd_at_node_end");
         break;
     }
-    case 10:
+    case kGotoDestination:
         bDone = true;
         break;
     default:
@@ -724,7 +725,7 @@ void FGotoGuide::Start()
     FMissionDirectiveList Directives;                                   // FUN_06f93460
     switch (State)
     {
-    case 2:
+    case kGotoApproach:
     {
         TRefHandle<FObjListDirective> New;
         CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
@@ -735,10 +736,10 @@ void FGotoGuide::Start()
         KeepAndQueue(this, New, &Directives);
         break;
     }
-    case 3:
+    case kGotoWaitForTarget:
         Ship->CancelDirectives();                                       // FUN_06f57740
         break;
-    case 5:
+    case kGotoLeadToWaypoint:
     {
         TRefHandle<FObjListDirective> New;
         CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
@@ -748,7 +749,7 @@ void FGotoGuide::Start()
         KeepAndQueue(this, New, &Directives);
         break;
     }
-    case 6:
+    case kGotoLeadToLegEnd:
     {
         TRefHandle<FObjListDirective> New;
         CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
@@ -759,7 +760,7 @@ void FGotoGuide::Start()
         KeepAndQueue(this, New, &Directives);
         break;
     }
-    case 7:
+    case kGotoTradeLane:
     {
         FSystemInfo* System = Ship->GetSystem();
         if (System == nullptr)
@@ -775,7 +776,7 @@ void FGotoGuide::Start()
         KeepAndQueue(this, New, &Directives);
         break;
     }
-    case 8:
+    case kGotoFollowPath:
     {
         FSystemInfo* System = Ship->GetSystem();
         if (System == nullptr)
@@ -784,7 +785,7 @@ void FGotoGuide::Start()
         BuildPathDirectives(System, &ShipPosition, &Waypoint, &Directives.Items, 0x19, &Range);
         break;
     }
-    case 10:
+    case kGotoDestination:
     {
         TRefHandle<FObjListDirective> New;
         CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
@@ -867,15 +868,15 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
     switch (MsgId)
     {
     case EMessage::Heartbeat:
-        if (State == 10)
+        if (State == kGotoDestination)
         {
             bDocking = true;
             bDone = false;
-            PrevState = 10;
-            State = 12;
+            PrevState = kGotoDestination;
+            State = kDockGuideDocking;
             bDockRestart = true;
         }
-        else if (State == 13)
+        else if (State == kDockGuideDocked)
         {
             bDone = true;
         }
@@ -886,7 +887,7 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         break;
     case EMessage::Msg0x27:
     {
-        if (State != 12)
+        if (State != kDockGuideDocking)
         {
             bForward = true;
             break;
@@ -903,17 +904,17 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
             bArrived = true;
         else if ((Type & OBJ_DOCKING_RING) != 0 && DockTargetId == Ids[2])
             bArrived = true;
-        if (bArrived && State != 13)
+        if (bArrived && State != kDockGuideDocked)
         {
             PrevState = State;
-            State = 13;
+            State = kDockGuideDocked;
             bDockRestart = true;
         }
         break;
     }
     case EMessage::DockComplete:
     {
-        if (State != 12)
+        if (State != kDockGuideDocking)
         {
             bForward = true;
             break;
@@ -927,24 +928,24 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
             break;
         if (DockTargetId != Ids[1])
             break;
-        if (State != 13)
+        if (State != kDockGuideDocked)
         {
             PrevState = State;
-            State = 13;
+            State = kDockGuideDocked;
             bDockRestart = true;
         }
         break;
     }
     case EMessage::TradelaneEnter:
-        if (State != 12)
+        if (State != kDockGuideDocking)
         {
             bForward = true;
             break;
         }
         if (Ids[0] == Ship->SpaceObjId && Ids[1] == DockTargetId)
         {
-            PrevState = 12;
-            State = 13;
+            PrevState = kDockGuideDocking;
+            State = kDockGuideDocked;
             bDockRestart = true;
         }
         break;
@@ -970,7 +971,7 @@ void FDockGuide::Start()
         return;
     if (Ship->IsInTradeLane())
         return;
-    if (State == 12)
+    if (State == kDockGuideDocking)
     {
         FMissionDirectiveList Directives;                               // FUN_06f93790 head
         TRefHandle<FObjListDirective> New;

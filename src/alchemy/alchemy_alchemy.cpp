@@ -349,7 +349,7 @@ namespace AlchemyImpl
             G_VbHandle = nullptr;
         }
         const GENRESULT Result = VertexBuffer->CreateVb(
-            kAlchemyVbFvf, G_MaxVertices, reinterpret_cast<unsigned int**>(&G_VbHandle), 1);
+            kAlchemyVbFvf, G_MaxVertices, reinterpret_cast<unsigned int**>(&G_VbHandle), kRpBufferDynamic);
         if (Result < 0)
         {
             FdumpAlchemyError(0x43, kMsgCreateVb);
@@ -563,7 +563,7 @@ namespace AlchemyImpl
         SubmitChildNodes(NodePtr);
         unsigned long Flag = 0;
         AsFxNode(NodePtr)->GetNodeFlags(&Flag);
-        Flag |= 0x80000000u;
+        Flag |= kNodeFlagDead;
         AsFxNode(NodePtr)->SetNodeFlags(Flag);
         if (G_UpdateCallback != nullptr)
             G_UpdateCallback(0, NodePtr, 0);
@@ -655,7 +655,7 @@ namespace AlchemyImpl
             }
             if (static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->CreateVb(
                     kAlchemyVbFvf, G_MaxVertices,
-                    reinterpret_cast<unsigned int**>(&G_VbHandle), 1) < 0)
+                    reinterpret_cast<unsigned int**>(&G_VbHandle), kRpBufferDynamic) < 0)
             {
                 FdumpAlchemyError(0x43, kMsgCreateVb);
                 if (G_RpVertexBuffer != nullptr)
@@ -866,7 +866,7 @@ namespace AlchemyImpl
                 SubmitNodeChain(Child);
             unsigned long Flag = 0;
             AsFxNode(Node)->GetNodeFlags(&Flag);
-            Flag |= 0x80000000u;
+            Flag |= kNodeFlagDead;
             AsFxNode(Node)->SetNodeFlags(Flag);
             if (G_UpdateCallback != nullptr)
                 G_UpdateCallback(0, Node, 0);

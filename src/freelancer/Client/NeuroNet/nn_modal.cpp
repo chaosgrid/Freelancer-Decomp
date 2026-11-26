@@ -113,7 +113,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
 
     // The colour override; no null test on the control.
     Caption->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPalettePaleGreen), 1);
-    Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
+    Caption->Flags = static_cast<unsigned char>(Caption->Flags & ~(kWin3DActive | kWin3DVisible));
 
     SetOffset(0.0f, 0.0f, -1.0f);
     SetPosition(&Position);
@@ -145,11 +145,11 @@ void NnArrivalText::Update()
     {
         if (IsLetterboxVisible())
         {
-            Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
+            Caption->Flags = static_cast<unsigned char>(Caption->Flags & ~(kWin3DActive | kWin3DVisible));
             return;
         }
         if (Delay <= 0.0f)
-            Caption->Flags = static_cast<unsigned char>(Caption->Flags | 3);
+            Caption->Flags = static_cast<unsigned char>(Caption->Flags | kWin3DActive | kWin3DVisible);
     }
 
     // The visible bit is sampled here. A caption showing with its delay spent goes away as soon
@@ -166,7 +166,7 @@ void NnArrivalText::Update()
 
     Win3D::Update();
 
-    if ((Caption->Flags & 2) == 0)
+    if ((Caption->Flags & kWin3DVisible) == 0)
     {
         // Hidden: unless one of those windows is up, the delay runs down (in double, stored as
         // float) and a negative delay shows the caption.
@@ -174,7 +174,7 @@ void NnArrivalText::Update()
         {
             Delay = static_cast<float>(static_cast<double>(Delay) - GetClientFrameTimeCapped());
             if (Delay < 0.0f)
-                Caption->Flags = static_cast<unsigned char>(Caption->Flags | 3);
+                Caption->Flags = static_cast<unsigned char>(Caption->Flags | kWin3DActive | kWin3DVisible);
         }
     }
     else if (Caption->bTypewriter == 0)
@@ -189,7 +189,7 @@ void NnArrivalText::Update()
     }
 
     // A caption that became visible this frame starts typing (60 ms per character).
-    if (!bWasVisible && (Caption->Flags & 2) != 0)
+    if (!bWasVisible && (Caption->Flags & kWin3DVisible) != 0)
         Caption->SetProperty(kTextPropTypewriter, 1, 0x3c);
 }
 

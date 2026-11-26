@@ -534,7 +534,7 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         ToolTipIds = static_cast<int>(A);
         bToolTip = (A != 0) ? 1 : 0;
         break;
-    case 0x19:
+    case kWinPropRenderFlags:
         bBorder = ((A & 0xffff0000u) != 0) ? 0 : 1;
         break;
     case kWinNotifyHighlight:
@@ -543,15 +543,15 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case kWinNotifyUnhighlight:
         Field34b = 0;
         break;
-    case 0x3f:
+    case kBarPropColour:
         memcpy(Color, &A, sizeof(Color));
         break;
-    case 0x40:
+    case kBarPropFill:
         // The arguments convert as unsigned.
         Capacity = static_cast<float>(static_cast<unsigned>(A));
         Used = static_cast<float>(static_cast<unsigned>(B));
         break;
-    case 0x41:
+    case kBarPropSegments:
         TailSegment = static_cast<float>(static_cast<unsigned>(A));
         HeadSegment = static_cast<float>(static_cast<unsigned>(B));
         break;

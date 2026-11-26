@@ -27,6 +27,7 @@
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
 #include "Space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
 #include "Interface/rich_text_win.h"
+#include "common_server.h"             // EPopUpButton
 #include "Space/star_sys.h"               // GetAttitudeClass (FUN_0045a490)
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
@@ -225,7 +226,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         CharUpperW(G_NnTextScratchB);
         Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 
-        if ((G_NnMissionMessageButtons & 1) != 0)
+        if ((G_NnMissionMessageButtons & kPopUpButtonYes) != 0)
         {
             Vector const YesPosition = {NnFloatBits(0xbe6b851f), NnFloatBits(0xbe560419), 0.0f};
             YesButton = CreateWireButtonControl("MMYesButton", kSelectSound, &YesPosition,
@@ -234,7 +235,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
             CreateTextControl("MMYesText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e4ac083), CaptionHeight, CaptionArg6, 0x4dc, 1, 0, 1);
         }
-        if ((G_NnMissionMessageButtons & 2) != 0)
+        if ((G_NnMissionMessageButtons & kPopUpButtonNo) != 0)
         {
             Vector const NoPosition = {0.0f, NnFloatBits(0xbe560419), 0.0f};
             NoButton = CreateWireButtonControl("MMNoButton", kSelectSound, &NoPosition, &AnswerExtents,
@@ -243,7 +244,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
             CreateTextControl("MMNoText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e4ac083), CaptionHeight, CaptionArg6, 0x4dd, 1, 0, 1);
         }
-        if ((G_NnMissionMessageButtons & 4) != 0)
+        if ((G_NnMissionMessageButtons & kPopUpButtonLater) != 0)
         {
             Vector const LaterPosition = {NnFloatBits(0x3e6b851f), NnFloatBits(0xbe560419), 0.0f};
             LaterButton = CreateWireButtonControl("MMLaterButton", kSelectSound, &LaterPosition,
@@ -254,7 +255,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
                               1);
         }
         // Ok comes with the close box after all.
-        if ((G_NnMissionMessageButtons & 8) != 0)
+        if ((G_NnMissionMessageButtons & kPopUpButtonClose) != 0)
         {
             CloseButton = CreateButtonControl("MissionCloseButton", kCloseMesh, nullptr,
                                               kSelectSound, nullptr, &ClosePosition, nullptr,

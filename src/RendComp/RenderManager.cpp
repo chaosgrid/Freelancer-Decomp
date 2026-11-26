@@ -30,15 +30,6 @@ struct FAggDesc18
     IDAComponent* Parent;
 };
 
-// RenderInstance flag bits (LAB_06c32a80).
-static const unsigned long kDrawPickSwitch = 0x08;     // pick the LOD by distance (FUN_06c32040)
-static const unsigned long kDrawRotateOffset = 0x10;   // rotate the matrix offset by its own 3x3
-static const unsigned long kDrawConjugate = 0x20;      // matrix := World * matrix * World^-1
-static const unsigned long kDrawMatrixReady = 0x40;    // the matrix is used as given
-static const unsigned long kDrawKeepCurrent = 0x80;    // draw the current LOD
-static const unsigned long kDrawNoCull = 0x100;        // skip ICamera ClassifySphere, rank 4
-static const unsigned long kDrawNoChildren = 0x2000;   // do not recurse into child instances
-
 // The archetype map (retail VC6 std::map<int, FLodSet> at +8, head +0xC, helpers FUN_06c34170 /
 // 06c34380 / 06c34ab0 / 06c2a270). Every retail lookup is lower_bound plus a key compare,
 // i.e. find.
@@ -788,12 +779,12 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
     MathEngineCached(G_MathRenderMgr)->TransformXform(ViewCenter, *View, WorldCenter);
     const float Depth = (ViewCenter.z < 0.0f) ? -ViewCenter.z : ViewCenter.z;
 
-    int Rank = 4;
+    int Rank = kSphereInside;
     bool bDraw = true;
     if ((Flags & kDrawNoCull) == 0)
     {
         Rank = Camera->ClassifySphere(&ViewCenter, Radius * Scale);
-        bDraw = Rank >= 3;
+        bDraw = Rank >= kSphereStraddling;
     }
 
     if (bDraw)
@@ -841,7 +832,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
                 else
                 {
                     Set->CurrentLod = Set->LodCount;
-                    Rank = 1;
+                    Rank = kSphereOutside;
                 }
             }
         }
@@ -857,7 +848,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
             if (Rank != ChildRank)
             {
                 const int Larger = (Rank < ChildRank) ? ChildRank : Rank;
-                Rank = (Larger > 3) ? 3 : Larger;
+                Rank = (Larger > kSphereStraddling) ? kSphereStraddling : Larger;
             }
             Child = G_Engine->GetRelatedInstance(Inst, 1, Child);
         }

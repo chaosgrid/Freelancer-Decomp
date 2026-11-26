@@ -124,7 +124,7 @@ namespace CmnPhySys
             FEngineJointBlock const* const Joint = Engine->GetInstanceRelative(Child);
             Matrix const ParentRotation = Local.Rotation;
 
-            if (Joint->Type == 0)
+            if (Joint->Type == kJointTypeFix)
             {
                 // R = R * Orient; T += ParentR * ChildPoint.
                 PhySys_MatrixMulInPlace(Local.Rotation, Joint->Orient);
@@ -133,7 +133,7 @@ namespace CmnPhySys
                 Local.Translation.y = Local.Translation.y + Offset.y;
                 Local.Translation.z = Local.Translation.z + Offset.z;
             }
-            else if (Joint->Type == 1)
+            else if (Joint->Type == kJointTypePris)
             {
                 // Prismatic: the joint parameter slides along Axis.
                 float Parameter;
@@ -162,7 +162,7 @@ namespace CmnPhySys
                 Local.Translation.y = Local.Translation.y + Delta.y;
                 Local.Translation.z = Local.Translation.z + Delta.z;
             }
-            else if (Joint->Type == 2)
+            else if (Joint->Type == kJointTypeRev)
             {
                 // Revolute: the joint angle about Axis. x87: sin of the half angle is stored as
                 // a float, divided by the unrounded axis length.

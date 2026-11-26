@@ -48,6 +48,29 @@
 
 struct FButtonMontageTile;
 
+// Bits of NnButtonControl::ButtonBits (+0x330); see the layout above.
+enum EButtonBits : unsigned char
+{
+    kButtonHovered = 0x01,          // MouseEnter / MouseLeave
+    kButtonFocused = 0x02,          // properties 0x2c / 0x2d (highlight / unhighlight)
+    kButtonLitWhilePressed = 0x04,  // set while the press this button holds is over it
+    kButtonAction = 0x08,           // INI "action_button"
+    kButtonCaptured = 0x10,         // the button holds the press (the capture stack)
+    kButtonNoColorChange = 0x20,    // INI "no_color_change": draw white
+    kButtonSelected = 0x40,         // property 0xc
+    kButtonDoubleClick = 0x80       // the press was a double click
+};
+
+// Bits of NnButtonControl::ButtonBits2 (+0x331).
+enum EButtonBits2 : unsigned char
+{
+    kButtonNoMeshRender = 0x01,      // INI "no_mesh_render"
+    kButtonEnabled = 0x02,
+    kButtonLightWhilePressed = 0x04, // lit (yellow) while pressed and hovered
+    kButtonPulseWhenHovered = 0x08,
+    kButtonDrawWhileInactive = 0x10  // property 0x34
+};
+
 class NnButtonControl : public WinControl
 {
 public:

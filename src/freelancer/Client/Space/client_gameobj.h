@@ -594,6 +594,25 @@ static_assert(offsetof(FClientSolarGameobj, bTradeLaneIdle) == 0x1f0, "Solar +0x
 static_assert(offsetof(FClientSolarGameobj, JumpEffectId) == 0x200, "Solar +0x200");
 static_assert(sizeof(FClientSolarGameobj) == 0x208, "Solar sizeof 0x208");
 
+// Bits of the first byte of FClientShipGameobj::TradeLaneFlags (+0x184), kept by tradelane_fx.cpp.
+enum ETradeLaneShipFlag
+{
+    kTradeLaneFlagSideKey = 0x1,   // the ring node's side key; picks the side of the ring's lane hardpoint
+    kTradeLaneFlagRingSide = 0x2,  // the ship's side of the exit ring (get_ring_side)
+    kTradeLaneFlagTravelFx = 0x20, // FUN_00514750 started the travel effect (once)
+    kTradeLaneFlagTunnelFx = 0x40, // the player's tunnel companion (+0x174) is running
+    kTradeLaneFlagRiding = 0x80    // the ship is riding the lane
+};
+
+// FClientShipGameobj::ShipFlags (+0x18c).
+enum EShipFlag
+{
+    kShipFlagHullHit = 0x1,      // set by OnMunitionHit (FUN_00545ed0) for a non-shield hit; the first-person camera shakes and clears it
+    kShipFlagShieldHit = 0x2,    // set by OnMunitionHit for a shield hit; the camera shakes and clears it
+    kShipFlagTradeRequest = 0x4, // client_iclient.cpp FUN_005a61c0: a pending trade request; HudReputationColor shows the ship purple
+    kShipFlagLanding = 0x8,      // set by RequestLand (FUN_00543b40); the atmosphere burn effect leaves the list
+};
+
 class FClientShipGameobj : public FClientEquippedObj
 {
 public:

@@ -385,8 +385,8 @@ void PageCharacterSelectSingle::ShowDetails(CCharacterSet::CharacterInfo const* 
         CharacterLocation->ClearContent();
         AppendStyle(CharacterLocation, 0x5724);
         CharacterLocation->AppendContent(Dash);
-        LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags & 0xfe);
-        DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags & 0xfe);
+        LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags & ~kWin3DActive);
+        DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags & ~kWin3DActive);
         LoadCharacter->bInteractive = 0;
         DeleteCharacter->bInteractive = 0;
         return;
@@ -446,8 +446,8 @@ void PageCharacterSelectSingle::ShowDetails(CCharacterSet::CharacterInfo const* 
         CharacterLocation->AppendContent(LocationText);
     }
 
-    LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | 1);
-    DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | 1);
+    LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | kWin3DActive);
+    DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | kWin3DActive);
     LoadCharacter->bInteractive = 1;
     DeleteCharacter->bInteractive = 1;
 }
@@ -480,7 +480,7 @@ void PageCharacterSelectSingle::BeginLeave(int Direction)
     LeaveDirection = Direction;
     bLeaving = 1;
     SlideT = 0.0;
-    PlayUiSoundSlot(0x1b);
+    PlayUiSoundSlot(kUiSoundMotionSwish);
 }
 
 bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
@@ -488,33 +488,33 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
     // LAB_0056c360.
     if (Msg == kWinMsgCommand)
     {
-        PlayOrRewindUiSoundSlot(0);
-        if (A == 0x3003)
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
+        if (A == kCharSelectSingleCmdLoad)
         {
             if (bLeaving != 0)
                 return true;
             BeginLeave(1);
             return true;
         }
-        if (A == 0x300c)
+        if (A == kCharSelectSingleCmdMainMenu)
         {
             if (bLeaving != 0)
                 return true;
             BeginLeave(0);
             return true;
         }
-        if (A == 0x3002)
+        if (A == kCharSelectSingleCmdDelete)
         {
             if (bDeletePending != 0)
             {
                 // The confirm box said yes: everything live again.
                 bDeletePending = 0;
-                CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags | 1);
-                CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags | 1);
-                CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags | 1);
-                MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | 1);
-                LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | 1);
-                DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | 1);
+                CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags | kWin3DActive);
+                CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags | kWin3DActive);
+                CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags | kWin3DActive);
+                MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | kWin3DActive);
+                LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | kWin3DActive);
+                DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | kWin3DActive);
                 MainMenu->bInteractive = 1;
                 LoadCharacter->bInteractive = 1;
                 DeleteCharacter->bInteractive = 1;
@@ -569,12 +569,12 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
             // First press: the confirm box over the page; everything inactive until it answers
             // (0x3006).
             bDeletePending = 1;
-            CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags & 0xfe);
-            CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags & 0xfe);
-            CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags & 0xfe);
-            MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags & 0xfe);
-            LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags & 0xfe);
-            DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags & 0xfe);
+            CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags & ~kWin3DActive);
+            CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags & ~kWin3DActive);
+            CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags & ~kWin3DActive);
+            MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags & ~kWin3DActive);
+            LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags & ~kWin3DActive);
+            DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags & ~kWin3DActive);
             MainMenu->bInteractive = 0;
             LoadCharacter->bInteractive = 0;
             DeleteCharacter->bInteractive = 0;
@@ -591,12 +591,12 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
             if (bDeletePending != 0)
             {
                 bDeletePending = 0;
-                CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags | 1);
-                CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags | 1);
-                CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags | 1);
-                MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | 1);
-                LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | 1);
-                DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | 1);
+                CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags | kWin3DActive);
+                CharSelDesc->Flags = static_cast<unsigned char>(CharSelDesc->Flags | kWin3DActive);
+                CharSelTime->Flags = static_cast<unsigned char>(CharSelTime->Flags | kWin3DActive);
+                MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | kWin3DActive);
+                LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | kWin3DActive);
+                DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | kWin3DActive);
                 MainMenu->bInteractive = 1;
                 LoadCharacter->bInteractive = 1;
                 DeleteCharacter->bInteractive = 1;
@@ -629,7 +629,7 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
         }
         if (A == 1)
         {
-            ProcessMessage(kWinMsgCommand, 0x3002, 0);
+            ProcessMessage(kWinMsgCommand, kCharSelectSingleCmdDelete, 0);
             return true;
         }
         return true;
@@ -768,7 +768,7 @@ void PageCharacterSelectSingle::Update()
 
         // -0.5 is DAT_005e2a50, -0.1 DAT_005d5070.
         if (SlideT > -0.5 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b);
+            PlayUiSoundSlot(kUiSoundMotionSwish);
     }
     else if (bLeaving != 0)
     {

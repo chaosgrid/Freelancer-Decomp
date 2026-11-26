@@ -60,10 +60,13 @@ public:
     virtual ~IVP_Listener_Object() {}                                                  // slot 4
 };
 
-// IVP_Listener_Collision::enabled_callbacks bit gated by FUN_0634cf60.
+// IVP_Listener_Collision::enabled_callbacks bits: 1 gated by FUN_0634cf60 (slot 0), 2 by 0634b090 (slot 1),
+// 4 by 0634b0e0 / 0634b140 / 0634cfa0 / 0634cfe0 (slots 2 and 3).
 enum : int32_t
 {
     IVP_LISTENER_COLLISION_CALLBACK_PRE_COLLISION = 0x01,
+    IVP_LISTENER_COLLISION_CALLBACK_OBJECT_DELETED = 0x02,
+    IVP_LISTENER_COLLISION_CALLBACK_FRICTION = 0x04,
 };
 
 // vtable .rdata:0639c2a0: four `RET 4` no-op slots (.text:062ed730) + deleting

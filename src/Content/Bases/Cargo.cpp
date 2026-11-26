@@ -47,10 +47,10 @@ namespace
     unsigned int FeelingMask(float Feeling)
     {
         if (Feeling >= 0.2f)
-            return 1;
+            return kFeelingFriendly;
         if (Feeling > -0.2f)
-            return 2;
-        return 4;
+            return kFeelingNeutral;
+        return kFeelingHostile;
     }
 }
 
@@ -92,11 +92,11 @@ void __cdecl GetHostileFactionShares(weighted_vector<unsigned int> const* Factio
     {
         float Feeling = 0.0f;
         pub::Reputation::GetReputation(*Group, It->first, Feeling);
-        if ((FeelingMask(Feeling) & 4) != 0)
+        if ((FeelingMask(Feeling) & kFeelingHostile) != 0)
             HostileFrom = HostileFrom + It->second;
         float Back = 0.0f;
         pub::Reputation::GetReputation(It->first, *Group, Back);
-        if ((FeelingMask(Back) & 4) != 0)
+        if ((FeelingMask(Back) & kFeelingHostile) != 0)
             HostileTo = HostileTo + It->second;
         Total = Total + It->second;
     }

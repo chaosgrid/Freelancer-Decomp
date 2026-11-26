@@ -79,6 +79,19 @@ enum : uint32_t
     IVP_CORE_PINNED                   = 0x300u,
 };
 
+// The movement-state byte: the low byte of IVP_Core::MovementState, of IVP_Real_Object::flags and of
+// IVP_Simulation_Unit::State (the signed byte < IVP_MT_NOT_SIM means "in the simulation"). Values are
+// retail's, names IVP's. classify_motion_state (FUN_063478f0) returns MOVING / SLOW / CALM and a unit
+// sleeps only when every core reports CALM; mark_active_and_sync_objects (FUN_06347170) sets MOVING;
+// the constructor and the sleep path set NOT_SIM, which revive_sleeping_core undoes.
+enum EIVP_MovementState
+{
+    IVP_MT_MOVING = 1,
+    IVP_MT_SLOW = 2,
+    IVP_MT_CALM = 3,
+    IVP_MT_NOT_SIM = 8,
+};
+
 // Complete full retail IVP_Core structure (0x1BC = 444 bytes)
 class IVP_Core
 {

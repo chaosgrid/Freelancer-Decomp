@@ -25,6 +25,23 @@ protected:
 public:
 	enum { IDD = 156 };
 
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlStatsList = 0x410,
+		kControlLoadBar = 0x425,
+		kControlLoadText = 0x427,
+		kControlTitle = 0x428,
+		kControlBanner = 0x42b,
+	};
+
+	// SetTimer ids: the 1 s refresh and the 100 ms marquee.
+	enum ETimerId
+	{
+		kTimerRefresh = 0x2001,
+		kTimerMarquee = 0x2002,
+	};
+
 	CFLSummaryForm();
 	virtual ~CFLSummaryForm();
 

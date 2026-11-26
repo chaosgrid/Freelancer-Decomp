@@ -846,7 +846,7 @@ void FLedgeConvexHullBuilder::MarkVirtualFeatures()
         {
             const int32_t EdgeKey[2] = { Index[K], Index[(K + 1) % 3] };
             if (EdgeHash.Find(EdgeKey) == 0)
-                Triangle->CEdge[K].Data |= 0x80000000u;
+                Triangle->CEdge[K].Data |= IVP_Compact_Edge::kPiercingFlag;
         }
     }
 }

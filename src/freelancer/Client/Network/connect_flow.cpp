@@ -82,15 +82,15 @@ bool LoginToServer()
     {
         // Keyed on the login status byte (DAT_0067e969); a generic failure is not reported when
         // the server already dropped us (DAT_0067ecbe).
-        if (G_LoginMgr.LoginStatus == 0)
+        if (G_LoginMgr.LoginStatus == kLoginBanned)
         {
             NnErrorRunModal(0x742, true, nullptr);
         }
-        else if (G_LoginMgr.LoginStatus == 1)
+        else if (G_LoginMgr.LoginStatus == kLoginAlreadyLoggedIn)
         {
             NnErrorRunModal(0x753, true, nullptr);
         }
-        else if (G_LoginMgr.LoginStatus == 7)
+        else if (G_LoginMgr.LoginStatus == kLoginAccountLocked)
         {
             NnErrorRunModal(0x743, true, nullptr);
         }

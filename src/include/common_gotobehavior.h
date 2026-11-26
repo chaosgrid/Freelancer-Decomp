@@ -215,6 +215,15 @@ static_assert(sizeof(GotoBehavior) == 0x3fc, "GotoBehavior size == retail operat
 // TODO: hoist the struct and make these member functions.
 // ============================================================================
 
+// The proximity watcher's zone flags (struct +0x14, DockProximityWatcher::Flags14; +0x18 holds
+// last tick's copy), set by ProxWatcherRecomputeZoneFlags (FUN_062c2af0).
+enum EProxWatcherZone
+{
+    kProxZoneOverlap = 0x1,   // the intercept clearance of the reference point exceeds its distance to the watched object
+    kProxZoneNear = 0x2,      // intercept clearance within the near limit (minus the 50.0f hysteresis band)
+    kProxZoneFar = 0x4,       // intercept clearance within the far limit; its entry / exit raise tether events 2 / 3
+};
+
 // FUN_062c29f0 (RET 0x14). Re-arms the watcher:
 // +0x08 = Near, +0x0c = Far, watch Target (Target+8, deduplicated), clear +0x14/+0x18; then,
 // when something is watched, +0x10 = CruiseRatio if it is > 0.0, else own ship's

@@ -56,6 +56,16 @@ bool IsCommodityByBaseListedName(int Ids);
 // object the player knows (visit flag 4), with the price of ArchId's good there.
 void BuildCommodityByBaseRows(unsigned ArchId);
 
+// The sort columns of the commodity-by-base list (NnCommodityByBase::SortColumn, the column
+// title buttons PriceTitle / BaseTitle / SystemTitle / BuySellTitle).
+enum ECommodityByBaseColumn
+{
+    kCommodityColumnPrice = 1,
+    kCommodityColumnBase = 2,
+    kCommodityColumnSystem = 3,
+    kCommodityColumnBuySell = 4
+};
+
 // FUN_00470040 (cdecl) -- bubble-sort the rows by Column: 1 price (high first) then base
 // name, 2 base name, 3 system name then price then base name, 4 base-sells first then price;
 // any other value leaves the rows as they are.

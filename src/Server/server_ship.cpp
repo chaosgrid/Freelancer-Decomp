@@ -170,7 +170,7 @@ bool Ship::apply_damage_ratio(float Ratio, DamageList& Damage)
     // Equipment pass only while the list does not say destroyed.
     if (!Damage.bDestroyed)
     {
-        CEquipTraverser Walk(0x1ee0);
+        CEquipTraverser Walk(kEquipMaskAttachedNoShield);
         CEquipManager& Equipment = static_cast<CEqObj*>(Raw)->EquipManager;
         for (CEquip* Equip = Equipment.Traverse(Walk); Equip != nullptr;
              Equip = Equipment.Traverse(Walk))
@@ -288,7 +288,7 @@ void Ship::tick_jettison(float Dt)
     if (JettisonTimer != 0.0f)
         return;
     // The raw CShip's BayState (+0x2ac) must be 2.
-    if (static_cast<CShip*>(Object)->BayState != 2)
+    if (static_cast<CShip*>(Object)->BayState != BayOpen)
         return;
 
     EquipDesc& Desc = Jettison.Items.front();
@@ -488,7 +488,7 @@ bool Ship::light_fuse(unsigned int SourceId, ID_String const& FuseId,
         // IBehaviorManager slot 0 (Common LAB_062d3f90).
         unsigned int LeaderId = get_id();
         FBehaviorManagerEvent FuseEvent;
-        FuseEvent.Type = 7;
+        FuseEvent.Type = FBehaviorManagerEvent::kEventObjectDying;
         FuseEvent.Data = &LeaderId;
         Behavior->OnEvent(&FuseEvent);
     };
@@ -532,7 +532,7 @@ void Ship::request_returned(int RequestType, int Response, int Arg3)
     unsigned int const Id = get_id();
     g_pClientInterface->SendServerRequestReturned(OwnerPlayer, Id, RequestType, Response, Arg3);
     bDockInUse = 0;
-    if (RequestType == 0 && Response == DOCK_HOST_RESPONSE_BUSY)
+    if (RequestType == kRequestEventDock && Response == DOCK_HOST_RESPONSE_BUSY)
         bDockInUse = 1;
 }
 
@@ -805,7 +805,7 @@ int Ship::request_event(int RequestType, unsigned const* TargetId, unsigned cons
     PendingRequest = Callback;
     bDockInUse = 1;
 
-    if (RequestType == 0)
+    if (RequestType == kRequestEventDock)
     {
         unsigned int Msg[4] = { 0u, 0u, 0u, 0u };
         Msg[0] = get_id();
@@ -815,7 +815,7 @@ int Ship::request_event(int RequestType, unsigned const* TargetId, unsigned cons
         Server_ControllerDispatch(0, pub::Controller::EMessage::DockRequest, Msg);
         return 0;
     }
-    if (RequestType == 1)
+    if (RequestType == kRequestEventFormation)
     {
         unsigned int Msg[3];
         Msg[2] = OwnerSystem->SystemInfo->NicknameId;
@@ -824,7 +824,7 @@ int Ship::request_event(int RequestType, unsigned const* TargetId, unsigned cons
         Server_ControllerDispatch(0, pub::Controller::EMessage::FormationRequest, Msg);
         return 0;
     }
-    if (RequestType == 2)
+    if (RequestType == kRequestEventTradelane)
     {
         unsigned int Msg[4];
         Msg[0] = get_id();
@@ -845,7 +845,7 @@ int Ship::request_cancel(int RequestType, unsigned const* TargetId, int Arg3)
     PendingRequest = nullptr;
     bDockInUse = 0;
 
-    if (RequestType == 0)
+    if (RequestType == kRequestEventDock)
     {
         unsigned int Msg[3];
         Msg[0] = get_id();
@@ -853,7 +853,7 @@ int Ship::request_cancel(int RequestType, unsigned const* TargetId, int Arg3)
         Msg[2] = static_cast<unsigned int>(Arg3);
         Server_ControllerDispatch(0, pub::Controller::EMessage::DockCancel, Msg);
     }
-    else if (RequestType == 1)
+    else if (RequestType == kRequestEventFormation)
     {
         unsigned int Msg[3];
         Msg[0] = get_id();
@@ -861,7 +861,7 @@ int Ship::request_cancel(int RequestType, unsigned const* TargetId, int Arg3)
         Msg[2] = OwnerSystem->SystemInfo->NicknameId;
         Server_ControllerDispatch(0, pub::Controller::EMessage::FormationLeave, Msg);
     }
-    else if (RequestType == 2)
+    else if (RequestType == kRequestEventTradelane)
     {
         unsigned int Msg[3];
         Msg[0] = get_id();

@@ -2467,13 +2467,13 @@ void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     // All arms receive the UNMASKED feature edge.
     switch (Mindist->synapse[1].status)
     {
-    case 0:
+    case IVP_SYNAPSE_POINT:
         Ctx->EstimateBallVsLedgeVertexContact(ObjectA, FeatureB, SourceA, &SideB);
         break;
-    case 1:
+    case IVP_SYNAPSE_EDGE:
         Ctx->EstimateBallVsLedgeEdgeContact(ObjectA, FeatureB, SourceA, &SideB);
         break;
-    case 2:
+    case IVP_SYNAPSE_POLY:
         Ctx->EstimateBallVsLedgeFaceContact(FeatureB, SourceA, &SideB);
         break;
     default:

@@ -29,6 +29,29 @@ enum ETriMeshTriangleClass : unsigned long
     TriMeshTriangleBackFrontFront = 0x208,
 };
 
+// The bits of a ClassifyTriangle result that mark the corner pattern of a straddling triangle:
+// TriMeshTriangleStraddles is set in every mixed class, and the second bit names the pattern
+// (the class names above are Straddles | pattern).
+enum ETriMeshTriangleClassBit : unsigned long
+{
+    TriMeshTriangleStraddles = 0x8,
+    TriMeshPatternFrontBackBack = 0x10,
+    TriMeshPatternBackFrontBack = 0x20,
+    TriMeshPatternBackBackFront = 0x40,
+    TriMeshPatternFrontFrontBack = 0x80,
+    TriMeshPatternFrontBackFront = 0x100,
+    TriMeshPatternBackFrontFront = 0x200
+};
+
+// FTriMeshArch::Flags (+0xA8).
+enum ETriMeshArchFlag : unsigned long
+{
+    TriMeshArchLoaded = 0x1,
+    TriMeshArchSphereCached = 0x2,
+    TriMeshArchBoxCached = 0x4,
+    TriMeshArchCenterCached = 0x8 // GetCenter tests bit 0x2 but records 0x8 (FUN_06c25d40)
+};
+
 // One face group: operator new(0x40) + FUN_06c276a0 (Type 4, Bucket 4, every other dword 0).
 // Copy ctor FUN_06c276e0, assignment FUN_06c27780, dtor FUN_06c27720.
 struct FTriMeshGroup
@@ -142,7 +165,7 @@ public:
     std::vector<FTriMeshGroup*> Groups;
     FRpVertexSrcDesc Vertices;             // +0x1C the shared vertex source (loader, FUN_06c25140)
     FTriMeshUvAnim UvAnim;                 // +0x8C
-    unsigned long Flags;                   // +0xA8 bit0 loaded, bit1 sphere cached, bit2 box
+    unsigned long Flags;                   // +0xA8 ETriMeshArchFlag: bit0 loaded, bit1 sphere cached, bit2 box
                                            //       cached, bit3 centroid computed
     char Name[0x104];                      // +0xAC the node path (IFileSystem +0xA4)
     Vector Center;                         // +0x1B0 FUN_06c25d40

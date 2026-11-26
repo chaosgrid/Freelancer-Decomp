@@ -78,7 +78,7 @@ namespace
 {
     CSimple* InspectSimple(CObject const* Object)
     {
-        if (Object != nullptr && ((unsigned)Object->ObjectClass & 3) == 3) {
+        if (Object != nullptr && ((unsigned)Object->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple) {
             return static_cast<CSimple*>(const_cast<CObject*>(Object));
         }
         return nullptr;
@@ -208,9 +208,9 @@ int IObjInspectImpl::get_status(float& Health) const
     // soon as one shield (mask 0x100, IsFunctioning = vtable +0xc) is down, else 1; -3 only
     // when there is none at all. Otherwise the relative health, negative clamped to 0.
     CSimple* S = InspectSimple(Object);
-    if (S->TypeBits == 0x80) {
+    if (S->TypeBits == OBJ_TRADELANE_RING) {
         CEqObj* Eq = InspectEqObj(Object);
-        CEquipTraverser Walk(0x100);
+        CEquipTraverser Walk(EquipTypeShield);
         CEquip* E = Eq->EquipManager.Traverse(Walk);
         if (E == nullptr) {
             return -3;
@@ -275,7 +275,7 @@ int IObjInspectImpl::get_shield_status(float& CurHealth, float& MaxHealth, bool&
     CurHealth = 0.0f;
     MaxHealth = 0.0f;
     bActive = false;
-    CEquipTraverser Walk(0x100);
+    CEquipTraverser Walk(EquipTypeShield);
     CEquip* E = Eq->EquipManager.Traverse(Walk);
     while (E != nullptr) {
         CurHealth += E->GetHitPoints();
@@ -813,18 +813,18 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
     {
         // Type 0 -> ChargeRate (+0x74), type 4 -> Capacity (+0x70); 0.0f once destroyed.
         Archetype::Power const* const Arch = static_cast<Archetype::Power const*>(Found->Arch);
-        if (Kind == 0)
+        if (Kind == EquipValPowerDraw)
             FloatVal = Found->IsDestroyed() ? 0.0f : Arch->ChargeRate;
-        else if (Kind == 4)
+        else if (Kind == EquipValCapacity)
             FloatVal = Found->IsDestroyed() ? 0.0f : Arch->Capacity;
         else
             return -3;
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
     }
-    case 0x20000:                                                              // CEEngine
+    case EquipTypeEngine:                                                      // CEEngine
     {
-        if (Kind != 0)
+        if (Kind != EquipValPowerDraw)
             return -3;
         // An out-of-range Param gives -4; NaN passes the clamp but fails the equality, so -4.
         float Throttle;
@@ -840,13 +840,13 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
     }
-    case 0x400:                                                                // CEThruster
-        if (Kind != 0)
+    case EquipTypeThruster:                                                    // CEThruster
+        if (Kind != EquipValPowerDraw)
             return -3;
         FloatVal = static_cast<CEThruster*>(Found)->GetPowerDraw();
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
-    case 0x80:                                                                 // CEGun
+    case EquipTypeGun:                                                         // CEGun
     {
         CEGun* const Gun = static_cast<CEGun*>(Found);
         // FUN_062969c0 (+0x4c) is the munition archetype, FUN_0629fb90 (+0x0c) the gun's.
@@ -854,11 +854,11 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
         Archetype::Gun const* const GunArch = static_cast<Archetype::Gun const*>(Found->Arch);
         switch (Kind)
         {
-        case 0:                                                                // vtable +0x9c
+        case EquipValPowerDraw:                                                // vtable +0x9c
             FloatVal = (float)Gun->GetPowerDrawPerFire();
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
             return 0;
-        case 1:
+        case EquipValHullDamagePerFire:
         {
             // Unsigned widening; HullDamage +0x80.
             unsigned const PerFire = Gun->GetProjectilesPerFire();
@@ -866,37 +866,37 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
             return 0;
         }
-        case 2:
+        case EquipValRefireDelay:
             std::memcpy(Out, &GunArch->RefireDelay, sizeof(float));             // +0x90
             return 0;
-        case 3:                                                                // vtable +0xa0
+        case EquipValAmmoCount:                                                // vtable +0xa0
             IntVal = Gun->GetAmmoCount();
             std::memcpy(Out, &IntVal, sizeof(IntVal));
             return 0;
-        case 5:
+        case EquipValRange:
             FloatVal = Gun->GetMunitionRange();
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
             return 0;
-        case 6:
+        case EquipValMunitionKind:
             // +0xac byte == 1 -> 3; HpType (+0xa8) == 0xa -> 2; else Seeker (+0x90) != 0.
             if (*reinterpret_cast<unsigned char const*>(&Ammo->bCruiseDisruptor) == 1)
-                IntVal = 3;
-            else if (Ammo->HpType == 0xa)
-                IntVal = 2;
+                IntVal = kMunitionKindCruiseDisruptor;
+            else if (Ammo->HpType == HpTypeTorpedo)
+                IntVal = kMunitionKindTorpedo;
             else
-                IntVal = Ammo->Seeker != 0 ? 1 : 0;
+                IntVal = Ammo->Seeker != 0 ? kMunitionKindSeeker : kMunitionKindPlain;
             std::memcpy(Out, &IntVal, sizeof(IntVal));
             return 0;
-        case 8:
+        case EquipValMuzzleVelocity:
             std::memcpy(Out, &GunArch->MuzzleVelocity, sizeof(float));          // +0x94
             return 0;
-        case 9:
+        case EquipValAutoTurret:
             Out[0] = *reinterpret_cast<unsigned char const*>(&GunArch->bAutoTurret);   // +0xba byte
             return 0;
-        case 0xa:
+        case EquipValSeeker:
             Out[0] = Ammo->Seeker != 0 ? 1 : 0;                                // byte
             return 0;
-        case 0xb:
+        case EquipValTargetId:
         {
             // The gun target's Id, or 0.
             CSimple* Target = nullptr;
@@ -910,21 +910,21 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
             return -3;
         }
     }
-    case 0x80000:                                                              // CEScanner
-        if (Kind == 5)
+    case EquipTypeScanner:                                                     // CEScanner
+        if (Kind == EquipValRange)
         {
             FloatVal = static_cast<CEScanner*>(Found)->GetRadarRange();
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
             return 0;
         }
-        if (Kind == 7)
+        if (Kind == EquipValCargoScanRange)
         {
             std::memcpy(Out, &static_cast<Archetype::Scanner const*>(Found->Arch)->CargoScanRange, sizeof(float));
             return 0;
         }
         return -3;
-    case 0x100000:                                                             // CETractor
-        if (Kind != 5)
+    case EquipTypeTractor:                                                     // CETractor
+        if (Kind != EquipValRange)
             return -3;
         FloatVal = static_cast<CETractor*>(Found)->GetRange();
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
@@ -944,7 +944,7 @@ int IObjInspectImpl::can_point_at(bool& OutCanPoint, unsigned short const& Equip
         CEquip* Found = Eq->EquipManager.FindByID(EquipId);
         if (Found == nullptr || Found->IsDestroyed())
             return -2;
-        if (Found->GetType() != 0x80)
+        if (Found->GetType() != EquipTypeGun)
             return -3;
         CEGun* Gun = static_cast<CEGun*>(Found);
         OutCanPoint = Gun->CanPointAt(Point, Angle);
@@ -963,7 +963,7 @@ int IObjInspectImpl::is_pointing_at(bool& OutIsPointing, unsigned short const& E
         CEquip* Found = Eq->EquipManager.FindByID(EquipId);
         if (Found == nullptr || Found->IsDestroyed())
             return -2;
-        if (Found->GetType() != 0x80)
+        if (Found->GetType() != EquipTypeGun)
             return -3;
         CEGun* Gun = static_cast<CEGun*>(Found);
         OutIsPointing = Gun->CanSeeTargetObject(Angle);
@@ -981,7 +981,7 @@ int IObjInspectImpl::get_tgt_lead_fire_pos(unsigned short const& EquipId, Vector
         CEquip* Found = Eq->EquipManager.FindByID(EquipId);
         if (Found == nullptr || Found->IsDestroyed())
             return -2;
-        if (Found->GetType() != 0x80)
+        if (Found->GetType() != EquipTypeGun)
             return -3;
         CEGun* Gun = static_cast<CEGun*>(Found);
         bool bComputed = Gun->ComputeTgtLeadPosition(OutPos);
@@ -1061,7 +1061,7 @@ int IObjInspectImpl::get_scanlist(ScanList const*& OutList, uint Type, bool bFla
     // scanner +0x24.
     OutList = nullptr;
     CEqObj* Eq = InspectEqObj(Object);
-    CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(0x80000));
+    CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(EquipTypeScanner));
     CEScanner* Scanner = (CEScanner*)Equip;
     if (Scanner == nullptr)
     {
@@ -1112,7 +1112,7 @@ bool IObjInspectImpl::has_dock_hardpoints() const
          It != Spheres.end(); ++It)
     {
         unsigned const Type = It->Type;
-        if (Type == 1 || Type == 6 || Type == 7)
+        if (Type == TERM_BERTH || Type == TERM_RING || Type == TERM_JUMP)
             return true;
     }
     return false;
@@ -1181,7 +1181,9 @@ int IObjInspectImpl::enumerate_subtargets(SubtargetEnumerator* Enum) const
     if (Eq == nullptr)
         return -3;
 
-    CEquipTraverser Walk(0x1fe0);
+    CEquipTraverser Walk(EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun |
+                         EquipTypeShield | EquipTypeShieldGen | EquipTypeThruster |
+                         EquipTypeCargoPod | EquipTypeCloak);
     CEquip* EqItem = Eq->EquipManager.Traverse(Walk);
     while (EqItem != nullptr)
     {
@@ -1210,7 +1212,7 @@ int IObjInspectImpl::enumerate_cargo(CargoEnumerator* Enum) const
     if (Eq == nullptr)
         return -3;
 
-    CEquipTraverser Walk(0x10000);
+    CEquipTraverser Walk(EquipTypeCargo);
     CEquip* E = Eq->EquipManager.Traverse(Walk);
     while (E != nullptr)
     {
@@ -1230,7 +1232,7 @@ int IObjInspectImpl::scan_cargo(IObjRW* Target, EquipDescVector& OutCargo) const
     if (Eq == nullptr)
         return -3;
 
-    CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(0x80000));
+    CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(EquipTypeScanner));
     CEScanner* Sc = reinterpret_cast<CEScanner*>(Equip);
 
     CObject const* TargetObj = Target->cobject();

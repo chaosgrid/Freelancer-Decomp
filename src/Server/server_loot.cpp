@@ -119,7 +119,7 @@ bool Loot::update(float Dt)
             unsigned int Cursor[3];
             Cursor[0] = 0;
             Cursor[1] = 0;
-            Cursor[2] = 0x7f0000u;
+            Cursor[2] = OBJ_SHIP_MASK;
             IObjRW* Other = OwnerSystem->GetNext(Cursor);
             while (Other != nullptr)
             {
@@ -142,7 +142,7 @@ bool Loot::update(float Dt)
             // Expired loot is removed and the scan timer is left running; otherwise the
             // timer restarts.
             if (UnseenLife < 0.0f)
-                destroy(0, get_id());
+                destroy(DESTROY_VANISH, get_id());
             else
                 CheckTimer = 0.0f;
         }
@@ -171,7 +171,7 @@ bool Loot::destroy(int Kind, unsigned int ObjId)
     GameObject::destroy(Kind, ObjId);
 
     // A real kill also blows the crate up and spills its cargo.
-    if (Kind == 1)
+    if (Kind == DESTROY_FUSE)
     {
         explode_on_destroy(); // FUN_06cf2b10
         split_stack();        // FUN_06cf2c10
@@ -230,7 +230,7 @@ void Loot::apply_damage_list(DamageList& Damage)
 
     // The invincibility gate (+0x1b8) can block the kill.
     if (Damage.bDestroyed && !is_damage_blocked(Damage) && !is_destroyed())
-        destroy(1, Damage.InflictorId);
+        destroy(DESTROY_FUSE, Damage.InflictorId);
 
     set_in_damage_callback(false);
 }
@@ -262,7 +262,7 @@ bool Loot::update_decay(float Dt)
 
     if (cloot()->Units == 1)
     {
-        destroy(1, get_id());
+        destroy(DESTROY_FUSE, get_id());
         return false;
     }
 
@@ -430,7 +430,7 @@ void Loot::split_stack()
 // .text:06d08eb0.
 unsigned int Loot::get_type_bits() const
 {
-    return 0x10000000u;
+    return OBJ_LOOT;
 }
 
 CLoot* Loot::cloot() const

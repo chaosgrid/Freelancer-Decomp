@@ -1045,132 +1045,132 @@ static bool DeliverReqCollisionGroups(const FPacket_FLPACKET_CLIENT_REQCOLLISION
 // The channel-3 table. Ordered by opcode, not by the retail registrator's order.
 // ===========================================================================
 const FRpcServerCodec GChannel3Codecs[] = {
-    { 3, 0x01, "FLPACKET_CLIENT_LOGIN",                      0x404,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_LOGIN), "FLPACKET_CLIENT_LOGIN",                      0x404,
       RpcMarshalAs<MarshalLogin>,                  RpcDeliverToServerAs<DeliverLogin> },
-    { 3, 0x03, "FLPACKET_CLIENT_MUNCOLLISION",               0x1c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MUNCOLLISION), "FLPACKET_CLIENT_MUNCOLLISION",               0x1c,
       RpcMarshalAs<MarshalMunCollision>,           RpcDeliverToServerAs<DeliverMunCollision> },
-    { 3, 0x04, "FLPACKET_CLIENT_REQUESTLAUNCH",              0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTLAUNCH), "FLPACKET_CLIENT_REQUESTLAUNCH",              0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverPlayerLaunch> },
-    { 3, 0x05, "FLPACKET_CLIENT_REQUESTCHARINFO",            0x00,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTCHARINFO), "FLPACKET_CLIENT_REQUESTCHARINFO",            0x00,
       MarshalCh3Empty,                             RpcDeliverToServerAs<DeliverCharacterInfoReq> },
-    { 3, 0x06, "FLPACKET_CLIENT_SELECTCHARACTER",            0x200,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SELECTCHARACTER), "FLPACKET_CLIENT_SELECTCHARACTER",            0x200,
       RpcMarshalAs<MarshalCharacterId>,            RpcDeliverToServerAs<DeliverCharacterSelect> },
-    { 3, 0x07, "FLPACKET_CLIENT_ENTERBASE",                  0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ENTERBASE), "FLPACKET_CLIENT_ENTERBASE",                  0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverBaseEnter> },
-    { 3, 0x08, "FLPACKET_CLIENT_REQUESTBASEINFO",            0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTBASEINFO), "FLPACKET_CLIENT_REQUESTBASEINFO",            0x08,
       MarshalInfoRequest,                          RpcDeliverToServerAs<DeliverBaseInfoRequest> },
-    { 3, 0x09, "FLPACKET_CLIENT_REQUESTLOCATIONINFO",        0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTLOCATIONINFO), "FLPACKET_CLIENT_REQUESTLOCATIONINFO",        0x08,
       MarshalInfoRequest,
       RpcDeliverToServerAs<DeliverLocationInfoRequest> },
-    { 3, 0x0b, "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE", 0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE), "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE", 0x04,
       MarshalCh3DwordAt<0>,
       RpcDeliverToServerAs<DeliverSystemSwitchOutComplete> },
-    { 3, 0x0c, "FLPACKET_CLIENT_OBJCOLLISION",               0x14,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_OBJCOLLISION), "FLPACKET_CLIENT_OBJCOLLISION",               0x14,
       RpcMarshalAs<MarshalObjCollision>,           RpcDeliverToServerAs<DeliverObjCollision> },
-    { 3, 0x0d, "FLPACKET_CLIENT_EXITBASE",                   0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_EXITBASE), "FLPACKET_CLIENT_EXITBASE",                   0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverBaseExit> },
-    { 3, 0x0e, "FLPACKET_CLIENT_ENTERLOCATION",              0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ENTERLOCATION), "FLPACKET_CLIENT_ENTERLOCATION",              0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverLocationEnter> },
-    { 3, 0x0f, "FLPACKET_CLIENT_EXITLOCATION",               0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_EXITLOCATION), "FLPACKET_CLIENT_EXITLOCATION",               0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverLocationExit> },
-    { 3, 0x10, "FLPACKET_CLIENT_REQUESTCREATESHIP",          0x00,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTCREATESHIP), "FLPACKET_CLIENT_REQUESTCREATESHIP",          0x00,
       MarshalCh3Empty,                             RpcDeliverToServerAs<DeliverRequestCreateShip> },
-    { 3, 0x11, "FLPACKET_CLIENT_GFGOODSELL",                 0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODSELL), "FLPACKET_CLIENT_GFGOODSELL",                 0x0c,
       MarshalCh3StructHead<3>,                     RpcDeliverToServerAs<DeliverGFGoodSell> },
-    { 3, 0x12, "FLPACKET_CLIENT_GFGOODBUY",                  0x10,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODBUY), "FLPACKET_CLIENT_GFGOODBUY",                  0x10,
       MarshalCh3StructHead<4>,                     RpcDeliverToServerAs<DeliverGFGoodBuy> },
-    { 3, 0x13, "FLPACKET_CLIENT_GFSELECTOBJECT",             0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFSELECTOBJECT), "FLPACKET_CLIENT_GFSELECTOBJECT",             0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverGFObjSelect> },
-    { 3, 0x14, "FLPACKET_CLIENT_MISSIONRESPONSE",            0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MISSIONRESPONSE), "FLPACKET_CLIENT_MISSIONRESPONSE",            0x0c,
       RpcMarshalAs<MarshalMissionResponse>,        RpcDeliverToServerAs<DeliverMissionResponse> },
-    { 3, 0x15, "FLPACKET_CLIENT_REQSHIPARCH",                0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQSHIPARCH), "FLPACKET_CLIENT_REQSHIPARCH",                0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqShipArch> },
-    { 3, 0x16, "FLPACKET_CLIENT_REQEQUIPMENT",               0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQEQUIPMENT), "FLPACKET_CLIENT_REQEQUIPMENT",               0x04,
       RpcMarshalAs<MarshalReqEquipmentCommon>,     RpcDeliverToServerAs<DeliverReqEquipment> },
-    { 3, 0x17, "FLPACKET_CLIENT_REQCARGO",                   0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCARGO), "FLPACKET_CLIENT_REQCARGO",                   0x04,
       RpcMarshalAs<MarshalReqEquipmentCommon>,     RpcDeliverToServerAs<DeliverReqCargo> },
-    { 3, 0x18, "FLPACKET_CLIENT_REQADDITEM",                 0x18,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQADDITEM), "FLPACKET_CLIENT_REQADDITEM",                 0x18,
       RpcMarshalAs<MarshalReqAddItem>,             RpcDeliverToServerAs<DeliverReqAddItem> },
-    { 3, 0x19, "FLPACKET_CLIENT_REQREMOVEITEM",              0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQREMOVEITEM), "FLPACKET_CLIENT_REQREMOVEITEM",              0x08,
       RpcMarshalAs<MarshalReqRemoveItem>,          RpcDeliverToServerAs<DeliverReqRemoveItem> },
-    { 3, 0x1a, "FLPACKET_CLIENT_REQMODIFYITEM",              0x18,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQMODIFYITEM), "FLPACKET_CLIENT_REQMODIFYITEM",              0x18,
       RpcMarshalAs<MarshalReqModifyItem>,          RpcDeliverToServerAs<DeliverReqModifyItem> },
-    { 3, 0x1b, "FLPACKET_CLIENT_REQSETCASH",                 0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQSETCASH), "FLPACKET_CLIENT_REQSETCASH",                 0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqSetCash> },
-    { 3, 0x1c, "FLPACKET_CLIENT_REQCHANGECASH",              0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCHANGECASH), "FLPACKET_CLIENT_REQCHANGECASH",              0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqChangeCash> },
-    { 3, 0x1e, "FLPACKET_CLIENT_SAVEGAME",                   0x208,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SAVEGAME), "FLPACKET_CLIENT_SAVEGAME",                   0x208,
       RpcMarshalAs<MarshalSaveGame>,               RpcDeliverToServerAs<DeliverSaveGame> },
-    { 3, 0x20, "FLPACKET_CLIENT_MINEASTEROID",               0x1c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MINEASTEROID), "FLPACKET_CLIENT_MINEASTEROID",               0x1c,
       RpcMarshalAs<MarshalMineAsteroid>,           RpcDeliverToServerAs<DeliverMineAsteroid> },
-    { 3, 0x22, "FLPACKET_CLIENT_DBGCREATESHIP",              0x70,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGCREATESHIP), "FLPACKET_CLIENT_DBGCREATESHIP",              0x70,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgCreateShip> },
-    { 3, 0x23, "FLPACKET_CLIENT_DBGLOADSYSTEM",              0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGLOADSYSTEM), "FLPACKET_CLIENT_DBGLOADSYSTEM",              0x08,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgLoadSystem> },
-    { 3, 0x24, "FLPACKET_CLIENT_DOCK",                       0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DOCK), "FLPACKET_CLIENT_DOCK",                       0x04,
       MarshalCh3DwordByRefAt<0>,                   RpcDeliverToServerAs<DeliverDock> },
-    { 3, 0x25, "FLPACKET_CLIENT_DBGDESTROYOBJECT",           0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGDESTROYOBJECT), "FLPACKET_CLIENT_DBGDESTROYOBJECT",           0x08,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgDestroyObject> },
-    { 3, 0x27, "FLPACKET_CLIENT_TRADERESPONSE",              0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_TRADERESPONSE), "FLPACKET_CLIENT_TRADERESPONSE",              0x08,
       RpcMarshalAs<MarshalTradeResponse>,          RpcDeliverToServerAs<DeliverTradeResponse> },
-    { 3, 0x2b, "FLPACKET_CLIENT_CARGOSCAN",                  0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_CARGOSCAN), "FLPACKET_CLIENT_CARGOSCAN",                  0x08,
       RpcMarshalAs<MarshalSPScanCargo>,            RpcDeliverToServerAs<DeliverSPScanCargo> },
-    { 3, 0x2d, "FLPACKET_CLIENT_DBGCONSOLE",                 0x84,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGCONSOLE), "FLPACKET_CLIENT_DBGCONSOLE",                 0x84,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgConsole> },
-    { 3, 0x2e, "FLPACKET_CLIENT_DBGFREESYSTEM",              0x00,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGFREESYSTEM), "FLPACKET_CLIENT_DBGFREESYSTEM",              0x00,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgFreeSystem> },
-    { 3, 0x2f, "FLPACKET_CLIENT_SETMANEUVER",                0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SETMANEUVER), "FLPACKET_CLIENT_SETMANEUVER",                0x0c,
       RpcMarshalAs<MarshalSetManeuver>,            RpcDeliverToServerAs<DeliverSetManeuver> },
-    { 3, 0x30, "FLPACKET_CLIENT_DBGRELOCATE_SHIP",           0x10,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DBGRELOCATE_SHIP), "FLPACKET_CLIENT_DBGRELOCATE_SHIP",           0x10,
       nullptr,                                     RpcDeliverToServerAs<DeliverDbgRelocateShip> },
-    { 3, 0x31, "FLPACKET_CLIENT_REQUEST_EVENT",              0x14,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_EVENT), "FLPACKET_CLIENT_REQUEST_EVENT",              0x14,
       RpcMarshalAs<MarshalRequestEvent>,           RpcDeliverToServerAs<DeliverRequestEvent> },
-    { 3, 0x32, "FLPACKET_CLIENT_REQUEST_CANCEL",             0x10,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_CANCEL), "FLPACKET_CLIENT_REQUEST_CANCEL",             0x10,
       RpcMarshalAs<MarshalRequestCancel>,          RpcDeliverToServerAs<DeliverRequestCancel> },
-    { 3, 0x35, "FLPACKET_CLIENT_INTERFACEITEMUSED",          0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_INTERFACEITEMUSED), "FLPACKET_CLIENT_INTERFACEITEMUSED",          0x04,
       MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverInterfaceItemUsed> },
-    { 3, 0x36, "FLPACKET_CLIENT_REQCOLLISIONGROUPS",         0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQCOLLISIONGROUPS), "FLPACKET_CLIENT_REQCOLLISIONGROUPS",         0x0c,
       RpcMarshalAs<MarshalReqCollisionGroups>,
       RpcDeliverToServerAs<DeliverReqCollisionGroups> },
-    { 3, 0x37, "FLPACKET_CLIENT_COMMCOMPLETE",               0x10,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_COMMCOMPLETE), "FLPACKET_CLIENT_COMMCOMPLETE",               0x10,
       RpcMarshalAs<MarshalCommComplete>,           RpcDeliverToServerAs<DeliverCommComplete> },
-    { 3, 0x38, "FLPACKET_CLIENT_REQUESTNEWCHARINFO",         0x00,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUESTNEWCHARINFO), "FLPACKET_CLIENT_REQUESTNEWCHARINFO",         0x00,
       MarshalCh3Empty,
       RpcDeliverToServerAs<DeliverNewCharacterInfoReq> },
-    { 3, 0x39, "FLPACKET_CLIENT_CREATENEWCHAR",              0x90,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_CREATENEWCHAR), "FLPACKET_CLIENT_CREATENEWCHAR",              0x90,
       RpcMarshalAs<MarshalCreateNewCharacter>,
       RpcDeliverToServerAs<DeliverCreateNewCharacter> },
-    { 3, 0x3a, "FLPACKET_CLIENT_DESTROYCHAR",                0x200,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_DESTROYCHAR), "FLPACKET_CLIENT_DESTROYCHAR",                0x200,
       RpcMarshalAs<MarshalCharacterId>,            RpcDeliverToServerAs<DeliverDestroyCharacter> },
-    { 3, 0x3b, "FLPACKET_CLIENT_REQHULLSTATUS",              0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQHULLSTATUS), "FLPACKET_CLIENT_REQHULLSTATUS",              0x04,
       MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqHullStatus> },
-    { 3, 0x3c, "FLPACKET_CLIENT_GFGOODVAPORIZED",            0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_GFGOODVAPORIZED), "FLPACKET_CLIENT_GFGOODVAPORIZED",            0x0c,
       MarshalCh3StructHead<3>,                     RpcDeliverToServerAs<DeliverGFGoodVaporized> },
-    { 3, 0x3d, "FLPACKET_CLIENT_BADLANDSOBJCOLLISION",       0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_BADLANDSOBJCOLLISION), "FLPACKET_CLIENT_BADLANDSOBJCOLLISION",       0x0c,
       RpcMarshalAs<MarshalBadLandsObjCollision>,
       RpcDeliverToServerAs<DeliverBadLandsObjCollision> },
-    { 3, 0x3e, "FLPACKET_CLIENT_LAUNCHCOMPLETE",             0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_LAUNCHCOMPLETE), "FLPACKET_CLIENT_LAUNCHCOMPLETE",             0x08,
       MarshalDwordPair,                            RpcDeliverToServerAs<DeliverLaunchComplete> },
-    { 3, 0x3f, "FLPACKET_CLIENT_HAIL",                       0x0c,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_HAIL), "FLPACKET_CLIENT_HAIL",                       0x0c,
       RpcMarshalAs<MarshalHail>,                   RpcDeliverToServerAs<DeliverHail> },
-    { 3, 0x40, "FLPACKET_CLIENT_REQUEST_USE_ITEM",           0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQUEST_USE_ITEM), "FLPACKET_CLIENT_REQUEST_USE_ITEM",           0x08,
       RpcMarshalAs<MarshalSPRequestUseItem>,       RpcDeliverToServerAs<DeliverSPRequestUseItem> },
-    { 3, 0x41, "FLPACKET_CLIENT_ABORT_MISSION",              0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_ABORT_MISSION), "FLPACKET_CLIENT_ABORT_MISSION",              0x04,
       MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverAbortMission> },
-    { 3, 0x42, "FLPACKET_CLIENT_SKIP_AUTOSAVE",              0x00,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_SKIP_AUTOSAVE), "FLPACKET_CLIENT_SKIP_AUTOSAVE",              0x00,
       MarshalCh3Empty,
       RpcDeliverToServerAs<DeliverCharacterSkipAutosave> },
-    { 3, 0x43, "FLPACKET_CLIENT_JUMPINCOMPLETE",             0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_JUMPINCOMPLETE), "FLPACKET_CLIENT_JUMPINCOMPLETE",             0x08,
       MarshalDwordPair,                            RpcDeliverToServerAs<DeliverJumpInComplete> },
-    { 3, 0x44, "FLPACKET_CLIENT_REQINVINCIBILITY",           0x08,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQINVINCIBILITY), "FLPACKET_CLIENT_REQINVINCIBILITY",           0x08,
       RpcMarshalAs<MarshalSPRequestInvincibility>,
       RpcDeliverToServerAs<DeliverSPRequestInvincibility> },
-    { 3, 0x45, "FLPACKET_CLIENT_MISSIONSAVEB",               0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_MISSIONSAVEB), "FLPACKET_CLIENT_MISSIONSAVEB",               0x04,
       MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverMissionSaveB> },
-    { 3, 0x46, "FLPACKET_CLIENT_REQDIFFICULTYSCALE",         0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_REQDIFFICULTYSCALE), "FLPACKET_CLIENT_REQDIFFICULTYSCALE",         0x04,
       MarshalCh3DwordAt<0>,
       RpcDeliverToServerAs<DeliverReqDifficultyScale> },
-    { 3, 0x47, "FLPACKET_CLIENT_RTCDONE",                    0x04,
+    { kPacketChannelClient, FlPacketOpcode(FLPACKET_CLIENT_RTCDONE), "FLPACKET_CLIENT_RTCDONE",                    0x04,
       MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverRTCDone> },
 };
 
@@ -1178,7 +1178,7 @@ const unsigned int GChannel3CodecCount =
     (unsigned int)(sizeof(GChannel3Codecs) / sizeof(GChannel3Codecs[0]));
 
 const FRpcServerCodec* RpcFindServerCodec(unsigned int Channel, unsigned int Opcode) {
-    if (Channel != 3u) {
+    if (Channel != kPacketChannelClient) {
         return nullptr;
     }
     for (unsigned int i = 0; i < GChannel3CodecCount; ++i) {
@@ -1204,7 +1204,7 @@ const FRpcServerCodec* RpcFindServerCodec(unsigned int Channel, unsigned int Opc
 static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
                                      IChatServer* ChatServer, unsigned int SessionId) {
     switch (Packet->GetOpcode()) {
-    case 0x01: {   // UPDATEOBJECT -> slot 52 SPObjUpdate
+    case FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT): { // UPDATEOBJECT -> slot 52 SPObjUpdate
         const FPayloadCommonUpdateObject& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_UPDATEOBJECT*>(Packet)->Wire;
         SSPObjUpdateInfo Info;
@@ -1222,7 +1222,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->SPObjUpdate(Info, SessionId);
         return true;
     }
-    case 0x02: {   // FIREWEAPON -> slot 0
+    case FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON): { // FIREWEAPON -> slot 0
         const FPayloadCommonFireWeapon& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_FIREWEAPON*>(Packet)->Wire;
         // A local XFireWeaponInfo; the hardpoint vector is a copy of the elements (inlined
@@ -1237,7 +1237,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->FireWeapon(SessionId, Info);
         return true;
     }
-    case 0x04: {   // SETTARGET -> slot 4. The wire packs both ids first, XSetTarget interleaves.
+    case FlPacketOpcode(FLPACKET_COMMON_SETTARGET): { // SETTARGET -> slot 4. The wire packs both ids first, XSetTarget interleaves.
         const FPayloadCommonSetTarget& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_SETTARGET*>(Packet)->Wire;
         XSetTarget Info;
@@ -1250,7 +1250,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->SetTarget(SessionId, Info);
         return true;
     }
-    case 0x05: {   // CHATMSG -> IChatServer slot 0. Retail: SubmitChat(Session & 0xffff,
+    case FlPacketOpcode(FLPACKET_COMMON_CHATMSG): { // CHATMSG -> IChatServer slot 0. Retail: SubmitChat(Session & 0xffff,
                    // payload+0x08, payload+0x0c, payload+0x00, -1).
         if (ChatServer == nullptr) {
             return false;
@@ -1262,7 +1262,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         ChatServer->SubmitChat(Sender, Wire.Size, Wire.Buffer, Target, -1);
         return true;
     }
-    case 0x08: {   // ACTIVATEEQUIP -> slot 1
+    case FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP): { // ACTIVATEEQUIP -> slot 1
         const FPayloadCommonActivateEquip& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_ACTIVATEEQUIP*>(Packet)->Wire;
         XActivateEquip Info;
@@ -1273,7 +1273,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->ActivateEquip(SessionId, Info);
         return true;
     }
-    case 0x0e: {   // ACTIVATECRUISE -> slot 2
+    case FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE): { // ACTIVATECRUISE -> slot 2
         const FPayloadCommonActivateCruise& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_ACTIVATECRUISE*>(Packet)->Wire;
         XActivateCruise Info;
@@ -1285,7 +1285,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->ActivateCruise(SessionId, Info);
         return true;
     }
-    case 0x0f: {   // GOTRADELANE -> slot 6
+    case FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE): { // GOTRADELANE -> slot 6
         const FPayloadCommonGoTradelane& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_GOTRADELANE*>(Packet)->Wire;
         XGoTradelane Info;
@@ -1299,33 +1299,33 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->GoTradelane(SessionId, Info);
         return true;
     }
-    case 0x10: {   // STOPTRADELANE -> slot 7: ship, entrance and exit from the
+    case FlPacketOpcode(FLPACKET_COMMON_STOPTRADELANE): { // STOPTRADELANE -> slot 7: ship, entrance and exit from the
                    // IServerImpl sender 06d8e770; SessionId comes from this dispatcher.
         const FPayloadCommonStopTradelane& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_STOPTRADELANE*>(Packet)->Wire;
         Server->StopTradelane(SessionId, Wire.ShipId, Wire.TradelaneRing1, Wire.TradelaneRing2);
         return true;
     }
-    case 0x11: {   // SET_WEAPON_GROUP -> slot 70
+    case FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP): { // SET_WEAPON_GROUP -> slot 70
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP*>(Packet)->Wire;
         Server->SetWeaponGroup(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x12: {   // PLAYER_TRADE -> the eight trade slots, picked by the bitmask at +0x00
+    case FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE): { // PLAYER_TRADE -> the eight trade slots, picked by the bitmask at +0x00
         const FPayloadCommonPlayerTrade& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_PLAYER_TRADE*>(Packet)->Wire;
         switch (Wire.SubType) {
-        case 0x01:
+        case kPlayerTradeInitiateTrade:
             Server->InitiateTrade(SessionId, Wire.ShipId);
             return true;
-        case 0x02:
+        case kPlayerTradeTerminateTrade:
             Server->TerminateTrade(SessionId, (int)Wire.Reason);
             return true;
-        case 0x04:
+        case kPlayerTradeSetTradeMoney:
             Server->SetTradeMoney(SessionId, Wire.Money);
             return true;
-        case 0x08: {
+        case kPlayerTradeAddTradeEquip: {
             EquipDesc Desc;
             Desc.set_arch_id(Wire.EquipArchId);
             Desc.set_count((int)Wire.EquipCount);
@@ -1334,7 +1334,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
             Server->AddTradeEquip(SessionId, Desc);          // IServer+0x14c
             return true;
         }
-        case 0x10: {
+        case kPlayerTradeDelTradeEquip: {
             // Retail never calls set_status here; health stays at the constructor default.
             EquipDesc Desc;
             Desc.set_arch_id(Wire.EquipArchId);
@@ -1343,13 +1343,13 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
             Server->DelTradeEquip(SessionId, Desc);          // IServer+0x150
             return true;
         }
-        case 0x20:
+        case kPlayerTradeRequestTrade:
             Server->RequestTrade(SessionId, Wire.ShipId);
             return true;
-        case 0x40:
+        case kPlayerTradeAcceptTrade:
             Server->AcceptTrade(SessionId, Wire.bAccepted != 0);
             return true;
-        case 0x80:
+        case kPlayerTradeStopTradeRequest:
             // Retail quirk: the one sub-type that does not forward the session id;
             // StopTradeRequest gets payload+0x08 instead.
             Server->StopTradeRequest(Wire.ShipId);
@@ -1358,13 +1358,13 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
             return false;
         }
     }
-    case 0x13: {   // SET_VISITED_STATE -> slot 71
+    case FlPacketOpcode(FLPACKET_COMMON_SET_VISITED_STATE): { // SET_VISITED_STATE -> slot 71
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_SET_VISITED_STATE*>(Packet)->Wire;
         Server->SetVisitedState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x14: {   // JETTISONCARGO -> slot 8
+    case FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO): { // JETTISONCARGO -> slot 8
         const FPayloadCommonJettisonCargo& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_JETTISONCARGO*>(Packet)->Wire;
         XJettisonCargo Info;
@@ -1375,7 +1375,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->JettisonCargo(SessionId, Info);
         return true;
     }
-    case 0x15: {   // ACTIVATETHRUSTERS -> slot 3
+    case FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS): { // ACTIVATETHRUSTERS -> slot 3
         const FPayloadCommonActivateThrusters& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS*>(Packet)->Wire;
         XActivateThrusters Info;
@@ -1387,50 +1387,50 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Server->ActivateThrusters(SessionId, Info);
         return true;
     }
-    case 0x16: {   // REQUEST_BEST_PATH -> slot 72
+    case FlPacketOpcode(FLPACKET_COMMON_REQUEST_BEST_PATH): { // REQUEST_BEST_PATH -> slot 72
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH*>(Packet)->Wire;
         Server->RequestBestPath(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x17: {   // REQUEST_GROUP_POSITIONS -> slot 75
+    case FlPacketOpcode(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS): { // REQUEST_GROUP_POSITIONS -> slot 75
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS*>(Packet)->Wire;
         Server->RequestGroupPositions(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x18: {   // REQUEST_PLAYER_STATS -> slot 73
+    case FlPacketOpcode(FLPACKET_COMMON_REQUEST_PLAYER_STATS): { // REQUEST_PLAYER_STATS -> slot 73
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS*>(Packet)->Wire;
         Server->RequestPlayerStats(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x19: {   // SET_MISSION_LOG -> slot 76
+    case FlPacketOpcode(FLPACKET_COMMON_SET_MISSION_LOG): { // SET_MISSION_LOG -> slot 76
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_SET_MISSION_LOG*>(Packet)->Wire;
         Server->SetMissionLog(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x1a: {   // REQUEST_RANK_LEVEL -> slot 78
+    case FlPacketOpcode(FLPACKET_COMMON_REQUEST_RANK_LEVEL): { // REQUEST_RANK_LEVEL -> slot 78
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL*>(Packet)->Wire;
         Server->RequestRankLevel(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x1b: {   // POP_UP_DIALOG -> slot 74. Retail forwards ONLY payload+0x10; the two
+    case FlPacketOpcode(FLPACKET_COMMON_POP_UP_DIALOG): { // POP_UP_DIALOG -> slot 74. Retail forwards ONLY payload+0x10; the two
                    // flattened FmtStr blocks are dropped on this side of the wire.
         const FPayloadCommonPopUpDialog& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_POP_UP_DIALOG*>(Packet)->Wire;
         Server->PopUpDialog(SessionId, Wire.Buttons);
         return true;
     }
-    case 0x1c: {   // SET_INTERFACE_STATE -> slot 77
+    case FlPacketOpcode(FLPACKET_COMMON_SET_INTERFACE_STATE): { // SET_INTERFACE_STATE -> slot 77
         const FPayloadCommonBuffer& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE*>(Packet)->Wire;
         Server->SetInterfaceState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
-    case 0x1d: {   // TRACTOROBJECTS -> slot 5
+    case FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS): { // TRACTOROBJECTS -> slot 5
         const FPayloadCommonTractorObjects& Wire =
             static_cast<const FPacket_FLPACKET_COMMON_TRACTOROBJECTS*>(Packet)->Wire;
         XTractorObjects Info;
@@ -1466,15 +1466,15 @@ bool RpcDispatchToServer(FPacketBase* Packet, unsigned int SessionId) {
     }
 
     const unsigned int Channel = Packet->GetChannel();
-    if (Channel == 1u) {
+    if (Channel == kPacketChannelCommon) {
         return DispatchChannel1ToServer(Packet, Server, GRealChatServer, SessionId);
     }
-    if (Channel != 3u) {
+    if (Channel != kPacketChannelClient) {
         // Channel 2 never reaches this dispatcher in retail.
         return false;
     }
 
-    const FRpcServerCodec* Codec = RpcFindServerCodec(3u, Packet->GetOpcode());
+    const FRpcServerCodec* Codec = RpcFindServerCodec(kPacketChannelClient, Packet->GetOpcode());
     if (Codec == nullptr || Codec->Deliver == nullptr) {
         // ch3 0x0a GFREQUESTSHIPINFO: registered, no case in retail either.
         return false;

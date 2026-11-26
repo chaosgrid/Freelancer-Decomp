@@ -42,6 +42,13 @@ static const int kThornFlagEntityRelative = 0x20;
 static const int kThornFlagParentChild = 0x40;
 static const int kThornFlagOrientRelative = 0x80;
 
+// Event flags a START_SOUND / START_MOTION event gives bits 2, 4 and 8 (script keywords SPATIAL,
+// STREAM, LOOP; START_MOTION's `loop` key sets bit 2).
+static const int kThornFlagSoundSpatial = 2;
+static const int kThornFlagSoundStream = 4;
+static const int kThornFlagSoundLoop = 8;
+static const int kThornFlagMotionLoop = 2;
+
 static const int kThornSpatialBitPos = 0x1;
 static const int kThornSpatialBitOrient = 0x2;
 static const int kThornSpatialBitAxisRot = 0x4;

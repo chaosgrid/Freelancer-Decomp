@@ -61,6 +61,15 @@ struct FStarSphereLayer
 //   Layers[0] (+0x00, name DAT_00679910) = [Background] nebulae
 //   Layers[1] (+0x14, name DAT_00679924) = [Background] basic_stars
 //   Layers[2] (+0x28, name DAT_00679938) = [Background] complex_stars / file
+// FStarSphereBackground::DesiredQuality / CurrentQuality: which of the three layers are loaded.
+enum EStarSphereQuality
+{
+    kStarSphereQualityOff = 0,          // no layer
+    kStarSphereQualityNebulae = 1,      // the nebulae layer
+    kStarSphereQualityBasicStars = 2,   // nebulae and basic stars
+    kStarSphereQualityComplexStars = 3  // nebulae and complex stars
+};
+
 struct FStarSphereBackground
 {
     FStarSphereLayer Layers[3];

@@ -332,8 +332,8 @@ void FRoomEntry::enter(unsigned int SessionId)
     Record->Props.BehaviorId = 0xffffffff;
     Record->Props.VoiceId = CreateID(Slot.voice);
     Record->Props.NameAnsi = nullptr;
-    Record->Props.CharType = 1;
-    Record->Props.Posture = 0;
+    Record->Props.CharType = kSetpointCharPc;
+    Record->Props.Posture = kSetpointPostureStand;
     Record->Filter = 0;
     Record->bDirty = true;
 
@@ -401,7 +401,7 @@ int FRoomEntry::create_character(CharacterProperties const& Props, unsigned int 
         }
     }
 
-    Record->Props.CharType = 0;
+    Record->Props.CharType = kSetpointCharNpc;
     Record->Props.Posture = Posture;
     Record->Filter = RecordFilter;
     Record->bDirty = true;

@@ -184,7 +184,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
 
         // A sound device that fails to start is shut down and dropped.
         bool bAudioFailed = false;
-        if (Sound != nullptr && Sound->StartupDevice(Hwnd, 0x113) != GR_OK)
+        if (Sound != nullptr && Sound->StartupDevice(Hwnd, kSoundFlagHw2D | kSoundFlagHw3D | kSoundFlagRightHanded | kSoundFlagAlgLight) != GR_OK)
         {
             bAudioFailed = true;
             Sound->ShutdownDevice();
@@ -257,10 +257,10 @@ void __cdecl DALib::OpenData(const char* DataPath)
     Desc.ComponentName = "FileSystem";
     Desc.BackendName = "DOS";
     Desc.DataPath = DataPath;
-    Desc.Access = 0x80000000; // GENERIC_READ
-    Desc.ShareMode = 1;          // FILE_SHARE_READ
-    Desc.Creation = 3;          // OPEN_EXISTING
-    Desc.Flags = 0x08000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
     Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&Data));
 }

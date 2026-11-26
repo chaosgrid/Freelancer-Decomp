@@ -555,10 +555,10 @@ void AttribStackNode::Execute(TextRenderContext& Ctx, bool)
     // .text:063294e0: each case is the matching TextRenderContext call inlined.
     switch ((int)Operation)
     {
-    case 0:
+    case AttribStackNode::Op_Push:
         Ctx.push_default_attributes();
         break;
-    case 1:
+    case AttribStackNode::Op_Pop:
         Ctx.pop_default_attributes();
         break;
     case 2:

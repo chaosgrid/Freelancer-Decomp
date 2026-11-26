@@ -629,7 +629,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         Static = static_cast<ISoundSource*>(Handle);
         if (bStarted != 0)
         {
-            SetClientSoundSourceType(Static, 2);
+            SetClientSoundSourceType(Static, kSoundSourceVoice);
         }
     }
 }
@@ -645,7 +645,7 @@ bool FCommVoice::PlayLine(FCommLine* Line)
     memcpy(&PlayKey[5], &KeyAttenuation, sizeof(float));
     if (PlayVoiceMsgArch(Line->Msg, PlayKey, &Line->Source) != 0)
     {
-        SetClientSoundSourceType(Line->Source, 2);
+        SetClientSoundSourceType(Line->Source, kSoundSourceVoice);
         Line->Source->SetAttenuation(
             static_cast<float>(static_cast<double>(Attenuation) + DuckDb));
         return true;
@@ -1013,7 +1013,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
     Window.bOpen = 1;
 
     // The head only above detail level 0 (NaN included goes without).
-    if (static_cast<double>(GetPerfOptionSlot(5)) > 0.0)
+    if (static_cast<double>(GetPerfOptionSlot(kPerfSlotDynamicCommHead)) > 0.0)
     {
         Body = G_EngineCharacterCache.FindOrCreate(SpeakerCostume); // FUN_004c9a80
         bNoPortrait = 0;
@@ -1026,11 +1026,11 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             Pose.Translation.y = 0.0f;
             Pose.Translation.z = 0.0f;
             Pose.Rotation = SpeakerRotate;
-            if (Gender == 1)
+            if (Gender == kGenderMale)
             {
                 Pose.Translation = MaleOffset;
             }
-            else if (Gender == 2)
+            else if (Gender == kGenderFemale)
             {
                 Pose.Translation = FemaleOffset;
             }
@@ -1152,7 +1152,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
     {
         return;
     }
-    CommText->Flags = static_cast<unsigned char>(CommText->Flags | 3);
+    CommText->Flags = static_cast<unsigned char>(CommText->Flags | kWin3DActive | kWin3DVisible);
     Vector const TextPos = {-0.51f, 0.229f, -1.0f};
     CommText->Init("Normal", &TextPos, nullptr, 0.129f, 0.06f, 1.0f, 0, 1, 0, 1); // FUN_0058a110
     FFontString* const Font = CommText->GetFontString();
@@ -1341,7 +1341,7 @@ void FCommChannel::CloseWindow()
     Body = nullptr;
     if (CommText != nullptr)
     {
-        CommText->Flags = static_cast<unsigned char>(CommText->Flags & 0xfc);
+        CommText->Flags = static_cast<unsigned char>(CommText->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 }
 
@@ -1415,16 +1415,16 @@ void FCommChannel::Cancel()
 void FCommChannel::DrawFrame()
 {
     // FUN_004cc440.
-    Win3DDisable(0xde1);
-    Win3DDisable(0xb44);
-    Win3DDisable(0xb71);
-    Win3DDisable(0xb60);
+    Win3DDisable(kWin3DTexture2D);
+    Win3DDisable(kWin3DCullFace);
+    Win3DDisable(kWin3DDepthTest);
+    Win3DDisable(kWin3DFog);
     ICamera* const Cam = AsCamera(Win3DGetCamera());
     Win3DSetViewport(Cam, kHudCommCpp, 0x660);
     Win3DApplyCamera(Cam);
     EngineLightClearRegisteredList();
     DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
     float const WinX = Window.WinPos.x;
     float const WinY = Window.WinPos.y;
@@ -1436,12 +1436,12 @@ void FCommChannel::DrawFrame()
     Model.Translation.z = 0.0f;
     Win3DBindModelview(nullptr, &Model); // FUN_00422690
 
-    Win3DDisable(0xb71);
-    Win3DDisable(0xb44);
-    Win3DDisable(0xde1);
-    Win3DEnable(0xbe2);
-    Win3DSetBlendFunc(2, 1);
-    Win3DBegin(2);
+    Win3DDisable(kWin3DDepthTest);
+    Win3DDisable(kWin3DCullFace);
+    Win3DDisable(kWin3DTexture2D);
+    Win3DEnable(kWin3DBlend);
+    Win3DSetBlendFunc(kWin3DBlendOne, D3DBLEND_ZERO);
+    Win3DBegin(kWin3DLines);
     Win3DColor4ubv(G_HudChromeColorRgba);
 
     // FUN_00422b80: the top-left corner.
@@ -1464,14 +1464,14 @@ void FCommChannel::DrawPortrait(FGameCamera* Cam, FEngineLight* Light, void* Bac
 {
     // FUN_004cc660.
     ICamera* const CamIface = AsCamera(Cam);
-    Win3DDisable(0xb71);
-    Win3DDisable(0xbe2);
+    Win3DDisable(kWin3DDepthTest);
+    Win3DDisable(kWin3DBlend);
     Win3DApplyCamera(CamIface);
     Win3DSetViewport(CamIface, kHudCommCpp, 0x6a1);
-    Win3DDisable(0xbe2);
+    Win3DDisable(kWin3DBlend);
     Win3DBindTexture(BackdropTexture);
     Win3DColor3ub(0x80, 0x80, 0xc8);
-    Win3DBegin(8);
+    Win3DBegin(kWin3DQuads);
     Win3DTexCoord2f(0.0f, 0.0f);
     Win3DVertex3f(-kPortraitHalf, kPortraitHalf, kPortraitZ);
     Win3DTexCoord2f(kPortraitU1, 0.0f);
@@ -1486,14 +1486,14 @@ void FCommChannel::DrawPortrait(FGameCamera* Cam, FEngineLight* Light, void* Bac
     EngineLightSetAmbientRgbBytes(Dim);
     FEngineLight* const Lights[1] = {Light};
     EngineLightApplyList(Lights, 1, CamIface, nullptr); // FUN_004102c0
-    if (GetGameOption(0x18) == 0)
+    if (GetGameOption(kGameOptLighting) == 0)
     {
         unsigned char const Full[3] = {0xff, 0xff, 0xff};
         EngineLightSetAmbientRgbBytes(Full);
     }
-    Win3DEnable(0xb44);
-    Win3DEnable(0xb71);
-    Win3DSetDepthFunc(4);
+    Win3DEnable(kWin3DCullFace);
+    Win3DEnable(kWin3DDepthTest);
+    Win3DSetDepthFunc(D3DCMP_LESSEQUAL);
     Win3DSetDepthWrite(1);
 
     if (Body != nullptr && Body->Deformable != nullptr)
@@ -1517,34 +1517,34 @@ void CommDrawStatic(int const* Rect)
     }
     Win3DSetOrtho2D(); // FUN_004225e0
     Win3DBindTexture(TexShapeGetGpuHandle(StaticTexture, 0));
-    Win3DDisable(0xb71);
-    Win3DDisable(0xb44);
-    Win3DEnable(0xbe2);
+    Win3DDisable(kWin3DDepthTest);
+    Win3DDisable(kWin3DCullFace);
+    Win3DEnable(kWin3DBlend);
     Win3DColor3ub(kStaticBrightness, kStaticBrightness, kStaticBrightness);
     switch (GetHudStaticBlend()) // DAT_00612374
     {
     case 1:
-        Win3DSetBlendFunc(5, 6);
+        Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
         break;
     case 2:
-        Win3DSetBlendFunc(5, 2);
+        Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendOne);
         break;
     case 3:
-        Win3DSetBlendFunc(3, 6);
+        Win3DSetBlendFunc(D3DBLEND_SRCCOLOR, kWin3DBlendInvSrcAlpha);
         break;
     case 4:
-        Win3DSetBlendFunc(3, 2);
+        Win3DSetBlendFunc(D3DBLEND_SRCCOLOR, kWin3DBlendOne);
         break;
     case 5:
-        Win3DSetBlendFunc(2, 6);
+        Win3DSetBlendFunc(kWin3DBlendOne, kWin3DBlendInvSrcAlpha);
         break;
     case 6:
         Win3DColor3ub(0x80, 0x80, 0x80);
-        Win3DSetBlendFunc(2, 2);
+        Win3DSetBlendFunc(kWin3DBlendOne, kWin3DBlendOne);
         break;
     case 7:
-        Win3DDisable(0xbe2);
-        Win3DSetBlendFunc(3, 4);
+        Win3DDisable(kWin3DBlend);
+        Win3DSetBlendFunc(D3DBLEND_SRCCOLOR, D3DBLEND_INVSRCCOLOR);
         break;
     default:
         return;
@@ -1552,7 +1552,7 @@ void CommDrawStatic(int const* Rect)
     int const Random = rand();
     float const U = static_cast<float>(static_cast<double>(Random & 0xff) * kStaticUvStep);
     float const V = static_cast<float>(static_cast<double>((Random >> 4) & 0xfc) * kStaticUvStep);
-    Win3DBegin(8);
+    Win3DBegin(kWin3DQuads);
     Win3DTexCoord2f(U, V);
     Win3DVertex3f(static_cast<float>(Rect[0]), static_cast<float>(Rect[1]), 0.0f);
     float const U1 = U + 1.0f;
@@ -1588,7 +1588,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
 
     Win3DReparent(this, nullptr); // FUN_0059dd00
     Win3DRegister(this);          // FUN_0059dbf0
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | 3);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     HUDItem::Name = "RadioReceiver"; // FUN_00417c50(+0x84, 0x20, ...)
     Light = nullptr;
     // FUN_0040fb60: the two stores, nothing else.
@@ -1692,7 +1692,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
         static_cast<NnButtonControl*>(LowEndCommButton)
             ->Init("interface\\HUD\\HUD_genericcomm.3db", nullptr, nullptr, nullptr,
                    &CommButtonOffset, nullptr, &CommButtonHalfExtents, 0, 0, 0, 0, 0, 0, 0);
-        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & 0xfc);
+        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 }
 
@@ -1736,13 +1736,13 @@ void HUD_Receiver::Update()
 {
     // FUN_004cd9d0. No null test on the button.
     if (ChannelA.Window.bOpen != 0 &&
-        (!(static_cast<double>(GetPerfOptionSlot(5)) > 0.0) || ChannelA.bNoPortrait == 1))
+        (!(static_cast<double>(GetPerfOptionSlot(kPerfSlotDynamicCommHead)) > 0.0) || ChannelA.bNoPortrait == 1))
     {
-        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags | 3);
+        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags | kWin3DActive | kWin3DVisible);
     }
     else
     {
-        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & 0xfc);
+        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & ~(kWin3DActive | kWin3DVisible));
     }
     if (ShouldSkipLocalServerTick()) // FUN_0042d740
     {
@@ -1753,7 +1753,7 @@ void HUD_Receiver::Update()
     while (Child != nullptr)
     {
         Win3D* const Next = Child->NextSibling;
-        if ((Child->Flags & 1) != 0)
+        if ((Child->Flags & kWin3DActive) != 0)
         {
             Child->Update();
         }
@@ -1798,7 +1798,7 @@ void HUD_Receiver::Draw()
     if (ChannelA.Window.bOpen != 0)
     {
         ChannelA.DrawFrame();
-        if (static_cast<double>(GetPerfOptionSlot(5)) > 0.0)
+        if (static_cast<double>(GetPerfOptionSlot(kPerfSlotDynamicCommHead)) > 0.0)
         {
             ICamera* const Win3DCam = AsCamera(Win3DGetCamera());
             if (ChannelA.Body != nullptr && ChannelA.Body->Deformable != nullptr)
@@ -1809,7 +1809,7 @@ void HUD_Receiver::Draw()
             Win3DSetViewport(Win3DCam, kHudCommCpp, 0xbd8);
             ChannelA.Window.DrawCorners();
             Win3DSetOrtho2D();
-            Win3DDisable(0xb44);
+            Win3DDisable(kWin3DCullFace);
             if (ChannelA.Window.bStatic != 0)
             {
                 CommDrawStatic(ChannelA.Window.Rect);
@@ -2024,7 +2024,7 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
         // The talking head.
         FCommChannel* const Channel = Slot->Channel;
         Channel->Reset();
-        PlayOrRewindUiSoundSlot(0x2c); // FUN_005645c0
+        PlayOrRewindUiSoundSlot(kUiSoundHudCommWindow); // FUN_005645c0
         CObject* const SenderObject = CommObjectOf(Msg->Sender);
         CObject* const ReceiverObject = CommObjectOf(Msg->Receiver);
         Channel->Appearance(SenderObject, ReceiverObject, Msg->SenderCostume, Msg->CaptionIds,

@@ -17,6 +17,7 @@
 #include "Universe/SystemInfo.h"
 #include "Core/ContentStaticIds.h"     // TU40's 16 static-init thunks 06f24670-06f24850
 #include "Core/ContentInternal.h"      // SubtractVectors (FUN_06eeaee0)
+#include "common_facebehavior.h"   // kFaceKindObject / kFaceKindPoint
 #include "common_ini.h"
 #include "common_server.h"
 
@@ -257,7 +258,7 @@ void FObjListAvoidance::Parse(INI_Reader* Reader)
 // 06ea1450.
 int FObjListAvoidance::GetType()
 {
-    return 0;
+    return OBJLIST_AVOIDANCE;
 }
 
 // FUN_06f26020.
@@ -287,7 +288,7 @@ void FObjListDelay::Parse(INI_Reader* Reader)
 // 06ee9e10.
 int FObjListDelay::GetType()
 {
-    return 1;
+    return OBJLIST_DELAY;
 }
 
 // FUN_06f27940.
@@ -306,7 +307,7 @@ bool FObjListIdle::Execute(FContentShipBase* Ship)
 // 06ee9660.
 int FObjListIdle::GetType()
 {
-    return 2;
+    return OBJLIST_IDLE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -376,7 +377,7 @@ void FObjListGotoShip::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
-    Op.GotoKind = 0;
+    Op.GotoKind = kGotoKindObject;
     TargetName = Reader->get_value_string(1);
     Op.ArrivalRange = Reader->get_value_float(2);
     Op.bFlyThrough = _stricmp(Reader->get_value_string(3), "true") == 0 ? 1 : 0;
@@ -396,13 +397,13 @@ void FObjListGotoShip::Parse(INI_Reader* Reader)
 // 06f5e540.
 int FObjListGotoShip::GetType()
 {
-    return 3;
+    return OBJLIST_GOTO_SHIP;
 }
 
 // FUN_06f26150.
 void FObjListGotoShip::SetTarget(unsigned int const* TargetId, float Range, float Param3)
 {
-    Op.GotoKind = 0;
+    Op.GotoKind = kGotoKindObject;
     Op.TargetId = static_cast<int32_t>(*TargetId);
     Op.bFlyThrough = 0;
     Op.ArrivalRange = Range;
@@ -427,7 +428,7 @@ void FObjListGotoSpline::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
-    Op.GotoKind = 2;
+    Op.GotoKind = kGotoKindSpline;
 
     StoreFloatBits(&Op.SplineP0X, Reader->get_value_float(1));
     StoreFloatBits(&Op.SplineP0Y, Reader->get_value_float(2));
@@ -460,7 +461,7 @@ void FObjListGotoSpline::Parse(INI_Reader* Reader)
 // 06f25080.
 int FObjListGotoSpline::GetType()
 {
-    return 4;
+    return OBJLIST_GOTO_SPLINE;
 }
 
 // Inlined in factory case 5.
@@ -479,7 +480,7 @@ void FObjListGotoVec::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
-    Op.GotoKind = 1;
+    Op.GotoKind = kGotoKindPoint;
     Op.Destination.x = static_cast<float>(Reader->get_value_int(1));
     Op.Destination.y = static_cast<float>(Reader->get_value_int(2));
     Op.Destination.z = static_cast<float>(Reader->get_value_int(3));
@@ -501,14 +502,14 @@ void FObjListGotoVec::Parse(INI_Reader* Reader)
 // 06ee99a0.
 int FObjListGotoVec::GetType()
 {
-    return 5;
+    return OBJLIST_GOTO_VEC;
 }
 
 // FUN_06f26460.
 void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                                      unsigned int ObjectId, bool bNoCruise, bool bCruise)
 {
-    Op.GotoKind = 1;
+    Op.GotoKind = kGotoKindPoint;
     Op.Destination = *Destination;
     Op.ArrivalRange = Range;
     Op.MaxSpeed = MaxSpeed;
@@ -558,7 +559,7 @@ void FObjListTrail::Parse(INI_Reader* Reader)
 // 06f250c0.
 int FObjListTrail::GetType()
 {
-    return 6;
+    return OBJLIST_TRAIL;
 }
 
 // FUN_06f275b0.
@@ -613,7 +614,7 @@ void FObjListFollow::Parse(INI_Reader* Reader)
 // 06f250d0.
 int FObjListFollow::GetType()
 {
-    return 7;
+    return OBJLIST_FOLLOW;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -655,7 +656,7 @@ void FObjListGuide::Parse(INI_Reader* Reader)
     Op.FollowParams.FollowOffsetX = static_cast<float>(Reader->get_value_int(1));
     Op.FollowParams.FollowOffsetY = static_cast<float>(Reader->get_value_int(2));
     Op.FollowParams.FollowOffsetZ = static_cast<float>(Reader->get_value_int(3));
-    Op.GotoParams.GotoKind = 1;
+    Op.GotoParams.GotoKind = kGotoKindPoint;
     ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.bGotoNoCruise, &Op.GotoParams.bGotoCruise);
     Op.GotoParams.Destination.x = static_cast<float>(Reader->get_value_int(5));
     Op.GotoParams.Destination.y = static_cast<float>(Reader->get_value_int(6));
@@ -684,7 +685,7 @@ void FObjListGuide::Parse(INI_Reader* Reader)
 // 06ee99a0.
 int FObjListGuide::GetType()
 {
-    return 5;
+    return OBJLIST_GOTO_VEC;
 }
 
 // FUN_06f26770.
@@ -692,7 +693,7 @@ void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowO
                              Vector const* Destination, float Range, bool bNoCruise,
                              bool bCruise, bool bStartFollowing, bool bFlyThrough)
 {
-    Op.GotoParams.GotoKind = 1;
+    Op.GotoParams.GotoKind = kGotoKindPoint;
     Op.GotoParams.Destination = *Destination;
     Op.GotoParams.bFlyThrough = bFlyThrough ? 1 : 0;
     Op.GotoParams.ArrivalRange = Range;
@@ -752,7 +753,7 @@ void FObjListGuideShip::Parse(INI_Reader* Reader)
     Op.FollowParams.FollowOffsetX = static_cast<float>(Reader->get_value_int(1));
     Op.FollowParams.FollowOffsetY = static_cast<float>(Reader->get_value_int(2));
     Op.FollowParams.FollowOffsetZ = static_cast<float>(Reader->get_value_int(3));
-    Op.GotoParams.GotoKind = 0;
+    Op.GotoParams.GotoKind = kGotoKindObject;
     ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.bGotoNoCruise, &Op.GotoParams.bGotoCruise);
     ObjectName = Reader->get_value_string(5);
     Op.GotoParams.ArrivalRange = static_cast<float>(Reader->get_value_int(6));
@@ -779,7 +780,7 @@ void FObjListGuideShip::Parse(INI_Reader* Reader)
 // 06ee99a0.
 int FObjListGuideShip::GetType()
 {
-    return 5;
+    return OBJLIST_GOTO_VEC;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -797,7 +798,7 @@ FObjListFace::FObjListFace()
 bool FObjListFace::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
-    if (Op.Mode == 1 && TargetName.Length != 0)
+    if (Op.Mode == kFaceKindObject && TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.TargetId = Id;
@@ -815,18 +816,18 @@ bool FObjListFace::Execute(FContentShipBase* Ship)
 void FObjListFace::Parse(INI_Reader* Reader)
 {
     if (_stricmp(Reader->get_value_string(0), "OBJECT") == 0)
-        Op.Mode = 1;
+        Op.Mode = kFaceKindObject;
     else if (_stricmp(Reader->get_value_string(0), "POINT") == 0)
-        Op.Mode = 2;
+        Op.Mode = kFaceKindPoint;
 
-    if (Op.Mode == 1)
+    if (Op.Mode == kFaceKindObject)
     {
         TargetName = Reader->get_value_string(1);
         if (!Reader->is_value_empty(2))
             Op.bKillEngine = Reader->get_value_bool(2) ? 1 : 0;
         return;
     }
-    if (Op.Mode != 2)
+    if (Op.Mode != kFaceKindPoint)
         return;
     Op.FacePoint.x = Reader->get_value_float(1);
     Op.FacePoint.y = Reader->get_value_float(2);
@@ -838,7 +839,7 @@ void FObjListFace::Parse(INI_Reader* Reader)
 // 06f25070.
 int FObjListFace::GetType()
 {
-    return 0xa;
+    return OBJLIST_FACE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -886,7 +887,7 @@ void FObjListSetLifeTime::Parse(INI_Reader* Reader)
 // 06f250e0.
 int FObjListSetLifeTime::GetType()
 {
-    return 0xb;
+    return OBJLIST_SET_LIFE_TIME;
 }
 
 // FUN_06f28260 (SetPriority = FUN_06f57c90).
@@ -912,7 +913,7 @@ void FObjListSetPriority::Parse(INI_Reader* Reader)
 // 06f250b0.
 int FObjListSetPriority::GetType()
 {
-    return 0xc;
+    return OBJLIST_SET_PRIORITY;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -927,7 +928,7 @@ namespace
     bool ExecuteZone(FContentShipBase* Ship, pub::AI::SetZoneBehaviorParams* Op,
                      TString<0x30> const* ObjectName)
     {
-        if (Op->Mode == 1)
+        if (Op->Mode == pub::AI::SetZoneBehaviorParams::kZoneBox)
         {
             Vector const Unused = SubtractVectors(Op->BoxMax, Op->BoxMin);
             (void)Unused;
@@ -958,7 +959,7 @@ namespace
         unsigned int Index = 0;
         if (!Reader->is_value_empty(5))
         {
-            Op->Mode = 1;
+            Op->Mode = pub::AI::SetZoneBehaviorParams::kZoneBox;
             Op->BoxMin.x = Reader->get_value_float(0);
             Op->BoxMin.y = Reader->get_value_float(1);
             Op->BoxMin.z = Reader->get_value_float(2);
@@ -971,7 +972,7 @@ namespace
         // an else branch, so slot 3 decides the mode even after a box.
         if (!Reader->is_value_empty(3))
         {
-            Op->Mode = 0;
+            Op->Mode = pub::AI::SetZoneBehaviorParams::kZoneSphere;
             Op->TargetPoint.x = (float)Reader->get_value_int(Index);
             Op->TargetPoint.y = (float)Reader->get_value_int(Index + 1);
             Op->TargetPoint.z = (float)Reader->get_value_int(Index + 2);
@@ -980,13 +981,13 @@ namespace
         }
         else
         {
-            Op->Mode = 2;
+            Op->Mode = pub::AI::SetZoneBehaviorParams::kZoneObject;
             *ObjectName = Reader->get_value_string(Index);
             Op->Radius = (float)Reader->get_value_int(Index + 1);
             Index += 2;
         }
         if (!Reader->is_value_empty(Index) && !Reader->get_value_bool(Index))
-            Op->InvertMode = 2;
+            Op->InvertMode = pub::AI::SetZoneBehaviorParams::kInvertClearUserZone;
     }
 }
 
@@ -1003,14 +1004,14 @@ bool FObjListStayInRange::Execute(FContentShipBase* Ship)
 
 void FObjListStayInRange::Parse(INI_Reader* Reader)
 {
-    Op.InvertMode = 0;
+    Op.InvertMode = pub::AI::SetZoneBehaviorParams::kInvertNormal;
     ParseZone(Reader, &Op, &ObjectName);
 }
 
 // 06f250f0.
 int FObjListStayInRange::GetType()
 {
-    return 0xd;
+    return OBJLIST_STAY_IN_RANGE;
 }
 
 // FUN_06f27db0.
@@ -1020,8 +1021,8 @@ void FObjListStayInRange::SetSphere(Vector const* Center, float Radius)
     Op.TargetPoint.y = Center->y;
     Op.TargetPoint.z = Center->z;
     Op.Radius = Radius;
-    Op.Mode = 0;
-    Op.InvertMode = 0;
+    Op.Mode = pub::AI::SetZoneBehaviorParams::kZoneSphere;
+    Op.InvertMode = pub::AI::SetZoneBehaviorParams::kInvertNormal;
 }
 
 // Inlined in factory case 0xe.
@@ -1037,14 +1038,14 @@ bool FObjListStayOutOfRange::Execute(FContentShipBase* Ship)
 
 void FObjListStayOutOfRange::Parse(INI_Reader* Reader)
 {
-    Op.InvertMode = 1;
+    Op.InvertMode = pub::AI::SetZoneBehaviorParams::kInvertInverted;
     ParseZone(Reader, &Op, &ObjectName);
 }
 
 // 06f25100.
 int FObjListStayOutOfRange::GetType()
 {
-    return 0xe;
+    return OBJLIST_STAY_OUT_OF_RANGE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1107,7 +1108,7 @@ void FObjListMakeNewFormation::Parse(INI_Reader* Reader)
 // 06f25110.
 int FObjListMakeNewFormation::GetType()
 {
-    return 0xf;
+    return OBJLIST_MAKE_NEW_FORMATION;
 }
 
 // FUN_06f28840. Retail calls vtbl +4 and drops the result, and builds a local list holding
@@ -1181,7 +1182,7 @@ void FObjListFollowPlayer::Parse(INI_Reader* Reader)
 // 06f25110 (shared with MakeNewFormation, so FollowPlayer reports 0xf).
 int FObjListFollowPlayer::GetType()
 {
-    return 0xf;
+    return OBJLIST_MAKE_NEW_FORMATION;
 }
 
 // FUN_06f28d70 (RemoveFromFormation = FUN_06f67090).
@@ -1195,7 +1196,7 @@ bool FObjListBreakFormation::Execute(FContentShipBase* Ship)
 // 06f25120.
 int FObjListBreakFormation::GetType()
 {
-    return 0x11;
+    return OBJLIST_BREAK_FORMATION;
 }
 
 // FUN_06f28d90 (CancelDirectives = FUN_06f57740).
@@ -1212,7 +1213,7 @@ bool FObjListCancelObjective::Execute(FContentShipBase* Ship)
 // 06f25130.
 int FObjListCancelObjective::GetType()
 {
-    return 0x12;
+    return OBJLIST_CANCEL_OBJECTIVE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1265,7 +1266,7 @@ void FObjListDock::Parse(INI_Reader* Reader)
 // 06f250a0.
 int FObjListDock::GetType()
 {
-    return 0x13;
+    return OBJLIST_DOCK;
 }
 
 // FUN_06f276f0.
@@ -1298,7 +1299,7 @@ void FObjListInstantTradelane::Parse(INI_Reader* Reader)
 // 06f250a0 (Dock's body, so InstantTradelane reports 0x13).
 int FObjListInstantTradelane::GetType()
 {
-    return 0x13;
+    return OBJLIST_DOCK;
 }
 
 // FUN_06f27870.
@@ -1355,7 +1356,7 @@ void FObjListLaunch::Parse(INI_Reader* Reader)
 // 06f25090.
 int FObjListLaunch::GetType()
 {
-    return 0x15;
+    return OBJLIST_LAUNCH;
 }
 
 // FUN_06f27a10.
@@ -1410,7 +1411,7 @@ void FObjListWaitForPlayerManeuver::Parse(INI_Reader* Reader)
 // 06f251a0.
 int FObjListWaitForPlayerManeuver::GetType()
 {
-    return 0x16;
+    return OBJLIST_WAIT_FOR_PLAYER_MANEUVER;
 }
 
 // LAB_06f28dd0: no priority default here.
@@ -1422,7 +1423,7 @@ bool FObjListTractorBeam::Execute(FContentShipBase* Ship)
 // 06eea870.
 int FObjListTractorBeam::GetType()
 {
-    return 0x19;
+    return OBJLIST_TRACTOR_BEAM;
 }
 
 // FUN_06f28df0.

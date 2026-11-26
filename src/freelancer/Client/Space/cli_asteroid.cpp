@@ -27,6 +27,7 @@
 #include "render/mesh_iface.h"
 #include "render/rendcomp.h"
 #include "render/shading.h"
+#include "render/slots.h"      // Render::EPipelineState
 #include "Space/Cameras/space_camera.h"
 #include "Space/space_scene_obj_draw.h"
 #include "Space/star_sys.h"
@@ -68,8 +69,9 @@ struct FCliAsteroidExclusionInline
 };
 
 // DAT_005dc374 / DAT_005dc394, copied from the PE.
-unsigned const kRsAsteroidOpaque[7] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0};
-unsigned const kRsAsteroidBlend[11] = {0x89, 1, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
+unsigned const kRsAsteroidOpaque[7] = {D3DRS_LIGHTING, 1, D3DRS_SPECULARENABLE, 0, D3DRS_ALPHABLENDENABLE, 0, 0};
+unsigned const kRsAsteroidBlend[11] = {D3DRS_LIGHTING, 1, D3DRS_SPECULARENABLE, 0, D3DRS_ALPHABLENDENABLE, 1,
+                                       D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
 
 namespace
 {
@@ -1836,7 +1838,7 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
         Win3DDisable(kWin3DDepthTest);
         Win3DEnable(kWin3DBlend);
         Win3DApplyCamera(Camera);
-        Win3DSetBlendFunc(5, 6);
+        Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
 
         int SavedRs18 = 0;
         DALib::Pipeline->GetRenderState(D3DRS_ALPHAREF, &SavedRs18);
@@ -1938,7 +1940,7 @@ namespace
         if (Field->bContainsFogZone != 0)
         {
             void* const Controller = GetSpaceFieldController();
-            if (Controller != nullptr && GetSpaceFieldEnclosure() != 0)
+            if (Controller != nullptr && GetSpaceFieldEnclosure() != kFieldEnclosureNone)
             {
                 Field->FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Controller));
                 FogFactor = ((FNebulaEffect*)Controller)->GetInsideFade();
@@ -1984,7 +1986,7 @@ namespace
     {
         unsigned char* const Base = static_cast<unsigned char*>(Verts);
         unsigned int const Count = static_cast<unsigned int>(VertCount);
-        Desc->Flags = 2;
+        Desc->Flags = kRpVertexSrcInterleaved;
         Desc->Position.Base = Base;
         Desc->Position.ByteSize = 0xC;
         Desc->Position.Stride = 0x2C;
@@ -2010,7 +2012,7 @@ namespace
         Desc->Tex[1].Stride = 0x2C;
         Desc->Tex[1].IndexArray = nullptr;
         Desc->Tex[1].Count = Count;
-        Desc->SrcFvf = 0x252;
+        Desc->SrcFvf = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2;
         Desc->SrcCount = Count;
     }
 
@@ -2083,7 +2085,7 @@ namespace
                 // No mesh -> straight to the releases.
                 if (Mesh != nullptr)
                 {
-                    Mesh->OpenFaceGroup(0, 1);
+                    Mesh->OpenFaceGroup(0, kMeshOpenRead);
                     if (Field->Material == nullptr)
                         Mesh->GetFaceGroupMaterial(&Field->Material);
                     Mesh->GetFaceGroupPrimitiveType(&Field->PrimitiveType);
@@ -2121,7 +2123,7 @@ namespace
                         Chunk.Verts = static_cast<unsigned char*>(
                             operator new(static_cast<unsigned>(Chunk.VertCount) * kCubeVertStride));
                         TotalVerts += Chunk.VertCount;
-                        RMesh->CopyVertexData(Chunk.Verts, 0x252u, 0, Chunk.VertCount);
+                        RMesh->CopyVertexData(Chunk.Verts, D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2, 0, Chunk.VertCount);
 
                         RMesh->GetIndexCount(&Chunk.IndexCount);
                         Chunk.Indices = static_cast<unsigned short*>(
@@ -2214,9 +2216,9 @@ namespace
     unsigned G_AsteroidCubesVisited = 0;
     unsigned G_AsteroidCubesDrawn = 0;
 
-    // DAT_005dc3c4 -- a {state, value} table, copied from the PE: CULLMODE (0x8d) 0. The
-    // blend and opaque tables are shared with the dynamic asteroids (cli_asteroid.h).
-    unsigned const kRsAsteroidCull[] = {0x8d, 0, 0};
+    // DAT_005dc3c4 -- a {state, value} table, copied from the PE: COLORVERTEX 0. The blend
+    // and opaque tables are shared with the dynamic asteroids (cli_asteroid.h).
+    unsigned const kRsAsteroidCull[] = {D3DRS_COLORVERTEX, 0, 0};
     // The inlined {state, value} walk is BillboardApplyRenderStates (asteroid_billboard.h).
 
     // MSVCRT _ftol (FUN_005b7ec0): truncation toward zero; the callers keep the low dword.
@@ -2319,7 +2321,7 @@ namespace
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
         int Combined = 1;
-        Pipe->GetPipelineState(7, &Combined);
+        Pipe->GetPipelineState(Render::PipelineStateViewspaceLights, &Combined);
         if (Combined != 0)
         {
             Transform Product;

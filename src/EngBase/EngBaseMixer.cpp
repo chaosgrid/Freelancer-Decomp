@@ -50,16 +50,16 @@ unsigned long MixerJointValueCount(unsigned long JointType)
 {
     switch (JointType)
     {
-    case 1:
-    case 2:
+    case kJointTypePris:
+    case kJointTypeRev:
         return 1;
-    case 3:
+    case kJointTypeCyl:
         return 2;
-    case 4:
+    case kJointTypeSphere:
         return 4;
-    case 5:
+    case kJointTypeTrans:
         return 3;
-    case 6:
+    case kJointTypeLoose:
         return 7;
     default:
         return 0;
@@ -159,7 +159,7 @@ void MixerInsertBefore(FMixerList* List, FMixerNode* Where, FMixerNode* Node)
 void MixerMarkDropped(FMixerNode* Node)
 {
     if (Node->Type == MixerLeafNode)
-        ((FMixerLeaf*)(Node))->Typed->PlayFlags |= 2;
+        ((FMixerLeaf*)(Node))->Typed->PlayFlags |= G_ChannelBlendFlag;
 }
 } // namespace
 
@@ -263,18 +263,18 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
         // Typed slot 0x0C.
         Typed->InterpolatePose(Out, LeftValue, RightValue,
                                              (double)(Weight));
-        if ((Flags & 2) == 0)
+        if ((Flags & G_MixerFlagPose) == 0)
             return;
 
         // One axis of the result survives the pose curve, picked by the channel's LoopFlags
         // bits 3/4/5.
         const unsigned long Axis = Typed->LoopFlags;
         float Kept = 0.0f;
-        if ((Axis & 0x8) != 0)
+        if ((Axis & G_LoopFlagPoseAxisX) != 0)
             Kept = Out[0];
-        else if ((Axis & 0x10) != 0)
+        else if ((Axis & G_LoopFlagPoseAxisY) != 0)
             Kept = Out[1];
-        else if ((Axis & 0x20) != 0)
+        else if ((Axis & G_LoopFlagPoseAxisZ) != 0)
             Kept = Out[2];
 
         // The float/double split follows retail's rounding points: float locals are spilled
@@ -300,11 +300,11 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
         Out[2] = (float)((double)(Pos2) + PoseStart.z);
 
         // Put the kept axis back. With none of the three bits set retail discards it.
-        if ((Axis & 0x8) != 0)
+        if ((Axis & G_LoopFlagPoseAxisX) != 0)
             Out[0] = Kept;
-        else if ((Axis & 0x10) != 0)
+        else if ((Axis & G_LoopFlagPoseAxisY) != 0)
             Out[1] = Kept;
-        else if ((Axis & 0x20) != 0)
+        else if ((Axis & G_LoopFlagPoseAxisZ) != 0)
             Out[2] = Kept;
         return;
     }
@@ -317,12 +317,12 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
     const double W = (double)(Weight);
     switch (LeftOverlay->Count)
     {
-    case 1:
+    case G_MixKindScalar:
         Out[0] = (float)(
             ((double)(RightOverlay->Values[0]) - LeftOverlay->Values[0]) * W +
             LeftOverlay->Values[0]);
         break;
-    case 3:
+    case G_MixKindVec3:
     {
         float Lerped[3];
         unsigned long Index = 0;
@@ -339,10 +339,10 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
         Out[2] = Lerped[2];
         break;
     }
-    case 4:
+    case G_MixKindQuat:
         MixerSlerpQuat(Out, LeftOverlay->Values, RightOverlay->Values, Weight);
         break;
-    case 7:
+    case G_MixKindPosQuat:
         MixerBlendPosQuat(Out, LeftOverlay->Values, RightOverlay->Values, Weight);
         break;
     default:                                                     // 2, 5, 6 and out of range
@@ -370,7 +370,7 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     Prev = nullptr;
     bRemove = 0;
     Type = MixerOverlayNode;
-    if (Desc->Kind == 0)
+    if (Desc->Kind == G_BindKindJoint)
     {
         const FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
         if (Relative != nullptr)
@@ -382,9 +382,9 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
         // there either.
         return;
     }
-    if (Desc->Kind == 1)
+    if (Desc->Kind == G_BindKindObject)
     {
-        Count = 7;
+        Count = G_MixKindPosQuat;
         const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance); // IEngine+0x90
         Values[0] = Position->x;
         Values[1] = Position->y;
@@ -439,9 +439,9 @@ bool FAnimBindLess::operator()(const FAnimBindOut& Left, const FAnimBindOut& Rig
 {
     if (Left.Kind != Right.Kind)
         return (long)(Left.Kind) < (long)(Right.Kind);
-    if (Left.Kind == 0 || Left.Kind == 1)
+    if (Left.Kind == G_BindKindJoint || Left.Kind == G_BindKindObject)
         return (ptrdiff_t)(Left.Instance) < (ptrdiff_t)(Right.Instance);
-    if (Left.Kind == 2)
+    if (Left.Kind == G_BindKindRoot)
         return (size_t)(Left.Sink) < (size_t)(Right.Sink);
     return false;
 }
@@ -579,13 +579,13 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
             if (Node->Type == MixerBlendNode)
             {
                 FMixerBlend* Blend = (FMixerBlend*)(Node);
-                if ((Blend->Flags & 2) != 0)
+                if ((Blend->Flags & G_MixerFlagPose) != 0)
                 {
                     FTypedChannel* PrevTyped = ((FMixerLeaf*)(Blend->Prev))->Typed;
                     const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance);
                     PrevTyped->SetOverlayPos(Position);
                 }
-                if ((Blend->Flags & 1) != 0)
+                if ((Blend->Flags & G_MixerFlagKeep) != 0)
                 {
                     FMixerNode* Outer = Blend->Prev->Prev;
                     if (Outer->Type == MixerBlendNode)
@@ -667,15 +667,15 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
     if (Stack.Count != 0)
     {
         unsigned long Kind = 0;
-        if (Desc->Kind == 0)
+        if (Desc->Kind == G_BindKindJoint)
         {
             const FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
             if (Relative != nullptr)
                 Kind = MixerJointValueCount(Relative->Type);
         }
-        else if (Desc->Kind == 1)
-            Kind = 7;
-        else if (Desc->Kind == 2)
+        else if (Desc->Kind == G_BindKindObject)
+            Kind = G_MixKindPosQuat;
+        else if (Desc->Kind == G_BindKindRoot)
             Kind = 0;
         else
         {
@@ -687,9 +687,9 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         float Out[7];
         Stack.Evaluate(Out, Kind);
 
-        if (Desc->Kind == 0)
+        if (Desc->Kind == G_BindKindJoint)
             G_AnimEngine->SetJointParams((InstanceIndex)Desc->Instance, 0, Out);
-        else if (Desc->Kind == 1)
+        else if (Desc->Kind == G_BindKindObject)
         {
             G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, (const Vector*)Out); // IEngine+0x8C
             Matrix Mat;
@@ -752,7 +752,7 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
         bBlend = 1;
         if (List->Count == 0)
         {
-            Flags &= ~0x80UL;
+            Flags &= ~G_LoopFlagKeepOutgoing;
             FMixerOverlay* Overlay = new FMixerOverlay(&Entry->first);
             MixerAppend(List, Overlay);
             Anchor = Overlay;
@@ -800,20 +800,20 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
     Blend->Time = 0.0f;
     Blend->Duration = Duration;
     // (byte & 0xFD) | 1 on uncleared memory; bits 2..7 are never read, stored as zero here.
-    Blend->Flags = 1;
+    Blend->Flags = G_MixerFlagKeep;
     if ((signed char)(Flags & 0xFF) < 0)              // Flags bit 7: keep the outgoing side
-        Blend->Flags &= 0xFE;
+        Blend->Flags &= ~G_MixerFlagKeep;
     MixerAppend(List, Blend);
     List->BlendDuration = Duration;
 
-    if (Typed->Kind != 1)
+    if (Typed->Kind != G_BindKindObject)
         return;
-    if ((Flags & 0x38) == 0)
+    if ((Flags & (G_LoopFlagPoseAxisX | G_LoopFlagPoseAxisY | G_LoopFlagPoseAxisZ)) == 0)
         return;
 
     Vector Predicted;
     Leaf->SampleDisplacement(&Predicted, Duration);
-    Blend->Flags |= 2;
+    Blend->Flags |= G_MixerFlagPose;
     const Vector* Start = G_AnimEngine->GetInstancePosition(Typed->Instance);
     Blend->PoseStart.x = Start->x;
     Blend->PoseStart.y = Start->y;
@@ -942,7 +942,7 @@ void MixerWalkAll(FAnimationObject* Animation, float Dt)
     FTypedChannelSet::iterator Channel = Animation->Channels->begin();
     while (Channel != Animation->Channels->end())
     {
-        (*Channel)->PlayFlags &= 0xFFFFFFFBu;
+        (*Channel)->PlayFlags &= ~G_ChannelHoldFlag;
         ++Channel;
     }
 
@@ -972,11 +972,11 @@ void MixerWalkAll(FAnimationObject* Animation, float Dt)
     while (Channel != Animation->Channels->end())
     {
         FTypedChannel* Typed = *Channel;
-        if ((Typed->PlayState & 1) != 0 && ((Typed->PlayFlags >> 2) & 1) == 0)
+        if ((Typed->PlayState & G_PlayStatePlaying) != 0 && ((Typed->PlayFlags >> 2) & 1) == 0)
         {
             if (Typed->Tick(Dt) == 1)
             {
-                Typed->PlayState &= 0xFE;
+                Typed->PlayState &= ~G_PlayStatePlaying;
                 MixerUnbindTyped(Animation, Typed);
             }
         }
@@ -992,7 +992,7 @@ void FAnimPlayback::WriteOverlayPos(const Vector* Pos, FMixerDescMap* Inner)
     {
         FTypedChannel* Typed = this->Typed[Index];
         Typed->SetOverlayPos(Pos);
-        if (Typed->Kind == 1)
+        if (Typed->Kind == G_BindKindObject)
         {
             FMixerDescMap::iterator Entry = Inner->find(*TypedBindDesc(Typed));
             if (Entry != Inner->end())
@@ -1028,7 +1028,7 @@ void FAnimPlayback::WriteOverlayOrient(const Matrix* Mat, FMixerDescMap* Inner)
     {
         FTypedChannel* Typed = this->Typed[Index];
         Typed->SetOverlayExtra(Mat);
-        if (Typed->Kind == 1)
+        if (Typed->Kind == G_BindKindObject)
         {
             FMixerDescMap::iterator Entry = Inner->find(*TypedBindDesc(Typed));
             if (Entry != Inner->end())
@@ -1060,7 +1060,7 @@ void FAnimPlayback::AddOverlayPos(const Vector* Delta, FMixerDescMap* Inner)
     {
         FTypedChannel* Typed = this->Typed[Index];
         Typed->AddOverlayPos(Delta);
-        if (Typed->Kind == 1)
+        if (Typed->Kind == G_BindKindObject)
         {
             FMixerDescMap::iterator Entry = Inner->find(*TypedBindDesc(Typed));
             if (Entry != Inner->end())

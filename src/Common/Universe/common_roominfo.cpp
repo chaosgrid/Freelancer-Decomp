@@ -72,10 +72,10 @@ void RoomCameraInfo::destroy()
 SetpointProperties::SetpointProperties()
     : bValid(0)
     , bZoneScript(0)
-    , CharType(-1)
+    , CharType(kSetpointCharNone)
     , Segment(nullptr)
     , Zone(-1)
-    , Posture(-1)
+    , Posture(kSetpointPostureUnset)
 {
     NameBuffer[0] = '\0';
 }
@@ -122,11 +122,11 @@ void SetpointProperties::clear()
 {
     bValid = 0;
     bZoneScript = 0;
-    CharType = -1;
+    CharType = kSetpointCharNone;
     Segment = nullptr;
     Zone = -1;
     NameBuffer[0] = '\0';
-    Posture = -1;
+    Posture = kSetpointPostureUnset;
 }
 
 // 0627b1d0
@@ -204,13 +204,13 @@ void SetpointProperties::extract_from_name(char const* FullName)
               kSetpointSource, 0x87, PrefixToken, FullName);
 
     if (strcmp(CharTypeToken, "pc") == 0)
-        CharType = 1;
+        CharType = kSetpointCharPc;
     else if (strcmp(CharTypeToken, "npc") == 0)
-        CharType = 0;
+        CharType = kSetpointCharNpc;
     else if (strcmp(CharTypeToken, "none") == 0)
-        CharType = -1;
+        CharType = kSetpointCharNone;
     else if (strcmp(CharTypeToken, "rpc") == 0)
-        CharType = 2;
+        CharType = kSetpointCharRpc;
     else
         FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: setpoint character type %s (of %s) is not pc, npc, none, or rpc\n",
@@ -228,11 +228,11 @@ void SetpointProperties::extract_from_name(char const* FullName)
     set_segment(NameToken);
 
     if (strcmp(PostureToken, "stand") == 0)
-        Posture = 0;
+        Posture = kSetpointPostureStand;
     else if (strcmp(PostureToken, "sitlow") == 0)
-        Posture = 1;
+        Posture = kSetpointPostureSitLow;
     else if (strcmp(PostureToken, "sithigh") == 0)
-        Posture = 2;
+        Posture = kSetpointPostureSitHigh;
     else
     {
         if (bZoneScript == 0)
@@ -240,7 +240,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
                   "%s(%d) : *** ERROR: invalid posture %s in setpoint marker %s - if this is a special "
                   "relocation marker, mark it with Zs\n",
                   kSetpointSource, 0xc8, PostureToken, FullName);
-        Posture = 3;
+        Posture = kSetpointPostureSpecial;
     }
 
     malloc_strfree(&Work);
@@ -255,11 +255,11 @@ char const* SetpointProperties::combine_to_name() const
     GSetpointNameBuffer[0] = '\0';
     strcat(GSetpointNameBuffer, bZoneScript != 0 ? "Zs/" : "Zg/");
 
-    if (CharType == 1)
+    if (CharType == kSetpointCharPc)
         strcat(GSetpointNameBuffer, "pc/");
-    else if (CharType == 2)
+    else if (CharType == kSetpointCharRpc)
         strcat(GSetpointNameBuffer, "rpc/");
-    else if (CharType == 0)
+    else if (CharType == kSetpointCharNpc)
         strcat(GSetpointNameBuffer, "npc/");
     else
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSetpointSource, 0xfe,
@@ -276,13 +276,13 @@ char const* SetpointProperties::combine_to_name() const
     strcat(GSetpointNameBuffer, NameBuffer);
     strcat(GSetpointNameBuffer, "/");
 
-    if (Posture == 0)
+    if (Posture == kSetpointPostureStand)
         strcat(GSetpointNameBuffer, "stand");
-    else if (Posture == 1)
+    else if (Posture == kSetpointPostureSitLow)
         strcat(GSetpointNameBuffer, "sitlow");
-    else if (Posture == 2)
+    else if (Posture == kSetpointPostureSitHigh)
         strcat(GSetpointNameBuffer, "sithigh");
-    else if (Posture == 3)
+    else if (Posture == kSetpointPostureSpecial)
         strcat(GSetpointNameBuffer, "special");
     else
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSetpointSource, 0x127,
@@ -327,8 +327,8 @@ void SetpointInfo::destroy()
 
 CharPlaceInfo::CharPlaceInfo()
     : Name(nullptr)
-    , CharType(-1)
-    , Posture(-1)
+    , CharType(kSetpointCharNone)
+    , Posture(kSetpointPostureUnset)
     , bZoneScript(0)
     , StartScript(nullptr)
 {
@@ -344,8 +344,8 @@ void CharPlaceInfo::clear()
 {
     Name = nullptr;
     Frame.set_identity();
-    CharType = -1;
-    Posture = -1;
+    CharType = kSetpointCharNone;
+    Posture = kSetpointPostureUnset;
     bZoneScript = 0;
     StartScript = nullptr;
 }

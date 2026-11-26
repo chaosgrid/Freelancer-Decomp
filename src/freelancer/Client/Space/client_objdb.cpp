@@ -169,7 +169,7 @@ namespace
                 return nullptr;
             }
             CObject* const Obj = const_cast<CObject*>(Go->cobject());
-            CSimple* const Simple = (Obj != nullptr && (Obj->ObjectClass & 3u) == 3u)
+            CSimple* const Simple = (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                                         ? static_cast<CSimple*>(Obj)
                                         : nullptr;
             if ((Simple->TypeBits & Mask) == 0u)
@@ -188,23 +188,23 @@ namespace
         FObjDbIterState* const Iter = static_cast<FObjDbIterState*>(IterStateRaw);
         FClientGameobj* Hit = nullptr;
 
-        if ((Iter->Mask & 0x7f0000u) != 0u)
+        if ((Iter->Mask & OBJ_SHIP_MASK) != 0u)
             Hit = WalkListArm(Iter, &Lists[1], Iter->Mask);
-        if ((Iter->Mask & 0xfdffu) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[2], Iter->Mask);
-        if ((Iter->Mask & 0x10000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_LOOT) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[7], Iter->Mask);
-        if ((Iter->Mask & 0x20000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_ASTEROID) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[8], Iter->Mask);
-        if ((Iter->Mask & 0x40000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_DYNAMIC_ASTEROID) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[9], Iter->Mask);
-        if ((Iter->Mask & 0x1000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_GUIDED) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[4], Iter->Mask);
-        if ((Iter->Mask & 0x4000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_MINE) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[5], Iter->Mask);
-        if ((Iter->Mask & 0x8000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_COUNTERMEASURE) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[6], Iter->Mask);
-        if ((Iter->Mask & 0x2000000u) != 0u && Hit == nullptr)
+        if ((Iter->Mask & OBJ_BULLET) != 0u && Hit == nullptr)
             Hit = WalkListArm(Iter, &Lists[3], Iter->Mask);
 
         return Hit;
@@ -227,7 +227,7 @@ namespace
     {
         // LAB_005422d0: (TypeMask & 0xfdff) ? DAT_00678ae0 : nullptr. The partition is only
         // created by FUN_00540eb0 (ClientObjDb_RebuildSpatial) at the end of a system load.
-        if ((TypeMask & 0xfdffu) == 0u)
+        if ((TypeMask & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0u)
             return nullptr;
         return Spatial;
     }
@@ -373,7 +373,7 @@ void ClientObjDb_RegisterGameobj(FClientGameobj* Go, bool bRemotePhysics)
         {
             uint Type = 0;
             Go->get_type(Type);
-            if ((Type & 0x80u) == 0u)
+            if ((Type & OBJ_TRADELANE_RING) == 0u)
                 G_LargeSolars.push_back(Go);
         }
 
@@ -440,7 +440,7 @@ void ClientObjDb_Unregister(FClientGameobj* Go)
 
         // Retail does not test the partition (DAT_00678ae0) for null here.
         uint Type = 0;
-        if (Go->get_type(Type) == 0 && (Type & 0xfdffu) != 0u)
+        if (Go->get_type(Type) == 0 && (Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0u)
         {
             G_ClientObjDb.Spatial->Remove(static_cast<IObjRW*>(Go));
         }
@@ -487,7 +487,7 @@ void ClientObjDb_UpdateAll(float Dt)
             {
                 uint Type = 0;
                 Item->get_type(Type);
-                if ((Type & 0x80u) == 0u)
+                if ((Type & OBJ_TRADELANE_RING) == 0u)
                     continue;
             }
             // Retail's __RTDynamicCast IObjRW -> GameObject.
@@ -531,16 +531,16 @@ FClientGameobj* ClientObjDb_FindByCObject(CObject const* Obj)
     int Kind = 0;
     switch (static_cast<int>(Obj->ObjectClass))
     {
-    case CObject::ClassShip: Kind = 1; break;
-    case CObject::ClassSolar: Kind = 2; break;
-    case CObject::ClassBeam: Kind = 3; break;
-    case CObject::ClassGuided: Kind = 4; break;
-    case CObject::ClassMine: Kind = 5; break;
-    case CObject::ClassCounterMeasure: Kind = 6; break;
-    case CObject::ClassLoot: Kind = 7; break;
-    case CObject::ClassAsteroid: Kind = 8; break;
-    case CObject::ClassDynamicAsteroid: Kind = 9; break;
-    case CObject::ClassObject: Kind = 10; break;
+    case CObject::ClassShip: Kind = static_cast<int>(EClientGameobjKind::Ship); break;
+    case CObject::ClassSolar: Kind = static_cast<int>(EClientGameobjKind::Solar); break;
+    case CObject::ClassBeam: Kind = static_cast<int>(EClientGameobjKind::Beam); break;
+    case CObject::ClassGuided: Kind = static_cast<int>(EClientGameobjKind::Guided); break;
+    case CObject::ClassMine: Kind = static_cast<int>(EClientGameobjKind::Mine); break;
+    case CObject::ClassCounterMeasure: Kind = static_cast<int>(EClientGameobjKind::CounterMeasure); break;
+    case CObject::ClassLoot: Kind = static_cast<int>(EClientGameobjKind::Loot); break;
+    case CObject::ClassAsteroid: Kind = static_cast<int>(EClientGameobjKind::MedAsteroid); break;
+    case CObject::ClassDynamicAsteroid: Kind = static_cast<int>(EClientGameobjKind::DynamicAsteroid); break;
+    case CObject::ClassObject: Kind = static_cast<int>(EClientGameobjKind::Debris); break;
     default: return nullptr;
     }
 
@@ -657,7 +657,7 @@ bool ClientObjDb_IsLargeSolar(FClientGameobj const* Go)
 void ClientObjDb_MoveBeams(float Dt)
 {
     // FUN_00540bd0 (called from the space frame): no null test on the narrowed CBeam.
-    int Kind = 3;
+    int Kind = static_cast<int>(EClientGameobjKind::Beam);
     for (FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind); Go != nullptr; Go = Go->ListNext)
     {
         CObject* const Obj = Go->Object;
@@ -746,7 +746,7 @@ void ClientObjDb_ProcessCollisions()
     // FUN_0052fc20 (called from the space frame). Each beam's life is read with no null test
     // on the narrowed CBeam; a life below 0 or NaN skips (0.0 is DAT_005c7474).
     int Count = 0;
-    int Kind = 3;
+    int Kind = static_cast<int>(EClientGameobjKind::Beam);
     for (FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind); Go != nullptr; Go = Go->ListNext)
     {
         CObject* const Obj = Go->Object;
@@ -895,7 +895,9 @@ FClientGameobj* ClientObjDb_FindObject(unsigned ObjectId, int Kind)
     if (Kind != 0)
         return FindObjectInKind(Kind, ObjectId);
 
-    int const kOrder[6] = {1, 4, 5, 6, 7, 2};
+    int const kOrder[6] = {static_cast<int>(EClientGameobjKind::Ship), static_cast<int>(EClientGameobjKind::Guided),
+                           static_cast<int>(EClientGameobjKind::Mine), static_cast<int>(EClientGameobjKind::CounterMeasure),
+                           static_cast<int>(EClientGameobjKind::Loot), static_cast<int>(EClientGameobjKind::Solar)};
     for (int OrderIndex = 0; OrderIndex < 6; ++OrderIndex)
     {
         FClientGameobj* const Found = FindObjectInKind(kOrder[OrderIndex], ObjectId);
@@ -913,10 +915,10 @@ FClientGameobj* ClientObjDb_FindEqObjByVibeId(unsigned VibeId, int Kind)
     if (Kind != 0)
         return FindObjectInKind(Kind, VibeId);
 
-    FClientGameobj* const Ship = FindEqObjInKind(1, VibeId);
+    FClientGameobj* const Ship = FindEqObjInKind(static_cast<int>(EClientGameobjKind::Ship), VibeId);
     if (Ship != nullptr)
         return Ship;
-    return FindEqObjInKind(2, VibeId);
+    return FindEqObjInKind(static_cast<int>(EClientGameobjKind::Solar), VibeId);
 }
 
 unsigned ClientObjDb_GetSolarCount()
@@ -1016,7 +1018,7 @@ void ClientObjDb_RebuildSpatial()
         uint Type = 0;
         if (Cursor->get_type(Type) != 0)
             continue;
-        if ((Type & 0xfdffu) == 0u)
+        if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0u)
             continue;
         Entries[Added].Object = static_cast<IObjRW*>(Cursor);
         Entries[Added].Position = Cursor->cobject()->WorldPosition;

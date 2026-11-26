@@ -24,7 +24,7 @@ CServerInfoDlg::CServerInfoDlg(CWnd* Parent)
 // .text:004075b0
 void CServerInfoDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1005, InfoTree);
+	DDX_Control(DX, kControlInfoTree, InfoTree);
 }
 
 // Message map .rdata:0041c8f0.

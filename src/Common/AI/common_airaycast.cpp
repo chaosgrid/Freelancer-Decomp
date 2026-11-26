@@ -276,7 +276,7 @@ bool RayOrientedBoxIntersect(Vector const& RayOrigin, Vector const& RayDir, Orie
     // Retail has no null test on OutHitType or OutPoints; its one caller passes both.
     if (!RayAABBIntersect(LocalOrigin, LocalDir, Box.HalfExtent, TMin, TMax))
     {
-        *OutHitType = 0;
+        *OutHitType = kRayBoxMiss;
         return false;
     }
 
@@ -293,7 +293,7 @@ bool RayOrientedBoxIntersect(Vector const& RayOrigin, Vector const& RayDir, Orie
     {
         // Entered from outside: hit type 2, entry point (TMin*D rounded into a Vector,
         // then + origin, two roundings) in [0], exit point in [1].
-        *OutHitType = 2;
+        *OutHitType = kRayBoxEnter;
         Vector const Scaled{ TMin * RayDir.x, TMin * RayDir.y, TMin * RayDir.z };
         OutPoints[0] = Vector{ Scaled.x + RayOrigin.x, Scaled.y + RayOrigin.y, Scaled.z + RayOrigin.z };
         OutPoints[1] = Exit;
@@ -302,7 +302,7 @@ bool RayOrientedBoxIntersect(Vector const& RayOrigin, Vector const& RayDir, Orie
 
     // Ray origin already inside the box: hit type 1, ONLY the exit point, into
     // OutPoints[0]; OutPoints[1] is left untouched.
-    *OutHitType = 1;
+    *OutHitType = kRayBoxInside;
     OutPoints[0] = Exit;
     return true;
 }
@@ -379,7 +379,7 @@ bool RayTransformedBoxNearestHit(Vector const& RayOrigin, Vector const& RayDir,
 
     // The slab clipper for the actual points. Retail seeds the hit-type slot with 0 and
     // ignores FUN_062dfd80's bool, switching on the slot.
-    int HitType = 0;
+    int HitType = kRayBoxMiss;
     // RETAIL UB: this two-Vector scratch is uninitialised in retail. When FUN_062dfd80 reports type 0 after the SAT passed (reachable, e.g.
     // a NaN RayDir from a zero-length normalise in the caller, or a zero RayDir with
     // the origin inside the box), retail reads stack garbage in the two-point branch
@@ -387,7 +387,7 @@ bool RayTransformedBoxNearestHit(Vector const& RayOrigin, Vector const& RayDir,
     Vector HitPoints[2] = { Vector{ 0.0f, 0.0f, 0.0f }, Vector{ 0.0f, 0.0f, 0.0f } };
     RayOrientedBoxIntersect(RayOrigin, RayDir, Box, &HitType, HitPoints);
 
-    if (HitType == 1)
+    if (HitType == kRayBoxInside)
     {
         // The ray origin was already inside the box.
         if (OutStartsInside != 0)

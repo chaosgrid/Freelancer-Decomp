@@ -399,7 +399,7 @@ namespace
                     Total = static_cast<float>(FastLengthOver(LengthSquared, 300.0f) + Total);
                 }
             }
-            if (Leg->Kind == 1)
+            if (Leg->Kind == kNnPathLegFlight)
             {
                 Vector const Along = Subtract(Leg->PointA, Leg->PointB);   // FUN_06eb7810
                 Total = static_cast<float>(FastLengthOver(LengthSquaredZyx(Along), 300.0f) + Total);
@@ -420,7 +420,7 @@ namespace
     FNnPathLeg MakeFreeLeg(Vector const& PointA, Vector const& PointB)
     {
         FNnPathLeg Leg;
-        Leg.Kind = 1;
+        Leg.Kind = kNnPathLegFlight;
         Leg.PointA = PointA;
         Leg.PointB = PointB;
         Leg.ObjectA = 0;
@@ -688,7 +688,7 @@ bool __cdecl BuildNnPath(FSystemInfo* System, Vector const* From, Vector const* 
     for (std::vector<FTradeLane>::iterator Lane = Lanes->begin(); Lane != Lanes->end(); ++Lane)
     {
         FNnPathLeg Leg = MakeFreeLeg(Lane->StartPosition, Lane->EndPosition);
-        Leg.Kind = 0;
+        Leg.Kind = kNnPathLegTradeLane;
         Leg.ObjectA = Lane->Rings.empty() ? 0 : Lane->Rings.front().ObjectId;
         Leg.ObjectB = Lane->Rings.empty() ? 0 : Lane->Rings.back().ObjectId;
         Planner.Lanes.push_back(Leg);                                      // FUN_06f68e70
@@ -862,7 +862,7 @@ void __cdecl BuildPathDirectives(FSystemInfo* System, Vector const* From, Vector
     BuildNnPath(System, From, To, &Legs, Flags, Range, 0);
     for (std::list<FNnPathLeg>::iterator Leg = Legs.begin(); Leg != Legs.end(); ++Leg)
     {
-        if (Leg->Kind == 0)
+        if (Leg->Kind == kNnPathLegTradeLane)
         {
             TRefHandle<FObjListDirective> Directive;
             CreateObjListDirective(OBJLIST_DOCK, &Directive.Pointer);
@@ -872,7 +872,7 @@ void __cdecl BuildPathDirectives(FSystemInfo* System, Vector const* From, Vector
             Directives->push_back(Directive.Pointer);
             Directive->AddRef();
         }
-        else if (Leg->Kind == 1)
+        else if (Leg->Kind == kNnPathLegFlight)
         {
             TRefHandle<FObjListDirective> Directive;
             CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);

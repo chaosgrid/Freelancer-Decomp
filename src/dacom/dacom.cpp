@@ -135,8 +135,7 @@ namespace
 
         if (Severity == 0 || Severity == 1 || (!GbIgnoreWarnings && Severity == 2))
         {
-            // 0x40012 = MB_ABORTRETRYIGNORE | MB_ICONERROR | MB_TOPMOST.
-            const int Answer = MessageBoxA(nullptr, Text, "DACOM::STANDARD_DUMP", 0x40012);
+            const int Answer = MessageBoxA(nullptr, Text, "DACOM::STANDARD_DUMP", MB_ABORTRETRYIGNORE | MB_ICONERROR | MB_TOPMOST);
             if (Answer == IDABORT)
             {
                 PostQuitMessage(-1);
@@ -1013,7 +1012,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             FAGGDESC14* Aggregate = (FAGGDESC14*)Desc;
-            if (Aggregate->Size != 0x14 || std::strcmp(Aggregate->NameAt4, Name) != 0)
+            if (Aggregate->Size != sizeof(FAGGDESC14) || std::strcmp(Aggregate->NameAt4, Name) != 0)
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -1162,7 +1161,7 @@ namespace
         // {0x14, "ProfileParser2", outer = this, &this+0x2c, 0}: the parser is aggregated, its
         // IProfileParser* lands in +0x28 and its inner unknown in +0x2c.
         FAGGDESC14 Desc = {};
-        Desc.Size = 0x14;
+        Desc.Size = sizeof(FAGGDESC14);
         Desc.NameAt4 = "ProfileParser2";
         Desc.OuterUnknown = (ICOManager*)this;
         Desc.InnerUnknown = &ParserInner;
@@ -2624,7 +2623,7 @@ namespace
         // Retail LAB_065b5cc0: plain 8-byte AGGDESC whose name matches (strcmp).
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            if (Desc->size != 8 || std::strcmp(Desc->interface_name, Name) != 0)
+            if (Desc->size != sizeof(AGGDESC) || std::strcmp(Desc->interface_name, Name) != 0)
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;

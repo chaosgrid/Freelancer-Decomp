@@ -124,6 +124,16 @@ enum
     kNnInventoryRows = 5
 };
 
+// The property ids the inventory windows add (NnInventory FUN_00479d10 passes them to its
+// NnDealer; NnScanner adds the last).
+enum ENnInventoryProperty
+{
+    kInvPropShowShipPackage = 0x13,   // A = the ship package id
+    kInvPropSetTradeMode = 0x47,      // A = an ENnTradeMode
+    kInvPropOpen = 0x48,              // A, B = the result callback's argument and function
+    kScannerPropSetCargo = 0x49,      // NnScanner: A -> the scanned EquipDescList, B = ship arch id
+};
+
 class NnInventory : public WinControl
 {
 public:

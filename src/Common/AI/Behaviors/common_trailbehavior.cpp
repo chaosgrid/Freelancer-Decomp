@@ -143,7 +143,7 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     if (!ObjInspectOf(OwnerContext)->is_player())
         MatchThrottle.SetFlag3b(true);                              // FUN_062d6730
     Move.SetContext(OwnerContext, SysMgr, Manager);
-    Move.SetMode(1);                                                // FUN_062d5980
+    Move.SetMode(kMoveModeTradelane);                                                // FUN_062d5980
     Afterburner.SetContext(OwnerContext, SysMgr, Manager);
     return bOk;
 }
@@ -154,7 +154,7 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 void TrailBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 
     // The owner's target, else the directive target.
     IObjRW* Leader = SysMgr->Targeting.GetTarget();              // FUN_062ed5a0
@@ -244,7 +244,7 @@ int TrailBehavior::OnEvaluateReadiness(float Unused)
                     Readiness = Flag29 ? 3 : Result;
                     return Readiness;
                 }
-                if ((RefreshNavFlags(NavOf(Sys)) & 0x7f0000u) != 0)
+                if ((RefreshNavFlags(NavOf(Sys)) & OBJ_SHIP_MASK) != 0)
                     Result = 1;
                 // FUN_062e1aa0 against pi/2 (.rdata:0639f5d4); >= or unordered falls through.
                 if (BearingAngleToIface(Leader, OwnerContext) < 1.5707964f)
@@ -291,12 +291,12 @@ EvaluateResult TrailBehavior::evaluate(unsigned int Context)
 
     // Behaviors 0xe, 0x11 and 8 cannot be trailed.
     int const TargetBehavior = Target->get_behavior_id();
-    if (TargetBehavior == 0xe || TargetBehavior == 0x11 || TargetBehavior == 8)
+    if (TargetBehavior == BEHAVIOR_GUIDE || TargetBehavior == BEHAVIOR_FOLLOW || TargetBehavior == BEHAVIOR_LAUNCH)
         return EvalSkip;
 
     // FUN_062e6200 re-reads the type the null-safe way.
     unsigned const TypeAgain = GetObjectTypeOrZero(Target);
-    if ((TypeAgain & 0x7f0000u) == 0 || (TypeAgain & 0x600de0u) != 0)
+    if ((TypeAgain & OBJ_SHIP_MASK) == 0 || (TypeAgain & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING)) != 0)
         return EvalSkip;
 
     SysMgr->Targeting.RetargetOwner(Target, SUBOBJ_ID_NONE);     // FUN_062ee940
@@ -319,15 +319,15 @@ int TrailBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     SystemManager* const Sys = SysMgr;
     if (Sys->Timers.IsTimer0Active())                              // FUN_062e8810
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // Set when the leader comes from the TargetManager rather than the directive.
@@ -341,23 +341,23 @@ int TrailBehavior::OnUpdate()
     {
         if (Sys->Targeting.GetTarget() == nullptr)
         {
-            UpdateResult = 2;
-            return 2;
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
         Leader = Sys->Targeting.GetTarget();
         // An AI owner gives up on a target slower than 20 (FUN_062e61a0; unordered stays).
         if (!OwnShipIsPlayer(Sys) && Leader != nullptr &&
             GetIfaceVectorMagnitude(Sys->Targeting.GetTarget()) < 20.0f)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
         bTrailTarget = true;
     }
     if (Leader == nullptr)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // Every idea watches the leader's id; a new leader re-engages (virtual slot 3).
@@ -405,8 +405,8 @@ int TrailBehavior::OnUpdate()
                 Axis.z = AxisZ208;
                 Face.SetAxis(Axis);                                 // FUN_062d75e0
                 Face.Update(DeltaTime);
-                UpdateResult = 1;
-                return 1;
+                UpdateResult = kBehaviorUpdateRunning;
+                return kBehaviorUpdateRunning;
             }
             AxisTimer1f8 = static_cast<float>(static_cast<double>(DeltaTime) + AxisTimer1f8);
         }
@@ -427,13 +427,13 @@ int TrailBehavior::OnUpdate()
             if (bAfterburner20c != 0)
                 Afterburner.Update(DeltaTime);
             Face.Update(DeltaTime);
-            Move.SetMode(0);                                        // FUN_062d5980
+            Move.SetMode(kMoveModeEngine);                                        // FUN_062d5980
             Move.SetScale40(1.0f);                                  // ICF fold 062a33e0
             Move.SetDirectionFrom(&Sys->SelfTarget.Iface->get_transform().Rotation);   // FUN_062d58f0
             Move.SetAngle38(3.14159274f);                           // ICF fold 063275f0
             Move.Update(DeltaTime);
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
         Afterburner.Commit();
@@ -506,7 +506,7 @@ int TrailBehavior::OnUpdate()
     }
     else
     {
-        Move.SetMode(0);
+        Move.SetMode(kMoveModeEngine);
         Move.SetScale40(1.0f);
         Move.SetWatchObject(Leader);                                // FUN_062d5760
         Move.SetAngle38(3.14159274f);
@@ -530,8 +530,8 @@ int TrailBehavior::OnUpdate()
         Face.SetUpVector(Up);                                       // FUN_062d7640
     }
     Face.Update(DeltaTime);
-    UpdateResult = 1;
-    return 1;
+    UpdateResult = kBehaviorUpdateRunning;
+    return kBehaviorUpdateRunning;
 }
 
 // ----------------------------------------------------------------------------
@@ -548,11 +548,11 @@ bool TrailBehavior::OnApplyDirective(void* DirectiveOp)
         {
             DirectiveTarget.set(reinterpret_cast<Watchable const*>(static_cast<char*>(Target) + 8));
             bHasDirectiveTarget1e0 = 1;
-            Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+            Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
             return true;
         }
     }
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     return false;
 }
 

@@ -32,6 +32,7 @@
 #include "render/IRenderPipeline.h"
 #include "render/RenderPipeline.h"
 #include "render/shading.h"
+#include "render/slots.h"      // Render::EPipelineState
 #include "Space/Cameras/space_camera.h"
 #include "Space/space_scene_obj_draw.h"
 #include "Space/star_sys.h"
@@ -46,7 +47,7 @@
 #include <cstring>
 #include <new>
 
-constexpr int kPipelineStateViewspace = 7;
+constexpr int kPipelineStateViewspace = Render::PipelineStateViewspaceLights;
 constexpr float kPi = 3.14159274f; // 0x40490fdb
 constexpr float kTinyFade = 1.0e-7f; // 0x33d6bf95 — Load clamp for zero fades
 constexpr float kHalf = 0.5f;       // DAT_00613458
@@ -818,7 +819,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             return;
 
         int const BlendSrc = (*AlphaFlag == 0) ? 2 : 5;
-        Win3DSetBlendFunc(BlendSrc, 2);
+        Win3DSetBlendFunc(BlendSrc, kWin3DBlendOne);
         // FUN_00421ed0(0xbe2) -- glDisable(GL_BLEND).
         if (G_SunCoronaNoBlend != 0)
             Win3DDisable(kWin3DBlend);
@@ -1175,7 +1176,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     {
         // The blend func is set first, before the shape is resolved, so it is applied even when
         // the shape is missing. No argument test (Sphere->SunBody is read as it is).
-        Win3DSetBlendFunc(5, 2);
+        Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendOne);
 
         // FUN_00512660 (the out-of-line copy of the same cached find); a null shape leaves.
         FTexShape const** ShapeSlot = &Spines->Shape;
@@ -1367,9 +1368,9 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         Win3DEnable(kWin3DBlend);
         if (Desc->bShapeAlpha == 0)
-            Win3DSetBlendFunc(2, 4);
+            Win3DSetBlendFunc(kWin3DBlendOne, D3DBLEND_INVSRCCOLOR);
         else
-            Win3DSetBlendFunc(5, 6);
+            Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
         void* const Tex = ResolveShapeTextureHandle(Shape);
         Win3DBindTexture(Tex);
 
@@ -2636,10 +2637,10 @@ void LoadSolarStarArchIni()
         return;
     IRenderPipeline* const Pipe = DALib::Pipeline;
     int Saved = 0;
-    Pipe->GetPipelineState(4, &Saved);
-    Pipe->SetPipelineState(4, 1);
+    Pipe->GetPipelineState(Render::PipelineStateTextureAllow32Bit, &Saved);
+    Pipe->SetPipelineState(Render::PipelineStateTextureAllow32Bit, 1);
     G_StarSphereShapeDB.Load(FullPath, nullptr);
-    Pipe->SetPipelineState(4, Saved);
+    Pipe->SetPipelineState(Render::PipelineStateTextureAllow32Bit, Saved);
 }
 
 // -------------------------------------------------------------------- FUN_00511010

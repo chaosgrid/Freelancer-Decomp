@@ -184,8 +184,8 @@ void UiWinDeform::Draw()
         Win3DApplyCamera(AsCamera(&Camera));
         Win3DSetViewport(AsCamera(&Camera), kUiWinCpp, 0x29f);
 
-        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 2);
-        DALib::Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
+        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
+        DALib::Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 
         DALib::Deform->SetLod(Body.Deformable, 0.0f, Zeros);
         DALib::Deform->Draw(Body.Deformable, &Camera, Zeros, nullptr, &OutLod, 0);

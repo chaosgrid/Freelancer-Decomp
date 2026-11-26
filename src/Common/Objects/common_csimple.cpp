@@ -46,7 +46,7 @@ CSimple::CSimple(Class ObjectClass)
     : CObject(ObjectClass)
 {
     // FUN_062b5850. AttachedDamageObjs (+0xbc) and SelfWatchable (+0x9c) default-construct.
-    FlagsA0 = 1;
+    FlagsA0 = kSimpleFlagTargetable;
     CurrentZone = nullptr;
     ZoneImmersion = 0.0f;
     ObjectDb = nullptr;
@@ -64,7 +64,7 @@ CSimple::CSimple(CSimple const& Other)
     : CObject(Other)
     // Retail's XOR/AND/XOR copies only bit 0 (targetable) into a byte assumed to be zero; the
     // port copies bit 0 directly.
-    , FlagsA0((unsigned char)(Other.FlagsA0 & 0x1))
+    , FlagsA0((unsigned char)(Other.FlagsA0 & kSimpleFlagTargetable))
     , CurrentZone(Other.CurrentZone)
     , ZoneImmersion(Other.ZoneImmersion)
     , ObjectDb(Other.ObjectDb)
@@ -213,7 +213,7 @@ unsigned CSimple::get_name() const
 bool CSimple::is_targetable() const
 {
     // FUN_06281190 (+0xa0 bit 0)
-    return (FlagsA0 & 1) != 0;
+    return (FlagsA0 & kSimpleFlagTargetable) != 0;
 }
 
 void CSimple::init(CreateParms const& Parms)

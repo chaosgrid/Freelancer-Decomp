@@ -62,7 +62,7 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         // stores the jump object's id right after controller event 0x11), found under type
         // mask 0xc40; its CObject must be a CSolar (0x303).
         unsigned int* const GateIdField = &static_cast<Ship*>(Obj)->DockedObjId;
-        GameObject* const Gate = Sys->find_object(*GateIdField, 0xc40);
+        GameObject* const Gate = Sys->find_object(*GateIdField, OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE);
         if (Gate == nullptr) return;
         CObject* const GateRaw = Gate->Object;
         if (GateRaw == nullptr) return;
@@ -90,7 +90,7 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         Msg25[0] = ship_id;
         Msg25[1] = *GateIdField;
         Msg25[2] = Sys->SystemInfo->NicknameId;
-        Server_ControllerDispatch(0, pub::Controller::EMessage::Msg0x25, Msg25);
+        Server_ControllerDispatch(0, pub::Controller::EMessage::ShipLeftSystem, Msg25);
 
         // The transit CreateParms. The bytes retail never writes (+0x1f .. +0x25, +0x27) are
         // stack contents there; the port zero-initialises them.
@@ -271,7 +271,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
 
         if (!SinglePlayer()) {
             g_pClientInterface->SendServerMiscObjUpdateObjectGroup(session_id, ship_id, Req.GroupId);
-            unsigned int Affiliation = 0xffffffffu;
+            unsigned int Affiliation = kNoAffiliation;
             int AffiliationVibe = p->rep_vibe;
             ::Reputation::Vibe::GetAffiliation(AffiliationVibe, Affiliation, false);
             g_pClientInterface->SendServerMiscObjUpdateAffiliation(session_id, ship_id, Affiliation);
@@ -729,14 +729,14 @@ void IServerImpl::RequestGroupPositions(unsigned int session_id, unsigned char* 
                 StarSystem* const MemberSystem =
                     SysDB_LookupSystem(*(unsigned int*)(Entry + 0x10));
                 GameObject* const MemberShip =
-                    MemberSystem->find_object(Member->ship_object_id, 0x7f0000u);
+                    MemberSystem->find_object(Member->ship_object_id, OBJ_SHIP_MASK);
                 if (MemberShip == nullptr) {
                     *(unsigned int*)(Entry + 0x00) = 0;
                     *(unsigned int*)(Entry + 0x04) = 0;
                     *(unsigned int*)(Entry + 0x08) = 0;
                 } else {
                     Vector const& Pos = MemberShip->get_position();
-                    std::memcpy(Entry, &Pos, 0x0c);
+                    std::memcpy(Entry, &Pos, sizeof(Vector));
                 }
             } else {
                 // Only BaseId is written; Pos stays as operator new left it.
@@ -893,7 +893,7 @@ void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info)
             static_cast<CEqObj*>(Raw)->get_behavior_interface();
         if (Manager != nullptr) {
             FBehaviorManagerEvent Event;
-            Event.Type = 2;
+            Event.Type = FBehaviorManagerEvent::kEventSetManeuver;
             Event.Data = const_cast<XSetManeuver*>(&info);
             Manager->OnEvent(&Event);
         }

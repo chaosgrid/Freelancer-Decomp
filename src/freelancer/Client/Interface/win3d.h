@@ -61,6 +61,17 @@ enum EWin3DMouseAction : int
     kWin3DMouseDoubleClick = 3
 };
 
+// The modifier byte Win3DDispatchKey (FUN_0059dfd0) builds and passes to KeyEvent as its second
+// argument; bits 5..7 are stack garbage in retail.
+enum EWin3DKeyState : unsigned char
+{
+    kWin3DKeyReleased = 0x01,   // a key-up event
+    kWin3DKeyPressed = 0x02,    // a key-down event
+    kWin3DKeyShift = 0x04,      // a Shift key is held
+    kWin3DKeyControl = 0x08,    // a Control key is held
+    kWin3DKeyAlt = 0x10         // an Alt key is held
+};
+
 struct FWin3DMouseEvent
 {
     int Button;

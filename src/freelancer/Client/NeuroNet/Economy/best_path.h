@@ -29,6 +29,21 @@
 struct IObjRW;
 class Vector;
 
+// Values of FBestPathWaypoint::ObjectiveState (record +0x18, from the server): the low nibble is
+// the objective's state, the high bits are one-shot requests (below).
+enum EObjectiveState
+{
+    kObjectiveStateNoNumber = 9,  // listed without a stop number (the nav map, FUN_0049f7a0)
+    kObjectiveStateNumbered = 0xa // a numbered stop (ids 0x4df)
+};
+enum EObjectiveStateBits
+{
+    kObjectiveStateMask = 0xf,       // the state nibble
+    kObjectiveRequestPending = 0x10, // FUN_004b9f90 (mission-log queue)
+    kObjectiveRequestHistory = 0x20, // FUN_004ba2a0 (mission-log history)
+    kObjectiveRequestReset = 0x80    // FUN_004b9bb0 (story star reset)
+};
+
 // One 0x1c-byte waypoint record. FUN_004c5110 / FUN_004c52d0 walk +0x00 as a FmtStr::Val chain.
 // The chain is {next, data, ushort tag}, with tags 'B' (0x42) base, 'R' (0x52) object and 'N'
 // (0x4e) data block, so +0x00..+0x17 is a FmtStr (0x18 bytes).

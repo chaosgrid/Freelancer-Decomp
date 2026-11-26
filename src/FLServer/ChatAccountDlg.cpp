@@ -51,15 +51,15 @@ CChatAccountDlg::~CChatAccountDlg()
 // .text:004141a0
 void CChatAccountDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1047, InputEdit);
-	DDX_Control(DX, 1048, LogEdit);
-	DDX_Control(DX, 1049, TitleEdit);
+	DDX_Control(DX, kControlInput, InputEdit);
+	DDX_Control(DX, kControlLog, LogEdit);
+	DDX_Control(DX, kControlTitle, TitleEdit);
 }
 
 // Message map .rdata:0041e290.
 BEGIN_MESSAGE_MAP(CChatAccountDlg, CDialog)
-	ON_NOTIFY(EN_MSGFILTER, 1047, &CChatAccountDlg::OnMsgFilterInput) // 00414260
-	ON_BN_CLICKED(1053, &CChatAccountDlg::OnCloseButton)             // 00414690
+	ON_NOTIFY(EN_MSGFILTER, kControlInput, &CChatAccountDlg::OnMsgFilterInput) // 00414260
+	ON_BN_CLICKED(kControlClose, &CChatAccountDlg::OnCloseButton)             // 00414690
 END_MESSAGE_MAP()
 
 // .text:004141e0

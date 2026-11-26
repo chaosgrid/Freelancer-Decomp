@@ -41,14 +41,14 @@ CUniverseChatDlg::CUniverseChatDlg(CWnd* Parent)
 // .text:004181c0
 void CUniverseChatDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1047, InputEdit);
-	DDX_Control(DX, 1048, LogEdit);
+	DDX_Control(DX, kControlInput, InputEdit);
+	DDX_Control(DX, kControlLog, LogEdit);
 }
 
 // Message map .rdata:0041e858.
 BEGIN_MESSAGE_MAP(CUniverseChatDlg, CDialog)
-	ON_NOTIFY(EN_MSGFILTER, 1047, &CUniverseChatDlg::OnMsgFilterInput) // 004182f0
-	ON_BN_CLICKED(1053, &CUniverseChatDlg::OnCloseButton)             // 00418590
+	ON_NOTIFY(EN_MSGFILTER, kControlInput, &CUniverseChatDlg::OnMsgFilterInput) // 004182f0
+	ON_BN_CLICKED(kControlClose, &CUniverseChatDlg::OnCloseButton)             // 00418590
 	ON_WM_CLOSE()                                                     // 004185a0
 	ON_WM_DESTROY()                                                   // 004185b0
 END_MESSAGE_MAP()

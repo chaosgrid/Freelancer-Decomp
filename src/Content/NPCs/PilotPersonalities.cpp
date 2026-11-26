@@ -76,6 +76,8 @@ namespace
     // _strupr's it before the strstr tests.
     char GAttackPreferenceWeapons[256];
 
+    typedef FPersonality::JobStruct FJobStruct;
+
     // .rdata 06fb95e8..06fb97b8: 12 records of {char Name[0x20]; int ClassId;}
     // (stride 0x24), read by attack_order (06f3c190) and FUN_06f3c9b0.
     struct FShipClassName
@@ -85,18 +87,18 @@ namespace
     };
 
     FShipClassName const GShipClassNames[12] = {
-        { "FIGHTER", 0 },
-        { "FREIGHTER", 1 },
-        { "TRANSPORT", 2 },
-        { "GUNBOAT", 3 },
-        { "CRUISER", 4 },
-        { "CAPITAL", 5 },
-        { "TRADELANE", 6 },
-        { "JUMPGATE", 7 },
-        { "WEAPONS_PLATFORM", 8 },
-        { "DESTROYABLE_DEPOT", 9 },
-        { "SOLAR", 10 },
-        { "ANYTHING", 11 },
+        { "FIGHTER", FJobStruct::kAttackClassFighter },
+        { "FREIGHTER", FJobStruct::kAttackClassFreighter },
+        { "TRANSPORT", FJobStruct::kAttackClassTransport },
+        { "GUNBOAT", FJobStruct::kAttackClassGunboat },
+        { "CRUISER", FJobStruct::kAttackClassCruiser },
+        { "CAPITAL", FJobStruct::kAttackClassCapital },
+        { "TRADELANE", FJobStruct::kAttackClassTradelane },
+        { "JUMPGATE", FJobStruct::kAttackClassJumpgate },
+        { "WEAPONS_PLATFORM", FJobStruct::kAttackClassWeaponsPlatform },
+        { "DESTROYABLE_DEPOT", FJobStruct::kAttackClassDestroyableDepot },
+        { "SOLAR", FJobStruct::kAttackClassSolar },
+        { "ANYTHING", FJobStruct::kAttackClassAnything },
     };
 
     // JobStruct +0x10: attack preference records {class, range, weapon flags},
@@ -504,11 +506,11 @@ namespace
                 // MULTIPLE stores 1.
                 char const* Style = Reader->get_value_string();
                 if (_stricmp(Style, "MULTIPLE") == 0)
-                    Out->FireStyle = 0;
+                    Out->FireStyle = FPersonality::GunUseStruct::kFireStyleMultiple;
                 else
                 {
                     _stricmp(Style, "SINGLE");
-                    Out->FireStyle = 1;
+                    Out->FireStyle = FPersonality::GunUseStruct::kFireStyleSingle;
                 }
             }
         } while (Reader->read_value());
@@ -679,15 +681,15 @@ namespace
             {
                 // No match leaves the field as it was.
                 if (_stricmp(Reader->get_value_string(), "BREAK_AWAY_FROM_CENTER") == 0)
-                    Out->FormationExitMode = 0;
+                    Out->FormationExitMode = kFormationExitBreakAwayFromCenter;
                 else if (_stricmp(Reader->get_value_string(), "BREAK_AWAY_FROM_CENTER_AFTERBURNER") == 0)
-                    Out->FormationExitMode = 1;
+                    Out->FormationExitMode = kFormationExitBreakAwayFromCenterAfterburner;
                 else if (_stricmp(Reader->get_value_string(), "BRAKE_REVERSE") == 0)
-                    Out->FormationExitMode = 2;
+                    Out->FormationExitMode = kFormationExitBrakeReverse;
                 else if (_stricmp(Reader->get_value_string(), "OUTRUN") == 0)
-                    Out->FormationExitMode = 3;
+                    Out->FormationExitMode = kFormationExitOutrun;
                 else if (_stricmp(Reader->get_value_string(), "NOTHING") == 0)
-                    Out->FormationExitMode = 5;
+                    Out->FormationExitMode = kFormationExitNothing;
             }
             else if (Reader->is_value("formation_exit_top_turn_break_away_throttle"))
                 Out->FormationExitTopTurnBreakAwayThrottle = Reader->get_value_float(0);
@@ -721,19 +723,19 @@ namespace
                 std::strcpy(GAttackPreferenceWeapons, Reader->get_value_string(2));
                 _strupr(GAttackPreferenceWeapons);
                 if (std::strstr(GAttackPreferenceWeapons, "GUNS") != nullptr)
-                    Record->WeaponFlags |= 1;
+                    Record->WeaponFlags |= FJobStruct::kAttackWeaponGuns;
                 if (std::strstr(GAttackPreferenceWeapons, "GUIDED") != nullptr)
-                    Record->WeaponFlags |= 2;
+                    Record->WeaponFlags |= FJobStruct::kAttackWeaponGuided;
                 if (std::strstr(GAttackPreferenceWeapons, "UNGUIDED") != nullptr)
-                    Record->WeaponFlags |= 4;
+                    Record->WeaponFlags |= FJobStruct::kAttackWeaponUnguided;
                 if (std::strstr(GAttackPreferenceWeapons, "TORPEDO") != nullptr)
-                    Record->WeaponFlags |= 8;
+                    Record->WeaponFlags |= FJobStruct::kAttackWeaponTorpedo;
                 break;
             }
         }
 
         // Terminator after this record, matched or not.
-        Records[Index + 1].ShipClass = 0xC;
+        Records[Index + 1].ShipClass = FJobStruct::kAttackClassEnd;
     }
 
     // FUN_06f3cad0: attack_subtarget_order token list -> JobStruct +0xAC ints,
@@ -746,28 +748,28 @@ namespace
         int Count = 0;
         if (Token == nullptr)
         {
-            Order[0] = 7;
+            Order[0] = FJobStruct::kAttackSubtargetEnd;
             return;
         }
         do
         {
             if (_stricmp(Token, "ANYTHING") == 0)
-                Order[Count++] = 6;
+                Order[Count++] = FJobStruct::kAttackSubtargetAnything;
             if (_stricmp(Token, "GUNS") == 0)
-                Order[Count++] = 0;
+                Order[Count++] = FJobStruct::kAttackSubtargetGuns;
             if (_stricmp(Token, "TURRETS") == 0)
-                Order[Count++] = 1;
+                Order[Count++] = FJobStruct::kAttackSubtargetTurrets;
             if (_stricmp(Token, "LAUNCHERS") == 0)
-                Order[Count++] = 2;
+                Order[Count++] = FJobStruct::kAttackSubtargetLaunchers;
             if (_stricmp(Token, "TOWERS") == 0)
-                Order[Count++] = 3;
+                Order[Count++] = FJobStruct::kAttackSubtargetTowers;
             if (_stricmp(Token, "ENGINES") == 0)
-                Order[Count++] = 4;
+                Order[Count++] = FJobStruct::kAttackSubtargetEngines;
             if (_stricmp(Token, "HULL") == 0)
-                Order[Count++] = 5;
+                Order[Count++] = FJobStruct::kAttackSubtargetHull;
             Token = std::strtok(nullptr, Delimiters);
         } while (Token != nullptr);
-        Order[Count] = 7;
+        Order[Count] = FJobStruct::kAttackSubtargetEnd;
     }
 
     // FUN_06f3c190: [JobBlock] values.
@@ -785,16 +787,16 @@ namespace
                 char const* Text = Reader->get_value_string();
                 Out->LootPreference = 0;
                 if (std::strstr(Text, "LT_ALL") != nullptr)
-                    Out->LootPreference = 7;
+                    Out->LootPreference = FPersonality::JobStruct::kLootPrefAll;
                 else if (std::strstr(Text, "LT_NONE") != nullptr)
                     Out->LootPreference = 0;
                 else
                 {
-                    unsigned int Flags = std::strstr(Text, "LT_COMMODITIES") != nullptr ? 1u : 0u;
+                    unsigned int Flags = std::strstr(Text, "LT_COMMODITIES") != nullptr ? FPersonality::JobStruct::kLootPrefCommodities : 0u;
                     if (std::strstr(Text, "LT_EQUIPMENT") != nullptr)
-                        Flags |= 2;
+                        Flags |= FPersonality::JobStruct::kLootPrefEquipment;
                     if (std::strstr(Text, "LT_POTIONS") != nullptr)
-                        Flags |= 4;
+                        Flags |= FPersonality::JobStruct::kLootPrefPotions;
                     Out->LootPreference = (int32_t)Flags;
                 }
             }
@@ -829,7 +831,7 @@ namespace
                 while (Token != nullptr)
                 {
                     if (_stricmp(Token, "ANYTHING") == 0)
-                        Records[Count++].ShipClass = 0xB;
+                        Records[Count++].ShipClass = FJobStruct::kAttackClassAnything;
                     // The table also holds ANYTHING (11): an ANYTHING token takes
                     // two records, as in retail.
                     for (int ClassIndex = 0; ClassIndex < 12; ++ClassIndex)
@@ -838,13 +840,13 @@ namespace
                         {
                             Records[Count].ShipClass = GShipClassNames[ClassIndex].ClassId;
                             Records[Count].Range = 5000.0f; // 0x459c4000
-                            Records[Count].WeaponFlags = 0xF;
+                            Records[Count].WeaponFlags = FJobStruct::kAttackWeaponGuns | FJobStruct::kAttackWeaponGuided | FJobStruct::kAttackWeaponUnguided | FJobStruct::kAttackWeaponTorpedo;
                             ++Count;
                         }
                     }
                     Token = std::strtok(nullptr, Delimiters);
                 }
-                Records[Count].ShipClass = 0xC;
+                Records[Count].ShipClass = FJobStruct::kAttackClassEnd;
             }
             else if (Reader->is_value("attack_preference"))
             {

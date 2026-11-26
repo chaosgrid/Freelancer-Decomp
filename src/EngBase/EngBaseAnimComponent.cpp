@@ -342,7 +342,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, 
                                                      void* Context)
 {
     FAnimScript* Script = (FAnimScript*)InScript;
-    const GENRESULT Miss = (GENRESULT)0xFFFFFFFE;
+    const GENRESULT Miss = GR_INVALID_PARMS;
     if (Callback == nullptr || !IsValidAnimScript(Script))
         return Miss;
     FAnimNameEntry* Entry = FindAnimName(Script, DACOM_CRC::GetCRC32(Name));
@@ -654,10 +654,10 @@ unsigned long DACOM_API FAnimationChannelFacet::StopGraph(unsigned long Key)
 {
     void* ChannelThis = this;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
-    if (Typed == nullptr || (Typed->PlayState & 1) == 0)
+    if (Typed == nullptr || (Typed->PlayState & G_PlayStatePlaying) == 0)
         return 0;
     Typed->ApplyFromArchetype();
-    Typed->PlayState &= 0xFE;
+    Typed->PlayState &= ~G_PlayStatePlaying;
     return 1;
 }
 
@@ -778,7 +778,7 @@ GENRESULT DACOM_API FAnimationChannelFacet::GetMapped(unsigned long Key, unsigne
     void* ChannelThis = this;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     *Out = Typed->Rate < 0.0f ? 0 : 1;
     return GR_OK;
 }

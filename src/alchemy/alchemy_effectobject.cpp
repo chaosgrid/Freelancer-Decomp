@@ -351,13 +351,13 @@ namespace AlchemyImpl
             if (static_cast<unsigned char>(AsFx(Record->Node)->IsNodeDead()) != 0)
                 continue;
 
-            if (Flags == 7)
+            if (Flags == (kFxNodeClassEmitter | kFxNodeClassField | kFxNodeClassAppearance))
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x1) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsEmitter) != 0)
+            if ((Flags & kFxNodeClassEmitter) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsEmitter) != 0)
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x2) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsField) != 0)
+            if ((Flags & kFxNodeClassField) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsField) != 0)
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x4) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsAppearance) != 0)
+            if ((Flags & kFxNodeClassAppearance) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsAppearance) != 0)
                 return static_cast<GENRESULT>(0);
         }
         return static_cast<GENRESULT>(1);
@@ -366,7 +366,7 @@ namespace AlchemyImpl
     GENRESULT FFxEffectObject::DispatchFlagsToAlchemy(unsigned long Flags)
     {
         FFxEffectNodeRec* Record = Nodes_;
-        if (Flags == 7)
+        if (Flags == (kFxNodeClassEmitter | kFxNodeClassField | kFxNodeClassAppearance))
         {
             const unsigned long Count = NodeCount_;
             for (long Index = 0; Index < RootNodeCount_ &&
@@ -387,13 +387,13 @@ namespace AlchemyImpl
             IDAComponent* Node = Record->Node;
             if (static_cast<unsigned char>(AsFx(Node)->IsNodeDead()) == 0)
             {
-                if ((Flags & 0x1) != 0 &&
+                if ((Flags & kFxNodeClassEmitter) != 0 &&
                     CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsEmitter) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
-                if ((Flags & 0x2) != 0 &&
+                if ((Flags & kFxNodeClassField) != 0 &&
                     CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsField) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
-                if ((Flags & 0x4) != 0 &&
+                if ((Flags & kFxNodeClassAppearance) != 0 &&
                     CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsAppearance) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
             }

@@ -159,7 +159,7 @@ void NnGroupControl::SetChannelTable(FChatChannelTable* Table)
 void NnGroupControl::ShowControl(Win3D* Control)
 {
     // FUN_00462a30: OR byte [ECX+0x6c],3.
-    Control->Flags = static_cast<unsigned char>(Control->Flags | 0x03);
+    Control->Flags = static_cast<unsigned char>(Control->Flags | kWin3DActive | kWin3DVisible);
 }
 
 bool NnGroupControl::Create(Win3D* NewParent, void* Data)
@@ -230,7 +230,7 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
         RequestDisplay->SetAutoScrollbar(true);
         RequestDisplay->SetFrameColor(
             reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
-        RequestDisplay->SetAlignMode(2);
+        RequestDisplay->SetAlignMode(kRichAlignMiddle);
         RequestDisplay->GetToolTipHoverInfo()->IdsAlt = 0x1b83;
         RequestDisplay->SetToolTipEnabled(true);
     }
@@ -283,8 +283,8 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
         AttentionTitle->AppendNode(Ref);
     }
 
-    BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags | 0x03);
-    BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags | 0x03);
+    BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags | kWin3DActive | kWin3DVisible);
+    BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags | kWin3DActive | kWin3DVisible);
     ShowControl(BtnDecline);
 
     if (G_ChatChannelTable != nullptr)
@@ -311,7 +311,7 @@ bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     {
         if (Parent != nullptr)
             Win3DReparent(this, nullptr);
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         RefreshRequestDisplay();
         return true;
     }
@@ -321,7 +321,7 @@ bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 void NnGroupControl::UpdateInactive()
 {
     // LAB_00462ab0
-    if (ChannelTable != nullptr && (Flags & 0x02) == 0)
+    if (ChannelTable != nullptr && (Flags & kWin3DVisible) == 0)
     {
         bool bChanged = false;
         int const NowMs = GroupNowMsRounded();
@@ -373,7 +373,7 @@ intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (ChatServer != nullptr)
             {
                 FNnGroupWireMessage Message;
-                Message.Opcode = 2;
+                Message.Opcode = kGroupOpAccept;
                 Message.Payload = ShownFrom.Id & 0xffffu;
                 ChatServer->SubmitChat(CHAT_ID(GetPlayerConnectionId() & 0xffffu),
                                        sizeof(Message), &Message, G_ChatIdGroupInvite, -1);
@@ -426,7 +426,7 @@ intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         {
             unsigned const ConnWord = GetPlayerConnectionId() & 0xffffu;
             FNnGroupWireMessage Message;
-            Message.Opcode = 1;
+            Message.Opcode = kGroupOpLeave;
             Message.Payload = ConnWord;
             ChatServer->SubmitChat(CHAT_ID(ConnWord), sizeof(Message), &Message,
                                    G_ChatIdGroupInvite, -1);
@@ -452,8 +452,8 @@ void NnGroupControl::RefreshRequestDisplay()
 
     if (ShownFrom.Id == G_ChatIdNone.Id)
     {
-        BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags & 0xfe);
-        BtnDecline->Flags = static_cast<unsigned char>(BtnDecline->Flags & 0xfe);
+        BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags & ~kWin3DActive);
+        BtnDecline->Flags = static_cast<unsigned char>(BtnDecline->Flags & ~kWin3DActive);
         RequestDisplay->ClearContent();
         JustifyNode Justify(TextJustifyCenter);    // JustifyNode(1)
         RequestDisplay->AppendNode(Justify);
@@ -464,16 +464,16 @@ void NnGroupControl::RefreshRequestDisplay()
 
         // G_NnMainButton && !(Flags & 2) -> FUN_0045da10(0) and
         // FUN_0045da50(0) on it (the plain request icon, no alert colour).
-        if (G_NnMainButton != nullptr && (Flags & 0x02) == 0)
+        if (G_NnMainButton != nullptr && (Flags & kWin3DVisible) == 0)
         {
             G_NnMainButton->SetGroupButtonAlert(false);
-            G_NnMainButton->SetGroupButtonMesh(0);
+            G_NnMainButton->SetGroupButtonMesh(kGroupButtonMeshRequest);
         }
     }
     else
     {
-        BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags | 0x01);
-        BtnDecline->Flags = static_cast<unsigned char>(BtnDecline->Flags | 0x01);
+        BtnAccept->Flags = static_cast<unsigned char>(BtnAccept->Flags | kWin3DActive);
+        BtnDecline->Flags = static_cast<unsigned char>(BtnDecline->Flags | kWin3DActive);
         RequestDisplay->ClearContent();
         {
             JustifyNode Justify(TextJustifyCenter);    // JustifyNode(1)
@@ -528,18 +528,18 @@ void NnGroupControl::RefreshRequestDisplay()
 
         // G_NnMainButton && !(Flags & 2) -> FUN_0045da10(1) and
         // FUN_0045da50(ShipId == 0 ? 2 : 1) -- the group or the trade request icon.
-        if (G_NnMainButton != nullptr && (Flags & 0x02) == 0)
+        if (G_NnMainButton != nullptr && (Flags & kWin3DVisible) == 0)
         {
             G_NnMainButton->SetGroupButtonAlert(true);
-            G_NnMainButton->SetGroupButtonMesh(ShownShipId == 0 ? 2 : 1);
+            G_NnMainButton->SetGroupButtonMesh(ShownShipId == 0 ? kGroupButtonMeshGroupRequest : kGroupButtonMeshTradeRequest);
         }
     }
 
     // BtnLeave shows while the group has members.
     if (!GroupMembers.empty())
-        BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags | 0x01);
+        BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags | kWin3DActive);
     else
-        BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags & 0xfe);
+        BtnLeave->Flags = static_cast<unsigned char>(BtnLeave->Flags & ~kWin3DActive);
 }
 
 void NnGroupControl::AddTradeRequest(unsigned ShipId)
@@ -606,15 +606,15 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
     RenderDisplayList* Name = nullptr;
     switch (Message->Opcode)
     {
-    case 0:
-    case 1:
-    case 2:
+    case kGroupOpInvite:
+    case kGroupOpLeave:
+    case kGroupOpAccept:
         // Server-side opcodes.
         GroupNotice(0x8ef, "Received a group command on a client. This is illegal.\n");
         DiscardEntry(Entry);
         return;
 
-    case 3:
+    case kGroupOpInviteSent:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
@@ -622,7 +622,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 4:
+    case kGroupOpInviteFrom:
     {
         // An identical pending invitation -> nothing.
         for (std::list<FNnGroupRequest>::iterator It = Requests.begin(); It != Requests.end();
@@ -651,7 +651,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         return;
     }
 
-    case 5:
+    case kGroupOpJoinedGroup:
     {
         // Every pending invitation (ShipId 0, From set) is dropped.
         bool bErased = false;
@@ -681,7 +681,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         return;
     }
 
-    case 6:
+    case kGroupOpNewMember:
         // The invitation from this player, if pending, is dropped.
         if (Key.Id != G_ChatIdNone.Id)
         {
@@ -706,7 +706,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 7:
+    case kGroupOpLeftGroup:
     {
         GroupMembers.clear();
         RefreshRequestDisplay();
@@ -727,8 +727,8 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
                 {
                     IBehaviorManager* const Behavior =
                         static_cast<CEqObj*>(Obj)->get_behavior_interface();
-                    if (Behavior != nullptr && Behavior->CurrentBehaviorIndex == 10)
-                        Hud->RequestManeuver(0x13, false);
+                    if (Behavior != nullptr && Behavior->CurrentBehaviorIndex == BEHAVIOR_FORMATION)
+                        Hud->RequestManeuver(BEHAVIOR_FREE_FLIGHT, false);
                 }
             }
         }
@@ -738,7 +738,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         return;
     }
 
-    case 8:
+    case kGroupOpMemberLeft:
         GroupMembers.erase(Key.Id);
         RefreshRequestDisplay();
 
@@ -749,17 +749,17 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 9:
+    case kGroupOpCannotInviteSelf:
         AppendPrefixAndName(Entry, Texts[kNnGroupTextCannotInviteSelf], nullptr);
         ChatCommitEntries();
         return;
 
-    case 0xa:
+    case kGroupOpGroupFull:
         AppendPrefixAndName(Entry, Texts[kNnGroupTextGroupFull], nullptr);
         ChatCommitEntries();
         return;
 
-    case 0xb:
+    case kGroupOpAlreadyInYourGroup:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
@@ -767,12 +767,12 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 0xc:
+    case kGroupOpCannotJoinOwnGroup:
         AppendPrefixAndName(Entry, Texts[kNnGroupTextCannotJoinOwnGroup], nullptr);
         ChatCommitEntries();
         return;
 
-    case 0xd:
+    case kGroupOpNotInvited:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
@@ -780,7 +780,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 0xe:
+    case kGroupOpAlreadyMember:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
@@ -788,7 +788,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 0xf:
+    case kGroupOpAbortMission:
         // The full payload dword against DAT_00673344.
         if (Payload == GetPlayerConnectionId())
         {
@@ -803,7 +803,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 0x10:
+    case kGroupOpGroupNowFull:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
@@ -811,12 +811,12 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         ChatCommitEntries();
         return;
 
-    case 0x12:
+    case kGroupOpNotInGroup:
         AppendPrefixAndName(Entry, Texts[kNnGroupTextNotInGroup], nullptr);
         ChatCommitEntries();
         return;
 
-    case 0x14:
+    case kGroupOpPlayerDied:
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;

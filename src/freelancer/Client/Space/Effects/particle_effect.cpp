@@ -75,8 +75,8 @@ unsigned char FJumpParticleEffect::UpdateVisibility(float /*Dt*/, FSpaceCamera* 
 {
     FJumpParticleEffect* const Self = this;
     // LAB_005033e0: +0x7c |= 1, and that bit is the result. Neither argument is read.
-    Self->Flags7C = static_cast<unsigned char>(Self->Flags7C | 1u);
-    return static_cast<unsigned char>(Self->Flags7C & 1u);
+    Self->Flags7C = static_cast<unsigned char>(Self->Flags7C | kParticleFlagVisible);
+    return static_cast<unsigned char>(Self->Flags7C & kParticleFlagVisible);
 }
 
 unsigned char FParticleTunnel::UpdateVisibility(float /*Dt*/, FSpaceCamera* Cam)
@@ -92,7 +92,7 @@ unsigned char FParticleTunnel::UpdateVisibility(float /*Dt*/, FSpaceCamera* Cam)
     }
     Self->Flags7C = static_cast<unsigned char>(((Self->Flags7C ^ bCockpitView) & 1u) ^
                                                Self->Flags7C);
-    return static_cast<unsigned char>(Self->Flags7C & 1u);
+    return static_cast<unsigned char>(Self->Flags7C & kParticleFlagVisible);
 }
 
 unsigned char FParticleTunnel::TickDraw(float Dt, FSpaceCamera* Cam)
@@ -162,9 +162,9 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
 {
     // FUN_004f8360. No null tests on `this`, the DALib globals or the VisEffect.
     // Already created -> 1; not started (bit 4 clear) -> 0.
-    if ((This->Flags7C & 4u) != 0)
+    if ((This->Flags7C & kParticleFlagFxCreated) != 0)
         return 1;
-    if ((This->Flags7C & 0x10u) == 0)
+    if ((This->Flags7C & kParticleFlagStarted) == 0)
         return 0;
 
     AGGDESC Desc = {8, "FxNode"};
@@ -176,14 +176,14 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
               "%s(%d) : *** WARNING: ParticleEffect::start_effect: couldnt create ale.tree "
               "for %s",
               "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3dc, This->Vis->Nickname);
-        This->Flags7C = static_cast<unsigned char>(This->Flags7C & 0xefu);
+        This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagStarted);
         return 0;
     }
 
     // FUN_0042e080's answer is not read. Bit 3 records that this effect holds a reference
     // (released by the destructor).
     VisEffectArchAddRef(This->Vis);
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C | 8u);
+    This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagArchRef);
 
     // The out pointer is the member itself.
     unsigned long const Key = This->Vis->EffectCrc;
@@ -204,7 +204,7 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
               "(%s) in file (%s) ... Effect is most likely corrupted",
               "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3f0,
               This->Vis->Nickname, This->Vis->AlchemyPath);
-        This->Flags7C = static_cast<unsigned char>(This->Flags7C & 0xefu);
+        This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagStarted);
         return 0;
     }
 
@@ -214,7 +214,7 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
     DALib::Alchemy->AttachNode(RootRaw, This->FxNode);
     reinterpret_cast<IDAComponent*>(RootRaw)->Release();
 
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C | 4u);
+    This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagFxCreated);
     return static_cast<unsigned char>((This->Flags7C >> 2) & 1u);
 }
 
@@ -223,8 +223,8 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
     FParticleEffect* const This = this;
     // FUN_004f8160. No null test on `this`. Every failure calls the object's own slot +4
     // (dispatched).
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C & 0xefu);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
+    This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagStarted);
 
     if (EffectArch == nullptr)
     {
@@ -291,8 +291,8 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
         return 0;
     }
 
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C | 0x10u);
-    This->Flags08 = static_cast<unsigned char>(This->Flags08 & 0xfdu);
+    This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagStarted);
+    This->Flags08 = static_cast<unsigned char>(This->Flags08 & ~kEffectFlagDeactivated);
     This->RunTime78 = TypeInfo->RunTime;                   // +0x18
     This->Radius74 = TypeInfo->Radius;                     // +0x10
 
@@ -318,7 +318,7 @@ void FParticleEffect::Kill()
     {
         EffectTypeListLink(This);
         EffectFreezeToWorld(Base);
-        This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+        This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return;
     }
 
@@ -332,7 +332,7 @@ void FParticleEffect::Kill()
             // no-op by now.)
             EffectTypeListLink(This);
             EffectFreezeToWorld(Base);
-            This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+            This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         }
         else
         {
@@ -405,7 +405,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
             if (DrawStateA == 0)
             {
                 // Outside every field while the camera is fully inside one.
-                if (GetSpaceFieldEnclosure() == 2)
+                if (GetSpaceFieldEnclosure() == kFieldEnclosureInside)
                     return 0;
             }
             else
@@ -433,7 +433,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 
     // Below the perf level (or unordered) returns the visibility bit untouched.
     if (!(This->Priority >= GetPerfGenericEffectPerf()))
-        return static_cast<unsigned char>(This->Flags7C & 1u);
+        return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 
     Vector WorldPos;
     float const Radius = This->GetWorldPos(&WorldPos);
@@ -447,7 +447,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     float const NegZ = -ViewPos.z;
     float const FarEdge = NegZ + Radius;
     if (!(CamIface->GetZNear() < FarEdge))
-        return static_cast<unsigned char>(This->Flags7C & 1u);
+        return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 
     // No null test on the type info here. The pbubble threshold, unrounded, must be strictly
     // greater than the near distance.
@@ -459,7 +459,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
             (1.0 - static_cast<double>(GetPerfGenericEffectPerf())) +
         TypeInfo->PbubbleNear;
     if (!(Threshold > NearDistance))
-        return static_cast<unsigned char>(This->Flags7C & 1u);
+        return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 
     // ALCHEMY_LOD: a false LOD blend zeroes +0x80 and leaves the visibility bit as it is.
     if (GetGameOption(kGameOptAlchemyLod) != 0)
@@ -468,7 +468,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
                                 &This->Float80))
         {
             This->Float80 = 0.0f;
-            return static_cast<unsigned char>(This->Flags7C & 1u);
+            return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
         }
     }
 
@@ -483,8 +483,8 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
         if (DistY <= Radius)
             Inside = 1;
     }
-    This->Flags7C = static_cast<unsigned char>((This->Flags7C & 0xfeu) | Inside);
-    return static_cast<unsigned char>(This->Flags7C & 1u);
+    This->Flags7C = static_cast<unsigned char>((This->Flags7C & ~kParticleFlagVisible) | Inside);
+    return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 }
 
 unsigned char ParticleEffectUpdateVisibility(FParticleEffect* This, float Dt, FSpaceCamera* Cam)
@@ -505,7 +505,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     // +0x7c is read once. Without the start bit (0x10) the effect is finished.
     unsigned char const Flags = This->Flags7C;
     bool bFinished = true;
-    if ((Flags & 0x10u) != 0)
+    if ((Flags & kParticleFlagStarted) != 0)
     {
         bFinished = false;
         // A run time above zero counts down by Dt; the unrounded result at or below zero
@@ -518,7 +518,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
                 bFinished = true;
         }
         // With the ale bit (4), a finished IFxEffect also finishes it.
-        if (!bFinished && (Flags & 4u) != 0 &&
+        if (!bFinished && (Flags & kParticleFlagFxCreated) != 0 &&
             static_cast<unsigned char>(This->FxEffect->IsFinished(reinterpret_cast<void*>(4))) != 0)
             bFinished = true;
     }
@@ -526,7 +526,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     {
         EffectTypeListLink(This);
         EffectFreezeToWorld(AsEffectBase(This));
-        This->Flags08 = static_cast<unsigned char>(This->Flags08 | 2u);
+        This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return 0;
     }
 
@@ -540,7 +540,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     }
 
     // Neither UPDATE_OFFSCREEN nor visible (+0x7c re-read) -> 0.
-    if (TypeInfo->UpdateOffscreen == 0 && (This->Flags7C & 1u) == 0)
+    if (TypeInfo->UpdateOffscreen == 0 && (This->Flags7C & kParticleFlagVisible) == 0)
         return 0;
 
     if (ParticleEffectCreateAlchemyNodes(This) == 0)
@@ -571,7 +571,7 @@ unsigned char FParticleEffect::BuildGeometry(FSpaceCamera* Cam)
 {
     FParticleEffect* const This = this;
     // FUN_004f8be0: the visibility bit is cleared first, before the option test.
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C & 0xfeu);
+    This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagVisible);
     if (GetGameOption(kGameOptParticles) == 0)
         return 0;
     if (This->FxEffect != nullptr)
@@ -658,16 +658,16 @@ unsigned char FParticleEffectCruise::UpdateVisibility(float Dt, FSpaceCamera* Ca
     // effect whose saved +0x80 was above zero stays visible while +0x80 fades out, clamped at 0.
     float const SavedLod = This->Float80;
     unsigned char const Visible = ParticleEffectUpdateVisibility(This, Dt, Cam);
-    This->Flags7C = static_cast<unsigned char>((This->Flags7C & 0xfeu) | (Visible & 1u));
-    if ((This->Flags7C & 1u) == 0 && SavedLod > 0.0f)
+    This->Flags7C = static_cast<unsigned char>((This->Flags7C & ~kParticleFlagVisible) | (Visible & 1u));
+    if ((This->Flags7C & kParticleFlagVisible) == 0 && SavedLod > 0.0f)
     {
         double Faded = static_cast<double>(SavedLod) - static_cast<double>(Dt) * 0.5;
         if (Faded < 0.0)
             Faded = 0.0;
         This->Float80 = static_cast<float>(Faded);
-        This->Flags7C = static_cast<unsigned char>(This->Flags7C | 1u);
+        This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagVisible);
     }
-    return static_cast<unsigned char>(This->Flags7C & 1u);
+    return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 }
 
 unsigned char ParticleEffectCruiseUpdateVisibility(FParticleEffectCruise* This, float Dt, FSpaceCamera* Cam)
@@ -677,9 +677,9 @@ unsigned char ParticleEffectCruiseUpdateVisibility(FParticleEffectCruise* This, 
 
 FParticleEffect::~FParticleEffect()
 {
-    if ((Flags7C & 4u) != 0)
+    if ((Flags7C & kParticleFlagFxCreated) != 0)
         ParticleEffectCleanupAlchemy(this);
-    if ((Flags7C & 8u) != 0 && Vis != nullptr)
+    if ((Flags7C & kParticleFlagArchRef) != 0 && Vis != nullptr)
         VisEffectArchRelease(Vis);
 }
 
@@ -860,7 +860,7 @@ unsigned char FCameraParticles::TickDraw(float Dt, FSpaceCamera* Cam)
     return 0;
 }
 
-FCameraParticles::FCameraParticles() : FEffectBase(0x2cu)
+FCameraParticles::FCameraParticles() : FEffectBase(EFT_CODE_PROJ_EFFECT)
 {
     Camera = nullptr;
     bStartOpaque = 1;
@@ -921,7 +921,7 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal)
     // passes an embedded companion's address.
     unsigned char* Base = static_cast<unsigned char*>(CompanionLocal);
     FEffectBase* Particle = *reinterpret_cast<FEffectBase**>(Base + 8);
-    if (Particle != nullptr && (Particle->Flags08 & 2u) == 0)
+    if (Particle != nullptr && (Particle->Flags08 & kEffectFlagDeactivated) == 0)
         return 1;
     ISoundSource* Sound = *reinterpret_cast<ISoundSource**>(Base + 4);
     if (Sound != nullptr && Sound->IsActive() != 0)

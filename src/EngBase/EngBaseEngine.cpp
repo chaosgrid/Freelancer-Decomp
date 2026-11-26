@@ -900,14 +900,14 @@ GENRESULT DACOM_API FEngineObject::GetSearchPath(IDAComponent** Out)
 void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, const char* Backend)
 {
     std::memset(Desc, 0, sizeof(*Desc));
-    Desc->Size = 0x34;
+    Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc->ComponentName = G_NameFileSystem;
     Desc->BackendName = Backend;
     Desc->DataPath = Path;
-    Desc->Access = 0x80000000;
-    Desc->ShareMode = 1;
-    Desc->Creation = 3;
-    Desc->Flags = 0x8000080;
+    Desc->Access = GENERIC_READ;
+    Desc->ShareMode = FILE_SHARE_READ;
+    Desc->Creation = OPEN_EXISTING;
+    Desc->Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
@@ -1022,8 +1022,8 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
     PartDesc.FindHandle = FindHandle;
     IFileSystem* FileFs = nullptr;
     void* PartFs = nullptr;
-    GENRESULT ObjectResult = (GENRESULT)0xFFFFFFFF;
-    GENRESULT FileResult = (GENRESULT)0xFFFFFFFF;
+    GENRESULT ObjectResult = GR_GENERIC;
+    GENRESULT FileResult = GR_GENERIC;
     char FileName[0x40];
     if (AsFileSystem(CmpndFs)->CreateInstance((AGGDESC*)(&PartDesc), &PartFs) == 0)
     {
@@ -1083,14 +1083,6 @@ static const unsigned long G_JointUtfNameBytes = 0x40;
 static const unsigned long G_JointUtfHeaderBytes = 0x80;
 static const unsigned long G_JointUtfMaxBytes = 0xD8;
 
-static const unsigned long G_JointTypeFix = 0;
-static const unsigned long G_JointTypePris = 1;
-static const unsigned long G_JointTypeRev = 2;
-static const unsigned long G_JointTypeCyl = 3;
-static const unsigned long G_JointTypeSphere = 4;
-static const unsigned long G_JointTypeTrans = 5;
-static const unsigned long G_JointTypeLoose = 6;
-
 static void CopyPayloadDwords(unsigned long* Dest, const unsigned long* Source,
                               unsigned long Count)
 {
@@ -1109,19 +1101,19 @@ static void RemapJointPayload(unsigned long Type, const unsigned char* UtfExtra,
     const unsigned long* Source = (const unsigned long*)UtfExtra;
     switch (Type)
     {
-    case G_JointTypeFix:
-    case G_JointTypeTrans:
-    case G_JointTypeLoose:
+    case kJointTypeFix:
+    case kJointTypeTrans:
+    case kJointTypeLoose:
         CopyPayloadDwords(Payload + 4, Source, 12);
         break;
-    case G_JointTypePris:
-    case G_JointTypeRev:
+    case kJointTypePris:
+    case kJointTypeRev:
         CopyPayloadDwords(Payload + 1, Source, 20);
         break;
-    case G_JointTypeCyl:
+    case kJointTypeCyl:
         CopyPayloadDwords(Payload + 1, Source, 22);
         break;
-    case G_JointTypeSphere:
+    case kJointTypeSphere:
         CopyPayloadDwords(Payload + 1, Source, 15);
         Payload[16] = Source[19];
         Payload[17] = Source[20];
@@ -1177,19 +1169,19 @@ static unsigned long JointTypeFromName(const char* Name)
     if (Name == nullptr)
         return 0xFFFFFFFF;
     if (DACOM_CRC::CompareStringsI(Name, G_NameFix) == 0)
-        return G_JointTypeFix;
+        return kJointTypeFix;
     if (DACOM_CRC::CompareStringsI(Name, G_NamePris) == 0)
-        return G_JointTypePris;
+        return kJointTypePris;
     if (DACOM_CRC::CompareStringsI(Name, G_NameRev) == 0)
-        return G_JointTypeRev;
+        return kJointTypeRev;
     if (DACOM_CRC::CompareStringsI(Name, G_NameCyl) == 0)
-        return G_JointTypeCyl;
+        return kJointTypeCyl;
     if (DACOM_CRC::CompareStringsI(Name, G_NameSphere) == 0)
-        return G_JointTypeSphere;
+        return kJointTypeSphere;
     if (DACOM_CRC::CompareStringsI(Name, G_NameTrans) == 0)
-        return G_JointTypeTrans;
+        return kJointTypeTrans;
     if (DACOM_CRC::CompareStringsI(Name, G_NameLoose) == 0)
-        return G_JointTypeLoose;
+        return kJointTypeLoose;
     return 0xFFFFFFFF;
 }
 
@@ -2116,27 +2108,27 @@ unsigned long DACOM_API FEngineObject::GetJointParams(InstanceIndex InInstance, 
     }
 
     const unsigned long Type = Instance->Relative[0];
-    if (Type == G_JointTypePris || Type == G_JointTypeRev)
+    if (Type == kJointTypePris || Type == kJointTypeRev)
     {
         CopyJointFloats(Out, Instance->JointState, 1);
         return 1;
     }
-    if (Type == G_JointTypeCyl)
+    if (Type == kJointTypeCyl)
     {
         CopyJointFloats(Out, Instance->JointState, 2);
         return 1;
     }
-    if (Type == G_JointTypeSphere)
+    if (Type == kJointTypeSphere)
     {
         CopyJointFloats(Out, Instance->JointState + 3, 4);
         return 1;
     }
-    if (Type == G_JointTypeTrans)
+    if (Type == kJointTypeTrans)
     {
         CopyJointFloats(Out, Instance->JointState, 3);
         return 1;
     }
-    if (Type == G_JointTypeLoose)
+    if (Type == kJointTypeLoose)
     {
         CopyJointFloats(Out, Instance->JointState, 7);
         return 1;
@@ -2160,7 +2152,7 @@ unsigned long DACOM_API FEngineObject::SetJointParams(InstanceIndex InInstance, 
 
     Instance->bWorldDirty = 1;
     const unsigned long Type = Instance->Relative[0];
-    if (Type == G_JointTypePris || Type == G_JointTypeRev)
+    if (Type == kJointTypePris || Type == kJointTypeRev)
     {
         const float Input = Values[0];
         const float MinLimit = *(const float*)(&Instance->Relative[0x13]);
@@ -2173,22 +2165,22 @@ unsigned long DACOM_API FEngineObject::SetJointParams(InstanceIndex InInstance, 
             Instance->JointState[0] = Input;
         return 1;
     }
-    if (Type == G_JointTypeCyl)
+    if (Type == kJointTypeCyl)
     {
         CopyJointFloats(Instance->JointState, Values, 2);
         return 1;
     }
-    if (Type == G_JointTypeSphere)
+    if (Type == kJointTypeSphere)
     {
         CopyJointFloats(Instance->JointState + 3, Values, 4);
         return 1;
     }
-    if (Type == G_JointTypeTrans)
+    if (Type == kJointTypeTrans)
     {
         CopyJointFloats(Instance->JointState, Values, 3);
         return 1;
     }
-    if (Type == G_JointTypeLoose)
+    if (Type == kJointTypeLoose)
     {
         CopyJointFloats(Instance->JointState, Values, 7);
         return 1;
@@ -2407,13 +2399,13 @@ static void DestroyChildNodeValue(FEngineChildNode* Node)
 // PTR_LAB_06621118: joint type to UTF record size (not the FUN_06625560 apply).
 static unsigned long JointUtfRecordSize(unsigned long Type)
 {
-    if (Type == G_JointTypeFix || Type == G_JointTypeTrans || Type == G_JointTypeLoose)
+    if (Type == kJointTypeFix || Type == kJointTypeTrans || Type == kJointTypeLoose)
         return 0xB0;
-    if (Type == G_JointTypePris || Type == G_JointTypeRev)
+    if (Type == kJointTypePris || Type == kJointTypeRev)
         return 0xD0;
-    if (Type == G_JointTypeCyl)
+    if (Type == kJointTypeCyl)
         return 0xD8;
-    if (Type == G_JointTypeSphere)
+    if (Type == kJointTypeSphere)
         return 0xD4;
     return 0;
 }
@@ -2462,19 +2454,19 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
     Transform* Dest = &Instance->Matrix;
     const float* Rel = (const float*)(Instance->Relative);
     const float* State = Instance->JointState;
-    if (Type == G_JointTypeFix)
+    if (Type == kJointTypeFix)
         ApplyFixJoint(Dest, Rel);
-    else if (Type == G_JointTypePris)
+    else if (Type == kJointTypePris)
         ApplyPrisJoint(Dest, Rel, State);
-    else if (Type == G_JointTypeRev)
+    else if (Type == kJointTypeRev)
         ApplyRevJoint(Dest, Rel, State);
-    else if (Type == G_JointTypeCyl)
+    else if (Type == kJointTypeCyl)
         ApplyCylJoint(Dest, Rel, State);
-    else if (Type == G_JointTypeSphere)
+    else if (Type == kJointTypeSphere)
         ApplySphereJoint(Dest, Rel, State);
-    else if (Type == G_JointTypeTrans)
+    else if (Type == kJointTypeTrans)
         ApplyTransJoint(Dest, Rel, State);
-    else if (Type == G_JointTypeLoose)
+    else if (Type == kJointTypeLoose)
         ApplyLooseJoint(Dest, Rel, State);
     else
         return 0;

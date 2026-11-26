@@ -57,6 +57,18 @@ struct FD3dLight8
     float Phi;            // +0x64 (light +0x70)
 };
 
+// Flag bits of FEngineLight::Flags (+0xB4).
+enum EEngineLightFlags
+{
+    kLightFlagDynamic = 0x01,    // EngineLightSetType's bDynamic; the nearby-light collect skips it
+                                 // unless asked for dynamic lights
+    kLightFlagHasCurve = 0x02,   // an ambient / zone / colour curve is set
+    kLightFlagRegistered = 0x04, // the D3DLIGHT8 is registered with the pipeline
+    kLightFlagEnabled = 0x08,    // lit
+    kLightFlagLinked = 0x10,     // linked into the global light list (DAT_006164e0)
+    kLightFlagHasD3d = 0x20      // the D3DLIGHT8 is filled in
+};
+
 struct FEngineLight
 {
     explicit FEngineLight(int LightType = kLightNone);

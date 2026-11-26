@@ -138,7 +138,7 @@ void Server_PhysicsUpdate(float dt) {
         Event[2] = Exited->OwnerSystem->SystemInfo->NicknameId;
         Event[0] = Exited->get_id();
         Event[1] = Exited->DockedObjId;                           // +0x90, the dock object
-        Server_ControllerDispatch(0, pub::Controller::EMessage::Msg0x25, Event);
+        Server_ControllerDispatch(0, pub::Controller::EMessage::ShipLeftSystem, Event);
     }
     GDockExitedShips.clear();
 }
@@ -417,7 +417,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
         {
             GameObject* const Ring = Rings.front();
             *OutObjId = Ring->get_id();
-            if ((Ring->get_type_bits() & 0x20u) != 0u)
+            if ((Ring->get_type_bits() & OBJ_DOCKING_RING) != 0u)
             {
                 *OutKind = 1;
             }

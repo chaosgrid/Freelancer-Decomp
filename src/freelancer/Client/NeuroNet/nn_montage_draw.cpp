@@ -100,11 +100,11 @@ void LoadButtonMontage()
                     Shape = G_ButtonShapeTalkElement;
                     Step = 0.5f;
                 }
-                else if (Size == 0x20)
+                else if (Size == 32)
                 {
                     Shape = G_ButtonShapeMontage32;
                 }
-                else if (Size == 0x40)
+                else if (Size == 64)
                 {
                     Shape = G_ButtonShapeMontage64;
                 }

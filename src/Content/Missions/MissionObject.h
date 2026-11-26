@@ -539,6 +539,13 @@ public:
     FMissionPlayer* Owner = nullptr;
 };
 
+// FNnPathLeg::Kind.
+enum ENnPathLegKind
+{
+    kNnPathLegTradeLane = 0,   // ObjectA / ObjectB are the rings of a trade lane
+    kNnPathLegFlight = 1       // plain flight from PointA to PointB
+};
+
 // One leg of the NN path (+0x5c list value, 0x24 bytes; node 0x2c, list ctor FUN_06eb79a0).
 // Written by the TU53 path builder FUN_06f5ea40; read by mission slot 11 (FUN_06f1b9f0): a
 // kind 0 leg gives two type 5 objectives (at PointA with ObjectA's reputation, then at PointB
@@ -550,6 +557,17 @@ struct FNnPathLeg
     Vector PointB;                                        // +0x10
     unsigned int ObjectA;                                 // +0x1c
     unsigned int ObjectB;                                 // +0x20
+};
+
+// FMissionNnPath::State.
+enum ENnPathState
+{
+    kNnPathIdle = 0,             // not started / reset
+    kNnPathStarted = 1,          // Act_NNPath / the trigger load
+    kNnPathHeartbeatSeen = 2,    // the first heartbeat
+    kNnPathTimerRunning = 3,     // the path timer runs
+    kNnPathDocked = 4,           // the player is docked (base exit / trade lane)
+    kNnPathArrived = 5           // one leg left in the target's system
 };
 
 // The NN path objective state (0x88 bytes), held by the TU21 script mission at +0x21c. Built

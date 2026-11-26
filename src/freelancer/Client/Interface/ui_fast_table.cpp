@@ -52,10 +52,10 @@ namespace
     {
         DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
         DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
         DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 0);
-        DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, 5);
-        DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 6);
+        DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
         DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
     }
 
@@ -299,7 +299,7 @@ UiFastTable::UiFastTable()
     , bBorderRight(1)
     , bRowHighlights(1)
     , HeaderRows(0)
-    , TipMode(0)
+    , TipMode(kTableTipSingle)
     , CellMarginX(2)
     , CellMarginY(2)
 {
@@ -654,13 +654,13 @@ void UiFastTable::SetTipMode(int Mode)
     bool bResize = true;
     switch (TipMode)
     {
-    case 1:
+    case kTableTipColumn:
         Count = static_cast<unsigned>(ColEdges.size());
         break;
-    case 2:
+    case kTableTipRow:
         Count = static_cast<unsigned>(RowEdges.size());
         break;
-    case 3:
+    case kTableTipCell:
         Count = static_cast<unsigned>(Cells.size());
         break;
     default:
@@ -688,7 +688,7 @@ void UiFastTable::SetTipMode(int Mode)
 FToolTipHoverInfo* UiFastTable::GetToolTipHoverInfo()
 {
     // LAB_0058d8f0
-    if (TipMode == 0)
+    if (TipMode == kTableTipSingle)
         return &HoverInfo;
     return nullptr;
 }
@@ -696,7 +696,7 @@ FToolTipHoverInfo* UiFastTable::GetToolTipHoverInfo()
 FToolTipHoverInfo* UiFastTable::GetRowTip(unsigned Row)
 {
     // FUN_0058d910
-    if (TipMode != 2 || Tips.empty() || Row >= Tips.size())
+    if (TipMode != kTableTipRow || Tips.empty() || Row >= Tips.size())
         return nullptr;
     return &Tips[Row].Info;
 }
@@ -704,7 +704,7 @@ FToolTipHoverInfo* UiFastTable::GetRowTip(unsigned Row)
 FToolTipHoverInfo* UiFastTable::GetCellTip(unsigned Row, unsigned Column)
 {
     // FUN_0058d960
-    if (TipMode != 3)
+    if (TipMode != kTableTipCell)
         return nullptr;
     unsigned const Index = static_cast<unsigned>(ColEdges.size()) * Row + Column;
     if (Tips.empty() || Index >= Tips.size())
@@ -982,13 +982,13 @@ void UiFastTable::Update()
         bool bFromTips = true;
         switch (TipMode)
         {
-        case 1:
+        case kTableTipColumn:
             Index = HoverColumn;
             break;
-        case 2:
+        case kTableTipRow:
             Index = HoverRow;
             break;
-        case 3:
+        case kTableTipCell:
             Index = HoverRow * static_cast<unsigned>(ColEdges.size()) + HoverColumn;
             break;
         default:

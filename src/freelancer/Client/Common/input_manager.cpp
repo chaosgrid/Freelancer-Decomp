@@ -265,7 +265,7 @@ namespace
     {
         if (G_Mouse.Device != nullptr)
             G_Mouse.Device->Unacquire();
-        G_Mouse.Flags = static_cast<unsigned char>(G_Mouse.Flags & 0xf3);
+        G_Mouse.Flags = static_cast<unsigned char>(G_Mouse.Flags & ~(kMouseAcquired | kMouseExclusive));
         G_Mouse.Events.clear();
     }
 
@@ -750,7 +750,7 @@ namespace
             CursorAnimate(G_CurrentCursor, &G_MouseShapeDB, Time);
         }
 
-        if (GetGameOption(6) == 0 || GetGameOption(0xe) == 0)
+        if (GetGameOption(kGameOptInterfaceGroup) == 0 || GetGameOption(kGameOptDrawMouse) == 0)
             return;
         if (G_CurrentCursor == nullptr)
             return;
@@ -763,7 +763,7 @@ namespace
         FRenderStateSave ZEnable;
         RenderStateSaveAndSet(&ZEnable, kRsZEnable, 0);
         FRenderStateSave CullMode;
-        RenderStateSaveAndSet(&CullMode, kRsCullMode, 1);
+        RenderStateSaveAndSet(&CullMode, kRsCullMode, D3DCULL_NONE);
         FRenderStateSave AlphaTest;
         RenderStateSaveAndSet(&AlphaTest, kRsAlphaTestEnable, 0);
 
@@ -774,29 +774,29 @@ namespace
         Win3DColor4ubv(G_CurrentCursor->Color);            // FUN_00421ba0
 
         // The blend switch on +0x50.
-        int SourceBlend = 2;
-        int DestBlend = 1;
+        int SourceBlend = D3DBLEND_ONE;
+        int DestBlend = D3DBLEND_ZERO;
         switch (G_CurrentCursor->Blend)
         {
         case 1:
-            SourceBlend = 2;
-            DestBlend = 2;
+            SourceBlend = D3DBLEND_ONE;
+            DestBlend = D3DBLEND_ONE;
             break;
         case 2:
-            SourceBlend = 2;
-            DestBlend = 4;
+            SourceBlend = D3DBLEND_ONE;
+            DestBlend = D3DBLEND_INVSRCCOLOR;
             break;
         case 3:
-            SourceBlend = 5;
-            DestBlend = 2;
+            SourceBlend = D3DBLEND_SRCALPHA;
+            DestBlend = D3DBLEND_ONE;
             break;
         case 4:
-            SourceBlend = 5;
-            DestBlend = 6;
+            SourceBlend = D3DBLEND_SRCALPHA;
+            DestBlend = D3DBLEND_INVSRCALPHA;
             break;
         case 5:
-            SourceBlend = 5;
-            DestBlend = 4;
+            SourceBlend = D3DBLEND_SRCALPHA;
+            DestBlend = D3DBLEND_INVSRCCOLOR;
             break;
         default:
             break;

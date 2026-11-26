@@ -32,6 +32,14 @@
 //    7  LAB_062c8800  OnUpdate
 //   10  LAB_062c87c0  OnApplyDirective
 // Every other slot is Behavior's own entry.
+// DrasticEvadeBehavior::EvadeMode (+0x40), copied from pub::AI::DirectiveDrasticEvadeOp::Mode; any other
+// value ends the behavior at once.
+enum EDrasticEvadeMode
+{
+    kDrasticEvadeNudge = 0,     // set_nudge_vec along NudgeOffset for Duration seconds
+    kDrasticEvadeReverse = 1,   // full reverse throttle for Duration seconds
+};
+
 class DrasticEvadeBehavior : public Behavior
 {
 public:

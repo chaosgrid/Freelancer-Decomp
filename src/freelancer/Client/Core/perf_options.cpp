@@ -25,6 +25,7 @@
 #include "Common/input_manager.h"
 #include "Common/Audio/menu_sound_arch.h"
 #include "render/IRenderPipeline.h"
+#include "render/slots.h"          // Render::EPipelineState
 #include "render/shading.h"
 #include "Space/space_solar_world.h"
 #include "Space/star_sphere.h"
@@ -78,29 +79,29 @@ namespace
     void ApplySoundMaxDistScale(float Value)  // LAB_005b6230 — DAT_0067ed18
     {
         // Readers go through FUN_005b3510(2).
-        G_Slots[2] = Value;
+        G_Slots[kPerfSlotSoundMaxDistScale] = Value;
     }
 
     void ApplySoundLevelOfDetail(float Value)  // LAB_005b4bd0 — DAT_0067ed1c + FUN_0042ac30
     {
         // floor(2 * (1 - v)) in double, as on the x87 stack.
-        G_Slots[3] = Value;
+        G_Slots[kPerfSlotSoundLevelOfDetail] = Value;
         SetClientSoundLod(static_cast<int>(floor(2.0 * (1.0 - static_cast<double>(Value)))));
     }
 
     void ApplyUse3dSounds(float Value)  // LAB_005b6240 — DAT_0067ed20
     {
-        G_Slots[4] = Value;
+        G_Slots[kPerfSlotUse3dSounds] = Value;
     }
 
     void ApplyDynamicCommHead(float Value)  // LAB_005b6250 — DAT_0067ed24
     {
-        G_Slots[5] = Value;
+        G_Slots[kPerfSlotDynamicCommHead] = Value;
     }
 
     void ApplyDifficultyScale(float Value)  // LAB_005b6260 — DAT_0067ed28
     {
-        G_Slots[6] = Value;
+        G_Slots[kPerfSlotDifficultyScale] = Value;
     }
 
     void ApplyMaxSubmittedSounds(float Value)  // LAB_005b3870 — DAT_00615c6c
@@ -191,11 +192,11 @@ namespace
             Pipe->QueryDeviceAbility(8, &Ability);
             if (Ability != 0)
             {
-                G_Slots[0] = Value;
+                G_Slots[kPerfSlotUseEnvironmentMaps] = Value;
                 return;
             }
         }
-        G_Slots[0] = 0.f;
+        G_Slots[kPerfSlotUseEnvironmentMaps] = 0.f;
     }
 
     void ApplyHighDetailTextures(float Value)  // LAB_005b4870 - DAT_0067ed14
@@ -222,10 +223,10 @@ namespace
         }
         if (DALib::TextureLib != nullptr)
             DALib::TextureLib->SetGenericSlot(4, bHighDetail != 0 ? 0u : 0x80u);
-        G_Slots[1] = bHighDetail != 0 ? 1.f : 0.f;
+        G_Slots[kPerfSlotHighDetailTextures] = bHighDetail != 0 ? 1.f : 0.f;
         Pipe = DALib::Pipeline;
         if (Pipe != nullptr)
-            Pipe->SetPipelineState(4, bPipelineState4);
+            Pipe->SetPipelineState(Render::PipelineStateTextureAllow32Bit, bPipelineState4);
     }
 
     // level_of_detail: the retail option object is 0x28 bytes (ctor 005b4430) -- the common

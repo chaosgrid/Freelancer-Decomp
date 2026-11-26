@@ -453,7 +453,7 @@ FThornComponent* FGfScript::SpawnDeformable(int Index, FThornEntitySnap const* S
     Deformable->Character = Character;
     Character->LightGroup = Snap->LtGrp;
     Character->Layer = Snap->SrtGrp;
-    Character->RenderMode = 0;
+    Character->RenderMode = kRoomRenderMesh;
     malloc_strcpy(&Deformable->ActorName, Snap->Name);
     if (Actor == nullptr)
         return Deformable;

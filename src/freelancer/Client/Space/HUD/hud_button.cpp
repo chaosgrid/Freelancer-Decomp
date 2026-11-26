@@ -267,15 +267,15 @@ HUD_Button::HUD_Button(INI_Reader& Reader)
             Action = Value;
             CommandId = 0;
             if (Action == "radio")
-                CommandId = 0x5c;
+                CommandId = USER_RADIO;
             else if (Action == "status")
-                CommandId = 0x5e;
+                CommandId = USER_STATUS;
             else if (Action == "zoom")
-                CommandId = 0x55;
+                CommandId = USER_RADAR_ZOOM;
             else if (Action == "navmap")
-                CommandId = 0x63;
+                CommandId = USER_NAV_MAP;
             else if (Action == "toggle_manuevers")
-                CommandId = 0x73;
+                CommandId = USER_MANEUVER_WINDOW;
             else
                 DebugPrint("Warning: unknown HUD_Button action %s\n", Value);
         }

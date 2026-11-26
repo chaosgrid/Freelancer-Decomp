@@ -253,7 +253,7 @@ void Action_JumpOut::do_simulation_controller(IVP_Event_Sim* EventSim,
 
     // A gate type with bit 0x800 keeps the start orientation.
     Quaternion Rotation;
-    if ((GateType & 0x800u) != 0)
+    if ((GateType & OBJ_JUMP_HOLE) != 0)
     {
         Rotation = StartRotation;
     }

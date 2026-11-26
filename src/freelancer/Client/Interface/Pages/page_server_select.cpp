@@ -454,7 +454,7 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     ListServerStatus->GetToolTipHoverInfo()->IdsAlt = 0xade;
     Refresh->GetToolTipHoverInfo()->IdsAlt = 0xac9;
 
-    ServerTable->SetTipMode(3); // one tip per cell
+    ServerTable->SetTipMode(kTableTipCell);
 
     // In retail's order.
     LoadIds(TextYes, 0x727);
@@ -586,7 +586,7 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
 
     RefreshDetailsText();
 
-    ListServerStatus->SetAlignMode(2);
+    ListServerStatus->SetAlignMode(kRichAlignMiddle);
     RefreshListStatus(); // inlined in retail
 
     Legend->ClearContent();
@@ -895,15 +895,15 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     unsigned const TableId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(ServerTable));
     if (Msg == kWinMsgCommand)
     {
-        PlayOrRewindUiSoundSlot(0);
-        if (A == 0x3e9)
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
+        if (A == kServerCmdMainMenu)
         {
             // "MainMenu".
             BeginLeave();
             LeaveDirection = -1;
             return false;
         }
-        if (A == 0x3ea)
+        if (A == kServerCmdSetFilter)
         {
             // "SetFilter": a WM_QUIT inside the modal filter dialog quits the process.
             SetToolTipsEnabled(false);
@@ -913,7 +913,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             RebuildTable();
             return false;
         }
-        if (A == 0x3eb)
+        if (A == kServerCmdRefresh)
         {
             // "Refresh": only before the first list request (CLoginMgr +0x23c).
             if (G_LoginMgr.ServerListPage != 0)
@@ -931,7 +931,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             G_LoginMgr.RequestServerList();
             return false;
         }
-        if (A != 0x3003)
+        if (A != kServerCmdConnect)
             return false;
 
         // "Connect".
@@ -1166,7 +1166,7 @@ void PageServerSelect::BeginLeave()
     MainMenu->SetSkipUpload(true);
     SetFilter->SetSkipUpload(true);
     Refresh->SetSkipUpload(true);
-    PlayUiSoundSlot(0x1b);
+    PlayUiSoundSlot(kUiSoundMotionSwish);
     SetToolTipsEnabled(false); // inlined in retail
 }
 
@@ -1220,12 +1220,12 @@ void PageServerSelect::Update()
         unsigned SelectedRow = 0;
         if (!ServerTable->GetSelectedRow(&SelectedRow) && SelectedServerId == 0xffffffffu)
         {
-            Connect->Flags = static_cast<unsigned char>(Connect->Flags & 0xfe);
+            Connect->Flags = static_cast<unsigned char>(Connect->Flags & ~kWin3DActive);
             Connect->bInteractive = 0;
         }
         else
         {
-            Connect->Flags = static_cast<unsigned char>(Connect->Flags | 1);
+            Connect->Flags = static_cast<unsigned char>(Connect->Flags | kWin3DActive);
             Connect->bInteractive = 1;
         }
     }
@@ -1287,7 +1287,7 @@ void PageServerSelect::Update()
         }
 
         if (SlideT > -0.8 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b);
+            PlayUiSoundSlot(kUiSoundMotionSwish);
     }
 
     // Leaving with a direction: 1.5 per second, no frame-time cap.

@@ -701,13 +701,13 @@ namespace
         if (lua_isnil(FogOn) == 0)
         {
             Target->On = ReadFogByte(FogOn);
-            LoadedMask |= 0x1;
+            LoadedMask |= kThornFogBitOn;
         }
         const lua_Object FogTable = GetFieldOrNil(Fog, "fogtable");
         if (lua_isnil(FogTable) == 0)
         {
             Target->Table = ReadFogByte(FogTable);
-            LoadedMask |= 0x2;
+            LoadedMask |= kThornFogBitTable;
         }
         const lua_Object FogColor = GetFieldOrNil(Fog, "fogcolor");
         if (lua_isnil(FogColor) == 0)
@@ -733,31 +733,31 @@ namespace
             // All numeric callbacks and float stores precede ANY RGB output.
             // The exact retained-Z ftol core is shared with SCENE ambient.
             StoreSceneAmbientIntegers(Coordinates, Target->Color);
-            LoadedMask |= 0x4;
+            LoadedMask |= kThornFogBitColor;
         }
         const lua_Object FogMode = GetFieldOrNil(Fog, "fogmode");
         if (lua_isnil(FogMode) == 0)
         {
             Target->Mode = LuaNumberToRetailInt(FogMode);
-            LoadedMask |= 0x8;
+            LoadedMask |= kThornFogBitMode;
         }
         const lua_Object FogStart = GetFieldOrNil(Fog, "fogstart");
         if (lua_isnil(FogStart) == 0)
         {
             StoreLuaNumberFloat(FogStart, &Target->Start);
-            LoadedMask |= 0x10;
+            LoadedMask |= kThornFogBitStart;
         }
         const lua_Object FogEnd = GetFieldOrNil(Fog, "fogend");
         if (lua_isnil(FogEnd) == 0)
         {
             StoreLuaNumberFloat(FogEnd, &Target->End);
-            LoadedMask |= 0x20;
+            LoadedMask |= kThornFogBitEnd;
         }
         const lua_Object FogDensity = GetFieldOrNil(Fog, "fogdensity");
         if (lua_isnil(FogDensity) == 0)
         {
             StoreLuaNumberFloat(FogDensity, &Target->Density);
-            LoadedMask |= 0x40;
+            LoadedMask |= kThornFogBitDensity;
         }
         if (Mask != nullptr)
             *Mask = LoadedMask;
@@ -1195,25 +1195,25 @@ namespace
         {
             const int Value = LuaNumberToRetailInt(Environment);
             std::memcpy(&Target->Environment, &Value, sizeof(Value));
-            LoadedMask = 1;
+            LoadedMask = kThornReverbBitEnvironment;
         }
         const lua_Object Volume = GetFieldOrNil(Reverb, "vol");
         if (lua_isnil(Volume) == 0)
         {
             StoreLuaNumberFloat(Volume, &Target->Volume);
-            LoadedMask |= 2;
+            LoadedMask |= kThornReverbBitVolume;
         }
         const lua_Object Decay = GetFieldOrNil(Reverb, "decay");
         if (lua_isnil(Decay) == 0)
         {
             StoreLuaNumberFloat(Decay, &Target->Decay);
-            LoadedMask |= 4;
+            LoadedMask |= kThornReverbBitDecay;
         }
         const lua_Object Damping = GetFieldOrNil(Reverb, "damping");
         if (lua_isnil(Damping) == 0)
         {
             StoreLuaNumberFloat(Damping, &Target->Damping);
-            LoadedMask |= 8;
+            LoadedMask |= kThornReverbBitDamping;
         }
         if (Mask != nullptr)
             *Mask = LoadedMask;
@@ -1497,26 +1497,26 @@ namespace
             FThornEntitySnap* Descriptor = nullptr;
             switch (Type)
             {
-            case 1:
-            case 2:
-            case 13:
+            case kThornEntityCompound:
+            case kThornEntityDeformable:
+            case kThornEntityPsys:
             {
                 if (TemplateName == nullptr)
                     TemplateName = Name;
                 Descriptor = new FThornEntitySnap{};
-                float* Output = Type == 13 ? &Descriptor->PsysSparam : &Descriptor->FloorHeight;
+                float* Output = Type == kThornEntityPsys ? &Descriptor->PsysSparam : &Descriptor->FloorHeight;
                 std::memset(Output, 0, sizeof(float));
-                const lua_Object Properties = GetFieldOrNil(Table, Type == 13 ? "psysprops" : "compoundprops");
+                const lua_Object Properties = GetFieldOrNil(Table, Type == kThornEntityPsys ? "psysprops" : "compoundprops");
                 if (lua_istable(Properties) != 0)
                 {
-                    const lua_Object Value = GetFieldOrNil(Properties, Type == 13 ? "sparam" : "floor_height");
+                    const lua_Object Value = GetFieldOrNil(Properties, Type == kThornEntityPsys ? "sparam" : "floor_height");
                     if (lua_isnil(Value) == 0)
                         StoreLuaNumberFloat(Value, Output);
                 }
                 break;
             }
-            case 3:
-            case 4:
+            case kThornEntityCamera:
+            case kThornEntityMonitor:
             {
                 Descriptor = new FThornEntitySnap{};
                 const unsigned int Defaults[4] = {
@@ -1537,7 +1537,7 @@ namespace
                 }
                 break;
             }
-            case 5:
+            case kThornEntityLight:
             {
                 Descriptor = new FThornEntitySnap{};
                 ThornInitLightEntityDefaults(&Descriptor->Light);
@@ -1551,19 +1551,19 @@ namespace
                 }
                 break;
             }
-            case 6:
+            case kThornEntitySound:
                 Descriptor = LoadAudioEntityDesc(Table, TemplateName);
                 break;
-            case 7:
-            case 8:
+            case kThornEntityMarker:
+            case kThornEntityHardpoint:
                 Descriptor = new FThornEntitySnap{};
                 break;
-            case 9:
-            case 10:
+            case kThornEntityScene:
+            case kThornEntitySubScene:
                 Descriptor = new FThornEntitySnap{};
                 LoadSceneEntityDesc(Table, Descriptor);
                 break;
-            case 11:
+            case kThornEntityMotionPath:
                 Descriptor = new FThornEntitySnap{};
                 Descriptor->MotionPath.PathType = nullptr;
                 Descriptor->MotionPath.MotionPath = nullptr;
@@ -1678,7 +1678,7 @@ namespace
             if (lua_isnil(Sparam) == 0)
             {
                 // 274c3..274ca publishes mask BEFORE the numeric callback.
-                Temporary->PsysMask |= 1;
+                Temporary->PsysMask |= kThornPsysBitSparam;
                 StoreLuaNumberFloat(Sparam, &Temporary->SparamTarget);
             }
         }
@@ -1720,49 +1720,49 @@ namespace
             const lua_Object Attenuation = GetFieldOrNil(Audio, "attenuation");
             if (lua_isnil(Attenuation) == 0)
             {
-                Temporary->AudioMask |= 1;
+                Temporary->AudioMask |= kThornAudioBitAttenuation;
                 StoreLuaNumberFloat(Attenuation, &Temporary->AudioTarget.Attenuation);
             }
             const lua_Object Pan = GetFieldOrNil(Audio, "pan");
             if (lua_isnil(Pan) == 0)
             {
-                Temporary->AudioMask |= 2;
+                Temporary->AudioMask |= kThornAudioBitPan;
                 StoreLuaNumberFloat(Pan, &Temporary->AudioTarget.Pan);
             }
             const lua_Object Dmin = GetFieldOrNil(Audio, "dmin");
             if (lua_isnil(Dmin) == 0)
             {
-                Temporary->AudioMask |= 4;
+                Temporary->AudioMask |= kThornAudioBitDmin;
                 StoreLuaNumberFloat(Dmin, &Temporary->AudioTarget.Dmin);
             }
             const lua_Object Dmax = GetFieldOrNil(Audio, "dmax");
             if (lua_isnil(Dmax) == 0)
             {
-                Temporary->AudioMask |= 8;
+                Temporary->AudioMask |= kThornAudioBitDmax;
                 StoreLuaNumberFloat(Dmax, &Temporary->AudioTarget.Dmax);
             }
             const lua_Object Ain = GetFieldOrNil(Audio, "ain");
             if (lua_isnil(Ain) == 0)
             {
-                Temporary->AudioMask |= 0x10;
+                Temporary->AudioMask |= kThornAudioBitAin;
                 Temporary->AudioTarget.Ain = LuaNumberToRetailInt(Ain);
             }
             const lua_Object Aout = GetFieldOrNil(Audio, "aout");
             if (lua_isnil(Aout) == 0)
             {
-                Temporary->AudioMask |= 0x20;
+                Temporary->AudioMask |= kThornAudioBitAout;
                 Temporary->AudioTarget.Aout = LuaNumberToRetailInt(Aout);
             }
             const lua_Object Atout = GetFieldOrNil(Audio, "atout");
             if (lua_isnil(Atout) == 0)
             {
-                Temporary->AudioMask |= 0x40;
+                Temporary->AudioMask |= kThornAudioBitAtout;
                 StoreLuaNumberFloat(Atout, &Temporary->AudioTarget.Atout);
             }
             const lua_Object Rmix = GetFieldOrNil(Audio, "rmix");
             if (lua_isnil(Rmix) == 0)
             {
-                Temporary->AudioMask |= 0x80;
+                Temporary->AudioMask |= kThornAudioBitRmix;
                 StoreLuaNumberFloat(Rmix, &Temporary->AudioTarget.Rmix);
             }
         }
@@ -1918,7 +1918,7 @@ namespace
             const lua_Object Loop = GetFieldOrNil(Props, "loop");
             // 25dba FCOMP 0; TEST AH,41h/JNZ skips not-greater, fallthrough sets bit2.
             if (lua_isnil(Loop) == 0 && lua_getnumber(Loop) > 0.0)
-                Descriptor->Common.Flags |= 2;
+                Descriptor->Common.Flags |= kThornFlagMotionLoop;
             // The primary type is read after all preceding property callbacks.
             if (PrimaryDesc->Type == kThornEntityCompound)
                 ReadRetailFloatField(Props, "trans_scale", &Descriptor->TransScale);
@@ -2108,7 +2108,7 @@ namespace
         if (Type == kThornTypePathAnim && SecondaryDesc != nullptr &&
             SecondaryDesc->Type > 0 && SecondaryDesc->Type <= 8)
             Type = kThornTypeAttachEntity;
-        else if (Type == 0x17)
+        else if (Type == kThornTypeScriptStart)
             Type = PrimaryDesc->Type == kThornEntitySound
                 ? kThornTypeStartSound : kThornTypeStartMotion;
         if (Type == kThornTypeStartSound)

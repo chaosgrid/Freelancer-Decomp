@@ -88,7 +88,7 @@ void FaceBehavior::OnEngage()
     Flag1c5 = 0;
     EngineKillStateElapsed = 0.0f;
 
-    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 
     // FUN_062e91d0.
     SysMgr->Thrust.SetEngineActive(bKillEngine == 0);
@@ -103,7 +103,7 @@ void FaceBehavior::OnEngage()
 // Slot 4, FUN_062c9380.
 void FaceBehavior::OnDisengage()
 {
-    if ((Flags28 & 0x2) == 0 && Watcher30.target() != nullptr)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) == 0 && Watcher30.target() != nullptr)
     {
         Watcher30.set(nullptr);
     }
@@ -120,7 +120,7 @@ void FaceBehavior::OnDisengage()
 int FaceBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
-    if ((Flags28 & 0x2) != 0 && TargetKind2c == 1 && GetWatchedRawBlock() != nullptr)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) != 0 && TargetKind2c == kFaceKindObject && GetWatchedRawBlock() != nullptr)
     {
         int const Mode = Flag29 ? 3 : 1;
         Readiness = Mode;
@@ -213,7 +213,7 @@ int FaceBehavior::Update()
     if (Flag1d4 != 0)
     {
         Flag1d4 = 0;
-        UpdateResult = 2;
+        UpdateResult = kBehaviorUpdateFinished;
         return UpdateResult;
     }
 
@@ -267,8 +267,8 @@ int FaceBehavior::Update()
             Face.SetAxis(ZeroAxis);
             Face.Update(DeltaTime);
 
-            UpdateResult = 0;
-            return 0;
+            UpdateResult = kBehaviorUpdateBusy;
+            return kBehaviorUpdateBusy;
         }
 
         // LAB_062c8f0a: re-validate the watch. AfterburnerIdea::Commit, afterburner off.
@@ -296,7 +296,7 @@ int FaceBehavior::Update()
             // Retail re-reads the watcher here, after the Commit() above, instead of reusing
             // the earlier value.
             void* const FreshBlock = GetWatchedRawBlock();
-            TargetKind2c = 1;
+            TargetKind2c = kFaceKindObject;
 
             // Retail expands the watcher-to-block idiom three more times and branches on
             // each; all of those branches are dead after the guards above (one would
@@ -341,7 +341,7 @@ int FaceBehavior::Update()
     // LAB_062c9038: unsigned switch on TargetKind2c - 1; outside 1..4 goes to the shared tail.
     switch (TargetKind2c)
     {
-    case 1:
+    case kFaceKindObject:
     {
         if (Flag1b4 != 0)
         {
@@ -362,13 +362,13 @@ int FaceBehavior::Update()
             // The only case arm with its own RET, skipping the shared tail.
             if (GetWatchedRawBlock() == nullptr)
             {
-                UpdateResult = 3;
-                return 3;
+                UpdateResult = kBehaviorUpdateAborted;
+                return kBehaviorUpdateAborted;
             }
         }
         break;
     }
-    case 2:
+    case kFaceKindPoint:
     {
         if (Flag1b4 != 0)
         {
@@ -431,10 +431,10 @@ int FaceBehavior::Update()
         }
         break;
     }
-    case 3:
+    case kFaceKindOrientation:
         Face.SetBasis(OrientMatrix38);
         break;
-    case 4:
+    case kFaceKindAhead:
     {
         // The jump-table caseD_4 at 062c90c3, not the shared tail Ghidra gives the same name.
         Vector const Col2 = MatrixColumn2(
@@ -467,7 +467,7 @@ bool FaceBehavior::OnApplyDirective(void* Message)
 {
     if (Message == nullptr)
     {
-        Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
         return false;
     }
 
@@ -478,7 +478,7 @@ bool FaceBehavior::OnApplyDirective(void* Message)
 
     switch (Kind)
     {
-    case 1:
+    case kFaceKindObject:
     {
         // FUN_062e74a0; then the watch must be live.
         void* const T = SysMgr->Timers.FindVerifiedObject(&Op->TargetId);
@@ -486,30 +486,30 @@ bool FaceBehavior::OnApplyDirective(void* Message)
                                    : nullptr);
         if (GetWatchedRawBlock() == nullptr)
         {
-            Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
+            Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
             return false;
         }
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
         return true;
     }
-    case 2:
+    case kFaceKindPoint:
     {
         TargetPosition5c = Op->FacePoint;
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
         return true;
     }
-    case 3:
+    case kFaceKindOrientation:
     {
         OrientMatrix38 = Op->Orientation;
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
         return true;
     }
-    case 4:
-        Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
-        TargetKind2c = 4;
+    case kFaceKindAhead:
+        Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
+        TargetKind2c = kFaceKindAhead;
         return true;
     default:
-        Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
         return false;
     }
 }
@@ -519,10 +519,10 @@ bool FaceBehavior::OnApplyDirective(void* Message)
 void FaceBehavior::set_direction(Vector const& Offset)
 {
     // TargetKind2c 2 always sets; 1 sets only for a non-zero offset; anything else clears.
-    if (TargetKind2c != 2)
+    if (TargetKind2c != kFaceKindPoint)
     {
         float const MagnitudeSquared = Offset.x * Offset.x + Offset.y * Offset.y + Offset.z * Offset.z;
-        if (TargetKind2c != 1 || !(MagnitudeSquared > 0.0f))
+        if (TargetKind2c != kFaceKindObject || !(MagnitudeSquared > 0.0f))
         {
             Flag1b4 = 0;
             return;

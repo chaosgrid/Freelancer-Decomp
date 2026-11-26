@@ -54,7 +54,7 @@ namespace
     unsigned long G_ForceFreqToSw = 1;
     unsigned long G_NeverSetStartPos = 0;
     unsigned long G_DisplayExtraDebug = 0;
-    unsigned long G_Ds3dCreateFlags = 0x00040090;
+    unsigned long G_Ds3dCreateFlags = DSBCAPS_LOCDEFER | DSBCAPS_CTRLVOLUME | DSBCAPS_CTRL3D;
 
     const char kDefaultDeviceId[] = "{00000000-0000-0000-0000-000000000000}";
     // s_0123456789truefalsynox.. at 06eea428 (36 chars + NUL); the trailing "OX+-" lets "0X1F"
@@ -339,36 +339,36 @@ namespace
                                    unsigned long HwUsed)
     {
         unsigned long Flags = Node->StatusFlags;
-        if ((Flags & 0x24) != 0)
+        if ((Flags & (kInstanceSoftware | kInstanceFrequency)) != 0)
             return 0;
         if (Node->NotifyEvent != nullptr)
             return 0;
-        if ((Flags & 0x40) != 0)
+        if ((Flags & kInstanceStarted) != 0)
         {
-            if (G_AllowHwToSw == 0 && (Flags & 1) != 0)
+            if (G_AllowHwToSw == 0 && (Flags & kInstanceHardware) != 0)
                 return 0;
-            if (G_AllowSwToHw == 0 && (Flags & 1) == 0)
+            if (G_AllowSwToHw == 0 && (Flags & kInstanceHardware) == 0)
                 return 0;
         }
-        Flags &= ~8u;
+        Flags &= ~kInstanceWantHardware;
         Node->StatusFlags = Flags;
         const unsigned char bIs3d = Node->PlayKey->Is3d();
         if (bIs3d != 0)
         {
-            if ((Manager->CapsFlags & 2) != 0 && Node->DistSq < Node->MaxDistSq &&
+            if ((Manager->CapsFlags & kSoundFlagHw3D) != 0 && Node->DistSq < Node->MaxDistSq &&
                 HwUsed < Manager->FreeHwMixingBuffers)
-                Node->StatusFlags |= 8;
+                Node->StatusFlags |= kInstanceWantHardware;
         }
-        else if ((Manager->CapsFlags & 0x20) == 0 && (Manager->CapsFlags & 1) != 0 &&
+        else if ((Manager->CapsFlags & kSoundFlagAll2DInSoftware) == 0 && (Manager->CapsFlags & kSoundFlagHw2D) != 0 &&
                  HwUsed < Manager->FreeHwMixingBuffers)
         {
-            Node->StatusFlags |= 8;
+            Node->StatusFlags |= kInstanceWantHardware;
         }
         Flags = Node->StatusFlags;
         const unsigned char bNeed = static_cast<unsigned char>(((Flags >> 3) ^ Flags) & 1);
         if (bNeed == 0)
             return 0;
-        Flags &= ~1u;
+        Flags &= ~kInstanceHardware;
         Node->StatusFlags = Flags;
         if (G_DisplayExtraDebug == 0)
             return bNeed;
@@ -383,7 +383,7 @@ namespace
             return bNeed;
         }
         // Retail tests the flags after clearing bit 0, so this notice never fires; kept as retail.
-        if ((Flags & 1) != 0)
+        if ((Flags & kInstanceHardware) != 0)
         {
             Fdump(kFdumpNotice, 0xC30,
                   FormatMessage2000(Line, "Had to stop HW instance of arch %d to move to SW.\n",
@@ -761,7 +761,7 @@ namespace
         if (Archetype == nullptr)
             return 0;
         unsigned long Duration = Archetype->DurationMs;
-        if ((Archetype->Flags & 2) == 0)
+        if ((Archetype->Flags & kSoundArchFrequency) == 0)
             return Duration;
         float Pitch = 0.0f;
         if (PlayKey->GetPitch(&Pitch) != 0)
@@ -986,7 +986,7 @@ namespace
         memset(&This->Desc, 0, sizeof(This->Desc));
         This->Desc.dwSize = 0x24;
         This->Desc.lpwfxFormat = Format;
-        This->Desc.dwFlags = 0x10;
+        This->Desc.dwFlags = DSBCAPS_CTRL3D;
         This->Desc.dwBufferBytes = 4;
         return This;
     }
@@ -1168,27 +1168,27 @@ GENRESULT FSoundArchetype::FillFromPcm(const unsigned short* Fmt8, unsigned long
     Desc.dwFlags = G_Ds3dCreateFlags;
     Desc.lpwfxFormat = &Wave;
 
-    if ((InFlags & 8) != 0 && (InFlags & 0x10) != 0)
+    if ((InFlags & kSoundArch3d) != 0 && (InFlags & kSoundArchPan) != 0)
     {
         Fdump(kFdumpWarning, 0x1AC, "SoundMgr:Archetype requested 3D and Pan controls, disabling pan.\n"); // 06eea0e0
-        Flags &= ~0x10u;
+        Flags &= ~kSoundArchPan;
     }
-    if ((Flags & 8) != 0)
-        Desc.dwFlags = (Desc.dwFlags & ~0x40u) | 0x10u;
-    else if ((Flags & 0x10) != 0)
-        Desc.dwFlags = (Desc.dwFlags & ~0x10u) | 0x40u;
-    if ((Flags & 2) != 0)
+    if ((Flags & kSoundArch3d) != 0)
+        Desc.dwFlags = (Desc.dwFlags & ~DSBCAPS_CTRLPAN) | DSBCAPS_CTRL3D;
+    else if ((Flags & kSoundArchPan) != 0)
+        Desc.dwFlags = (Desc.dwFlags & ~DSBCAPS_CTRL3D) | DSBCAPS_CTRLPAN;
+    if ((Flags & kSoundArchFrequency) != 0)
     {
-        Desc.dwFlags |= 0x20u;
+        Desc.dwFlags |= DSBCAPS_CTRLFREQUENCY;
         if (G_ForceFreqToSw != 0)
-            Flags |= 0x20u;
+            Flags |= kSoundArchSoftware;
     }
-    if ((Flags & 1) != 0 && (Desc.dwFlags & 0x10) != 0)
-        Desc.dwFlags |= 0x20000u;
-    if ((Flags & 0x40) != 0 && (LoopStart != 0 || LoopEnd < NumFrames))
-        Desc.dwFlags |= 0x10100u;
-    if ((Flags & 0x20) != 0)
-        Desc.dwFlags = (Desc.dwFlags & ~0x40000u) | 0x8u;
+    if ((Flags & kSoundArchMute3dAtMaxDistance) != 0 && (Desc.dwFlags & DSBCAPS_CTRL3D) != 0)
+        Desc.dwFlags |= DSBCAPS_MUTE3DATMAXDISTANCE;
+    if ((Flags & kSoundArchLoopNotify) != 0 && (LoopStart != 0 || LoopEnd < NumFrames))
+        Desc.dwFlags |= DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_CTRLPOSITIONNOTIFY;
+    if ((Flags & kSoundArchSoftware) != 0)
+        Desc.dwFlags = (Desc.dwFlags & ~DSBCAPS_LOCDEFER) | DSBCAPS_LOCSOFTWARE;
 
     if (DirectSound->CreateSoundBuffer(&Desc, &Buffer, nullptr) < 0)
     {
@@ -1316,7 +1316,7 @@ GENRESULT DACOM_API FSoundManagerFactory::CreateInstance(AGGDESC* Desc, void** I
 FSoundManager::FSoundManager()
     : bParserBound(0), MasterGain(0.0f), CurrentTickMs(0), FreeHwMixingBuffers(0), MaxChannels(0), EaxEnv(0),
       EaxVol(0.0f), EaxDecay(0.0f), EaxDamp(0.0f), SavedEaxEnv(0), SavedEaxVol(0), SavedEaxDecay(0), SavedEaxDamp(0),
-      ReverbMix(0.0f), Ds3dAlgGuid0(0), Ds3dAlgGuid1(0), Ds3dAlgGuid2(0), Ds3dAlgGuid3(0), Flags(0x113), CapsFlags(0),
+      ReverbMix(0.0f), Ds3dAlgGuid0(0), Ds3dAlgGuid1(0), Ds3dAlgGuid2(0), Ds3dAlgGuid3(0), Flags(kSoundFlagHw2D | kSoundFlagHw3D | kSoundFlagRightHanded | kSoundFlagAlgLight), CapsFlags(0),
       FreeHw3dBuffers(0), SampleRate(0x5622), Channels(2), BitsPerSample(0x10), CoordScale(1),
       DistanceFactor(1.0f), DopplerFactor(1.0f), RolloffFactor(1.0f), Max3dPan(10000.0f),
       Window(nullptr), ArchEntries(nullptr), ArchCount(0), ArchCap(0), bArchEmpty(1), Pad108(0),
@@ -1542,7 +1542,7 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
     else
         EaxDamp = Damp;
 
-    if ((Flags & 4) == 0)
+    if ((Flags & kSoundFlagEax) == 0)
         return GR_GENERIC;
 
     WAVEFORMATEX Format;
@@ -1571,14 +1571,14 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
     }
 
     ULONG Support = 0;
-    if (PropertySet->QuerySupport(kDsPropSetEax20Buffer, 0, &Support) != 0 || (Support & 3) == 0)
+    if (PropertySet->QuerySupport(kDsPropSetEax20Buffer, 0, &Support) != 0 || (Support & (kKsPropertySupportGet | kKsPropertySupportSet)) == 0)
     {
         PropertySet->Release();
         ReleaseDsBufferWrapper(&Wrapper);
         return GR_GENERIC;
     }
 
-    if ((CapsFlags & 4) == 0)
+    if ((CapsFlags & kSoundFlagEax) == 0)
     {
         // The buffer is not pre-zeroed and the Get result is ignored; whatever is there lands
         // in +0x68..+0x74.
@@ -1588,7 +1588,7 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
         SavedEaxVol = Cached[1];
         SavedEaxDecay = Cached[2];
         SavedEaxDamp = Cached[3];
-        CapsFlags |= 4;
+        CapsFlags |= kSoundFlagEax;
     }
 
     struct FEaxBlob
@@ -1747,7 +1747,7 @@ GENRESULT DACOM_API FSoundManager::GetOrientationMatrix(Matrix* Out9)
     const double Uy = Up.y;
     const double Uz = Up.z;
     Vector Right;
-    if ((Flags & 0x10) != 0)
+    if ((Flags & kSoundFlagRightHanded) != 0)
     {
         Right.x = static_cast<float>(Uz * Fy - Fz * Uy);
         Right.y = static_cast<float>(Fz * Ux - Uz * Fx);
@@ -1821,7 +1821,7 @@ GENRESULT DACOM_API FSoundManager::EaxGetInstance(void* Id, GUID* Set, unsigned 
             {
                 ULONG Support = 0;
                 PropertySet->QuerySupport(*Set, Prop, &Support);
-                if ((Support & 1) != 0)
+                if ((Support & kKsPropertySupportGet) != 0)
                 {
                     PropertySet->Get(*Set, Prop, nullptr, 0, Buf, Cb, Pcb);
                     Result = GR_OK;
@@ -1851,7 +1851,7 @@ GENRESULT DACOM_API FSoundManager::EaxSetInstance(void* Id, GUID* Set, unsigned 
             {
                 ULONG Support = 0;
                 PropertySet->QuerySupport(*Set, Prop, &Support);
-                if ((Support & 2) != 0)
+                if ((Support & kKsPropertySupportSet) != 0)
                 {
                     PropertySet->Set(*Set, Prop, nullptr, 0, Data, Cb);
                     Result = GR_OK;
@@ -1893,7 +1893,7 @@ GENRESULT DACOM_API FSoundManager::EaxGetPrimary(GUID* Set, unsigned long Prop, 
         {
             ULONG Support = 0;
             PropertySet->QuerySupport(*Set, Prop, &Support);
-            if ((Support & 1) != 0)
+            if ((Support & kKsPropertySupportGet) != 0)
             {
                 PropertySet->Get(*Set, Prop, nullptr, 0, Buf, Cb, Pcb);
                 Result = GR_OK;
@@ -1932,7 +1932,7 @@ GENRESULT DACOM_API FSoundManager::EaxSetPrimary(GUID* Set, unsigned long Prop, 
         {
             ULONG Support = 0;
             PropertySet->QuerySupport(*Set, Prop, &Support);
-            if ((Support & 2) != 0)
+            if ((Support & kKsPropertySupportSet) != 0)
             {
                 PropertySet->Set(*Set, Prop, nullptr, 0, Data, Cb);
                 Result = GR_OK;
@@ -2111,7 +2111,7 @@ unsigned char FSoundManager::MixerAllowCreate(ISoundSource* PlayKey)
     if (Archetype == nullptr)
         return 0;
     unsigned char bAllow = 1;
-    if ((Archetype->Flags & 1) != 0)
+    if ((Archetype->Flags & kSoundArchMute3dAtMaxDistance) != 0)
     {
         // The position local is not pre-initialised; GetPosition fills it.
         Vector SrcPos;
@@ -2166,7 +2166,7 @@ void FSoundManager::SplicePendingInstances()
 void FSoundManager::MixerApplyEax(FSoundInstanceNode* Node)
 {
     // Tail of FUN_06ee64c0. The QuerySupport result is ignored; only its SET bit is tested.
-    if ((CapsFlags & 4) == 0)
+    if ((CapsFlags & kSoundFlagEax) == 0)
         return;
     unsigned long Probe = 0;
     const int ProbeHr = Node->PlayKey->GetEaxEnvironment(&Probe);
@@ -2177,7 +2177,7 @@ void FSoundManager::MixerApplyEax(FSoundInstanceNode* Node)
         return;
     ULONG Support = 0;
     PropertySet->QuerySupport(kDsPropSetEax20Listener, 1, &Support);
-    if ((Support & 2) != 0)
+    if ((Support & kKsPropertySupportSet) != 0)
         PropertySet->Set(kDsPropSetEax20Listener, 1, nullptr, 0, &Probe, sizeof(Probe));
     PropertySet->Release();
 }
@@ -2224,8 +2224,8 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
         {
             if (bWas3d == 0)
                 Buffer3d->SetMode(DS3DMODE_NORMAL, Apply);
-            if ((CapsFlags & 2) != 0)
-                Node->StatusFlags |= 8;
+            if ((CapsFlags & kSoundFlagHw3D) != 0)
+                Node->StatusFlags |= kInstanceWantHardware;
 
             unsigned long SoundMode = 0;
             if (PlayKey->GetSoundMode(&SoundMode) >= 0)
@@ -2292,7 +2292,7 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
                 ClientAtten = SoftwareAttenuation(Node->MinDistance, Dist, DistanceFactor,
                                                   RolloffFactor, ClientAtten);
 
-            if ((Node->DsCapsFlags & 0x40) != 0)
+            if ((Node->DsCapsFlags & DSBCAPS_CTRLPAN) != 0)
             {
                 // Listener right = Up x Front on the FPU; the normalised direction is stored
                 // back as floats. No clamp on the pan.
@@ -2325,7 +2325,7 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
         bChanged = bWas3d;
         if (Buffer3d != nullptr && bWas3d != 0)
             Buffer3d->SetMode(DS3DMODE_DISABLE, Apply);
-        if ((Node->DsCapsFlags & 0x40) != 0)
+        if ((Node->DsCapsFlags & DSBCAPS_CTRLPAN) != 0)
         {
             // Signed clamp.
             long ClientPan = 0;
@@ -2350,7 +2350,7 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
     // instance node of that archetype under the instance lock, so a node the mixer walks always
     // resolves.
     FSoundArchetype* Archetype = LookupArchetype(PlayKey->GetArchId());
-    if ((Node->StatusFlags & 0x20) != 0)
+    if ((Node->StatusFlags & kInstanceFrequency) != 0)
     {
         // Unsigned clamp to [100, 100000].
         const int Rate = static_cast<int>(Archetype->nSamplesPerSec);
@@ -2446,7 +2446,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     // FUN_06ee6b70 (sole caller MixerTick). The result gates the mixer's Play. No null checks.
     ISoundSource* PlayKey = Node->PlayKey;
     unsigned long Tick;
-    if ((Node->StatusFlags & 0x40) == 0)
+    if ((Node->StatusFlags & kInstanceStarted) == 0)
     {
         PlayKey->MarkStarted();
         Tick = PlayKey->GetStartTick();
@@ -2464,7 +2464,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     if (Archetype == nullptr)
         return 0;
     unsigned long Delta = CurrentTickMs - Tick;
-    if ((Node->StatusFlags & 0x20) != 0)
+    if ((Node->StatusFlags & kInstanceFrequency) != 0)
     {
         // A failed GetPitch clears bit 0x20.
         float Pitch;
@@ -2472,7 +2472,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
         if (PlayKey->GetPitch(&Pitch) == 0)
             Multiplier = PitchToMultiplier(Pitch);
         else
-            Node->StatusFlags &= ~0x20u;
+            Node->StatusFlags &= ~kInstanceFrequency;
         Delta = Ftol32(static_cast<double>(static_cast<unsigned long long>(Delta)) * Multiplier);
     }
     // 0.001f is DAT_06ee949c.
@@ -2500,7 +2500,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     }
     Node->Buffer->SetCurrentPosition(ByteOffset);
     Archetype->Release();
-    if ((Node->StatusFlags & 0x40) == 0)
+    if ((Node->StatusFlags & kInstanceStarted) == 0)
         return 1;
     DWORD Status = 0;
     Node->Buffer->GetStatus(&Status);
@@ -2556,35 +2556,35 @@ FSoundInstanceNode* FSoundManager::CreateInstanceFromKey(ISoundSource* PlayKey)
     Dup->GetCaps(&Caps);
     Node->DsCapsFlags = Caps.dwFlags;
 
-    if ((Caps.dwFlags & 0x10) != 0)
+    if ((Caps.dwFlags & DSBCAPS_CTRL3D) != 0)
     {
         // IID at DAT_06ee919c; the result is ignored.
         Dup->QueryInterface(kIidDirectSound3DBufferRetail, reinterpret_cast<void**>(&Node->Buffer3d));
         if (Node->Buffer3d != nullptr)
         {
-            Node->StatusFlags |= 0x10;
+            Node->StatusFlags |= kInstance3d;
             Node->bIs3dCache = 1;
         }
         else
-            Node->StatusFlags &= ~0x10u;
+            Node->StatusFlags &= ~kInstance3d;
     }
 
-    if ((Caps.dwFlags & 0x20) != 0)
+    if ((Caps.dwFlags & DSBCAPS_CTRLFREQUENCY) != 0)
     {
         // The notice asks GetArchId again.
         DWORD DummyFreq = 0;
         if (Dup->GetFrequency(&DummyFreq) >= 0)
-            Node->StatusFlags |= 0x20;
+            Node->StatusFlags |= kInstanceFrequency;
         else if (G_DisplayExtraDebug != 0)
             Fdump(kFdumpNotice, 0xCC1,
                   FormatMessage2000(Message, "Failed to get requested freq control for instance of %d.\n", // 06eeabec
                                     PlayKey->GetArchId()));
     }
 
-    if ((Caps.dwFlags & 0x8) != 0)
-        Node->StatusFlags = (Node->StatusFlags & ~0x8u) | 0x4;
+    if ((Caps.dwFlags & DSBCAPS_LOCSOFTWARE) != 0)
+        Node->StatusFlags = (Node->StatusFlags & ~kInstanceWantHardware) | kInstanceSoftware;
 
-    if ((Caps.dwFlags & 0x100) != 0)
+    if ((Caps.dwFlags & DSBCAPS_CTRLPOSITIONNOTIFY) != 0)
     {
         const unsigned long Align = Archetype->nBlockAlign;
         Node->LoopStartBytes = Archetype->LoopStart * Align;
@@ -2849,20 +2849,20 @@ void FSoundManager::DumpDeviceNotices()
 {
     // FUN_06ee5b20. "" is DAT_06eeaf78, " NOT" is DAT_06eeaae4.
     char Line[0x2000];
-    const char* Enabled = ((CapsFlags & 1) != 0) ? "ENABLED" : "DISABLED";
-    const char* Requested = ((Flags & 1) != 0) ? "" : " NOT";
+    const char* Enabled = ((CapsFlags & kSoundFlagHw2D) != 0) ? "ENABLED" : "DISABLED";
+    const char* Requested = ((Flags & kSoundFlagHw2D) != 0) ? "" : " NOT";
     Fdump(kFdumpNotice, 0xBA0,
           FormatMessage2000(Line, "SoundMgr:2D HW%s requested and %s with %d HW buffers available.\n",
                             Requested, Enabled, FreeHwMixingBuffers));
 
-    Enabled = ((CapsFlags & 2) != 0) ? "ENABLED" : "DISABLED";
-    Requested = ((Flags & 2) != 0) ? "" : " NOT";
+    Enabled = ((CapsFlags & kSoundFlagHw3D) != 0) ? "ENABLED" : "DISABLED";
+    Requested = ((Flags & kSoundFlagHw3D) != 0) ? "" : " NOT";
     Fdump(kFdumpNotice, 0xBA5,
           FormatMessage2000(Line,
                             "SoundMgr:3D HW%s requested and %s with %d 3D HW buffers available.\n",
                             Requested, Enabled, FreeHw3dBuffers));
 
-    if ((CapsFlags & 3) != 0)
+    if ((CapsFlags & (kSoundFlagHw2D | kSoundFlagHw3D)) != 0)
     {
         Requested = (G_AllowHwToSw != 0) ? "" : " NOT";
         Fdump(kFdumpNotice, 0xBAA,
@@ -2875,25 +2875,25 @@ void FSoundManager::DumpDeviceNotices()
     }
 
     // Literals 06eea9a0 / 964 / 928 / 8f0 / 8c0 / 894 / 86c / 830 / 804 / 7e0.
-    if ((CapsFlags & 0x200) != 0)
+    if ((CapsFlags & kSoundFlagAlgFull) != 0)
         Fdump(kFdumpNotice, 0xBB1,
               FormatMessage2000(Line, "SoundMgr:Using Full Algorithm for DSound3D SW buffers.\n"));
-    else if ((CapsFlags & 0x100) != 0)
+    else if ((CapsFlags & kSoundFlagAlgLight) != 0)
         Fdump(kFdumpNotice, 0xBB5,
               FormatMessage2000(Line, "SoundMgr:Using Light Algorithm for DSound3D SW buffers.\n"));
-    else if ((CapsFlags & 0x80) != 0)
+    else if ((CapsFlags & kSoundFlagAlgBasic) != 0)
         Fdump(kFdumpNotice, 0xBB9,
               FormatMessage2000(Line, "SoundMgr:Using Basic Algorithm for DSound3D SW buffers.\n"));
-    else if ((CapsFlags & 0x40) != 0)
+    else if ((CapsFlags & kSoundFlagAlgUser) != 0)
         Fdump(kFdumpNotice, 0xBBD,
               FormatMessage2000(Line, "SoundMgr:Using User Default for DSound3D SW buffers.\n"));
-    else if ((CapsFlags & 0x400) != 0)
+    else if ((CapsFlags & kSoundFlagAlgNone) != 0)
         Fdump(kFdumpNotice, 0xBC1,
               FormatMessage2000(Line, "SoundMgr:Disabling DSound3D for SW buffers.\n"));
 
-    if ((CapsFlags & 0x10) != 0)
+    if ((CapsFlags & kSoundFlagRightHanded) != 0)
         Fdump(kFdumpNotice, 0xBC6, FormatMessage2000(Line, "SoundMgr:Using Right Handed Coordinates.\n"));
-    if ((CapsFlags & 0x20) != 0)
+    if ((CapsFlags & kSoundFlagAll2DInSoftware) != 0)
         Fdump(kFdumpNotice, 0xBCA, FormatMessage2000(Line, "SoundMgr:Forcing all 2D buffers to SW.\n"));
     if (G_ForceFreqToSw != 0)
         Fdump(kFdumpNotice, 0xBCF,
@@ -2903,7 +2903,7 @@ void FSoundManager::DumpDeviceNotices()
     if (G_DisplayExtraDebug != 0)
         Fdump(kFdumpNotice, 0xBD9, FormatMessage2000(Line, "SoundMgr:Extra debug info enabled.\n"));
 
-    Enabled = ((CapsFlags & 4) != 0) ? "ENABLED" : "DISABLED";
+    Enabled = ((CapsFlags & kSoundFlagEax) != 0) ? "ENABLED" : "DISABLED";
     Fdump(kFdumpNotice, 0xBDE, FormatMessage2000(Line, "SoundMgr:EAX %s.\n", Enabled));
     Fdump(kFdumpNotice, 0xBE0, FormatMessage2000(Line, "SoundMgr:Max channels set to %d.\n", MaxChannels));
 }
@@ -2973,10 +2973,10 @@ GENRESULT FSoundManager::CreateDirectSound()
         return GR_GENERIC;
     }
 
-    CapsFlags &= ~3u;
+    CapsFlags &= ~(kSoundFlagHw2D | kSoundFlagHw3D);
     if ((Caps.dwFlags & DSCAPS_EMULDRIVER) != 0 || Caps.dwUnlockTransferRateHwBuffers != 0)
     {
-        Flags &= ~3u;
+        Flags &= ~(kSoundFlagHw2D | kSoundFlagHw3D);
         char Isa[0x2000];
         Fdump(kFdumpNotice, 0xB5D,
               FormatMessage2000(Isa, "ISA or slow sound card detected. Disabling HW buffers.\n")); // 06eea704
@@ -2990,7 +2990,7 @@ GENRESULT FSoundManager::CreateDirectSound()
         Fmt.nAvgBytesPerSec = 0x15888;
         Fmt.nBlockAlign = 4;
         Fmt.wBitsPerSample = 0x10;
-        if ((Flags & 1) != 0)
+        if ((Flags & kSoundFlagHw2D) != 0)
         {
             DSBUFFERDESC Probe = {};
             Probe.dwSize = 0x24;
@@ -2999,11 +2999,11 @@ GENRESULT FSoundManager::CreateDirectSound()
             Probe.lpwfxFormat = &Fmt;
             IDirectSoundBuffer* ProbeBuf = nullptr;
             if (DirectSound->CreateSoundBuffer(&Probe, &ProbeBuf, nullptr) >= 0)
-                CapsFlags |= 1;
+                CapsFlags |= kSoundFlagHw2D;
             if (ProbeBuf != nullptr)
                 ProbeBuf->Release();
         }
-        if ((Flags & 2) != 0)
+        if ((Flags & kSoundFlagHw3D) != 0)
         {
             DSBUFFERDESC Probe = {};
             Probe.dwSize = 0x24;
@@ -3012,7 +3012,7 @@ GENRESULT FSoundManager::CreateDirectSound()
             Probe.lpwfxFormat = &Fmt;
             IDirectSoundBuffer* ProbeBuf = nullptr;
             if (DirectSound->CreateSoundBuffer(&Probe, &ProbeBuf, nullptr) >= 0)
-                CapsFlags |= 2;
+                CapsFlags |= kSoundFlagHw3D;
             if (ProbeBuf != nullptr)
                 ProbeBuf->Release();
         }
@@ -3052,8 +3052,8 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     }
 
     Flags = InFlags;
-    if ((InFlags & 0x800) != 0)
-        Flags &= ~3u;
+    if ((InFlags & kSoundFlagNoHw) != 0)
+        Flags &= ~(kSoundFlagHw2D | kSoundFlagHw3D);
 
     // One integer and one float stack variable carry every value. Each block resets them to its default only once a parser was obtained, so a block
     // whose acquisition fails inherits the previous block's value, exactly as retail does.
@@ -3066,7 +3066,7 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     if (AcquireParserLocal(Dacom, Parser, &Local))
     {
         IProfileParser* Ini = static_cast<IProfileParser*>(Local);
-        Value = Flags & 4;
+        Value = Flags & kSoundFlagEax;
         void* Audio = Ini->OpenSection("AudioProperties", 3);
         if (Audio != nullptr)
         {
@@ -3078,9 +3078,9 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     if (Local != nullptr)
         Local->Release();
     if (Value != 0)
-        Flags |= 4;
+        Flags |= kSoundFlagEax;
     else
-        Flags &= ~4u;
+        Flags &= ~kSoundFlagEax;
 
     // reverbBaseEnvironment (default 0) -> +0x58.
     if (AcquireParserLocal(Dacom, Parser, &Local))
@@ -3179,15 +3179,15 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     ReleaseComPtr(&Local);
     ParseGuidString(DeviceIdString, &DeviceGuid);
 
-    const unsigned long AlgBits = Flags & 0x3C0;
+    const unsigned long AlgBits = Flags & kSoundFlagAlgMask;
     const char* AlgName = "USER";
-    if (AlgBits == 0x200)
+    if (AlgBits == kSoundFlagAlgFull)
         AlgName = "FULL";
-    else if (AlgBits == 0x80)
+    else if (AlgBits == kSoundFlagAlgBasic)
         AlgName = "BASIC";
-    else if (AlgBits == 0x100)
+    else if (AlgBits == kSoundFlagAlgLight)
         AlgName = "LIGHT";
-    else if (AlgBits == 0x400)
+    else if (AlgBits == kSoundFlagAlgNone)
         AlgName = "NONE";
     // Retail copies the default name into AlgBuf only once a parser was obtained, so without one
     // it compares an uninitialised buffer. Deviation: the port fills it up front so that case
@@ -3206,34 +3206,34 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
         }
     }
     ReleaseComPtr(&Local);
-    Flags &= ~0x3C0u;
+    Flags &= ~kSoundFlagAlgMask;
     if (_stricmp(AlgBuf, "FULL") == 0)
     {
-        Flags |= 0x200;
-        CapsFlags |= 0x200;
+        Flags |= kSoundFlagAlgFull;
+        CapsFlags |= kSoundFlagAlgFull;
         CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgHrtfFull);
     }
     else if (_stricmp(AlgBuf, "LIGHT") == 0)
     {
-        Flags |= 0x100;
-        CapsFlags |= 0x100;
+        Flags |= kSoundFlagAlgLight;
+        CapsFlags |= kSoundFlagAlgLight;
         CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgHrtfLight);
     }
     else if (_stricmp(AlgBuf, "BASIC") == 0)
     {
-        Flags |= 0x80;
-        CapsFlags |= 0x80;
+        Flags |= kSoundFlagAlgBasic;
+        CapsFlags |= kSoundFlagAlgBasic;
         CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgNoVirtual);
     }
     else if (_stricmp(AlgBuf, "USER") == 0)
     {
-        Flags |= 0x40;
-        CapsFlags |= 0x40;
+        Flags |= kSoundFlagAlgUser;
+        CapsFlags |= kSoundFlagAlgUser;
         CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgGuidNull);
     }
     else if (_stricmp(AlgBuf, "NONE") == 0)
     {
-        G_Ds3dCreateFlags = (G_Ds3dCreateFlags & ~0x10u) | 0x40u;
+        G_Ds3dCreateFlags = (G_Ds3dCreateFlags & ~DSBCAPS_CTRL3D) | DSBCAPS_CTRLPAN;
         CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgGuidNull);
     }
 
@@ -3241,7 +3241,7 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     if (AcquireParserLocal(Dacom, Parser, &Local))
     {
         IProfileParser* Ini = static_cast<IProfileParser*>(Local);
-        Value = Flags & 0x800;
+        Value = Flags & kSoundFlagNoHw;
         void* Section = Ini->OpenSection("SoundManager", 3);
         if (Section != nullptr)
         {
@@ -3252,31 +3252,31 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     }
     ReleaseComPtr(&Local);
     if (Value != 0)
-        Flags &= ~3u;
+        Flags &= ~(kSoundFlagHw2D | kSoundFlagHw3D);
 
     // From here on FUN_06ee72f0 does the reads; every call writes the shared Value and the caller
     // reads Value back (not the return), so a failed parser acquisition keeps the previous value.
     IProfileParser* Cached = Parser;
-    ReadProfileInt(Dacom, Cached, "SoundManager", "rightHandedCoordinates", Flags & 0x10, &Value);
+    ReadProfileInt(Dacom, Cached, "SoundManager", "rightHandedCoordinates", Flags & kSoundFlagRightHanded, &Value);
     if (Value != 0)
     {
-        Flags |= 0x10;
-        CapsFlags |= 0x10;
+        Flags |= kSoundFlagRightHanded;
+        CapsFlags |= kSoundFlagRightHanded;
         CoordScale = -1; // +0xA4
     }
     else
-        Flags &= ~0x10u;
+        Flags &= ~kSoundFlagRightHanded;
 
-    ReadProfileInt(Dacom, Cached, "SoundManager", "createAll2DInSoftware", Flags & 0x20, &Value);
+    ReadProfileInt(Dacom, Cached, "SoundManager", "createAll2DInSoftware", Flags & kSoundFlagAll2DInSoftware, &Value);
     if (Value != 0)
     {
-        Flags |= 0x20;
-        CapsFlags |= 0x20;
+        Flags |= kSoundFlagAll2DInSoftware;
+        CapsFlags |= kSoundFlagAll2DInSoftware;
     }
     else
     {
-        Flags &= ~0x20u;
-        CapsFlags &= ~0x20u;
+        Flags &= ~kSoundFlagAll2DInSoftware;
+        CapsFlags &= ~kSoundFlagAll2DInSoftware;
     }
 
     // Presence probe of speakerConfiguration into DAT_06eebc00; only when the key exists is it
@@ -3306,26 +3306,26 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     ReadProfileInt(Dacom, Cached, "SoundManager", "maxSoundChannels", MaxChannels, &Value);
     MaxChannels = Value; // +0x54
 
-    ReadProfileInt(Dacom, Cached, "SoundManager", "use2DHW", Flags & 1, &Value);
+    ReadProfileInt(Dacom, Cached, "SoundManager", "use2DHW", Flags & kSoundFlagHw2D, &Value);
     if (Value != 0)
-        Flags |= 1;
+        Flags |= kSoundFlagHw2D;
     else
-        Flags &= ~1u;
+        Flags &= ~kSoundFlagHw2D;
 
-    ReadProfileInt(Dacom, Cached, "SoundManager", "use3DHW", Flags & 2, &Value);
+    ReadProfileInt(Dacom, Cached, "SoundManager", "use3DHW", Flags & kSoundFlagHw3D, &Value);
     if (Value != 0)
-        Flags |= 2;
+        Flags |= kSoundFlagHw3D;
     else
-        Flags &= ~2u;
+        Flags &= ~kSoundFlagHw3D;
 
     ReadProfileInt(Dacom, Cached, "SoundManager", "ALLOW_HW_TO_SW", G_AllowHwToSw, &Value);
-    if (Value != 0 && (Flags & 3) != 0)
+    if (Value != 0 && (Flags & (kSoundFlagHw2D | kSoundFlagHw3D)) != 0)
         G_AllowHwToSw = 1;
     else
         G_AllowHwToSw = 0;
 
     ReadProfileInt(Dacom, Cached, "SoundManager", "ALLOW_SW_TO_HW", G_AllowSwToHw, &Value);
-    if (Value != 0 && (Flags & 3) != 0)
+    if (Value != 0 && (Flags & (kSoundFlagHw2D | kSoundFlagHw3D)) != 0)
         G_AllowSwToHw = 1;
     else
         G_AllowSwToHw = 0;
@@ -3385,7 +3385,7 @@ unsigned char FSoundManager::SetupInstanceNotify(FSoundInstanceNode* Node)
     Notify->Release();
     if (Hr < 0)
         return 0;
-    Node->StatusFlags |= 2;
+    Node->StatusFlags |= kInstanceNotify;
     return 1;
 }
 
@@ -3430,7 +3430,7 @@ GENRESULT DACOM_API FSoundManager::ShutdownDevice()
         }
     }
     DestroyAllArchetypes();
-    if ((CapsFlags & 4) != 0)
+    if ((CapsFlags & kSoundFlagEax) != 0)
         // Retail quirk (06EE4A0E): vol and damp are swapped when the saved EAX state is restored.
         SetEaxPreview(static_cast<int>(SavedEaxEnv), *reinterpret_cast<float*>(&SavedEaxDamp),
                       *reinterpret_cast<float*>(&SavedEaxDecay), *reinterpret_cast<float*>(&SavedEaxVol));
@@ -3570,7 +3570,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
                 {
                     // Equal, greater and NaN all cull.
                     RefreshInstancePose(Existing);
-                    if (PlayKey->Is3d() != 0 && (Existing->DsCapsFlags & 0x20000) != 0 &&
+                    if (PlayKey->Is3d() != 0 && (Existing->DsCapsFlags & DSBCAPS_MUTE3DATMAXDISTANCE) != 0 &&
                         !(Existing->DistSq < Existing->MaxDistSq))
                     {
                         EnterCriticalSection(&G_InstanceLock);
@@ -3585,7 +3585,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
                         if (MaybeMigrateHwSw(this, Existing, AttachedIndex) != 0)
                         {
                             Existing->Buffer->Stop();
-                            Existing->StatusFlags &= ~0x40u;
+                            Existing->StatusFlags &= ~kInstanceStarted;
                         }
                     }
                 }
@@ -3640,12 +3640,12 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
             Node = Next;
             continue;
         }
-        if (PlayFlags != 0 && (Node->DsCapsFlags & 0x100) != 0)
+        if (PlayFlags != 0 && (Node->DsCapsFlags & DSBCAPS_CTRLPOSITIONNOTIFY) != 0)
             SetupInstanceNotify(Node);
         unsigned long LocFlags = 0;
-        if ((Node->DsCapsFlags & 0x40000) != 0)
+        if ((Node->DsCapsFlags & DSBCAPS_LOCDEFER) != 0)
         {
-            if ((Node->StatusFlags & 8) != 0)
+            if ((Node->StatusFlags & kInstanceWantHardware) != 0)
                 LocFlags = DSBPLAY_LOCHARDWARE;
             else
                 LocFlags = DSBPLAY_LOCSOFTWARE;
@@ -3668,7 +3668,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
                 Hr = Node->Buffer->Play(0, 0, PlayFlags | LocFlags);
                 if (Hr >= 0)
                 {
-                    Node->StatusFlags = (Node->StatusFlags & ~1u) | LocFlags;
+                    Node->StatusFlags = (Node->StatusFlags & ~kInstanceHardware) | LocFlags;
                     if (G_DisplayExtraDebug != 0)
                         Fdump(kFdumpNotice, 0xA3D, "SUCCEEDED!\n");
                 }
@@ -3685,7 +3685,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
                 Hr = Node->Buffer->Play(0, 0, PlayFlags);
                 if (Hr >= 0)
                 {
-                    Node->StatusFlags = (Node->StatusFlags & ~1u) | 4u;
+                    Node->StatusFlags = (Node->StatusFlags & ~kInstanceHardware) | kInstanceSoftware;
                     if (G_DisplayExtraDebug != 0)
                         Fdump(kFdumpNotice, 0xA5D, "SUCCEEDED!\n");
                 }
@@ -3695,9 +3695,9 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
         }
         if (Hr >= 0)
         {
-            Node->StatusFlags |= 0x40;
+            Node->StatusFlags |= kInstanceStarted;
             if (LocFlags == DSBPLAY_LOCHARDWARE)
-                Node->StatusFlags |= 1;
+                Node->StatusFlags |= kInstanceHardware;
         }
         Node = Next;
     }

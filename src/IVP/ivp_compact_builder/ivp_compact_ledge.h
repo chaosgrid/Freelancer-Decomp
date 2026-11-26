@@ -34,6 +34,9 @@ alignas(16) static const int32_t G_IVP_Compact_Edge_Prev_Lut[4] = { 0,  8, -4, -
 class IVP_Compact_Edge
 {
 public:
+    // Data bit 31: the edge's is_piercing flag (IsPiercing).
+    static constexpr uint32_t kPiercingFlag = 0x80000000U;
+
     uint32_t Data; // [15:0] start_point_index, [30:16] opposite_offset (15-bit signed), [31] is_piercing
 
 public:
@@ -50,7 +53,7 @@ public:
 
     inline bool IsPiercing() const
     {
-        return (Data & 0x80000000U) != 0;
+        return (Data & kPiercingFlag) != 0;
     }
 
     inline uint32_t GetEdgeIndex() const
@@ -185,6 +188,9 @@ extern "C" void* IVP_Compact_Triangle_Init(void* Memory);
 class alignas(16) IVP_Compact_Ledge
 {
 public:
+    // SizeAndFlags bits 0..1, the has-children flag.
+    static constexpr uint32_t kHasChildrenMask = 0x3u;
+
     int32_t CPointOffset;           // +0x00: Byte offset from 'this' to the IVP_U_Float_Point array
     union
     {

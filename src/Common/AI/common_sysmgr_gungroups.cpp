@@ -232,10 +232,10 @@ int SystemManagerGunGroupManager::PopulateSlots(unsigned short const* SourceIds,
                 int NewKind = -1;
                 switch (Classify)
                 {
-                case 0: NewKind = FGunGroupSlot::KindPlain; break;
-                case 1: NewKind = FGunGroupSlot::KindSeeker; break;
-                case 2: NewKind = FGunGroupSlot::KindTorpedo; break;
-                case 3: NewKind = FGunGroupSlot::KindCruiseDisruptor; break;
+                case kMunitionKindPlain: NewKind = FGunGroupSlot::KindPlain; break;
+                case kMunitionKindSeeker: NewKind = FGunGroupSlot::KindSeeker; break;
+                case kMunitionKindTorpedo: NewKind = FGunGroupSlot::KindTorpedo; break;
+                case kMunitionKindCruiseDisruptor: NewKind = FGunGroupSlot::KindCruiseDisruptor; break;
                 default: break; // retail's own jump table has exactly 4 entries; anything else leaves the field untouched
                 }
                 if (NewKind != -1)
@@ -264,7 +264,7 @@ int SystemManagerGunGroupManager::PopulateSlots(unsigned short const* SourceIds,
         // A non-player ship whose Status bit 0 is clear toggles the item on.
         if (OwnShip()->get_equipment_status(Status, Slot->HardpointId) == 0 &&
             !OwnShip()->is_player() &&
-            (Status.Flags & 0x01) == 0)
+            (Status.Flags & EquipStatusFlagActive) == 0)
         {
             OwnShip()->toggle_item(SourceCursor, true, -1);
         }
@@ -410,7 +410,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
         SelfRecord->bFlagsValid = 1;
     }
 
-    bool const bSelfMayEngage = (SelfRecord->CachedFlags & 0xa0) == 0;
+    bool const bSelfMayEngage = (SelfRecord->CachedFlags & (OBJ_DOCKING_RING | OBJ_TRADELANE_RING)) == 0;
     bool bAnyHostile = false;
 
     // Unsigned index, GunCount re-read on every pass.
@@ -454,7 +454,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
             if (ElemCObj != nullptr && ((unsigned)ElemCObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
             {
                 IBehaviorManager* const ElemMgr = ((CEqObj*)ElemCObj)->get_behavior_interface();
-                if (ElemMgr != nullptr && ElemMgr->ContentCbCreationType == 2 && !bSelfMayEngage)
+                if (ElemMgr != nullptr && ElemMgr->ContentCbCreationType == pub::AI::ContentCallback::CreationMission && !bSelfMayEngage)
                     continue;
             }
 
@@ -497,9 +497,9 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
     }
 
     // FUN_062ee280: 0 when any hostile was seen this scan, 2 otherwise.
-    if ((SelfRecord->CachedFlags & 0x7f0000) != 0)
+    if ((SelfRecord->CachedFlags & OBJ_SHIP_MASK) != 0)
         return;
-    Sys->Targeting.SetAttackState(bAnyHostile ? 0 : 2);
+    Sys->Targeting.SetAttackState(bAnyHostile ? TargetManager::kAttackStateEngaged : TargetManager::kAttackStateCombatOver);
 }
 
 namespace

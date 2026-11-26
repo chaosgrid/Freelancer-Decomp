@@ -8,6 +8,57 @@
 
 // The UI sound table (DAT_0067a4a8[0x2d]) of the post-DataConfig bootstrap.
 
+// The slots of the UI sound table (DAT_006149e8, FUN_00564520 ..): the sound nickname each slot
+// resolves to is in the comment.
+enum EUiSoundSlot
+{
+    kUiSoundSelectItem = 0,                   // "ui_select_item"
+    kUiSoundItemSelect = 1,                   // "ui_item_select"
+    kUiSoundWindowOpen = 2,                   // "ui_window_open"
+    kUiSoundOpenInfocard = 3,                 // "ui_open_infocard"
+    kUiSoundFilterSelect = 4,                 // "ui_filter_select"
+    kUiSoundNavMapExpand = 5,                 // "ui_nav_map_expand"
+    kUiSoundHudZoomIn = 6,                    // "hud_zoom_in"
+    kUiSoundHudZoomOut = 7,                   // "hud_zoom_out"
+    kUiSoundNavMapFade = 8,                   // "ui_nav_map_fade"
+    kUiSoundNavMapSubmenu = 9,                // "ui_nav_map_submenu"
+    kUiSoundHudWaypoint = 10,                 // "hud_waypoint"
+    kUiSoundTypingCharacters = 11,            // "ui_typing_characters"
+    kUiSoundNnExpansioncontraction = 12,      // "ui_nn_expansioncontraction"
+    kUiSoundBeginScan = 13,                   // "ui_begin_scan"
+    kUiSoundEndScan = 14,                     // "ui_end_scan"
+    kUiSoundNewStoryStar = 15,                // "ui_new_story_star"
+    kUiSoundLoadCargo = 16,                   // "ui_load_cargo"
+    kUiSoundEquipDetach = 17,                 // "ui_equip_detach"
+    kUiSoundEquipMount01 = 18,                // "ui_equip_mount01"
+    kUiSoundEquipMount02 = 19,                // "ui_equip_mount02"
+    kUiSoundEquipMount03 = 20,                // "ui_equip_mount03"
+    kUiSoundEquipMount04 = 21,                // "ui_equip_mount04"
+    kUiSoundEquipMount05 = 22,                // "ui_equip_mount05"
+    kUiSoundHudWeaponSelect = 23,             // "hud_weapon_select"
+    kUiSoundHudSubtarget = 24,                // "hud_subtarget"
+    kUiSoundIncomingMissile = 25,             // "ui_incoming_missile"
+    kUiSoundExecuteTransaction = 26,          // "ui_execute_transaction"
+    kUiSoundMotionSwish = 27,                 // "ui_motion_swish"
+    kUiSoundToggleMouseFlight = 28,           // "ui_toggle_mouse_flight"
+    kUiSoundRollover = 29,                    // "ui_rollover"
+    kUiSoundVoiceTest = 30,                   // "ui_voice_test"
+    kUiSoundEffectsTest = 31,                 // "ui_effects_test"
+    kUiSoundMusicTest = 32,                   // "ui_music_test"
+    kUiSoundInterfaceTest = 33,               // "ui_interface_test"
+    kUiSoundAmbianceTest = 34,                // "ui_ambiance_test"
+    kUiSoundTargetChange = 35,                // "ui_target_change"
+    kUiSoundTargetExpandBrackets = 36,        // "ui_target_expand_brackets"
+    kUiSoundBuyCommodity = 37,                // "ui_buy_commodity"
+    kUiSoundReceiveMoney = 38,                // "ui_receive_money"
+    kUiSoundGainLevel = 39,                   // "ui_gain_level"
+    kUiSoundUseNanobotsSuccess = 40,          // "ui_use_nanobots_success"
+    kUiSoundUseShieldBatterySuccess = 41,     // "ui_use_shield_battery_success"
+    kUiSoundUseNanobotsFailure = 42,          // "ui_use_nanobots_failure"
+    kUiSoundUseShieldBatteryFailure = 43,     // "ui_use_shield_battery_failure"
+    kUiSoundHudCommWindow = 44                // "hud_comm_window"
+};
+
 // FUN_00564520.
 void InitUiSoundTable();
 // FUN_00564610.

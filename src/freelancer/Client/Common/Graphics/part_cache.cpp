@@ -15,6 +15,7 @@
 #include "render/IRenderPipeline.h"  // IVertexBufferManager
 #include "render/mesh_iface.h"
 #include "render/rendcomp.h"
+#include "render/slots.h"          // Render::EPipelineState
 #include "x86math.h"
 
 #include <cstdint>
@@ -96,13 +97,13 @@ int FvfTexcoordBlockBytes(unsigned Fvf)
         do
         {
             unsigned Code = (Fvf >> (Shift & 0x1Fu)) & 3U;
-            if (Code == 0)
+            if (Code == D3DFVF_TEXTUREFORMAT2)
                 Total += 8;
-            else if (Code == 1)
+            else if (Code == D3DFVF_TEXTUREFORMAT3)
                 Total += 0xC;
-            else if (Code == 2)
+            else if (Code == D3DFVF_TEXTUREFORMAT4)
                 Total += 0x10;
-            else if (Code == 3)
+            else if (Code == D3DFVF_TEXTUREFORMAT1)
                 Total += 4;
             Shift += 2;
             Remaining -= 1;
@@ -188,21 +189,21 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
 
     unsigned Fvf = MeshHeader->Fvf;
     unsigned ExtraPos = 0;
-    if ((Fvf & 0xCu) == 0xCu)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         ExtraPos = 0x1Cu;
-    else if ((Fvf & 4U) == 4U)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         ExtraPos = 0x10U;
-    else if ((Fvf & 2U) == 2U)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
         ExtraPos = 0xCu;
 
     unsigned ExtraUv2 = 0;
-    if ((Fvf & 0x10U) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
         ExtraUv2 = 0xCu;
 
     unsigned ExtraTail = 0;
-    if ((Fvf & 0x40U) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         ExtraTail = 4;
-    if ((Fvf & 0x80U) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         ExtraTail += 4;
 
     int TexBytes = FvfTexcoordBlockBytes(Fvf);
@@ -279,13 +280,13 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
     {
         Entry->Indices = static_cast<unsigned short*>(
             operator new(static_cast<std::size_t>(Entry->IndexCount) * 2U));
-        Mesh->OpenFaceGroup(0, 1);
-        Mesh->OpenFaceGroupChannels(0x80U);
+        Mesh->OpenFaceGroup(0, kMeshOpenRead);
+        Mesh->OpenFaceGroupChannels(kMeshChannelEdgeIndices);
 
         void* CellB4c = nullptr;
         void* CellB48 = nullptr;
         unsigned VertCap = 0;
-        Mesh->GetFaceGroupData(0x80, reinterpret_cast<void**>(&Positions), &CellB4c, &CellB48,
+        Mesh->GetFaceGroupData(kMeshChannelEdgeIndices, reinterpret_cast<void**>(&Positions), &CellB4c, &CellB48,
                      reinterpret_cast<void**>(&VertCap));
 
         Entry->Vertices = static_cast<FPartCacheVertex*>(
@@ -304,12 +305,12 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
     for (unsigned GroupIndex = 0; GroupIndex < GroupCount; ++GroupIndex)
     {
         // A negative select result skips the group (no close).
-        if (Mesh->OpenFaceGroup(static_cast<int>(GroupIndex), 1) < 0)
+        if (Mesh->OpenFaceGroup(static_cast<int>(GroupIndex), kMeshOpenRead) < 0)
             continue;
 
         // -8 closes and returns 0 at once. Retail neither frees the remap table nor stores
         // VertexCount on this path.
-        if (Mesh->OpenFaceGroupChannels(0x180U) == -8)
+        if (Mesh->OpenFaceGroupChannels(kMeshChannelEdgeIndices | kMeshChannelEdgeAngles) == -8)
         {
             Mesh->CloseFaceGroup();
             return 0;
@@ -320,7 +321,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
         void* CellB58 = nullptr;
         void* CellB54 = nullptr;
         void* CellB50 = nullptr;
-        Mesh->GetFaceGroupData(0x100, reinterpret_cast<void**>(&Weights), &CellB58, &CellB54, &CellB50);
+        Mesh->GetFaceGroupData(kMeshChannelEdgeAngles, reinterpret_cast<void**>(&Weights), &CellB58, &CellB54, &CellB50);
 
         unsigned short* WeightIndex = nullptr;
         void* CellB5c = nullptr;
@@ -651,15 +652,19 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
 namespace
 {
     // DAT_005c7608 / DAT_005c7628 / DAT_005c7640: {render state, value} pairs ended by state 0.
-    // 0x89 D3DRS_LIGHTING, 0x1d D3DRS_SPECULARENABLE, 0x1b D3DRS_ALPHABLENDENABLE,
-    // 0x8d D3DRS_COLORVERTEX, 0x91 D3DRS_DIFFUSEMATERIALSOURCE.
-    unsigned long const kPartDrawStatesOff[] = {0x89, 0, 0x1d, 0, 0x1b, 0, 0};
-    unsigned long const kPartDrawColourVertexOn[] = {0x8d, 1, 0x91, 1, 0};
-    unsigned long const kPartDrawColourVertexOff[] = {0x8d, 0, 0};
-    // DAT_005c7650: {texture stage state, value} pairs for stage 0, ended by type 0 -- COLOROP
-    // SELECTARG1, COLORARG1 DIFFUSE, COLORARG2 CURRENT, ALPHAOP SELECTARG1, ALPHAARG1 DIFFUSE,
-    // ALPHAARG2 CURRENT.
-    unsigned long const kPartDrawStage0[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    unsigned long const kPartDrawStatesOff[] = {D3DRS_LIGHTING, 0, D3DRS_SPECULARENABLE, 0,
+                                                D3DRS_ALPHABLENDENABLE, 0, 0};
+    unsigned long const kPartDrawColourVertexOn[] = {D3DRS_COLORVERTEX, 1,
+                                                     D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1,
+                                                     0};
+    unsigned long const kPartDrawColourVertexOff[] = {D3DRS_COLORVERTEX, 0, 0};
+    // DAT_005c7650: {texture stage state, value} pairs for stage 0, ended by type 0.
+    unsigned long const kPartDrawStage0[] = {D3DTSS_COLOROP, D3DTOP_DISABLE,
+                                             D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                             D3DTSS_COLORARG2, D3DTA_CURRENT,
+                                             D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+                                             D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+                                             D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
     // FUN_00406510's loops: the first pair's state is an immediate, then [cursor + 8] until 0.
     void PartDrawApplyStates(IRenderPipeline* Pipeline, unsigned long const* Table)
@@ -689,44 +694,44 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
     // The result of the lock is not tested. Only the source-block fields below are ever written
     // (retail's normal and texcoord streams stay as the stack left them).
     FRpVertexSrcDesc Source;
-    Source.Flags = 2;
+    Source.Flags = kRpVertexSrcInterleaved;
     Source.Position.ByteSize = 0xc;
     Source.Position.Stride = 0x10;
     Source.Position.IndexArray = nullptr;
     Source.Diffuse.ByteSize = 4;
     Source.Diffuse.Stride = 0x10;
     Source.Diffuse.IndexArray = nullptr;
-    Source.SrcFvf = 0x42;
+    Source.SrcFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE;
     unsigned IndexTotal = 0;
     FVertexMemoryLock LockOut; // vertex buffer, FVF, base vertex, memory
-    DALib::VertexBuffer->LockVertexMemory(0x42, Cache->TotalVertices, &LockOut);
+    DALib::VertexBuffer->LockVertexMemory(D3DFVF_XYZ | D3DFVF_DIFFUSE, Cache->TotalVertices, &LockOut);
 
     // The stride of the locked FVF.
     unsigned const Fvf = static_cast<unsigned>(LockOut.Listing.Fvf);
     int PositionBytes = 0;
-    if ((Fvf & 0xcu) == 0xcu)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
     {
         PositionBytes = 0x1c;
     }
-    else if ((Fvf & 4u) == 4u)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
     {
         PositionBytes = 0x10;
     }
-    else if ((Fvf & 2u) == 2u)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
     {
         PositionBytes = 0xc;
     }
     int NormalBytes = 0;
-    if ((Fvf & 0x10u) != 0)
+    if ((Fvf & D3DFVF_NORMAL) != 0)
     {
         NormalBytes = 0xc;
     }
     int ColourBytes = 0;
-    if ((Fvf & 0x40u) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
     {
         ColourBytes = 4;
     }
-    if ((Fvf & 0x80u) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
     {
         ColourBytes += 4;
     }
@@ -774,7 +779,7 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
     // Pipeline state 7 (seeded 1 before the query) picks one combined modelview or a separate
     // world and view.
     int bCombined = 1;
-    DALib::Pipeline->GetPipelineState(7, &bCombined);
+    DALib::Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &bCombined);
     if (bCombined != 0)
     {
         Transform const* const View =

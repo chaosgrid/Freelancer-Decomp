@@ -98,9 +98,9 @@ void NnNetworkOperation::Draw()
 bool NnNetworkOperation::KeyEvent(unsigned Key, unsigned char* Modifiers)
 {
     // LAB_00472450 (RET 8): Escape with modifier bit 1 clear cancels the wait.
-    if ((*Modifiers & 0x02) != 0)
+    if ((*Modifiers & kWin3DKeyPressed) != 0)
         return false;
-    if (Key != 0x1b)
+    if (Key != VK_ESCAPE)
         return false;
     Close();
     return true;

@@ -77,7 +77,7 @@ namespace
 	{
 		LONG Result = 1;
 		DWORD Code = Info->ExceptionRecord->ExceptionCode;
-		if (Code == 0x80000003 || Code == 0x80000004)
+		if (Code == EXCEPTION_BREAKPOINT || Code == EXCEPTION_SINGLE_STEP)
 		{
 			return 0;
 		}

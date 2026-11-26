@@ -248,12 +248,12 @@ int FVMeshPart::Claim(IFileSystem* File)
     FFileSystemDesc Desc;
     std::memset(&Desc, 0, sizeof(Desc));
     Desc.ComponentName = "FileSystem";
-    Desc.Access = 0x80000000;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.Path = "VMeshRef";
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.FindHandle = 0xFFFFFFFF;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
@@ -370,7 +370,7 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned lo
     if ((Flags & 0x200) == 0)
     {
         int State = 1;
-        G_Pipeline->GetPipelineState(7, &State);
+        G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &State);
         if (State != 0)
         {
             Transform Product;
@@ -401,7 +401,7 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned lo
             G_Pipeline->SetView(View);
         }
     }
-    Flags |= 0x10C;
+    Flags |= kMaterialSubmitKeepVertices | kMaterialSubmitKeepIndices | kMaterialSubmitUseBuffers;
 
     const FVmeshDataHeader* Header = Data->Header;
     FVbListing Listing;
@@ -1048,7 +1048,7 @@ GENRESULT DACOM_API VMeshPluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc,
     Plugin->RefCount = 1;
     GENRESULT Result = GR_OK;
     if (Extended->Parent == nullptr || Extended->Engine == nullptr)
-        Result = (GENRESULT)0xFFFFFFFE;
+        Result = GR_INVALID_PARMS;
     if (Result != GR_OK)
     {
         std::free(Plugin);

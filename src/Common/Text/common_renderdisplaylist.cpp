@@ -94,7 +94,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
     TextRenderAttributes EllipsisAttrs;
     EllipsisAttrs.Packed = 0x10;
     TRANode EllipsisAttrNode;
-    EllipsisAttrNode.set_attributes(EllipsisAttrs, 0xff);
+    EllipsisAttrNode.set_attributes(EllipsisAttrs, kTextAttrFontMask | kTextAttrStyleMask);
     EllipsisAttrNode.set_default_mask(0);
 
     Ctx.get_state(SavedState);
@@ -300,11 +300,11 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
         const int LineHeight = MaxBelow + MaxAscent;
 
         int HCursor = OriginH;
-        if (JustifyMode == 1)
+        if (JustifyMode == TextJustifyCenter)
         {
             HCursor = (FullWidth - LineWidth) / 2 + OriginH;
         }
-        else if (JustifyMode == 2)
+        else if (JustifyMode == TextJustifyRight)
         {
             HCursor = FullWidth - LineWidth + OriginH;
         }

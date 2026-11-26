@@ -112,13 +112,13 @@ namespace
         {
             FFileSystemDesc Desc;
             memset(&Desc, 0, 0x34);
-            Desc.Size = 0x34;
+            Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
             Desc.ComponentName = "FileSystem";
             Desc.Path = Path;
-            Desc.Access = 0x80000000u;
-            Desc.ShareMode = 1;
-            Desc.Creation = 3;
-            Desc.Flags = 0x8000080u;
+            Desc.Access = GENERIC_READ;
+            Desc.ShareMode = FILE_SHARE_READ;
+            Desc.Creation = OPEN_EXISTING;
+            Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
             Desc.FindHandle = FindHandle;
             Handle = static_cast<unsigned long>(Fs->OpenByDesc(&Desc));
             if (Handle == 0xffffffffu)
@@ -173,7 +173,7 @@ namespace
     bool TgaHasAlpha(unsigned char const* Header)
     {
         unsigned char const Bits = ((Header[2] & 7) == kTgaColourMapped) ? Header[7] : Header[0x10];
-        int const AlphaBits = (Bits == 0x20) ? 8 : 0;
+        int const AlphaBits = (Bits == 32) ? 8 : 0;
         return AlphaBits > 0;
     }
 
@@ -282,12 +282,12 @@ bool Image::LoadBmp(char const* Path)
 
     DIBSECTION Dib;
     memset(&Dib, 0, sizeof(Dib));
-    if (GetObjectA(Bitmap, 0x54, &Dib) == 0x54)
+    if (GetObjectA(Bitmap, sizeof(Dib), &Dib) == sizeof(Dib))
     {
         unsigned long const Compression = Dib.dsBmih.biCompression;
         unsigned short const BitCount = Dib.dsBmih.biBitCount;
         if ((Compression == 0 || Compression == 3) &&
-            (BitCount == 0x10 || BitCount == 0x18 || BitCount == 0x20))
+            (BitCount == 16 || BitCount == 24 || BitCount == 32))
         {
             unsigned long RedBits = 8;
             unsigned long GreenBits = 8;
@@ -302,7 +302,7 @@ bool Image::LoadBmp(char const* Path)
             unsigned long ImageFormat = 0;
             PixelFormatFind(&ImageFormat, BitCount, RedBits, GreenBits, BlueBits, 0);
             unsigned long TargetFormat = 0;
-            PixelFormatFind(&TargetFormat, 0x20, 8, 8, 8, 0);
+            PixelFormatFind(&TargetFormat, 32, 8, 8, 8, 0);
 
             // Descriptor +0x10 is the 32-bit target format, +0x14 the DIB's own (the header
             // calls them SrcFormat / DstFormat; ximage uses +0x10 to choose the texture format
@@ -346,13 +346,13 @@ bool Image::LoadTga(char const* Path)
     // A "FileSystem" rooted at TgaPath under DALib::Data.
     FFileSystemDesc Desc;
     memset(&Desc, 0, 0x34);
-    Desc.Size = 0x34;
+    Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc.ComponentName = "FileSystem";
     Desc.Path = GetIntroConfigState()->TgaPath.Text;
-    Desc.Access = 0x80000000u;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080u;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
     IFileSystem* SubFs = nullptr;
     if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
@@ -380,8 +380,8 @@ bool Image::LoadTga(char const* Path)
             unsigned char const Type = static_cast<unsigned char>(Header[2] & 7);
             if (Type == kTgaColourMapped && Header[1] == 1)
                 PixelFormatFind(&ImageFormat, 8, 0, 0, 0, 0);
-            else if (Header[0x10] == 0x10)
-                PixelFormatFind(&ImageFormat, 0x10, 5, 5, 5, 0);
+            else if (Header[0x10] == 16)
+                PixelFormatFind(&ImageFormat, 16, 5, 5, 5, 0);
             else if (Type == kTgaGreyscale)
                 PixelFormatFind(&ImageFormat, 8, 8, 0, 0, 0);
             else if (TgaHasAlpha(Header))

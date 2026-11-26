@@ -48,7 +48,7 @@ void WinObject::Destroy()
     // FUN_004c9150.
     if (ClientMeshHolderHasInstance(&MeshHolder))
         ClientUiMeshHolderRelease(&MeshHolder);
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
     Win3DUnregister(this);
@@ -91,7 +91,7 @@ void WinObject::Draw()
     // Plain pass unless bit1 (FUN_0059efa0).
     if ((DrawFlags & 2) == 0)
     {
-        DALib::Pipeline->SetRenderState(D3DRS_ZFUNC, 8);
+        DALib::Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
         DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 1);
         SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0);
     }

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "flmaterials.h"
+#include "render/slots.h"
 #include "common_misc.h" // ICamera
 #include "engine/engbase.h" // IEngine
 #include "render/rendcomp.h" // IRenderer2
@@ -54,9 +55,17 @@ namespace
     unsigned char G_FixedShadowAddExtent = 1; // DAT_06704094
     unsigned char G_FixedShadowUseBounds = 0; // DAT_06704644
 
-    const unsigned long kShadowDrawRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kShadowDrawTss0[] = {1, 4, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
-    const unsigned long kShadowDrawTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const unsigned long kShadowDrawRs[] = {
+        D3DRS_LIGHTING, FALSE, D3DRS_SPECULARENABLE, FALSE, D3DRS_ALPHABLENDENABLE, TRUE,
+        D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
+    const unsigned long kShadowDrawTss0[] = {
+        D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
+    const unsigned long kShadowDrawTss1[] = {
+        D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT, 0};
 
     const char* const G_Name3DMathEngine = "3DMathEngine";
     const float kCameraNearConst = 1.0f;       // DAT_06701394
@@ -73,7 +82,7 @@ namespace
     const float kShadowColorScale = 255.0f;    // DAT_067022C4
     const float kShadowFadeForce = 10.0f;      // DAT_06702FC0
     const double kShadowScaleBias = 0.8;       // DAT_06702FB8
-    const unsigned long kShadowFvf = 0x142;    // XYZ|DIFFUSE|TEX1
+    const unsigned long kShadowFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
     float G_ShadowQuadScale = 1.0f;            // DAT_06704078
     unsigned char G_ShadowFadeForce = 0;       // DAT_06704640
     I3DMathEngine* G_MathEngine = nullptr;
@@ -231,30 +240,30 @@ namespace
             const float Cz = Center->z;
 
             if (((double)Radius - ZNear) < Cz)
-                return 1;
+                return kSphereOutside;
 
-            int Rank = 4;
+            int Rank = kSphereInside;
             if (!(((double)Radius + Cz) < -(double)ZNear))
-                Rank = 3;
+                Rank = kSphereStraddling;
             if (((double)Radius + Cz) < -(double)ZFar)
-                return 1;
+                return kSphereOutside;
             if (!(((double)Radius - ZFar) < Cz))
-                Rank = 3;
+                Rank = kSphereStraddling;
 
             const double SumX = std::fabs((double)Cx) * SidePlaneX_.x
                 + (double)Cz * SidePlaneX_.z;
             if (SumX > Radius)
-                return 1;
+                return kSphereOutside;
             if (!(SumX < -Radius))
-                Rank = 3;
+                Rank = kSphereStraddling;
 
             const double SumY = std::fabs((double)Cy) * SidePlaneY_.y
                 + (double)Cz * SidePlaneY_.z;
             if (SumY > Radius)
-                return 1;
+                return kSphereOutside;
             if (SumY < -Radius)
                 return Rank;
-            return 3;
+            return kSphereStraddling;
         }
 
         // +0x40 LAB_066fdca0: byte+9 → this+0x3C, else inner GetViewTransform.
@@ -888,15 +897,15 @@ namespace
     void ShadowWriterReset(FShadowVertWriter* Writer, char* Dest, int MaxVerts, unsigned long Fvf)
     {
         Writer->Xyz = Dest;
-        const unsigned long PositionBytes = (Fvf & 0xC) == 0xC ? 28 :
-            ((Fvf & 4) != 0 ? 16 : ((Fvf & 2) != 0 ? 12 : 0));
-        const unsigned long NormalBytes = (Fvf & 0x10) != 0 ? 12 : 0;
-        const unsigned long ColorBytes = ((Fvf & 0x40) != 0 ? 4 : 0) + ((Fvf & 0x80) != 0 ? 4 : 0);
+        const unsigned long PositionBytes = (Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4 ? 28 :
+            ((Fvf & D3DFVF_XYZRHW) != 0 ? 16 : ((Fvf & D3DFVF_XYZ) != 0 ? 12 : 0));
+        const unsigned long NormalBytes = (Fvf & D3DFVF_NORMAL) != 0 ? 12 : 0;
+        const unsigned long ColorBytes = ((Fvf & D3DFVF_DIFFUSE) != 0 ? 4 : 0) + ((Fvf & D3DFVF_SPECULAR) != 0 ? 4 : 0);
         unsigned long TextureBytes = 0;
         for (unsigned long Index = 0; Index < ((Fvf >> 8) & 15); ++Index)
         {
             const unsigned long Lane = (Fvf >> ((16 + Index * 2) & 31)) & 3;
-            TextureBytes += Lane == 0 ? 8 : (Lane == 1 ? 12 : (Lane == 2 ? 16 : 4));
+            TextureBytes += Lane == D3DFVF_TEXTUREFORMAT2 ? 8 : (Lane == D3DFVF_TEXTUREFORMAT3 ? 12 : (Lane == D3DFVF_TEXTUREFORMAT4 ? 16 : 4));
         }
         Writer->Color = Dest + PositionBytes + NormalBytes;
         Writer->Uv = Dest + PositionBytes + NormalBytes + ColorBytes;
@@ -954,7 +963,7 @@ namespace
     {
         (void)D;
         unsigned long Ability = 0;
-        PipelineQueryDeviceAbility(Appearance->Pipeline_, 9, &Ability);
+        PipelineQueryDeviceAbility(Appearance->Pipeline_, Render::DepthBias, &Ability);
         if (Ability == 0)
             return (GENRESULT)-1;
         const int InstanceCount = (int)((unsigned long)(C));
@@ -982,10 +991,10 @@ namespace
 
         PipelineApplyRsTable(Appearance->Pipeline_, kShadowDrawRs);
         PipelineSetModelview(Appearance->Pipeline_, (const float*)((ICamera*)A)->GetViewTransform());
-        FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, 4);
-        FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, 1);
+        FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+        FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, D3DCULL_NONE);
         FShadowRenderStateScope DepthBias(Appearance->Pipeline_, D3DRS_ZBIAS, 4);
-        FShadowRenderStateScope DepthWrite(Appearance->Pipeline_, D3DRS_ZWRITEENABLE, 0);
+        FShadowRenderStateScope DepthWrite(Appearance->Pipeline_, D3DRS_ZWRITEENABLE, FALSE);
         PipelineSetTextureStageState(Appearance->Pipeline_, 0, D3DTSS_TEXCOORDINDEX, 0);
         PipelineSetTextureStageTexture(Appearance->Pipeline_, 0, Handle);
         PipelineApplyTssTable(Appearance->Pipeline_, 0, kShadowDrawTss0);
@@ -1094,7 +1103,7 @@ namespace
                 }
                 Interfaces.Manager->UnlockVertexMemory(&LockOut);
                 if (Writer.Written != 0)
-                    PipelineDrawPrimitiveVb(Interfaces.Pipeline, 4, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
+                    PipelineDrawPrimitiveVb(Interfaces.Pipeline, D3DPT_TRIANGLELIST, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
                         (unsigned long)Writer.Written, nullptr);
             }
         }
@@ -1159,7 +1168,7 @@ namespace
         // LAB_066fe667: Inst is the second argument, Extra is the Starsphere override.
         IRenderer2* const Renderer = Renderer_;
         Camera = (FCameraBlob*)Scratch88_;
-        Renderer->RenderInstance(Camera, Extra, 1.0f, 0x80, nullptr, Override);
+        Renderer->RenderInstance(Camera, Extra, 1.0f, kDrawKeepCurrent, nullptr, Override);
         Camera = (FCameraBlob*)Scratch88_;
         if (Camera->BackdropClip() != 0)
         {
@@ -1190,7 +1199,7 @@ namespace
             return GR_OK;
         FlmVisibleCounterReset();
         // FUN_066ff620: both renderer and result destination are mandatory.
-        Renderer_->RenderInstance(A, B, 1.0f, 0x80, nullptr, Visible);
+        Renderer_->RenderInstance(A, B, 1.0f, kDrawKeepCurrent, nullptr, Visible);
         FlmVisibleCounterCopy((unsigned long*)C);
         return GR_OK;
     }

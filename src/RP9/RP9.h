@@ -181,6 +181,21 @@ struct FRp9IbList
     unsigned long Count;
 };
 
+// FDirectX9::SwapFlags_: the [RenderPipeline] INI switches read by Startup.
+enum ERp9SwapFlag
+{
+    SwapFlagLockableBackbuffer = 0x1, // LOCKABLE_BACKBUFFER
+    SwapFlagUseSyslock = 0x2,         // USE_SYSLOCK
+    SwapFlagHandleSwapLoss = 0x4      // HANDLE_SWAPLOSS
+};
+
+// FDirectX9::DeviceReady_.
+enum ERp9DeviceReadyFlag
+{
+    DeviceReadyBuffers = 0x1,     // between create_buffers and destroy_buffers
+    DeviceReadyGammaEnable = 0x2  // IGammaControl enable
+};
+
 enum ERp9StreamDirtyFlag : unsigned char
 {
     StreamDirtyVertexSource = 1,

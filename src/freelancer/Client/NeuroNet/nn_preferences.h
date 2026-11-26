@@ -41,6 +41,19 @@ class UiScroll;
 class WireButtonControl;
 class WireStaticControl;
 
+// NnPreferences::CurPage / ReqPage (+0x7f4 / +0x7f8); see the page list above. 5 (the close button
+// or main menu button) and 6 (escape) only ever occur as the requested page.
+enum EPrefPage
+{
+    kPrefPageKeyMap = 0,
+    kPrefPageInterface = 1,  // OptionsA
+    kPrefPageVideo = 2,      // OptionsC
+    kPrefPageAudio = 3,      // OptionsB
+    kPrefPageCredits = 4,
+    kPrefPageClose = 5,
+    kPrefPageEscape = 6
+};
+
 // One optlist.ini row (0x18 bytes); FUN_004afe30 initialises every int to -1 and every byte to 0.
 struct FPrefOption
 {
@@ -56,6 +69,15 @@ struct FPrefOption
 };
 static_assert(sizeof(FPrefOption) == 0x18, "retail optlist row is 0x18 bytes");
 
+// FKeyRow::BindingKind.
+enum EKeyBindingKind
+{
+    kKeyBindingNone = 0,           // no command
+    kKeyBindingPrimaryOnly = 1,
+    kKeyBindingPrimaryAndAlt = 2,  // has an alternate binding
+    kKeyBindingNoPrimary = 3       // only the alternate is bound
+};
+
 // One key map row (0x2c bytes) -- two FKeyBindingLookup-shaped triples and the command data.
 struct FKeyRowKey
 {
@@ -70,7 +92,7 @@ struct FKeyRow
     int NameIds;          // +0x18
     int InfoIds;          // +0x1c
     unsigned CommandId;   // +0x20
-    int BindingKind;      // +0x24 0 no command, 1 primary only, 2 has an alt, 3 no primary
+    int BindingKind;      // +0x24 EKeyBindingKind
     unsigned char bEditable; // +0x28
     unsigned char Pad29[3];
 };

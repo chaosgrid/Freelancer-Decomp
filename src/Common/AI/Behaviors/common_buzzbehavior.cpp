@@ -35,9 +35,9 @@ BuzzBehavior::BuzzBehavior(int InTypeId)
     , FastPathMaxDuration(0.0f)
     , AlignedElapsed(0.0f)
     , AfterburnerDelay(1.5f)
-    , BuzzState(0)
-    , HeadTowardStyle(0)
-    , PassByStyle(0)
+    , BuzzState(kBuzzStateHeadAway)
+    , HeadTowardStyle(kBuzzHeadStraightTo)
+    , PassByStyle(kBuzzPassBreakAway)
     , MinDistanceToHeadToward(500.0f)
     , Field328(1.5f)
     , DistanceToPassBy(100.0f)
@@ -86,11 +86,11 @@ bool BuzzBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // Four ICF-folded one-store setters on Move; retail calls them by borrowed names:
     // FUN_062d88b0 (+0x44), TextRenderContext::set_origin_h (.text:063275f0, +0x38),
     // FUN_062d5980 (MoveIdea::SetMode), DeviceTRC::bind_to_dc (.text:062a66b0, +0x3c).
-    Move.SetField44(2);
+    Move.SetField44(kMoveStopFlyThrough);
 
     Move.SetAngle38(3.14159274f);  // 0x40490fdb, MoveIdea's own ctor default
 
-    Move.SetMode(0);
+    Move.SetMode(kMoveModeEngine);
 
     Move.SetRange3c(0.0f);   // raw dword 0
 
@@ -114,7 +114,7 @@ void BuzzBehavior::RecomputeApproach()
 {
     Behavior::OnEngage();   // FUN_062d20d0
 
-    SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);   // FUN_062d21d0
 
     FastPathRange = 300.0f;
     FastPathElapsed = 0.0f;
@@ -123,7 +123,7 @@ void BuzzBehavior::RecomputeApproach()
 
     FastPathMaxDuration = 5.0f;
     AlignedElapsed = 0.0f;
-    BuzzState = 0;
+    BuzzState = kBuzzStateHeadAway;
     PassByElapsed = 0.0f;
     HeadAwayElapsed = 0.0f;
 
@@ -141,11 +141,11 @@ void BuzzBehavior::RecomputeApproach()
                                   Head.BuzzHeadTowardStyleWeightStraightTo);
         double const Pick = (double)std::rand() * Sum * 3.0517578125e-05;
         if (Pick < Head.BuzzHeadTowardStyleWeightSlide)
-            HeadTowardStyle = 1;
+            HeadTowardStyle = kBuzzHeadSlide;
         else if (Pick < (double)Head.BuzzHeadTowardStyleWeightWaggle + Head.BuzzHeadTowardStyleWeightSlide)
-            HeadTowardStyle = 2;
+            HeadTowardStyle = kBuzzHeadWaggle;
         else
-            HeadTowardStyle = 0;
+            HeadTowardStyle = kBuzzHeadStraightTo;
     }
 
     // Same shape for PassByStyle over StraightBy / EngineKill / BreakAway.
@@ -155,11 +155,11 @@ void BuzzBehavior::RecomputeApproach()
                                   Pass.BuzzPassByStyleWeightBreakAway);
         double const Pick = (double)std::rand() * Sum * 3.0517578125e-05;
         if (Pick < Pass.BuzzPassByStyleWeightStraightBy)
-            PassByStyle = 1;
+            PassByStyle = kBuzzPassStraightBy;
         else if (Pick < (double)Pass.BuzzPassByStyleWeightEngineKill + Pass.BuzzPassByStyleWeightStraightBy)
-            PassByStyle = 2;
+            PassByStyle = kBuzzPassEngineKill;
         else
-            PassByStyle = 0;
+            PassByStyle = kBuzzPassBreakAway;
     }
 
     // Variance factor (2R - 1) * pct + 1 computed on the x87 stack, one float store.
@@ -238,7 +238,7 @@ int BuzzBehavior::EvaluateReadiness()
         if (!SysMgr->FormationLeaders.FollowerDirectiveGateA())
         {
             IObjRW* const Target = SysMgr->Targeting.GetTarget();
-            if (Target != nullptr && (GetObjectTypeOrZero(Target) & 0x30000) != 0)
+            if (Target != nullptr && (GetObjectTypeOrZero(Target) & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0)
                 Mode = 1;
         }
     }
@@ -337,8 +337,8 @@ int BuzzBehavior::Update()
     // Retail writes the record's interface pointers before testing either.
     if (OwnerContext == nullptr || Handle == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     // SysMgr+0x14fc, the first argument to all four intercept probes.
@@ -357,7 +357,7 @@ int BuzzBehavior::Update()
     // tail (LAB_062c6cda), so the timeout check below still runs.
     // ------------------------------------------------------------------
     bool bFastPathTaken = false;
-    if (BuzzState != 2)
+    if (BuzzState != kBuzzStatePassBy)
     {
         // FUN_062e4f60 / FUN_062e4d00, arguments in retail's push order. Strict less-than.
         if (IsTargetCoAlignedAndAhead(NavRecord, &Record, 0.0f) &&
@@ -423,7 +423,7 @@ int BuzzBehavior::Update()
         // ------------------------------------------------------------------
         // BuzzState == 0, the head-away stage.
         // ------------------------------------------------------------------
-        if (BuzzState == 0)
+        if (BuzzState == kBuzzStateHeadAway)
         {
             // IObjAffect slot 8 (named from Server.dll's Ship forwarder .text:06d02a70);
             // retail discards the result.
@@ -435,7 +435,7 @@ int BuzzBehavior::Update()
                 // Any other style goes straight to the timer. No own field is written here.
                 switch (HeadTowardStyle)
                 {
-                case 0:
+                case kBuzzHeadStraightTo:
                 {
                     // Retail pushes the argument before the branch and both arms tick Afterburner,
                     // so the tick is hoisted.
@@ -445,7 +445,7 @@ int BuzzBehavior::Update()
                     // unordered. The second switch gates the same field with JNP.
                     if (Pers.BuzzHeadParams.BuzzHeadTowardRollThrottle != 0.0f)   // [0x1638]
                     {
-                        ApplySteeringFate(3, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
+                        ApplySteeringFate(kDodgeStyleCorkscrew, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
                                           Pers.BuzzHeadParams.BuzzDodgeIntervalTimeVariancePercent);
                     }
                     else
@@ -489,16 +489,16 @@ int BuzzBehavior::Update()
                     }
                     break;
                 }
-                case 1:
+                case kBuzzHeadSlide:
                     // Retail enters the epilogue at LAB_062c66f2, past the push sequence, but
                     // performs the same three stores.
                     Afterburner.Update(DeltaTime);
-                    ApplySteeringFate(2, Pers.BuzzHeadParams.BuzzSlideIntervalTime,
+                    ApplySteeringFate(kDodgeStyleSlide, Pers.BuzzHeadParams.BuzzSlideIntervalTime,
                                       Pers.BuzzHeadParams.BuzzSlideIntervalTimeVariancePercent);
                     break;
-                case 2:
+                case kBuzzHeadWaggle:
                     Afterburner.Update(DeltaTime);
-                    ApplySteeringFate(0, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
+                    ApplySteeringFate(kDodgeStyleWaggle, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
                                       Pers.BuzzHeadParams.BuzzDodgeIntervalTimeVariancePercent);
                     break;
                 default:
@@ -522,7 +522,7 @@ int BuzzBehavior::Update()
                 Afterburner.Commit();
                 Face.Commit();
                 Move.Commit();
-                BuzzState = 1;
+                BuzzState = kBuzzStateHeadToward;
 
                 // FUN_062ecc60 / FUN_062ecce0 on the SysMgr+0x1364 record.
                 FFormationLeaderState& LeaderRec = SysMgr->FormationLeaders;
@@ -541,7 +541,7 @@ int BuzzBehavior::Update()
         // LAB_062c672b: BuzzState == 1, the head-toward stage. Runs in the same tick as the
         // head-toward commit above.
         // ------------------------------------------------------------------
-        if (BuzzState == 1)
+        if (BuzzState == kBuzzStateHeadToward)
         {
             if (IsWithinInterceptRange(NavRecord, &Record, DistanceToPassBy))
             {
@@ -559,7 +559,7 @@ int BuzzBehavior::Update()
                 {
                     Afterburner.Commit();
                 }
-                BuzzState = 2;
+                BuzzState = kBuzzStatePassBy;
 
                 if (Pers.FormationParams.bBreakApartFormationOnBuzzPassBy != 0)
                 {
@@ -584,7 +584,7 @@ int BuzzBehavior::Update()
                     // DAT_0639f5d0 pi/8, DAT_0639f534 pi/16, DAT_0639f5d4 pi/2.
                     switch (HeadTowardStyle)
                     {
-                    case 0:
+                    case kBuzzHeadStraightTo:
                     {
                         Record.RefreshPos();
                         NavRecord->RefreshPos();
@@ -595,7 +595,7 @@ int BuzzBehavior::Update()
                             ReadCandidateMetric(SysMgr, CandidatePos) < 0.3926991f;  // DAT_0639f5d0
                         if (bWithinAngle && Pers.BuzzHeadParams.BuzzHeadTowardRollThrottle != 0.0f)
                         {
-                            ApplySteeringFate(3, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
+                            ApplySteeringFate(kDodgeStyleCorkscrew, Pers.BuzzHeadParams.BuzzDodgeIntervalTime,
                                               Pers.BuzzHeadParams.BuzzDodgeIntervalTimeVariancePercent);
                         }
                         else
@@ -604,12 +604,12 @@ int BuzzBehavior::Update()
                         }
                         break;
                     }
-                    case 1:
+                    case kBuzzHeadSlide:
                         Record.RefreshPos();
                         NavRecord->RefreshPos();
                         if (ReadCandidateMetric(SysMgr, CandidatePos) < 0.19634955f)  // DAT_0639f534
                         {
-                            ApplySteeringFate(2, Pers.BuzzHeadParams.BuzzSlideIntervalTime,
+                            ApplySteeringFate(kDodgeStyleSlide, Pers.BuzzHeadParams.BuzzSlideIntervalTime,
                                               Pers.BuzzHeadParams.BuzzSlideIntervalTimeVariancePercent);
                         }
                         else
@@ -617,7 +617,7 @@ int BuzzBehavior::Update()
                             AcquireLockEffects();
                         }
                         break;
-                    case 2:
+                    case kBuzzHeadWaggle:
                     {
                         // Not the shared epilogue: a guide-vector write sits between the fate
                         // stores and the Dodge tick.
@@ -625,7 +625,7 @@ int BuzzBehavior::Update()
                         NavRecord->RefreshPos();
                         if (ReadCandidateMetric(SysMgr, CandidatePos) < 1.5707964f)  // DAT_0639f5d4
                         {
-                            Dodge.DodgeStyle = 0;                                 // .text:062d8920
+                            Dodge.DodgeStyle = kDodgeStyleWaggle;                                 // .text:062d8920
                             Dodge.IntervalTime = Pers.BuzzHeadParams.BuzzDodgeIntervalTime;                // [0x1664] .text:063275d0
                             Dodge.IntervalTimeVariancePercent = Pers.BuzzHeadParams.BuzzDodgeIntervalTimeVariancePercent; // [0x1668] .text:063275f0
 
@@ -675,7 +675,7 @@ int BuzzBehavior::Update()
         // LAB_062c6b50: BuzzState == 2, the pass-by stage. Also runs in the same tick as the
         // transition above.
         // ------------------------------------------------------------------
-        if (BuzzState == 2)
+        if (BuzzState == kBuzzStatePassBy)
         {
             // Compare on the unrounded sum, strictly less.
             double const Sum338 = (double)(PassByElapsed) + (double)(DeltaTime);
@@ -684,14 +684,14 @@ int BuzzBehavior::Update()
             {
                 switch (PassByStyle)
                 {
-                case 0:
+                case kBuzzPassBreakAway:
                     // All four on BreakAway (BreakAwayIdea).
                     BreakAway.TurnThrottle = Pers.BuzzPassParams.BuzzBreakTurnThrottle;   // FUN_062d9490, +0x94
-                    BreakAway.BreakStyle = 1;   // .text:063275d0 fold, +0x34; 1 = Sideways
+                    BreakAway.BreakStyle = kBreakStyleSideways;   // .text:063275d0 fold, +0x34
                     BreakAway.SetWatchObject(Record.Iface);   // FUN_062d9450
                     BreakAway.Update(DeltaTime);   // LAB_062d8a50
                     break;
-                case 1:
+                case kBuzzPassStraightBy:
                     Face.PublishTargetId(0);   // FUN_062d4e50
                     // FUN_062d75e0 (FaceIdea::SetAxis); the roll throttle goes in .z.
                     {
@@ -718,7 +718,7 @@ int BuzzBehavior::Update()
                     break;
                 default:
                     // PassByStyle == 2 only; other values just zero Result (LAB_062c6cbf).
-                    if (PassByStyle == 2)
+                    if (PassByStyle == kBuzzPassEngineKill)
                     {
                         SysMgr->Thrust.SetEngineActive(false);   // FUN_062e91d0
 
@@ -736,7 +736,7 @@ int BuzzBehavior::Update()
                 // Give up the maneuver and restart at head away.
                 PassByElapsed = 0.0f;
                 HeadAwayElapsed = 0.0f;
-                BuzzState = 0;
+                BuzzState = kBuzzStateHeadAway;
                 Result = 2;
             }
         }

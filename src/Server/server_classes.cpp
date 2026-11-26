@@ -729,7 +729,7 @@ unsigned int ObjectList::collect_in_sphere(unsigned int* OutIds, unsigned int Ma
         CSimple* const Simple = static_cast<CSimple*>(Raw);
         if ((Simple->TypeBits & TypeMask) == 0u)
             continue;
-        if ((TypeMask & 0x7f0000u) != 0u && Wrapper->is_destroyed())
+        if ((TypeMask & OBJ_SHIP_MASK) != 0u && Wrapper->is_destroyed())
             continue;
 
         if (static_cast<double>(Radius) < 0.0)

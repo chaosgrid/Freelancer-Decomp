@@ -230,9 +230,15 @@ struct FRpVertexStream
     unsigned int Count;              // +0x10  vertices in the stream
 };
 
+enum ERpVertexSrcFlags
+{
+    kRpVertexSrcInterleaved = 2, // FRpVertexSrcDesc::Flags: interleaved source
+    kRpVertexSrcIndexed = 4      // FRpVertexSrcDesc::Flags: indexed (family B)
+};
+
 struct FRpVertexSrcDesc
 {
-    unsigned int Flags;              // +0x00  2: interleaved source, 4: indexed (family B)
+    unsigned int Flags;              // +0x00  ERpVertexSrcFlags
     FRpVertexStream Position;        // +0x04
     FRpVertexStream Normal;          // +0x18
     FRpVertexStream Diffuse;         // +0x2c
@@ -291,6 +297,14 @@ struct IRPDraw : IDAComponent
                                                      unsigned int NumVertices,
                                                      unsigned int StartIndex,
                                                      unsigned int Count) = 0;
+};
+
+// Flags of IRPVertexBuffer::CreateVb / IRPIndexBuffer::CreateIb (rp8.dll FUN_06d118c8,
+// FUN_06d12d4e).
+enum ERpBufferCreateFlags
+{
+    kRpBufferDynamic = 1,            // D3DUSAGE_DYNAMIC (CreateVb: the per-FVF pooled buffer)
+    kRpBufferSoftwareProcessing = 2  // D3DUSAGE_SOFTWAREPROCESSING
 };
 
 struct IRPIndexBuffer : IDAComponent
@@ -355,6 +369,14 @@ struct IRPVertexBuffer : IDAComponent
 // Slot order from rp8.dll's IGammaControl vtables (.rdata:06d5e200 and 06d5e540, identical
 // from slot 3 on). The only exe caller FUN_00424510 calls slot 6 with one byte and slot 3 with
 // (7, gamma, 0, 1.0f, 0).
+// IGammaControl channel selector (rp8.dll FUN_06d153e6, FUN_06d1560c, FUN_06d15757).
+enum ERpGammaChannel
+{
+    kRpGammaRed = 1,
+    kRpGammaGreen = 2,
+    kRpGammaBlue = 4
+};
+
 struct IGammaControl : IDAComponent
 {
     // slot 3 FUN_06d153e6, RET 0x18: a channel bitmask (bit0 red, bit1 green, bit2 blue) and

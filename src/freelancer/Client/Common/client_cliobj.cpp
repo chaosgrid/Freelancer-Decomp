@@ -830,7 +830,7 @@ namespace Archetype
             int GroupOverride = static_cast<int>(Arg);
 
             // DAT_005c75dc = 1.0f; unordered takes the plain load.
-            if (GetPerfOptionSlot(1) < 1.0f)
+            if (GetPerfOptionSlot(kPerfSlotHighDetailTextures) < 1.0f)
             {
                 // A zero group arg refuses the load outright.
                 if (GroupOverride == 0)
@@ -903,10 +903,10 @@ namespace Archetype
                 Desc.Size = 0x34;
                 Desc.ComponentName = "FileSystem";
                 Desc.DataPath = Path;
-                Desc.Access = 0x80000000u;
-                Desc.ShareMode = 1;
-                Desc.Creation = 3;
-                Desc.Flags = 0x8000080u;
+                Desc.Access = GENERIC_READ;
+                Desc.ShareMode = FILE_SHARE_READ;
+                Desc.Creation = OPEN_EXISTING;
+                Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
                 Desc.FindHandle = 0xffffffffu;
 
                 void* FsOut = nullptr;
@@ -2190,11 +2190,11 @@ namespace Archetype
                     It += 1;
                 }
                 ResolvedEntries.End = ResolvedEntries.Begin;
-                StateFlags = static_cast<unsigned char>(StateFlags & 0xFCu);
+                StateFlags = static_cast<unsigned char>(StateFlags & ~(CliObjFlagCacheBuilt | CliObjFlagMaterialsRealized));
             }
 
             ReleaseHitEffects();
-            StateFlags = static_cast<unsigned char>(StateFlags & 0xEBu);
+            StateFlags = static_cast<unsigned char>(StateFlags & ~(CliObjFlagEngineSide | CliObjFlagLodPickDone));
         }
 
         void FCliObj::LoadHitEffects(unsigned Arg)
@@ -2223,7 +2223,7 @@ namespace Archetype
                 TeardownDistanceRecord(It);
                 It += 1;
             }
-            StateFlags = static_cast<unsigned char>(StateFlags & 0xF7u);
+            StateFlags = static_cast<unsigned char>(StateFlags & ~CliObjFlagHitEffectsLoaded);
         }
 
         void FCliObj::DestroyMostDerived()

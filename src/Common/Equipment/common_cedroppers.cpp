@@ -120,7 +120,7 @@ bool CECounterMeasureDropper::Update(float Dt, unsigned Flags)
 
                 unsigned Kind = 0;                  // retail leaves the slot unset before the call
                 Tracked->get_type(Kind);
-                if (Kind != 0x1000000)
+                if (Kind != OBJ_GUIDED)
                     continue;
 
                 IObjRW* SubObj = nullptr;

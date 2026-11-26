@@ -60,19 +60,19 @@ namespace
     // Win3D +0x6c bits 0..1 (FUN_005a0c30's pair): set = shown.
     void ShowControl(Win3D* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags | 3);
+        Control->Flags = static_cast<unsigned char>(Control->Flags | kWin3DActive | kWin3DVisible);
     }
 
     void HideControl(Win3D* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags & 0xfc);
+        Control->Flags = static_cast<unsigned char>(Control->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 }
 
 NnLoadSave::NnLoadSave()
     : bCursorDrawFlag(0)
     , Mode(0)
-    , ConfirmMode(0)
+    , ConfirmMode(kLoadSaveConfirmNone)
     , bExitToMainMenu(0)
     , bSaveAllowed(1)
     , bListRefreshed(1)
@@ -306,7 +306,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                             nullptr, nullptr, &DescripPosition, nullptr,
                                             &DescripHalf, 0, 0, 1, 0, 0x596, 0, 0);
         static_cast<NnButtonControl*>(DescripButton)->SetMontageMode(1);
-        DescripButton->SetProperty(0x32, 1, 0);
+        DescripButton->SetProperty(kButtonPropNoMeshRender, 1, 0);
 
         Vector const DescripTextPosition = {NnFloatBits(0xbc1374bc), NnFloatBits(0x3e50e560),
                                             ZFar};
@@ -523,7 +523,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // NN_Confirm answered (A == 1 yes) the question +0x338 names.
         switch (ConfirmMode)
         {
-        case 1:
+        case kLoadSaveConfirmDelete:
             // Delete the selected save (FUN_005aa8f0 on DAT_0067e7b8).
             if (A == 1 && NameList.SelectedIndex != -1)
             {
@@ -539,14 +539,14 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 RefreshSaveList();
             }
             break;
-        case 2:
+        case kLoadSaveConfirmMainMenu:
             // Back to the main menu at the next Update.
             if (A == 1)
                 bExitToMainMenu = 1;
             break;
-        case 3:
+        case kLoadSaveConfirmSaveFailed:
             break;
-        case 4:
+        case kLoadSaveConfirmOverwrite:
             // Overwrite: the save FUN_00487550 would have made, with +0x368 as the character.
             if (A == 1)
             {
@@ -574,7 +574,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                   0x2dc, ConfirmMode);
             break;
         }
-        ConfirmMode = 0;
+        ConfirmMode = kLoadSaveConfirmNone;
         if (DescripEdit != nullptr)
             DescripEdit->Activate();
         NameList.bSelectable = 1;
@@ -622,7 +622,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (bButtonEnabled[2] == 0 || NameList.SelectedIndex == -1)
                 return 0;
             wchar_t const* const Name = Entries[NameList.SelectedIndex].Name.c_str();
-            ConfirmMode = 1;
+            ConfirmMode = kLoadSaveConfirmDelete;
             if (DescripEdit != nullptr)
                 DescripEdit->Deactivate(false); // FUN_0057c7d0(0)
             GetIdsStringWWithRawFallback(0x75c, Format, 0x400);
@@ -637,7 +637,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (bButtonEnabled[3] == 0)
                 return 0;
             GetIdsStringWWithRawFallback(0x75b, Text, 0x400);
-            ConfirmMode = 2;
+            ConfirmMode = kLoadSaveConfirmMainMenu;
             if (DescripEdit != nullptr)
                 DescripEdit->Deactivate(false);
             NameList.bSelectable = 0;
@@ -672,7 +672,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // The pointer entered a button: its caption, when shown, highlights.
         WinControl* const Caption = ButtonTextFor(A);
-        if (Caption == nullptr || (Caption->Flags & 1) == 0)
+        if (Caption == nullptr || (Caption->Flags & kWin3DActive) == 0)
             return 0;
         Caption->SetProperty(kWinPropBlink, 1, 0);
         return 0;
@@ -681,7 +681,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // It left: the colour goes back to DAT_00679bb4.
         WinControl* const Caption = ButtonTextFor(A);
-        if (Caption == nullptr || (Caption->Flags & 1) == 0)
+        if (Caption == nullptr || (Caption->Flags & kWin3DActive) == 0)
             return 0;
         Caption->SetProperty(kWinPropBlink, 0, 0);
         Caption->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 0);
@@ -731,7 +731,7 @@ void NnLoadSave::SaveGame()
         // "Overwrite?"; retail inlines FUN_004889e0 here.
         wchar_t Text[0x400];
         GetIdsStringWWithRawFallback(0x706, Text, 0x400);
-        ConfirmMode = 4;
+        ConfirmMode = kLoadSaveConfirmOverwrite;
         if (DescripEdit != nullptr)
             DescripEdit->Deactivate(false);
         NameList.bSelectable = 0;
@@ -793,7 +793,7 @@ void NnLoadSave::RefreshSaveList()
         // Saves failed while away (DAT_0067e984).
         if (G_LoginMgr.SaveFailureCount != 0)
         {
-            ConfirmMode = 3;
+            ConfirmMode = kLoadSaveConfirmSaveFailed;
             if (DescripEdit != nullptr)
                 DescripEdit->Deactivate(false);
             NnErrorOpen(0x5cd, this);
@@ -970,7 +970,7 @@ void NnLoadSave::Update()
 
     // Outside the main-menu question, the row under the pointer in either list is highlighted
     // in both (ListBox +0x80).
-    if (ConfirmMode != 2)
+    if (ConfirmMode != kLoadSaveConfirmMainMenu)
     {
         int Row = -1;
         if (NameList.HoverIndex != -1)

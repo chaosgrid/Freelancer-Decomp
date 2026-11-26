@@ -33,6 +33,14 @@ struct GoodInfo;
 class RichTextWin;
 class ShipViewControl;
 
+// NnShipTrader::RowStatus values.
+enum EShipTraderRowStatus
+{
+    kShipRowBuyable = 0,
+    kShipRowRankTooLow = 1,        // single player only (IDS 0x61b with the level)
+    kShipRowReputationTooLow = 2   // IDS 0x61c
+};
+
 class NnShipTrader : public WinControl, public EventHandler
 {
 public:

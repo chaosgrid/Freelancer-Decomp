@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_guidebehavior.h"
+#include "common_gotobehavior.h"   // EGotoKind
 #include "common_pathfind.h" // PathfindManager (IBehaviorManager+0x0C)
 #include "common_systemmanager.h" // SystemManager::Targeting / ExternalIface (NotifyManagerGuideEvent)
 
@@ -75,7 +76,7 @@ void GuideBehavior::OnEngage()
     BaseFollowerBehavior* const Follow = static_cast<BaseFollowerBehavior*>(FollowDelegate);
     Follow->Flag28c = 1;
     Follow->MatchThrottle.SetFlag39(true);
-    Follow->Move.SetField44(2);
+    Follow->Move.SetField44(kMoveStopFlyThrough);
     FollowDelegate->OnEngage();
     GuideDestination = GotoOp.Destination;
     ArrivalRadius = GotoOp.ArrivalRange;
@@ -112,7 +113,7 @@ void GuideBehavior::OnDisengage()
 int GuideBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
-    if ((Flags28 & 0x2) != 0)
+    if ((Flags28 & kBehaviorFlagDirectiveAccepted) != 0)
     {
         IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target()));
         if (Lead != nullptr)
@@ -123,7 +124,7 @@ int GuideBehavior::OnEvaluateReadiness(float Value)
                 Readiness = (Flag29 != 0) ? 3 : 0;
             return Readiness;
         }
-        BehaviorMgr->SetDirectiveResult(0xe, 1);
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_GUIDE, 1);
     }
     Readiness = (Flag29 != 0) ? 3 : 2;
     return Readiness;
@@ -179,7 +180,7 @@ bool GuideBehavior::OnApplyDirective(void* DirectiveOp)
     }
     GuideRange = Op->GuideRange;
     bStartFollowing = Op->bStartFollowing;
-    Flags28 = static_cast<unsigned char>((Flags28 & ~0x2u) | (bResult ? 0x2u : 0u));
+    Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | (bResult ? static_cast<unsigned>(kBehaviorFlagDirectiveAccepted) : 0u));
     return bResult;
 }
 
@@ -210,7 +211,7 @@ bool GuideBehavior::NotifyManagerGuideEvent(IBehaviorManager* BehaviorMgr, unsig
                                            int EventCode, float Clearance, Vector const* Point)
 {
     // Only while attacking (+0x1434) and Guide (0xe) is the current behavior.
-    if (BehaviorMgr->Sys->Targeting.AttackState == 0 || BehaviorMgr->CurrentBehaviorIndex != 0xe)
+    if (BehaviorMgr->Sys->Targeting.AttackState == TargetManager::kAttackStateEngaged || BehaviorMgr->CurrentBehaviorIndex != BEHAVIOR_GUIDE)
         return false;
 
     // ContentCbPtr (+0x110) slot 2.
@@ -242,14 +243,14 @@ int GuideBehavior::Update()
     if (ObjA == nullptr)
     {
         // Only this exit clears the flag bit.
-        Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        UpdateResult = 3;
-        return 3;
+        Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     // Retail re-reads EscortWatcher and repeats both tests here; nothing in between can change it.
 
@@ -257,22 +258,22 @@ int GuideBehavior::Update()
 
     // ---- refresh the guide destination point ----
     int const GotoMode = GotoOp.GotoKind;
-    if (GotoMode == 0)
+    if (GotoMode == kGotoKindObject)
     {
         IObjRW* const ObjB = ObjRwFromWatchable(const_cast<Watchable*>(DestinationWatcher.target()));
         if (ObjB == nullptr)
         {
-            Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgr->SetDirectiveResult(0xe, 1);
-            UpdateResult = 2;
-            return 2;
+            Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+            BehaviorMgr->SetDirectiveResult(BEHAVIOR_GUIDE, 1);
+            UpdateResult = kBehaviorUpdateFinished;
+            return kBehaviorUpdateFinished;
         }
         // Retail re-tests the mode here (062cf66d), which is always zero: dead, not reproduced.
         Vector WatchedBPos;
         GetIfacePositionOrZero(&WatchedBPos, ObjB);
         GuideDestination = WatchedBPos;
     }
-    else if (GotoMode == 1)
+    else if (GotoMode == kGotoKindPoint)
     {
         GuideDestination = GotoOp.Destination;
     }
@@ -356,7 +357,7 @@ int GuideBehavior::Update()
             if (ProgressDelta < ProgressLowThreshold)
             {
                 if (!bInsideRadial)
-                    FireGuideEvent(ObjA, NavElem, 8, Clearance);
+                    FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadFollowNeg, Clearance);
                 bEscortFollowing = 0; // whether or not the event fired
             }
             else if (ProgressDelta > ProgressHighThreshold)
@@ -364,19 +365,19 @@ int GuideBehavior::Update()
                 if (ApproachAngleRad > CourseAngleThreshold)
                 {
                     if (!bInsideRadial)
-                        FireGuideEvent(ObjA, NavElem, 6, Clearance);
+                        FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadFollowPosAppOff, Clearance);
                     bEscortFollowing = 0;
                 }
                 else
                 {
                     // The one arm that neither checks bInsideRadial nor clears bEscortFollowing.
-                    FireGuideEvent(ObjA, NavElem, 5, Clearance);
+                    FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadFollowPos, Clearance);
                 }
             }
             else if (Clearance < EscortMinClearance)
             {
                 if (!bInsideRadial)
-                    FireGuideEvent(ObjA, NavElem, 7, Clearance);
+                    FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadFollowFlat, Clearance);
                 bEscortFollowing = 0;
             }
         }
@@ -404,11 +405,11 @@ int GuideBehavior::Update()
         {
             if (bLeaderIsSelf)
             {
-                FireGuideEvent(ObjA, NavElem, 4, Clearance);
+                FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadSelf, Clearance);
             }
             else if (ProgressDelta < ProgressLowThreshold && !bInsideRadial)
             {
-                FireGuideEvent(ObjA, NavElem, 3, Clearance);
+                FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadGotoNeg, Clearance);
             }
             else
             {
@@ -426,18 +427,18 @@ int GuideBehavior::Update()
                         // Unordered skips the event.
                         if (ApproachAngleRad <= CourseAngleThreshold)
                         {
-                            FireGuideEvent(ObjA, NavElem, 1, Clearance);
+                            FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadGotoPos, Clearance);
                             bEscortFollowing = 1;
                         }
                     }
                     else if (bInsideRadial)
                     {
-                        FireGuideEvent(ObjA, NavElem, 4, Clearance);
+                        FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadSelf, Clearance);
                     }
                 }
                 else if (!bField3cC0 && !bInsideRadial)
                 {
-                    FireGuideEvent(ObjA, NavElem, 2, Clearance);
+                    FireGuideEvent(ObjA, NavElem, pub::AI::ContentCallback::LeadGotoFlat, Clearance);
                     bEscortFollowing = 1;
                 }
             }
@@ -455,7 +456,7 @@ int GuideBehavior::Update()
         {
             // Still leading: tick GotoDelegate. A result of 2 skips the radial termination test.
             GotoDelegate->DeltaTime = DeltaTime;
-            if (GotoDelegate->OnUpdate() == 2)
+            if (GotoDelegate->OnUpdate() == kBehaviorUpdateFinished)
                 bSkipRadialTermination = true;
         }
     }
@@ -467,18 +468,18 @@ int GuideBehavior::Update()
     {
         if (!(GetSignedRadialClearanceToPoint(NavElem, GuideDestination) <= ArrivalRadius))
         {
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
     }
     if (!(GetInterceptClearanceOfIface(NavElem, ObjA) <= GotoOp.TetherNearRange))
     {
-        UpdateResult = 1;
-        return 1;
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;
     }
 
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-    BehaviorMgr->SetDirectiveResult(0xe, 0);
-    UpdateResult = 2;
-    return 2;
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
+    BehaviorMgr->SetDirectiveResult(BEHAVIOR_GUIDE, 0);
+    UpdateResult = kBehaviorUpdateFinished;
+    return kBehaviorUpdateFinished;
 }

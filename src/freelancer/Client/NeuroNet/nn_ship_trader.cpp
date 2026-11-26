@@ -187,7 +187,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
                 Vector const Zero = {0.0f, 0.0f, 0.0f};
                 ShipMeshes[Row] = CreateStaticControl(Name, ShipGood->ItemIcon.Value, &Position, nullptr,
                                                       &Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0, &Zero);
-                ShipMeshes[Row]->Flags = static_cast<unsigned char>(ShipMeshes[Row]->Flags & 0xf7);
+                ShipMeshes[Row]->Flags = static_cast<unsigned char>(ShipMeshes[Row]->Flags & ~kWin3DPickable);
                 RowMeshPaths[Row] = ShipGood->ItemIcon.Value; // +0x78
             }
         }
@@ -336,7 +336,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
                                                           ShipGood->ItemIcon.Value, &Position, nullptr,
                                                           &Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0,
                                                           &Zero);
-                    CurrentShipMesh->Flags = static_cast<unsigned char>(CurrentShipMesh->Flags & 0xf7);
+                    CurrentShipMesh->Flags = static_cast<unsigned char>(CurrentShipMesh->Flags & ~kWin3DPickable);
                 }
             }
 
@@ -474,7 +474,7 @@ void NnShipTrader::RefreshRows()
     {
         unsigned const GoodId = RowGoodIds[Row];
         RowIndices[Row] = Row;
-        RowStatus[Row] = 0;
+        RowStatus[Row] = kShipRowBuyable;
         float const MinLevel = ClientMarketGetMinLevel(Market, GoodId); // FUN_00438160
         float const MinRep = ClientMarketGetMinRep(Market, GoodId);     // FUN_004381c0
         RowRequiredLevels[Row] = static_cast<int>(MinLevel);
@@ -484,13 +484,13 @@ void NnShipTrader::RefreshRows()
         if (Level >= 0 && Level < 0x3e7 && static_cast<double>(Level) < static_cast<double>(MinLevel))
         {
             if (SinglePlayer())
-                RowStatus[Row] = 1;
+                RowStatus[Row] = kShipRowRankTooLow;
             continue;
         }
 
         // A requirement above the base feeling locks the row by reputation.
         if (MinRep > BaseFeeling)
-            RowStatus[Row] = 2;
+            RowStatus[Row] = kShipRowReputationTooLow;
     }
 
     // Bubble sort by status.
@@ -544,7 +544,7 @@ void NnShipTrader::RefreshRows()
         FormatGroupedNumber(PriceText, RowPrices[Row], -1); // FUN_004779a0
         ShipPrices[Row]->SetProperty(kTextPropSetText, PointerArg(PriceText), 0);
 
-        uintptr_t const bLocked = RowStatus[Row] != 0 ? 1 : 0;
+        uintptr_t const bLocked = RowStatus[Row] != kShipRowBuyable ? 1 : 0;
         unsigned char const FrameColor[4] = {0x80, 0x80, 0x80, 0xff};
         NameFrames[Row]->SetProperty(kWinPropColour, PointerArg(FrameColor), bLocked);
         NameIconFrames[Row]->SetProperty(kWinPropColour, PointerArg(FrameColor), bLocked);
@@ -609,7 +609,7 @@ bool NnShipTrader::KeyEvent(unsigned Key, unsigned char* Modifiers)
 {
     // LAB_004b89a0 (RET 8): a key press (bit 1) of Escape closes the window. Retail tests `this`
     // first.
-    if ((*Modifiers & 2) != 0 && Key == 0x1b)
+    if ((*Modifiers & kWin3DKeyPressed) != 0 && Key == VK_ESCAPE)
     {
         NavBarCloseService(false); // FUN_004424f0(0)
         NavBarShowDealerTab();     // FUN_00442850
@@ -671,7 +671,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         if (RowPrices[Row] > PlayerWorth)
             return 0;
-        if (RowStatus[Row] != 0)
+        if (RowStatus[Row] != kShipRowBuyable)
             return 0;
         int const Index = RowIndices[Row];
         NavBarCloseService(false);
@@ -709,7 +709,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    case 0x4e:
+    case kWinPropCloseFromOutside:
         // caseD_4e: close. Retail tests `this` first.
         NavBarCloseService(false);
         NavBarShowDealerTab();
@@ -740,20 +740,20 @@ void NnShipTrader::SelectRow(int Row)
     for (int Index = 0; Index < RowCount; ++Index)
     {
         uintptr_t const bChecked = Index == Row ? 1 : 0;
-        NameFrames[Index]->SetProperty(0xc, bChecked, 0);
-        NameIconFrames[Index]->SetProperty(0xc, bChecked, 0);
+        NameFrames[Index]->SetProperty(kWinPropLit, bChecked, 0);
+        NameIconFrames[Index]->SetProperty(kWinPropLit, bChecked, 0);
     }
 
     // The current ship's frames (not tested for null on -2).
     if (Selected == -2)
     {
-        CurrentShipButton->SetProperty(0xc, 1, 0);
-        CurrentShipFrame->SetProperty(0xc, 1, 0);
+        CurrentShipButton->SetProperty(kWinPropLit, 1, 0);
+        CurrentShipFrame->SetProperty(kWinPropLit, 1, 0);
     }
     else if (CurrentShipButton != nullptr)
     {
-        CurrentShipButton->SetProperty(0xc, 0, 0);
-        CurrentShipFrame->SetProperty(0xc, 0, 0);
+        CurrentShipButton->SetProperty(kWinPropLit, 0, 0);
+        CurrentShipFrame->SetProperty(kWinPropLit, 0, 0);
     }
 
     ShipView->SetProperty(kWinPropHide, 0, 0);
@@ -837,7 +837,7 @@ void NnShipTrader::SelectRow(int Row)
     // Selected even when it is -2 (the dwords 8 bytes before each array); the -2 case hides
     // everything again below.
     int const Status = RowDword(offsetof(NnShipTrader, RowStatus), Selected);
-    if (Status == 1)
+    if (Status == kShipRowRankTooLow)
     {
         // Ids 0x61b with the required rank level.
         GetIdsStringWWithRawFallback(0x61b, G_NnTextScratchA, G_NnTextScratchCapacity); // FUN_004347e0
@@ -848,7 +848,7 @@ void NnShipTrader::SelectRow(int Row)
         BuyButton->SetProperty(kWinPropHide, 1, 0);
         BuyText->SetProperty(kWinPropHide, 1, 0);
     }
-    else if (Status == 2)
+    else if (Status == kShipRowReputationTooLow)
     {
         // Reputation (ids 0x61c).
         ErrorHelp->SetProperty(kTextPropSetIds, 0x61c, 0);

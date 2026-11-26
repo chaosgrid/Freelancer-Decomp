@@ -73,7 +73,7 @@ int TargetManager::QueryZonePropertyLevels(IObjInspect const* probeSrc, int* out
 
     unsigned const mask = System->GetSphereProperties(&probe);
 
-    if ((mask & 0x40000u) != 0)
+    if ((mask & Universe::kZonePropDamage) != 0)
     {
         return 0;
     }
@@ -87,7 +87,7 @@ int TargetManager::QueryZonePropertyLevels(IObjInspect const* probeSrc, int* out
     if (mask & 8u) out3[1] = 1;
     if (mask & 0x10u) out3[1] = 2;
     if (mask & 0x20u) out3[1] = 3;
-    if (mask & 0x8000u) out3[2] = 1;
+    if (mask & Universe::kZonePropNebula) out3[2] = 1;
     return 1;
 }
 
@@ -111,7 +111,7 @@ void TargetManager::SetAttackState(int NewState)
 
     switch (NewState)
     {
-    case 0:
+    case kAttackStateEngaged:
     {
         if (Listener != nullptr)
         {
@@ -125,7 +125,7 @@ void TargetManager::SetAttackState(int NewState)
 
             // The owner is re-resolved here.
             unsigned int const OwnerId = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()))->get_id();
-            Listener->combat_state_notification(pub::AI::ContentCallback::CSNType0, OwnerId, TargetId);
+            Listener->combat_state_notification(pub::AI::ContentCallback::CSNEngage, OwnerId, TargetId);
         }
 
         // Slot 4 (get_orientation) is the /OPT:ICF fold of get_transform; retail reads the
@@ -134,18 +134,18 @@ void TargetManager::SetAttackState(int NewState)
         AnchorPosition = Xform.Translation;
         break;
     }
-    case 1:
+    case kAttackStateNoEngage:
         if (Listener != nullptr)
         {
             unsigned int const OwnerId = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()))->get_id();
-            Listener->combat_state_notification(pub::AI::ContentCallback::CSNType2, OwnerId, 0);
+            Listener->combat_state_notification(pub::AI::ContentCallback::CSNNoEngage, OwnerId, 0);
         }
         break;
-    case 2:
+    case kAttackStateCombatOver:
         if (Listener != nullptr)
         {
             unsigned int const OwnerId = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()))->get_id();
-            Listener->combat_state_notification(pub::AI::ContentCallback::CSNType4, OwnerId, 0);
+            Listener->combat_state_notification(pub::AI::ContentCallback::CSNCombatOver, OwnerId, 0);
         }
         break;
     default:
@@ -238,7 +238,7 @@ bool TargetManager::enumerate_equip(unsigned short Id, unsigned Type)
     // target; anything else scores FLT_MAX. The value stays unrounded to the compare. Owner's
     // object and the target are not null-tested, as in retail. Never stops the walk.
     double Value = 3.4028235e+38f; // DAT_0639c39c
-    if (Type == 0x80)
+    if (Type == EquipTypeGun)
     {
         TargetManager_EnsurePhysicalCacheFresh(Owner);
 
@@ -303,7 +303,7 @@ bool TargetManager::Attach(SystemManager* NewOwner)
     if (ObjRwFromWatchable(const_cast<Watchable*>(Watched)) == nullptr)
         return false;
     Owner = NewOwner;
-    AttackState = 2;
+    AttackState = kAttackStateCombatOver;
     NumForcedTargets = 0;
     AggressionRatio = 0.5f;
     AnchorPosition.z = 0.0f;
@@ -372,7 +372,7 @@ double TargetManager::GetHostilePowerRatio()
             Elem->bFlagsValid = 1;
         }
 
-        if ((Elem->CachedFlags & 0x7f8110) == 0)
+        if ((Elem->CachedFlags & (OBJ_SHIP_MASK | OBJ_MISSION_SATELLITE | OBJ_STATION | OBJ_SATELLITE)) == 0)
             continue;
 
         // Three FUN_062e6a80 calls: reverse attitude, then attitude, <= -0.6f (DAT_063a0808,
@@ -428,19 +428,19 @@ pub::AI::ScanResponse TargetManager::GetScanResponse(uint Type)
     float Threshold;
     switch (Owner->PersonalityData.JobParams.LootFleeThreshold)
     {
-    case 0:
+    case pub::AI::Personality::ToughnessEasiest:
         Threshold = 0.15f;
         break;
-    case 1:
+    case pub::AI::Personality::ToughnessEasy:
         Threshold = 0.35f;
         break;
-    case 2:
+    case pub::AI::Personality::ToughnessEqual:
         Threshold = 0.65f;
         break;
-    case 3:
+    case pub::AI::Personality::ToughnessHard:
         Threshold = 0.85f;
         break;
-    case 4:
+    case pub::AI::Personality::ToughnessHardest:
         Threshold = 1.0f;
         break;
     default:
@@ -459,8 +459,11 @@ pub::AI::ScanResponse TargetManager::GetScanResponse(uint Type)
 // looks like a pointer, not a mask -- copied verbatim since no observed record indexes that
 // far. Read by MatchesAttackOrder (FUN_062ee530) and SelectAttackCandidate (FUN_062ee600).
 static unsigned const GAttackOrderClassMasks[14] = {
-    0x00010000u, 0x00020000u, 0x00100000u, 0x00040000u, 0x00080000u, 0x00200000u,
-    0x00000080u, 0x00000040u, 0x00001000u, 0x00002000u, 0x0000cd3fu, 0xffffffffu,
+    OBJ_FIGHTER, OBJ_FREIGHTER, OBJ_TRANSPORT, OBJ_GUNBOAT, OBJ_CRUISER, OBJ_CAPITAL,
+    OBJ_TRADELANE_RING, OBJ_JUMP_GATE, OBJ_WEAPONS_PLATFORM, OBJ_DESTROYABLE_DEPOT,
+    OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_BLACKHOLE | OBJ_SATELLITE | OBJ_DOCKING_RING | OBJ_STATION |
+        OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_NON_TARGETABLE | OBJ_MISSION_SATELLITE,
+    0xffffffffu,
     0x00000000u, 0x063a9df4u,
 };
 
@@ -472,7 +475,7 @@ bool TargetManager::MatchesAttackOrder(FAiTarget* Candidate)
     pub::AI::Personality::JobStruct::FAttackPreference const* const Records =
         Owner->PersonalityData.JobParams.AttackPreferences;
     int Count = 0;
-    while (Records[Count].ShipClass != 0xc)
+    while (Records[Count].ShipClass != pub::AI::Personality::JobStruct::kAttackClassEnd)
         ++Count;
 
     for (int Index = 0; Index < Count; ++Index)
@@ -512,7 +515,7 @@ FAiTarget* TargetManager::SelectAttackCandidate(
         Owner->PersonalityData.JobParams.AttackPreferences;
 
     int tierCount = 0;
-    while (Prefs[tierCount].ShipClass != 0xc)
+    while (Prefs[tierCount].ShipClass != pub::AI::Personality::JobStruct::kAttackClassEnd)
     {
         ++tierCount;
     }
@@ -541,7 +544,7 @@ FAiTarget* TargetManager::SelectAttackCandidate(
 
             if (cand->Iface->is_player() != 0)
             {
-                typeFlags = classMask & 0x30000u;
+                typeFlags = classMask & (OBJ_FIGHTER | OBJ_FREIGHTER);
             }
 
             if (typeFlags == 0)
@@ -597,7 +600,7 @@ FAiTarget* TargetManager::SelectAttackCandidate(
             // Slot 0x150 is cobject(), declared as returning CObject const*. This site needs
             // the CShip it actually is -- the 0x503 class mask below is CObject::ObjectClass.
             CShip* ship = (CShip*)candIface->cobject();
-            if (ship == nullptr || ((unsigned)ship->ObjectClass & 0x503u) != 0x503u)
+            if (ship == nullptr || ((unsigned)ship->ObjectClass & CObject::ClassShip) != CObject::ClassShip)
             {
                 continue;
             }
@@ -742,7 +745,7 @@ void TargetManager::UpdateAttackTargetOverride()
         int const directiveArg = *reinterpret_cast<int const*>(directiveBytes + 4);
         int const directiveTag = *reinterpret_cast<int const*>(directiveBytes + 8);
         bool const isIdleDirective = (directiveKind == 1 && directiveArg == 0);
-        if (directiveTag != 0x14 && directiveTag != 6 && isIdleDirective)
+        if (directiveTag != BEHAVIOR_DELAY && directiveTag != BEHAVIOR_IDLE && isIdleDirective)
         {
             return;
         }
@@ -759,7 +762,7 @@ void TargetManager::UpdateAttackTargetOverride()
         ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()))->get_position();
 
     bool committedThisTick = false;
-    if (AttackState == 0)
+    if (AttackState == kAttackStateEngaged)
     {
         // The differences are rounded to float; the length runs on the unrounded sum.
         float const dx = AnchorPosition.x - selfPos.x;
@@ -777,7 +780,7 @@ void TargetManager::UpdateAttackTargetOverride()
                 Listener->combat_drift_event();
             }
             bCommitted = true;
-            SetAttackState(2);
+            SetAttackState(kAttackStateCombatOver);
             committedThisTick = true;
         }
     }
@@ -887,7 +890,7 @@ void TargetManager::UpdateAttackTargetOverride()
     AggressionRatio = (float)aggressionRatio;
     if (aggressionRatio != 0.0 && (double)aggressionThreshold < aggressionRatio)
     {
-        SetAttackState(1);
+        SetAttackState(kAttackStateNoEngage);
         return;
     }
 
@@ -912,7 +915,7 @@ void TargetManager::UpdateAttackTargetOverride()
         {
             CShip* const candShip =
                 (CShip*)cand->Iface->cobject();
-            if (candShip != nullptr && ((unsigned)candShip->ObjectClass & 0x503u) == 0x503u)
+            if (candShip != nullptr && ((unsigned)candShip->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
             {
                 TargetedEnemyCount = candShip->get_targeted_enemy_count();
             }
@@ -942,7 +945,7 @@ void TargetManager::UpdateAttackTargetOverride()
 
         // Anything whose flags survive the 0xFDFF mask must also be alive. The threshold is
         // the double 0.0 at DAT_0639c430 and only exact equality rejects: NaN passes.
-        if ((cand->CachedFlags & 0xfdffu) != 0)
+        if ((cand->CachedFlags & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
         {
             float health = 1.0f; // retail seeds the out slot with 1.0f
             cand->Iface->get_status(health);
@@ -1087,7 +1090,7 @@ void TargetManager::UpdateAttackTargetOverride()
                     ->set_target((IObjRW*)selectedIface, (unsigned short)subObjNone, -1);
             }
 
-            SetAttackState(0);
+            SetAttackState(kAttackStateEngaged);
             // JobParams.bForceAttackFormation (Sys+0x1958).
             if (Job.bForceAttackFormation == 0)
             {
@@ -1128,7 +1131,7 @@ void TargetManager::UpdateAttackTargetOverride()
             // follower of the owner's ship instead.
             CShip* ownerShip = (CShip*)
                 ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()))->cobject();
-            if (ownerShip == nullptr || ((unsigned)ownerShip->ObjectClass & 0x503u) != 0x503u)
+            if (ownerShip == nullptr || ((unsigned)ownerShip->ObjectClass & CObject::ClassShip) != CObject::ClassShip)
             {
                 ownerShip = nullptr;
             }
@@ -1164,7 +1167,7 @@ void TargetManager::UpdateAttackTargetOverride()
                 ->set_target(nullptr, SUBOBJ_ID_NONE, -1);
         }
     }
-    SetAttackState(2);
+    SetAttackState(kAttackStateCombatOver);
 }
 
 // ---------------------------------------------------------------------------

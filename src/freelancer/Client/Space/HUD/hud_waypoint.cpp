@@ -415,7 +415,7 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Parms.VibeId = NewObjectId;
     int const& RepGroup = reinterpret_cast<int const&>(Parms.VibeId);
     Reputation::Vibe::Alloc(RepGroup);
-    Reputation::Vibe::SetAffiliation(RepGroup, 0xffffffffu, false);
+    Reputation::Vibe::SetAffiliation(RepGroup, kNoAffiliation, false);
 
     // The name is mad-lib ids 0x442 with no values, the second name empty; no infocard.
     FmtStr Name;

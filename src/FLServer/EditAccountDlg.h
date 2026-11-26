@@ -19,6 +19,15 @@ class CEditAccountDlg : public CDialog
 {
 public:
 	enum { IDD = 141 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlAccountName = 1037,
+		kControlCharacterList = 1040,
+		kControlDeleteCharacter = 1041,
+		kControlBanned = 1044,
+		kControlKickAccount = 1045,
+	};
 
 	explicit CEditAccountDlg(CWnd* Parent = nullptr);
 

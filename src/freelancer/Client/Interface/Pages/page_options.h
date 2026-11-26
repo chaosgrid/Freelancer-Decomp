@@ -25,6 +25,13 @@
 
 class WinControl;
 
+// The button command PageOptions::ProcessMessage answers with kWinMsgCommand: back to the main
+// menu state.
+enum EOptionsCommand
+{
+    kOptionsCmdMainMenu = 0x300c
+};
+
 class PageOptions : public UIPage::MasterWin
 {
 public:

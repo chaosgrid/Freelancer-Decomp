@@ -343,7 +343,7 @@ static void UnlinkListNode(FDeformInstance* Instance, FIkListNode* Node)
 void FillFileDesc(FFileSystemDesc* Desc, const char* Path)
 {
     std::memset(Desc, 0, sizeof(FFileSystemDesc));
-    Desc->Size = 0x34;
+    Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
     Desc->ComponentName = G_FileSystemName;
     Desc->Path = Path;
     Desc->Access = GENERIC_READ;
@@ -454,7 +454,7 @@ void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, 
     const InstanceIndex Bone = FirstBoneInstance(this);
     // Submit the root instance and merge its renderer rank into the LOD result.
     const int Rank = G_Renderer->RenderInstance(
-        Camera, Bone, 1.0f, Flags | 0x108ul, nullptr, RenderArg);
+        Camera, Bone, 1.0f, Flags | kDrawNoCull | kDrawPickSwitch, nullptr, RenderArg);
     if (*OutLod != Rank)
     {
         if (*OutLod < Rank)
@@ -807,7 +807,7 @@ void FDeformInstance::SweepExpiredList()
         if (Node->Active != 0)
         {
             FIkEvent* Event = Node->Event;
-            if ((Event->StateFlags & 1) != 0 &&
+            if ((Event->StateFlags & kIkStateStopped) != 0 &&
                 (unsigned char)(G_Channel->InMixer((unsigned long)(
                     (ptrdiff_t)Event->Channels[0]))) == 0)
                 bDrop = true;
@@ -990,7 +990,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
             const InstanceIndex CursorInstance = Cursor;
             Parent = (int)((ptrdiff_t)(G_Engine->GetInstanceParent(CursorInstance)));
             const FEngineJointBlock* Relative = G_Engine->GetInstanceRelative(CursorInstance);
-            if (Relative->Type == 4)
+            if (Relative->Type == kJointTypeSphere)
             {
                 const Vector* Axis = &Relative->ChildPos;
                 bSphereAxis = 1;
@@ -1019,7 +1019,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     // operator new 0x44 (not cleared), then the inlined constructor (vtable 06601340).
     FIkEvent* Event = new FIkEvent;
     Event->TargetB = Aim->TargetB;
-    Event->StateFlags = (unsigned char)(Event->StateFlags & 0xFE);
+    Event->StateFlags = (unsigned char)(Event->StateFlags & (unsigned char)~kIkStateStopped);
     Event->TargetA = Aim->TargetA;
     Event->ApplyTick = 0;
     Node->Event = Event;

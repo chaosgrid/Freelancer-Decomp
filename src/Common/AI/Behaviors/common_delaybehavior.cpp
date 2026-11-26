@@ -63,7 +63,7 @@ int DelayBehavior::Update()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
+        UpdateResult = kBehaviorUpdateAborted;
         return UpdateResult;
     }
 
@@ -79,10 +79,10 @@ int DelayBehavior::Update()
         DelayElapsed = *reinterpret_cast<float*>(&SentinelBits);
 
         // 0x14 is DelayBehavior's own index in the BehaviorDispatchTable (GuideBehavior uses 0xe).
-        BehaviorMgr->SetDirectiveResult(0x14, 0);   // FUN_062d29a0
+        BehaviorMgr->SetDirectiveResult(BEHAVIOR_DELAY, 0);   // FUN_062d29a0
     }
 
-    UpdateResult = 1;
+    UpdateResult = kBehaviorUpdateRunning;
     return UpdateResult;
 }
 
@@ -92,7 +92,7 @@ bool DelayBehavior::ApplyDirective(void const* Param)
     float Value = static_cast<pub::AI::DirectiveDelayOp const*>(Param)->DelaySeconds;
 
     DelayDuration = Value;
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     DelayElapsed = Value; // retail writes the same value to both fields
 
     return true;

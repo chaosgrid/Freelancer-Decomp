@@ -54,14 +54,14 @@ int IdleBehavior::Update()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult = 3;
+        UpdateResult = kBehaviorUpdateAborted;
         return UpdateResult;
     }
 
     // Result discarded.
     Watcher2c.Update(DeltaTime);
 
-    UpdateResult = 1;
+    UpdateResult = kBehaviorUpdateRunning;
     return UpdateResult;
 }
 
@@ -69,7 +69,7 @@ int IdleBehavior::Update()
 // its own method rather than a cast to that unrelated type.
 bool IdleBehavior::RequestFlag()
 {
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     return true;
 }
 

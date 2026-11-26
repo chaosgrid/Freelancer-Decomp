@@ -76,7 +76,7 @@ namespace
 
         explicit FCargoScanRequest(unsigned int TargetId)
         {
-            Info.Type = 1;
+            Info.Type = pub::SpaceObj::EQINFO_TYPE_SCAN_CARGO;
             Info.EquipId = 1;
             Info.TargetObjId = TargetId;
             Result = new (Info.CargoOut) EquipDescVector();
@@ -103,7 +103,7 @@ FGuideRoute* FPatrolRoute::Clone()
 // 06ee9660.
 int FPatrolRoute::GetType()
 {
-    return 2;
+    return kGuideRoutePatrol;
 }
 
 // LAB_06f0bc00.
@@ -111,13 +111,13 @@ int FPatrolRoute::GetStatus()
 {
     switch (State)
     {
-    case 1:
-    case 2:
-        return 1;
-    case 4:
-        return 3;
+    case kPatrolRouteStart:
+    case kPatrolRouteGoto:
+        return kGuideRouteBusy;
+    case kPatrolRouteDone:
+        return kGuideRouteFinished;
     default:
-        return 2;
+        return kGuideRouteInactive;
     }
 }
 
@@ -126,7 +126,7 @@ int FPatrolRoute::GetStatus()
 // (squared per axis; NaN is not reached).
 int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
 {
-    if (State == 1)
+    if (State == kPatrolRouteStart)
     {
         TRefHandle<FObjListDirective> Directive;
         CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);                 // FUN_06f24870
@@ -136,9 +136,9 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
         Goto->Op.Priority = 1;
         Out->push_back(Directive.Pointer);                              // FUN_06f1e390
         Directive->AddRef();
-        State = 2;
+        State = kPatrolRouteGoto;
     }
-    else if (State == 2)
+    else if (State == kPatrolRouteGoto)
     {
         FObjListDirective** Active = Ship->GetActiveDirectiveSlot();   // slot 3
         if ((*Active)->GetType() == OBJLIST_GOTO_VEC)
@@ -153,12 +153,12 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
             if (bReached)
             {
                 if (NextPoint == EndPoint)
-                    State = 4;
+                    State = kPatrolRouteDone;
                 else
                     AdvancePoint();                                     // FUN_06f0bf10
             }
         }
-        if (State != 4)
+        if (State != kPatrolRouteDone)
         {
             TRefHandle<FObjListDirective> Directive;
             CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);
@@ -170,9 +170,9 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
             Directive->AddRef();
         }
     }
-    else if (State == 3)
+    else if (State == kPatrolRouteFlee)
     {
-        State = 2;
+        State = kPatrolRouteGoto;
         Update(Out);
     }
     return GetStatus();
@@ -190,11 +190,11 @@ bool FPatrolRoute::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
 {
     (void)OutParam;
     OutFloat = 500.0f;                                                  // DAT_06fb8120
-    if (State != 1 && State != 2 && State != 3)
+    if (State != kPatrolRouteStart && State != kPatrolRouteGoto && State != kPatrolRouteFlee)
         return false;
 
-    State = 3;
-    OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+    State = kPatrolRouteFlee;
+    OutType = pub::AI::ContentCallback::FleeDestPoint;
     Vector const Point = Path->Points[NextPoint];
     Vector const ShipPosition = GetShipPosition(Ship);
     Vector Delta;                                                       // FUN_06eb7810
@@ -271,7 +271,7 @@ void FPatrolRoute::AdvancePoint()
 // (Next beyond End) End - Next + Count + 1; going down the same with Next - End.
 int FPatrolRoute::GetPointsToGo() const
 {
-    if (State != 2 && State != 1)
+    if (State != kPatrolRouteGoto && State != kPatrolRouteStart)
         return 0;
     int const Count = static_cast<int>(Path->Points.size());
     if (Direction > 0)
@@ -344,17 +344,17 @@ FGuideRoute* FCargoScanRoute::Clone()
 // 06f5e540.
 int FCargoScanRoute::GetType()
 {
-    return 3;
+    return kGuideRouteCargoScan;
 }
 
 // LAB_06f0abe0. Anything but off / idle is busy (1).
 int FCargoScanRoute::GetStatus()
 {
     if (State == ScanOff)
-        return 2;
+        return kGuideRouteInactive;
     if (State == ScanIdle)
-        return 0;
-    return 1;
+        return kGuideRouteIdle;
+    return kGuideRouteBusy;
 }
 
 // LAB_06f0ac00.
@@ -1012,7 +1012,7 @@ FPatrolGuide::FPatrolGuide(FGuideDesc const* Desc)
     NewRoute->Direction = Desc->Plan.PathDirection;                     // desc +0x44
     NewRoute->NextPoint = Desc->Plan.PathTargetPoint;                   // desc +0x40
     NewRoute->EndPoint = Desc->Plan.PathPoint;                          // desc +0x3c
-    NewRoute->State = 1;
+    NewRoute->State = kPatrolRouteStart;
     Route = NewRoute;
     Scanner = new FCargoScanRoute(Desc->Ship);
     RegisterGuidedShip(Ship);
@@ -1067,27 +1067,27 @@ void FPatrolGuide::Start()
     {
         switch (State)
         {
-        case 0:
-            State = 1;
+        case kPatrolGuideBegin:
+            State = kPatrolGuideRoute;
             continue;
-        case 1:
+        case kPatrolGuideRoute:
         {
             FMissionDirectiveList Next;                                 // FUN_06f93790
-            if (Route->Update(&Next.Items) == 3)                        // slot 4
+            if (Route->Update(&Next.Items) == kGuideRouteFinished)                        // slot 4
             {
-                State = 2;
+                State = kPatrolGuideDock;
                 continue;
             }
             Ship->SetDirectives(&Next.Items, 0);                        // FUN_06f57840
             return;
         }
-        case 2:
+        case kPatrolGuideDock:
             bUndocked = false;
             Scanner->SetScanEnabled(false);
             IssueDockDirective();
-            State = 3;
+            State = kPatrolGuideDocked;
             return;
-        case 3:
+        case kPatrolGuideDocked:
         {
             unsigned int const ShipId = Ship->SpaceObjId;
             unsigned int DockTarget;
@@ -1095,14 +1095,14 @@ void FPatrolGuide::Start()
             if (GetShipDockingTarget(&ShipId, &DockTarget, &DockIndex, nullptr))   // FUN_06f6eca0
             {
                 IssueDelayDirective();
-                State = 4;
+                State = kPatrolGuideLaunch;
                 return;
             }
             SwapTargets();
-            State = 1;
+            State = kPatrolGuideRoute;
             continue;
         }
-        case 4:
+        case kPatrolGuideLaunch:
         {
             IssueLaunchDirective();
             SwapTargets();
@@ -1110,24 +1110,24 @@ void FPatrolGuide::Start()
             Route->Path->GetObjectPointIndices(&TargetId2, &Points);   // FUN_06f37d30
             int const Count = static_cast<int>(Points.size());
             Route->EndPoint = Points[(std::rand() * Count) / 32768];
-            Route->State = 1;
+            Route->State = kPatrolRouteStart;
             if (!Route->Path->bLoop)
                 Route->Direction = -Route->Direction;
-            State = 1;
+            State = kPatrolGuideRoute;
             bUndocked = true;
             Scanner->SetScanEnabled(bScanState);
             return;
         }
-        case 5:
+        case kPatrolGuideScan:
         {
             FMissionDirectiveList Next;
-            if (Scanner->Update(&Next.Items) == 1)                      // slot 4
+            if (Scanner->Update(&Next.Items) == kGuideRouteBusy)                      // slot 4
             {
                 if (!Next.Items.empty())
                     Ship->SetDirectives(&Next.Items, 0);
                 return;
             }
-            State = 1;
+            State = kPatrolGuideRoute;
             continue;
         }
         default:
@@ -1139,7 +1139,7 @@ void FPatrolGuide::Start()
 // LAB_06f0aa10: +0x28 = 0.
 void FPatrolGuide::Reset()
 {
-    State = 0;
+    State = kPatrolGuideBegin;
 }
 
 // LAB_06f0af30.
@@ -1159,15 +1159,15 @@ void FPatrolGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parm
 {
     int const StatusBefore = Scanner->GetStatus();
     int const ScanStatus = Scanner->HandleEvent(MsgId, Parms);
-    if (ScanStatus == 1)
+    if (ScanStatus == kGuideRouteBusy)
     {
-        State = 5;
+        State = kPatrolGuideScan;
         Start();
         return;
     }
     if (StatusBefore != ScanStatus)
     {
-        State = 1;
+        State = kPatrolGuideRoute;
         Start();
     }
 }
@@ -1206,7 +1206,7 @@ bool FPatrolGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     pub::SpaceObj::GetLocation(TargetId2, TargetPosition, Orientation);
     if (!Route->RequestFleeDestination(OutType, OutPosition, OutParam, OutFloat))
     {
-        OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(2);
+        OutType = pub::AI::ContentCallback::FleeDestDock;
         OutParam = TargetId2;
     }
     return true;

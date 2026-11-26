@@ -99,6 +99,7 @@ void ClientObjDb_UpdateRemotePhysics(float Dt);
 // 1, 4, 5, 6, 7, 2 in that order, any other Kind searches only that bucket. Null for an id
 // with no bits under 0x3fffffff.
 FClientGameobj* ClientObjDb_FindObject(unsigned ObjectId, int Kind);
+
 // FUN_00541890 -- Kind 0: the ship (bucket 1) or else solar (bucket 2) whose
 // CEqObj+0x104 equals VibeId; any other Kind: the get_id match in that bucket, as
 // FUN_005416c0 does.

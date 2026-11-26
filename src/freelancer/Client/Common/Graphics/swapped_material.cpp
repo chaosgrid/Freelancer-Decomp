@@ -148,7 +148,7 @@ bool FSwappedMaterial::CaptureOriginal()
         {
             FShadingPropertyValue Value = {};
             Material->GetParameterValue(Parameter, &Value);
-            if (Value.Type == 7)
+            if (Value.Type == kMaterialParamTextureName)
             {
                 malloc_strcpy(&OriginalTexture, reinterpret_cast<char const*>(Value.Payload0));
                 FindTextureRecord(OriginalTexture, &OriginalTexRecord);
@@ -188,7 +188,7 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
         {
             FShadingPropertyValue Value = {};
             Material->GetParameterValue(Parameter, &Value);
-            if (Value.Type == 7)
+            if (Value.Type == kMaterialParamTextureName)
             {
                 if (Value.Payload0 != 0)
                 {

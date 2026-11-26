@@ -339,7 +339,7 @@ FRoomObject::FRoomObject(FRoomRuntime* InOwner)
       bRunningLights(0),
       LightGroup(0),
       Layer(0),
-      RenderMode(0),
+      RenderMode(kRoomRenderMesh),
       FloorHeight(0.0f),
       MaterialEntries()
 {
@@ -440,7 +440,7 @@ static void BuildCharacterPlacements(std::vector<FRoomCharPlacement>& Placements
     int Index = 0;
     for (Index = 0; Index < static_cast<int>(Source.size()); ++Index)
     {
-        if (Source[Index]->Posture != 3)
+        if (Source[Index]->Posture != kSetpointPostureSpecial)
             ++Wanted;
     }
     // Retail reallocates to exactly that many.
@@ -450,7 +450,7 @@ static void BuildCharacterPlacements(std::vector<FRoomCharPlacement>& Placements
     for (Index = 0; Index < static_cast<int>(Source.size()); ++Index)
     {
         CharPlaceInfo* const Info = Source[Index];
-        if (Info->Posture == 3)
+        if (Info->Posture == kSetpointPostureSpecial)
             continue;
         FRoomCharPlacement Placement;
         Placement.Info = Info;
@@ -488,7 +488,7 @@ static FCharacterObject* CreatePlacedCharacter(std::vector<FRoomCharPlacement>& 
 {
     int CharType = static_cast<int>(Props.CharType);
     if (Props.SessionId != 0 && Props.SessionId != GetPlayerConnectionId())
-        CharType = 2;
+        CharType = kSetpointCharRpc;
 
     int Found = -1;
     int Index = 0;
@@ -505,7 +505,7 @@ static FCharacterObject* CreatePlacedCharacter(std::vector<FRoomCharPlacement>& 
             }
         }
     }
-    else if (CharType == 1 || CharType == 2)
+    else if (CharType == kSetpointCharPc || CharType == kSetpointCharRpc)
     {
         for (Index = 0; Index < static_cast<int>(Placements.size()); ++Index)
         {
@@ -1188,7 +1188,7 @@ FCharacterObject* RoomControlPlayerCharacter(FRoomRuntime* Runtime)
         if (Character == nullptr)
             continue;
         CharPlaceInfo const* const Placement = Character->Placement;
-        if (Placement != nullptr && Placement->CharType == 1)
+        if (Placement != nullptr && Placement->CharType == kSetpointCharPc)
             return Character;
     }
     return nullptr;
@@ -1412,19 +1412,19 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
         AmbientScriptInfo const& Record = *Room->AmbientScripts[RecordIndex];
         if (!RtcSlider::is_enabled(static_cast<unsigned long>(Record.Priority)))
             continue;
-        if (Record.Type == 1)
+        if (Record.Type == kAmbientScriptAmbient)
         {
             malloc_strcpy(&Runtime->SceneAmbient[Runtime->SceneAmbientCount], Record.Path);
             Runtime->SceneAmbientFlag[Runtime->SceneAmbientCount] = 1;
             ++Runtime->SceneAmbientCount;
         }
-        else if (Record.Type == 2)
+        else if (Record.Type == kAmbientScriptTraffic)
         {
             malloc_strcpy(&Runtime->SceneTraffic[Runtime->SceneTrafficCount], Record.Path);
             Runtime->SceneTrafficFlag[Runtime->SceneTrafficCount] = 1;
             ++Runtime->SceneTrafficCount;
         }
-        else if (Record.Type == 3)
+        else if (Record.Type == kAmbientScriptOnce)
         {
             malloc_strcpy(&Runtime->SceneOnce[Runtime->SceneOnceCount], Record.Path);
             Runtime->SceneOnceFlag[Runtime->SceneOnceCount] = 1;
@@ -1454,21 +1454,21 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             }
             ++Step;
         }
-        if (Script->ScriptId == 1)
+        if (Script->ScriptId == kAmbientScriptAmbient)
         {
             malloc_strcpy(&Runtime->SceneAmbient[Runtime->SceneAmbientCount], Script->Name);
             Runtime->SceneAmbientFlag[Runtime->SceneAmbientCount] =
                 static_cast<unsigned char>(Script->bFlag);
             ++Runtime->SceneAmbientCount;
         }
-        else if (Script->ScriptId == 2)
+        else if (Script->ScriptId == kAmbientScriptTraffic)
         {
             malloc_strcpy(&Runtime->SceneTraffic[Runtime->SceneTrafficCount], Script->Name);
             Runtime->SceneTrafficFlag[Runtime->SceneTrafficCount] =
                 static_cast<unsigned char>(Script->bFlag);
             ++Runtime->SceneTrafficCount;
         }
-        else if (Script->ScriptId == 3)
+        else if (Script->ScriptId == kAmbientScriptOnce)
         {
             malloc_strcpy(&Runtime->SceneOnce[Runtime->SceneOnceCount], Script->Name);
             Runtime->SceneOnceFlag[Runtime->SceneOnceCount] =
@@ -2321,12 +2321,12 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
     }
 
     int const Mode = Object->RenderMode;
-    if (Mode == 0)
+    if (Mode == kRoomRenderMesh)
     {
         // Perf slot 0 is FUN_005b3510(0), compared with DAT_005c7474 (0.0f); appearance slot 8,
         // then slot 3.
         void* EnvValue = nullptr;
-        if (Object->bEnvMap != 0 && GetPerfOptionSlot(0) > 0.0f)
+        if (Object->bEnvMap != 0 && GetPerfOptionSlot(kPerfSlotUseEnvironmentMaps) > 0.0f)
         {
             IFLAppearance* Appearance = nullptr;
             bool bHaveEnv = false;
@@ -2351,9 +2351,9 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
             }
         }
         // Renderer slot 7.
-        DALib::Renderer->RenderInstance(Room->Camera, Instance, 1.0f, 8u, nullptr, EnvValue);
+        DALib::Renderer->RenderInstance(Room->Camera, Instance, 1.0f, kDrawPickSwitch, nullptr, EnvValue);
     }
-    else if (Mode == 1)
+    else if (Mode == kRoomRenderStarsphere)
     {
         // Appearance slot 10; the QI result is tested for exactly 0 here.
         IFLAppearance* Appearance = nullptr;
@@ -2363,7 +2363,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
         if (Appearance != nullptr)
             Appearance->Release();
     }
-    else if (Mode == 2)
+    else if (Mode == kRoomRenderBackdrop)
     {
         // Appearance slot 9.
         IFLAppearance* Appearance = nullptr;

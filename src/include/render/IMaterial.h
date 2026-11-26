@@ -14,6 +14,17 @@
 
 struct FRpVertexSrcDesc;
 
+// Flags argument of IMaterial::Submit and IMaterialBatcher2::Submit.
+enum EMaterialSubmitFlag
+{
+    kMaterialSubmitKeepVertices = 0x4,   // SourceVertices outlives the call: the batcher queues the pointer, not a copy
+    kMaterialSubmitKeepIndices = 0x8,    // Indices outlives the call: the batcher queues the pointer, not a copy
+    kMaterialSubmitSortDepth = 0x20,     // SortDepth holds the view depth as float bits
+    kMaterialSubmitComputeDepth = 0x40,  // FBatchedMaterial derives SortDepth from the world translation, then sets 0x20
+    kMaterialSubmitUseBuffers = 0x100,   // VbListing / IbScratch are valid: draw through the bound buffers (IRPDraw + IbScratch->Bias)
+    kMaterialSubmitNoAlphaTest = 0x400,  // SinglePass skips its alpha-test scope
+};
+
 // Shared material contract. Keep the declared calling conventions and slot order.
 struct IMaterial : IDAComponent
 {
@@ -56,6 +67,38 @@ struct IMaterial : IDAComponent
     virtual unsigned long DACOM_API InnerAddRef() = 0;
     virtual unsigned long DACOM_API InnerRelease() = 0;
 };
+// Tag of a typed material parameter cell: FShadingPropertyValue::Type and the matching cells of
+// every material's parameter descriptor table. Tag 10 is copied like the other single-dword
+// tags; no table declares it.
+enum EMaterialParamType
+{
+    kMaterialParamInteger = 1,     // raw dword read from the property file as is
+    kMaterialParamFloat = 2,       // one float (range-checked against Minimum / Maximum)
+    kMaterialParamVector3 = 3,     // three floats, 12 bytes in the property file
+    kMaterialParamVector4 = 4,     // four floats, 16 bytes in the property file
+    kMaterialParamString = 5,      // ProcessHeap copy of a string
+    kMaterialParamComponent = 6,   // AddRef'd IDAComponent
+    kMaterialParamTextureName = 7, // string like 5; one texture block per entry ("Dt_name")
+    kMaterialParamWrapMode = 8,    // texture wrap mode, bits 4..7 of the "Dt_flags" word
+    kMaterialParamAddressMode = 9, // texture U or V address mode, a 2-bit field of "Dt_flags"
+};
+
+// Flags dword of a material parameter descriptor (FShadingPropertyRecord::Flags).
+enum EMaterialParamFlag
+{
+    kMaterialParamFlagNotSaved = 0x1,      // skipped by LoadProperties / SaveProperties
+    kMaterialParamFlagAddressU = 0x20000,  // address-mode entry that reads the U field
+    kMaterialParamFlagAddressV = 0x40000,  // address-mode entry that reads the V field
+};
+
+// Bits of IMaterial::GetRenderFlags that are established. The other bits of the value are set by
+// the individual materials and read by the render bucket sort in RendComp.
+enum EMaterialRenderFlag
+{
+    kMaterialRenderTranslucent = 0x2, // alpha-blended; the batcher puts it in bin 1
+    kMaterialRenderBatched = 0x10,    // added by FBatchedMaterial around the inner material's flags
+};
+
 static const unsigned long kMaterialParamDescSize = 0x4C;
 // Descriptor shared by material factories and their controlling outer component.
 struct FMaterialAggregateDesc

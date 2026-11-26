@@ -55,12 +55,12 @@ namespace IntroPageUtil
 
     void HideWin3D(Win3D* Object)
     {
-        Object->Flags = static_cast<unsigned char>(Object->Flags & 0xfc);
+        Object->Flags = static_cast<unsigned char>(Object->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     void ShowWin3D(Win3D* Object)
     {
-        Object->Flags = static_cast<unsigned char>(Object->Flags | 3);
+        Object->Flags = static_cast<unsigned char>(Object->Flags | kWin3DActive | kWin3DVisible);
     }
 
     unsigned long const* ChromeColor()

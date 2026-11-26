@@ -8,6 +8,7 @@
 
 #include "Space/player_spawn.h"
 #include "common_archetype.h"
+#include "common_cobject.h"
 #include "common_misc.h" // GetFileSysPath
 #include "dacom.h"
 #include "Space/HUD/hud_element_list.h"
@@ -21,7 +22,7 @@
 
 namespace
 {
-    static const unsigned kShipObjectClassFlags = 0x503U;
+    static const unsigned kShipObjectClassFlags = CObject::ClassShip;
 
     // .rdata 0x005e07bc -- the fallback when the ship archetype names no cockpit.
     static const char kDefaultCockpitIniRel[] = "cockpits\\cockpit.ini";

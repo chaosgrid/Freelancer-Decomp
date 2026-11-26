@@ -117,33 +117,33 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
 {
     int32_t StartCode = 0;
     if (!(ray_start_point.k[0] >= Min[0]))
-        StartCode = 1;
+        StartCode = IVP_RAY_OUT_BELOW_X;
     else if (ray_start_point.k[0] > Max[0])
-        StartCode = 2;
+        StartCode = IVP_RAY_OUT_ABOVE_X;
     if (!(ray_start_point.k[1] >= Min[1]))
-        StartCode |= 4;
+        StartCode |= IVP_RAY_OUT_BELOW_Y;
     else if (ray_start_point.k[1] > Max[1])
-        StartCode |= 8;
+        StartCode |= IVP_RAY_OUT_ABOVE_Y;
     if (!(ray_start_point.k[2] >= Min[2]))
-        StartCode |= 0x10;
+        StartCode |= IVP_RAY_OUT_BELOW_Z;
     else if (ray_start_point.k[2] > Max[2])
-        StartCode |= 0x20;
+        StartCode |= IVP_RAY_OUT_ABOVE_Z;
     if (static_cast<int16_t>(StartCode) == 0)
         return 1;
 
     int32_t EndCode = 0;
     if (!(ray_end_point.k[0] >= Min[0]))
-        EndCode = 1;
+        EndCode = IVP_RAY_OUT_BELOW_X;
     else if (ray_end_point.k[0] > Max[0])
-        EndCode = 2;
+        EndCode = IVP_RAY_OUT_ABOVE_X;
     if (!(ray_end_point.k[1] >= Min[1]))
-        EndCode |= 4;
+        EndCode |= IVP_RAY_OUT_BELOW_Y;
     else if (ray_end_point.k[1] > Max[1])
-        EndCode |= 8;
+        EndCode |= IVP_RAY_OUT_ABOVE_Y;
     if (!(ray_end_point.k[2] >= Min[2]))
-        EndCode |= 0x10;
+        EndCode |= IVP_RAY_OUT_BELOW_Z;
     else if (ray_end_point.k[2] > Max[2])
-        EndCode |= 0x20;
+        EndCode |= IVP_RAY_OUT_ABOVE_Z;
     if (static_cast<int16_t>(EndCode) == 0)
         return 1;
 
@@ -154,7 +154,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
     const IVP_U_Point& E = ray_end_point;
 
     // :06349d62 -- start below Min.z: face z = Min.z, x/y within [Min, (Max.x, Max.y, Min.z)].
-    if ((StartCode & 0x10) != 0 && (EndCode & 0x10) == 0)
+    if ((StartCode & IVP_RAY_OUT_BELOW_Z) != 0 && (EndCode & IVP_RAY_OUT_BELOW_Z) == 0)
     {
         const float PlaneDist = (float)((double)(Min[2]) - S.k[2]);
         const float Scale = (float)((double)(E.k[2]) - S.k[2]);
@@ -163,7 +163,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
             return 1;
     }
     // :06349dc7 -- start beyond Max.x: face x = Max.x, y/z within [(Max.x, Min.y, Min.z), Max].
-    if ((StartCode & 0x2) != 0 && (EndCode & 0x2) == 0)
+    if ((StartCode & IVP_RAY_OUT_ABOVE_X) != 0 && (EndCode & IVP_RAY_OUT_ABOVE_X) == 0)
     {
         const float PlaneDist = (float)((double)(S.k[0]) - Max[0]);
         const float Scale = (float)((double)(S.k[0]) - E.k[0]);
@@ -172,7 +172,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
             return 1;
     }
     // :06349e2c -- start beyond Max.z: face z = Max.z, x/y within [(Min.x, Min.y, Max.z), Max].
-    if ((StartCode & 0x20) != 0 && (EndCode & 0x20) == 0)
+    if ((StartCode & IVP_RAY_OUT_ABOVE_Z) != 0 && (EndCode & IVP_RAY_OUT_ABOVE_Z) == 0)
     {
         const float PlaneDist = (float)((double)(S.k[2]) - Max[2]);
         const float Scale = (float)((double)(S.k[2]) - E.k[2]);
@@ -181,7 +181,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
             return 1;
     }
     // :06349e90 -- start below Min.x: face x = Min.x, y/z within [Min, (Min.x, Max.y, Max.z)].
-    if ((StartCode & 0x1) != 0 && (EndCode & 0x1) == 0)
+    if ((StartCode & IVP_RAY_OUT_BELOW_X) != 0 && (EndCode & IVP_RAY_OUT_BELOW_X) == 0)
     {
         const float PlaneDist = (float)((double)(Min[0]) - S.k[0]);
         const float Scale = (float)((double)(E.k[0]) - S.k[0]);
@@ -190,7 +190,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
             return 1;
     }
     // :06349ef3 -- start below Min.y: face y = Min.y, x/z within [Min, (Max.x, Min.y, Max.z)].
-    if ((StartCode & 0x4) != 0 && (EndCode & 0x4) == 0)
+    if ((StartCode & IVP_RAY_OUT_BELOW_Y) != 0 && (EndCode & IVP_RAY_OUT_BELOW_Y) == 0)
     {
         const float PlaneDist = (float)((double)(Min[1]) - S.k[1]);
         const float Scale = (float)((double)(E.k[1]) - S.k[1]);
@@ -199,7 +199,7 @@ int IVP_Ray_Solver::check_ray_against_box(const float* Min, const float* Max)
             return 1;
     }
     // :06349f58 -- start beyond Max.y: face y = Max.y, x/z within [(Min.x, Max.y, Min.z), Max].
-    if ((StartCode & 0x8) != 0 && (EndCode & 0x8) == 0)
+    if ((StartCode & IVP_RAY_OUT_ABOVE_Y) != 0 && (EndCode & IVP_RAY_OUT_ABOVE_Y) == 0)
     {
         const float PlaneDist = (float)((double)(S.k[1]) - Max[1]);
         const float Scale = (float)((double)(S.k[1]) - E.k[1]);
@@ -287,10 +287,10 @@ void IVP_Ray_Solver::check_ray_against_object(IVP_Real_Object* Object)
 
     switch (Object->object_type)
     {
-    case 2: // polygon: surface manager slot 6 (CALL [ESI+0x18])
+    case IVP_POLYGON: // polygon: surface manager slot 6 (CALL [ESI+0x18])
         Object->surface_manager->insert_all_ledges_hitting_ray(this, Object);
         break;
-    case 3: // ball
+    case IVP_BALL: // ball
         check_ray_against_ball(Object);
         break;
     default:

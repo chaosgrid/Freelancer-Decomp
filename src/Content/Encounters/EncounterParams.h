@@ -77,6 +77,25 @@ enum EArrivalMethod
     ARRIVAL_BUZZ = 8,                  // "buzz"
 };
 
+// FEncounterFormation::RerollFrequency, the "reroll_frequency" keywords.
+enum EEncounterReroll
+{
+    kEncounterRerollOnce = 0,    // "once": the first refresh only
+    kEncounterRerollSynch = 1,   // "synch": with the parameters' reroll interval
+    kEncounterRerollEvery = 2    // "every": on every refresh (default)
+};
+
+// FEncounterFormation::FeelingMask, the "feeling_to_formation" keywords. The friendly / hostile
+// bits are the feelings GetFactionFeelingMask returns; "same" is no feeling: PickFaction
+// matches the very faction.
+enum EEncounterFeeling
+{
+    kEncounterFeelingFriendly = 1,   // "friendly"
+    kEncounterFeelingHostile = 4,    // "hostile"
+    kEncounterFeelingAny = 7,        // "any" (default)
+    kEncounterFeelingSame = 8        // "same"
+};
+
 // EncounterParameters +0x2c element: one [EncounterFormation] section, retail 0x80 bytes.
 // Ctor FUN_06ef5b50 (defaults + ParseSection), dtor FUN_06ef3e30, copy FUN_06efa7c0 (all
 // member-wise).

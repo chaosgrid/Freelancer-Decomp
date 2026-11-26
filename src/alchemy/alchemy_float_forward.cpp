@@ -24,7 +24,7 @@ namespace AlchemyImpl
             return;
         static_cast<ITextureLibrary2*>(G_TextureLibrary)->AdvanceTime(Handle, Dt);
         static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(
-            Handle, -1, reinterpret_cast<unsigned long*>(Frame));
+            Handle, kTextureFrameCurrent, reinterpret_cast<unsigned long*>(Frame));
     }
 
     __declspec(noinline) double ForwardAppearanceSingleEval(

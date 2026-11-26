@@ -238,7 +238,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
     FHudCmdHandler* const Cancelled = G_HudCmdCancelNodes->back();
     G_HudCmdCancelNodes->pop_back();
     G_HudCmdCancelCount = G_HudCmdCancelCount - 1;
-    Cancelled->OnEvent(0x10u);
+    Cancelled->OnEvent(USER_STACKABLE_CANCEL);
     return 1;
 }
 
@@ -351,7 +351,7 @@ bool SpaceSendCommand(FSpaceCommand* Command)
     }
 
     // Ids up to 0xe stop here, unconsumed.
-    if (Command->Id <= 0xe)
+    if (Command->Id <= static_cast<int>(USER_EVENTS))
         return false;
 
     // The camera's watched object, when it is a ship (ManagerKind 1), gets the record through

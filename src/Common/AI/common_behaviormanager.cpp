@@ -185,7 +185,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     LockManeuversByte = 0;
     InSightsTargetId = 0;
     TurnSensitivity = 0.75f;                                 // 0x3f400000
-    ContentCbCreationType = 3;
+    ContentCbCreationType = pub::AI::ContentCallback::CreationNone;
 }
 
 IBehaviorManager::~IBehaviorManager()
@@ -333,7 +333,7 @@ IObjRW const* IBehaviorManager::get_debugger_target() const
 bool IBehaviorManager::get_docking_port(IObjRW const*& OutPort, int& OutIndex)
 {
     // 0x062d4b30, RET 8. Every failure path leaves OutPort / OutIndex untouched.
-    if (CurrentBehaviorIndex != 7 || DockingPortFlag == 0 || DockingPortStatus != 1)
+    if (CurrentBehaviorIndex != BEHAVIOR_DOCK || DockingPortFlag == 0 || DockingPortStatus != 1)
         return false;
 
     // [this+0x190] is BehaviorDispatchTable[7], the DockBehavior; retail does null-test it.
@@ -518,9 +518,9 @@ pub::AI::OP_RTYPE IBehaviorManager::set_directive_priority(
     if (*reinterpret_cast<int*>(DirectiveStorage) != 0)
     {
         *reinterpret_cast<pub::AI::DirectivePriority*>(DirectiveStorage + 4) = Priority;
-        return static_cast<pub::AI::OP_RTYPE>(1);
+        return pub::AI::OpRTypeAccepted;
     }
-    return static_cast<pub::AI::OP_RTYPE>(3);
+    return pub::AI::OpRTypeNoDirective;
 }
 
 void IBehaviorManager::set_personality(pub::AI::Personality const& Personality)
@@ -1037,7 +1037,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         // Only when the target manager's current behavior is 10: [Mgr+0x19c] is
         // BehaviorDispatchTable[10] (index constant-folded) and slot +0x1c is OnUpdate. Falls
         // through into case 1 as retail does.
-        if (Mgr->CurrentBehaviorIndex == 0xa && Mgr->BehaviorDispatchTable[0xa] != nullptr)
+        if (Mgr->CurrentBehaviorIndex == BEHAVIOR_FORMATION && Mgr->BehaviorDispatchTable[0xa] != nullptr)
         {
             Mgr->BehaviorDispatchTable[0xa]->OnUpdate();
         }
@@ -1180,7 +1180,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     if (ContentCbPtr != nullptr)
     {
         int const* DirDwords = reinterpret_cast<int const*>(DirectiveStorage);
-        bool NewContentFlag = (Sys->Targeting.AttackState == 2) && (CurrentBehaviorIndex == 2)
+        bool NewContentFlag = (Sys->Targeting.AttackState == TargetManager::kAttackStateCombatOver) && (CurrentBehaviorIndex == BEHAVIOR_GOTO)
                              && (DirDwords[0] == 0 || DirDwords[1] == 1);
         if (NewContentFlag != (bScanState != 0))
         {
@@ -1221,7 +1221,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
 
     // Behavior 6 always resets BehaviorTimerA and counts as a wrap.
     bool bCurrentIsIndex6 = false;
-    if (CurrentBehaviorIndex == 6)
+    if (CurrentBehaviorIndex == BEHAVIOR_IDLE)
     {
         bTimerAWrapped = true;
         BehaviorTimerA = 0.0f;
@@ -1270,18 +1270,18 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     // The active behavior's status: 2 and 3 force a re-evaluation, 0 forbids one, anything
     // else leaves the wrap's verdict alone.
     int const BehaviorStatus = CurrentBehavior->GetStatus();
-    if (BehaviorStatus == 2 || BehaviorStatus == 3)
+    if (BehaviorStatus == kBehaviorUpdateFinished || BehaviorStatus == kBehaviorUpdateAborted)
         bReevaluate = true;
-    if (BehaviorStatus == 0)
+    if (BehaviorStatus == kBehaviorUpdateBusy)
         bReevaluate = false;
 
     // Two AI-target-list probes on Sys->Timers, each forcing a re-evaluation unless the
     // behavior they would switch to is already current. Skipped while a directive is armed.
     if (!bDirectiveArmed)
     {
-        if (Sys->Timers.IsTimer3Active() && CurrentBehaviorIndex != 0xf)   // FUN_062e8830
+        if (Sys->Timers.IsTimer3Active() && CurrentBehaviorIndex != BEHAVIOR_FACE)   // FUN_062e8830
             bReevaluate = true;
-        if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers) && CurrentBehaviorIndex != 5)
+        if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers) && CurrentBehaviorIndex != BEHAVIOR_EVADE)
             bReevaluate = true;
     }
 
@@ -1291,7 +1291,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     if (WatchedObj->is_player())
     {
         // On the player's own ship a status 2 or 3 behavior is abandoned right away.
-        if (BehaviorStatus == 2 || BehaviorStatus == 3)
+        if (BehaviorStatus == kBehaviorUpdateFinished || BehaviorStatus == kBehaviorUpdateAborted)
             SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);
 
         // Defaults, overwritten below.
@@ -1301,23 +1301,23 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
         bReevaluate = false;
 
         // Behavior 19 has no docking-probe handling.
-        if (CurrentBehaviorIndex != -1 && CurrentBehaviorIndex != 0x13)
+        if (CurrentBehaviorIndex != -1 && CurrentBehaviorIndex != BEHAVIOR_FREE_FLIGHT)
         {
             // The entry is called (+0x2c) with no null test.
             Behavior* const Active = BehaviorDispatchTable[CurrentBehaviorIndex];
             {
                 bAllowUserSteering = Active->allow_user_steering() ? 1 : 0;
-                if (BehaviorStatus == 0 || LockManeuversByte != 0)
+                if (BehaviorStatus == kBehaviorUpdateBusy || LockManeuversByte != 0)
                     DockingPortFlag = 1;
 
                 // Resolve the docking target; the source depends on the running behavior.
                 IObjRW* Target = nullptr;
                 bool bProximityGated = false;
-                if (CurrentBehaviorIndex == 7)
+                if (CurrentBehaviorIndex == BEHAVIOR_DOCK)
                 {
                     Target = static_cast<IObjRW*>(Active->GetDockTarget());
                 }
-                else if (CurrentBehaviorIndex == 0xa)
+                else if (CurrentBehaviorIndex == BEHAVIOR_FORMATION)
                 {
                     // FUN_062ecaf0 on Sys+0x1364 returns the leader, already -8 adjusted.
                     bProximityGated = true;
@@ -1336,7 +1336,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                                 IBehaviorManager* const PartnerMgr =
                                     static_cast<CEqObj*>(const_cast<CObject*>(PartnerObj))->get_behavior_interface();
                                 // The manager is null-tested, its table[7] is not.
-                                if (PartnerMgr != nullptr && PartnerMgr->CurrentBehaviorIndex == 7)
+                                if (PartnerMgr != nullptr && PartnerMgr->CurrentBehaviorIndex == BEHAVIOR_DOCK)
                                 {
                                     Target = static_cast<IObjRW*>(
                                         PartnerMgr->BehaviorDispatchTable[7]->GetDockTarget());
@@ -1518,7 +1518,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     }
 
     // A pending directive result whose behavior is still running, or is 8, completes now.
-    if (PendingCompletedBehavior != -1 && (PendingCompletedBehavior == CurrentBehaviorIndex || PendingCompletedBehavior == 8))
+    if (PendingCompletedBehavior != -1 && (PendingCompletedBehavior == CurrentBehaviorIndex || PendingCompletedBehavior == BEHAVIOR_LAUNCH))
     {
         DirDwords[0] = 0;
         SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);
@@ -1602,7 +1602,7 @@ bool IBehaviorManager::NotifyFollowEvent(uint ObjectId1, uint ObjectId2,
                                          pub::AI::ContentCallback::FollowStatusType Status,
                                          float Distance)
 {
-    if (Sys->Targeting.AttackState == 0 || CurrentBehaviorIndex != 0x11)
+    if (Sys->Targeting.AttackState == TargetManager::kAttackStateEngaged || CurrentBehaviorIndex != BEHAVIOR_FOLLOW)
         return false;
     // The callback's slot 0.
     if (ContentCbPtr != nullptr)
@@ -1620,9 +1620,9 @@ bool IBehaviorManager::NotifyTetherEvent(uint ObjectId1, uint ObjectId2,
                                          pub::AI::ContentCallback::TetherStatusType Status,
                                          Vector const& Position)
 {
-    if (Sys->Targeting.AttackState == 0)
+    if (Sys->Targeting.AttackState == TargetManager::kAttackStateEngaged)
         return false;
-    if (CurrentBehaviorIndex != 2 && CurrentBehaviorIndex != 7)
+    if (CurrentBehaviorIndex != BEHAVIOR_GOTO && CurrentBehaviorIndex != BEHAVIOR_DOCK)
         return false;
     // The callback's slot 1 (+0x04).
     if (ContentCbPtr != nullptr)
@@ -1650,12 +1650,12 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
 
         // Behavior 6 as the player becomes DefaultBehaviorIndex instead, and every steering
         // input on the ThrustManager (Sys+0x18) is released on the way.
-        if (NewIndex == 6)
+        if (NewIndex == BEHAVIOR_IDLE)
         {
             EffectiveIndex = static_cast<int>(DefaultBehaviorIndex);
             ThrustManager* const Thrust = &Sys->Thrust;
-            Thrust->SetThrottle(0.0f, 2);                           // FUN_062e89a0(0, 2)
-            Thrust->SetThrottle(0.0f, 0);                           // FUN_062e89a0(0, 0)
+            Thrust->SetThrottle(0.0f, kThrottleModeCruise);                           // FUN_062e89a0(0, 2)
+            Thrust->SetThrottle(0.0f, kThrottleModeEngine);                           // FUN_062e89a0(0, 0)
             // Retail re-zeroes the same stack scratch before each of the next two calls.
             Vector Zero;
             Zero.x = 0.0f;
@@ -1725,12 +1725,12 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
     FFormationLeaderState* const Rec = &Sys->FormationLeaders;  // Sys + 0x1364
     switch (Event->Type)
     {
-    case 0:
+    case FBehaviorManagerEvent::kEventDamageTaken:
         // FUN_062e86d0(Sys+0x34, Data).
         AccumulateSystemManagerTimerLevel(&Sys->Timers, Data);
         return;
 
-    case 1:
+    case FBehaviorManagerEvent::kEventMunitionHit:
         // The callee 062ed730 is the ICF-folded `RET 4` Ghidra labels
         // MetaList<GoodDesc>::operator=, so the case only reads [Data] (kept: it faults on a
         // bad pointer in retail too).
@@ -1740,7 +1740,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         }
         return;
 
-    case 2:
+    case FBehaviorManagerEvent::kEventSetManeuver:
     {
         // A type-2 directive whose target is [Data+8] is completed.
         int* const Dir = reinterpret_cast<int*>(DirectiveStorage);
@@ -1756,7 +1756,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         return;
     }
 
-    case 3:
+    case FBehaviorManagerEvent::kEventObjectLeftSystem:
     {
         // [Data+4] / [Data+8] are re-read from memory at every use, as retail does.
         unsigned int& LeftId = *reinterpret_cast<unsigned int*>(Data + 8);
@@ -1768,7 +1768,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         CObject const* const WatchedCobj =
             ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->cobject();
         if (WatchedCobj != nullptr &&
-            (static_cast<unsigned int>(WatchedCobj->ObjectClass) & 0x503u) == 0x503u)
+            (static_cast<unsigned int>(WatchedCobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             static_cast<CShip*>(const_cast<CObject*>(WatchedCobj))->leaving_system_update(LeftId);
 
         if (LeftId == Sys->SelfTarget.Iface->get_id())
@@ -1784,7 +1784,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
                 Entry->OnObjectLeftSystem(reinterpret_cast<void*>(static_cast<uintptr_t>(LeftId)));
         }
 
-        if ((LeftFlags & 0xc40u) != 0)
+        if ((LeftFlags & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
         {
             // get_formation_leader (+0xb0), return value ignored; the watcher is not tested.
             IObjRW* Leader = nullptr;
@@ -1803,11 +1803,11 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
                 const_cast<FBehaviorManagerEvent*>(Event));
         }
 
-        if ((LeftFlags & 0x840u) == 0)
+        if ((LeftFlags & (OBJ_JUMP_GATE | OBJ_JUMP_HOLE)) == 0)
             return;
         if (!Sys->SelfTarget.Iface->is_player())
             return;
-        if (CurrentBehaviorIndex != 0xa)
+        if (CurrentBehaviorIndex != BEHAVIOR_FORMATION)
             return;
         if (LeftId != Sys->SelfTarget.Iface->get_id())
             return;
@@ -1815,7 +1815,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         return;
     }
 
-    case 4:
+    case FBehaviorManagerEvent::kEventTradelane:
     {
         // FUN_062ecaf0 returns the leader (already -8 adjusted) or 0. The behavior slot 22 call
         // is unconditional (entry not null-tested).
@@ -1835,7 +1835,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         return;
     }
 
-    case 5:
+    case FBehaviorManagerEvent::kEventDockRequest:
     {
         IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();
         if (Watched == nullptr)
@@ -1850,12 +1850,12 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         return;
     }
 
-    case 6:
+    case FBehaviorManagerEvent::kEventMissileLaunched:
         // FUN_062e8720(Sys+0x34, Data).
         AppendSystemManagerTimerListEntry(&Sys->Timers, Data);
         return;
 
-    case 7:
+    case FBehaviorManagerEvent::kEventObjectDying:
         // Otherwise FUN_062ec6a0 (sets Rec+0xc5).
         if (*reinterpret_cast<unsigned int const*>(Data) ==
             Sys->SelfTarget.Iface->get_id())

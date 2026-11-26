@@ -10,6 +10,7 @@
 #include "DALib.h"
 #include "Core/globals.h"
 #include "render/IRenderPipeline.h"
+#include "render/slots.h"          // Render::EPipelineState
 #include "Space/space_state.h"
 #include "common_misc.h"
 
@@ -24,9 +25,9 @@ void ClearWin3DBuffers(unsigned int Bits)
     // FUN_004215e0. No null test on the pipeline.
     IRenderPipeline* const Pipe = DALib::Pipeline;
 
-    unsigned long ClearFlags = (Bits & kWin3DClearColour) != 0 ? 1u : 0u;
+    unsigned long ClearFlags = (Bits & kWin3DClearColour) != 0 ? D3DCLEAR_TARGET : 0u;
     if ((Bits & kWin3DClearDepth) != 0)
-        ClearFlags |= 2u;
+        ClearFlags |= D3DCLEAR_ZBUFFER;
 
     // The depth range is reset to [0, 1] on every clear, before the clear itself.
     Pipe->SetDepthRange(0.0f, 1.0f);
@@ -58,7 +59,7 @@ void Win3DApplyCamera(ICamera* Camera)
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
     int bViewspace = 1;                           // the out value is seeded with 1
-    Pipe->GetPipelineState(7, &bViewspace);
+    Pipe->GetPipelineState(Render::PipelineStateViewspaceLights, &bViewspace);
     if (bViewspace != 0)
     {
         Pipe->SetModelview((const Transform*)GWin3DModelview);

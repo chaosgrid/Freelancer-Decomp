@@ -125,11 +125,11 @@ bool NnToolTipControl::Create(Win3D* NewParent, void* /*Data*/)
     // FUN_004bd830 (RET 8).
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     InitTextDefaults(); // FUN_005a1c50
     Width = 0.1f;
     Height = 0.1f;
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
     DrawSubLayer = 7;
     return true;
 }
@@ -227,7 +227,7 @@ void NnToolTipControl::Draw()
     {
         return;
     }
-    if ((Flags & 0x02) == 0)
+    if ((Flags & kWin3DVisible) == 0)
     {
         return;
     }
@@ -350,7 +350,7 @@ void NnToolTipControl::ApplyHover(FToolTipHoverInfo const* Info)
     if (_wcsicmp(Resolved, L" ") == 0)
     {
         bHasText_ = 0;
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
 
@@ -380,7 +380,7 @@ void NnToolTipControl::UpdateFromHover(FToolTipHoverInfo const* Info)
     if (GetClientMouseCursorDrawFlag() == 0)
     {
         bHasText_ = 0;
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
 
@@ -402,7 +402,7 @@ void NnToolTipControl::UpdateFromHover(FToolTipHoverInfo const* Info)
                         && Hover_.WorldPos[1] == Info->WorldPos[1]);
         if (bSameIds && bSameLive && bSamePos)
         {
-            Flags = static_cast<unsigned char>(Flags & 0xfd);
+            Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
             return;
         }
         bHasText_ = 0;
@@ -422,7 +422,7 @@ void NnToolTipControl::UpdateFromHover(FToolTipHoverInfo const* Info)
             return;
         ApplyHover(Info);
     }
-    Flags = static_cast<unsigned char>(Flags | 0x03);
+    Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
 }
 
 void NnToolTipControl::TickToolTip(double DeltaSeconds)
@@ -430,7 +430,7 @@ void NnToolTipControl::TickToolTip(double DeltaSeconds)
     // FUN_004bdda0.
     if (bFedThisFrame_ == 0)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         bHasText_ = 0;
     }
     bFedThisFrame_ = 0;
@@ -438,7 +438,7 @@ void NnToolTipControl::TickToolTip(double DeltaSeconds)
     if (GetClientMouseCursorDrawFlag() == 0)
     {
         bHasText_ = 0;
-        Flags = static_cast<unsigned char>(Flags & 0xfd);
+        Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
         return;
     }
 
@@ -459,7 +459,7 @@ void NnToolTipControl::TickToolTip(double DeltaSeconds)
     }
 
     bBuilt_ = static_cast<unsigned char>((Flags >> 1) & 1);
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
 
     int CursorX = 0;
     int CursorY = 0;
@@ -483,7 +483,7 @@ void NnToolTipControl::TickToolTip(double DeltaSeconds)
 void NnToolTipControl::HideNow()
 {
     // FUN_004be390.
-    Flags = static_cast<unsigned char>(Flags & 0xfd);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DVisible);
     bHasText_ = 0;
 }
 
@@ -569,7 +569,7 @@ Win3D* ToolTipFactory::Create(Win3D* Parent, void* Payload)
 {
     // FUN_004be420 (RET 8): operator new(0x170); the singleton is DAT_0067244c.
     NnToolTipControl* const Tip = new NnToolTipControl();
-    Tip->Flags = static_cast<unsigned char>(Tip->Flags & 0xfd);
+    Tip->Flags = static_cast<unsigned char>(Tip->Flags & ~kWin3DVisible);
     G_ToolTipSingleton = Tip;
     Tip->ClassName = ClassName;
     if (!Tip->Create(Parent, Payload))

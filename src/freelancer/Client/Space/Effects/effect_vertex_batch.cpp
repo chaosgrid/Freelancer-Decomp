@@ -39,42 +39,42 @@ namespace
 
     FEffectVertexBatchAutoInit G_EffectVertexBatchAutoInit;
 
-    constexpr unsigned kEffectFvf = 0x142;
+    constexpr unsigned kEffectFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
     constexpr int kDefaultGrowth = 0x80;
 
     // DAT_005d9a04 — SetTextureStageState stage 0: (type,value) chain, type starts at 1.
     // Walked as: value=[p+4], next_type=[p+8], p+=8 until next_type==0.
     int const kTssStage0[] = {
-        1, 4, // COLOROP = MODULATE
-        2, 2, // COLORARG1 = TEXTURE
-        3, 0, // COLORARG2 = DIFFUSE (0)
-        4, 4, // ALPHAOP = MODULATE
-        5, 2, // ALPHAARG1 = TEXTURE
-        6, 0, // ALPHAARG2 = DIFFUSE
+        D3DTSS_COLOROP, D3DTOP_MODULATE,
+        D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_DIFFUSE,
+        D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+        D3DTSS_ALPHAARG2, D3DTA_DIFFUSE,
         0
     };
 
     // DAT_005d9a3c — stage 1.
     int const kTssStage1[] = {
-        1, 1, // COLOROP = DISABLE
-        2, 2,
-        3, 1,
-        4, 1, // ALPHAOP = DISABLE
-        5, 2,
-        6, 1,
+        D3DTSS_COLOROP, D3DTOP_DISABLE,
+        D3DTSS_COLORARG1, D3DTA_TEXTURE,
+        D3DTSS_COLORARG2, D3DTA_CURRENT,
+        D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+        D3DTSS_ALPHAARG1, D3DTA_TEXTURE,
+        D3DTSS_ALPHAARG2, D3DTA_CURRENT,
         0
     };
 
     // DAT_005d99dc — SetRenderState chain, state starts at 0x8d.
     int const kRsSetup[] = {
-        0x8d, 1, // COLORVERTEX = TRUE
-        0x91, 1, // DIFFUSEMATERIALSOURCE = COLOR1
+        D3DRS_COLORVERTEX, 1,
+        D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1,
         0
     };
 
     // DAT_005d99f4 — restore.
     int const kRsRestore[] = {
-        0x8d, 0,
+        D3DRS_COLORVERTEX, 0,
         0
     };
 
@@ -315,7 +315,7 @@ void EffectVertexBatchFlush(ICamera* Cam)
 {
     FEffectVertexBatch* const Batch = &G_EffectVertexBatch;
 
-    DALib::Pipeline->SetTextureStageState(0, 0xb, 0);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
     ApplyTssTable(DALib::Pipeline, 0, kTssStage0);
     ApplyTssTable(DALib::Pipeline, 1, kTssStage1);
     ApplyRsTable(DALib::Pipeline, kRsSetup);
@@ -324,12 +324,12 @@ void EffectVertexBatchFlush(ICamera* Cam)
     DALib::Pipeline->SetTextureStageTexture(0, ResolveBeamTextureHandle(G_BeamEffectTexture, 0));
 
     DALib::Pipeline->SetRenderState(D3DRS_CLIPPING, 1);  // CLIPPING
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);  // CULLMODE = NONE
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);  // CULLMODE = NONE
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 1);   // ZENABLE
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);   // ZWRITEENABLE
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);  // ALPHABLENDENABLE
-    DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, 2);  // SRCBLEND = ONE
-    DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 2);  // DESTBLEND = ONE
+    DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);  // SRCBLEND = ONE
+    DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);  // DESTBLEND = ONE
 
     int SavedLighting = 0;
     DALib::Pipeline->GetRenderState(D3DRS_LIGHTING, &SavedLighting);
@@ -368,6 +368,6 @@ void EffectVertexBatchFlush(ICamera* Cam)
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, SavedLighting);
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 2);
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
     ApplyRsTable(DALib::Pipeline, kRsRestore);
 }

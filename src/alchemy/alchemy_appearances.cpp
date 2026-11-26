@@ -309,14 +309,14 @@ namespace AlchemyImpl
         // swaps V0/V1 (in both the quad and the triangle fill).
         void FlipBasicAppearanceFrame(unsigned long Flags, float* FrameBlock)
         {
-            if ((Flags & 0x1000u) != 0)
+            if ((Flags & kAppFlagFlipTexU) != 0)
             {
                 std::uint32_t Previous;
                 std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
                 FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
                 std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
             }
-            if ((Flags & 0x2000u) != 0)
+            if ((Flags & kAppFlagFlipTexV) != 0)
             {
                 std::uint32_t Previous;
                 std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
@@ -327,13 +327,13 @@ namespace AlchemyImpl
 
         void ApplyFrameFlips(unsigned long Flags, float* FrameBlock)
         {
-            if ((Flags & 0x1000u) != 0)
+            if ((Flags & kAppFlagFlipTexU) != 0)
             {
                 const float Swap = FrameBlock[1];
                 FrameBlock[1] = FrameBlock[3];
                 FrameBlock[3] = Swap;
             }
-            if ((Flags & 0x2000u) != 0)
+            if ((Flags & kAppFlagFlipTexV) != 0)
             {
                 const float Swap = FrameBlock[2];
                 FrameBlock[2] = FrameBlock[4];
@@ -440,35 +440,38 @@ namespace AlchemyImpl
         // perp FUN_06235320 / FUN_06232730, oriented FUN_0622e680 / FUN_0622b8a0, dust
         // FUN_06211e10 / FUN_06211e70, beam FUN_06204af0 / FUN_06204ba0.
         const FDescriptorFlagBit kBasicFlags[] = {
-            {0xF863872Eu, 0x1},    {0xF87B5FD5u, 0x2},    {0xE91467F1u, 0x4},
-            {0xE2F60EEBu, 0x8},    {0xF3D52EE4u, 0x1000}, {0xE8DC7F5Eu, 0x2000},
+            {0xF863872Eu, kAppFlagTriTexture},         {0xF87B5FD5u, kAppFlagQuadTexture},
+            {0xE91467F1u, kAppFlagMotionBlur},         {0xE2F60EEBu, kAppFlagUseCommonTexFrame},
+            {0xF3D52EE4u, kAppFlagFlipTexU},           {0xE8DC7F5Eu, kAppFlagFlipTexV},
         };
         const FDescriptorFlagBit kRectFlags[] = {
-            {0xFB7958C1u, 0x1},    {0xE91467F1u, 0x4},    {0xF9FEBF0Du, 0x10},
-            {0xE2F60EEBu, 0x8},    {0xF3D52EE4u, 0x1000}, {0xE8DC7F5Eu, 0x2000},
+            {0xFB7958C1u, kAppFlagCenterOnPos},        {0xE91467F1u, kAppFlagMotionBlur},
+            {0xF9FEBF0Du, kAppFlagViewingAngleFade},   {0xE2F60EEBu, kAppFlagUseCommonTexFrame},
+            {0xF3D52EE4u, kAppFlagFlipTexU},           {0xE8DC7F5Eu, kAppFlagFlipTexV},
         };
         const FDescriptorFlagBit kPerpFlags[] = {
-            {0xF9FEBF0Du, 0x10},
-            {0xE2F60EEBu, 0x8},
-            {0xF3D52EE4u, 0x1000},
-            {0xE8DC7F5Eu, 0x2000},
+            {0xF9FEBF0Du, kAppFlagViewingAngleFade},
+            {0xE2F60EEBu, kAppFlagUseCommonTexFrame},
+            {0xF3D52EE4u, kAppFlagFlipTexU},
+            {0xE8DC7F5Eu, kAppFlagFlipTexV},
         };
         const FDescriptorFlagBit kOrientedFlags[] = {
-            {0xF9FEBF0Du, 0x40},
-            {0xE2F60EEBu, 0x8},
-            {0xF3D52EE4u, 0x1000},
-            {0xE8DC7F5Eu, 0x2000},
+            {0xF9FEBF0Du, kAppFlagOrientedViewingAngleFade},
+            {0xE2F60EEBu, kAppFlagUseCommonTexFrame},
+            {0xF3D52EE4u, kAppFlagFlipTexU},
+            {0xE8DC7F5Eu, kAppFlagFlipTexV},
         };
         const FDescriptorFlagBit kDustFlags[] = {
-            {0xE2F60EEBu, 0x8},
-            {0xF3D52EE4u, 0x1000},
-            {0xE8DC7F5Eu, 0x2000},
+            {0xE2F60EEBu, kAppFlagUseCommonTexFrame},
+            {0xF3D52EE4u, kAppFlagFlipTexU},
+            {0xE8DC7F5Eu, kAppFlagFlipTexV},
         };
         // 0x03503B61 / 0xE2F60EEB / 0x0ABE0402 share the tail that reads 0 or leaves Flags
         // alone and returns 0.
         const FDescriptorFlagBit kBeamFlags[] = {
-            {0x08508C35u, 0x200}, {0xE8B8CDE7u, 0x100}, {0x1C65B7B9u, 0x400},
-            {0xF87B5FD5u, 0x2},   {0x03503B61u, 0x0},   {0xE2F60EEBu, 0x0},
+            {0x08508C35u, kAppFlagBeamDisablePlaceHolder}, {0xE8B8CDE7u, kAppFlagBeamDupeFirstParticle},
+            {0x1C65B7B9u, kAppFlagBeamLineAppearance},     {0xF87B5FD5u, kAppFlagQuadTexture},
+            {0x03503B61u, 0x0},   {0xE2F60EEBu, 0x0},
             {0x0ABE0402u, 0x0},
         };
 
@@ -521,116 +524,116 @@ namespace AlchemyImpl
         // 0x06256aa0, perp 0x06256890, oriented 0x062565b8, dust 0x06255918, beam
         // 0x062555c0, particle 0x06256780, mesh 0x06256298.
         const FNodePropertyRow kBasicPropertyRows[] = {
-            {"Appearance_LODCurve", 0x0C53B008U, 0x200, 0.0f, 100.0f},
-            {"BasicApp_TriTexture", 0xF863872EU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_QuadTexture", 0xF87B5FD5U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_MotionBlur", 0xE91467F1U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_Size", 0xF7C2EBA9U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_HToVAspect", 0xE0E97650U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_Rotate", 0x05DB630EU, 0x200, -kNodePropertyRowMax, kNodePropertyRowMax},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, 0x202, 0.0f, 1.0f},
-            {"BasicApp_FlipTexU", 0xF3D52EE4U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_FlipTexV", 0xE8DC7F5EU, 0x1, 0.0f, 0.0f},
+            {"Appearance_LODCurve", 0x0C53B008U, kFxPropSingleRampRamp, 0.0f, 100.0f},
+            {"BasicApp_TriTexture", 0xF863872EU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_QuadTexture", 0xF87B5FD5U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_MotionBlur", 0xE91467F1U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Size", 0xF7C2EBA9U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_HToVAspect", 0xE0E97650U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_Rotate", 0x05DB630EU, kFxPropSingleRampRamp, -kNodePropertyRowMax, kNodePropertyRowMax},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"BasicApp_FlipTexU", 0xF3D52EE4U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_FlipTexV", 0xE8DC7F5EU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kRectPropertyRows[] = {
-            {"Appearance_LODCurve", 0x0C53B008U, 0x200, 0.0f, 100.0f},
-            {"BasicApp_MotionBlur", 0xE91467F1U, 0x1, 0.0f, 0.0f},
-            {"RectApp_CenterOnPos", 0xFB7958C1U, 0x1, 0.0f, 0.0f},
-            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"RectApp_Scale", 0xFBA203B8U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"RectApp_Length", 0xE48DDAE2U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"RectApp_Width", 0x1266735FU, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, 0x202, 0.0f, 1.0f},
-            {"BasicApp_FlipTexU", 0xF3D52EE4U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_FlipTexV", 0xE8DC7F5EU, 0x1, 0.0f, 0.0f},
+            {"Appearance_LODCurve", 0x0C53B008U, kFxPropSingleRampRamp, 0.0f, 100.0f},
+            {"BasicApp_MotionBlur", 0xE91467F1U, kFxPropBool, 0.0f, 0.0f},
+            {"RectApp_CenterOnPos", 0xFB7958C1U, kFxPropBool, 0.0f, 0.0f},
+            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"RectApp_Scale", 0xFBA203B8U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"RectApp_Length", 0xE48DDAE2U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"RectApp_Width", 0x1266735FU, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"BasicApp_FlipTexU", 0xF3D52EE4U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_FlipTexV", 0xE8DC7F5EU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kPerpPropertyRows[] = {
-            {"Appearance_LODCurve", 0x0C53B008U, 0x200, 0.0f, 100.0f},
-            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_Size", 0xF7C2EBA9U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, 0x202, 0.0f, 1.0f},
-            {"BasicApp_FlipTexU", 0xF3D52EE4U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_FlipTexV", 0xE8DC7F5EU, 0x1, 0.0f, 0.0f},
+            {"Appearance_LODCurve", 0x0C53B008U, kFxPropSingleRampRamp, 0.0f, 100.0f},
+            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Size", 0xF7C2EBA9U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"BasicApp_FlipTexU", 0xF3D52EE4U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_FlipTexV", 0xE8DC7F5EU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kOrientedPropertyRows[] = {
-            {"Appearance_LODCurve", 0x0C53B008U, 0x200, 0.0f, 100.0f},
-            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, 0x1, 0.0f, 0.0f},
-            {"MeshApp_ParticleTransform", 0xF0004D58U, 0x105, 0.0f, 0.0f},
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"RectApp_Scale", 0xFBA203B8U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"OrientedApp_Height", 0xF267B8E1U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"OrientedApp_Width", 0xFA03992FU, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, 0x202, 0.0f, 1.0f},
-            {"BasicApp_FlipTexU", 0xF3D52EE4U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_FlipTexV", 0xE8DC7F5EU, 0x1, 0.0f, 0.0f},
+            {"Appearance_LODCurve", 0x0C53B008U, kFxPropSingleRampRamp, 0.0f, 100.0f},
+            {"RectApp_ViewingAngleFade", 0xF9FEBF0DU, kFxPropBool, 0.0f, 0.0f},
+            {"MeshApp_ParticleTransform", 0xF0004D58U, kFxPropTransform, 0.0f, 0.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"RectApp_Scale", 0xFBA203B8U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"OrientedApp_Height", 0xF267B8E1U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"OrientedApp_Width", 0xFA03992FU, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"BasicApp_FlipTexU", 0xF3D52EE4U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_FlipTexV", 0xE8DC7F5EU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kDustPropertyRows[] = {
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_Size", 0xF7C2EBA9U, 0x200, 0.0f, kNodePropertyRowMax},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, 0x1, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, 0x202, 0.0f, 1.0f},
-            {"BasicApp_FlipTexU", 0xF3D52EE4U, 0x1, 0.0f, 0.0f},
-            {"BasicApp_FlipTexV", 0xE8DC7F5EU, 0x1, 0.0f, 0.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Size", 0xF7C2EBA9U, kFxPropSingleRampRamp, 0.0f, kNodePropertyRowMax},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_UseCommonTexFrame", 0xE2F60EEBU, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_CommonTexFrame", 0xF52B8DD5U, kFxPropAnimatedSingleRamp, 0.0f, 1.0f},
+            {"BasicApp_FlipTexU", 0xF3D52EE4U, kFxPropBool, 0.0f, 0.0f},
+            {"BasicApp_FlipTexV", 0xE8DC7F5EU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kBeamPropertyRows[] = {
-            {"Appearance_LODCurve", 0x0C53B008U, 0x200, 0.0f, 100.0f},
-            {"BasicApp_Color", 0x048767E8U, 0x201, 0.0f, 1.0f},
-            {"BasicApp_Alpha", 0x04FC9016U, 0x200, 0.0f, 1.0f},
-            {"RectApp_Scale", 0xFBA203B8U, 0x200, 0.0f, 1000.0f},
-            {"RectApp_Width", 0x1266735FU, 0x200, 0.0f, 1001.0f},
-            {"BasicApp_TexName", 0x1BA23359U, 0x103, 0.0f, 0.0f},
-            {"BasicApp_BlendInfo", 0x1506EB6CU, 0x104, 0.0f, 0.0f},
-            {"BasicApp_TexFrame", 0x015A6F47U, 0x200, 0.0f, 1.0f},
-            {"BasicApp_QuadTexture", 0xF87B5FD5U, 0x1, 0.0f, 0.0f},
-            {"BeamApp_DisablePlaceHolder", 0x08508C35U, 0x1, 0.0f, 0.0f},
-            {"BeamApp_DupeFirstParticle", 0xE8B8CDE7U, 0x1, 0.0f, 0.0f},
-            {"BeamApp_LineAppearance", 0x1C65B7B9U, 0x1, 0.0f, 0.0f},
+            {"Appearance_LODCurve", 0x0C53B008U, kFxPropSingleRampRamp, 0.0f, 100.0f},
+            {"BasicApp_Color", 0x048767E8U, kFxPropColorRampRamp, 0.0f, 1.0f},
+            {"BasicApp_Alpha", 0x04FC9016U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"RectApp_Scale", 0xFBA203B8U, kFxPropSingleRampRamp, 0.0f, 1000.0f},
+            {"RectApp_Width", 0x1266735FU, kFxPropSingleRampRamp, 0.0f, 1001.0f},
+            {"BasicApp_TexName", 0x1BA23359U, kFxPropName, 0.0f, 0.0f},
+            {"BasicApp_BlendInfo", 0x1506EB6CU, kFxPropPair, 0.0f, 0.0f},
+            {"BasicApp_TexFrame", 0x015A6F47U, kFxPropSingleRampRamp, 0.0f, 1.0f},
+            {"BasicApp_QuadTexture", 0xF87B5FD5U, kFxPropBool, 0.0f, 0.0f},
+            {"BeamApp_DisablePlaceHolder", 0x08508C35U, kFxPropBool, 0.0f, 0.0f},
+            {"BeamApp_DupeFirstParticle", 0xE8B8CDE7U, kFxPropBool, 0.0f, 0.0f},
+            {"BeamApp_LineAppearance", 0x1C65B7B9U, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
         const FNodePropertyRow kParticlePropertyRows[] = {
-            {"ParticleApp_LifeName", 0x0EC7A290U, 0x103, 0.0f, 0.0f},
-            {"ParticleApp_DeathName", 0x03B76E6CU, 0x103, 0.0f, 0.0f},
-            {"ParticleApp_UseDynamicRotation", 0xE34C3C55U, 0x1, 0.0f, 0.0f},
-            {"ParticleApp_SmoothRotation", 0x049A6DBEU, 0x1, 0.0f, 0.0f},
+            {"ParticleApp_LifeName", 0x0EC7A290U, kFxPropName, 0.0f, 0.0f},
+            {"ParticleApp_DeathName", 0x03B76E6CU, kFxPropName, 0.0f, 0.0f},
+            {"ParticleApp_UseDynamicRotation", 0xE34C3C55U, kFxPropBool, 0.0f, 0.0f},
+            {"ParticleApp_SmoothRotation", 0x049A6DBEU, kFxPropBool, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
         const FNodePropertyRow kMeshPropertyRows[] = {
-            {"MeshApp_MeshId", 0x0B7EE41CU, 0x2, 0.0f, 0.0f},
-            {"MeshApp_MeshName", 0x18DADCA8U, 0x103, 0.0f, 0.0f},
-            {"MeshApp_UseParticleTransform", 0x001FC112U, 0x1, 0.0f, 0.0f},
-            {"MeshApp_ParticleTransform", 0xF0004D58U, 0x105, 0.0f, 0.0f},
+            {"MeshApp_MeshId", 0x0B7EE41CU, kFxPropInt, 0.0f, 0.0f},
+            {"MeshApp_MeshName", 0x18DADCA8U, kFxPropName, 0.0f, 0.0f},
+            {"MeshApp_UseParticleTransform", 0x001FC112U, kFxPropBool, 0.0f, 0.0f},
+            {"MeshApp_ParticleTransform", 0xF0004D58U, kFxPropTransform, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
 
@@ -907,12 +910,12 @@ namespace AlchemyImpl
         G_BasicDrawContext.PrimCount = 0;
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         const FFxTextureKey Key = {"???", Descriptor_->TextureCrc};
         Texture_.SetTexture(&Key);
         if (Texture_.Handle == -1)
             Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) != 0)
+        if ((Descriptor_->Flags & kAppFlagUseCommonTexFrame) != 0)
         {
             const float Position = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->FrameRamp, AppearanceOuterTime_, Age_));
@@ -1014,7 +1017,7 @@ namespace AlchemyImpl
             return GR_OK;
 
         ++G_DrawCounters[3];
-        if ((Descriptor_->Flags & 2u) != 0)
+        if ((Descriptor_->Flags & kAppFlagQuadTexture) != 0)
             FillQuadGeometry();
         else
             FillTriangleGeometry();
@@ -1065,7 +1068,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FxBasicAppearance::FillBatchedGeometry()
     {
         ++G_DrawCounters[3];
-        if ((Descriptor_->Flags & 2u) != 0)
+        if ((Descriptor_->Flags & kAppFlagQuadTexture) != 0)
             FillQuadGeometry();
         else
             FillTriangleGeometry();
@@ -1087,8 +1090,8 @@ namespace AlchemyImpl
         const float Scale = static_cast<float>(ScaleValue);
         if (IsZeroBasicScale(ScaleValue))
             return;
-        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
-        const bool bStreak = (Descriptor_->Flags & 4u) != 0;
+        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & kAppFlagUseCommonTexFrame) == 0;
+        const bool bStreak = (Descriptor_->Flags & kAppFlagMotionBlur) != 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         Transform ViewWorld;
         ComposeTransform(&ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
@@ -1254,7 +1257,7 @@ namespace AlchemyImpl
     void FxBasicAppearance::FillTriangleGeometry()
     {
         const FPooledParticle* Particle = InstanceListHead_;
-        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
+        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & kAppFlagUseCommonTexFrame) == 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         const Transform* const View = Camera->GetViewTransform();
         Transform ViewTemporary;
@@ -1468,12 +1471,12 @@ namespace AlchemyImpl
         G_RectDrawContext.PrimCount = 0;
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         const FFxTextureKey Key = {"???", Descriptor_->TextureCrc};
         Texture_.SetTexture(&Key);
         if (Texture_.Handle == -1)
             Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) != 0)
+        if ((Descriptor_->Flags & kAppFlagUseCommonTexFrame) != 0)
         {
             const float Position = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->CommonTexFrameRamp, AppearanceOuterTime_, Age_));
@@ -1615,8 +1618,8 @@ namespace AlchemyImpl
         ++G_DrawCounters[1];
 
         const unsigned long* const Blend = Descriptor_->BlendInfo;
-        CallSetRenderState(G_RenderPipeline, 0x13, static_cast<int>(Blend[0]));
-        CallSetRenderState(G_RenderPipeline, 0x14, static_cast<int>(Blend[1]));
+        CallSetRenderState(G_RenderPipeline, D3DRS_SRCBLEND, static_cast<int>(Blend[0]));
+        CallSetRenderState(G_RenderPipeline, D3DRS_DESTBLEND, static_cast<int>(Blend[1]));
 
         unsigned long FrameTexture = 0;
         std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
@@ -1649,24 +1652,24 @@ namespace AlchemyImpl
         const float FacingFadeScale = FloatFromBits(0x4106b33du);
         ++G_DrawCounters[4];
         const FPooledParticle* Particle = InstanceListHead_;
-        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
-        const bool bStretch = (Descriptor_->Flags & 4u) != 0;
+        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & kAppFlagUseCommonTexFrame) == 0;
+        const bool bStretch = (Descriptor_->Flags & kAppFlagMotionBlur) != 0;
         const bool bCentered = (Descriptor_->Flags & 1u) != 0;
-        const bool bViewFade = (Descriptor_->Flags & 0x10u) != 0;
+        const bool bViewFade = (Descriptor_->Flags & kAppFlagViewingAngleFade) != 0;
         Transform InvNode;
         float InverseW;
         ComputeGeneralInverseTransform(NodeWorldXform_,
             InvNode, InverseW);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
-        if ((Descriptor_->Flags & 0x1000u) != 0)
+        if ((Descriptor_->Flags & kAppFlagFlipTexU) != 0)
         {
             std::uint32_t Previous;
             std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
             FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
             std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
         }
-        if ((Descriptor_->Flags & 0x2000u) != 0)
+        if ((Descriptor_->Flags & kAppFlagFlipTexV) != 0)
         {
             std::uint32_t Previous;
             std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
@@ -1783,14 +1786,14 @@ namespace AlchemyImpl
                 {
                     LastFrame = Frame;
                     Texture_.LookupFrame(Frame, FrameBlock);
-                    if ((Descriptor_->Flags & 0x1000u) != 0)
+                    if ((Descriptor_->Flags & kAppFlagFlipTexU) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
                         FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
                         std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
                     }
-                    if ((Descriptor_->Flags & 0x2000u) != 0)
+                    if ((Descriptor_->Flags & kAppFlagFlipTexV) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
@@ -1973,12 +1976,12 @@ namespace AlchemyImpl
         G_PerpDrawContext.PrimCount = 0;
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         const FFxTextureKey Key = {"???", Descriptor_->TextureCrc};
         Texture_.SetTexture(&Key);
         if (Texture_.Handle == -1)
             Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) != 0)
+        if ((Descriptor_->Flags & kAppFlagUseCommonTexFrame) != 0)
         {
             const float Position = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->AxisOverrideRamp, AppearanceOuterTime_, Age_));
@@ -2161,22 +2164,22 @@ namespace AlchemyImpl
 
         ++G_DrawCounters[5];
         FPooledParticle* Particle = InstanceListHead_;
-        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
-        const bool bCameraFade = (Descriptor_->Flags & 0x10u) != 0;
+        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & kAppFlagUseCommonTexFrame) == 0;
+        const bool bCameraFade = (Descriptor_->Flags & kAppFlagViewingAngleFade) != 0;
         Transform InvNode;
         float InverseW;
         ComputeGeneralInverseTransform(NodeWorldXform_,
                                        InvNode, InverseW);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
-        if ((Descriptor_->Flags & 0x1000u) != 0)
+        if ((Descriptor_->Flags & kAppFlagFlipTexU) != 0)
         {
             std::uint32_t Previous;
             std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
             FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
             std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
         }
-        if ((Descriptor_->Flags & 0x2000u) != 0)
+        if ((Descriptor_->Flags & kAppFlagFlipTexV) != 0)
         {
             std::uint32_t Previous;
             std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
@@ -2305,14 +2308,14 @@ namespace AlchemyImpl
                 {
                     LastFrame = Frame;
                     Texture_.LookupFrame(Frame, FrameBlock);
-                    if ((Descriptor_->Flags & 0x1000u) != 0)
+                    if ((Descriptor_->Flags & kAppFlagFlipTexU) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[1], sizeof(Previous));
                         FrameBlock[1] = static_cast<float>(LoadAppearanceScalar(FrameBlock[3]));
                         std::memcpy(&FrameBlock[3], &Previous, sizeof(Previous));
                     }
-                    if ((Descriptor_->Flags & 0x2000u) != 0)
+                    if ((Descriptor_->Flags & kAppFlagFlipTexV) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[2], sizeof(Previous));
@@ -2486,12 +2489,12 @@ namespace AlchemyImpl
         G_OrientedDrawContext.PrimCount = 0;
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         const FFxTextureKey Key = {"???", Descriptor_->TextureCrc};
         Texture_.SetTexture(&Key);
         if (Texture_.Handle == -1)
             Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) != 0)
+        if ((Descriptor_->Flags & kAppFlagUseCommonTexFrame) != 0)
         {
             const float Position = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->CommonTexFrameRamp, AppearanceOuterTime_, Age_));
@@ -2610,14 +2613,14 @@ namespace AlchemyImpl
         const FPooledParticle* Particle = InstanceListHead_;
         if (Particle == nullptr)
             return GR_OK;
-        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
+        const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & kAppFlagUseCommonTexFrame) == 0;
         unsigned long VertCount = 0;
         unsigned long IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_OrientedDrawContext, 4, VertCount, IndexCount))
             return GR_OK;
-        const bool bCameraFade = (Descriptor_->Flags & 0x40u) != 0;
+        const bool bCameraFade = (Descriptor_->Flags & kAppFlagOrientedViewingAngleFade) != 0;
         Transform InverseNode;
         Vector CameraPosition;
         if (bCameraFade)
@@ -2750,14 +2753,14 @@ namespace AlchemyImpl
                     LastFrame = Frame;
                     Texture_.LookupFrame(Frame, FrameBlock);
                     const FAppearanceRampDescriptor* const FrameDescriptor = Descriptor_;
-                    if ((FrameDescriptor->Flags & 0x1000u) != 0)
+                    if ((FrameDescriptor->Flags & kAppFlagFlipTexU) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[1], sizeof(Previous));
                         FrameBlock[1] = static_cast<float>(LoadAppearanceScalar(FrameBlock[3]));
                         std::memcpy(&FrameBlock[3], &Previous, sizeof(Previous));
                     }
-                    if ((FrameDescriptor->Flags & 0x2000u) != 0)
+                    if ((FrameDescriptor->Flags & kAppFlagFlipTexV) != 0)
                     {
                         std::uint32_t Previous;
                         std::memcpy(&Previous, &FrameBlock[2], sizeof(Previous));
@@ -2932,7 +2935,7 @@ namespace AlchemyImpl
         const double NextAge = static_cast<double>(Dt) + Age_;
         StoreAlchemyFpuFloat(Age_, NextAge);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
 
         FFxTextureKey Key;
         Key.Name = kTexNameUnknown;
@@ -2940,7 +2943,7 @@ namespace AlchemyImpl
         Texture_.SetTexture(&Key);
         if (Texture_.Handle == -1)
             Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) == 8u)
+        if ((Descriptor_->Flags & kAppFlagUseCommonTexFrame) == kAppFlagUseCommonTexFrame)
         {
             // Texture callbacks can publish a different live descriptor.
             const double PositionValue = ForwardAppearanceSingleEval(
@@ -3152,13 +3155,13 @@ namespace AlchemyImpl
             float FrameBlock[5];
             std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
             const unsigned long Flags = Descriptor_->Flags;
-            if ((Flags & 0x1000u) != 0)
+            if ((Flags & kAppFlagFlipTexU) != 0)
             {
                 const double Swap = LoadAppearanceScalar(FrameBlock[1]);
                 std::memcpy(&FrameBlock[1], &FrameBlock[3], sizeof(float));
                 StoreAlchemyFpuFloat(FrameBlock[3], (Swap));
             }
-            if ((Flags & 0x2000u) != 0)
+            if ((Flags & kAppFlagFlipTexV) != 0)
             {
                 const double Swap = LoadAppearanceScalar(FrameBlock[2]);
                 std::memcpy(&FrameBlock[2], &FrameBlock[4], sizeof(float));
@@ -3345,8 +3348,8 @@ namespace AlchemyImpl
             if (AlDrawContextEnd(G_DustDrawContext) != 0)
             {
                 ++G_DrawCounters[1];
-                CallSetRenderState(G_RenderPipeline, 0x13, static_cast<int>(Descriptor_->BlendInfo[0]));
-                CallSetRenderState(G_RenderPipeline, 0x14, static_cast<int>(Descriptor_->BlendInfo[1]));
+                CallSetRenderState(G_RenderPipeline, D3DRS_SRCBLEND, static_cast<int>(Descriptor_->BlendInfo[0]));
+                CallSetRenderState(G_RenderPipeline, D3DRS_DESTBLEND, static_cast<int>(Descriptor_->BlendInfo[1]));
                 unsigned long FrameTexture = 0;
                 std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
                 CallRenderPipelineSetTexture(G_RenderPipeline, 0, static_cast<int>(FrameTexture));
@@ -3434,7 +3437,7 @@ namespace AlchemyImpl
         G_BeamDrawContext.PrimCount = 0;
         Age_ = static_cast<float>(Delta + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         FFxTextureKey Key;
         Key.Name = "???"; // DAT_06255804
         Key.Crc = Descriptor_->TextureCrc;
@@ -3663,7 +3666,7 @@ namespace AlchemyImpl
     {
         unsigned long Count = ResolveLiveInstanceCount() * 5;
         *Out = Count;
-        if ((GetAppearanceRampDescriptor()->Flags & 0x100u) == 0x100u)
+        if ((GetAppearanceRampDescriptor()->Flags & kAppFlagBeamDupeFirstParticle) == kAppFlagBeamDupeFirstParticle)
             *Out = Count + 5;
         return GR_OK;
     }
@@ -3674,7 +3677,7 @@ namespace AlchemyImpl
     {
         unsigned long Count = ResolveLiveInstanceCount() * 0x18;
         *Out = Count;
-        if ((GetAppearanceRampDescriptor()->Flags & 0x100u) == 0x100u)
+        if ((GetAppearanceRampDescriptor()->Flags & kAppFlagBeamDupeFirstParticle) == kAppFlagBeamDupeFirstParticle)
             *Out = Count + 0x18;
         return GR_OK;
     }
@@ -3691,7 +3694,7 @@ namespace AlchemyImpl
 
         int FillMode = 0;
         unsigned long Texture = 0;
-        if ((GetAppearanceRampDescriptor()->Flags & 0x400u) == 0x400u)
+        if ((GetAppearanceRampDescriptor()->Flags & kAppFlagBeamLineAppearance) == kAppFlagBeamLineAppearance)
         {
             FillMode = 2;
             Texture = 0;
@@ -3904,7 +3907,7 @@ namespace AlchemyImpl
             if (static_cast<long>(LiveInstanceCount_) < 2)
                 return;
             const FPooledParticle* Next = Head->Next;
-            if ((Descriptor_->Flags & 0x200u) != 0x200u)
+            if ((Descriptor_->Flags & kAppFlagBeamDisablePlaceHolder) != kAppFlagBeamDisablePlaceHolder)
             {
                 float Difference[3];
                 BeamSubtract(Difference, &Next->PosX, &Head->PosX);
@@ -3941,7 +3944,7 @@ namespace AlchemyImpl
         bool bTipNoCap = false;
         if (bHaveTip)
         {
-            if ((Descriptor_->Flags & 0x100u) == 0x100u)
+            if ((Descriptor_->Flags & kAppFlagBeamDupeFirstParticle) == kAppFlagBeamDupeFirstParticle)
             {
                 float HalfWidth = 0.0f;
                 float Rgba[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -4128,7 +4131,7 @@ namespace AlchemyImpl
     void FLBeamAppearance::JoinRing(const FBeamRingState& State, const float* Pos,
                                     unsigned long Diffuse, const unsigned short* NewIdx)
     {
-        if ((State.Node->Descriptor_->Flags & 2u) == 2u)
+        if ((State.Node->Descriptor_->Flags & kAppFlagQuadTexture) == kAppFlagQuadTexture)
         {
             float Middle[3];
             BeamAdd(Middle, Pos, State.PrevPos);
@@ -4435,7 +4438,7 @@ namespace AlchemyImpl
     {
         Age_ += Dt;
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         IDAComponent** Field = AssociatedFields_;
         IDAComponent** FieldEnd = AssociatedFields_ + FieldCount_;
         while (Field != FieldEnd)
@@ -4609,7 +4612,7 @@ namespace AlchemyImpl
     {
         if (Hash == kParticleUseDynamicRotationHash)
         {
-            *Out = static_cast<unsigned char>(Flags & 1u);
+            *Out = static_cast<unsigned char>(Flags & kParticleFlagUseDynamicRotation);
             return GR_OK;
         }
         if (Hash == kParticleSmoothRotationHash)
@@ -4626,9 +4629,9 @@ namespace AlchemyImpl
     {
         unsigned long Mask = 0;
         if (Hash == kParticleUseDynamicRotationHash)
-            Mask = 1u;
+            Mask = kParticleFlagUseDynamicRotation;
         else if (Hash == kParticleSmoothRotationHash)
-            Mask = 2u;
+            Mask = kParticleFlagSmoothRotation;
         else
             return GR_ALE_CREATE_FAIL;
         if (Value != 0)
@@ -4901,7 +4904,7 @@ namespace AlchemyImpl
         std::memcpy(&M.Translation, &Record->PosX, 3 * sizeof(float));
 
         const unsigned long Flags = ParticleProps()->Flags; // [[node+0xc0]+0xa0]
-        if ((Flags & 1) != 0)
+        if ((Flags & kParticleFlagUseDynamicRotation) != 0)
         {
             float N[3];
             std::memcpy(N, &Record->VelX, sizeof(N));
@@ -4965,7 +4968,7 @@ namespace AlchemyImpl
 
             Matrix Rotation;
             // Retail reloads the class cache after the MulQuat callback.
-            if ((ParticleProps()->Flags & 2) != 0)
+            if ((ParticleProps()->Flags & kParticleFlagSmoothRotation) != 0)
             {
                 // Speed >= 0.5 (or unordered) takes Speed * Dt.
                 if (Speed < 0.5f)
@@ -5104,7 +5107,7 @@ namespace AlchemyImpl
     {
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         ApplyFieldsToPool(this, true);
 
         FPooledParticle* Record = InstanceListHead_;

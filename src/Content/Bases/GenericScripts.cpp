@@ -152,7 +152,7 @@ void __cdecl UnloadGenericScripts()
 // FUN_06f020c0 (06f020c0-06f02329).
 char const* __cdecl PickGenericScript(int Segment, int Gender, int Posture, unsigned int VoiceId)
 {
-    int const Slot = (Posture != 0 ? 1 : 0) + 2 * ((Gender != 1 ? 1 : 0) + 2 * Segment);
+    int const Slot = (Posture != 0 ? 1 : 0) + 2 * ((Gender != kGenderMale ? 1 : 0) + 2 * Segment);
     std::vector<std::string>& Scripts = GGenericScripts[Slot];
 
     std::vector<std::string>::iterator Chosen;
@@ -328,7 +328,7 @@ namespace
                                   CharacterBehaviorDescription* Behavior, int Posture,
                                   FContentPlayerState* State)
     {
-        Behavior->DialogType = 3;
+        Behavior->DialogType = kDialogMission;
         AppendGenericScript(Behavior, GSEG_F01jG, Character, Posture, 0);
         // A player already on a mission.
         if ((State->GetLiveMission() & GIdValueMask) != 0)
@@ -476,7 +476,7 @@ namespace
                                 Character, Posture, 2);
             AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_F10bR : GSEG_F10bRm, Character, Posture, 3);
             FormatBribeOfferText(&Behavior->NameFmtStr, Bribe);
-            Behavior->DialogType = 1;
+            Behavior->DialogType = kDialogBribe;
             return;
         }
 
@@ -518,7 +518,7 @@ namespace
             AppendGenericScript(Behavior, GSEG_F07bP, Character, Posture, 3);
             AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_F10bR : GSEG_F10bRm, Character, Posture, 3);
             FormatKnowOfferText(Behavior, Know);
-            Behavior->DialogType = 4;
+            Behavior->DialogType = kDialogInfo;
             return;
         }
 
@@ -537,7 +537,7 @@ namespace
             for (int const* Id = &Rumor->Ids[1]; *Id != 0; ++Id)
                 Behavior->DescFmtStr.append_string(static_cast<unsigned int>(*Id));
             Behavior->DescFmtStr.end_mad_lib();
-            Behavior->DialogType = 2;
+            Behavior->DialogType = kDialogRumor;
             return;
         }
 
@@ -588,7 +588,7 @@ namespace
         Behavior.StartRoomLocationId = 0;
         bool const bShop = IsShopRole(Character);
         Behavior.OfferKind = pub::Controller::MissionOfferBarCharacter;
-        Behavior.DialogType = bShop ? 2 : 0;
+        Behavior.DialogType = bShop ? kDialogRumor : kDialogBlowoff;
         Behavior.OfferId = Character->CharacterId;
         Behavior.Filter = Character->PlayerId;
 

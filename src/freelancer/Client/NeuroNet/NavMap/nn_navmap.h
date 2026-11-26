@@ -175,6 +175,45 @@ struct FNavMapJumpLink
                                 //       the best path (or the player's system)
 };
 
+// FNavMapItem::Kind. No item of Kind 1 is created, but the type-mask gate of the draw and the
+// pick tests Kind 0 and 1 together.
+enum ENavMapItemKind : int
+{
+    kNavMapItemSolar = 0,     // a system object (BuildSystemItems) or a universe-view star (NAV_star)
+    kNavMapItemPlayer = 2,    // the player marker (AddPlayerMarker, "NNM_SM_INFO_POSITION")
+    kNavMapItemWaypoint = 3,  // a waypoint marker (FUN_00496e50)
+    kNavMapItemBestPath = 4   // a best-path stop marker
+};
+
+// FNavMapJumpLink::Kind.
+enum ENavMapLinkKind : int
+{
+    kNavMapLinkPlain = 0,     // drawn in the blue band colour
+    kNavMapLinkWaypoint = 1,  // both ends on the waypoint route
+    kNavMapLinkBestPath = 2   // both ends on the best path (or the player's system)
+};
+
+// G_NavMapFilterMode (DAT_006720a0): the filter buttons of FUN_004a0220 (SetFilterMode).
+enum ENavMapFilterMode : int
+{
+    kNavMapFilterPhysical = 0,   // PhysicalFilter
+    kNavMapFilterPolitical = 1,  // PoliticalFilter
+    kNavMapFilterPatrol = 2,     // PatrolFilter
+    kNavMapFilterMission = 3,    // MissionFilter
+    kNavMapFilterLegend = 4,     // LegendFilter
+    kNavMapFilterMineable = 5,   // MineableFilter
+    kNavMapFilterInfoCard = 6,   // the info card (ShowInfoCard) hides the filter row
+    kNavMapFilterBaseList = 7    // BaseListFilter
+};
+
+// G_NavMapZoneFilter (DAT_006720a4): AllFilter / HostileFilter / FriendlyFilter.
+enum ENavMapZoneFilter : int
+{
+    kNavMapZoneFilterAll = 0,
+    kNavMapZoneFilterHostile = 1,
+    kNavMapZoneFilterFriendly = 2
+};
+
 // NeuroNetNavMap::ViewMode / TransitionView.
 enum ENavMapView : int
 {

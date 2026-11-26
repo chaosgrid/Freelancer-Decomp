@@ -360,7 +360,7 @@ void FFormationLeaderState::SyncFormationLeader()
             if (FormationLeader->is_dying())
             {
                 IObjRW* const Ship = WatchedObject(Owner->Watcher);
-                static_cast<IObjAffect*>(Ship)->slot_6c(5, 0); // +0x6C
+                static_cast<IObjAffect*>(Ship)->slot_6c(kShipVoiceFormationLost, 0); // +0x6C
                 SetFormationLeader(nullptr);
                 bReleaseRequested = 0;
                 return;
@@ -373,7 +373,7 @@ void FFormationLeaderState::SyncFormationLeader()
         bValueB0Valid == 0)
     {
         IObjRW* const Ship = WatchedObject(Owner->Watcher);
-        static_cast<IObjAffect*>(Ship)->slot_6c(5, 0);
+        static_cast<IObjAffect*>(Ship)->slot_6c(kShipVoiceFormationLost, 0);
     }
 
     SetFormationLeader(nullptr);
@@ -483,14 +483,14 @@ bool FFormationLeaderState::FollowerDirectiveGateA() const
     {
         IBehaviorManager* const Mgr = GetBehaviorManager(Watched);
         // The leader's current behavior.
-        if (Mgr != nullptr && Mgr->CurrentBehaviorIndex == 0xf)
+        if (Mgr != nullptr && Mgr->CurrentBehaviorIndex == BEHAVIOR_FACE)
             return false;
         // Sys+0x17cc; strictly greater or unordered is false.
         return ForceAttackCycleTimer <= Sys->PersonalityData.FormationParams.ForceAttackFormationActiveTime;
     }
 
     // Sys->Owner (the IBehaviorManager), no null test.
-    if (Sys->Owner->CurrentBehaviorIndex != 0xa)
+    if (Sys->Owner->CurrentBehaviorIndex != BEHAVIOR_FORMATION)
         return false;
     if (OwnerIsPlayer(Sys))
         return false;
@@ -555,7 +555,7 @@ int FFormationLeaderState::RequestRelease()
     bReleaseRequested = 1;
     unsigned int const Id = Sys->SelfTarget.Iface->get_id();
     IObjRW* const Self = WatchedObject(Sys->Watcher);
-    return ObjAffectOf(Self)->request_cancel(1, &Id, -1);
+    return ObjAffectOf(Self)->request_cancel(kRequestEventFormation, &Id, -1);
 }
 
 // FUN_062ecab0 (3 call sites): the formation leader, or null when the +0xc5 gate byte is set.

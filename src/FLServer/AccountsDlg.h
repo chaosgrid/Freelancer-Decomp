@@ -18,6 +18,15 @@ class CAccountsDlg : public CDialog
 {
 public:
 	enum { IDD = 0x93 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlDeleteCharacter = 2,
+		kControlDeleteAccount = 3,
+		kControlEditAccount = 1029,
+		kControlAccountList = 1040,
+		kControlBannedLabel = 1045,
+	};
 
 	explicit CAccountsDlg(CWnd* Parent = nullptr);
 

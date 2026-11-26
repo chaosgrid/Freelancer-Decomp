@@ -98,6 +98,27 @@ COMMON_API bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& Ou
 // 0xaeba0 -- compose the hardpoint's frame with the instance's world transform, in place.
 COMMON_API void __cdecl HardpointToWorld(long Handle, HardpointInfo& Info);
 
+// SetpointProperties::CharType: the "pc" / "npc" / "none" / "rpc" token of the setpoint name
+// (extract_from_name, combine_to_name).
+enum ESetpointCharType
+{
+    kSetpointCharNone = -1,
+    kSetpointCharNpc = 0,
+    kSetpointCharPc = 1,
+    kSetpointCharRpc = 2,
+};
+
+// SetpointProperties::Posture: the "stand" / "sitlow" / "sithigh" token of the setpoint name;
+// any other token is kSetpointPostureSpecial (a relocation marker). -1 is the unset default.
+enum ESetpointPosture
+{
+    kSetpointPostureUnset = -1,
+    kSetpointPostureStand = 0,
+    kSetpointPostureSitLow = 1,
+    kSetpointPostureSitHigh = 2,
+    kSetpointPostureSpecial = 3,
+};
+
 // ---------------------------------------------------------------------------
 // SetpointProperties — sizeof 0x24. Parsed from setpoint name convention
 // "zs/pc/Segment/00/Name/posture" (or "zg/..." for a zone-group setpoint).
@@ -429,6 +450,18 @@ static_assert(sizeof(HardpointSummary) == 0x20, "HardpointSummary sizeof 0x20");
 // Network-serializable property bags. Use FmtStr (common_text.h).
 // ---------------------------------------------------------------------------
 
+// The mission class of a vendor offer (MissionVendorOfferDescription / MissionVendorProperties::
+// MissionClass), named as the icon textures get_icon_texture maps it to; any other value has no
+// icon.
+enum EMissionClass
+{
+    kMissionClassDestroy = 1,
+    kMissionClassDestroyInstallation = 2,
+    kMissionClassAssassinate = 3,
+    kMissionClassDestroyContraband = 4,
+    kMissionClassBountyOffer = 5,
+    kMissionClassRetrieveMissingItem = 6,
+};
 // Property bag description structs
 struct MissionVendorOfferDescription
 {
@@ -694,6 +727,13 @@ public:
 
 static_assert(sizeof(AmbientScriptProperties) == 0x14, "AmbientScriptProperties sizeof 0x14");
 
+// AmbientScriptInfo::Type: the kind of a room's "scene =" line (ambient | traffic | once).
+enum EAmbientScriptType
+{
+    kAmbientScriptAmbient = 1,
+    kAmbientScriptTraffic = 2,    // obsolete, read_ambient_script warns
+    kAmbientScriptOnce = 3,
+};
 // ---------------------------------------------------------------------------
 // AmbientScriptInfo -- retail Common.dll exports four members and nothing else
 // (ctor 0x06274130, dtor and destroy 0x06274140 -- one body, clear 0x062ee230).
@@ -1456,6 +1496,13 @@ COMMON_API Csys __cdecl ThornScriptGetCsys(IScriptEngine* Engine, char const* Ac
 
 class RoomData;
 
+// FlashLightSetInfo::Mode, stamped by read_FlashLightSet_block / read_FlashLightLine_block and
+// tested by FlashLightSetInfo::fixup; 0 is the cleared state.
+enum EFlashLightMode
+{
+    kFlashLightModeSet = 1,     // the LightFrames are used verbatim
+    kFlashLightModeLine = 2,    // NumLineLights frames interpolated between LightFrames[0] and [1]
+};
 // FlashLightSetInfo -- ctor 0x06273bb0 / dtor 0x06273bf0 / clear 0x06273c30 /
 // add_light_csys 0x06273d70 / unfixup 0x06274120. Per-object runtime table of resolved
 // flashlight-hardpoint frames (unrelated to RoomLightInfo, 0x06273410).

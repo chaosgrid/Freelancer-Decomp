@@ -16,8 +16,6 @@
 
 namespace
 {
-    const int32_t GIvpObjectTypeCluster = 1; // object_type (+4) tested by 0634b1a0
-
     // One {hash index, element} slot of IVP_VHash::Elems.
     struct FIvpVHashSlot
     {
@@ -249,7 +247,7 @@ IVP_Object* IVP_Cluster_Manager::get_next_real_object_in_cluster_tree(IVP_Object
         }
 
         // LAB_0634b1ce -- descend through clusters to the first non-cluster child.
-        if (Current->object_type == GIvpObjectTypeCluster)
+        if (Current->object_type == IVP_CLUSTER)
         {
             for (;;)
             {
@@ -258,7 +256,7 @@ IVP_Object* IVP_Cluster_Manager::get_next_real_object_in_cluster_tree(IVP_Object
                 {
                     break;
                 }
-                if (Current->object_type != GIvpObjectTypeCluster)
+                if (Current->object_type != IVP_CLUSTER)
                 {
                     return Current;
                 }
@@ -296,7 +294,7 @@ IVP_Object* IVP_Cluster_Manager::get_next_real_object_in_cluster_tree(IVP_Object
 
         // LAB_0634b207
         Current = Next;
-        if (Next->object_type != GIvpObjectTypeCluster)
+        if (Next->object_type != IVP_CLUSTER)
         {
             return Next;
         }
@@ -445,7 +443,7 @@ void IVP_Cluster_Manager::fire_event_pre_collision(IVP_Real_Object* Object, void
     for (int32_t I = static_cast<int32_t>(Table->listeners.n_elems) - 1; I >= 0; --I)
     {
         IVP_Listener_Collision* const Listener = Table->listeners.elems[I];
-        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & 0x1u) == 0)
+        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & IVP_LISTENER_COLLISION_CALLBACK_PRE_COLLISION) == 0)
         {
             continue;
         }
@@ -469,7 +467,7 @@ void IVP_Cluster_Manager::fire_event_collision_object_deleted(IVP_Real_Object* O
     for (int32_t I = static_cast<int32_t>(Table->listeners.n_elems) - 1; I >= 0; --I)
     {
         IVP_Listener_Collision* const Listener = Table->listeners.elems[I];
-        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & 0x2u) == 0)
+        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & IVP_LISTENER_COLLISION_CALLBACK_OBJECT_DELETED) == 0)
         {
             continue;
         }
@@ -492,7 +490,7 @@ void IVP_Cluster_Manager::fire_event_friction_created(IVP_Real_Object* Object, v
     for (int32_t I = static_cast<int32_t>(Table->listeners.n_elems) - 1; I >= 0; --I)
     {
         IVP_Listener_Collision* const Listener = Table->listeners.elems[I];
-        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & 0x4u) == 0)
+        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) == 0)
         {
             continue;
         }
@@ -515,7 +513,7 @@ void IVP_Cluster_Manager::fire_event_friction_deleted(IVP_Real_Object* Object, v
     for (int32_t I = static_cast<int32_t>(Table->listeners.n_elems) - 1; I >= 0; --I)
     {
         IVP_Listener_Collision* const Listener = Table->listeners.elems[I];
-        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & 0x4u) == 0)
+        if ((static_cast<uint8_t>(Listener->enabled_callbacks) & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) == 0)
         {
             continue;
         }

@@ -30,11 +30,11 @@ namespace
 void InitFuseDamageList(DamageList& Damage, EqObj* Owner, unsigned SourceId)
 {
     unsigned int InflictorOwner = 0;
-    Damage.Cause = static_cast<DamageCause>(0x15);
+    Damage.Cause = DamageCause::Fuse;
     Damage.InflictorId = SourceId;
     if (Owner != nullptr && Owner->OwnerSystem != nullptr)
     {
-        GameObject* Source = Owner->OwnerSystem->find_object(SourceId, 0x7f0000u);
+        GameObject* Source = Owner->OwnerSystem->find_object(SourceId, OBJ_SHIP_MASK);
         if (Source != nullptr)
             InflictorOwner = Source->csimple()->OwnerPlayer;
     }
@@ -265,7 +265,7 @@ bool DestroyRootAction::Read(INI_Reader& Reader)
 void DestroyRootAction::Trigger(unsigned SourceId, unsigned short SubObjId)
 {
     if (!IsTriggered())
-        Owner->destroy(1, SourceId);
+        Owner->destroy(DESTROY_FUSE, SourceId);
     FuseAction::Trigger(SourceId, SubObjId);
 }
 
@@ -572,7 +572,7 @@ void DestroyHardpointAttachmentAction::Trigger(unsigned SourceId, unsigned short
             // ceqobj() is not null-tested. CEquipTraverser(0x1fe0): attached equips.
             CEquipManager& Equips = Owner->ceqobj()->EquipManager;
             int Count = 0;
-            CEquipTraverser Walk(0x1fe0);
+            CEquipTraverser Walk(kEquipMaskAttached);
             // First pass: count the live equips.
             CEquip* Equip = Equips.Traverse(Walk);
             while (Equip != nullptr)
@@ -804,14 +804,14 @@ void ImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                 ExplosionDamageEvent Event;
                 Event.ExplodingObjId = 0;
                 Event.InflictorId = 0;
-                Event.Cause = static_cast<DamageCause>(4);
+                Event.Cause = DamageCause::Explosion;
                 Event.Explosion = nullptr;
                 Event.SkipCollisionGroup = nullptr;
                 unsigned int const BlastOwnerId = Owner->get_id();
                 Event.ExplodingObjId = BlastOwnerId;
                 Event.InflictorId = BlastOwnerId;
                 Event.Position = BlastPos;
-                Event.Cause = static_cast<DamageCause>(0x15);
+                Event.Cause = DamageCause::Fuse;
                 Event.Explosion = &Blast;
 
                 System->explode(Event);
@@ -945,7 +945,7 @@ void TumbleAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                     // a zero-extended dword local.
                     if (bEngineKill)
                     {
-                        unsigned int EngineId = Cq->EquipManager.FindFirst(0x20000u)->Id;
+                        unsigned int EngineId = Cq->EquipManager.FindFirst(EquipTypeEngine)->Id;
                         unsigned short const* EngineIdPtr =
                             reinterpret_cast<unsigned short const*>(&EngineId);
                         static_cast<IObjAffect*>(Owner)->toggle_item(EngineIdPtr, false, 0);

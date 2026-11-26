@@ -102,14 +102,14 @@ Action_Explode* Action_Explode::Create(Archetype::Explosion* Arch, FClientGameob
             if (Player->get_id() != OwnerId)
                 Action->ApplyImpulse(Player);
         }
-        int Kind = 10;
+        int Kind = static_cast<int>(EClientGameobjKind::Debris);
         FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind);
         while (Go != nullptr)
         {
             Action->ApplyImpulse(Go);
             Go = Go->ListNext;
         }
-        Kind = 9;
+        Kind = static_cast<int>(EClientGameobjKind::DynamicAsteroid);
         Go = ClientObjDb_GetKindHead(&Kind);
         while (Go != nullptr)
         {
@@ -224,9 +224,9 @@ bool Action_Explode::update(float Dt)
     // (slot 87), and process = shatter (0) breaks it up.
     if (LifetimeEndedThisTick())
     {
-        if (Arch->Process != 2u)
+        if (Arch->Process != Archetype::Explosion::ProcessNone)
             Gameobj->MarkForRemoval(true);
-        if (Arch->Process == 0u)
+        if (Arch->Process == Archetype::Explosion::ProcessShatter)
             Shatter();
     }
 
@@ -237,7 +237,7 @@ bool Action_Explode::update(float Dt)
 void Action_Explode::ApplyImpulse(FClientGameobj* Target)
 {
     // FUN_005366a0. The target's object narrowed by class & 1 -- no null test on the result.
-    CObject* const Simple = NarrowGameobjObject(Target, 1u);
+    CObject* const Simple = NarrowGameobjObject(Target, CObject::ClassObject);
     Vector const Center = Simple->get_center_of_mass();
 
     // Strictly inside the blast radius only.
@@ -328,7 +328,7 @@ void Action_Explode::Shatter()
             Parms.SystemId = StarSysGetActiveSystemId();
             // The exploding object's collision group copied into the name (an inline strcpy,
             // no length limit).
-            char const* Group = PhySys::GetCollisionGroup(NarrowGameobjObject(Gameobj, 1u));
+            char const* Group = PhySys::GetCollisionGroup(NarrowGameobjObject(Gameobj, CObject::ClassObject));
             char* Out = Parms.Name;
             char Ch = '\0';
             do
@@ -473,7 +473,7 @@ void Action_Explode::SpawnInnardsDebris()
 {
     // FUN_00536fb0. The spawn radius: innards_debris_radius when it is > 0, else the Gameobj's
     // physical radius (class & 1 narrowing, no null test).
-    CObject* const Simple = NarrowGameobjObject(Gameobj, 1u);
+    CObject* const Simple = NarrowGameobjObject(Gameobj, CObject::ClassObject);
     Vector RadiusCenter;
     float SpawnRadius = Simple->get_physical_radius_r(RadiusCenter);
     if (Arch->InnardsDebrisRadius > 0.0f)
@@ -516,8 +516,8 @@ void Action_Explode::SpawnInnardsDebris()
             // Its object (class & 1, no null test) joins the exploding object's collision group.
             FClientDebrisGameobj* const Debris =
                 CreateDebrisGameobjFromArch(ObjectArch, DebrisArch, &SpawnPos);
-            CObject* const DebrisObject = NarrowGameobjObject(Debris, 1u);
-            CObject* const Source = NarrowGameobjObject(Gameobj, 1u);
+            CObject* const DebrisObject = NarrowGameobjObject(Debris, CObject::ClassObject);
+            CObject* const Source = NarrowGameobjObject(Gameobj, CObject::ClassObject);
             PhySys::SetCollisionGroup(DebrisObject, PhySys::GetCollisionGroup(Source));
             Archetype::HookUpInstanceTreeMaterials(DebrisObject->EngineInstanceId);
 

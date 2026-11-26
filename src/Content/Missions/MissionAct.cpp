@@ -227,7 +227,7 @@ ActRandomPopSphere::ActRandomPopSphere(FMissionScript* InMission)
     , CenterY(0.0f)
     , CenterZ(0.0f)
     , Radius(0.0f)
-    , Mode(0)
+    , Mode(kRandomPopSphereOn)
 {
 }
 
@@ -244,19 +244,19 @@ void ActRandomPopSphere::Parse(INI_Reader& Reader)
     ModeName = Reader.get_value_string(4);
     if (_stricmp(ModeName.Data, "on") == 0)
     {
-        Mode = 0;
+        Mode = kRandomPopSphereOn;
         return;
     }
     if (_stricmp(ModeName.Data, "off") == 0)
-        Mode = 1;
+        Mode = kRandomPopSphereOff;
 }
 
 // LAB_06ecdc80: FUN_06f5aaf0 / FUN_06f5a840.
 bool ActRandomPopSphere::Execute()
 {
-    if (Mode == 0)
+    if (Mode == kRandomPopSphereOn)
         SpacePopRemoveExclusionSphere(CenterX, CenterY, CenterZ, Radius);
-    else if (Mode == 1)
+    else if (Mode == kRandomPopSphereOff)
         SpacePopAddExclusionSphere(CenterX, CenterY, CenterZ, Radius);
     return true;
 }
@@ -340,7 +340,7 @@ bool ActSave::Execute()
     Text.begin_mad_lib(0x762);
     Text.end_mad_lib();
     pub::Player::DisplayMissionMessage(Mission->PlayerId, Text,
-                                       static_cast<MissionMessageType>(7), true);
+                                       MISSION_MSG_OBJECTIVE, true);
     pub::Save(Mission->PlayerId, SaveType);
     return true;
 }
@@ -569,7 +569,7 @@ bool ActSetOffer::Execute()
     ResetMadLib(Mission->MissionOffer, OfferId);
     if (Mission->MissionOffer.MadLibId != 1 && Mission->MissionOffer.MadLibId != 0)
         pub::Player::DisplayMissionMessage(Mission->PlayerId, Mission->MissionOffer,
-                                           static_cast<MissionMessageType>(8), true);
+                                           MISSION_MSG_HISTORY, true);
     Mission->RenumberAllObjectives();
     return true;
 }
@@ -987,11 +987,11 @@ void ActSetNnObj::Parse(INI_Reader& Reader)
     if (Reader.is_value_empty(1))
         return;
     if (_stricmp(Reader.get_value_string(1), "HISTORY") == 0)
-        State = 0x12a;
+        State = kNnObjStateHistory;
     if (_stricmp(Reader.get_value_string(1), "OBJECTIVE") == 0)
-        State = 0x11a;
+        State = kNnObjStateObjective;
     if (_stricmp(Reader.get_value_string(1), "OBJECTIVE_HISTORY") == 0)
-        State = 0x13a;
+        State = kNnObjStateObjectiveHistory;
 }
 
 // FUN_06ec9150 (SetObjectiveState = FUN_06f1b310, RenumberAllObjectives = FUN_06f1b610).
@@ -1009,7 +1009,7 @@ bool ActSetNnObj::Execute()
 ActSetNnState::ActSetNnState(FMissionScript* InMission)
     : Act(InMission)
     , ObjectiveId(0)
-    , State(4)
+    , State(kNnObjectiveInactive)
 {
     ObjectiveId = CreateID("");
 }
@@ -1020,21 +1020,21 @@ void ActSetNnState::Parse(INI_Reader& Reader)
     ObjectiveId = CreateID(Reader.get_value_string(0));
     if (_stricmp("ACTIVE", Reader.get_value_string(1)) == 0)
     {
-        State = 1;
+        State = kNnObjectiveActive;
         return;
     }
     if (_stricmp("INACTIVE", Reader.get_value_string(1)) == 0)
     {
-        State = 4;
+        State = kNnObjectiveInactive;
         return;
     }
     if (_stricmp("COMPLETE", Reader.get_value_string(1)) == 0)
     {
-        State = 3;
+        State = kNnObjectiveComplete;
         return;
     }
     if (_stricmp("FAILED", Reader.get_value_string(1)) == 0)
-        State = 2;
+        State = kNnObjectiveFailed;
 }
 
 // LAB_06ec92e0.
@@ -1048,7 +1048,7 @@ bool ActSetNnState::Execute()
 ActNnIds::ActNnIds(FMissionScript* InMission)
     : Act(InMission)
     , TextId(1)
-    , MessageType(9)
+    , MessageType(MISSION_MSG_OBJECTIVE_HISTORY)
 {
 }
 
@@ -1060,16 +1060,16 @@ void ActNnIds::Parse(INI_Reader& Reader)
         return;
     if (_stricmp(Reader.get_value_string(1), "OBJECTIVE") == 0)
     {
-        MessageType = 7;
+        MessageType = MISSION_MSG_OBJECTIVE;
         return;
     }
     if (_stricmp(Reader.get_value_string(1), "HISTORY") == 0)
     {
-        MessageType = 8;
+        MessageType = MISSION_MSG_HISTORY;
         return;
     }
     if (_stricmp(Reader.get_value_string(1), "OBJECTIVE_HISTORY") == 0)
-        MessageType = 9;
+        MessageType = MISSION_MSG_OBJECTIVE_HISTORY;
 }
 
 // FUN_06ecc7f0.
@@ -1475,7 +1475,7 @@ bool FMissionNagDist::CountDown()
     --NagsLeft;
     if (NagsLeft != 0)
         return true;
-    Mission->SetDesiredMissionState(0, FailMadLibId);
+    Mission->SetDesiredMissionState(G_MissionStateFail, FailMadLibId);
     return false;
 }
 
@@ -2164,7 +2164,7 @@ bool ActCloak::Execute()
 
         pub::SpaceObj::EQInfo Info;
         memset(&Info, 0, sizeof(Info));
-        Info.Type = 2;
+        Info.Type = pub::SpaceObj::EQINFO_TYPE_CLOAK;
         Info.EquipId = bCloak;
         pub::SpaceObj::ActivateEquipment(Member->second, &Info);
         ++Member;
@@ -2194,11 +2194,11 @@ void ActLockDock::Parse(INI_Reader& Reader)
     Gate = Reader.get_value_string(1);
     if (_stricmp(Reader.get_value_string(2), "lock") == 0)
     {
-        Mode = 1;
+        Mode = kLockDockLock;
         return;
     }
     if (_stricmp(Reader.get_value_string(2), "unlock") == 0)
-        Mode = 0;
+        Mode = kLockDockUnlock;
 }
 
 // LAB_06ec5e60. Register = FUN_06f6d400, Unregister = FUN_06f6d5d0, NPC lock / unlock =
@@ -2210,12 +2210,12 @@ bool ActLockDock::Execute()
     if (strcmp(Target.Data, "Player") == 0)
     {
         unsigned int const PlayerId = Mission->PlayerId;
-        if (Mode == 1)
+        if (Mode == kLockDockLock)
         {
             RegisterContentGateLock(PlayerId, GateId);
             return true;
         }
-        if (Mode == 0)
+        if (Mode == kLockDockUnlock)
         {
             UnregisterContentGateLock(&PlayerId, &GateId);
             UnregisterContentGateLock(&NoPlayer, &GateId);
@@ -2225,13 +2225,13 @@ bool ActLockDock::Execute()
     if (strcmp(Target.Data, "Everyone") == 0)
     {
         unsigned int const PlayerId = Mission->PlayerId;
-        if (Mode == 1)
+        if (Mode == kLockDockLock)
         {
             RegisterContentGateLock(PlayerId, GateId);
             RegisterContentNpcGateLock(&GateId);
             return true;
         }
-        if (Mode == 0)
+        if (Mode == kLockDockUnlock)
         {
             RemoveContentNpcGateLock(&GateId);
             UnregisterContentGateLock(&PlayerId, &GateId);
@@ -2248,7 +2248,7 @@ bool ActLockDock::Execute()
 // FUN_06ec7f20.
 ActDestroy::ActDestroy(FMissionScript* InMission)
     : Act(InMission)
-    , DestroyMode(1)
+    , DestroyMode(DESTROY_FUSE)
 {
     ClearTString(Label);
     Label = "";
@@ -2262,11 +2262,11 @@ void ActDestroy::Parse(INI_Reader& Reader)
         return;
     if (_stricmp(Reader.get_value_string(1), "EXPLODE") == 0)
     {
-        DestroyMode = 1;
+        DestroyMode = DESTROY_FUSE;
         return;
     }
     if (_stricmp(Reader.get_value_string(1), "SILENT") == 0)
-        DestroyMode = 0;
+        DestroyMode = DESTROY_VANISH;
 }
 
 // FUN_06ec8050 (GetLabelObjectId = FUN_06f15b90).
@@ -2492,16 +2492,16 @@ void ActPopUpDialog::Parse(INI_Reader& Reader)
     Kind = Reader.get_value_string(2);
     if (_stricmp(Kind.Data, "YES_NO") == 0)
     {
-        Buttons = 3;
+        Buttons = kPopUpButtonYes | kPopUpButtonNo;
         return;
     }
     if (_stricmp(Kind.Data, "YES_NO_LATER") == 0)
     {
-        Buttons = 7;
+        Buttons = kPopUpButtonYes | kPopUpButtonNo | kPopUpButtonLater;
         return;
     }
     if (_stricmp(Kind.Data, "CLOSE") == 0)
-        Buttons = 8;
+        Buttons = kPopUpButtonClose;
 }
 
 // FUN_06ecd6a0.
@@ -2525,7 +2525,7 @@ bool ActPopUpDialog::Execute()
 ActSetPriority::ActSetPriority(FMissionScript* InMission)
     : Act(InMission)
     , FormationId(0)
-    , Priority(0)
+    , Priority(kScriptPriorityAlwaysExecute)
 {
 }
 
@@ -2535,11 +2535,11 @@ void ActSetPriority::Parse(INI_Reader& Reader)
     FormationId = CreateID(Reader.get_value_string(0));
     if (_stricmp(Reader.get_value_string(1), "NORMAL") == 0)
     {
-        Priority = 1;
+        Priority = kScriptPriorityNormal;
         return;
     }
     if (_stricmp(Reader.get_value_string(1), "ALWAYS_EXECUTE") == 0)
-        Priority = 0;
+        Priority = kScriptPriorityAlwaysExecute;
 }
 
 // LAB_06ecd8b0: the upper bound is re-walked each pass (FindNpcById = FUN_06f156b0,
@@ -2568,7 +2568,7 @@ bool ActSetPriority::Execute()
 // FUN_06ec8b50.
 ActSetFlee::ActSetFlee(FMissionScript* InMission)
     : Act(InMission)
-    , Mode(2)
+    , Mode(kSetFleeClear)
     , Position{0.0f, 0.0f, 0.0f}
     , Distance(0.0f)
     , bFlag(0)
@@ -2581,13 +2581,13 @@ ActSetFlee::ActSetFlee(FMissionScript* InMission)
 void ActSetFlee::Parse(INI_Reader& Reader)
 {
     if (_stricmp(Reader.get_value_string(0), "CLEAR") == 0)
-        Mode = 2;
+        Mode = kSetFleeClear;
     else if (_stricmp(Reader.get_value_string(0), "SET_POS") == 0)
-        Mode = 0;
+        Mode = kSetFleePosition;
     else if (_stricmp(Reader.get_value_string(0), "SET_OBJ") == 0)
-        Mode = 1;
+        Mode = kSetFleeObject;
     Npc = Reader.get_value_string(1);
-    if (Mode == 0)
+    if (Mode == kSetFleePosition)
     {
         float const Z = Reader.get_value_float(4);
         float const Y = Reader.get_value_float(3);
@@ -2599,7 +2599,7 @@ void ActSetFlee::Parse(INI_Reader& Reader)
         bFlag = Reader.get_value_bool(6) ? 1 : 0;
         return;
     }
-    if (Mode == 1)
+    if (Mode == kSetFleeObject)
     {
         Target = Reader.get_value_string(2);
         Distance = Reader.get_value_float(3);
@@ -2613,19 +2613,19 @@ bool ActSetFlee::Execute()
     FContentNpcShip* const Ship = Mission->FindNpcByName(&Npc);
     if (Ship == nullptr)
         return true;
-    if (Mode == 0)
+    if (Mode == kSetFleePosition)
     {
         Ship->SetFleePosition(&Position, &Distance);
         return true;
     }
-    if (Mode == 1)
+    if (Mode == kSetFleeObject)
     {
         unsigned int const TargetId = Mission->GetLabelObjectId(&Target);
         if ((TargetId & GIdValueMask) != 0)
             Ship->SetFleeObject(&TargetId, &Distance, bFlag != 0);
         return true;
     }
-    if (Mode == 2)
+    if (Mode == kSetFleeClear)
         Ship->ClearFlee();
     return true;
 }
@@ -3757,7 +3757,7 @@ namespace
             return;
         unsigned int Type = 0;
         pub::SpaceObj::GetType(ObjId, Type);
-        if ((Type & 0xfdff) == 0)
+        if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0)
             return;
         if (Script->FindSolarById(&ObjId) != nullptr)
             return;
@@ -4068,7 +4068,7 @@ namespace
         ContentMathEngine()->MulMatrix(Rotation, Heading3, ObjectRotation);
 
         int const PlacementMode = *Mode;
-        if (PlacementMode == 2)
+        if (PlacementMode == kSpawnRelRelative)
         {
             Vector Turned;
             ContentMathEngine()->TransformMatrix(Turned, ObjectRotation, Offset->Translation);
@@ -4076,13 +4076,13 @@ namespace
             OutPosition->y = Turned.y + ObjectPosition.y;
             OutPosition->z = Turned.z + ObjectPosition.z;
         }
-        else if (PlacementMode == 1)
+        else if (PlacementMode == kSpawnRelDirectional)
         {
             OutPosition->x = ObjectPosition.x + Offset->Translation.x;
             OutPosition->y = ObjectPosition.y + Offset->Translation.y;
             OutPosition->z = ObjectPosition.z + Offset->Translation.z;
         }
-        else if (PlacementMode == 0)
+        else if (PlacementMode == kSpawnRelPoint)
         {
             float const DX = ObjectPosition.x - Offset->Translation.x;
             float const DY = ObjectPosition.y - Offset->Translation.y;
@@ -4202,11 +4202,11 @@ void ActSpawnShipRel::Parse(INI_Reader& Reader)
     ObjList = CreateID(Reader.get_value_string(1));
     RelObj = Reader.get_value_string(2);
     if (_stricmp(Reader.get_value_string(3), "DIRECTIONAL") == 0)
-        Mode = 1;
+        Mode = kSpawnRelDirectional;
     else if (_stricmp(Reader.get_value_string(3), "POINT") == 0)
-        Mode = 0;
+        Mode = kSpawnRelPoint;
     else if (_stricmp(Reader.get_value_string(3), "RELATIVE") == 0)
-        Mode = 2;
+        Mode = kSpawnRelRelative;
     float const Z = Reader.get_value_float(6);
     float const Y = Reader.get_value_float(5);
     Offset.Translation.x = Reader.get_value_float(4);

@@ -30,7 +30,7 @@ unsigned long const G_ScreenQuadDefaultFrame[5] = {0u, 0u, 0u, 0x3f800000u, 0x3f
 
 namespace
 {
-    static const unsigned kScreenQuadFvf = 0x1c4u; // XYZRHW|DIFFUSE|SPECULAR|TEX1
+    static const unsigned kScreenQuadFvf = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | D3DFVF_TEX1;
 
     // FVF 0x1C4 vertex — FUN_004042c0 expand shape (8 dwords / 0x20).
     struct FScreenQuadGpuVert
@@ -445,13 +445,13 @@ namespace
         int const BlendMode = Node->BlendMode;
         if (BlendMode == 1)
         {
-            Pipe->SetRenderState(D3DRS_SRCBLEND, 2);
-            Pipe->SetRenderState(D3DRS_DESTBLEND, 2);
+            Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+            Pipe->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
         }
         else if (BlendMode == 2)
         {
-            Pipe->SetRenderState(D3DRS_SRCBLEND, 5);
-            Pipe->SetRenderState(D3DRS_DESTBLEND, 6);
+            Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+            Pipe->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
         }
         Pipe->SetRenderState(D3DRS_ALPHABLENDENABLE, (BlendMode != 0) ? 1 : 0);
 
@@ -505,7 +505,7 @@ namespace
 
                     Ib->UnlockIb(ScratchIb);
                     if (Ib->SelectIb(ScratchIb, static_cast<unsigned int>(Lock.Listing.BaseVertex), 0, 0) >= 0)
-                        Draw->DrawIndexedPrimitive(4, 0, VertexCount, IndexOffset, IndexCount);
+                        Draw->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, VertexCount, IndexOffset, IndexCount);
                 }
             }
         }
@@ -894,26 +894,26 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
     Pipe->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
     // DAT_005c7540.
     Pipe->SetRenderState(D3DRS_COLORVERTEX, 1);
-    Pipe->SetRenderState(D3DRS_DIFFUSEMATERIALSOURCE, 1);
+    Pipe->SetRenderState(D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1);
     // Stage 0 type 0xb = 0 (the table loop leaves the register at 0).
-    Pipe->SetTextureStageState(0, 0xb, 0);
+    Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
     // DAT_005c7568 on stage 0.
-    Pipe->SetTextureStageState(0, 1, 4);
-    Pipe->SetTextureStageState(0, 2, 2);
-    Pipe->SetTextureStageState(0, 3, 0);
-    Pipe->SetTextureStageState(0, 4, 4);
-    Pipe->SetTextureStageState(0, 5, 2);
-    Pipe->SetTextureStageState(0, 6, 0);
+    Pipe->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    Pipe->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    Pipe->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    Pipe->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    Pipe->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    Pipe->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
     // DAT_005c75a0 on stage 1.
-    Pipe->SetTextureStageState(1, 1, 1);
-    Pipe->SetTextureStageState(1, 2, 2);
-    Pipe->SetTextureStageState(1, 3, 1);
-    Pipe->SetTextureStageState(1, 4, 1);
-    Pipe->SetTextureStageState(1, 5, 2);
-    Pipe->SetTextureStageState(1, 6, 1);
-    Pipe->SetTextureStageState(0, 0x18, 0);
-    Pipe->SetTextureStageState(0, 0xd, 3);
-    Pipe->SetTextureStageState(0, 0xe, 3);
+    Pipe->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+    Pipe->SetTextureStageState(1, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    Pipe->SetTextureStageState(1, D3DTSS_COLORARG2, D3DTA_CURRENT);
+    Pipe->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+    Pipe->SetTextureStageState(1, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    Pipe->SetTextureStageState(1, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
+    Pipe->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 
     if (Key == G_ScreenQuadCurrentListKey)
     {
@@ -940,8 +940,8 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
 
     // DAT_005c7558.
     Pipe->SetRenderState(D3DRS_COLORVERTEX, 0);
-    Pipe->SetTextureStageState(0, 0xd, 1);
-    Pipe->SetTextureStageState(0, 0xe, 1);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
     // DAT_00616498 is nulled only on a change.
     if (G_MaterialListKey != G_MaterialListKeyDefault)
@@ -974,25 +974,25 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long Packe
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
     // DAT_005c7540.
     DALib::Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
-    DALib::Pipeline->SetRenderState(D3DRS_DIFFUSEMATERIALSOURCE, 1);
-    DALib::Pipeline->SetTextureStageState(0, 0xb, 0);
+    DALib::Pipeline->SetRenderState(D3DRS_DIFFUSEMATERIALSOURCE, D3DMCS_COLOR1);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
     // DAT_005c7568 on stage 0.
-    DALib::Pipeline->SetTextureStageState(0, 1, 4);
-    DALib::Pipeline->SetTextureStageState(0, 2, 2);
-    DALib::Pipeline->SetTextureStageState(0, 3, 0);
-    DALib::Pipeline->SetTextureStageState(0, 4, 4);
-    DALib::Pipeline->SetTextureStageState(0, 5, 2);
-    DALib::Pipeline->SetTextureStageState(0, 6, 0);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
     // DAT_005c75a0 on stage 1.
-    DALib::Pipeline->SetTextureStageState(1, 1, 1);
-    DALib::Pipeline->SetTextureStageState(1, 2, 2);
-    DALib::Pipeline->SetTextureStageState(1, 3, 1);
-    DALib::Pipeline->SetTextureStageState(1, 4, 1);
-    DALib::Pipeline->SetTextureStageState(1, 5, 2);
-    DALib::Pipeline->SetTextureStageState(1, 6, 1);
-    DALib::Pipeline->SetTextureStageState(0, 0x18, 0);
-    DALib::Pipeline->SetTextureStageState(0, 0xd, 3);
-    DALib::Pipeline->SetTextureStageState(0, 0xe, 3);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_COLORARG2, D3DTA_CURRENT);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    DALib::Pipeline->SetTextureStageState(1, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 
     int SavedStage0Type10 = 0;
     int SavedStage0Type11 = 0;
@@ -1001,8 +1001,8 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long Packe
 
     if (G_BigImageTilePointFilter != 0)
     {
-        DALib::Pipeline->SetTextureStageState(0, 0x10, 1);
-        DALib::Pipeline->SetTextureStageState(0, 0x11, 1);
+        DALib::Pipeline->SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+        DALib::Pipeline->SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
     }
 
     // EH states 3, 4.
@@ -1066,10 +1066,10 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long Packe
 
     // DAT_005c7558, then the filters back.
     DALib::Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
-    DALib::Pipeline->SetTextureStageState(0, 0xd, 1);
-    DALib::Pipeline->SetTextureStageState(0, 0xe, 1);
-    DALib::Pipeline->SetTextureStageState(0, 0x10, SavedStage0Type10);
-    DALib::Pipeline->SetTextureStageState(0, 0x11, SavedStage0Type11);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MAGFILTER, SavedStage0Type10);
+    DALib::Pipeline->SetTextureStageState(0, D3DTSS_MINFILTER, SavedStage0Type11);
 
     // FUN_00422ab0; the savers then restore in reverse order.
     Win3DPopProjection();

@@ -208,7 +208,7 @@ bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Ma
     {
         Self->TractorOwner = Self;
         (void)static_cast<IObjInspect*>(WatchedObject(Self->Watcher))
-            ->find_equipment(&Self->TractorEquipId, 1, 0x100000);
+            ->find_equipment(&Self->TractorEquipId, 1, EquipTypeTractor);
     }
 
     if (IsWatcherLive(Self->Watcher))

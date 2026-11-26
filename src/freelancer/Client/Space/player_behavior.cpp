@@ -262,13 +262,13 @@ void ToggleMouseFlightLock()
 {
     // FUN_004c7c40
     G_MouseFlightLocked = !G_MouseFlightLocked;
-    PlayOrRewindUiSoundSlot(0x1c); // FUN_005645c0
+    PlayOrRewindUiSoundSlot(kUiSoundToggleMouseFlight); // FUN_005645c0
 }
 
 void OnMouseFlightRawMessage(unsigned Msg)
 {
     // FUN_004c80f0: WM_LBUTTONDOWN only.
-    if (Msg == 0x201u)
+    if (Msg == WM_LBUTTONDOWN)
         G_MouseFlightButtonTrigger = true;
 }
 

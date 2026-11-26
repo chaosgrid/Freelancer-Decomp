@@ -482,7 +482,7 @@ CndCmpToPlane::CndCmpToPlane(FMissionScript* InMission)
     , PlaneB(0.0f)
     , PlaneC(0.0f)
     , PlaneD(0.0f)
-    , Side(0)
+    , Side(kCndPlaneInside)
     , ObjectId(0)
 {
     InitEmpty(ObjectLabel);
@@ -492,9 +492,9 @@ CndCmpToPlane::CndCmpToPlane(FMissionScript* InMission)
 void CndCmpToPlane::Parse(INI_Reader& Reader)
 {
     if (_stricmp("inside", Reader.get_value_string(0)) == 0)
-        Side = 0;
+        Side = kCndPlaneInside;
     else if (_stricmp("outside", Reader.get_value_string(0)) == 0)
-        Side = 1;
+        Side = kCndPlaneOutside;
     ObjectLabel = Reader.get_value_string(1);
     PlaneA = Reader.get_value_float(2);
     PlaneB = Reader.get_value_float(3);
@@ -522,10 +522,10 @@ bool CndCmpToPlane::Matches(pub::Controller::EMessage /*EventId*/, void const* /
     if (pub::SpaceObj::GetLocation(ObjectId, Position, Orientation) != 0)
         return false;
     float const Value = Position.z * PlaneC + Position.y * PlaneB + Position.x * PlaneA + PlaneD;
-    if (0.0f > Value && Side == 0)
+    if (0.0f > Value && Side == kCndPlaneInside)
         return true;
     if (0.0f < Value)
-        return Side == 1;
+        return Side == kCndPlaneOutside;
     return false;
 }
 
@@ -1349,21 +1349,21 @@ void CndInZone::Parse(INI_Reader& Reader)
         return;
     if (_stricmp("OBJECT_ZONE", Reader.get_value_string(2)) == 0)
     {
-        ZoneFlags = 0x7fc0;
+        ZoneFlags = Universe::kZonePropObjectZone;
         return;
     }
     if (_stricmp("EXCLUSION_ZONE", Reader.get_value_string(2)) == 0)
     {
-        ZoneFlags = 0x30000;
+        ZoneFlags = Universe::kZonePropExclusionZone;
         return;
     }
     if (_stricmp("NEBULA_ZONE", Reader.get_value_string(2)) == 0)
     {
-        ZoneFlags = 0x8000;
+        ZoneFlags = Universe::kZonePropNebula;
         return;
     }
     if (_stricmp("DUST_ZONE", Reader.get_value_string(2)) == 0)
-        ZoneFlags = 0x200000;
+        ZoneFlags = Universe::kZonePropSpacedust;
 }
 
 // LAB_06ec2980.
@@ -1628,7 +1628,7 @@ void CndLootAcquired::Load(INI_Reader* Reader)
 // Inlined in FUN_06ebb850 (+0x0c not set).
 CndMsnResponse::CndMsnResponse(FMissionScript* InMission)
     : Cnd(InMission)
-    , Response(0)
+    , Response(kCndMsnResponseAccept)
 {
 }
 
@@ -1637,11 +1637,11 @@ void CndMsnResponse::Parse(INI_Reader& Reader)
 {
     if (_stricmp(Reader.get_value_string(0), "accept") == 0)
     {
-        Response = 0;
+        Response = kCndMsnResponseAccept;
         return;
     }
     if (_stricmp(Reader.get_value_string(0), "reject") == 0)
-        Response = 1;
+        Response = kCndMsnResponseReject;
 }
 
 // LAB_06ec32b0: parms byte +0x08 = accepted.
@@ -1651,8 +1651,8 @@ bool CndMsnResponse::Matches(pub::Controller::EMessage /*EventId*/, void const* 
         return false;
     unsigned char const bAccepted = static_cast<unsigned char const*>(EventParms)[8];
     if (bAccepted != 0)
-        return Response == 0;
-    return Response == 1;
+        return Response == kCndMsnResponseAccept;
+    return Response == kCndMsnResponseReject;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2055,7 +2055,7 @@ bool CndPlayerManeuver::Matches(pub::Controller::EMessage /*EventId*/, void cons
         pub::SpaceObj::GetTarget(ShipId, Target);
         if (Behavior == BehaviorId)
         {
-            if (Behavior == 0xa)
+            if (Behavior == BEHAVIOR_FORMATION)
             {
                 // Formation behaviour: the targeted NPC and the player ship must share the
                 // formation (+0x154).
@@ -2101,21 +2101,21 @@ void CndPopUpDialog::Parse(INI_Reader& Reader)
     Button = Reader.get_value_string(0);
     if (_stricmp(Button.Data, "YES") == 0)
     {
-        ButtonMask = 1;
+        ButtonMask = kPopUpButtonYes;
         return;
     }
     if (_stricmp(Button.Data, "NO") == 0)
     {
-        ButtonMask = 2;
+        ButtonMask = kPopUpButtonNo;
         return;
     }
     if (_stricmp(Button.Data, "LATER") == 0)
     {
-        ButtonMask = 4;
+        ButtonMask = kPopUpButtonLater;
         return;
     }
     if (_stricmp(Button.Data, "CLOSE") == 0)
-        ButtonMask = 8;
+        ButtonMask = kPopUpButtonClose;
 }
 
 // LAB_06ec21d0: parms+0x04 = pressed button bits.
@@ -2819,7 +2819,7 @@ bool CndWatchTrigger::Matches(pub::Controller::EMessage /*EventId*/, void const*
 // FUN_06ec43e0.
 CndWatchVibe::CndWatchVibe(FMissionScript* InMission)
     : Cnd(InMission)
-    , Compare(0)
+    , Compare(kCndVibeLess)
     , ObjectAId(0)
     , ObjectBId(0)
     , Value(0.0f)
@@ -2849,16 +2849,16 @@ void CndWatchVibe::Parse(INI_Reader& Reader)
         return;
     if (_stricmp(Reader.get_value_string(3), "lt") == 0)
     {
-        Compare = 0;
+        Compare = kCndVibeLess;
         return;
     }
     if (_stricmp(Reader.get_value_string(3), "gt") == 0)
     {
-        Compare = 1;
+        Compare = kCndVibeGreater;
         return;
     }
     if (_stricmp(Reader.get_value_string(3), "eq") == 0)
-        Compare = 2;
+        Compare = kCndVibeEqual;
 }
 
 // LAB_06ec4670: A's attitude towards B. Retail's "lt" is less or equal and "gt" is not less
@@ -2879,11 +2879,11 @@ bool CndWatchVibe::Matches(pub::Controller::EMessage /*EventId*/, void const* /*
     pub::SpaceObj::GetRep(ObjectAId, RepA);
     pub::SpaceObj::GetRep(ObjectBId, RepB);
     pub::Reputation::GetAttitude(RepA, RepB, Attitude);
-    if (Compare == 0)
+    if (Compare == kCndVibeLess)
         return Attitude < Value || Attitude == Value;
-    if (Compare == 1)
+    if (Compare == kCndVibeGreater)
         return Attitude >= Value;
-    if (Compare == 2)
+    if (Compare == kCndVibeEqual)
         return Attitude == Value;
     return false;
 }

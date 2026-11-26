@@ -177,7 +177,7 @@ GENRESULT DACOM_API FChannelArchetypeObject::Load(IFileSystem* FileSystem)
         Fs->CloseFile((unsigned long)FramesHandle); // +0x10
         return GR_GENERIC;
     }
-    if ((Flags & 0xF0) != 0 || (Flags & 0x100) != 0)
+    if ((Flags & (G_ChannelFlagZeroPos | G_ChannelFlagIdentQuat | G_ChannelFlagCompQuat3 | G_ChannelFlagCompAxis)) != 0 || (Flags & G_ChannelFlagCompQuat4) != 0)
     {
         if (FileSize > G_ChannelFramePoolSize)
         {
@@ -244,9 +244,9 @@ static double ChannelUnpackShort(const unsigned char* Src)
 void FChannelArchetypeObject::DecompressFrames()
 {
     const unsigned long Flags = this->Flags;
-    if ((Flags & 0xF0) == 0 && (Flags & 0x100) == 0)
+    if ((Flags & (G_ChannelFlagZeroPos | G_ChannelFlagIdentQuat | G_ChannelFlagCompQuat3 | G_ChannelFlagCompAxis)) == 0 && (Flags & G_ChannelFlagCompQuat4) == 0)
         return;
-    if ((Flags & 9) != 0)
+    if ((Flags & (G_ChannelFlagScalar | G_ChannelFlagScalarOnly)) != 0)
     {
         EngBaseFdump(kFdumpFatal, G_FdumpFileChannelArch, 0x13C, "FATAL",
                      "Cannot uncompress data other than vectors and quaternions");
@@ -284,7 +284,7 @@ void FChannelArchetypeObject::DecompressFrames()
         Words += 4;
     unsigned char* const Out =
         (unsigned char*)(std::malloc(FrameCount * Words * 4));
-    this->Flags = this->Flags & 0xFFFFFE0F;
+    this->Flags = this->Flags & ~G_ChannelCompressMask;
     if (bHasPos)
         this->Flags = this->Flags | G_ChannelFlagPosition;
     if (bHasQuat)
@@ -423,9 +423,9 @@ GENRESULT DACOM_API FChannelArchetypeObject::Sample(float Time, const unsigned c
     float Duration = 0.0f;
     GetDuration(&Duration);
     if (!((double)Time >= 0.0))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     if (!(Time <= Duration))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     const unsigned long Hi = FrameIndexAt(Time);
     const double TimeHi = FrameTime(Hi);
     if (!(TimeHi > (double)Time))
@@ -452,7 +452,7 @@ GENRESULT DACOM_API FChannelArchetypeObject::GetFrame(unsigned char bLast, const
     {
         Index = (long)(FrameCount - 1);
         if (Index < 0)
-            return (GENRESULT)0xFFFFFFFF;
+            return GR_GENERIC;
     }
     *Out = FramePayload((unsigned long)Index);
     return GR_OK;
@@ -464,7 +464,7 @@ GENRESULT DACOM_API FChannelArchetypeObject::CollectAt(float Time, float* OutKey
 {
     *Count = 0;
     if (Flags != G_ChannelFlagScalarOnly)
-        return (GENRESULT)0xFFFFFFFF;
+        return GR_GENERIC;
     GENRESULT Result = GR_OK;
     for (unsigned long Index = 0; Index < FrameCount; ++Index)
     {
@@ -477,7 +477,7 @@ GENRESULT DACOM_API FChannelArchetypeObject::CollectAt(float Time, float* OutKey
                 std::memcpy(OutKeys + *Count * 2 + 1, &Key, sizeof(Key));
             }
             else
-                Result = (GENRESULT)0xFFFFFFFF;
+                Result = GR_GENERIC;
             *Count += 1;
         }
     }
@@ -505,16 +505,16 @@ GENRESULT DACOM_API FChannelArchetypeObject::CollectRange(float Time0, float Tim
 {
     *Count = 0;
     if (Flags != G_ChannelFlagScalarOnly)
-        return (GENRESULT)0xFFFFFFFF;
+        return GR_GENERIC;
     float Duration = 0.0f;
     GetDuration(&Duration);
     const float DurEps = Duration + G_ChannelTimeEpsPos;
     if (!(Time0 >= G_ChannelTimeEpsNeg) || !(Time0 <= DurEps))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     if (!(Time1 >= G_ChannelTimeEpsNeg) || !(Time1 <= DurEps))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     if (Time0 == Time1)
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
 
     long Start = 0;
     std::memcpy(&Start, &Time0, sizeof(Start));
@@ -574,9 +574,9 @@ GENRESULT DACOM_API FChannelArchetypeObject::SamplePair(float Time, const unsign
     float Duration = 0.0f;
     GetDuration(&Duration);
     if (!((double)Time >= 0.0))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     if (!(Time <= Duration))
-        return (GENRESULT)0xFFFFFFFE;
+        return GR_INVALID_PARMS;
     const unsigned long Hi = FrameIndexAt(Time);
     const double FrameTime = this->FrameTime(Hi);
     if (!(FrameTime > (double)Time))

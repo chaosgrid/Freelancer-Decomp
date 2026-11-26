@@ -151,7 +151,7 @@ void Solar::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
         Payload.EquipType = 0u;
         Payload.CollisionGroupType = 0u;
         FBehaviorManagerEvent DamageEvent;
-        DamageEvent.Type = 0;
+        DamageEvent.Type = FBehaviorManagerEvent::kEventDamageTaken;
         DamageEvent.Data = &Payload;
         Behavior->OnEvent(&DamageEvent);
     }
@@ -194,7 +194,7 @@ void Solar::explosion_hit_hull(ExplosionDamageEvent const& Blast, DamageList& Ou
         Payload.EquipType = 0u;
         Payload.CollisionGroupType = 0u;
         FBehaviorManagerEvent DamageEvent;
-        DamageEvent.Type = 0;
+        DamageEvent.Type = FBehaviorManagerEvent::kEventDamageTaken;
         DamageEvent.Data = &Payload;
         Behavior->OnEvent(&DamageEvent);
     }

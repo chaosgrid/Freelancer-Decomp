@@ -156,7 +156,7 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
             {
                 ZoneShape Shape;
                 pub::Zone::GetShape(Zone->ZoneId, Shape);
-                if (Shape == 3)
+                if (Shape == ZONE_SHAPE_BOX)
                 {
                     Vector Size;
                     pub::Zone::GetSize(Zone->ZoneId, Size);
@@ -192,9 +192,9 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
             {
                 char const* Usage = Reader->get_value_string(Index);
                 if (_stricmp(Usage, "trade") == 0)
-                    PathLabel->Usage |= 0x10;
+                    PathLabel->Usage |= kPathUsageTrade;
                 else if (_stricmp(Usage, "patrol") == 0)
-                    PathLabel->Usage |= 0x1;
+                    PathLabel->Usage |= kPathUsagePatrol;
                 ++Index;
             }
         }
@@ -236,11 +236,11 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         else if (Reader->is_value("vignette_type"))
         {
             if (_stricmp(Reader->get_value_string(0), "field") == 0)
-                Zone->VignetteType = 2;
+                Zone->VignetteType = kVignetteZoneField;
             else if (_stricmp(Reader->get_value_string(0), "exclusion") == 0)
-                Zone->VignetteType = 4;
+                Zone->VignetteType = kVignetteZoneExclusion;
             else
-                Zone->VignetteType = 1;
+                Zone->VignetteType = kVignetteZoneOpen;
         }
         else if (bLoadEncounters)
         {

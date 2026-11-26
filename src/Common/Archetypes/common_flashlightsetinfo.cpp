@@ -144,7 +144,7 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
         }
     }
 
-    if (Mode == 1)
+    if (Mode == kFlashLightModeSet)
     {
         for (long Index = 0; Index < NumLights; ++Index)
         {
@@ -152,7 +152,7 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
             ++Cursor;
         }
     }
-    else if (Mode == 2)
+    else if (Mode == kFlashLightModeLine)
     {
         // NumLineLights frames interpolated from LightFrames[0] to [1]; the quotient is formed
         // unrounded and rounded once.

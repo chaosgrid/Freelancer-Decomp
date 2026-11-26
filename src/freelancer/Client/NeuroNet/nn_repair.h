@@ -37,6 +37,14 @@
 
 class UiScroll;
 
+// FRepairItem::Kind.
+enum ERepairItemKind
+{
+    kRepairItemHull = 0,
+    kRepairItemCollisionGroup = 1,
+    kRepairItemEquipment = 2
+};
+
 // One row of the list, 0x20 bytes (the vector's stride; PopulateList builds it on the stack).
 struct FRepairItem
 {

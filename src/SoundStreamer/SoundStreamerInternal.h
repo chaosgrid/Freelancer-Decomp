@@ -73,6 +73,26 @@ public:
     const char* Name;
 };
 
+// FStreamingSound::State.
+enum EStreamState
+{
+    kStreamIdle = 0,     // no buffer yet / failed to start / closed
+    kStreamReady = 1,    // buffer created (LoadWav), not started
+    kStreamPriming = 2,  // play requested: pre-filling until the threshold is buffered
+    kStreamPlaying = 3,  // DirectSound buffer playing
+    kStreamDraining = 6, // decoder exhausted: playing out the silence-padded tail
+    kStreamEnded = 8,    // drained, or the buffer went missing
+    kStreamStopped = 9,  // StreamingSoundStop
+};
+
+// FSoundStreamer::ThreadFlags.
+enum EStreamerThreadFlag
+{
+    kStreamerThreadStarted = 0x01, // PumpStreams entered
+    kStreamerThreadExited = 0x02,  // PumpStreams returned
+    kStreamerThreadStop = 0x80,    // stop request from the destructor
+};
+
 // Heap handle — retail StreamingSound 0x110 (FUN_06ef1200 / FUN_06ef13d0).
 struct FStreamingSound
 {

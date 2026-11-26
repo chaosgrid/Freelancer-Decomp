@@ -453,8 +453,8 @@ void NnMissionVendor::RefreshRows()
         SummaryRewards[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
-        IconFrames[Row]->SetProperty(0xc, bSelected, 0);
-        SummaryBoxes[Row]->SetProperty(0xc, bSelected, 0);
+        IconFrames[Row]->SetProperty(kWinPropLit, bSelected, 0);
+        SummaryBoxes[Row]->SetProperty(kWinPropLit, bSelected, 0);
 
         ++Row;
         if (Row >= 5)
@@ -596,7 +596,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_0048c460 (RET 0xc): byte table 0x0048c6f0 over Msg - 0x26. Every path returns 0.
     switch (Msg)
     {
-    case 0x4e:
+    case kWinPropCloseFromOutside:
     {
         // Closed from outside: no callback, no NavBar. (Retail tests `this` first.)
         Win3DDeleteTree(this);

@@ -24,8 +24,8 @@ CCreateAccountDlg::CCreateAccountDlg(CWnd* Parent)
 // .text:004070f0
 void CCreateAccountDlg::DoDataExchange(CDataExchange* DX)
 {
-	DDX_Control(DX, 1037, NameEdit);
-	DDX_Control(DX, 1038, PasswordEdit);
+	DDX_Control(DX, kControlName, NameEdit);
+	DDX_Control(DX, kControlPassword, PasswordEdit);
 }
 
 // .rdata:0041c728: no entries.

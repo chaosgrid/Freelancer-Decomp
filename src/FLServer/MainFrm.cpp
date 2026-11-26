@@ -20,7 +20,8 @@ namespace
 {
 	// .data:00425978 — the status bar panes: the stretching message pane and the uptime pane
 	// (0xe707, string 59143 "Time: 00:00:00" in ServerResources.dll).
-	const UINT GStatusIndicators[] = { ID_SEPARATOR, 0xe707 };
+	const UINT kIndicatorUptime = 0xe707;
+	const UINT GStatusIndicators[] = { ID_SEPARATOR, kIndicatorUptime };
 
 	// .data:00427d98 / .data:00428528 — RemoteClient's per-client counters at the last and the
 	// previous 1 s sample (16 records of 0x78 bytes each); OnTimer zeroes both once, guarded by
@@ -48,7 +49,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_WM_CREATE()
 	ON_WM_TIMER()
 	ON_WM_CLOSE()
-	ON_UPDATE_COMMAND_UI(0xe707, &CMainFrame::OnUpdateUptime)
+	ON_UPDATE_COMMAND_UI(kIndicatorUptime, &CMainFrame::OnUpdateUptime)
 END_MESSAGE_MAP()
 
 // .text:00411f40

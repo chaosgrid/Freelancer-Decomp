@@ -580,7 +580,7 @@ namespace
             }
             if (Node == nullptr || !IsDirectoryRecord(Node))
             {
-                LastError = 0xA1;
+                LastError = ERROR_BAD_PATHNAME;
                 return -1;
             }
 
@@ -618,7 +618,7 @@ namespace
                     Block->Next = Added;
                     if (Added == nullptr)
                     {
-                        LastError = 0x54;
+                        LastError = ERROR_OUT_OF_STRUCTURES;
                         return -1;
                     }
                 }
@@ -644,12 +644,12 @@ namespace
             FUtfFindSlot* Slot = SlotFromId(Id);
             if (Slot == nullptr || Slot->Next == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             if (Slot->Next == RootHandle->Node)
             {
-                LastError = 0x12;
+                LastError = ERROR_NO_MORE_FILES;
                 return 0;
             }
             const char* Mask = Slot->Pattern;
@@ -664,7 +664,7 @@ namespace
                     AdvanceSlot(Slot);
                     if (Slot->Next == RootHandle->Node)
                     {
-                        LastError = 0x12;
+                        LastError = ERROR_NO_MORE_FILES;
                         return 0;
                     }
                     if (MatchUtfWildcard(RecordName(Slot->Next), Mask) != 0)
@@ -720,7 +720,7 @@ namespace
             FUtfFindSlot* Slot = SlotFromId(Id);
             if (Slot == nullptr || Slot->Next == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             Slot->Next = nullptr;
@@ -1044,7 +1044,7 @@ namespace
             const unsigned long Current = (unsigned long)(FileHandle);
             if (Handle == 0 || Handle == Current)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             if (NestedChild != nullptr)
@@ -1059,7 +1059,7 @@ namespace
             FDosOpenFile* Open = FindOpenFile(Handle);
             if (Open == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             CloseOneOpenFile(Handle);
@@ -1111,13 +1111,13 @@ namespace
         int DACOM_API Write(unsigned long, const void*, unsigned long, unsigned long*,
                              const void*) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
         int DACOM_API GetOverlappedResult(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
@@ -1175,7 +1175,7 @@ namespace
         // DOS LAB_06b75e50: LastError=5, return 0 (UTF and MEM override).
         int DACOM_API SetEndOfFile(unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
 
@@ -1194,13 +1194,13 @@ namespace
         int DACOM_API LockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 1;
         }
         int DACOM_API UnlockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 1;
         }
         int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
@@ -1221,7 +1221,7 @@ namespace
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
         int DACOM_API SetFileTimes(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         int DACOM_API CreateMapping(unsigned long FileKey, unsigned long A2, unsigned long A3, unsigned long A4,
@@ -1234,15 +1234,15 @@ namespace
                     LastError = (unsigned long)(NestedChild->GetFileSystemError());
                 return Result;
             }
-            if ((AccessFlags & 0x40000000u) != 0)
+            if ((AccessFlags & kGenericWrite) != 0)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             FDosOpenFile* Open = FindOpenFile(FileKey);
             if (Open == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             FDosMapToken* Token = new FDosMapToken();
@@ -1262,7 +1262,7 @@ namespace
             }
             if (Access != FILE_MAP_READ)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             FDosMapToken* Found = nullptr;
@@ -1277,23 +1277,23 @@ namespace
             }
             if (Found == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return -1;
             }
             FDosOpenFile* Open = Found->Open;
             if (Open == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             if (Open->View == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             if (ByteCount > Open->Size - OffLow)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             return (int)((char*)(Open->View) + OffLow);
@@ -1319,13 +1319,13 @@ namespace
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         int DACOM_API CreateNode(const char*, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
         int DACOM_API RemoveNode(unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
 
@@ -1333,7 +1333,7 @@ namespace
         {
             if (bFileInstance != 0)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             const int Copied = CopyClampedPathSuffix(Out, MaxChars, RootPath + PathPrefix);
@@ -1352,19 +1352,19 @@ namespace
         {
             if (bFileInstance != 0)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             char Resolved[0x105];
             if (JoinRoot(RootPath, Name, Resolved, 0x104) == 0)
             {
-                LastError = 0xa1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
             const DWORD Attr = GetFileAttributesA(Resolved);
             if (Attr == INVALID_FILE_ATTRIBUTES || (Attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
-                LastError = 0xa1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
             // Len >= 1: a successful join always holds one character.
@@ -1381,19 +1381,19 @@ namespace
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
         int DACOM_API RemoveFile(unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         // DOS LAB_06b75ed0 / UTF LAB_06b73d30: LastError=5, return 0.
         int DACOM_API CopyFileTo(unsigned long, unsigned long, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         int DACOM_API MoveFileTo(unsigned long, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         int DACOM_API GetPathAttributes(const char* RelPath) override
@@ -1401,13 +1401,13 @@ namespace
             const char* Name = RelPath;
             if (bFileInstance != 0 || Name == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             char Resolved[0x105];
             if (JoinRoot(RootPath, Name, Resolved, 0x104) == 0)
             {
-                LastError = 0xa1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
             const DWORD Attr = GetFileAttributesA(Resolved);
@@ -1418,7 +1418,7 @@ namespace
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         int DACOM_API SetPathAttributes(unsigned long, unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         int DACOM_API GetFileSystemError() override
@@ -1431,26 +1431,26 @@ namespace
                 return (int)((unsigned long)(FileHandle));
             if (bFileInstance != 0 || Desc->Path == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
 
             char Resolved[0x105];
             if (JoinRoot(RootPath, Desc->Path, Resolved, 0x104) == 0)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             const DWORD Attr = GetFileAttributesA(Resolved);
             if (Attr == INVALID_FILE_ATTRIBUTES || (Attr & FILE_ATTRIBUTE_DIRECTORY) != 0)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             const HANDLE Opened = InsertWin32File(Resolved, Desc);
             if (Opened == INVALID_HANDLE_VALUE)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             return (int)((unsigned long)(Opened));
@@ -1753,7 +1753,7 @@ namespace
             void* Created = nullptr;
 
             // Retail compares 0xB bytes, which equals strcmp.
-            if ((FsDesc->Size != 0x34 && FsDesc->Size != 0x30) ||
+            if ((FsDesc->Size != offsetof(FFileSystemDesc, MemBuffer) && FsDesc->Size != offsetof(FFileSystemDesc, FindHandle)) ||
                 std::strcmp(FsDesc->ComponentName, "FileSystem") != 0)
                 Result = GR_INTERFACE_UNSUPPORTED;
             // Only a null Path pointer is refused; "" resolves against the root.
@@ -1881,7 +1881,7 @@ namespace
         {
             if (bFileInstance != 0)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             char Resolved[0x105] = {};
@@ -1890,7 +1890,7 @@ namespace
             // INVALID_HANDLE_VALUE.
             if (JoinRoot(RootPath, Pattern, Resolved, 0x104) != 0)
             {
-                LastError = 0xa1;
+                LastError = ERROR_BAD_PATHNAME;
                 return -1;
             }
             const HANDLE Found =
@@ -2000,7 +2000,7 @@ namespace
             FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
             if (FsDesc == nullptr || FsDesc->ComponentName == nullptr)
                 return GR_GENERIC;
-            if (FsDesc->Size != 0x34 && FsDesc->Size != 0x30)
+            if (FsDesc->Size != offsetof(FFileSystemDesc, MemBuffer) && FsDesc->Size != offsetof(FFileSystemDesc, FindHandle))
                 return GR_INTERFACE_UNSUPPORTED;
             if (std::strcmp(FsDesc->ComponentName, "FileSystem") != 0)
                 return GR_INTERFACE_UNSUPPORTED;
@@ -2198,7 +2198,7 @@ namespace
             char Dest[0x105] = {};
             ResolvePath(Dest, Desc->Path,
                    0x104);
-            const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
+            const unsigned long Extra = Desc->Size == offsetof(FFileSystemDesc, MemBuffer) ? Desc->FindHandle : 0xFFFFFFFFu;
             FUtfHandle* Found =
                 ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
             if (Found == nullptr)
@@ -2229,7 +2229,7 @@ namespace
         {
             if (ParentFileSystem == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             LastError = 0;
@@ -2259,7 +2259,7 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (Root == nullptr || !Root->IsDirectory() || ActiveW == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
 
@@ -2267,7 +2267,7 @@ namespace
             if (ResolvePath(Dest, Name,
                        0x104) == 0)
             {
-                LastError = 0xA1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
 
@@ -2275,7 +2275,7 @@ namespace
                 ActiveW->Open(Dest, (unsigned long)(RootHandle()), 0xFFFFFFFFu);
             if (Opened == nullptr)
             {
-                LastError = 0xA1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
 
@@ -2306,7 +2306,7 @@ namespace
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0xFFFFFFFFu;
             }
             return UtfHandle->Size();
@@ -2317,7 +2317,7 @@ namespace
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return -1;
             }
             const unsigned long Size = UtfHandle->Size();
@@ -2337,13 +2337,13 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             ActiveW->GetFileTimes((unsigned long)(UtfHandle),
@@ -2357,20 +2357,20 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             char Dest[0x105];
             if (ResolvePath(Dest, Path, 0x104) == 0)
             {
-                LastError = 0xA1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
             const int Attributes =
                 ActiveW->GetAttributes(Dest, (unsigned long)(RootHandle()));
             if (Attributes == -1)
             {
-                LastError = 0xA1;
+                LastError = ERROR_BAD_PATHNAME;
                 return 0;
             }
             return Attributes;
@@ -2379,7 +2379,7 @@ namespace
         {
             if (ParentFileSystem == nullptr || Handle == 0)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             const int Result = ParentFileSystem->GetFilePosition(Handle, HighOut);
@@ -2392,13 +2392,13 @@ namespace
         {
             if (Handle == 0xFFFFFFFFu)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             std::list<FUtfHandle*>::iterator Token = FindMapToken(Handle);
@@ -2420,7 +2420,7 @@ namespace
                 FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\DOSFile\\ReadFile\\BaseUTF.cpp",
                       0x29B, Message);
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             return ActiveW->CloseHandle(UtfHandle) ? 1 : 0;
@@ -2437,7 +2437,7 @@ namespace
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             FUtfFileSystem* Archive = ArchiveOwner;
@@ -2485,7 +2485,7 @@ namespace
             if (Protect != PAGE_READONLY || ArchiveOwner == nullptr || ArchiveOwner->MappedView == nullptr ||
                 ArchiveOwner->Walker == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return -1;
             }
             FUtfHandle* UtfHandle = nullptr;
@@ -2495,7 +2495,7 @@ namespace
                 UtfHandle = FUtfWalker::HandleFromValue(FileKey);
             if (UtfHandle == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return -1;
             }
             MapTokens.push_back(UtfHandle);
@@ -2506,35 +2506,35 @@ namespace
         {
             if (Access != FILE_MAP_READ)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             std::list<FUtfHandle*>::iterator Found = FindMapToken(Token);
             if (Found == MapTokens.end())
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return -1;
             }
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             FUtfHandle* UtfHandle = *Found;
             if (UtfHandle == nullptr)
             {
-                LastError = 6;
+                LastError = ERROR_INVALID_HANDLE;
                 return 0;
             }
             if (ArchiveOwner == nullptr || ArchiveOwner->MappedView == nullptr)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             if (ByteCount > UtfHandle->Size() - OffLow)
             {
-                LastError = 5;
+                LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
             const unsigned long DataSection = ReadUtfDword(ActiveW->GetView(), 0x24);
@@ -2562,7 +2562,7 @@ namespace
         {
             if (ArchiveOwner != nullptr)
                 return 1;
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
 
@@ -2571,13 +2571,13 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             FUtfHandle* Opened = nullptr;
             if (OpenNodeHandle != nullptr)
             {
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
+                const unsigned long Extra = Desc->Size == offsetof(FFileSystemDesc, MemBuffer) ? Desc->FindHandle : 0xFFFFFFFFu;
                 Opened = ActiveW->Open(Desc->Path, (unsigned long)(OpenNodeHandle),
                                        Extra);
             }
@@ -2587,15 +2587,15 @@ namespace
                 if (ResolvePath(Dest,
                            Desc->Path, 0x104) == 0)
                 {
-                    LastError = 0xA1;
+                    LastError = ERROR_BAD_PATHNAME;
                     return -1;
                 }
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
+                const unsigned long Extra = Desc->Size == offsetof(FFileSystemDesc, MemBuffer) ? Desc->FindHandle : 0xFFFFFFFFu;
                 Opened = ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
             }
             if (Opened == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             return (int)((unsigned long)(Opened));
@@ -2615,7 +2615,7 @@ namespace
         }
         int DACOM_API SetEndOfFile(unsigned long) override
         {
-            LastError = 5;
+            LastError = ERROR_ACCESS_DENIED;
             return 0;
         }
         int DACOM_API FindFirst(const char* Pattern, WIN32_FIND_DATAA* FindData) override
@@ -2623,7 +2623,7 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return -1;
             }
             WIN32_FIND_DATAA* Out = FindData;
@@ -2636,7 +2636,7 @@ namespace
                 char Dest[0x105];
                 if (ResolvePath(Dest, Pattern, 0x104) == 0)
                 {
-                    LastError = 0xA1;
+                    LastError = ERROR_BAD_PATHNAME;
                     return -1;
                 }
                 Result = ActiveW->FindFirst(Dest, Out, (unsigned long)(OwnRootHandle));
@@ -2650,7 +2650,7 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return 0;
             }
             const int Result =
@@ -2664,7 +2664,7 @@ namespace
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
             {
-                LastError = 2;
+                LastError = ERROR_FILE_NOT_FOUND;
                 return 0;
             }
             const int Result = ActiveW->FindClose(Handle);
@@ -2684,6 +2684,14 @@ namespace
         FUtfWalker* Walker;               // +0x238, archives only
         FUtfHandle* OwnRootHandle;        // +0x23c, a clone's node handle (owner's walker)
         std::list<FUtfHandle*> MapTokens; // +0x240, Slot3C tokens
+    };
+
+    // FMemFileSystem::MemFlags: who owns the view and how it may grow.
+    enum EMemFileState
+    {
+        kMemFileOwnsView = 0x1,     // the view is released with the file (FUN_06b77250)
+        kMemFileFixedSize = 0x2,    // wrapped caller buffer: writes are cut at AllocSize, no growing
+        kMemFileVirtualAlloc = 0x4, // the view came from VirtualAlloc (else malloc)
     };
 
     class FMemFileSystem final : public FFileSystemBase
@@ -2766,7 +2774,7 @@ namespace
 
             Access = Desc->Access;
             void* Source = Desc->MemBuffer;
-            if ((Desc->MemFlags & 1) == 0)
+            if ((Desc->MemFlags & kMemDescUseBuffer) == 0)
             {
                 if (Source != nullptr)
                     AllocSize = Desc->MemSize;
@@ -2776,7 +2784,7 @@ namespace
                     if (MappedView == nullptr)
                         AllocSize = 0;
                 }
-                MemFlags = MemFlags | 5;
+                MemFlags = MemFlags | (kMemFileOwnsView | kMemFileVirtualAlloc);
             }
             else
             {
@@ -2785,9 +2793,9 @@ namespace
                     AllocSize = 0;
                 else
                     AllocSize = Desc->MemSize;
-                if ((Desc->MemFlags & 2) != 0)
-                    MemFlags = MemFlags | 1;
-                MemFlags = MemFlags | 2;
+                if ((Desc->MemFlags & kMemDescOwnBuffer) != 0)
+                    MemFlags = MemFlags | kMemFileOwnsView;
+                MemFlags = MemFlags | kMemFileFixedSize;
             }
 
             MappedSize = AllocSize;
@@ -2808,9 +2816,9 @@ namespace
         // free(); the view (+8) is released without a null test and cleared in every path.
         void ReleaseMemBuffer()
         {
-            if ((MemFlags & 1) != 0)
+            if ((MemFlags & kMemFileOwnsView) != 0)
             {
-                if ((MemFlags & 4) != 0)
+                if ((MemFlags & kMemFileVirtualAlloc) != 0)
                 {
                     VirtualFree(MappedView, 0, MEM_RELEASE);
                     MappedView = nullptr;
@@ -2922,7 +2930,7 @@ namespace
             const unsigned long End = MappedPos + Size;
             if (End > AllocSize)
             {
-                if ((MemFlags & 2) != 0)
+                if ((MemFlags & kMemFileFixedSize) != 0)
                 {
                     if (MappedPos >= AllocSize)
                         ToWrite = 0;
@@ -2946,7 +2954,7 @@ namespace
                         MappedView = NewView;
                         AllocSize = NewSize;
                         MappedSize = NewSize;
-                        MemFlags = MemFlags | 4;
+                        MemFlags = MemFlags | kMemFileVirtualAlloc;
                     }
                 }
             }
@@ -2965,7 +2973,7 @@ namespace
                 return 0;
             if (MappedPos > AllocSize)
             {
-                if ((MemFlags & 2) != 0)
+                if ((MemFlags & kMemFileFixedSize) != 0)
                     return 0;
                 const unsigned long NewSize = (MappedPos + 0xFFFFu) & 0xFFFFF000u;
                 void* NewView = VirtualAlloc(nullptr, NewSize, MEM_COMMIT, PAGE_READWRITE);
@@ -2977,7 +2985,7 @@ namespace
                         VirtualFree(MappedView, 0, MEM_RELEASE);
                     }
                     MappedView = NewView;
-                    MemFlags = MemFlags | 4;
+                    MemFlags = MemFlags | kMemFileVirtualAlloc;
                     AllocSize = NewSize;
                     MappedSize = NewSize;
                 }
@@ -3084,7 +3092,7 @@ namespace
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            if (Desc->size != 0x40 || std::strcmp(Desc->interface_name, Name) != 0)
+            if (Desc->size != sizeof(FFileSystemDesc) || std::strcmp(Desc->interface_name, Name) != 0)
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -3114,14 +3122,14 @@ namespace
         unsigned char Raw[0x34];
         std::memset(Raw, 0, sizeof(Raw));
         FFileSystemDesc* Desc = (FFileSystemDesc*)(Raw);
-        Desc->Size = 0x34;
+        Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc->ComponentName = "FileSystem";
         Desc->Implementation = "DOS";
         Desc->Path = Path;
         Desc->Access = kGenericRead;
-        Desc->ShareMode = 1;
+        Desc->ShareMode = FILE_SHARE_READ;
         Desc->Creation = kOpenExisting;
-        Desc->Flags = 0x08000080;
+        Desc->Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
         Desc->FindHandle = 0xFFFFFFFF;
 
         bool bResult = false;
@@ -3346,7 +3354,7 @@ namespace
         // LAB_06b78090: case-sensitive name compare; the object is calloc(0x118) in retail.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            if (Desc->size != 0x8 || std::strcmp(Desc->interface_name, Name) != 0)
+            if (Desc->size != sizeof(AGGDESC) || std::strcmp(Desc->interface_name, Name) != 0)
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;

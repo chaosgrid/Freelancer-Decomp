@@ -69,7 +69,7 @@ namespace
 BreakAwayIdea::BreakAwayIdea()
     : BaseIdea()
     , Picker()
-    , BreakStyle(0)
+    , BreakStyle(kBreakStyleOutrun)
     , BreakAwayRange(350.0f)
     , Flag3c(1)
     , Pad3d{}
@@ -144,7 +144,7 @@ int BreakAwayIdea::Update(float DeltaTime)
         // commands a zero vector, not the unsteered throttle.
 
         Handle->Thrust.SetAxisThrottle(Command);
-        Handle->Thrust.SetThrottle(1.0f, 0);
+        Handle->Thrust.SetThrottle(1.0f, kThrottleModeEngine);
         return 0;
     }
 
@@ -170,16 +170,16 @@ int BreakAwayIdea::Update(float DeltaTime)
         int const Pick = GenericWeightedPick(&Picker.LastDirection);
         switch (Pick)
         {
-        case 1:
+        case kDodgeDirLeft:
             RotateFrameRowsXZ(Frame60, 2.0943951023931953); // DAT_063a0518, +2*pi/3
             break;
-        case 2:
+        case kDodgeDirRight:
             RotateFrameRowsXZ(Frame60, -2.0943951023931953); // DAT_063a0510, -2*pi/3
             break;
-        case 3:
+        case kDodgeDirUp:
             RotateFrameRowsYZ(Frame60, 2.0943951023931953); // DAT_063a0518
             break;
-        case 4:
+        case kDodgeDirDown:
             RotateFrameRowsYZ(Frame60, -2.0943951023931953); // DAT_063a0510
             break;
         default:
@@ -190,7 +190,7 @@ int BreakAwayIdea::Update(float DeltaTime)
     }
 
     // Three modes; anything else returns 0.
-    if (BreakStyle == 2)
+    if (BreakStyle == kBreakStyleReverse)
     {
         // Unordered counts as not-less.
         if (!(AttemptReverseElapsed < AttemptReverseTime))
@@ -231,9 +231,9 @@ int BreakAwayIdea::Update(float DeltaTime)
         return 0;
     }
 
-    if (BreakStyle == 1)
+    if (BreakStyle == kBreakStyleSideways)
     {
-        Handle->Thrust.SetThrottle(Throttle, 0);
+        Handle->Thrust.SetThrottle(Throttle, kThrottleModeEngine);
 
         // Default aim is the reversed heading of this->Object, not of the nav
         // block's owner.
@@ -321,7 +321,7 @@ int BreakAwayIdea::Update(float DeltaTime)
         return 1;
     }
 
-    if (BreakStyle != 0)
+    if (BreakStyle != kBreakStyleOutrun)
     {
         return 0;
     }
@@ -336,7 +336,7 @@ int BreakAwayIdea::Update(float DeltaTime)
     (void)Handle->SelfTarget.Iface->get_transform();
 
     Handle->Thrust.SetAxisThrottle(Drive);
-    Handle->Thrust.SetThrottle(Throttle, 0);
+    Handle->Thrust.SetThrottle(Throttle, kThrottleModeEngine);
 
     // Unrounded sum compared; strictly-less or unordered skips.
     double const Elapsed = static_cast<double>(DeltaTime) + AfterburnerElapsed;
@@ -416,7 +416,7 @@ int BreakAwayIdea::EvaluateBreakAwayClearance()
     // else: once Flag5c is latched, retail computes the clearance and discards it.
 
     Flag5c = 1;
-    Handle->Thrust.SetThrottle(-1.0f, 0);
+    Handle->Thrust.SetThrottle(-1.0f, kThrottleModeEngine);
 
     // Retail re-reads the watcher rather than reusing the value.
     IObjRW* const Target = WatchedObjectOf(Picker.Watcher);

@@ -54,7 +54,7 @@ Mine::~Mine()
 // LAB_06cf3400.
 unsigned int Mine::get_type_bits() const
 {
-    return 0x4000000u;
+    return OBJ_MINE;
 }
 
 CMine* Mine::cmine() const
@@ -80,7 +80,7 @@ bool Mine::create(Archetype::Root* Arch)
 
     // open (vt+0x4c) goes through the CSimple narrowing, not null-tested.
     CObject* Narrowed = Object;
-    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & 3u) != 3u)
+    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         Narrowed = nullptr;
     Narrowed->open(Arch);
 
@@ -154,7 +154,7 @@ bool Mine::update(float Dt)
     // A spent lifetime (CProjectile+0xe8 below zero, or unordered) removes the mine quietly.
     if (!(Cm->Lifetime >= 0.0f))
     {
-        destroy(0, 0);
+        destroy(DESTROY_VANISH, 0);
     }
     else
     {
@@ -187,7 +187,7 @@ bool Mine::update(float Dt)
                 double const DistSq = (Dz * Dz + Dx * Dx) + Dy * Dy;
                 if (DistSq < static_cast<double>(DetonationSq))
                 {
-                    destroy(1, Closest->Id);
+                    destroy(DESTROY_FUSE, Closest->Id);
                 }
                 else
                 {
@@ -217,7 +217,7 @@ bool Mine::update(float Dt)
             Target.y = 0.0f;
             Target.x = 0.0f;
             if (bTriggered)
-                destroy(1, TriggerObjId);
+                destroy(DESTROY_FUSE, TriggerObjId);
         }
     }
 
@@ -234,7 +234,7 @@ bool Mine::destroy(int Kind, unsigned int ObjId)
 
     // Only a real kill blows up, and only with an explosion that has a radius and some
     // effect (double 0.0001 at .rdata:06d65190).
-    if (Kind == 1)
+    if (Kind == DESTROY_FUSE)
     {
         Archetype::Root* const Arch = Object->get_archetype();
         if (!Arch->ExplosionArch.IsEmpty())
@@ -275,7 +275,7 @@ void Mine::added(CObject* Obj)
     {
         // A seeking mine counts CSimple roots as intruders.
         CObject* const Root = GetRoot(Obj);
-        if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & 3u) == 3u)
+        if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             IntruderCount = IntruderCount + 1;
         return;
     }
@@ -283,7 +283,7 @@ void Mine::added(CObject* Obj)
     // A non-seeking mine latches a CSimple root that touches it, unless it is the owner
     // (narrowing not null-tested) while the owner-safe time still runs.
     CObject* const Root = GetRoot(Obj);
-    if (Root == nullptr || (static_cast<unsigned>(Root->ObjectClass) & 3u) != 3u)
+    if (Root == nullptr || (static_cast<unsigned>(Root->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
     CSimple* const Toucher = static_cast<CSimple*>(Root);
 
@@ -306,7 +306,7 @@ void Mine::deleted(CObject* Obj)
     if (!(Arch->SeekDist > 0.0f))
         return;
     CObject* const Root = GetRoot(Obj);
-    if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & 3u) == 3u)
+    if (Root != nullptr && (static_cast<unsigned>(Root->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         IntruderCount = IntruderCount - 1;
 }
 

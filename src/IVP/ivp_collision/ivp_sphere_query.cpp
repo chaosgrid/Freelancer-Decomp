@@ -159,7 +159,7 @@ void IVP_Sphere_Object_Query::collect_objects_in_node(IVP_OV_Node* Node, const I
 
         G_bLedgeTreeSphereHit = 0;
         const int32_t Type = Object->object_type;
-        if (Type == 2)
+        if (Type == IVP_POLYGON)
         {
             const IVP_SurfaceManager_Polygon* const SurfaceManager =
                 static_cast<const IVP_SurfaceManager_Polygon*>(Object->surface_manager);
@@ -170,7 +170,7 @@ void IVP_Sphere_Object_Query::collect_objects_in_node(IVP_OV_Node* Node, const I
                 Found.Add(Object);
             }
         }
-        else if (Type == 3)
+        else if (Type == IVP_BALL)
         {
             if (IVP_SphereTouchesSphere(&Local, Radius, &Core->MWorldFCore.vv, Core->UpperLimitRadius) != 0)
             {

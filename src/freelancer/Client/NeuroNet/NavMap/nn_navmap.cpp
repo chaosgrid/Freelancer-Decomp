@@ -44,8 +44,8 @@
 #include <windows.h>                 // CharUpperW (FUN_005b74d9)
 
 // --- Globals (retail NavMap.cpp .bss / .data) ---
-int G_NavMapFilterMode = 0;               // DAT_006720a0
-int G_NavMapZoneFilter = 0;               // DAT_006720a4
+int G_NavMapFilterMode = kNavMapFilterPhysical;               // DAT_006720a0
+int G_NavMapZoneFilter = kNavMapZoneFilterAll;               // DAT_006720a4
 unsigned char G_bNavMapNoBestPath = 0;    // DAT_006720a8
 // DAT_00672048 -- LAB_0048d730 constructs it empty and registers LAB_0048d760 (free) with atexit.
 std::vector<FNavMapGroupMember> G_NavMapGroupPositions;
@@ -490,7 +490,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     // continue button, and the 0xf event.
     if (bBriefing != 0)
     {
-        CloseButton->Flags = static_cast<unsigned char>(CloseButton->Flags & 0xfc);
+        CloseButton->Flags = static_cast<unsigned char>(CloseButton->Flags & ~(kWin3DActive | kWin3DVisible));
         {
             Vector const Position = {-0.76f, 0.47f, 0.0f};
             MissionBriefingText = CreateTextControl("MissionBriefingText", "MissionObjective",
@@ -557,7 +557,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_filter_physical.3db", nullptr,
             "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x4d3, 0, 0);
     }
-    PhysicalFilter->SetProperty(0xc, 1, 0);
+    PhysicalFilter->SetProperty(kWinPropLit, 1, 0);
     {
         Vector const Position = {-0.046f, 0.295f, 0.0f};
         PoliticalFilter = CreateButtonControl(
@@ -658,12 +658,12 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         Vector const AttachOffset = {kNavMapPanelBaseA + 0.93f, -0.06f, 0.0f};
         InfoText = CreateRichTextWin("NavMapInfoText", 0.27f, 0.33f, &AttachOffset, true);
     }
-    InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & 0xfd);
+    InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & ~kWin3DVisible);
     {
         Vector const AttachOffset = {0.4f, -0.02f, 0.0f};
         InfoCard = CreateRichTextWin("NavMapInfoCard", 0.43f, 0.41f, &AttachOffset, true);
     }
-    InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & 0xfd);
+    InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & ~kWin3DVisible);
     {
         Vector const Position = {kNavMapPanelBaseA + 0.36f, 0.256f, 0.0f};
         InfoTitle = CreateTextControl("NavMapInfoTitle", "Normal", &Position, nullptr, 0.32f,
@@ -853,8 +853,8 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", &Position,
                                               nullptr, 0.266f, 0.03f, 1.9f, 0x3a1, 1, 0, 1);
     }
-    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
-    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
+    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & ~(kWin3DActive | kWin3DVisible));
+    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & ~(kWin3DActive | kWin3DVisible));
 
     // The fifteen known-base rows, y = 0.171 - i * 0.03.
     for (int Index = 0; Index < 15; ++Index)
@@ -901,19 +901,19 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     // A best path forces the mission filter; the info-card modes do not
     // survive a reopen.
     if (BestPathGetWaypointCount() > 0)
-        G_NavMapFilterMode = 3;
-    else if (G_NavMapFilterMode == 6 || G_NavMapFilterMode == 7)
-        G_NavMapFilterMode = 0;
+        G_NavMapFilterMode = kNavMapFilterMission;
+    else if (G_NavMapFilterMode == kNavMapFilterInfoCard || G_NavMapFilterMode == kNavMapFilterBaseList)
+        G_NavMapFilterMode = kNavMapFilterPhysical;
 
-    LabelButton->SetProperty(0xc, G_bNavMapShowLabels, 0);
+    LabelButton->SetProperty(kWinPropLit, G_bNavMapShowLabels, 0);
     SetFilterMode(G_NavMapFilterMode);
-    AllFilter->SetProperty(0xc, G_NavMapZoneFilter == 0 ? 1 : 0, 0);
-    HostileFilter->SetProperty(0xc, G_NavMapZoneFilter == 1 ? 1 : 0, 0);
-    FriendlyFilter->SetProperty(0xc, G_NavMapZoneFilter == 2 ? 1 : 0, 0);
+    AllFilter->SetProperty(kWinPropLit, G_NavMapZoneFilter == kNavMapZoneFilterAll ? 1 : 0, 0);
+    HostileFilter->SetProperty(kWinPropLit, G_NavMapZoneFilter == kNavMapZoneFilterHostile ? 1 : 0, 0);
+    FriendlyFilter->SetProperty(kWinPropLit, G_NavMapZoneFilter == kNavMapZoneFilterFriendly ? 1 : 0, 0);
 
     // Hidden until shown (0xef01), the frame offset, the position again
     // (through slot 5), then FUN_004b5060.
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     SetOffset(0.624f, -0.23f, -0.22f);
     SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
@@ -930,7 +930,7 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             SetPosition(&GetParent()->Position);
         InitialShow();
         TransitionTime = TransitionDuration;
-        Flags = static_cast<unsigned char>(Flags | 3);
+        Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         bDebugTeleportMode = 0;
 
         // The system view's filter row.
@@ -948,10 +948,10 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
             unsigned char const bNoZones = MissionZoneIds.empty() ? 1 : 0;
             MissionFilter->SetProperty(kWinPropHide, bNoZones, 0);
-            if (bNoZones != 0 && G_NavMapFilterMode == 3)
-                SetFilterMode(0);
+            if (bNoZones != 0 && G_NavMapFilterMode == kNavMapFilterMission)
+                SetFilterMode(kNavMapFilterPhysical);
 
-            if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
+            if (G_NavMapFilterMode == kNavMapFilterPolitical || G_NavMapFilterMode == kNavMapFilterPatrol)
             {
                 AllFilter->SetProperty(kWinPropHide, 0, 0);
                 HostileFilter->SetProperty(kWinPropHide, 0, 0);
@@ -975,7 +975,7 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == kWinMsgHide)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         Win3DReparent(this, nullptr);
         Win3D* Child = GetChildHead();
         while (Child != nullptr)
@@ -1192,7 +1192,7 @@ void NeuroNetNavMap::BuildUniverseItems()
         unsigned char const Visit = System->GetVisit();
         int const IdsInfo = System->GetIdsInfo();
         int const StridName = System->GetStridName();
-        FNavMapItem* const Item = AddItem(0, 4, X, 0.0f, Z, RandomRadius, "NAV_star", StridName,
+        FNavMapItem* const Item = AddItem(kNavMapItemSolar, OBJ_SUN, X, 0.0f, Z, RandomRadius, "NAV_star", StridName,
                                           IdsInfo, 0, Id, Visit);
 
         // The item is used without a null test, as in retail.
@@ -1211,7 +1211,7 @@ void NeuroNetNavMap::BuildUniverseItems()
             unsigned char VisitFlags = 0;
             GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
-            Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
+            Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
             if (bDebugShowAll != 0)
                 Item->bShown = 1;
         }

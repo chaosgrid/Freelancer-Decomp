@@ -323,7 +323,7 @@ FGateTunnel::~FGateTunnel()
     // The tunnel light, disabled when enabled, then released.
     if (Light != nullptr)
     {
-        if ((Light->Flags & 0x08) != 0)
+        if ((Light->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Light);
         GameLightRelease(Light);
         Light = nullptr;
@@ -382,7 +382,7 @@ void FGateTunnel::EnterState1()
         Light = nullptr;
         return;
     }
-    if ((Light->Flags & 0x08) != 0)
+    if ((Light->Flags & kLightFlagEnabled) != 0)
         GameLightVirtualDisable(Light);
 }
 
@@ -397,7 +397,7 @@ void FGateTunnel::EnterState3()
     // FUN_005012a0.
     if (Light != nullptr)
     {
-        if ((Light->Flags & 0x08) != 0)
+        if ((Light->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Light);
         GameLightRelease(Light);
         Light = nullptr;
@@ -623,7 +623,7 @@ void FGateTunnel::Update(float Dt)
     }
 
     // An enabled tunnel light flickers in colour and direction.
-    if (Light != nullptr && (Light->Flags & 0x08) != 0)
+    if (Light != nullptr && (Light->Flags & kLightFlagEnabled) != 0)
     {
         float Colour[3] = {0.8f, 0.8f, 1.0f};
         float const RandA = static_cast<float>(static_cast<double>(rand()) * kRandHalfUnit);
@@ -694,7 +694,7 @@ void FGateTunnel::Draw(FSpaceCamera* Camera)
         return;
 
     // A light that is off is switched on for the draw.
-    if (Light != nullptr && (Light->Flags & 0x08) == 0)
+    if (Light != nullptr && (Light->Flags & kLightFlagEnabled) == 0)
         GameLightEnable(Light);
 
     Win3DApplyCamera(AsCamera(Camera));
@@ -702,8 +702,8 @@ void FGateTunnel::Draw(FSpaceCamera* Camera)
     Win3DSetDepthWrite(bWriteDepthBuffer);
     Win3DEnable(kWin3DBlend);
     IRenderPipeline* const Pipe = DALib::Pipeline;
-    Pipe->SetTextureStageState(0, 0xd, 1);
-    Pipe->SetTextureStageState(0, 0xe, 1);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+    Pipe->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
     // Each layer from 0.1 behind to 0.01 ahead of the ship, with the
     // step count negated around the call (the strips run backwards along the path).

@@ -121,6 +121,13 @@ static_assert(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 // the member unwind (see ~SystemManager in common_systemmanager.cpp).
 // ============================================================================
 
+// The Mode argument of ThrustManager::SetThrottle (FUN_062e89a0); any other value does nothing.
+enum EThrottleMode
+{
+    kThrottleModeEngine = 0,   // the engine throttle, clamped to [-1, 1]; leaves cruise
+    kThrottleModeCruise = 2,   // the cruise throttle, clamped to [0, 1.2]; may engage cruise
+};
+
 // ---------------------------------------------------------------------------
 // ThrustManager — SystemManager+0x18, 0x1C bytes. A retail class: Common.dll exports
 // ?engage_cruise@ThrustManager@@QAEX_N@Z (ordinal 2476, .text:062e90a0) and nothing else of
@@ -745,6 +752,14 @@ void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self);
 // InitSystemManager.
 // ---------------------------------------------------------------------------
 
+// The values of PotionHelper::State (PotionHelper::Update, FUN_062eceb0).
+enum EPotionState
+{
+    kPotionStateArmed = 0,         // waits until the health ratio falls to UseAtRatio
+    kPotionStatePreUseDelay = 1,   // waits PreUseDelay, then uses the item
+    kPotionStatePostUseDelay = 2,  // waits PostUseDelay, then re-arms
+};
+
 // PotionHelper -- abstract base; no virtual destructor (retail's table has two slots).
 struct PotionHelper
 {
@@ -762,7 +777,7 @@ struct PotionHelper
     // FUN_062eceb0, non-virtual.
     void Update(float Dt, IObjRW* Object);
 
-    int State;                  // +0x04  0 = armed, 1 = waiting PreUseDelay, 2 = waiting PostUseDelay
+    int State;                  // +0x04  EPotionState
     int Type;                   // +0x08  Archetype class type (0x1a / 0x1b), written by SetType
     unsigned short EquipId;     // +0x0C  id of the last matching cargo item enumerate() saw
     unsigned char Pad0E[2];

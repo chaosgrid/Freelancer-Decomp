@@ -363,7 +363,7 @@ namespace
         for (std::vector<FSystemZone*>::const_iterator It = AtShip->begin();
              It != AtShip->end() && Spawned == 0; ++It)
         {
-            FSpawnRequest Request(false, 0, GSpacePopControllerId, Ship, *Placement, *Velocity,
+            FSpawnRequest Request(false, kSpawnZonesAtShip, GSpacePopControllerId, Ship, *Placement, *Velocity,
                                   &GSpacePopExclusionSpheres);
             float const Scale = 1.0f;
             unsigned int const Limit = MaxDensity;
@@ -373,7 +373,7 @@ namespace
         for (std::vector<FSystemZone*>::const_iterator It = Near->begin();
              It != Near->end() && Spawned == 0; ++It)
         {
-            FSpawnRequest Request(false, 1, GSpacePopControllerId, Ship, *Placement, *Velocity,
+            FSpawnRequest Request(false, kSpawnZonesAdditive, GSpacePopControllerId, Ship, *Placement, *Velocity,
                                   &GSpacePopExclusionSpheres);
             float const Scale = 1.0f;
             unsigned int const Limit = MaxDensity;
@@ -395,7 +395,7 @@ namespace
             NoVelocity.x = 0.0f;
             NoVelocity.y = 0.0f;
             NoVelocity.z = 0.0f;
-            FSpawnRequest Request(false, 2, GSpacePopControllerId, Ship, AheadPlacement, NoVelocity,
+            FSpawnRequest Request(false, kSpawnZonesAhead, GSpacePopControllerId, Ship, AheadPlacement, NoVelocity,
                                   &GSpacePopExclusionSpheres);
             // 0.33f = DAT_06fbbb3c.
             unsigned int const Limit = static_cast<unsigned int>(static_cast<__int64>(
@@ -462,7 +462,7 @@ namespace
             for (std::vector<FSystemZone*>::size_type Index = 0;
                  !Zones->empty() && Index < Zones->size() && Spawned < Budget; ++Index)
             {
-                FSpawnRequest Request(true, 0, GSpacePopControllerId, Ship, *Placement, NoVelocity,
+                FSpawnRequest Request(true, kSpawnZonesAtShip, GSpacePopControllerId, Ship, *Placement, NoVelocity,
                                       &GSpacePopExclusionSpheres);
                 float const Share = (*Shares)[Index];
                 // -1.0 = DAT_06fb5e84.

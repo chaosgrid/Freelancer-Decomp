@@ -23,6 +23,15 @@ struct FStreamerInitDesc
     float Gain;                // +0x14; 0 → 1.0f
 };
 
+// IStreamer2::QueryStatus results: FSoundStreamer::QueryStatus maps the handle's state onto them.
+enum EStreamStatus
+{
+    kStreamStatusInvalid = 0,    // no handle or no worker thread
+    kStreamStatusPlaying = 1,    // playing, or draining its tail
+    kStreamStatusNotPlaying = 2, // ready, waiting to start, or stopped
+    kStreamStatusFinished = 4,   // ran to the end; the client's IsFinished treats it like 0
+};
+
 struct IStreamer2 : IDAComponent
 {
     virtual int DACOM_API InitializeDevice(FStreamerInitDesc* Desc) = 0; // +0x0C BOOL

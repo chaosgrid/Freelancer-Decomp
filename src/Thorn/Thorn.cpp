@@ -584,13 +584,13 @@ namespace
             {
                 ScriptPath_ = Path;
                 FFileSystemDesc Desc = {};
-                Desc.Size = 0x34;
+                Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
                 Desc.ComponentName = "FileSystem";
                 Desc.Path = Path;
-                Desc.Access = 0x80000000;
-                Desc.ShareMode = 1;
-                Desc.Creation = 3;
-                Desc.Flags = 0x08000080;
+                Desc.Access = GENERIC_READ;
+                Desc.ShareMode = FILE_SHARE_READ;
+                Desc.Creation = OPEN_EXISTING;
+                Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
                 Desc.FindHandle = 0xFFFFFFFF;
                 ICOManager* Manager = DACOM_Acquire();
                 const GENRESULT Result = Manager->CreateInstance(
@@ -611,13 +611,13 @@ namespace
             // the create failed.
             ScriptPath_ = Path;
             FFileSystemDesc Desc = {};
-            Desc.Size = 0x34;
+            Desc.Size = offsetof(FFileSystemDesc, MemBuffer);
             Desc.ComponentName = "FileSystem";
             Desc.Path = ScriptPath_.c_str();
-            Desc.Access = 0xC0000000;
-            Desc.ShareMode = 1;
-            Desc.Creation = 2;
-            Desc.Flags = 0x08000080;
+            Desc.Access = GENERIC_READ | GENERIC_WRITE;
+            Desc.ShareMode = FILE_SHARE_READ;
+            Desc.Creation = CREATE_ALWAYS;
+            Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
             Desc.FindHandle = 0xFFFFFFFF;
             IFileSystem* FileSystem;
             ICOManager* Manager = DACOM_Acquire();

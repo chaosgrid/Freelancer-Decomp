@@ -38,23 +38,31 @@ namespace
 
     // {state, value} tables, zero-terminated (FUN_0054f800 and its inlined copies), values read
     // out of the retail .rdata.
-    // DAT_005e09f0 -- texture stage 0: COLOROP MODULATE, COLORARG1 TEXTURE, COLORARG2 DIFFUSE,
-    // ALPHAOP MODULATE, ALPHAARG1 TEXTURE, ALPHAARG2 DIFFUSE.
-    unsigned const kStage0States[] = {1, 4, 2, 2, 3, 0, 4, 4, 5, 2, 6, 0, 0, 0};
-    // DAT_005e0a28 -- texture stage 1: COLOROP DISABLE, COLORARG1 TEXTURE, COLORARG2 CURRENT,
-    // ALPHAOP DISABLE, ALPHAARG1 TEXTURE, ALPHAARG2 CURRENT.
-    unsigned const kStage1States[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0, 0};
-    // DAT_005e09c8 -- COLORVERTEX (0x8d) 1, DIFFUSEMATERIALSOURCE (0x91) COLOR1.
-    unsigned const kRenderStatesMaterial[] = {0x8d, 1, 0x91, 1, 0, 0};
-    // DAT_005e0978 -- LIGHTING (0x89) 0, SPECULARENABLE (0x1d) 0, ALPHABLENDENABLE (0x1b) 0.
-    unsigned const kRenderStatesOpaque[] = {0x89, 0, 0x1d, 0, 0x1b, 0, 0, 0};
-    // DAT_005e0998 -- LIGHTING 0, SPECULARENABLE 0, ALPHABLENDENABLE 1, SRCBLEND (0x13)
-    // SRCALPHA, DESTBLEND (0x14) INVSRCALPHA.
-    unsigned const kRenderStatesBlend[] = {0x89, 0, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0, 0};
-    // DAT_005e09e0 -- COLORVERTEX 0.
-    unsigned const kRenderStatesMaterialOff[] = {0x8d, 0, 0, 0};
-    // DAT_005e0958 -- LIGHTING 1, SPECULARENABLE 0, ALPHABLENDENABLE 0.
-    unsigned const kRenderStatesRestore[] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0, 0};
+    // DAT_005e09f0 -- texture stage 0.
+    unsigned const kStage0States[] = {D3DTSS_COLOROP, D3DTOP_MODULATE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                      D3DTSS_COLORARG2, D3DTA_DIFFUSE, D3DTSS_ALPHAOP, D3DTOP_MODULATE,
+                                      D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE,
+                                      0, 0};
+    // DAT_005e0a28 -- texture stage 1.
+    unsigned const kStage1States[] = {D3DTSS_COLOROP, D3DTOP_DISABLE, D3DTSS_COLORARG1, D3DTA_TEXTURE,
+                                      D3DTSS_COLORARG2, D3DTA_CURRENT, D3DTSS_ALPHAOP, D3DTOP_DISABLE,
+                                      D3DTSS_ALPHAARG1, D3DTA_TEXTURE, D3DTSS_ALPHAARG2, D3DTA_CURRENT,
+                                      0, 0};
+    // DAT_005e09c8.
+    unsigned const kRenderStatesMaterial[] = {D3DRS_COLORVERTEX, 1, D3DRS_DIFFUSEMATERIALSOURCE,
+                                              D3DMCS_COLOR1, 0, 0};
+    // DAT_005e0978.
+    unsigned const kRenderStatesOpaque[] = {D3DRS_LIGHTING, 0, D3DRS_SPECULARENABLE, 0,
+                                            D3DRS_ALPHABLENDENABLE, 0, 0, 0};
+    // DAT_005e0998.
+    unsigned const kRenderStatesBlend[] = {D3DRS_LIGHTING, 0, D3DRS_SPECULARENABLE, 0,
+                                           D3DRS_ALPHABLENDENABLE, 1, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA,
+                                           D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0, 0};
+    // DAT_005e09e0.
+    unsigned const kRenderStatesMaterialOff[] = {D3DRS_COLORVERTEX, 0, 0, 0};
+    // DAT_005e0958.
+    unsigned const kRenderStatesRestore[] = {D3DRS_LIGHTING, 1, D3DRS_SPECULARENABLE, 0,
+                                             D3DRS_ALPHABLENDENABLE, 0, 0, 0};
 
     // The SetTextureStageState walk FUN_0054e900 inlines (stage 0 and stage 1).
     void ApplyTextureStageStates(IRenderPipeline* Pipeline, int Stage, unsigned const* Table)
@@ -200,24 +208,24 @@ namespace
     // Position / normal / colour sizes FUN_0054f830 derives from an FVF.
     int FvfPositionBytes(unsigned Fvf)
     {
-        if ((Fvf & 0xcu) == 0xcu)
+        if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
             return 0x1c;
-        if ((Fvf & 4u) == 4u)
+        if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
             return 0x10;
-        if ((Fvf & 2u) == 2u)
+        if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
             return 0xc;
         return 0;
     }
 
     int FvfNormalBytes(unsigned Fvf)
     {
-        return (Fvf & 0x10u) != 0 ? 0xc : 0;
+        return (Fvf & D3DFVF_NORMAL) != 0 ? 0xc : 0;
     }
 
     int FvfColorBytes(unsigned Fvf)
     {
-        int Bytes = (Fvf & 0x40u) != 0 ? 4 : 0;
-        if ((Fvf & 0x80u) != 0)
+        int Bytes = (Fvf & D3DFVF_DIFFUSE) != 0 ? 4 : 0;
+        if ((Fvf & D3DFVF_SPECULAR) != 0)
             Bytes += 4;
         return Bytes;
     }
@@ -226,7 +234,7 @@ namespace
     // first vertex written once more.
     void BatchCloseLoop(FAsteroidBillboardBatch& Batch)
     {
-        if ((Batch.Flags & 2u) == 0)
+        if ((Batch.Flags & kBillboardFlagCloseLoop) == 0)
             return;
         float* const Pos = reinterpret_cast<float*>(Batch.PosCursor.Ptr);
         Pos[0] = Batch.Saved[0].Pos.x;
@@ -246,10 +254,10 @@ namespace
     // set from bit 1 (the compiler's bitfield copy), the triangle-list primitive.
     void BatchBeginTriangles(FAsteroidBillboardBatch& Batch)
     {
-        unsigned char Flags = static_cast<unsigned char>(Batch.Flags & 0xf9u);
+        unsigned char Flags = static_cast<unsigned char>(Batch.Flags & ~(kBillboardFlagCloseLoop | kBillboardFlagQuads));
         unsigned char const Bit0 = static_cast<unsigned char>(((Flags >> 1) ^ Flags) & 1u);
         Flags = static_cast<unsigned char>(Flags ^ Bit0);
-        Batch.Prim = 4;
+        Batch.Prim = D3DPT_TRIANGLELIST;
         Batch.Flags = Flags;
     }
 
@@ -321,10 +329,10 @@ static_assert(offsetof(FAsteroidBillboardBatch, Color) == 0x68, "batch colour +0
 static_assert(offsetof(FAsteroidBillboardBatch, PosCursor) == 0x6c, "batch cursors +0x6c");
 
 // LAB_0054dad0: FUN_0054daf0(0x142), atexit(LAB_0054db50).
-FAsteroidBillboardBatch G_AsteroidBillboardBatch(0x142);
+FAsteroidBillboardBatch G_AsteroidBillboardBatch(D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1);
 
 FAsteroidBillboardBatch::FAsteroidBillboardBatch(unsigned InFvf)
-    : Prim(0x7fffffff)
+    : Prim(D3DPT_FORCE_DWORD)
     , Count(0)
     , Fvf(InFvf)
     , Pipeline(nullptr)
@@ -390,11 +398,11 @@ void FAsteroidBillboardBatch::Reset()
     LockedCount = 0;
     Count = 0;
     QuadCounter = 0;
-    Flags = static_cast<unsigned char>(Flags & 0xf8u);
+    Flags = static_cast<unsigned char>(Flags & ~(kBillboardFlagSaveFirst | kBillboardFlagCloseLoop | kBillboardFlagQuads));
     Color = 0xffffffffu;
     V = 0.0f;
     U = 0.0f;
-    Prim = 0x7fffffff;
+    Prim = D3DPT_FORCE_DWORD;
 }
 
 void FAsteroidBillboardBatch::BindCursors(unsigned char* Base, unsigned InFvf)
@@ -430,9 +438,9 @@ void FAsteroidBillboardBatch::Vertex(float X, float Y, float Z)
     UvCursor.Ptr += UvCursor.Stride;
 
     // Bit 0: keep this vertex as the loop's first.
-    if ((Flags & 1u) != 0)
+    if ((Flags & kBillboardFlagSaveFirst) != 0)
     {
-        Flags = static_cast<unsigned char>(Flags & 0xfeu);
+        Flags = static_cast<unsigned char>(Flags & ~kBillboardFlagSaveFirst);
         Saved[0].Color = Color;
         Saved[0].U = U;
         Saved[0].V = V;
@@ -443,7 +451,7 @@ void FAsteroidBillboardBatch::Vertex(float X, float Y, float Z)
 
     // Bit 2: quads. Vertices 0 and 2 of each four are saved; after the fourth
     // both are written again, turning the quad into two triangles.
-    if ((Flags & 4u) == 0)
+    if ((Flags & kBillboardFlagQuads) == 0)
         return;
     if ((QuadCounter & 1u) == 0)
     {
@@ -776,13 +784,13 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     IRenderPipeline* const Pipe = DALib::Pipeline;
     Pipe->SetModelview(Cam->GetViewTransform());
     // CULLMODE none, ALPHAREF saved and set to 0x80.
-    Pipe->SetRenderState(D3DRS_CULLMODE, 1);
+    Pipe->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
     int OldAlphaRef = 0;
     Pipe->GetRenderState(D3DRS_ALPHAREF, &OldAlphaRef);
     Pipe->SetRenderState(D3DRS_ALPHAREF, 0x80);
     // The shape's frame-0 texture on stage 0, TEXCOORDINDEX 0.
     Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(Bb->Shape, 0));
-    Pipe->SetTextureStageState(0, 0xb, 0);
+    Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
     ApplyTextureStageStates(Pipe, 0, kStage0States);
     ApplyTextureStageStates(Pipe, 1, kStage1States);
     BillboardApplyRenderStates(Pipe, kRenderStatesMaterial);
@@ -1026,7 +1034,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
 
     Batch.SetInterfaces(nullptr, nullptr);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-    Pipe->SetRenderState(D3DRS_CULLMODE, 2);
+    Pipe->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
     Pipe->SetRenderState(D3DRS_ALPHAREF, OldAlphaRef);
     Pipe->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
     BillboardApplyRenderStates(Pipe, kRenderStatesMaterialOff);

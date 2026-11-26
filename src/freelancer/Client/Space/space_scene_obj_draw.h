@@ -83,6 +83,18 @@ bool GetAppearanceOverrideMaterial(unsigned long Index, void** Out);
 // (FUN_0051f8d0, FUN_0051f950), the effects drawn (layer bit 0x100) and the clear colour set.
 void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2);
 
+// The LayerFlags bits SpaceObjDrawPass tests (the in-space frame passes 0xffff).
+enum ESceneLayer
+{
+    kSceneLayerBackground = 0x1,   // the background star sphere
+    kSceneLayerShips = 0x20,       // the ships' gameobj list (with option SHIPS)
+    kSceneLayerSolars = 0x40,      // every large solar
+    kSceneLayerProjectiles = 0x80, // guided, mine and countermeasure lists (with option PROJECTILES)
+    kSceneLayerEffects = 0x100,    // the effects pass
+    kSceneLayerDebris = 0x400,     // the debris list (with option DEBRIS)
+    kSceneLayerLoot = 0x800        // the loot list (with option DEBRIS)
+};
+
 // FUN_00537c30 — rebuild DAT_00678980 light XZ quadtree from gamelit list.
 void LightGridRebuild();
 // FUN_005382f0 (callers: the space teardown and StarSysLeave): the grid root emptied with HalfSize = DAT_006789a0 / 2 (the extent is left as is) and both node pools
@@ -117,6 +129,14 @@ void SpaceSetFarClip(float FarClip);
 // and its radius squared. Read by the particle visibility test FUN_004f86c0.
 void* GetSpaceFieldController();
 int GetSpaceFieldEnclosure();
+
+// The values GetSpaceFieldEnclosure answers (DAT_0067524c).
+enum EFieldEnclosure
+{
+    kFieldEnclosureNone = 0,    // the camera is in no nebula
+    kFieldEnclosurePartial = 1, // the controller's zone is only partly around the camera
+    kFieldEnclosureInside = 2   // fully inside it
+};
 float GetSpaceFieldRadiusSq();
 
 // FUN_0051fbc0 -- the draw queue's teardown: Heap::Shrink on the two ZItem heaps

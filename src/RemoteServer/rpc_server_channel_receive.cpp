@@ -244,13 +244,13 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
 
         switch (Opcode)
         {
-            case 0x01: // FLPACKET_SERVER_CONNECTRESPONSE, RS case 06bd17c8
+            case FlPacketOpcode(FLPACKET_SERVER_CONNECTRESPONSE): // RS case 06bd17c8
             {
                 // The only SERVER call without a client id.
                 Client->OnConnect(static_cast<const FRpcConnectResponsePacket*>(Packet)->Value);
                 break;
             }
-            case 0x02: // FLPACKET_SERVER_LOGINRESPONSE, RS case 06bd17dc
+            case FlPacketOpcode(FLPACKET_SERVER_LOGINRESPONSE): // RS case 06bd17dc
             {
                 // The byte goes through module global 06c138b0.
                 static unsigned char GLoginResponseStatic = 0;
@@ -258,14 +258,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerLoginResponse(1u, GLoginResponseStatic);
                 break;
             }
-            case 0x03: // FLPACKET_SERVER_CHARACTERINFO, RS case 06bd17fc
+            case FlPacketOpcode(FLPACKET_SERVER_CHARACTERINFO): // RS case 06bd17fc
             {
                 // HandleCharacterInfo(packet, GClient, 1); `this` is unused by the member, so
                 // the shared body is called directly.
                 RpcServerHandleCharacterInfo(Packet, Client, 1u);
                 break;
             }
-            case 0x04: // FLPACKET_SERVER_CREATESHIP, RS case 06bd20b5
+            case FlPacketOpcode(FLPACKET_SERVER_CREATESHIP): // RS case 06bd20b5
             {
                 const FRpcServerCreateShipPacket* Typed =
                     static_cast<const FRpcServerCreateShipPacket*>(Packet);
@@ -305,7 +305,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 GCreateShipInfo.clear();
                 break;
             }
-            case 0x05: // FLPACKET_SERVER_DAMAGEOBJECT, RS case 06bd1fc4
+            case FlPacketOpcode(FLPACKET_SERVER_DAMAGEOBJECT): // RS case 06bd1fc4
             {
                 // HandleDamageObject's body inlined, client id literal 1.
                 const FRpcServerDamageObjectPacket* Typed =
@@ -315,7 +315,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerDamageObject(1u, Typed->ObjectId, Local);
                 break;
             }
-            case 0x06: // FLPACKET_SERVER_DESTROYOBJECT, RS case 06bd205a
+            case FlPacketOpcode(FLPACKET_SERVER_DESTROYOBJECT): // RS case 06bd205a
             {
                 // Function-local static (guard bit 1 of 06c138b8). The byte is zero-extended
                 // into the dword.
@@ -328,7 +328,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerDestroyObject(1u, GDestroyObjectStatic);
                 break;
             }
-            case 0x07: // FLPACKET_SERVER_LAUNCH, RS case 06bd1a41
+            case FlPacketOpcode(FLPACKET_SERVER_LAUNCH): // RS case 06bd1a41
             {
                 // Stack struct, every dword copied by integer moves.
                 const FRpcServerLaunchPacket* Typed = static_cast<const FRpcServerLaunchPacket*>(Packet);
@@ -341,7 +341,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerLaunch(1u, Info);
                 break;
             }
-            case 0x08: // FLPACKET_SERVER_CHARSELECTVERIFIED, RS case 06bd1918
+            case FlPacketOpcode(FLPACKET_SERVER_CHARSELECTVERIFIED): // RS case 06bd1918
             {
                 // Stores +0x00, +0x08, +0x0c only; +0x04 stays unwritten as in retail -- the
                 // game reader (005ab380) never reads it.
@@ -354,7 +354,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerCharSelectVerified(1u, Info);
                 break;
             }
-            case 0x0a: // FLPACKET_SERVER_ACTIVATEOBJECT, RS case 06bd249b
+            case FlPacketOpcode(FLPACKET_SERVER_ACTIVATEOBJECT): // RS case 06bd249b
             {
                 // Module globals 06c1389c/06c138a0/06c138a4; only the byte of +0x04 is
                 // written, its three pad bytes stay zero.
@@ -367,7 +367,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerActivateObject(1u, GActivateObjectStatic);
                 break;
             }
-            case 0x0b: // FLPACKET_SERVER_LAND, RS case 06bd246c
+            case FlPacketOpcode(FLPACKET_SERVER_LAND): // RS case 06bd246c
             {
                 const FRpcServerLandPacket* Typed = static_cast<const FRpcServerLandPacket*>(Packet);
                 FServerLandInfo Info;
@@ -377,7 +377,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerLand(1u, Info);
                 break;
             }
-            case 0x0d: // FLPACKET_SERVER_SETSTARTROOM, RS case 06bd1970
+            case FlPacketOpcode(FLPACKET_SERVER_SETSTARTROOM): // RS case 06bd1970
             {
                 const FRpcServerSetStartRoomPacket* Typed =
                     static_cast<const FRpcServerSetStartRoomPacket*>(Packet);
@@ -387,83 +387,83 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
             // GF list cases 0x0e..0x1f: every IClient argument is read straight off the
             // packet, client id literal 1; the packet stays owned by the caller (its
             // destructor frees a blob's Data).
-            case 0x0e: // GFCOMPLETENEWSBROADCASTLIST, RS case 06bd19d6
+            case FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST): // RS case 06bd19d6
                 Client->SendServerGFCompleteNewsBroadcastList(1u,
                     static_cast<FRpcServerGfCompleteNewsBroadcastListPacket*>(Packet)->Value);
                 break;
-            case 0x0f: // GFCOMPLETECHARLIST, RS case 06bd195a
+            case FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETECHARLIST): // RS case 06bd195a
                 Client->SendServerGFCompleteCharList(1u,
                     static_cast<FRpcServerGfCompleteCharListPacket*>(Packet)->Value);
                 break;
-            case 0x10: // GFCOMPLETEMISSIONCOMPUTERLIST, RS case 06bd19a4
+            case FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST): // RS case 06bd19a4
                 Client->SendServerGFCompleteMissionComputerList(1u,
                     static_cast<FRpcServerGfCompleteMissionComputerListPacket*>(Packet)->Value);
                 break;
-            case 0x11: // GFCOMPLETESCRIPTBEHAVIORLIST, RS case 06bd19ef
+            case FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST): // RS case 06bd19ef
                 Client->SendServerGFCompleteScriptBehaviorList(1u,
                     static_cast<FRpcServerGfCompleteScriptBehaviorListPacket*>(Packet)->Value);
                 break;
-            case 0x13: // GFCOMPLETEAMBIENTSCRIPTLIST, RS case 06bd19bd
+            case FlPacketOpcode(FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST): // RS case 06bd19bd
                 Client->SendServerGFCompleteAmbientScriptList(1u,
                     static_cast<FRpcServerGfCompleteAmbientScriptListPacket*>(Packet)->Value);
                 break;
-            case 0x14: // GFDESTROYNEWSBROADCAST, RS case 06bd29e9
+            case FlPacketOpcode(FLPACKET_SERVER_GFDESTROYNEWSBROADCAST): // RS case 06bd29e9
             {
                 const FRpcServerGfDestroyNewsBroadcastPacket* Typed =
                     static_cast<const FRpcServerGfDestroyNewsBroadcastPacket*>(Packet);
                 Client->SendServerGFDestroyNewsBroadcast(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x15: // GFDESTROYCHARACTER, RS case 06bd198a
+            case FlPacketOpcode(FLPACKET_SERVER_GFDESTROYCHARACTER): // RS case 06bd198a
             {
                 const FRpcServerGfDestroyCharacterPacket* Typed =
                     static_cast<const FRpcServerGfDestroyCharacterPacket*>(Packet);
                 Client->SendServerGFDestroyCharacter(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x16: // GFDESTROYMISSIONCOMPUTER, RS case 06bd2ab0
+            case FlPacketOpcode(FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER): // RS case 06bd2ab0
             {
                 const FRpcServerGfDestroyMissionComputerPacket* Typed =
                     static_cast<const FRpcServerGfDestroyMissionComputerPacket*>(Packet);
                 Client->SendServerGFDestroyMissionComputer(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x17: // GFDESTROYSCRIPTBEHAVIOR, RS case 06bd2a76
+            case FlPacketOpcode(FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR): // RS case 06bd2a76
             {
                 const FRpcServerGfDestroyScriptBehaviorPacket* Typed =
                     static_cast<const FRpcServerGfDestroyScriptBehaviorPacket*>(Packet);
                 Client->SendServerGFDestroyScriptBehavior(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x19: // GFDESTROYAMBIENTSCRIPT, RS case 06bd2a23
+            case FlPacketOpcode(FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT): // RS case 06bd2a23
             {
                 const FRpcServerGfDestroyAmbientScriptPacket* Typed =
                     static_cast<const FRpcServerGfDestroyAmbientScriptPacket*>(Packet);
                 Client->SendServerGFDestroyAmbientScript(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x1a: // GFSCRIPTBEHAVIOR, RS case 06bd2a59: (1, Data +0x24, Size +0x20)
+            case FlPacketOpcode(FLPACKET_SERVER_GFSCRIPTBEHAVIOR): // RS case 06bd2a59: (1, Data +0x24, Size +0x20)
             {
                 const FRpcServerGfScriptBehaviorPacket* Typed =
                     static_cast<const FRpcServerGfScriptBehaviorPacket*>(Packet);
                 Client->SendServerGFScriptBehavior(1u, Typed->Data, Typed->Size);
                 break;
             }
-            case 0x1d: // GFUPDATEMISSIONCOMPUTER, RS case 06bd2a93: (1, Data +0x24, Size +0x20)
+            case FlPacketOpcode(FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER): // RS case 06bd2a93: (1, Data +0x24, Size +0x20)
             {
                 const FRpcServerGfUpdateMissionComputerPacket* Typed =
                     static_cast<const FRpcServerGfUpdateMissionComputerPacket*>(Packet);
                 Client->SendServerGFUpdateMissionComputer(1u, Typed->Data, Typed->Size);
                 break;
             }
-            case 0x1e: // GFUPDATENEWSBROADCAST, RS case 06bd29cc: (1, Data +0x24, Size +0x20)
+            case FlPacketOpcode(FLPACKET_SERVER_GFUPDATENEWSBROADCAST): // RS case 06bd29cc: (1, Data +0x24, Size +0x20)
             {
                 const FRpcServerGfUpdateNewsBroadcastPacket* Typed =
                     static_cast<const FRpcServerGfUpdateNewsBroadcastPacket*>(Packet);
                 Client->SendServerGFUpdateNewsBroadcast(1u, Typed->Data, Typed->Size);
                 break;
             }
-            case 0x1f: // GFUPDATEAMBIENTSCRIPT, RS case 06bd2a06: (1, Data +0x20, Size +0x24)
+            case FlPacketOpcode(FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT): // RS case 06bd2a06: (1, Data +0x20, Size +0x24)
             {
                 const FRpcServerGfUpdateAmbientScriptPacket* Typed =
                     static_cast<const FRpcServerGfUpdateAmbientScriptPacket*>(Packet);
@@ -471,14 +471,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 break;
             }
             // ===== SERVER 0x20..0x3f =====
-            case 0x20: // GFMISSIONVENDORACCEPTANCE, RS case 06bd2acd: (1, Data +0x24, Size +0x20)
+            case FlPacketOpcode(FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE): // RS case 06bd2acd: (1, Data +0x24, Size +0x20)
             {
                 const FRpcServerGfMissionVendorAcceptancePacket* Typed =
                     static_cast<const FRpcServerGfMissionVendorAcceptancePacket*>(Packet);
                 Client->SendServerGFMissionVendorAcceptance(1u, Typed->Data, Typed->Size);
                 break;
             }
-            case 0x21: // FLPACKET_SERVER_SYSTEM_SWITCH_OUT, RS 06bd2441
+            case FlPacketOpcode(FLPACKET_SERVER_SYSTEM_SWITCH_OUT): // RS 06bd2441
             {
                 // Retail copies both dwords into a module global (06c137d4 / 06c137d8)
                 // and passes its address; a static FServerSystemSwitchOutInfo (two dwords)
@@ -491,7 +491,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSystemSwitchOut(1u, GSystemSwitchOut);
                 break;
             }
-            case 0x22: // FLPACKET_SERVER_SYSTEM_SWITCH_IN, RS 06bd23b6
+            case FlPacketOpcode(FLPACKET_SERVER_SYSTEM_SWITCH_IN): // RS 06bd23b6
             {
                 // Function-local static 06c138c8 (guard bit 4 of 06c138b8): nine dwords copied
                 // by integer moves.
@@ -507,12 +507,12 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSystemSwitchIn(1u, GSystemSwitchInStatic);
                 break;
             }
-            case 0x23: // FLPACKET_SERVER_SETSHIPARCH, RS 06bd1944
+            case FlPacketOpcode(FLPACKET_SERVER_SETSHIPARCH): // RS 06bd1944
             {
                 Client->SendServerSetShipArch(1u, static_cast<const FRpcSetShipArchPacket*>(Packet)->Value);
                 break;
             }
-            case 0x24: // FLPACKET_SERVER_SETEQUIPMENT, RS 06bd18ae
+            case FlPacketOpcode(FLPACKET_SERVER_SETEQUIPMENT): // RS 06bd18ae
             {
                 // The vector is built first, the handle second (destroyed first, 06bdc790).
                 EquipDescVector Vector;
@@ -522,7 +522,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetEquipment(1u, Vector);
                 break;
             }
-            case 0x25: // FLPACKET_SERVER_SETCARGO, RS 06bd180f
+            case FlPacketOpcode(FLPACKET_SERVER_SETCARGO): // RS 06bd180f
             {
                 EquipDescVector Vector;
                 FRpcServerEquipHandle Handle;
@@ -531,14 +531,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetCargo(1u, Vector);
                 break;
             }
-            case 0x26: // GFUPDATECHAR, RS case 06bd29b2: (1, Data +0x24, Size +0x20)
+            case FlPacketOpcode(FLPACKET_SERVER_GFUPDATECHAR): // RS case 06bd29b2: (1, Data +0x24, Size +0x20)
             {
                 const FRpcServerGfUpdateCharPacket* Typed =
                     static_cast<const FRpcServerGfUpdateCharPacket*>(Packet);
                 Client->SendServerGFUpdateChar(1u, Typed->Data, Typed->Size);
                 break;
             }
-            case 0x27: // FLPACKET_SERVER_REQUESTCREATESHIPRESP, RS 06bd1aa1
+            case FlPacketOpcode(FLPACKET_SERVER_REQUESTCREATESHIPRESP): // RS 06bd1aa1
             {
                 const FRpcServerRequestCreateShipRespPacket* Typed =
                     static_cast<const FRpcServerRequestCreateShipRespPacket*>(Packet);
@@ -547,7 +547,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerRequestCreateShipResp(1u, Typed->bSuccess != 0, Typed->ShipId);
                 break;
             }
-            case 0x28: // FLPACKET_SERVER_CREATELOOT, RS 06bd12b8
+            case FlPacketOpcode(FLPACKET_SERVER_CREATELOOT): // RS 06bd12b8
             {
                 // An empty list sends nothing. Count = the low byte of the list size; the
                 // new(Count * 0x48) array is not null-tested (a failed allocation is written
@@ -613,7 +613,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 ::operator delete(Items);
                 break;
             }
-            case 0x29: // FLPACKET_SERVER_SETREPUTATION, RS 06bd14bf
+            case FlPacketOpcode(FLPACKET_SERVER_SETREPUTATION): // RS 06bd14bf
             {
                 // VibeHandle = +0x58, Affiliation = +0x5c, Attitude = +0x30 (integer moves);
                 // the packet's relations are deep-copied into a stack list (06bddef0) and
@@ -655,7 +655,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 break;
             }
-            case 0x2a: // FLPACKET_SERVER_ADJUSTATTITUDE, RS 06bd1407
+            case FlPacketOpcode(FLPACKET_SERVER_ADJUSTATTITUDE): // RS 06bd1407
             {
                 // The float moves through x87.
                 const FRpcServerAdjustAttitudePacket* Typed =
@@ -666,7 +666,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerAdjustAttitude(1u, Local);
                 break;
             }
-            case 0x2b: // FLPACKET_SERVER_SETGROUPFEELINGS, RS 06bd16ab
+            case FlPacketOpcode(FLPACKET_SERVER_SETGROUPFEELINGS): // RS 06bd16ab
             {
                 // strncpy of the name with no bound to the 0x10-byte field (reproduced on
                 // purpose); relations deep-copied (06bdd430) and flattened as in 0x29
@@ -691,7 +691,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetGroupFeelings(1u, Info);
                 break;
             }
-            case 0x2c: // FLPACKET_SERVER_CREATEMINE, RS 06bd1bb1
+            case FlPacketOpcode(FLPACKET_SERVER_CREATEMINE): // RS 06bd1bb1
             {
                 // Integer moves: info +0x00..+0x08 = +0x20..+0x28, word +0x0c = +0x2c,
                 // Position = +0x40, Orientation = +0x30, Velocity = +0x4c, +0x38 = +0x58,
@@ -713,7 +713,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerCreateMine(1u, Info);
                 break;
             }
-            case 0x2d: // FLPACKET_SERVER_CREATECOUNTER, RS 06bd1dd9
+            case FlPacketOpcode(FLPACKET_SERVER_CREATECOUNTER): // RS 06bd1dd9
             {
                 // Integer moves. Pad0e (+0x0e..+0x0f) stays unwritten as in retail; the game
                 // reader (0053cd70) never reads it. Client id 1 goes BY REFERENCE.
@@ -733,7 +733,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerCreateCounter(One, Info);
                 break;
             }
-            case 0x2e: // FLPACKET_SERVER_SETADDITEM, RS 06bd1add
+            case FlPacketOpcode(FLPACKET_SERVER_SETADDITEM): // RS 06bd1add
             {
                 // Setters in native order. The Mission byte is a raw move into EquipDesc
                 // +0x18, not a bool test.
@@ -756,7 +756,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetAddItem(1u, static_cast<int>(Typed->AddResult), Desc);
                 break;
             }
-            case 0x2f: // FLPACKET_SERVER_SETREMOVEITEM, RS 06bd1b90
+            case FlPacketOpcode(FLPACKET_SERVER_SETREMOVEITEM): // RS 06bd1b90
             {
                 const FRpcServerSetRemoveItemPacket* Typed =
                     static_cast<const FRpcServerSetRemoveItemPacket*>(Packet);
@@ -764,7 +764,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<unsigned short>(Typed->Field_0x00), static_cast<int>(Typed->Field_0x04));
                 break;
             }
-            case 0x30: // FLPACKET_SERVER_SETCASH, RS 06bd1f9a
+            case FlPacketOpcode(FLPACKET_SERVER_SETCASH): // RS 06bd1f9a
             {
                 // The client id goes BY REFERENCE.
                 unsigned int One = 1u;
@@ -772,7 +772,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<int>(static_cast<const FRpcServerSetCashPacket*>(Packet)->Value));
                 break;
             }
-            case 0x31: // FLPACKET_SERVER_EXPLODEASTEROIDMINE, RS 06bd1c5d
+            case FlPacketOpcode(FLPACKET_SERVER_EXPLODEASTEROIDMINE): // RS 06bd1c5d
             {
                 // Integer moves.
                 const FRpcServerExplodeAsteroidMinePacket* Typed =
@@ -785,7 +785,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerExplodeAsteroidMine(1u, Info);
                 break;
             }
-            case 0x32: // FLPACKET_SERVER_REQUESTSPACESCRIPT, RS 06bd1d6d
+            case FlPacketOpcode(FLPACKET_SERVER_REQUESTSPACESCRIPT): // RS 06bd1d6d
             {
                 // +0x000 = [+0x20], +0x108..+0x110 = [+0x28..+0x30], +0x114 = ([+0x34] == 0) + 1.
                 // The rest of the name buffer, and all of it when Name is null, stays unwritten
@@ -800,7 +800,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Info.PosXBits = Typed->Position[0];
                 Info.PosYBits = Typed->Position[1];
                 Info.PosZBits = Typed->Position[2];
-                Info.CameraMode = (Typed->Mode == 0) ? 2u : 1u;
+                Info.CameraMode = (Typed->Mode == 0) ? kRequestSpaceScriptCameraIdentity : kRequestSpaceScriptCameraKeepTransform;
                 if (Typed->Name != nullptr) {
                     unsigned int i = 0;
                     do {
@@ -810,7 +810,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerRequestSpaceScript(1u, Info);
                 break;
             }
-            case 0x33: // FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE, RS 06bd24cf
+            case FlPacketOpcode(FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE): // RS 06bd24cf
             {
                 // {dword +0x20, byte of +0x24, word +0x28 zero-extended}. Deviation: retail
                 // leaves bytes +5..+7 uninitialised; the port zeroes them. Client id 1 BY
@@ -828,7 +828,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetMissionObjectiveState(One, Info);
                 break;
             }
-            case 0x34: // FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE, RS 06bd2584
+            case FlPacketOpcode(FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE): // RS 06bd2584
             {
                 // +0x00 = [+0x20], FmtStr at +0x04, byte +0x20 = [+0x24]; client id 1 BY
                 // REFERENCE. Deviation: retail leaves +0x1c and the pad bytes uninitialised;
@@ -847,7 +847,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerReplaceMissionObjective(One, Info);
                 break;
             }
-            case 0x35: // FLPACKET_SERVER_SETMISSIONOBJECTIVES, RS 06bd27b9
+            case FlPacketOpcode(FLPACKET_SERVER_SETMISSIONOBJECTIVES): // RS 06bd27b9
             {
                 // Count = [+0x38], byte +0x3c = [+0x24]. Entries are 0x1c bytes; the packet's
                 // i-th record (06bdac30) is used with no null test. Deviation: retail leaves
@@ -879,7 +879,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 break;
             }
-            case 0x37: // FLPACKET_SERVER_CREATEGUIDED, RS 06bd1e96
+            case FlPacketOpcode(FLPACKET_SERVER_CREATEGUIDED): // RS 06bd1e96
             {
                 // Integer moves. Pad26/Pad36 stay unwritten as in retail; the game reader
                 // (0053d080) never reads them. OwnerPlayer comes from packet +0x20, which never
@@ -900,7 +900,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerCreateGuided(One, Info);
                 break;
             }
-            case 0x38: // FLPACKET_SERVER_ITEMTRACTORED, RS 06bd1f2d
+            case FlPacketOpcode(FLPACKET_SERVER_ITEMTRACTORED): // RS 06bd1f2d
             {
                 const FRpcServerItemTractoredPacket* Typed =
                     static_cast<const FRpcServerItemTractoredPacket*>(Packet);
@@ -912,13 +912,13 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerItemTractored(1u, Info);
                 break;
             }
-            case 0x39: // FLPACKET_SERVER_SCANNOTIFY, RS 06bd1ac0
+            case FlPacketOpcode(FLPACKET_SERVER_SCANNOTIFY): // RS 06bd1ac0
             {
                 const FRpcServerScanNotifyPacket* Typed = static_cast<const FRpcServerScanNotifyPacket*>(Packet);
                 Client->SendServerScanNotify(1u, Typed->Field_0x00, Typed->Field_0x04);
                 break;
             }
-            case 0x3c: // FLPACKET_SERVER_REPAIROBJECT, RS 06bd2c45
+            case FlPacketOpcode(FLPACKET_SERVER_REPAIROBJECT): // RS 06bd2c45
             {
                 // {dword +0x20, word of +0x24, dword +0x28}. Deviation: retail leaves the pad
                 // word at +0x06 uninitialised; the port zeroes it.
@@ -932,7 +932,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerRepairObject(1u, Info);
                 break;
             }
-            case 0x3d: // FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE, RS 06bd2b04
+            case FlPacketOpcode(FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE): // RS 06bd2b04
             {
                 // 06bdaa80 extracts, 06bd5130 converts; client id 1 BY REFERENCE, ObjectId
                 // +0x28, Flag byte +0x24.
@@ -946,14 +946,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerRemoteObjectCargoUpdate(One, Typed->ObjectId, Vector, Typed->Flag);
                 break;
             }
-            case 0x3e: // FLPACKET_SERVER_SETNUMKILLS, RS 06bd2c76
+            case FlPacketOpcode(FLPACKET_SERVER_SETNUMKILLS): // RS 06bd2c76
             {
                 unsigned int One = 1u; // passed by reference
                 Client->SendServerSetNumKills(One,
                     static_cast<int>(static_cast<const FRpcServerSetNumKillsPacket*>(Packet)->Value));
                 break;
             }
-            case 0x3f: // FLPACKET_SERVER_SETMISSIONSUCCESSES, RS 06bd2ca0
+            case FlPacketOpcode(FLPACKET_SERVER_SETMISSIONSUCCESSES): // RS 06bd2ca0
             {
                 unsigned int One = 1u; // passed by reference
                 Client->SendServerSetMissionSuccesses(One,
@@ -964,14 +964,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
             // ===== SERVER 0x40..0x5b =====
             // Cases of HandlePacket 06bd1260 (switch 06bd12b1). Where retail passes &one, the 1
             // is a stack local written right before the call.
-            case 0x40: // SETMISSIONFAILURES, caseD_40 06bd2cca
+            case FlPacketOpcode(FLPACKET_SERVER_SETMISSIONFAILURES): // caseD_40 06bd2cca
             {
                 unsigned int One = 1u;
                 Client->SendServerSetMissionFailures(One,
                     static_cast<int>(static_cast<FRpcServerSetMissionFailuresPacket*>(Packet)->Value));
                 break;
             }
-            case 0x41: // BURNFUSE, caseD_41 06bd2cf4: integer copies into a stack record
+            case FlPacketOpcode(FLPACKET_SERVER_BURNFUSE): // caseD_41 06bd2cf4: integer copies into a stack record
             {
                 const FRpcServerBurnFusePacket* Typed = static_cast<FRpcServerBurnFusePacket*>(Packet);
                 FServerBurnFuseInfo Info = {};
@@ -986,7 +986,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerBurnFuse(One, Info);
                 break;
             }
-            case 0x42: // CREATESOLAR, caseD_42 06bd2d52
+            case FlPacketOpcode(FLPACKET_SERVER_CREATESOLAR): // caseD_42 06bd2d52
             {
                 // A function-local static CSolarCreateInfo (guard bit 8 of 06c138b8, atexit
                 // destructor 06bd4370) filled by the block reader 06bd52a0. Outside single
@@ -1011,14 +1011,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Static.CEqObjCreateInfo::clear();
                 break;
             }
-            case 0x43: // SET_STORY_CUE, caseD_43 06bd2631: the cue id by address
+            case FlPacketOpcode(FLPACKET_SERVER_SET_STORY_CUE): // caseD_43 06bd2631: the cue id by address
             {
                 unsigned int CueId = static_cast<FRpcServerSetStoryCuePacket*>(Packet)->Value;
                 unsigned int One = 1u;
                 Client->SendServerSetStoryCue(One, CueId);
                 break;
             }
-            case 0x44: // REQUEST_RETURNED, caseD_44 06bd1a08: +0x24 zero-, +0x25/+0x26 sign-extended
+            case FlPacketOpcode(FLPACKET_SERVER_REQUEST_RETURNED): // caseD_44 06bd1a08: +0x24 zero-, +0x25/+0x26 sign-extended
             {
                 const FRpcServerRequestReturnedPacket* Typed =
                     static_cast<FRpcServerRequestReturnedPacket*>(Packet);
@@ -1029,7 +1029,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<int>(static_cast<signed char>(Typed->DockPort)));
                 break;
             }
-            case 0x45: // SET_MISSION_MESSAGE, caseD_45 06bd2713
+            case FlPacketOpcode(FLPACKET_SERVER_SET_MISSION_MESSAGE): // caseD_45 06bd2713
             {
                 FRpcServerSetMissionMessagePacket* Typed = static_cast<FRpcServerSetMissionMessagePacket*>(Packet);
                 CSetMissionMessage Info;
@@ -1039,14 +1039,14 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetMissionMessage(One, Info);
                 break;
             }
-            case 0x46: // MARKOBJ, caseD_46 06bd2510: the mark byte zero-extended
+            case FlPacketOpcode(FLPACKET_SERVER_MARKOBJ): // caseD_46 06bd2510: the mark byte zero-extended
             {
                 const FRpcServerMarkObjPacket* Typed = static_cast<FRpcServerMarkObjPacket*>(Packet);
                 unsigned int One = 1u;
                 Client->SendServerMarkObj(One, Typed->ObjectId, static_cast<int>(Typed->MarkType));
                 break;
             }
-            case 0x47: // CFGINTERFACENOTIFICATION, caseD_47 06bd253f: the byte normalized to 0/1
+            case FlPacketOpcode(FLPACKET_SERVER_CFGINTERFACENOTIFICATION): // caseD_47 06bd253f: the byte normalized to 0/1
             {
                 const FRpcServerCfgInterfaceNotificationPacket* Typed =
                     static_cast<FRpcServerCfgInterfaceNotificationPacket*>(Packet);
@@ -1058,7 +1058,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerCfgInterfaceNotification(One, Info);
                 break;
             }
-                        case 0x48:
+                        case FlPacketOpcode(FLPACKET_SERVER_SETCOLLISIONGROUPS):
             {
                 // SETCOLLISIONGROUPS, caseD_48 06bd3102: the packet's own list (+0x20), no copy.
                 FRpcServerSetCollisionGroupsPacket* Typed =
@@ -1066,7 +1066,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetCollisionGroups(1u, Typed->Groups);
                 break;
             }
-            case 0x49: // SETHULLSTATUS: the float's dword pushed as is
+            case FlPacketOpcode(FLPACKET_SERVER_SETHULLSTATUS): // the float's dword pushed as is
             {
                 // Bit copy, not an x87 load: retail pushes the packet's dword unchanged.
                 float HullStatus;
@@ -1074,7 +1074,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetHullStatus(1u, HullStatus);
                 break;
             }
-            case 0x4a: // SETGUIDEDTARGET, caseD_4a 06bd313e: the word zero-extended
+            case FlPacketOpcode(FLPACKET_SERVER_SETGUIDEDTARGET): // caseD_4a 06bd313e: the word zero-extended
             {
                 const FRpcServerSetGuidedTargetPacket* Typed =
                     static_cast<FRpcServerSetGuidedTargetPacket*>(Packet);
@@ -1082,7 +1082,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     Typed->TargetSubObjId);
                 break;
             }
-            case 0x4b: // SET_CAMERA, caseD_4b 06bd2663: the quaternion through x87
+            case FlPacketOpcode(FLPACKET_SERVER_SET_CAMERA): // caseD_4b 06bd2663: the quaternion through x87
             {
                 const FRpcServerSetCameraPacket* Typed = static_cast<FRpcServerSetCameraPacket*>(Packet);
                 FPayloadServerSetCamera Info;
@@ -1099,20 +1099,20 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetCamera(One, Info);
                 break;
             }
-            case 0x4c: // REVERT_CAMERA, caseD_4c 06bd26f3
+            case FlPacketOpcode(FLPACKET_SERVER_REVERT_CAMERA): // caseD_4c 06bd26f3
             {
                 unsigned int One = 1u;
                 Client->SendServerRevertCamera(One);
                 break;
             }
-            case 0x4d: // LOADHINT, caseD_4d 06bd1c93
+            case FlPacketOpcode(FLPACKET_SERVER_LOADHINT): // caseD_4d 06bd1c93
             {
                 // Only Kind 1 builds a hint: new(0x3c), COMMON's CostumeHint ctor and this
                 // module's vftable 06c0b790 (FRpcLocalCostumeHint), then UnSerialize with no
                 // null test (reproduced on purpose).
                 FRpcServerLoadHintPacket* Typed = static_cast<FRpcServerLoadHintPacket*>(Packet);
                 CostumeHint* Hint = nullptr;
-                if (Typed->Kind == 1) {
+                if (Typed->Kind == kLoadHintKindCostume) {
                     Hint = new (std::nothrow) FRpcLocalCostumeHint;
                     Hint->UnSerialize(Typed->Data, Typed->Size);
                 }
@@ -1125,7 +1125,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 break;
             }
-            case 0x4e: // SETDIRECTIVE, caseD_4e 06bd1d2b
+            case FlPacketOpcode(FLPACKET_SERVER_SETDIRECTIVE): // caseD_4e 06bd1d2b
             {
                 // Retail seeds the local (06bd4230) and then wholly overwrites it with 0x25
                 // dwords from packet +0x20, padding included; the seeding is not observable and
@@ -1137,7 +1137,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerSetDirective(One, Info);
                 break;
             }
-            case 0x4f: // SENDCOMM, caseD_4f 06bd315c
+            case FlPacketOpcode(FLPACKET_SERVER_SENDCOMM): // caseD_4f 06bd315c
             {
                 // The costume goes through a stack copy (accessor 06bd4300); the other values
                 // come from accessors 06bd42d0..06bd4350 (the count sign-extended); the float
@@ -1152,7 +1152,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<int>(Typed->TextCount), Typed->PermutationIds, Level, false);
                 break;
             }
-            case 0x51: // USE_ITEM, caseD_51 06bd1f67: a stack FPayloadServerUseItem
+            case FlPacketOpcode(FLPACKET_SERVER_USE_ITEM): // caseD_51 06bd1f67: a stack FPayloadServerUseItem
             {
                 const FRpcServerUseItemPacket* Typed = static_cast<FRpcServerUseItemPacket*>(Packet);
                 FPayloadServerUseItem Info;
@@ -1162,7 +1162,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerUseItem(1u, Info);
                 break;
             }
-                        case 0x52:
+                        case FlPacketOpcode(FLPACKET_SERVER_PLAYERLIST):
             {
                 // PLAYERLIST, caseD_52 06bd31f2: any other Kind does nothing.
                 const FRpcServerPlayerListPacket* Typed =
@@ -1182,7 +1182,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 break;
             }
-            case 0x53: // FORMATION_UPDATE, caseD_53 06bd142f: Offset through x87
+            case FlPacketOpcode(FLPACKET_SERVER_FORMATION_UPDATE): // caseD_53 06bd142f: Offset through x87
             {
                 const FRpcServerFormationUpdatePacket* Typed =
                     static_cast<FRpcServerFormationUpdatePacket*>(Packet);
@@ -1193,41 +1193,41 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerFormationUpdate(1u, Typed->LeaderId, Local);
                 break;
             }
-            case 0x54: // MISCOBJUPDATE, caseD_54 06bd325d
+            case FlPacketOpcode(FLPACKET_SERVER_MISCOBJUPDATE): // caseD_54 06bd325d
             {
                 // Flags is re-read from the packet for every test except the 0x01 / 0x04 pair,
                 // which tests one snapshot. The text and the vector go by address into the
                 // packet; the word +0x2c zero-extended.
                 FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-                if ((Typed->Flags & 0x20u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagAffiliation) != 0) {
                     Client->SendServerMiscObjUpdateAffiliation(1u, Typed->ObjectId, Typed->Affiliation);
                 }
                 const unsigned short Snapshot = Typed->Flags;
-                if ((Snapshot & 0x01u) != 0) {
-                    if ((Snapshot & 0x04u) != 0) {
+                if ((Snapshot & kMiscObjUpdateFlagGroupId) != 0) {
+                    if ((Snapshot & kMiscObjUpdateFlagPlayerId) != 0) {
                         Client->SendServerMiscObjUpdatePlayerGroup(1u, Typed->PlayerId, Typed->GroupId);
                     } else {
                         Client->SendServerMiscObjUpdateObjectGroup(1u, Typed->ObjectId, Typed->GroupId);
                     }
                 }
-                if ((Typed->Flags & 0x02u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagMission) != 0) {
                     Client->SendServerMiscObjUpdateMission(1u, Typed->MissionId, Typed->MissionSetBy);
                 }
-                if ((Typed->Flags & 0x10u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagText) != 0) {
                     Client->SendServerMiscObjUpdateMotd(1u, Typed->Text);
                 }
-                if ((Typed->Flags & 0x40u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagRank) != 0) {
                     Client->SendServerMiscObjUpdateRank(1u, Typed->PlayerId, static_cast<int>(Typed->Rank));
                 }
-                if ((Typed->Flags & 0x80u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagSystemId) != 0) {
                     Client->SendServerMiscObjUpdateSystem(1u, Typed->PlayerId, Typed->SystemId);
                 }
-                if ((Typed->Flags & 0x100u) != 0) {
+                if ((Typed->Flags & kMiscObjUpdateFlagIds) != 0) {
                     Client->SendServerMiscObjUpdateFormation(1u, Typed->Ids);
                 }
                 break;
             }
-            case 0x55: // OBJECTCARGOUPDATE, caseD_55 06bd2bad: Common EquipDesc setters
+            case FlPacketOpcode(FLPACKET_SERVER_OBJECTCARGOUPDATE): // caseD_55 06bd2bad: Common EquipDesc setters
             {
                 const FRpcServerObjectCargoUpdatePacket* Typed =
                     static_cast<FRpcServerObjectCargoUpdatePacket*>(Packet);
@@ -1243,12 +1243,12 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerObjectCargoUpdate(One, Typed->ObjectId, Desc);
                 break;
             }
-            case 0x56: // SENDNNMESSAGE
+            case FlPacketOpcode(FLPACKET_SERVER_SENDNNMESSAGE):
             {
                 Client->SendServerSendNNMessage(1u, static_cast<FRpcServerSendNNMessagePacket*>(Packet)->Value);
                 break;
             }
-            case 0x57: // SET_MUSIC, caseD_57 06bd1462
+            case FlPacketOpcode(FLPACKET_SERVER_SET_MUSIC): // caseD_57 06bd1462
             {
                 const FRpcServerSetMusicPacket* Typed = static_cast<FRpcServerSetMusicPacket*>(Packet);
                 // Bit copy, not an x87 load: retail pushes the packet's dword unchanged.
@@ -1260,23 +1260,23 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     Typed->OverrideMusic, Typed->bNoLoop != 0, Fade);
                 break;
             }
-            case 0x58: // CANCEL_MUSIC
+            case FlPacketOpcode(FLPACKET_SERVER_CANCEL_MUSIC):
             {
                 Client->SendServerCancelMusic(1u);
                 break;
             }
-            case 0x59: // PLAY_SOUND_EFFECT
+            case FlPacketOpcode(FLPACKET_SERVER_PLAY_SOUND_EFFECT):
             {
                 Client->SendServerPlaySoundEffect(1u, static_cast<FRpcServerPlaySoundEffectPacket*>(Packet)->Value);
                 break;
             }
-            case 0x5a: // GFMISSIONVENDORWHYEMPTY, caseD_5a 06bd2aea: the byte zero-extended
+            case FlPacketOpcode(FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY): // caseD_5a 06bd2aea: the byte zero-extended
             {
                 Client->SendServerGFMissionVendorWhyEmpty(1u, static_cast<unsigned int>(
                     static_cast<FRpcServerGfMissionVendorWhyEmptyPacket*>(Packet)->Value));
                 break;
             }
-            case 0x5b: // MISSIONSAVEA, caseD_5b 06bd2a40
+            case FlPacketOpcode(FLPACKET_SERVER_MISSIONSAVEA): // caseD_5b 06bd2a40
             {
                 Client->SendServerMissionSaveA(1u, static_cast<FRpcServerMissionSaveAPacket*>(Packet)->Value);
                 break;

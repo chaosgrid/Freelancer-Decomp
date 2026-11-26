@@ -27,7 +27,7 @@ CounterMeasure::CounterMeasure()
 // LAB_06ce61f0.
 unsigned int CounterMeasure::get_type_bits() const
 {
-    return 0x8000000u;
+    return OBJ_COUNTERMEASURE;
 }
 
 CCounterMeasure* CounterMeasure::ccountermeasure() const
@@ -77,7 +77,7 @@ bool CounterMeasure::update(float Dt)
 
     // A spent lifetime (below zero, or unordered on x87) destroys it quietly.
     if (!(Cm->Lifetime >= 0.0f))
-        destroy(0, 0);
+        destroy(DESTROY_VANISH, 0);
 
     return !is_destroyed();
 }
@@ -131,7 +131,7 @@ bool CounterMeasure::destroy(int Kind, unsigned int ObjId)
 
     // Only a real kill blows up, and only with an explosion that has a radius and some
     // effect above 0.0001 (DAT_06d65190).
-    if (Kind == 1)
+    if (Kind == DESTROY_FUSE)
     {
         if (!Object->get_archetype()->ExplosionArch.IsEmpty())
         {
@@ -148,7 +148,7 @@ bool CounterMeasure::destroy(int Kind, unsigned int ObjId)
                 ExplosionDamageEvent Blast;
                 Blast.ExplodingObjId = get_id();
                 Blast.InflictorId = static_cast<CProjectile*>(Object)->OwnerId;
-                Blast.Cause = static_cast<DamageCause>(4);
+                Blast.Cause = DamageCause::Explosion;
                 Blast.Position = get_position();
                 Blast.Explosion = Explosion;
                 Blast.SkipCollisionGroup = nullptr;

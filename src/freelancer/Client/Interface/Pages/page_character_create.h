@@ -38,6 +38,13 @@ class UiTextMsgButton;
 class UiWinDeform;
 class UiWinObject;
 
+// The button commands PageCharacterCreate::ProcessMessage receives with kWinMsgCommand.
+enum ECharacterCreateCommand
+{
+    kCharCreateCmdBack = 0x300c,
+    kCharCreateCmdSelectShip = 0x300d
+};
+
 class PageCharacterCreate : public UIPage::MasterWin
 {
 public:

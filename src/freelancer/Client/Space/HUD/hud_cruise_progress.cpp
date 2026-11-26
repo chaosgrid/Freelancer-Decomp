@@ -35,7 +35,7 @@ HUD_CruiseProgress::HUD_CruiseProgress(INI_Reader& /*Reader*/)
     HUDItem::Name = "HUD_CruiseProgress";
     HUD_CruiseProgress::Create(nullptr, nullptr);
     Win3D::SetName("HUD_CruiseProgress");
-    Flags = static_cast<unsigned char>(Flags & 0xfe);
+    Flags = static_cast<unsigned char>(Flags & ~kWin3DActive);
     ClassName = "HUD_CruiseProgress";
     bCharging = 0;
 }

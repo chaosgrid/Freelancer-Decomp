@@ -15,6 +15,8 @@
 
 // FleeBehavior; see common_fleebehavior.h.
 
+using pub::AI::ContentCallback;
+
 // FUN_062ecaf0 is FFormationLeaderState::GetCurrentLeader: the follow / formation leader
 // watched at SystemManager+0x1364, or 0.
 namespace
@@ -37,11 +39,11 @@ float FleeHostileRatioThreshold(int Level)
 {
     switch (Level)
     {
-    case 0: return 0.15f;
-    case 1: return 0.35f;
-    case 2: return 0.65f;
-    case 3: return 0.85f;
-    case 4: return 1.0f;
+    case pub::AI::Personality::ToughnessEasiest: return 0.15f;
+    case pub::AI::Personality::ToughnessEasy: return 0.35f;
+    case pub::AI::Personality::ToughnessEqual: return 0.65f;
+    case pub::AI::Personality::ToughnessHard: return 0.85f;
+    case pub::AI::Personality::ToughnessHardest: return 1.0f;
     default: return 0.5f;
     }
 }
@@ -54,8 +56,8 @@ FleeBehavior::FleeBehavior(int InTypeId)
     : Behavior(InTypeId)
     , bFleeActive(0)
     , Pad2d{}
-    , FleeReason(4)
-    , FleeDestType(0)
+    , FleeReason(ContentCallback::FleeReasonOther)
+    , FleeDestType(ContentCallback::FleeDestNone)
     , bFollowFleeingTarget(0)
     , Pad39{}
     , GotoDelegate(nullptr)
@@ -106,11 +108,11 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         {
             // GetBehaviorManager(obj)->CurrentBehaviorIndex == 4: the target is fleeing.
             IBehaviorManager* const TargetMgr = GetBehaviorManager(Watched);
-            if (TargetMgr->CurrentBehaviorIndex == 4)
+            if (TargetMgr->CurrentBehaviorIndex == BEHAVIOR_FLEE)
             {
                 bFollowFleeingTarget = 1;
                 bFleeActive = 1;
-                FleeReason = 1;
+                FleeReason = ContentCallback::FleeReasonLeaderFleeing;
             }
         }
     }
@@ -157,7 +159,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         if (Ratio < static_cast<double>(Job.FleeWhenHullDamagedPercent))
         {
             bFlee = true;
-            FleeReason = 2;
+            FleeReason = ContentCallback::FleeReasonDamaged;
         }
     }
 
@@ -166,13 +168,13 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         static_cast<double>(FleeHostileRatioThreshold(Job.FleeSceneThreatStyle)))   // Sys+0x1948
     {
         bFlee = true;
-        FleeReason = 0;
+        FleeReason = ContentCallback::FleeReasonTough;
     }
 
     // With bFleeNoWeaponsStyle (Sys+0x1951), no ready weapon (FUN_062eb910) forces the flee.
     if (Job.bFleeNoWeaponsStyle != 0 && !Sys->GunGroups.HasReadyWeaponSlot())
     {
-        FleeReason = 3;
+        FleeReason = ContentCallback::FleeReasonNoWeapons;
         Result = 0;
     }
     else if (bFlee)
@@ -202,18 +204,18 @@ int FleeBehavior::Perform()
         bFleeActive = 1;
 
         // Retail seeds only Radius (500.0f); the other out-params are uninitialised stack.
-        pub::AI::ContentCallback::FleeDestinationType Type =
-            static_cast<pub::AI::ContentCallback::FleeDestinationType>(0);
+        ContentCallback::FleeDestinationType Type =
+            ContentCallback::FleeDestNone;
         Vector Destination = { 0.0f, 0.0f, 0.0f };
         uint DestinationId = 0;
         float Radius = 500.0f;
         uint const OwnerId = Sys->SelfTarget.Iface->get_id();
         if (!BehaviorMgr->RequestFleeDestination(
-                OwnerId, static_cast<pub::AI::ContentCallback::FleeReason>(FleeReason),
+                OwnerId, static_cast<ContentCallback::FleeReason>(FleeReason),
                 Type, Destination, DestinationId, Radius))
         {
             // Fallback: type 3, the cached physical centre pushed 10000 along X only.
-            Type = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
+            Type = ContentCallback::FleeDestPoint;
             if (Sys->SelfTarget.bPosValid == 0)
             {
                 Sys->SelfTarget.bPosValid = 1;
@@ -227,7 +229,7 @@ int FleeBehavior::Perform()
         }
 
         FleeDestType = static_cast<int>(Type);
-        if (FleeDestType == 2)
+        if (FleeDestType == ContentCallback::FleeDestDock)
         {
             // Save the dock delegate's current op when it is the active directive (type 7).
             pub::AI::DirectiveDockOp Op;
@@ -235,7 +237,7 @@ int FleeBehavior::Perform()
             bHasSavedDirective = 0;
             IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
             if (Current != nullptr &&
-                Current->GetBehaviorId() == 7)
+                Current->GetBehaviorId() == BEHAVIOR_DOCK)
             {
                 if (static_cast<DockBehavior*>(DockDelegate)->CopyDockOp(&DockOp))
                     bHasSavedDirective = 1;
@@ -243,24 +245,24 @@ int FleeBehavior::Perform()
             DockDelegate->OnApplyDirective(&Op);
             DockDelegate->OnEngage();
         }
-        else if (FleeDestType == 1 || FleeDestType == 3)
+        else if (FleeDestType == ContentCallback::FleeDestObject || FleeDestType == ContentCallback::FleeDestPoint)
         {
             pub::AI::DirectiveGotoOp Op;
-            if (FleeDestType == 3)
+            if (FleeDestType == ContentCallback::FleeDestPoint)
             {
-                Op.GotoKind = 1;
+                Op.GotoKind = kGotoKindPoint;
                 Op.Destination = Destination;
             }
             else
             {
-                Op.GotoKind = 0;
+                Op.GotoKind = kGotoKindObject;
                 Op.TargetId = static_cast<int32_t>(DestinationId);
             }
             Op.ArrivalRange = Radius;
             bHasSavedDirective = 0;
             IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
             if (Current != nullptr &&
-                Current->GetBehaviorId() == 2)
+                Current->GetBehaviorId() == BEHAVIOR_GOTO)
             {
                 if (static_cast<GotoBehavior*>(GotoDelegate)->CopyGotoOp(&GotoOp))
                     bHasSavedDirective = 1;
@@ -277,8 +279,8 @@ int FleeBehavior::Perform()
 
         if (bFleeActive == 0)
         {
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
     }
 
@@ -287,20 +289,20 @@ int FleeBehavior::Perform()
         FormationDelegate->OnEngage();
         FormationDelegate->DeltaTime = DeltaTime;
         (void)FormationDelegate->OnUpdate();
-        UpdateResult = 1;
-        return 1;
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;
     }
 
     // Types 1/3 drive GotoDelegate, type 2 DockDelegate, unguarded.
-    if (FleeDestType == 1 || FleeDestType == 2 || FleeDestType == 3)
+    if (FleeDestType == ContentCallback::FleeDestObject || FleeDestType == ContentCallback::FleeDestDock || FleeDestType == ContentCallback::FleeDestPoint)
     {
-        Behavior* const Delegate = (FleeDestType == 2) ? DockDelegate : GotoDelegate;
+        Behavior* const Delegate = (FleeDestType == ContentCallback::FleeDestDock) ? DockDelegate : GotoDelegate;
         Delegate->DeltaTime = DeltaTime;
         int const ChildResult = Delegate->OnUpdate();
-        if (ChildResult != 2 && ChildResult != 3)
+        if (ChildResult != kBehaviorUpdateFinished && ChildResult != kBehaviorUpdateAborted)
         {
-            UpdateResult = 1;
-            return 1;
+            UpdateResult = kBehaviorUpdateRunning;
+            return kBehaviorUpdateRunning;
         }
     }
     else
@@ -311,9 +313,9 @@ int FleeBehavior::Perform()
     }
 
     bFleeActive = 0;
-    BehaviorMgr->SetDirectiveResult(4, 0);                              // FUN_062d29a0
-    UpdateResult = 2;
-    return 2;
+    BehaviorMgr->SetDirectiveResult(BEHAVIOR_FLEE, 0);                              // FUN_062d29a0
+    UpdateResult = kBehaviorUpdateFinished;
+    return kBehaviorUpdateFinished;
 }
 
 // ============================================================================
@@ -329,12 +331,12 @@ void FleeBehavior::OnEngage()
         FormationDelegate->OnEngage();
         return;
     }
-    if (FleeDestType == 1 || FleeDestType == 3)
+    if (FleeDestType == ContentCallback::FleeDestObject || FleeDestType == ContentCallback::FleeDestPoint)
     {
         GotoDelegate->OnEngage();
         return;
     }
-    if (FleeDestType == 2)
+    if (FleeDestType == ContentCallback::FleeDestDock)
     {
         DockDelegate->OnEngage();
         return;
@@ -356,21 +358,21 @@ void FleeBehavior::OnDisengage()
         FormationDelegate->OnDisengage();
         return;
     }
-    if (FleeDestType == 1 || FleeDestType == 3)
+    if (FleeDestType == ContentCallback::FleeDestObject || FleeDestType == ContentCallback::FleeDestPoint)
     {
         if (GotoDelegate == nullptr)
             return;
         GotoDelegate->OnDisengage();
         IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
         if (Current != nullptr &&
-            Current->GetBehaviorId() == 2 &&
+            Current->GetBehaviorId() == BEHAVIOR_GOTO &&
             bHasSavedDirective != 0)
         {
             GotoDelegate->OnApplyDirective(&GotoOp);
         }
         return;
     }
-    if (FleeDestType == 2)
+    if (FleeDestType == ContentCallback::FleeDestDock)
     {
         if (DockDelegate == nullptr)
             return;
@@ -378,7 +380,7 @@ void FleeBehavior::OnDisengage()
         Behavior_ReleaseDirectiveTarget(DockDelegate);                            // FUN_062d21c0
         IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
         if (Current != nullptr &&
-            Current->GetBehaviorId() == 7 &&
+            Current->GetBehaviorId() == BEHAVIOR_DOCK &&
             bHasSavedDirective != 0)
         {
             DockDelegate->OnApplyDirective(&DockOp);
@@ -403,13 +405,13 @@ void FleeBehavior::OnEvent(void* Event)
             FormationDelegate->OnEvent(Event);
         return;
     }
-    if (FleeDestType == 1 || FleeDestType == 3)
+    if (FleeDestType == ContentCallback::FleeDestObject || FleeDestType == ContentCallback::FleeDestPoint)
     {
         if (GotoDelegate != nullptr)
             GotoDelegate->OnEvent(Event);
         return;
     }
-    if (FleeDestType == 2)
+    if (FleeDestType == ContentCallback::FleeDestDock)
     {
         if (DockDelegate != nullptr)
             DockDelegate->OnEvent(Event);

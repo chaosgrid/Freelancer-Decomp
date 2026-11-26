@@ -55,7 +55,7 @@ DodgeIdea::DodgeIdea()
     , Throttle(0.0f)                      // not written by retail's ctor
     , Field98(0)
     , Opaque99{}
-    , DodgeStyle(1)
+    , DodgeStyle(kDodgeStyleWaggleRandom)
     , VectorB8{}
     , FieldC4(30.0f)
     , SlideThrottle(1.0f)
@@ -170,7 +170,7 @@ int DodgeIdea::Update(float DeltaTime)
 
             switch (DodgeStyle)
             {
-            case 0:
+            case kDodgeStyleWaggle:
             {
                 // Two draws, each rounded once.
                 float const Angle1 = static_cast<float>(
@@ -193,13 +193,13 @@ int DodgeIdea::Update(float DeltaTime)
 
                 switch (GenericWeightedPick(&Picker.LastDirection))
                 {
-                case 1:   // XZ by Angle1, then YZ by Angle2
+                case kDodgeDirLeft:   // XZ by Angle1, then YZ by Angle2
                     RotateFrameXZ(WorkingFrame, X87Cos(static_cast<double>(Angle1)),
                                   X87Sin(static_cast<double>(Angle1)));
                     RotateFrameYZ(WorkingFrame, X87Cos(static_cast<double>(Angle2)),
                                   X87Sin(static_cast<double>(Angle2)));
                     break;
-                case 2:   // XZ by -Angle1, cosine rounded to float
+                case kDodgeDirRight:   // XZ by -Angle1, cosine rounded to float
                 {
                     double const Neg = -static_cast<double>(Angle1);
                     float const CosNeg = X87CosF(Neg);
@@ -208,13 +208,13 @@ int DodgeIdea::Update(float DeltaTime)
                                   X87Sin(static_cast<double>(Angle2)));
                     break;
                 }
-                case 3:   // YZ by Angle1, then XZ by Angle2
+                case kDodgeDirUp:   // YZ by Angle1, then XZ by Angle2
                     RotateFrameYZ(WorkingFrame, X87Cos(static_cast<double>(Angle1)),
                                   X87Sin(static_cast<double>(Angle1)));
                     RotateFrameXZ(WorkingFrame, X87Cos(static_cast<double>(Angle2)),
                                   X87Sin(static_cast<double>(Angle2)));
                     break;
-                case 4:   // YZ by -Angle1, cosine rounded to float
+                case kDodgeDirDown:   // YZ by -Angle1, cosine rounded to float
                 {
                     double const Neg = -static_cast<double>(Angle1);
                     float const CosNeg = X87CosF(Neg);
@@ -229,7 +229,7 @@ int DodgeIdea::Update(float DeltaTime)
                 break;
             }
 
-            case 1:
+            case kDodgeStyleWaggleRandom:
             {
                 float const Angle1 = static_cast<float>(
                     (1.0 - (static_cast<double>(rand()) * ConeAngleVariancePercent) * (1.0 / 32768.0)) * ConeAngle);
@@ -277,7 +277,7 @@ int DodgeIdea::Update(float DeltaTime)
                 break;
             }
 
-            case 2:
+            case kDodgeStyleSlide:
             {
                 // Dot summed z, y, x in double against 0.7f (DAT_063a04f0); less, equal
                 // or unordered keeps the draw.
@@ -292,7 +292,7 @@ int DodgeIdea::Update(float DeltaTime)
                 break;
             }
 
-            case 3:
+            case kDodgeStyleCorkscrew:
                 if (bRollFlipDirection != 0)
                     VectorCc.z = -VectorCc.z;
                 break;
@@ -304,7 +304,7 @@ int DodgeIdea::Update(float DeltaTime)
     }
 
     // caseD_4 (062d8178).
-    if (Pathfind->AvoidRecordKind == 2)
+    if (Pathfind->AvoidRecordKind == kAvoidRecordPoint)
     {
         RefreshCachedIfacePosition(Sys);
         Vector const RecomputeDir = Sub(Pathfind->AvoidTargetPoint, CachedIfacePosition(Sys));
@@ -353,13 +353,13 @@ int DodgeIdea::Update(float DeltaTime)
         FlagDa = 0;
     }
 
-    Sys->Thrust.SetThrottle(ThrottleCommand, 0);
+    Sys->Thrust.SetThrottle(ThrottleCommand, kThrottleModeEngine);
 
     // Second dispatch on DodgeStyle (0 and 1 share a body).
     switch (DodgeStyle)
     {
-    case 0:
-    case 1:
+    case kDodgeStyleWaggle:
+    case kDodgeStyleWaggleRandom:
     {
         Vector AxisThrottle = TurnHelper::get_angular_throttle(*IfaceOrientation(Sys), WorkingFrame,
                                                                &TurnAngle3c);
@@ -384,9 +384,9 @@ int DodgeIdea::Update(float DeltaTime)
         return 0;
     }
 
-    case 2:
+    case kDodgeStyleSlide:
     {
-        if (Pathfind->AvoidRecordKind != 0)
+        if (Pathfind->AvoidRecordKind != kAvoidRecordNone)
             return 0;
 
         // Dot summed z, y, x in double; compared against (double)0.9999f, unordered
@@ -445,7 +445,7 @@ int DodgeIdea::Update(float DeltaTime)
         return 0;
     }
 
-    case 3:
+    case kDodgeStyleCorkscrew:
     {
         Vector Transformed = TransformVectorByMatrix(*IfaceOrientation(Sys), VectorCc);
         Sys->Thrust.SetAxisThrottle(Transformed);

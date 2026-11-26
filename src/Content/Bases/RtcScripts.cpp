@@ -74,19 +74,19 @@ bool FCharacterEncounter::Load(char const* Path)
                     bAction = false;
                 }
                 else if (Reader.is_value("action"))
-                    Action.Type = 2;
+                    Action.Type = kEncounterActionAction;
                 else if (Reader.is_value("walkup"))
-                    Action.Type = 1;
+                    Action.Type = kEncounterActionWalkup;
                 else if (Reader.is_value("greet"))
-                    Action.Type = 0;
+                    Action.Type = kEncounterActionGreet;
                 else if (Reader.is_value("offer"))
-                    Action.Type = 3;
+                    Action.Type = kEncounterActionOffer;
                 else if (Reader.is_value("decision"))
-                    Action.Type = 4;
+                    Action.Type = kEncounterActionDecision;
                 else if (Reader.is_value("accept"))
-                    Action.Type = 5;
+                    Action.Type = kEncounterActionAccept;
                 else if (Reader.is_value("decline") || Reader.is_value("reject"))
-                    Action.Type = 6;
+                    Action.Type = kEncounterActionDecline;
                 else
                 {
                     bAction = false;

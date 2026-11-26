@@ -147,8 +147,8 @@ static void HideLanguageBar()
         DWORD Status;
         if (SUCCEEDED(Manager->GetShowFloatingStatus(&Status)))
             GLangBarStatus = Status;
-        if ((GLangBarStatus & 0x800u) == 0)
-            Manager->ShowFloating(8);
+        if ((GLangBarStatus & TF_SFT_DESKBAND) == 0)
+            Manager->ShowFloating(TF_SFT_HIDDEN);
         Manager->Release();
     }
 }

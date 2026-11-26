@@ -119,7 +119,7 @@ IVP_Sim_Units_Manager::IVP_Sim_Units_Manager(IVP_Environment* Environment)
 // ============================================================================
 void IVP_Sim_Units_Manager::rem_sim_unit_from_manager(IVP_Simulation_Unit* Unit)
 {
-    IVP_Simulation_Unit** HeadSlot = (static_cast<int8_t>(Unit->State & 0xFF) < 8)
+    IVP_Simulation_Unit** HeadSlot = (static_cast<int8_t>(Unit->State & 0xFF) < IVP_MT_NOT_SIM)
         ? &sim_units_head
         : &still_units_head;
 
@@ -148,7 +148,7 @@ static void IVP_Simulation_Unit_List_Push_Front(IVP_Simulation_Unit* Node, IVP_S
 // ============================================================================
 void IVP_Sim_Units_Manager::add_sim_unit_to_manager(IVP_Simulation_Unit* Unit)
 {
-    IVP_Simulation_Unit** HeadSlot = (static_cast<int8_t>(Unit->State & 0xFF) < 8)
+    IVP_Simulation_Unit** HeadSlot = (static_cast<int8_t>(Unit->State & 0xFF) < IVP_MT_NOT_SIM)
         ? &sim_units_head
         : &still_units_head;
 
@@ -323,7 +323,7 @@ void IVP_Simulation_Unit::split_off_core_group(IVP_Core* TargetMaster)
         bool NeedsAnotherPass = false;
 
         IVP_Simulation_Unit* NewUnit = new IVP_Simulation_Unit(); // operator_new(0x24) + FUN_06348e10
-        NewUnit->State = (NewUnit->State & 0xFFFFFF01u) | 1u;     // low byte 1 ("awake")
+        NewUnit->State = (NewUnit->State & 0xFFFFFF01u) | IVP_MT_MOVING;     // low byte 1 ("awake")
 
         TargetMaster->Environment->sim_units_manager->add_sim_unit_to_manager(NewUnit); // FUN_06349400
 
@@ -504,7 +504,7 @@ void IVP_Simulation_Unit::revive_if_sleeping(IVP_Environment* Environment)
             break;
         }
         IVP_Core* const Core = Cores.elems[Index];
-        if (IVP_SignedLowByte(Core->MovementState) < 8)
+        if (IVP_SignedLowByte(Core->MovementState) < IVP_MT_NOT_SIM)
         {
             continue;
         }
@@ -514,10 +514,10 @@ void IVP_Simulation_Unit::revive_if_sleeping(IVP_Environment* Environment)
         }
     }
 
-    if (static_cast<uint8_t>(State) == 0x08)
+    if (static_cast<uint8_t>(State) == IVP_MT_NOT_SIM)
     {
         Environment->sim_units_manager->rem_sim_unit_from_manager(this); // 06349460
-        State = (State & 0xFFFFFF01u) | 0x1u;
+        State = (State & 0xFFFFFF01u) | IVP_MT_MOVING;
         Environment->sim_units_manager->add_sim_unit_to_manager(this);   // 06349400
     }
 }
@@ -532,7 +532,7 @@ int IVP_Simulation_Unit::update_motion_and_maybe_sleep(IVP_Environment* Environm
     const float TimeBase = Environment->current_time.time_base;
     const float TimeOffset = Environment->current_time.time_offset;
 
-    int Verdict = 3;
+    int Verdict = IVP_MT_CALM;
     for (int i = static_cast<int>(Cores.n_elems) - 1; i >= 0; --i)
     {
         IVP_Core* Core = Cores.ElementAt(i);
@@ -541,7 +541,7 @@ int IVP_Simulation_Unit::update_motion_and_maybe_sleep(IVP_Environment* Environm
         Verdict &= Result;
     }
 
-    if (Verdict != 3)
+    if (Verdict != IVP_MT_CALM)
     {
         return 0;
     }
@@ -553,7 +553,7 @@ int IVP_Simulation_Unit::update_motion_and_maybe_sleep(IVP_Environment* Environm
 
     IVP_Sim_Units_Manager* const Manager = Environment->sim_units_manager;
     Manager->rem_sim_unit_from_manager(this); // 06349460
-    State = (State & 0xFFFFFF08u) | 0x08u;
+    State = (State & 0xFFFFFF08u) | IVP_MT_NOT_SIM;
     Manager->add_sim_unit_to_manager(this);   // 06349400
 
     return 1;

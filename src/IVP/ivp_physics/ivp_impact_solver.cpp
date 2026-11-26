@@ -515,7 +515,7 @@ void IVP_Impact_Solver::FinalizeImpact(IVP_Core* CoresOut[2])
     const int32_t WinnerIdx = (EffectiveMass0 > EffectiveMass1) ? 0 : 1;
     const int32_t LoserIdx = 1 - WinnerIdx;
 
-    if ((CoresOut[WinnerIdx]->Flags & 0x0C) != 0)
+    if ((CoresOut[WinnerIdx]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         CommitBothImmediately();
         return;

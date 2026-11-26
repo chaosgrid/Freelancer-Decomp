@@ -232,8 +232,8 @@ namespace
             // as wide as 4:3 -- a widescreen monitor starts native instead of stretching 1024x768.
             int DesktopWidth = 0;
             int DesktopHeight = 0;
-            if (bFullscreen != 0 && Format == 0x20 && WidescreenGetDesktopSize(&DesktopWidth, &DesktopHeight) &&
-                DesktopWidth >= 0x320 && DesktopHeight >= 0x258 &&
+            if (bFullscreen != 0 && Format == 32 && WidescreenGetDesktopSize(&DesktopWidth, &DesktopHeight) &&
+                DesktopWidth >= 800 && DesktopHeight >= 600 &&
                 DesktopWidth * 3 >= DesktopHeight * 4)
             {
                 Width = static_cast<unsigned>(DesktopWidth);
@@ -444,13 +444,13 @@ namespace
             LRESULT const Checked = SendMessageA(GetDlgItem(Dialog, 0x84), BM_GETCHECK, 0, 0);
             switch (WParam)
             {
-            case 1:
-            case 6:
+            case IDOK:
+            case IDYES:
                 SetSkipMachineWarnings(Checked == 0);
                 EndDialog(Dialog, 1);
                 return 1;
-            case 2:
-            case 7:
+            case IDCANCEL:
+            case IDNO:
                 EndDialog(Dialog, 2);
                 return 1;
             default:
@@ -478,7 +478,8 @@ bool RenderMgrApplyGamma()
         {
             // Result unread.
             Gamma->SetGammaEnable(static_cast<unsigned char>(g_display.fullscreen));
-            bOk = Gamma->SetGammaFunction(7, G_RenderGamma, 0.0f, 1.0f, 0.0f) >= 0;
+            bOk = Gamma->SetGammaFunction(kRpGammaRed | kRpGammaGreen | kRpGammaBlue, G_RenderGamma,
+                                          0.0f, 1.0f, 0.0f) >= 0;
         }
         if (Gamma != nullptr)
             Gamma->Release();
@@ -575,13 +576,13 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
 
     // Restore the FPU precision the renderer wants if the device changed it.
     const unsigned int Control = _control87(0, 0);
-    G_FpuPrecisionFound = ((Control & 0x30000) == 0x20000) ? 0x18 : 0x35;
+    G_FpuPrecisionFound = ((Control & _MCW_PC) == _PC_24) ? 24 : 53;
     if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
     {
-        if (G_FpuPrecisionWanted == 0x18)
-            _control87(0x20000, 0x30000);
-        else if (G_FpuPrecisionWanted == 0x35)
-            _control87(0x10000, 0x30000);
+        if (G_FpuPrecisionWanted == 24)
+            _control87(_PC_24, _MCW_PC);
+        else if (G_FpuPrecisionWanted == 53)
+            _control87(_PC_53, _MCW_PC);
         else
             _control87(0, 0);
     }
@@ -797,14 +798,14 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
 
     // The startup picture: width (unsigned compare) and colour bits pick one of four.
     char const* SplashPath = nullptr;
-    if (static_cast<unsigned>(g_display.width) >= 0x500u)
+    if (static_cast<unsigned>(g_display.width) >= 1280u)
     {
-        if (g_display.color_bpp == 0x20)
+        if (g_display.color_bpp == 32)
             SplashPath = "../Data/Interface/Intro/images/startupscreen_1280.tga";
         else
             SplashPath = "../Data/Interface/Intro/images/startupscreen_1280_16.bmp";
     }
-    else if (g_display.color_bpp == 0x20)
+    else if (g_display.color_bpp == 32)
     {
         SplashPath = "../Data/Interface/Intro/images/startupscreen.tga";
     }

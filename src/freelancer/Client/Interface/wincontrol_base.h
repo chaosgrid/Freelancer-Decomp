@@ -73,6 +73,56 @@ enum EWinTextProperty
     kTextPropTypewriter = 0x50,   // A == 1: on, B milliseconds per character; else off
 };
 
+// NnEditControl's own ids (LAB_0058c030); both answer 1.
+enum EWinEditProperty
+{
+    kEditPropEditable = 0x43,     // A != 0: editable, a non-zero B is the new maximum length;
+                                  // A == 0: read-only, the cursor removed
+    kEditPropDigitsOnly = 0x44,   // A bit 0
+};
+
+// NnStaticControl's own ids (LAB_00589050).
+enum EWinStaticProperty
+{
+    kStaticPropSetRoll = 0x0d,        // A = the float's bits; also the start roll
+    kStaticPropGetRoll = 0x0e,
+    kStaticPropSetPitch = 0x0f,
+    kStaticPropGetPitch = 0x10,
+    kStaticPropSetYaw = 0x11,
+    kStaticPropGetYaw = 0x12,
+    kStaticPropSetInstance = 0x17,    // A = a new engine instance; the angles reset
+    kStaticPropColours = 0x18,        // A -> the mesh colour, B -> the wire colour
+    kStaticPropEnableRotation = 0x1c, // A == 1; anything else also resets the orientation
+    kStaticPropForceRadius = 0x4d,    // A, converted as unsigned
+};
+
+// The button ids: NnButtonControl (FUN_0055bc30), WireButtonControl (LAB_005a4690) and
+// NnToggleButtonControl.
+enum EWinButtonProperty
+{
+    kButtonPropGetCommand = 0x2e,     // *A = the button's command id
+    kTogglePropGetState = 0x2f,       // *A = the toggle state
+    kTogglePropSetState = 0x30,       // state = (A == 0) ? 1 : 0
+    kTogglePropSounds = 0x31,         // A, B = the sound names of the two states (null keeps)
+    kButtonPropNoMeshRender = 0x32,   // A != 0 sets, 0 clears ButtonBits2 kButtonNoMeshRender
+    kButtonPropGlow = 0x35,           // A != 0
+    kButtonPropSpin = 0x36,           // A == 1
+};
+
+// CargoBarControl's own ids.
+enum EWinCargoBarProperty
+{
+    kBarPropColour = 0x3f,            // A = the colour dword itself
+    kBarPropFill = 0x40,              // A = capacity, B = used
+    kBarPropSegments = 0x41,          // A = tail segment, B = head segment
+};
+
+// ShipViewControl's own id (LAB_005864c0).
+enum EWinShipViewProperty
+{
+    kShipViewPropMode = 0x4c,         // A = the view mode
+};
+
 // The scroll bar property ids (ScrollControl FUN_005831b0 and UiScroll LAB_00597350, the only
 // handlers).
 enum EWinScrollProperty
@@ -86,10 +136,32 @@ enum EWinScrollProperty
     kScrollPropGetPage = 0x3d,    // ScrollControl only
 };
 
+// The words of the A / B arguments of kWinPropRenderFlags: a flag is set by any non-zero value
+// in its 16-bit word.
+enum EWinRenderFlagsArg
+{
+    kRenderArgNoMeshRender = 0x1,       // A, low word
+    kRenderArgNoWireRender = 0x10000,   // A, high word
+    kRenderArgNoZEnable = 0x1,          // B, low word
+    kRenderArgNoColoring = 0x10000,     // B, high word
+};
+
 // Property ids NnTextControl, NnButtonControl and WireStaticControl handle alike.
 enum EWinSharedProperty
 {
+    // A != 0 shows the control in its lit (selected) state: NnStaticControl +0x347,
+    // NnButtonControl ButtonBits 0x40, WireStaticControl kWireLit, NnTextControl bHighlighted.
+    kWinPropLit = 0x0c,
+    // Two flags per word, low word first: A = (no_mesh_render, no_wire_render), B =
+    // (no_z_enable, no_coloring). NnStaticControl takes all four; CargoBarControl draws its
+    // border unless A's high word is set; ShipViewControl keeps A's low word as ViewFlags 8.
+    kWinPropRenderFlags = 0x19,
     kWinPropColour = 0x33,        // A -> the colour dword; B == 1 turns the colour override on
+    kWinPropDrawInactive = 0x34,  // A != 0: NnButtonControl ButtonBits2 0x10, WireStaticControl
+                                  // kWireDrawInactive
+    // The NeuroNet panels (NN_News, NN_Repair, NN_MissionVendor, NN_ShipTrader): closed from
+    // outside (the NavBar, FUN_0043e600), so without their close callback.
+    kWinPropCloseFromOutside = 0x4e,
     kWinPropBlink = 0x51,         // A != 0 blinks
     // The NeuroNet dialogs (NN_Confirm, NN_Error, NN_Exit, NN_LoadSave, NN_Pause, NN_Prompt,
     // NN_News, NN_Repair, ...): SetOffset(*A) and SetPosition(Position).
@@ -99,6 +171,8 @@ enum EWinSharedProperty
 // The ids a control sends to its parent's SetProperty about itself (A = the sending control).
 enum EWinControlNotify
 {
+    kWinNotifyShipViewPick = 0x15,   // ShipViewControl: A = the engine instance picked
+    kWinNotifyShipViewDrop = 0x16,   // ShipViewControl: an item dropped on hardpoint A (its name)
     kWinNotifyHover = 0x25,          // WinControl::HitTest (FUN_005a0340) / UiScroll: a hit
     kWinNotifyClick = 0x26,          // a button's Activate, NnTextControl's release on it
     kWinNotifyDoubleClick = 0x27,    // a double click (WireButtonControl: non-zero answer
@@ -110,7 +184,11 @@ enum EWinControlNotify
     kWinNotifyCapturedEnter = 0x2b,  // a pressed button: the cursor came back
     kWinNotifyHighlight = 0x2c,      // MouseEnter, a press, the captured cursor back on
     kWinNotifyUnhighlight = 0x2d,    // MouseLeave, the captured cursor off
+    kWinNotifyToggled = 0x30,        // NnToggleButtonControl: B = its new state (the number
+                                     // is also the toggle's own kTogglePropSetState)
     kWinNotifyScrollValue = 0x3e,    // ScrollControl / UiScroll: B = the new value
+    kWinNotifyEditChanged = 0x45,    // NnEditControl: A = the text (null when emptied)
+    kWinNotifyTextHover = 0x46,      // NnTextControl's hit: handled like kWinNotifyHover
     kWinNotifyToolTip = 0x4f,        // HitTest asks before the child's tooltip; non-zero
                                      // suppresses it
 };
@@ -122,6 +200,12 @@ struct IDataViewOwner
 {
     virtual void DataViewSlot0(unsigned A, unsigned B) = 0; // +0x00
     virtual void DataViewSlot1(unsigned A) = 0;             // +0x04
+};
+
+// The bits of WinControl::PositionFlags.
+enum EWinPositionFlag
+{
+    kWinPositionAddOffset = 0x1,   // the instance is placed at Position + Offset (the ctor sets it)
 };
 
 class WinControl : public Win3D, public IDataViewOwner

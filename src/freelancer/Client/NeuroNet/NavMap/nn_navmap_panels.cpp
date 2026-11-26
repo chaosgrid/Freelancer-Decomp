@@ -52,7 +52,7 @@ void NeuroNetNavMap::BuildJumpLinks()
     for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
     {
         FNavMapItem* const From = *It;
-        if (From->bShown == 0 || (From->Type & 4) == 0)
+        if (From->bShown == 0 || (From->Type & OBJ_SUN) == 0)
             continue;
 
         Universe::ISystem const* const System = From->System;
@@ -73,7 +73,7 @@ void NeuroNetNavMap::BuildJumpLinks()
                  ++ToIt)
             {
                 FNavMapItem* const To = *ToIt;
-                if (To->bShown == 0 || (To->Type & 4) == 0)
+                if (To->bShown == 0 || (To->Type & OBJ_SUN) == 0)
                     continue;
                 if (To->System->GetId() == Connection.GotoSystemId)
                     AddJumpLink(From, To);
@@ -104,7 +104,7 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
     Link->To = To;
     Link->Field_0x08 = 1;
     Link->bBothWays = 0;
-    Link->Kind = 0;
+    Link->Kind = kNavMapLinkPlain;
 
     // Both ends on the best path (a best-path waypoint's system, or the
     // player's own system) -> kind 2.
@@ -139,7 +139,7 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
         }
         if (bToOnPath)
         {
-            Link->Kind = 2;
+            Link->Kind = kNavMapLinkBestPath;
             bKindSet = true;
         }
     }
@@ -179,7 +179,7 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
                 }
             }
             if (bToOnRoute)
-                Link->Kind = 1;
+                Link->Kind = kNavMapLinkWaypoint;
         }
     }
 
@@ -194,7 +194,7 @@ Universe::ISystem const* NeuroNetNavMap::BestPathWaypointSystem(int Index)
     while (Token != nullptr)
     {
         unsigned short const Tag = Token->TypeTag;
-        if (Tag == 0x42)
+        if (Tag == FmtStr::TagBase)
         {
             // 'B' -- the system one of whose objects docks with the base.
             unsigned const BaseId = Token->Value;
@@ -210,12 +210,12 @@ Universe::ISystem const* NeuroNetNavMap::BestPathWaypointSystem(int Index)
                 }
             }
         }
-        else if (Tag == 0x4e)
+        else if (Tag == FmtStr::TagNavMarker)
         {
             // 'N' -- the data block's first dword.
             return Universe::get_system(Token->Marker->Data[0]);
         }
-        else if (Tag == 0x53)
+        else if (Tag == FmtStr::TagSystem)
         {
             // 'S' -- the id itself.
             return Universe::get_system(Token->Value);
@@ -240,7 +240,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
         AbortMissionText->SetProperty(kWinPropHide, 1, 0);
         wcscpy(G_NnTextScratchB, L" ");
         InfoTitle->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
-        InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & 0xfd);
+        InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & ~kWin3DVisible);
 
         RenderDisplayList Text;
         {
@@ -259,7 +259,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
     FmtStrSprintf(&Path->Title, G_NnTextScratchB, G_NnTextScratchCapacity);
     InfoTitle->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     FmtStrSprintf(&Path->Text, G_NnTextScratchB, G_NnTextScratchCapacity);
-    InfoText->Flags = static_cast<unsigned char>(InfoText->Flags | 2);
+    InfoText->Flags = static_cast<unsigned char>(InfoText->Flags | kWin3DVisible);
 
     {
         RenderDisplayList Text;
@@ -383,19 +383,19 @@ void NeuroNetNavMap::RefreshObjectives()
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index);
         if (Waypoint == nullptr)
             continue;
-        unsigned const Kind = Waypoint->ObjectiveState & 0xf;
-        if (Kind != 9)
+        unsigned const Kind = Waypoint->ObjectiveState & kObjectiveStateMask;
+        if (Kind != kObjectiveStateNoNumber)
             ++Listed;
         if (Index < ObjectiveFirstRow)
         {
-            if (Kind == 0xa)
+            if (Kind == kObjectiveStateNumbered)
                 ++StopNumber;
             continue;
         }
-        if (Kind == 9 || Row >= 3)
+        if (Kind == kObjectiveStateNoNumber || Row >= 3)
             continue;
 
-        if (Kind == 0xa)
+        if (Kind == kObjectiveStateNumbered)
         {
             GetIdsStringWWithRawFallback(0x4df, G_NnTextScratchA, G_NnTextScratchCapacity);
             _swprintf(G_NnTextScratchB, G_NnTextScratchA, StopNumber);
@@ -436,7 +436,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
 {
     // FUN_004a0220.
     // The known-base rows (and their titles) take property 0x24 = mode 7.
-    uintptr_t const bBaseList = Mode == 7 ? 1 : 0;
+    uintptr_t const bBaseList = Mode == kNavMapFilterBaseList ? 1 : 0;
     for (int Index = 0; Index < 15; ++Index)
     {
         BaseTexts[Index]->SetProperty(kTextPropClickable, bBaseList, 0);
@@ -447,11 +447,11 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
 
     // Leaving an info-card mode (6 / 7) closes the card and brings back
     // what it covered.
-    if (G_NavMapFilterMode == 6 || G_NavMapFilterMode == 7)
+    if (G_NavMapFilterMode == kNavMapFilterInfoCard || G_NavMapFilterMode == kNavMapFilterBaseList)
     {
-        InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & 0xfc);
-        CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
-        CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
+        InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & ~(kWin3DActive | kWin3DVisible));
+        CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & ~(kWin3DActive | kWin3DVisible));
         if (ViewMode == kNavMapViewUniverse)
         {
             for (int Index = 0; Index < 4; ++Index)
@@ -459,30 +459,30 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
         }
         else
         {
-            PhysicalFilter->Flags = static_cast<unsigned char>(PhysicalFilter->Flags | 3);
-            PoliticalFilter->Flags = static_cast<unsigned char>(PoliticalFilter->Flags | 3);
-            PatrolFilter->Flags = static_cast<unsigned char>(PatrolFilter->Flags | 3);
-            LegendFilter->Flags = static_cast<unsigned char>(LegendFilter->Flags | 3);
-            BaseListFilter->Flags = static_cast<unsigned char>(BaseListFilter->Flags | 3);
-            MineableFilter->Flags = static_cast<unsigned char>(MineableFilter->Flags | 3);
-            LabelButton->Flags = static_cast<unsigned char>(LabelButton->Flags | 3);
+            PhysicalFilter->Flags = static_cast<unsigned char>(PhysicalFilter->Flags | kWin3DActive | kWin3DVisible);
+            PoliticalFilter->Flags = static_cast<unsigned char>(PoliticalFilter->Flags | kWin3DActive | kWin3DVisible);
+            PatrolFilter->Flags = static_cast<unsigned char>(PatrolFilter->Flags | kWin3DActive | kWin3DVisible);
+            LegendFilter->Flags = static_cast<unsigned char>(LegendFilter->Flags | kWin3DActive | kWin3DVisible);
+            BaseListFilter->Flags = static_cast<unsigned char>(BaseListFilter->Flags | kWin3DActive | kWin3DVisible);
+            MineableFilter->Flags = static_cast<unsigned char>(MineableFilter->Flags | kWin3DActive | kWin3DVisible);
+            LabelButton->Flags = static_cast<unsigned char>(LabelButton->Flags | kWin3DActive | kWin3DVisible);
             if (!MissionZoneIds.empty())
-                MissionFilter->Flags = static_cast<unsigned char>(MissionFilter->Flags | 3);
+                MissionFilter->Flags = static_cast<unsigned char>(MissionFilter->Flags | kWin3DActive | kWin3DVisible);
         }
     }
 
     // The new mode and the toggles' pressed state.
     G_NavMapFilterMode = Mode;
-    PhysicalFilter->SetProperty(0xc, G_NavMapFilterMode == 0 ? 1 : 0, 0);
-    PoliticalFilter->SetProperty(0xc, G_NavMapFilterMode == 1 ? 1 : 0, 0);
-    PatrolFilter->SetProperty(0xc, G_NavMapFilterMode == 2 ? 1 : 0, 0);
-    MissionFilter->SetProperty(0xc, G_NavMapFilterMode == 3 ? 1 : 0, 0);
-    LegendFilter->SetProperty(0xc, G_NavMapFilterMode == 4 ? 1 : 0, 0);
-    BaseListFilter->SetProperty(0xc, G_NavMapFilterMode == 7 ? 1 : 0, 0);
-    MineableFilter->SetProperty(0xc, G_NavMapFilterMode == 5 ? 1 : 0, 0);
+    PhysicalFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterPhysical ? 1 : 0, 0);
+    PoliticalFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterPolitical ? 1 : 0, 0);
+    PatrolFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterPatrol ? 1 : 0, 0);
+    MissionFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterMission ? 1 : 0, 0);
+    LegendFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterLegend ? 1 : 0, 0);
+    BaseListFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterBaseList ? 1 : 0, 0);
+    MineableFilter->SetProperty(kWinPropLit, G_NavMapFilterMode == kNavMapFilterMineable ? 1 : 0, 0);
 
     // The zone filters only in the political / patrol modes.
-    if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
+    if (G_NavMapFilterMode == kNavMapFilterPolitical || G_NavMapFilterMode == kNavMapFilterPatrol)
     {
         AllFilter->SetProperty(kWinPropHide, 0, 0);
         HostileFilter->SetProperty(kWinPropHide, 0, 0);
@@ -496,16 +496,16 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     }
 
     // Mode 6 (the info card) hides the filter row.
-    if (G_NavMapFilterMode == 6)
+    if (G_NavMapFilterMode == kNavMapFilterInfoCard)
     {
-        PhysicalFilter->Flags = static_cast<unsigned char>(PhysicalFilter->Flags & 0xfc);
-        PoliticalFilter->Flags = static_cast<unsigned char>(PoliticalFilter->Flags & 0xfc);
-        PatrolFilter->Flags = static_cast<unsigned char>(PatrolFilter->Flags & 0xfc);
-        MissionFilter->Flags = static_cast<unsigned char>(MissionFilter->Flags & 0xfc);
-        LegendFilter->Flags = static_cast<unsigned char>(LegendFilter->Flags & 0xfc);
-        BaseListFilter->Flags = static_cast<unsigned char>(BaseListFilter->Flags & 0xfc);
-        MineableFilter->Flags = static_cast<unsigned char>(MineableFilter->Flags & 0xfc);
-        LabelButton->Flags = static_cast<unsigned char>(LabelButton->Flags & 0xfc);
+        PhysicalFilter->Flags = static_cast<unsigned char>(PhysicalFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        PoliticalFilter->Flags = static_cast<unsigned char>(PoliticalFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        PatrolFilter->Flags = static_cast<unsigned char>(PatrolFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        MissionFilter->Flags = static_cast<unsigned char>(MissionFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        LegendFilter->Flags = static_cast<unsigned char>(LegendFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        BaseListFilter->Flags = static_cast<unsigned char>(BaseListFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        MineableFilter->Flags = static_cast<unsigned char>(MineableFilter->Flags & ~(kWin3DActive | kWin3DVisible));
+        LabelButton->Flags = static_cast<unsigned char>(LabelButton->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     // The title (the mode indexes DAT_00611c84 unchecked, as in retail).
@@ -527,7 +527,7 @@ void NeuroNetNavMap::RefreshMissionZones()
         for (FmtStr::Val const* Token = BestPathGetWaypoint(Index)->Marker.Head;
              Token != nullptr; Token = Token->Next)
         {
-            if (Token->TypeTag == 0x5a)
+            if (Token->TypeTag == FmtStr::TagZoneId)
                 MissionZoneIds.push_back(Token->Value);
         }
     }
@@ -538,7 +538,7 @@ void NeuroNetNavMap::RefreshMissionZones()
     {
         unsigned char const bNoZones = MissionZoneIds.empty() ? 1 : 0;
         MissionFilter->SetProperty(kWinPropHide, bNoZones, 0);
-        if (bNoZones != 0 && G_NavMapFilterMode == 3)
-            SetFilterMode(0);
+        if (bNoZones != 0 && G_NavMapFilterMode == kNavMapFilterMission)
+            SetFilterMode(kNavMapFilterPhysical);
     }
 }

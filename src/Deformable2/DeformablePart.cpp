@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "Deformable2.h"
+#include "render/slots.h"
 #include "EyeMaterial.h"
 #include "common_misc.h"
 #include "msvcrt_compat.h"
@@ -148,14 +149,14 @@ bool FDeformPart::SelectLod(int LodIndex)
     }
     FDeformMesh* Next = Meshes[LodIndex];
     Current = Next;
-    if ((Flags & 1) == 0 && Old == Next)
+    if ((Flags & kDeformPartLodChanged) == 0 && Old == Next)
     {
-        Flags = (unsigned char)(Flags & (unsigned char)(~1));
+        Flags = (unsigned char)(Flags & (unsigned char)(~kDeformPartLodChanged));
         this->LodIndex = LodIndex;
         return Old != Current;
     }
     // Retail's XOR/AND/XOR sets bit 0 whatever it was (it does not toggle).
-    Flags = (unsigned char)(Flags | 1);
+    Flags = (unsigned char)(Flags | kDeformPartLodChanged);
     this->LodIndex = LodIndex;
     return Old != Current;
 }
@@ -163,7 +164,7 @@ bool FDeformPart::SelectLod(int LodIndex)
 // FUN_065f69c0 (thiscall; its one argument is never read). Retail returns AL = 1.
 void FDeformPart::MarkSkinDirty()
 {
-    Flags = (unsigned char)(Flags | 2);
+    Flags = (unsigned char)(Flags | kDeformPartSkinStale);
 }
 
 // FUN_065f69d0 (thiscall on the part: Camera, Unused).
@@ -173,8 +174,8 @@ unsigned char FDeformPart::DrawLive(ICamera* Camera, void* /*Unused*/)
         return 1;
     const bool bVbSelected = G_VertexBuffer->SelectVb(Vb.Listing.VertexBuffer) >= 0;
     const unsigned char Flags = this->Flags;
-    const unsigned char bRebuild = ((Flags & 1) != 0 || !bVbSelected) ? 1 : 0;
-    if ((Flags & 2) != 0 || bRebuild != 0)
+    const unsigned char bRebuild = ((Flags & kDeformPartLodChanged) != 0 || !bVbSelected) ? 1 : 0;
+    if ((Flags & kDeformPartSkinStale) != 0 || bRebuild != 0)
     {
         if (Current->Skin(Lod, &Vb, bRebuild) == 0)
             return 0;
@@ -184,7 +185,7 @@ unsigned char FDeformPart::DrawLive(ICamera* Camera, void* /*Unused*/)
     const bool bIbSelected =
         G_IndexBuffer->SelectIb(Ib.Scratch.IndexBuffer,
                                 (unsigned int)(Vb.Listing.BaseVertex), 0, 0) >= 0;
-    if ((this->Flags & 1) != 0 || !bIbSelected)
+    if ((this->Flags & kDeformPartLodChanged) != 0 || !bIbSelected)
     {
         if (Current->FillIndexBuffer(&Ib) == 0)
             return 0;
@@ -194,7 +195,7 @@ unsigned char FDeformPart::DrawLive(ICamera* Camera, void* /*Unused*/)
             return 0;
     }
     Current->Draw(Camera, this);
-    this->Flags = (unsigned char)(this->Flags & 0xFC);
+    this->Flags = (unsigned char)(this->Flags & (unsigned char)~(kDeformPartLodChanged | kDeformPartSkinStale));
     return 1;
 }
 
@@ -262,13 +263,13 @@ static void TransformDirection(float* Out, const Transform* Xform, const float* 
 static int ComputeFvfStride(unsigned long Fvf)
 {
     int Position = 0;
-    if ((Fvf & 0xC) == 0xC)
+    if ((Fvf & D3DFVF_XYZB4) == D3DFVF_XYZB4)
         Position = 0x1C;
-    else if ((Fvf & 4) == 4)
+    else if ((Fvf & D3DFVF_XYZRHW) == D3DFVF_XYZRHW)
         Position = 0x10;
-    else if ((Fvf & 2) == 2)
+    else if ((Fvf & D3DFVF_XYZ) == D3DFVF_XYZ)
         Position = 0xC;
-    int Normal = ((Fvf & 0x10) != 0) ? 0xC : 0;
+    int Normal = ((Fvf & D3DFVF_NORMAL) != 0) ? 0xC : 0;
     return Position + Normal + FvfColorBytes(Fvf) + FvfTexcoordBytes(Fvf);
 }
 
@@ -311,9 +312,9 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
         FBoneRuntime* const Bone = &Holder->BoneSlots[BoneIndex];
         const FBoneVertexList* const List = &BoneVerts[BoneIndex];
         const unsigned char BoneFlags = Bone->Flags;
-        if ((BoneFlags & 2) != 0 || bForce != 0)
+        if ((BoneFlags & kBoneFlagPoseChanged) != 0 || bForce != 0)
         {
-            Bone->Flags = (unsigned char)(BoneFlags & 0xFD);
+            Bone->Flags = (unsigned char)(BoneFlags & (unsigned char)~kBoneFlagPoseChanged);
             if (List->Start != nullptr && (List->Finish - List->Start) != 0)
             {
                 SkinnedBoneCount += 1;
@@ -483,13 +484,13 @@ static int FvfTexcoordBytes(unsigned long Fvf)
     {
         switch ((Fvf >> (Bit & 31)) & 3)
         {
-        case 0:
+        case D3DFVF_TEXTUREFORMAT2:
             Bytes += 8;
             break;
-        case 1:
+        case D3DFVF_TEXTUREFORMAT3:
             Bytes += 0xC;
             break;
-        case 2:
+        case D3DFVF_TEXTUREFORMAT4:
             Bytes += 0x10;
             break;
         default:
@@ -502,13 +503,13 @@ static int FvfTexcoordBytes(unsigned long Fvf)
     return Bytes;
 }
 
-// FUN_065f7220: D3DFVF_DIFFUSE (0x40) / D3DFVF_SPECULAR (0x80).
+// FUN_065f7220: D3DFVF_DIFFUSE / D3DFVF_SPECULAR byte count.
 static int FvfColorBytes(unsigned long Fvf)
 {
     int Bytes = 0;
-    if ((Fvf & 0x40) != 0)
+    if ((Fvf & D3DFVF_DIFFUSE) != 0)
         Bytes += 4;
-    if ((Fvf & 0x80) != 0)
+    if ((Fvf & D3DFVF_SPECULAR) != 0)
         Bytes += 4;
     return Bytes;
 }
@@ -576,7 +577,7 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
         &BoneSlots[0].LocalTransform;
     const Transform* const View = Camera->GetViewTransform();
     int bHaveView = 1;
-    G_Pipeline->GetPipelineState(7, &bHaveView);
+    G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &bHaveView);
     if (bHaveView != 0)
     {
         Transform Composed;

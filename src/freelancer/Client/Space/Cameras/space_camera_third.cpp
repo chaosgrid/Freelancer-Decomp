@@ -316,7 +316,7 @@ bool ThirdPersonCameraActivate(FThirdPersonCamera* Cam, const int* ViewRect4)
 {
     // FUN_00518ad0: event 0x3f registered on the face at +0xf8, then HUDCamera's activate.
     FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
-    HudRegisterCommandHandler(Face, 0x3f);
+    HudRegisterCommandHandler(Face, USER_TOGGLE_LEVEL_CAMERA);
     return HudCameraActivate((FHudCamera*)Cam, ViewRect4);
 }
 

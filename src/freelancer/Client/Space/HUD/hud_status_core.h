@@ -222,6 +222,13 @@ public:
     // for every id of its switch.
     bool OnEvent(unsigned MsgId) override;
 
+    // The Mode of FireSeekerGuns.
+    enum ESeekerKind
+    {
+        kSeekerMissile = 0,
+        kSeekerTorpedo = 1,
+        kSeekerCruiseDisruptor = 2
+    };
     // FUN_004dd4e0 (thiscall, RET 4) -- fire the player's seeker-munition guns of one kind in a
     // single slot_34 call at the targetable-objects aim point: Mode 0 missiles (neither of the
     // others), 1 torpedoes (mounted on an hp of type 0x0a / 0x23 / 0x24), 2 cruise disruptors.

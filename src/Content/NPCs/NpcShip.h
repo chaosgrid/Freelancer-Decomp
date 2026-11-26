@@ -34,6 +34,15 @@ struct FNpcShipArch;            // NpcShips.h (TU42)
 struct FContentPlayerState;     // ContentPlayerState.h
 class FContentNpcShip;
 
+// FContentNpcShipParams::CreationType / FContentNpcShip::CreationKind: what created the ship
+// (get_creation_type maps it to the ContentCallback enum).
+enum ENpcCreationKind
+{
+    kNpcCreationMission = 0,         // a mission script ship (FMissionObject spawn)
+    kNpcCreationRandomMission = 1,   // a random mission ship (the vignette machine)
+    kNpcCreationEncounter = 2        // the parameter block's default
+};
+
 // Parameter block of an NPC ship (0x504). The default ctor FUN_06f33500 builds the TU50
 // block (see FContentShipParams), then the members below with their ctor values.
 struct FContentNpcShipParams : public FContentShipParams
@@ -63,7 +72,7 @@ struct FContentNpcShipParams : public FContentShipParams
     unsigned int GuideTargetId = 0;
     std::list<unsigned int> LabelIds;                 // +0x118 -> ship +0x17c
     pub::AI::Personality Personality;                    // +0x124
-    unsigned int CreationType = 2;                       // +0x4fc -> ship +0x1b4
+    unsigned int CreationType = kNpcCreationEncounter;                       // +0x4fc -> ship +0x1b4
     int Level = 0;                                       // +0x500 arch +0x24; ShipInfo +0xbc
 
     // FUN_06f33500.
@@ -165,7 +174,14 @@ public:
     std::list<unsigned int> LabelIds;           // +0x17c params +0x118. TODO: meaning
     // +0x188 flee destination kind read by request_flee_destination: 0 ask the guide,
     // 1 position (+0x190), 2 / 3 object (+0x19c).
-    int FleeState = 0;
+    enum EFleeState
+    {
+        kFleeStateGuide = 0,
+        kFleeStatePosition = 1,
+        kFleeStateObject = 2,        // SetFleeObject without bType3
+        kFleeStateObjectType3 = 3    // SetFleeObject with bType3
+    };
+    int FleeState = kFleeStateGuide;
     float FleeDistance = 0.0f;                     // +0x18c returned as OutFloat
     Vector FleePosition;                           // +0x190
     unsigned int FleeObjectId = 0;                 // +0x19c
@@ -206,6 +222,15 @@ public:
 // ship with a pending timer / lead / tether report; the timers are SpaceSupport's
 // (DAT_06fd1c74), so SpaceSupport hands its timer and comm messages to HandleMessage.
 // ---------------------------------------------------------------------------------------
+
+// FNpcShipEvent::Kind: what the timer reports.
+enum ENpcShipEventKind
+{
+    kNpcShipEventUnmuteComm = 0,
+    kNpcShipEventLead = 1,
+    kNpcShipEventFollow = 2,
+    kNpcShipEventTether = 3
+};
 
 // List value (0x30; node 0x38).
 struct FNpcShipEvent

@@ -69,7 +69,7 @@ StrafeBehavior::StrafeBehavior(int InTypeId)
     , StrafeDistance34(0.0f)
     , StrafeDir38{}
     , ForwardExtent44(0.0f)
-    , StrafeMode48(2)
+    , StrafeMode48(kStrafeModeStart)
     , StrafePoint4c{}
     , ScaleNear58(0.0f)
     , ScaleFar5c(0.0f)
@@ -102,7 +102,7 @@ bool StrafeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     Move.SetContext(Owner, Sys, Manager);
     Afterburner.SetContext(Owner, Sys, Manager);
     Field60 = 2;
-    StrafeMode48 = 2;
+    StrafeMode48 = kStrafeModeStart;
     Field64 = 0;
     Field6c = 0;
     Field68 = 999;
@@ -119,11 +119,11 @@ bool StrafeBehavior::OnApplyDirective(void* DirectiveOp)
         unsigned const* const OpTarget = &static_cast<pub::AI::DirectiveStrafeOp const*>(DirectiveOp)->TargetId;
         if (SysMgr->Timers.FindVerifiedObject(OpTarget) != nullptr)
         {
-            Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+            Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
             return true;
         }
     }
-    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
+    Flags28 = static_cast<unsigned char>(Flags28 & ~kBehaviorFlagDirectiveAccepted);
     return false;
 }
 
@@ -139,10 +139,10 @@ int StrafeBehavior::OnEvaluateReadiness(float Unused)
     {
         IObjRW* const Target = Sys->Targeting.GetTarget();         // FUN_062ed5a0
         if (Target != nullptr &&
-            (GetObjectTypeOrZero(Target) & 0x70000) == 0)
+            (GetObjectTypeOrZero(Target) & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_GUNBOAT)) == 0)
         {
             // FUN_062ca1b0 (FAiTarget::GetFlags, latch +0x7d).
-            if ((SelfRecord(Sys)->GetFlags() & 0x70000) != 0)
+            if ((SelfRecord(Sys)->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_GUNBOAT)) != 0)
             {
                 // DAT_0639fa48 = 400.0f; unordered takes it too.
                 Vector const Velocity = Target->get_velocity();
@@ -172,7 +172,7 @@ int StrafeBehavior::OnEvaluateReadiness(float Unused)
 void StrafeBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 
     IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
     SystemManager* const Sys = SysMgr;
@@ -194,7 +194,7 @@ void StrafeBehavior::OnEngage()
     }
 
     // FUN_062e5af0 (engine speed), times (Step + 1.0).
-    float const Speed = Behavior_GetSpeed(Owner, 1.0f, static_cast<ThrustEquipType>(1));
+    float const Speed = Behavior_GetSpeed(Owner, 1.0f, ThrustEquipEngine);
     TriggerRange2c = static_cast<float>(static_cast<double>(Speed) *
                                         (static_cast<double>(Step) + 1.0));
 
@@ -213,7 +213,7 @@ void StrafeBehavior::OnEngage()
     StrafeDistance34 = Params.StrafeRunAwayDistance;
     ScaleNear58 = Params.StrafeAttackThrottle;
     ScaleFar5c = Params.StrafeTurnThrottle;
-    StrafeMode48 = 2;
+    StrafeMode48 = kStrafeModeStart;
 }
 
 // ----------------------------------------------------------------------------
@@ -238,19 +238,19 @@ int StrafeBehavior::OnUpdate()
     IObjRW* const Target = Sys->Targeting.GetTarget();
     if (Target == nullptr)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
 
     Move.PublishTargetId(Target->get_id());
 
     // Needs type bits 0x70000 clear on the target and set on the self record, and target
     // speed squared <= 400 (unordered continues); otherwise 3.
-    if ((GetObjectTypeOrZero(Target) & 0x70000) != 0 ||
-        (SelfRecord(Sys)->GetFlags() & 0x70000) == 0)
+    if ((GetObjectTypeOrZero(Target) & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_GUNBOAT)) != 0 ||
+        (SelfRecord(Sys)->GetFlags() & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_GUNBOAT)) == 0)
     {
-        UpdateResult = 3;
-        return 3;
+        UpdateResult = kBehaviorUpdateAborted;
+        return kBehaviorUpdateAborted;
     }
     {
         Vector const Velocity = Target->get_velocity();
@@ -259,8 +259,8 @@ int StrafeBehavior::OnUpdate()
             static_cast<double>(Velocity.z) * Velocity.z;
         if (SpeedSq > 400.0)
         {
-            UpdateResult = 3;
-            return 3;
+            UpdateResult = kBehaviorUpdateAborted;
+            return kBehaviorUpdateAborted;
         }
     }
 
@@ -269,7 +269,7 @@ int StrafeBehavior::OnUpdate()
     Self->RefreshPos();                                             // FUN_062c47c0
     Vector const& SelfPos = Self->CachedPos;
 
-    if (StrafeMode48 == 0)
+    if (StrafeMode48 == kStrafeModeAttack)
     {
         // MoveIdea scale by the unrounded bearing to the target, split at pi/8 (>= and
         // unordered take the far value).
@@ -317,10 +317,10 @@ int StrafeBehavior::OnUpdate()
                            + static_cast<double>(Gap.x) * Gap.x;
         double const GapLength = CmnAiSteer::InlineFastLength(GapSq);
         if (GapLength < TriggerRange2c)
-            SelectStrafePoint(1, Target);
+            SelectStrafePoint(kStrafeModeRunAway, Target);
         Result = 0;
     }
-    else if (StrafeMode48 == 1)
+    else if (StrafeMode48 == kStrafeModeRunAway)
     {
         // Toward = (TargetPos - SelfPos) / fast length; only the length is stored to float.
         Vector const& TargetPos = Target->get_position();
@@ -347,12 +347,12 @@ int StrafeBehavior::OnUpdate()
             double const Reach = static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Target)) +
                                  static_cast<double>(StrafeDistance34);
             if (Reach < static_cast<double>(Length))
-                SelectStrafePoint(0, Target);
+                SelectStrafePoint(kStrafeModeAttack, Target);
         }
     }
-    else if (StrafeMode48 == 2)
+    else if (StrafeMode48 == kStrafeModeStart)
     {
-        SelectStrafePoint(0, ObjInspectOf(Target));
+        SelectStrafePoint(kStrafeModeAttack, ObjInspectOf(Target));
     }
 
     (void)Move.Update(DeltaTime);
@@ -369,7 +369,7 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
 {
     SystemManager* const Sys = SysMgr;
 
-    if (Mode == 1)
+    if (Mode == kStrafeModeRunAway)
     {
         // This ship (SystemManager::Watcher's object).
         Vector const SelfPos = WatchedSelf(Sys)->get_position();
@@ -432,7 +432,7 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
         return;
     }
 
-    if (Mode == 0)
+    if (Mode == kStrafeModeAttack)
     {
         Vector TargetPos{ 0.0f, 0.0f, 0.0f };
         GetIfacePositionOrZero(&TargetPos, const_cast<IObjInspect*>(Target));
@@ -475,7 +475,7 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
             }
         }
 
-        Move.SetField44(2);                // FUN_062d88b0
+        Move.SetField44(kMoveStopFlyThrough);                // FUN_062d88b0
         Move.SetRange3c(1.0f);             // ICF fold 062a66b0
         Move.SetPosition(StrafePoint4c);
         Face.SetPosition(StrafePoint4c);

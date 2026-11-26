@@ -29,6 +29,7 @@
 #include "Universe/SystemInfo.h"
 #include "Universe/TradelaneRequests.h"  // HandleTradelaneRequest / Release (TU55, msgs 0x14 / 0x15)
 #include "common_goods.h"       // EquipDesc
+#include "common_iface.h"       // BEHAVIOR_FORMATION
 #include "common_ini.h"
 #include "common_server.h"
 #include "common_server_controller.h"
@@ -140,7 +141,7 @@ namespace
         for (unsigned int Index = 0; Index < Count; ++Index)
         {
             int SolarRep = -1;
-            unsigned int Affiliation = 0xffffffffu;
+            unsigned int Affiliation = kNoAffiliation;
             if (pub::SpaceObj::GetSolarRep(Objects[Index], SolarRep) != 0)
                 continue;
             if (pub::Reputation::GetAffiliation(SolarRep, Affiliation) != 0)
@@ -305,11 +306,11 @@ namespace
     // (FUN_06eebb00) and the speaker / listener categories (FUN_06eebbb0 / FUN_06eebc60).
     void FSpaceSupport::InitGcs()
     {
-        int Type = 0;
+        int Type = kGcsHandlerDockHail;
         GGcsHandlers.AddHandler(&Type);
-        Type = 1;
+        Type = kGcsHandlerCombat;
         GGcsHandlers.AddHandler(&Type);
-        Type = 2;
+        Type = kGcsHandlerFidget;
         GGcsHandlers.AddHandler(&Type);
 
         SetGcsCategoryInterval(GCS_EVENT_DOCK_GRANTED, 12.0f);
@@ -675,7 +676,7 @@ namespace
             if (!pub::SinglePlayer())
                 break;
             FContentPlayerState* Player = FindContentPlayerStateByShip(&Msg[0]);
-            if (Player != nullptr && Player->ManeuverBehaviorId == 10)                   // FUN_06f48c10
+            if (Player != nullptr && Player->ManeuverBehaviorId == BEHAVIOR_FORMATION)                   // FUN_06f48c10
                 Player->SetManeuverBehaviorId(0);                                        // FUN_06f48c20
             break;
         }
@@ -711,13 +712,13 @@ namespace
             GGcsConversations.Update(DeltaTime);                              // FUN_06ee8c50
             break;
         }
-        case EMessage::Msg0x25:
+        case EMessage::ShipLeftSystem:
         {
             // {object, ?, system}: an object of the system's list is destroyed.
             FSystemInfo* System = FindSystemInfo(&Msg[2]);
             if (System == nullptr || System->FindSpaceObj(Msg[0]) == nullptr) // FUN_06f73990
                 break;
-            pub::SpaceObj::Destroy(Msg[0], static_cast<DestroyType>(0));
+            pub::SpaceObj::Destroy(Msg[0], DESTROY_VANISH);
             break;
         }
         case EMessage::Msg0x27:
@@ -791,7 +792,7 @@ namespace
             if ((TargetType & (OBJ_STATION | OBJ_CAPITAL)) != 0)
             {
                 // The dock hail handler keeps quiet about the ship for 30 s.
-                int const HandlerType = 0;
+                int const HandlerType = kGcsHandlerDockHail;
                 void* const AnyPhantom = nullptr;                              // DAT_06fbbb98
                 static_cast<FGcsDockHailHandler*>(GetGcsHandler(&HandlerType))
                     ->SuppressHail(&Entry.ShipId, &AnyPhantom, 0x1e);           // FUN_06ee9b70
@@ -979,7 +980,7 @@ namespace
             if (Ship->IsNpcShip())
                 NpcShip = static_cast<FContentNpcShip*>(Ship);
 
-            if (Event->Kind == 1)
+            if (Event->Kind == DESTROY_FUSE)
             {
                 unsigned int TopPlayer = 0;
                 unsigned int TopAny = 0;
@@ -1008,7 +1009,7 @@ namespace
         }
 
         // A killed object owned by a player -> "music_death" for him.
-        if (Event->OwnerPlayer != 0 && Event->Kind == 1)
+        if (Event->OwnerPlayer != 0 && Event->Kind == DESTROY_FUSE)
         {
             pub::Audio::Tryptich Track;
             Track.SpaceMusic = 0;
@@ -1302,7 +1303,7 @@ bool __cdecl BuildBestPathLegs(unsigned int /*Unused*/, FSystemInfo* System, Vec
     Legs->clear();
 
     FNnPathLeg Leg;
-    Leg.Kind = 1;
+    Leg.Kind = kNnPathLegFlight;
     Leg.PointA = *From;
     Leg.PointB = *To;
     Leg.ObjectA = 0;

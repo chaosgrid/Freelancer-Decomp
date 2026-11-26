@@ -342,7 +342,7 @@ Win3D::Win3D()
     CaptureNext = nullptr;
     HitPriority = 0;
     DrawSubLayer = 0;
-    Flags = static_cast<unsigned char>((Flags & 0xf8) | kWin3DPickable);
+    Flags = static_cast<unsigned char>((Flags & ~(kWin3DActive | kWin3DVisible | kWin3DUnregistered)) | kWin3DPickable);
     G_Win3DLiveCount = G_Win3DLiveCount + 1;
 }
 
@@ -417,7 +417,7 @@ bool Win3D::Create(Win3D* NewParent, void* /*Data*/)
     // FUN_004b5060 (RET 8).
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     return true;
 }
 
@@ -808,14 +808,14 @@ bool Win3DDispatchKey(FHudCmdRecord const* Record)
     unsigned char const bKeyDown = Record->bKeyDown;
     Modifiers = static_cast<unsigned char>(Modifiers | ((bKeyDown & 1) << 1));
     if (bKeyDown == 0)
-        Modifiers = static_cast<unsigned char>(Modifiers | 0x01);
+        Modifiers = static_cast<unsigned char>(Modifiers | kWin3DKeyReleased);
     unsigned const Shift = Record->Modifiers;
     if ((Shift & 0x03) != 0)
-        Modifiers = static_cast<unsigned char>(Modifiers | 0x04);
+        Modifiers = static_cast<unsigned char>(Modifiers | kWin3DKeyShift);
     if ((Shift & 0x0c) != 0)
-        Modifiers = static_cast<unsigned char>(Modifiers | 0x08);
+        Modifiers = static_cast<unsigned char>(Modifiers | kWin3DKeyControl);
     if ((Shift & 0x30) != 0)
-        Modifiers = static_cast<unsigned char>(Modifiers | 0x10);
+        Modifiers = static_cast<unsigned char>(Modifiers | kWin3DKeyAlt);
     unsigned const Key = Record->Key;
 
     // The focus object alone gets the key, and its answer is returned.
@@ -1255,10 +1255,10 @@ void Win3DStartupManager(int Width, int Height)
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = "interface\\interface.generic.vms";
-    Desc.Access = 0x80000000u;
-    Desc.ShareMode = 1;
-    Desc.Creation = 3;
-    Desc.Flags = 0x8000080u;
+    Desc.Access = GENERIC_READ;
+    Desc.ShareMode = FILE_SHARE_READ;
+    Desc.Creation = OPEN_EXISTING;
+    Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
     void* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),

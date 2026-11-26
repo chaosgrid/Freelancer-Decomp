@@ -7,6 +7,7 @@
 #pragma once
 
 #include "render/rendcomp.h"
+#include "render/slots.h"
 #include "engine/engbase.h"
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"

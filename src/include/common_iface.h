@@ -110,6 +110,15 @@ enum EquipmentValType
     EquipValTargetId = 0xB          // int: CEGun::GetTarget's object id, or 0
 };
 
+// The answer of get_equipment_val(EquipValMunitionKind).
+enum EEquipMunitionKind
+{
+    kMunitionKindPlain = 0,            // munition without a seeker
+    kMunitionKindSeeker = 1,
+    kMunitionKindTorpedo = 2,          // HpType 0xa (HpTypeTorpedo)
+    kMunitionKindCruiseDisruptor = 3,
+};
+
 struct EquipmentVal
 {
     float Value;
@@ -438,6 +447,15 @@ public:
 
     enum { MaxForcedTargets = 8 };
 
+    // The values of AttackState; SetAttackState reports them to the content callback as
+    // combat_state_notification CSNEngage / CSNNoEngage / CSNCombatOver.
+    enum EAttackState
+    {
+        kAttackStateEngaged = 0,     // a hostile target was acquired
+        kAttackStateNoEngage = 1,    // hostiles around (aggression ratio above the threshold), none engaged
+        kAttackStateCombatOver = 2,  // not in combat (Attach starts here, a combat drift ends there)
+    };
+
     // +0x00: vfptr (IObjInspect::SubtargetEnumerator).
     SystemManager* Owner;                  // +0x04 Attach; FUN_062ee600 / enumerate_equip read SystemManager through it
     int AttackState;                       // +0x08 SetAttackState (062ee280) compares and stores it; Attach sets 2.
@@ -512,6 +530,26 @@ inline IObjRW* ObjRwFromWatchable(void* WatchableSubObject)
         return nullptr;
     return reinterpret_cast<IObjRW*>(static_cast<char*>(WatchableSubObject) - 8);
 }
+
+// The RequestType of IObjAffect::request_event / request_cancel and the first argument of
+// RequestCB::OnResult: the controller message each one sends (DockRequest / DockCancel,
+// FormationRequest / FormationLeave, TradelaneRequest / TradelaneRelease).
+enum ERequestEventType
+{
+    kRequestEventDock = 0,
+    kRequestEventFormation = 1,
+    kRequestEventTradelane = 2,
+};
+
+// The ArgA of IObjAffect::slot_6c: the client plays the player's ship voice line for it
+// (FClientShipGameobj::slot_6c, FUN_00547250); the other values it is called with (2, 3, 4)
+// are ignored there.
+enum EShipVoiceNotice
+{
+    kShipVoiceDockTooFar = 0,
+    kShipVoiceTradeLaneDisrupted = 1,
+    kShipVoiceFormationLost = 5,
+};
 
 // IObjAffect abstract interface — mutation methods.
 struct IObjAffect
@@ -952,6 +990,18 @@ static_assert(sizeof(BehaviorScore) == 0x08, "BehaviorScore sizeof 0x08");
 // current behavior's Slot22 (.text:062d40e9 / 062d41fa). Retail struct name not recovered.
 struct FBehaviorManagerEvent
 {
+    // The values of Type, from IBehaviorManager::OnEvent's cases and the producers' payloads.
+    enum EType
+    {
+        kEventDamageTaken = 0,       // FBehaviorDamageEvent: Server's apply_*_entry
+        kEventMunitionHit = 1,       // FMunitionImpact, EqObj::munition_hit; OnEvent only reads it
+        kEventSetManeuver = 2,       // XSetManeuver: completes a directive whose target is [Data+8]
+        kEventObjectLeftSystem = 3,  // {id, type bits, ...}: StarSystem::remove_object
+        kEventTradelane = 4,         // FBehaviorTradelaneEvent
+        kEventDockRequest = 5,       // {TargetId, TargetType, ShipId, bHasPort}: pub::SpaceObj::Dock
+        kEventMissileLaunched = 6,   // {OwnerId, MissileId}: appended to the system manager's timer list
+        kEventObjectDying = 7,       // {ObjectId}, sent when its death fuse is lit: the owner itself resets to its default behavior, a formation leader is suppressed
+    };
     int Type;          // +0x00 -- 0..7
     void* Data;        // +0x04 -- per-case payload
 };
@@ -1348,6 +1398,18 @@ static_assert(offsetof(IBehaviorManager, bScanState) == 0xF8,
 // ============================================================================
 // ScriptBehavior — serializable behavior description
 // ============================================================================
+
+// The values of DialogType (CharacterBehaviorDescription / ScriptBehavior); the client picks the
+// cursor `talk_<name>` of the same name (FCharacterObject::UpdateCursor).
+enum ECharacterDialogType
+{
+    kDialogBlowoff = 0,
+    kDialogBribe = 1,
+    kDialogRumor = 2,
+    kDialogMission = 3,
+    kDialogInfo = 4,
+    kDialogStory = 5,
+};
 
 // CharacterBehaviorDescription — input to ScriptBehavior::init.
 // Layout from init @ 0xCE530. Not exported by retail (no member of it is in the export

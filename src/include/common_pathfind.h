@@ -14,6 +14,18 @@
 
 #include <cstddef>
 
+// PathfindManager::UserZone::Mode (+0x00), what UserZoneContainsPoint (FUN_062db830) tests
+// against, takes pub::AI::SetZoneBehaviorParams::EZoneMode.
+
+// PathfindManager::AvoidRecordKind (+0x214), the kind of avoidance record RefreshAvoidance built. Bit 0
+// marks a nudge record and bit 1 a point record (callers test the bits as well as comparing).
+enum EAvoidRecordKind
+{
+    kAvoidRecordNone = 0,
+    kAvoidRecordNudge = 1,   // AvoidNudgeDirection, handed to the ThrustManager
+    kAvoidRecordPoint = 2,   // AvoidTargetPoint / AvoidPointScale, steered at by DodgeIdea and FaceIdea
+};
+
 // ============================================================================
 // PathfindManager -- the per-ship AI path/obstacle state IBehaviorManager owns at +0x0C.
 //

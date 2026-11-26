@@ -15,6 +15,13 @@
 #include <cstddef>
 
 // Digital Anvil FileSystem AGGDESC (size 0x30 or 0x34). DALib::OpenData / ReadFile.dll.c.
+// FFileSystemDesc::MemFlags of a "MEM" file system descriptor (FUN_06b777f0).
+enum EMemFileDescFlag
+{
+    kMemDescUseBuffer = 0x1,    // wrap MemBuffer in place instead of allocating a buffer of MemSize
+    kMemDescOwnBuffer = 0x2,    // with kMemDescUseBuffer: the file object frees MemBuffer on release
+};
+
 struct FFileSystemDesc
 {
     unsigned long Size;              // +0x00  0x30 or 0x34

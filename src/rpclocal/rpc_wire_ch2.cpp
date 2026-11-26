@@ -247,7 +247,7 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** Buffe
     const unsigned char Flag10 = (unsigned char)(Wire.MaskRelationsWord & 0xffu);
 
     unsigned char Mask = 0;
-    if (Wire.Affiliation != 0xffffffffu) {                      // 06d91f14 CMP ...,-1
+    if (Wire.Affiliation != kNoAffiliation) {                      // 06d91f14 CMP ...,-1
         Mask = Flag1;
     }
     unsigned int RelCount = 0;
@@ -339,7 +339,7 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* 
         }
         Wire.Affiliation = Scratch;
     } else {
-        Wire.Affiliation = 0xffffffffu;
+        Wire.Affiliation = kNoAffiliation;
     }
 
     if (SinglePlayer()) {                                      // 06d9242a / 06d92432

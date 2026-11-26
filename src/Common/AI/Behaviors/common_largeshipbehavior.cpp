@@ -58,7 +58,7 @@ void LargeShipBehavior::OnEngage()
     // restoring MoveIdea's ctor default.
     Move.SetAngle38(3.14159274f);
 
-    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 
     // FUN_062eb5a0 (ComputeGunRangeStats): the average, not the max.
     float OutAverage = 0.0f;
@@ -152,8 +152,8 @@ int LargeShipBehavior::Update()
     IObjRW* const Handle = SysMgr->Targeting.GetTarget();
     if (Handle == nullptr)
     {
-        UpdateResult = 2;
-        return 2;
+        UpdateResult = kBehaviorUpdateFinished;
+        return kBehaviorUpdateFinished;
     }
 
     // AttitudeRefIface is the behaviour's own threat source, Iface the current target.
@@ -172,21 +172,21 @@ int LargeShipBehavior::Update()
     }
 
     RefreshAiTargetFlags(Scratch);
-    if ((Scratch.CachedFlags & 0x280100) != 0)
+    if ((Scratch.CachedFlags & (OBJ_STATION | OBJ_CRUISER | OBJ_CAPITAL)) != 0)
     {
         // Steer straight at the threat and hold that decision for 30 seconds.
         Scratch.RefreshPos();
         Vector const ThreatPos = Scratch.CachedPos;
 
         Move.SetRange3c(500.0f);  // DAT_0639f55c
-        Move.SetMode(0);
+        Move.SetMode(kMoveModeEngine);
         Move.SetScale40(0.6f);    // DAT_0639f554
         Face.SetPosition(ThreatPos);
         Move.SetPosition(ThreatPos);
 
         ThreatCooldown = 30.0f;  // DAT_0639f550
-        UpdateResult = 1;
-        return 1;  // early return: this path skips the shared tail's tick calls
+        UpdateResult = kBehaviorUpdateRunning;
+        return kBehaviorUpdateRunning;  // early return: this path skips the shared tail's tick calls
     }
 
     // A separate cooldown gates the avoidance scan (DAT_06399408 = 0.0f).
@@ -257,13 +257,13 @@ int LargeShipBehavior::Update()
                     // Exact equality on the whole flags dword (CMP, not TEST), each test
                     // preceded by its own copy of the lazy refresh.
                     RefreshAiTargetFlags(*Elem);
-                    if (Elem->CachedFlags != 0x80000)
+                    if (Elem->CachedFlags != OBJ_CRUISER)
                     {
                         RefreshAiTargetFlags(*Elem);
-                        if (Elem->CachedFlags != 0x100000)
+                        if (Elem->CachedFlags != OBJ_TRANSPORT)
                         {
                             RefreshAiTargetFlags(*Elem);
-                            if (Elem->CachedFlags != 0x200000)
+                            if (Elem->CachedFlags != OBJ_CAPITAL)
                             {
                                 continue;
                             }
@@ -349,8 +349,8 @@ int LargeShipBehavior::Update()
                 {
                     Face.Update(DeltaTime);
                     Move.Update(DeltaTime);
-                    UpdateResult = 1;
-                    return 1;
+                    UpdateResult = kBehaviorUpdateRunning;
+                    return kBehaviorUpdateRunning;
                 }
 
                 Vector RayDir = {};
@@ -376,10 +376,10 @@ int LargeShipBehavior::Update()
 
                     // A mask test this time, with an exact-equality fallback.
                     RefreshAiTargetFlags(*Elem);
-                    if ((Elem->CachedFlags & 0xfdff) == 0)
+                    if ((Elem->CachedFlags & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0)
                     {
                         RefreshAiTargetFlags(*Elem);
-                        if (Elem->CachedFlags != 0x200000)
+                        if (Elem->CachedFlags != OBJ_CAPITAL)
                         {
                             continue;
                         }
@@ -439,7 +439,7 @@ int LargeShipBehavior::Update()
                 if (!bBlocked)
                 {
                     Move.SetRange3c(250.0f);  // DAT_0639f558
-                    Move.SetMode(0);
+                    Move.SetMode(kMoveModeEngine);
                     Move.SetScale40(0.6f);    // DAT_0639f554
                     Face.SetPosition(AvoidanceGoalPos);
                     Move.SetPosition(AvoidanceGoalPos);
@@ -469,6 +469,6 @@ int LargeShipBehavior::Update()
     Face.Update(DeltaTime);
     Move.Update(DeltaTime);
 
-    UpdateResult = 1;
-    return 1;
+    UpdateResult = kBehaviorUpdateRunning;
+    return kBehaviorUpdateRunning;
 }

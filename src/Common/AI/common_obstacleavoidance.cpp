@@ -38,6 +38,13 @@ namespace
     unsigned GAvoidIndexTable[25] = {};
     unsigned GAvoidIndexTableShuffled = 0;
 
+    // The solar object types ClassifyShipObstaclePhase scans as obstacles alongside the round
+    // bodies (moon / planet / sun, scanned separately): the 0xfd58 filter mask of its
+    // GetOwnScanList call and of the per-candidate re-test.
+    unsigned const kObstacleSolarTypeMask = OBJ_BLACKHOLE | OBJ_SATELLITE | OBJ_JUMP_GATE | OBJ_STATION |
+                                            OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_WEAPONS_PLATFORM |
+                                            OBJ_DESTROYABLE_DEPOT | OBJ_NON_TARGETABLE | OBJ_MISSION_SATELLITE;
+
     // DAT_063ec6a8, a writable .data float (2.0f), read once by FUN_062de490.
     float GAvoidTurnGain = 2.0f;
 }
@@ -280,13 +287,13 @@ void ObstacleAvoidance::Update(float Dt)
         {
             continue;
         }
-        if (((unsigned)HitObject->ObjectClass & 3) != 3)
+        if (((unsigned)HitObject->ObjectClass & CObject::ClassSimple) != CObject::ClassSimple)
         {
             continue;
         }
         CSimple const* const HitSimple = (CSimple const*)HitObject;
         unsigned const HitType = HitSimple->TypeBits;
-        if ((HitType & 0x20c150) == 0 || HitType == OwnType)
+        if ((HitType & (OBJ_SATELLITE | OBJ_JUMP_GATE | OBJ_STATION | OBJ_NON_TARGETABLE | OBJ_MISSION_SATELLITE | OBJ_CAPITAL)) == 0 || HitType == OwnType)
         {
             continue;
         }
@@ -780,7 +787,7 @@ bool SystemManagerTimerTable::GetOwnScanList(ScanList const*& OutList, unsigned 
     EquipStatus Scratch{};
     ProviderBase->get_equipment_status(Scratch, ScannerEquipId);
 
-    if ((Scratch.Flags & 2) != 0)
+    if ((Scratch.Flags & EquipStatusFlagDestroyed) != 0)
         return false;
 
     // Retail re-derives the ProviderBase chain here with no null test (a null owner faults on
@@ -906,7 +913,7 @@ int PathfindManager::ClassifyObstaclePhase()
 
     // Behaviour 10 never reacts.
     int const BehaviorIndex = Owner->CurrentBehaviorIndex;
-    if (BehaviorIndex == 10)
+    if (BehaviorIndex == BEHAVIOR_FORMATION)
         return 4;
 
     int const LookaheadBehaviors[6] = { 1, 3, 5, 0xb, 0xd, 0x12 };
@@ -952,7 +959,7 @@ int PathfindManager::ClassifyObstaclePhase()
 
     // The return value is ignored; only a null list returns 4.
     ScanList const* CandidateList = nullptr;
-    Owner->Sys->Timers.GetOwnScanList(CandidateList, 0xfd58u);
+    Owner->Sys->Timers.GetOwnScanList(CandidateList, kObstacleSolarTypeMask);
     if (CandidateList == nullptr)
         return 4;
 
@@ -984,19 +991,19 @@ int PathfindManager::ClassifyObstaclePhase()
             if (Pass == 0)
             {
                 Candidate = ObjRwFromWatchable(const_cast<Watchable*>(CandidateList->Entries[Index].target()));
-                TypeMask = 0xfd58u;
+                TypeMask = kObstacleSolarTypeMask;
             }
             else
             {
                 Candidate = (IObjRW*)Nearby.Items[Index];
-                TypeMask = 7u;
+                TypeMask = OBJ_MOON | OBJ_PLANET | OBJ_SUN;
             }
 
             unsigned Type = 0;
             Candidate->get_type(Type);
             if ((Type & TypeMask) == 0)
                 continue;
-            bool const bCandidateClose = (Type & 7u) != 0;
+            bool const bCandidateClose = (Type & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0;
 
             unsigned const CandidateId = Candidate->get_id();
             ObstacleAvoidance::Slot* SlotPtr = nullptr;
@@ -1056,7 +1063,7 @@ int PathfindManager::ClassifyObstaclePhase()
 
     // Behaviour 2: a winner sitting on the target (within 1.0) does not count; unordered
     // continues.
-    if (BehaviorIndex == 2)
+    if (BehaviorIndex == BEHAVIOR_GOTO)
     {
         Vector const& WinnerPos = BestCandidate->get_position();
         double const DX = (double)(WinnerPos.x) - WorkingTarget.x;
@@ -1071,7 +1078,7 @@ int PathfindManager::ClassifyObstaclePhase()
     This->bHasCachedObstacle = true;
     unsigned WinnerType = 0;
     BestCandidate->get_type(WinnerType);
-    bool const bHasCloseFlags = (WinnerType & 7u) != 0;
+    bool const bHasCloseFlags = (WinnerType & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0;
 
     if (bHasCloseFlags)
     {
@@ -1189,7 +1196,7 @@ int PathfindManager::ClassifyObstaclePhase()
     else
     {
         CObject const* const Cobj = BestCandidate->cobject();
-        CObject* const Exclude = (Cobj != nullptr && ((unsigned)Cobj->ObjectClass & 3u) == 3u)
+        CObject* const Exclude = (Cobj != nullptr && ((unsigned)Cobj->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
             ? const_cast<CObject*>(Cobj)
             : nullptr;
         PhySys::RayHit Hit[1];

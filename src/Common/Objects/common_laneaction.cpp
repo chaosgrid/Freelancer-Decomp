@@ -358,7 +358,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
             if (TradelaneObj()->is_player())
             {
                 // IObjAffect slot 27, unnamed (see common_iface.h).
-                TradelaneObj()->slot_6c(1, 0);
+                TradelaneObj()->slot_6c(kShipVoiceTradeLaneDisrupted, 0);
             }
 
             bExitFlag = 1;

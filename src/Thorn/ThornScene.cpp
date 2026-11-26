@@ -933,10 +933,10 @@ namespace
         int UpIdx = 1;
         int FrontIdx = 2;
         // A null or sentinel (6) scene up axis skips BOTH scene selections.
-        if (SceneUpAxis != nullptr && *SceneUpAxis != 6)
+        if (SceneUpAxis != nullptr && *SceneUpAxis != kThornAxisUnset)
         {
             UpIdx = static_cast<int>(*SceneUpAxis);
-            if (SceneFrontAxis != nullptr && *SceneFrontAxis != 6)
+            if (SceneFrontAxis != nullptr && *SceneFrontAxis != kThornAxisUnset)
                 FrontIdx = static_cast<int>(*SceneFrontAxis);
         }
 
@@ -983,36 +983,36 @@ namespace
         bool bUpColumn0 = false;
         switch (FrontAxis)
         {
-        case 0:
-        case 3:
+        case kThornAxisX:
+        case kThornAxisNegX:
             WriteColumn(Out9, 0, &Dir);
             bCol0 = true;
             break;
-        case 1:
-        case 4:
+        case kThornAxisY:
+        case kThornAxisNegY:
             WriteColumn(Out9, 1, &Dir);
             bCol1 = true;
             break;
-        case 2:
-        case 5:
+        case kThornAxisZ:
+        case kThornAxisNegZ:
             WriteColumn(Out9, 2, &Dir);
             bCol2 = true;
             break;
         }
         switch (UpAxis)
         {
-        case 0:
-        case 3:
+        case kThornAxisX:
+        case kThornAxisNegX:
             WriteColumn(Out9, 0, &OrthoUp);
             bUpColumn0 = true;
             break;
-        case 1:
-        case 4:
+        case kThornAxisY:
+        case kThornAxisNegY:
             WriteColumn(Out9, 1, &OrthoUp);
             bCol1 = true;
             break;
-        case 2:
-        case 5:
+        case kThornAxisZ:
+        case kThornAxisNegZ:
             WriteColumn(Out9, 2, &OrthoUp);
             bCol2 = true;
             break;
@@ -1815,17 +1815,17 @@ namespace
         if (Entity->FogControl == nullptr)
             return;
         const unsigned char* FogBytes = reinterpret_cast<const unsigned char*>(&Entity->LiveSceneBlob[7]);
-        if ((Mask & 1) != 0)
+        if ((Mask & kThornFogBitOn) != 0)
             Entity->FogControl->SetOn(FogBytes[0]);
-        if ((Mask & 0xA) != 0)
+        if ((Mask & (kThornFogBitTable | kThornFogBitMode)) != 0)
             Entity->FogControl->SetTableMode(FogBytes[1], Entity->LiveSceneBlob[11]);
-        if ((Mask & 0x70) != 0)
+        if ((Mask & (kThornFogBitStart | kThornFogBitEnd | kThornFogBitDensity)) != 0)
         {
             float RangeValues[3];
             std::memcpy(RangeValues, &Entity->LiveSceneBlob[12], sizeof(RangeValues));
             Entity->FogControl->SetRangeValue(&RangeValues[0], &RangeValues[1], &RangeValues[2]);
         }
-        if ((Mask & 4) != 0)
+        if ((Mask & kThornFogBitColor) != 0)
         {
             // The packed block's int colour, not a float copy.
             Entity->FogControl->SetColor(reinterpret_cast<const int*>(&Entity->LiveSceneBlob[8]));
@@ -1929,11 +1929,11 @@ namespace
             Light->SetColor(Color);
             Entity->LightControl->SetDirection(&Live.Direction);
             Entity->LightControl->SetRange(Live.Range);
-            if (Live.Type == 1)
+            if (Live.Type == kThornLightPoint)
                 Entity->LightControl->SetCutoff(-1.0f);
             else
                 Entity->LightControl->SetCutoff(Live.Cutoff * PiOver180);
-            Entity->LightControl->SetInfinite((Live.Type == 3) ? 1 : 0);
+            Entity->LightControl->SetInfinite((Live.Type == kThornLightDirect) ? 1 : 0);
             Entity->LightControl->SetOn(Live.On);
         }
     }
@@ -2823,7 +2823,7 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
     else if (Type == kThornEntityLight)
     {
         // A reference entity (flag 1) gets the defaults, not the parsed fields.
-        if ((Entity->Snap.Flags & 1) != 0)
+        if ((Entity->Snap.Flags & kThornEntityFlagReference) != 0)
         {
             ThornInitLightEntityDefaults(&Entity->Snap.Light);
             ThornCopyLightPropsToEntity(Entity, &Entity->Snap.Light);
@@ -2839,7 +2839,7 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
     }
     else if (Type == kThornEntityScene || Type == kThornEntitySubScene)
     {
-        if (Type == kThornEntityScene && (Entity->Snap.Flags & 1) == 0)
+        if (Type == kThornEntityScene && (Entity->Snap.Flags & kThornEntityFlagReference) == 0)
             std::memcpy(Entity->Snap.SceneBlob, Entity->LiveSceneBlob, sizeof(Entity->Snap.SceneBlob));
         else
         {
@@ -2851,7 +2851,7 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
     }
     else if (Type == kThornEntityMotionPath)
     {
-        if ((Entity->Snap.Flags & 1) == 0)
+        if ((Entity->Snap.Flags & kThornEntityFlagReference) == 0)
         {
             Entity->Snap.MotionPath.PathType = Entity->PathType;
             Entity->Snap.MotionPath.MotionPath = Entity->ParsedMotionPathDescObject;
@@ -2859,7 +2859,7 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
         else
             Entity->Snap.MotionPath = {nullptr, nullptr};
     }
-    else if (Type == kThornEntityPsys && (Entity->Snap.Flags & 1) != 0)
+    else if (Type == kThornEntityPsys && (Entity->Snap.Flags & kThornEntityFlagReference) != 0)
         std::memset(&Entity->Snap.PsysSparam, 0, sizeof(Entity->Snap.PsysSparam));
 }
 
@@ -4667,18 +4667,18 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
                 if (bSnapDiscrete)
                 {
                     const unsigned int SnapMask = FogMask;
-                    if ((SnapMask & 1) != 0) ResultFog->On = Target.On;
-                    if ((SnapMask & 2) != 0) ResultFog->Table = Target.Table;
-                    if ((SnapMask & 8) != 0) ResultFog->Mode = Target.Mode;
+                    if ((SnapMask & kThornFogBitOn) != 0) ResultFog->On = Target.On;
+                    if ((SnapMask & kThornFogBitTable) != 0) ResultFog->Table = Target.Table;
+                    if ((SnapMask & kThornFogBitMode) != 0) ResultFog->Mode = Target.Mode;
                 }
                 const unsigned int InterpolationMask = FogMask;
-                if ((InterpolationMask & 0x10) != 0)
+                if ((InterpolationMask & kThornFogBitStart) != 0)
                     FogLerpFloat(&Capture->Start, &Target.Start, &U, &ResultFog->Start);
-                if ((InterpolationMask & 0x20) != 0)
+                if ((InterpolationMask & kThornFogBitEnd) != 0)
                     FogLerpFloat(&Capture->End, &Target.End, &U, &ResultFog->End);
-                if ((InterpolationMask & 0x40) != 0)
+                if ((InterpolationMask & kThornFogBitDensity) != 0)
                     FogLerpFloat(&Capture->Density, &Target.Density, &U, &ResultFog->Density);
-                if ((InterpolationMask & 4) != 0)
+                if ((InterpolationMask & kThornFogBitColor) != 0)
                 {
                     ResultFog->Color[0] = FogLerpInteger(Capture->Color[0], Target.Color[0], &U);
                     ResultFog->Color[1] = FogLerpInteger(Capture->Color[1], Target.Color[1], &U);
@@ -4754,15 +4754,15 @@ unsigned char FThornEvent::TickReverbPropAnim(int TimeMs, FThornScene* Scene)
                 if (Control != nullptr)
                 {
                     // Only U >= 1 (ordered) replaces the environment.
-                    if (U >= 1.0f && (ReverbMask & 1) != 0)
+                    if (U >= 1.0f && (ReverbMask & kThornReverbBitEnvironment) != 0)
                         Output.Environment = Target.Environment;
                     const int Mask = ReverbMask;
                     // Same x87 kernel as the FOG floats.
-                    if ((Mask & 2) != 0)
+                    if ((Mask & kThornReverbBitVolume) != 0)
                         FogLerpFloat(&ReverbCapture[1], &Target.Volume, &U, &Output.Volume);
-                    if ((Mask & 4) != 0)
+                    if ((Mask & kThornReverbBitDecay) != 0)
                         FogLerpFloat(&ReverbCapture[2], &Target.Decay, &U, &Output.Decay);
-                    if ((Mask & 8) != 0)
+                    if ((Mask & kThornReverbBitDamping) != 0)
                         FogLerpFloat(&ReverbCapture[3], &Target.Damping, &U, &Output.Damping);
                     ThornSetReverbProperties(Control, &Output);
                 }
@@ -4816,28 +4816,28 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
             const int Mask = AudioMask;
             FThornAudio8 Out;
             std::memcpy(&Out, Primary->Audio, sizeof(Out));
-            if ((Mask & 1) != 0)
+            if ((Mask & kThornAudioBitAttenuation) != 0)
                 AudioLerpFloat(&AudioCapture.Attenuation, &To.Attenuation, &Out.Attenuation);
-            if ((Mask & 2) != 0)
+            if ((Mask & kThornAudioBitPan) != 0)
                 AudioLerpFloat(&AudioCapture.Pan, &To.Pan, &Out.Pan);
             // Retail repeats these two, FP exception effects included.
-            if ((Mask & 1) != 0)
+            if ((Mask & kThornAudioBitAttenuation) != 0)
                 AudioLerpFloat(&AudioCapture.Attenuation, &To.Attenuation, &Out.Attenuation);
-            if ((Mask & 2) != 0)
+            if ((Mask & kThornAudioBitPan) != 0)
                 AudioLerpFloat(&AudioCapture.Pan, &To.Pan, &Out.Pan);
-            if ((Mask & 4) != 0)
+            if ((Mask & kThornAudioBitDmin) != 0)
                 AudioLerpFloat(&AudioCapture.Dmin, &To.Dmin, &Out.Dmin);
-            if ((Mask & 8) != 0)
+            if ((Mask & kThornAudioBitDmax) != 0)
                 AudioLerpFloat(&AudioCapture.Dmax, &To.Dmax, &Out.Dmax);
-            if ((Mask & 0x10) != 0)
+            if ((Mask & kThornAudioBitAin) != 0)
                 Out.Ain = static_cast<int>(static_cast<unsigned int>(static_cast<__int64>(
                     ComputeAudioLerpInteger(AudioCapture.Ain, To.Ain))));
-            if ((Mask & 0x20) != 0)
+            if ((Mask & kThornAudioBitAout) != 0)
                 Out.Aout = static_cast<int>(static_cast<unsigned int>(static_cast<__int64>(
                     ComputeAudioLerpInteger(AudioCapture.Aout, To.Aout))));
-            if ((Mask & 0x40) != 0)
+            if ((Mask & kThornAudioBitAtout) != 0)
                 AudioLerpFloat(&AudioCapture.Atout, &To.Atout, &Out.Atout);
-            if ((Mask & 0x80) != 0)
+            if ((Mask & kThornAudioBitRmix) != 0)
                 AudioLerpFloat(&AudioCapture.Rmix, &To.Rmix, &Out.Rmix);
             // Pop the progress before the output callback.
             __asm { fstp st(0) }
@@ -5265,7 +5265,7 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
                 FThornEntity* Primary = *PrimaryEntry;
                 float Result;
                 std::memcpy(&Result, &Primary->PsysRuntimeSparam, sizeof(Result));
-                if ((PsysMask & 1) != 0)
+                if ((PsysMask & kThornPsysBitSparam) != 0)
                 {
                     const float* Capture = &SparamCapture;
                     __asm {
@@ -5803,13 +5803,13 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
             Out[1] = ReverbCapture[1];
             Out[2] = ReverbCapture[2];
             Out[3] = ReverbCapture[3];
-            if (U >= 1.0f && (ReverbMask & 0x1) != 0)
+            if (U >= 1.0f && (ReverbMask & kThornReverbBitEnvironment) != 0)
                 Out[0] = To[0];
-            if ((ReverbMask & 0x2) != 0)
+            if ((ReverbMask & kThornReverbBitVolume) != 0)
                 Out[1] = ReverbCapture[1] + (To[1] - ReverbCapture[1]) * U;
-            if ((ReverbMask & 0x4) != 0)
+            if ((ReverbMask & kThornReverbBitDecay) != 0)
                 Out[2] = ReverbCapture[2] + (To[2] - ReverbCapture[2]) * U;
-            if ((ReverbMask & 0x8) != 0)
+            if ((ReverbMask & kThornReverbBitDamping) != 0)
                 Out[3] = ReverbCapture[3] + (To[3] - ReverbCapture[3]) * U;
             Primary->ReverbControl->SetReverb(BitsAsUInt(&Out[0]), Out[1], Out[2], Out[3]);
         }
@@ -6270,11 +6270,11 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     CopyPoseWordsForward(&LoadOrient, &Snap.Orient);
 
     if (DescriptorOwnerType == kThornEntityPsys &&
-        (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityPsys)
+        (SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityPsys)
         std::memcpy(&Snap.PsysSparam, &SnapIn->PsysSparam, sizeof(Snap.PsysSparam));
 
     if ((DescriptorOwnerType == kThornEntityScene || DescriptorOwnerType == kThornEntitySubScene) &&
-        (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityScene)
+        (SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityScene)
     {
         for (int Index = 0; Index < 15; ++Index)
         {
@@ -6287,7 +6287,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
 
     if (DescriptorOwnerType == kThornEntitySound)
     {
-        if ((SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntitySound)
+        if ((SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntitySound)
             CopyPoseWordsForward(Snap.Audio, SnapIn->Audio, 8);
         // Name/Template are read after the pose and tail.
         Snap.Name = AssignEntityName(SnapIn->Name);
@@ -6295,11 +6295,11 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     }
 
     if (DescriptorOwnerType == kThornEntityMotionPath &&
-        (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityMotionPath)
+        (SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityMotionPath)
         ApplyMotionPathDesc(this, &SnapIn->MotionPath);
 
     if (DescriptorOwnerType == kThornEntityLight &&
-        (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityLight)
+        (SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityLight)
     {
         // Raw 36-word tail copy.
         for (int Index = 0; Index < 36; ++Index)
@@ -6313,7 +6313,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     }
 
     if ((DescriptorOwnerType == kThornEntityCompound || DescriptorOwnerType == kThornEntityDeformable) &&
-        (SnapIn->Flags & 1) == 0 &&
+        (SnapIn->Flags & kThornEntityFlagReference) == 0 &&
         (SnapIn->Type == kThornEntityCompound || SnapIn->Type == kThornEntityDeformable))
     {
         // Only the descriptor copy (FUN_06f40f80); FUN_06f40f90 sets the runtime value.
@@ -6324,7 +6324,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     {
         // The input flags/type/tail are read only after the unlink.
         UnbindMonitorChildren(this);
-        if ((SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityCamera)
+        if ((SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityCamera)
         {
             // Raw stores in Near/Far/Fov/Aspect order.
             const int StoreOrder[4] = {1, 2, 0, 3};
@@ -6950,15 +6950,15 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
         BindQi(EngineObj, Iids::ReverbControl, Entity->ReverbControl, Result);
         BindQi(EngineObj, Iids::SubtitleControl, Entity->SubtitleControl, Result);
         // A sentinel 6 axis (FUN_06f42d70) is replaced in descriptor and live blob alike.
-        if (Entity->Snap.SceneBlob[6] == 6)
+        if (Entity->Snap.SceneBlob[6] == kThornAxisUnset)
         {
-            Entity->Snap.SceneBlob[6] = 5;
-            Entity->LiveSceneBlob[6] = 5;
+            Entity->Snap.SceneBlob[6] = kThornAxisNegZ;
+            Entity->LiveSceneBlob[6] = kThornAxisNegZ;
         }
-        if (Entity->Snap.SceneBlob[5] == 6)
+        if (Entity->Snap.SceneBlob[5] == kThornAxisUnset)
         {
-            Entity->Snap.SceneBlob[5] = 1;
-            Entity->LiveSceneBlob[5] = 1;
+            Entity->Snap.SceneBlob[5] = kThornAxisY;
+            Entity->LiveSceneBlob[5] = kThornAxisY;
         }
     }
     else if (EntType == kThornEntityMotionPath)
@@ -7087,7 +7087,7 @@ GENRESULT FThornScene::AddEntityFromDesc(void* Desc, int* OutIndex)
     *OutIndex = -1;
     const FThornEntitySnap* Snap = static_cast<const FThornEntitySnap*>(Desc);
     const int Type = Snap->Type;
-    if (Type < 1 || Type > 13 || Type == 12)
+    if (Type < kThornEntityCompound || Type > kThornEntityPsys || Type == kThornEntityDeleted)
         return GR_GENERIC;
     // Throwing new; retail's VC6 operator new could return null and then crash.
     FThornEntity* Entity = new FThornEntity(Type, Snap, this);
@@ -7727,14 +7727,14 @@ namespace
 
     const char* EntityTypeName(int Type)
     {
-        if (Type < 0 || Type > 13)
+        if (Type < 0 || Type > kThornEntityPsys)
             return kEntityTypeNames[0];
         return kEntityTypeNames[Type];
     }
 
     const char* EventTypeName(int Type)
     {
-        if (Type < 0 || Type > 19)
+        if (Type < 0 || Type > kThornEventTypeMax)
             return kEventTypeNames[0];
         // Retail maps the numeric ID to the table position first.
         static const int EventIds[] = {0, 10, 3, 11, 6, 8, 4, 5, 7, 2, 9, 12, 1,
@@ -7749,8 +7749,8 @@ namespace
 
     bool SpatialInSave(int Type)
     {
-        return Type == 1 || Type == 2 || Type == 3 || Type == 5 || Type == 6 || Type == 7 ||
-               Type == 9 || Type == 10 || Type == 11 || Type == 13;
+        return Type == kThornEntityCompound || Type == kThornEntityDeformable || Type == kThornEntityCamera || Type == kThornEntityLight || Type == kThornEntitySound || Type == kThornEntityMarker ||
+               Type == kThornEntityScene || Type == kThornEntitySubScene || Type == kThornEntityMotionPath || Type == kThornEntityPsys;
     }
 
     // Holds the save file system (FUN_06f2d2c0); releases it on unwind.
@@ -8145,20 +8145,20 @@ namespace
 
     const char* LightTypeName(int Type)
     {
-        if (Type == 2)
+        if (Type == kThornLightSpot)
             return "L_SPOT";
-        if (Type == 3)
+        if (Type == kThornLightDirect)
             return "L_DIRECT";
         return "L_POINT";
     }
 
     const char* FogModeName(int Mode)
     {
-        if (Mode == 1)
+        if (Mode == kThornFogExp)
             return "F_EXP";
-        if (Mode == 2)
+        if (Mode == kThornFogExp2)
             return "F_EXP2";
-        if (Mode == 3)
+        if (Mode == kThornFogLinear)
             return "F_LINEAR";
         return "F_NONE";
     }
@@ -8166,37 +8166,37 @@ namespace
     // FUN_06f2c3e0: byte mask; each value is read after its key is written.
     void SaveFogProps(FThornSaveBuf* Buf, const FThornFog8* Props, unsigned char Mask)
     {
-        if ((Mask & 0x1) != 0)
+        if ((Mask & kThornFogBitOn) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogon");
             SaveBufAppendStringValue(Buf, "%s, ", Props->On != 0 ? "Y" : "N");
         }
-        if ((Mask & 0x2) != 0)
+        if ((Mask & kThornFogBitTable) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogtable");
             SaveBufAppendStringValue(Buf, "%s, ", Props->Table != 0 ? "Y" : "N");
         }
-        if ((Mask & 0x4) != 0)
+        if ((Mask & kThornFogBitColor) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogcolor");
             SaveBufAppendColor(Buf, "{%d, %d, %d}, ", Props->Color);
         }
-        if ((Mask & 0x8) != 0)
+        if ((Mask & kThornFogBitMode) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogmode");
             SaveBufAppendStringValue(Buf, "%s, ", FogModeName(Props->Mode));
         }
-        if ((Mask & 0x10) != 0)
+        if ((Mask & kThornFogBitStart) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogstart");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->Start);
         }
-        if ((Mask & 0x20) != 0)
+        if ((Mask & kThornFogBitEnd) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogend");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->End);
         }
-        if ((Mask & 0x40) != 0)
+        if ((Mask & kThornFogBitDensity) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "fogdensity");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->Density);
@@ -8206,24 +8206,24 @@ namespace
     // FUN_06f2c8f0: byte mask; each value is read after its key is written.
     void SaveReverbProps(FThornSaveBuf* Buf, const FThornReverb4* Props, unsigned char Mask)
     {
-        if ((Mask & 0x1) != 0)
+        if ((Mask & kThornReverbBitEnvironment) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "env");
             int Environment;
             std::memcpy(&Environment, &Props->Environment, sizeof(Environment));
             SaveBufAppendInteger(Buf, "%d, ", Environment);
         }
-        if ((Mask & 0x2) != 0)
+        if ((Mask & kThornReverbBitVolume) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "vol");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->Volume);
         }
-        if ((Mask & 0x4) != 0)
+        if ((Mask & kThornReverbBitDecay) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "decay");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->Decay);
         }
-        if ((Mask & 0x8) != 0)
+        if ((Mask & kThornReverbBitDamping) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "damping");
             SaveBufAppendRawFloat(Buf, "%.6f, ", &Props->Damping);
@@ -8416,7 +8416,7 @@ namespace
 
     void SavePathAttachFlags(FThornSaveBuf* Buf, const FThornEventDesc* Descriptor, bool bAttach)
     {
-        if ((Descriptor->Flags & 0xf) == 0)
+        if ((Descriptor->Flags & (kThornFlagUseScriptDuration | kThornFlagPosition | kThornFlagOrientation | kThornFlagLookAt)) == 0)
             return;
         SaveBufAppendLiteral(Buf, ", flags =");
         char Started = '\0';
@@ -8492,35 +8492,35 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         if (Entity->Flags != 0)
         {
             char FlagStarted = '\0';
-            unsigned int KnownFlags = 0x11;
+            unsigned int KnownFlags = kThornEntityFlagReference | kThornEntityFlagHidden;
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tflags =");
-            if ((Entity->Flags & 1) != 0)
+            if ((Entity->Flags & kThornEntityFlagReference) != 0)
                 SaveBufAppendStringFormat(&Buf, " REFERENCE", &FlagStarted);
-            if ((Entity->Flags & 0x10) != 0)
+            if ((Entity->Flags & kThornEntityFlagHidden) != 0)
                 SaveBufAppendStringFormat(&Buf, " HIDDEN", &FlagStarted);
             const int Type = Entity->Type;
-            if (Type == 1 || Type == 2 || Type == 13)
+            if (Type == kThornEntityCompound || Type == kThornEntityDeformable || Type == kThornEntityPsys)
             {
-                KnownFlags = 0x17;
-                if ((Entity->Flags & 4) != 0)
+                KnownFlags = kThornEntityFlagReference | kThornEntityFlagHidden | kThornEntityFlagLitAmbient | kThornEntityFlagLitDynamic;
+                if ((Entity->Flags & kThornEntityFlagLitDynamic) != 0)
                     SaveBufAppendStringFormat(&Buf, " LIT_DYNAMIC", &FlagStarted);
-                if ((Entity->Flags & 2) != 0)
+                if ((Entity->Flags & kThornEntityFlagLitAmbient) != 0)
                     SaveBufAppendStringFormat(&Buf, " LIT_AMBIENT", &FlagStarted);
             }
-            else if (Type == 6)
+            else if (Type == kThornEntitySound)
             {
-                KnownFlags = 0x1f;
-                if ((Entity->Flags & 2) != 0)
+                KnownFlags = kThornEntityFlagReference | kThornEntityFlagHidden | kThornEntityFlagSoundSpatial | kThornEntityFlagSoundStream | kThornEntityFlagSoundLoop;
+                if ((Entity->Flags & kThornEntityFlagSoundSpatial) != 0)
                     SaveBufAppendStringFormat(&Buf, " SPATIAL", &FlagStarted);
-                if ((Entity->Flags & 8) != 0)
+                if ((Entity->Flags & kThornEntityFlagSoundLoop) != 0)
                     SaveBufAppendStringFormat(&Buf, " LOOP", &FlagStarted);
-                if ((Entity->Flags & 4) != 0)
+                if ((Entity->Flags & kThornEntityFlagSoundStream) != 0)
                     SaveBufAppendStringFormat(&Buf, " STREAM", &FlagStarted);
             }
-            else if (Type == 9)
+            else if (Type == kThornEntityScene)
             {
-                KnownFlags = 0x31;
-                if ((Entity->Flags & 0x20) != 0)
+                KnownFlags = kThornEntityFlagReference | kThornEntityFlagHidden | kThornEntityFlagFogPropsRemoved;
+                if ((Entity->Flags & kThornEntityFlagFogPropsRemoved) != 0)
                     SaveBufAppendStringFormat(&Buf, " FOG_PROPS_REMOVED", &FlagStarted);
             }
             const unsigned int UnknownFlags = static_cast<unsigned int>(Entity->Flags) & ~KnownFlags;
@@ -8546,7 +8546,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
 
-        if (Entity->Type == 3)
+        if (Entity->Type == kThornEntityCamera)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tcameraprops =\r\n\t\t{\r\n");
             SaveBufAppendRawFloat(&Buf, "\t\t\tfovh = %.6f,\r\n", &Entity->Fovh);
@@ -8555,19 +8555,19 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendRawFloat(&Buf, "\t\t\tfarplane = %.6f\r\n", &Entity->FarPlane);
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
-        else if (Entity->Type == 2)
+        else if (Entity->Type == kThornEntityDeformable)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tcompoundprops =\r\n\t\t{\r\n");
             SaveBufAppendRawFloat(&Buf, "\t\t\tfloor_height = %.6f\r\n", &Entity->FloorHeight);
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
-        else if (Entity->Type == 5)
+        else if (Entity->Type == kThornEntityLight)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tlightprops =\r\n\t\t{\r\n");
             SaveLightProps(&Buf, "\t\t\t", "\r\n", &Entity->Light, 0xffffffffu);
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
-        else if (Entity->Type == 6)
+        else if (Entity->Type == kThornEntitySound)
         {
             // Key and value in one FUN_06f2cbb0 call each.
             SaveBufAppendLiteral(&Buf, ",\r\n\t\taudioprops =\r\n\t\t{\r\n");
@@ -8581,14 +8581,14 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendNamedFloat(&Buf, "\t\t\t%s = %.6f,\r\n", "rmix", &Entity->Audio[7]);
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
-        else if (Entity->Type == 9 || Entity->Type == 10)
+        else if (Entity->Type == kThornEntityScene || Entity->Type == kThornEntitySubScene)
         {
             SaveBufAppendStringValue(&Buf, ",\r\n\t\tup = %s", kAxisNames[Entity->SceneBlob[5]]);
             SaveBufAppendStringValue(&Buf, ",\r\n\t\tfront = %s", kAxisNames[Entity->SceneBlob[6]]);
             SaveBufAppendColor(&Buf, ",\r\n\t\tambient = {%d,%d,%d}",
                                reinterpret_cast<const int*>(Entity->SceneBlob));
         }
-        else if (Entity->Type == 11)
+        else if (Entity->Type == kThornEntityMotionPath)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tpathprops =\r\n\t\t{\r\n");
             SaveBufAppendStringValue(&Buf, "\r\n\t\t\tpath_type = \"%s\"", Entity->MotionPath.PathType);
@@ -8607,7 +8607,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             }
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
-        else if (Entity->Type == 13)
+        else if (Entity->Type == kThornEntityPsys)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tpsysprops =\r\n\t\t{\r\n");
             SaveBufAppendRawFloat(&Buf, "\t\t\tsparam = %.6f\r\n", &Entity->PsysSparam);
@@ -8697,17 +8697,17 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             const FThornSoundEventDesc* Packet = reinterpret_cast<const FThornSoundEventDesc*>(Descriptor);
             if (Packet->SoundStartTime != 0)
                 SaveBufAppendInteger(&Buf, ", start_time = %d", Packet->SoundStartTime);
-            if ((Descriptor->Flags & 0xf) != 0)
+            if ((Descriptor->Flags & (kThornFlagUseScriptDuration | kThornFlagPosition | kThornFlagOrientation | kThornFlagLookAt)) != 0)
             {
                 SaveBufAppendLiteral(&Buf, ", flags =");
                 char Started = '\0';
                 if ((Descriptor->Flags & kThornFlagUseScriptDuration) != 0)
                     SaveBufAppendStringFormat(&Buf, " USE_SCRIPT_DURATION", &Started);
-                if ((Descriptor->Flags & 2) != 0)
+                if ((Descriptor->Flags & kThornFlagSoundSpatial) != 0)
                     SaveBufAppendStringFormat(&Buf, " SPATIAL", &Started);
-                if ((Descriptor->Flags & 8) != 0)
+                if ((Descriptor->Flags & kThornFlagSoundLoop) != 0)
                     SaveBufAppendStringFormat(&Buf, " LOOP", &Started);
-                if ((Descriptor->Flags & 4) != 0)
+                if ((Descriptor->Flags & kThornFlagSoundStream) != 0)
                     SaveBufAppendStringFormat(&Buf, " STREAM", &Started);
             }
         }
@@ -8764,8 +8764,8 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             const FThornSpatialEventDesc* Packet = reinterpret_cast<const FThornSpatialEventDesc*>(Descriptor);
             if (Packet->TargetPart != nullptr)
                 SaveBufAppendStringValue(&Buf, ", target_part = \"%s\"", Packet->TargetPart);
-            SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
-                : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
+            SaveBufAppendLiteral(&Buf, Packet->TargetType == kThornTargetHardpoint ? ", target_type = HARDPOINT"
+                : Packet->TargetType == kThornTargetPart ? ", target_type = PART" : ", target_type = ROOT");
             SaveBufAppendLiteral(&Buf, ", spatialprops = {");
             // Retail quirk: only the position branch sets the comma flag, so
             // orient followed by axisrot without pos gets no separating comma.
@@ -8828,8 +8828,8 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->FrontAxis]);
             if (Packet->TargetPart != nullptr)
                 SaveBufAppendStringValue(&Buf, ", target_part = \"%s\"", Packet->TargetPart);
-            SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
-                : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
+            SaveBufAppendLiteral(&Buf, Packet->TargetType == kThornTargetHardpoint ? ", target_type = HARDPOINT"
+                : Packet->TargetType == kThornTargetPart ? ", target_type = PART" : ", target_type = ROOT");
             SavePathAttachFlags(&Buf, Descriptor, true);
         }
         else if (EvType == kThornTypeConnectHardpoints)
@@ -8856,7 +8856,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             if (ShouldSaveNonzeroFloat(&Packet->Weight))
                 SaveBufAppendRawFloat(&Buf, ", weight = %.6f", &Packet->Weight);
             // Tests the primary entity's type (read earlier), after weight.
-            if (Primary->Type == 2)
+            if (Primary->Type == kThornEntityDeformable)
                 SaveBufAppendRawFloat(&Buf, ", heading = %.6f", &Packet->Heading);
             else if (ShouldSaveNonzeroFloat(&Packet->TransScale))
                 SaveBufAppendRawFloat(&Buf, ", trans_scale = %.6f", &Packet->TransScale);
@@ -8869,8 +8869,8 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendInteger(&Buf, ", count_to_root = %d", Packet->CountToRoot);
             if (Packet->TargetPart != nullptr)
                 SaveBufAppendStringValue(&Buf, ", target_part = \"%s\"", Packet->TargetPart);
-            SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
-                : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
+            SaveBufAppendLiteral(&Buf, Packet->TargetType == kThornTargetHardpoint ? ", target_type = HARDPOINT"
+                : Packet->TargetType == kThornTargetPart ? ", target_type = PART" : ", target_type = ROOT");
             SaveBufAppendRawFloat(&Buf, ", damping = %.6f", &Packet->Damping);
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->LookAtUpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->LookAtFrontAxis]);
@@ -8899,7 +8899,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             if (Descriptor->EventFlags != 0)
                 SaveBufAppendInteger(&Buf, ", event_flags = %d", Descriptor->EventFlags);
             SaveBufAppendLiteral(&Buf, ", psysprops = {");
-            if ((Packet->Mask & 1) != 0)
+            if ((Packet->Mask & kThornPsysBitSparam) != 0)
             {
                 SaveBufAppendStringValue(&Buf, "%s = ", "sparam");
                 SaveBufAppendRawFloat(&Buf, "%.6f", &Packet->Sparam);
@@ -8967,8 +8967,8 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             const FThornFloorEventDesc* Packet = reinterpret_cast<const FThornFloorEventDesc*>(Descriptor);
             if (Packet->TargetPart != nullptr)
                 SaveBufAppendStringValue(&Buf, ", target_part = \"%s\"", Packet->TargetPart);
-            SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
-                : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
+            SaveBufAppendLiteral(&Buf, Packet->TargetType == kThornTargetHardpoint ? ", target_type = HARDPOINT"
+                : Packet->TargetType == kThornTargetPart ? ", target_type = PART" : ", target_type = ROOT");
             SaveBufAppendRawFloat(&Buf, ", floor_height = %.6f", &Packet->FloorHeight);
             SaveUseScriptDuration(&Buf, Descriptor);
             if (Descriptor->EventFlags != 0)

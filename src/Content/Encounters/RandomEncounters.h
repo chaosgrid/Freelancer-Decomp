@@ -185,6 +185,14 @@ public:
     FSystemZone* TargetZone = nullptr;
 };
 
+// FRandEncSPParams::ActivationType, the "activation_type" keywords.
+enum ERandEncActivation
+{
+    kRandEncActivationTimeCumulative = 0,   // "time_cumulative" (the default)
+    kRandEncActivationLocation = 1,         // "location"
+    kRandEncActivationTime = 2              // "time"
+};
+
 // "SPParams" (retail 0xc4, ctor FUN_06f804d0): the attack in open space.
 class FRandEncSPParams : public FRandEncParams
 {
@@ -294,6 +302,13 @@ typename std::list<TElement>::iterator RandEncPickWeighted(std::list<TElement>* 
     }
     return Elements->end();
 }
+
+// FRandEncParams::GetType, the code CreateRandEncParamsByType takes.
+enum ERandEncParamsType
+{
+    kRandEncParamsSP = 2,   // FRandEncSPParams ("SPParams")
+    kRandEncParamsTL = 3    // FRandEncTLParams ("TLParams")
+};
 
 // FUN_06efb830 (cdecl; callers TU38): "TLParams" or "SPParams" (stricmp) -> a new object in
 // *Out, else null. True when *Out is non-null.

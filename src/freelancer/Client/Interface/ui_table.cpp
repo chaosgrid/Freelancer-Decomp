@@ -40,10 +40,10 @@ namespace
     {
         DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
         DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+        DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
         DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 0);
-        DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, 5);
-        DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 6);
+        DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+        DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
         DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
     }
 
@@ -239,7 +239,7 @@ bool UiTable::Create(Win3D* NewParent, void* Data)
     // LAB_00598490
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | 3);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     if (Data != nullptr)
     {
         // FUiPayloadTable: {Right, Bottom, rows, columns}.

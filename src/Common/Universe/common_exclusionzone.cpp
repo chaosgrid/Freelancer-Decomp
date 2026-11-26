@@ -461,13 +461,13 @@ bool AsteroidExclusionZoneMgr::is_excluded(const Vector& Pos, ExcludeObjectType 
     // case 2 calls is_billboard_excluded.
     switch ((unsigned)(Type))
     {
-    case 0:
+    case EOT_CliAsteroid:
         return is_cliasteroid_excluded(Pos, OutValue);
-    case 1:
+    case EOT_CmnAsteroid:
         return is_cmnasteroid_excluded(Pos, OutValue);
-    case 2:
+    case EOT_Billboard:
         return is_billboard_excluded(Pos, OutValue);
-    case 3:
+    case EOT_DynamicAsteroid:
         return is_dynamic_asteroid_excluded(Pos);
     default:
         return false;

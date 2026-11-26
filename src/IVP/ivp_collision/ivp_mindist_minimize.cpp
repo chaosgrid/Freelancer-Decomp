@@ -192,13 +192,13 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_B_POLY(IVP_Mindist_Minimize_S
     IVP_MRC_TYPE Result;
     switch (SynapseP->status)
     {
-    case 0:
+    case IVP_SYNAPSE_POINT:
         Result = Solver->p_minimize_BP(&Ball, Edge, &CacheP);
         break;
-    case 1:
+    case IVP_SYNAPSE_EDGE:
         Result = Solver->p_minimize_BK(&Ball, Edge, &CacheP);
         break;
-    case 2:
+    case IVP_SYNAPSE_POLY:
         Result = Solver->p_minimize_BF(&Ball, Edge, &CacheP);
         break;
     default:

@@ -41,6 +41,27 @@ enum EStoryMissionEventKind : unsigned int
     STORY_MISSION_EVENT_SUCCEEDED = 3,
 };
 
+// The story chapters (FStory::SetMissionChapter, FContentPlayerState::MissionNumber) the story
+// code names itself: the chapter a story mission starts at (FStory::StartMission's chapter and
+// controller name) and the chapter after the last mission, where the rank is recalculated and
+// the story stops advancing (FStory::FinishMission, HandleMessage).
+enum EStoryChapter
+{
+    kStoryChapterMission02 = 7,     // "Mission_02"
+    kStoryChapterMission03 = 10,    // "Mission_03"
+    kStoryChapterMission04 = 13,    // "Mission_04"
+    kStoryChapterMission05 = 16,    // "Mission_05"
+    kStoryChapterMission06 = 19,    // "Mission_06"
+    kStoryChapterMission07 = 22,    // "Mission_07"
+    kStoryChapterMission08 = 25,    // "Mission_08"
+    kStoryChapterMission09 = 28,    // "Mission_09"
+    kStoryChapterMission10 = 31,    // "Mission_10"
+    kStoryChapterMission11 = 34,    // "Mission_11"
+    kStoryChapterMission12 = 37,    // "Mission_12"
+    kStoryChapterMission13 = 40,    // "Mission_13"
+    kStoryChapterComplete = 42      // the story is over
+};
+
 // FUN_06ea6ba0 builds this polymorphic parameter object on the stack.
 // FUN_06eb75a0 reads PlayerId at +4 and StoryEvents at +8 before returning.
 struct FStoryMissionCreateParms final : pub::Controller::CreateParms

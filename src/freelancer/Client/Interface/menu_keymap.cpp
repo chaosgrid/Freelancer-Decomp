@@ -441,11 +441,11 @@ unsigned KeyMapGetModifierState()
     // FUN_00575dc0.
     unsigned Mods = 0;
     if (GetKeyState(VK_SHIFT) < 0)
-        Mods = 1;
+        Mods = kKeyModShift;
     if (GetKeyState(VK_CONTROL) < 0)
-        Mods |= 4;
+        Mods |= kKeyModControl;
     if (GetKeyState(VK_MENU) < 0)
-        Mods |= 0x10;
+        Mods |= kKeyModAlt;
     return Mods;
 }
 
@@ -577,7 +577,7 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
     Record->bRepeat = 0;
 
     // Only 0x100..0x105; WM_DEADCHAR shares the "false" arm.
-    unsigned Kind = 0;
+    unsigned Kind = USER_NONE;
     switch (Message)
     {
     case WM_KEYDOWN:
@@ -585,7 +585,7 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         // Repeat = previous state down, transition 0, no context bit.
         Record->Key = Wparam;
         Record->bRepeat = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
-        Kind = 1;
+        Kind = USER_KEY;
         Record->bKeyDown = 1;
         break;
     case WM_KEYUP:
@@ -593,11 +593,11 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         Record->Key = Wparam;
         Record->bKeyDown = 0;
         Record->bRepeat = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
-        Kind = 1;
+        Kind = USER_KEY;
         break;
     case WM_CHAR:
         Record->Key = 0;
-        Kind = 2;
+        Kind = USER_CHAR;
         Record->bKeyDown = 1;
         break;
     default:
@@ -610,17 +610,17 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
 
     unsigned Modifiers = 0;
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
-        Modifiers = 1;
+        Modifiers = kKeyModShift;
     if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
-        Modifiers = Modifiers | 4u;
+        Modifiers = Modifiers | kKeyModControl;
     if ((GetKeyState(VK_MENU) & 0x8000) != 0)
-        Modifiers = Modifiers | 0x10u;
+        Modifiers = Modifiers | kKeyModAlt;
     Record->Modifiers = Modifiers;
 
     // Kind 0 cannot reach here; kinds 1..2 dispatch in mode 1, anything else in mode 2.
-    if (Kind == 0)
+    if (Kind == USER_NONE)
         return false;
-    if (Kind > 2)
+    if (Kind > USER_CHAR)
         Mode = 2;
 
     // The raw kind (1 = key, 2 = char) goes to the handler tree first.
@@ -636,7 +636,7 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
 
         // Key events that are not Shift/Ctrl/Alt themselves and not an auto-repeat.
         unsigned const Key = Record->Key;
-        if (Kind == 1 && Key != VK_SHIFT && Key != VK_CONTROL && Key != VK_MENU &&
+        if (Kind == USER_KEY && Key != VK_SHIFT && Key != VK_CONTROL && Key != VK_MENU &&
             Record->bRepeat == 0)
         {
             if (Record->bKeyDown != 0)
@@ -701,7 +701,7 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
     }
 
     // A key event for VK_MENU itself is always consumed.
-    if (Kind == 1 && Wparam == VK_MENU)
+    if (Kind == USER_KEY && Wparam == VK_MENU)
         return true;
     return false;
 }
@@ -712,35 +712,35 @@ bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
     // wheel events.
     FHudCmdRecord* const Record = HudCommandRecord();
 
-    unsigned Kind = 0;
+    unsigned Kind = USER_NONE;
     switch (static_cast<int>(Event->Key))
     {
     case -9:
-        Kind = 4;
+        Kind = USER_WHEEL;
         break;
     case -8:
-        Kind = 0xd;
+        Kind = USER_BUTTON7;
         break;
     case -7:
-        Kind = 0xc;
+        Kind = USER_BUTTON6;
         break;
     case -6:
-        Kind = 0xb;
+        Kind = USER_BUTTON5;
         break;
     case -5:
-        Kind = 0xa;
+        Kind = USER_BUTTON4;
         break;
     case -4:
-        Kind = 9;
+        Kind = USER_BUTTON3;
         break;
     case -3:
-        Kind = 8;
+        Kind = USER_BUTTON2;
         break;
     case -2:
-        Kind = 7;
+        Kind = USER_BUTTON1;
         break;
     case -1:
-        Kind = 6;
+        Kind = USER_BUTTON0;
         break;
     default:
         break;
@@ -753,11 +753,11 @@ bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
 
     unsigned Modifiers = 0;
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
-        Modifiers = 1;
+        Modifiers = kKeyModShift;
     if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
-        Modifiers = Modifiers | 4u;
+        Modifiers = Modifiers | kKeyModControl;
     if ((GetKeyState(VK_MENU) & 0x8000) != 0)
-        Modifiers = Modifiers | 0x10u;
+        Modifiers = Modifiers | kKeyModAlt;
     Record->Modifiers = Modifiers;
 
     if (DispatchKeyCommand(Kind, 2))
@@ -851,11 +851,11 @@ bool KeyMapIsCommandHeld(unsigned NicknameId)
         // Re-read for every binding.
         unsigned Modifiers = 0;
         if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
-            Modifiers = 1;
+            Modifiers = kKeyModShift;
         if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
-            Modifiers = Modifiers | 4u;
+            Modifiers = Modifiers | kKeyModControl;
         if ((GetKeyState(VK_MENU) & 0x8000) != 0)
-            Modifiers = Modifiers | 0x10u;
+            Modifiers = Modifiers | kKeyModAlt;
         if ((Modifiers & Binding.Modifiers) != Binding.Modifiers)
             continue;
 
@@ -897,15 +897,15 @@ void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, un
         UINT const Scan = MapVirtualKeyA(Vk, MAPVK_VK_TO_VSC);
         LONG LParam = static_cast<LONG>(Scan << 16);
         bool bExtended = false;
-        if (Vk == 0x26 || Vk == 0x23 || Vk == 0x24 || Vk == 0x25 || Vk == 0x27 || Vk == 0x28
-            || Vk == 0x2d || Vk == 0x2e || Vk == 0x21 || Vk == 0x22)
+        if (Vk == VK_UP || Vk == VK_END || Vk == VK_HOME || Vk == VK_LEFT || Vk == VK_RIGHT ||
+            Vk == VK_DOWN || Vk == VK_INSERT || Vk == VK_DELETE || Vk == VK_PRIOR || Vk == VK_NEXT)
             bExtended = true;
 
         if (Scan != 0)
         {
             if (bExtended || GetKeyNameTextW(LParam, KeyName, 256) == 0)
             {
-                LParam |= 0x1000000;
+                LParam |= KF_EXTENDED << 16;
                 if (GetKeyNameTextW(LParam, KeyName, 256) == 0)
                     KeyName[0] = L'\0';
             }
@@ -965,7 +965,7 @@ void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, un
     if ((Binding->Modifiers & kKeyModShift) != 0)
     {
         size_t const Len = wcslen(Prefix);
-        UINT const Scan = MapVirtualKeyA(0x10, MAPVK_VK_TO_VSC);
+        UINT const Scan = MapVirtualKeyA(VK_SHIFT, MAPVK_VK_TO_VSC);
         if (GetKeyNameTextW(static_cast<LONG>(Scan << 16), Prefix + Len,
                             static_cast<int>(256 - Len))
             == 0)
@@ -976,7 +976,7 @@ void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, un
     if ((Binding->Modifiers & kKeyModControl) != 0)
     {
         size_t const Len = wcslen(Prefix);
-        UINT const Scan = MapVirtualKeyA(0x11, MAPVK_VK_TO_VSC);
+        UINT const Scan = MapVirtualKeyA(VK_CONTROL, MAPVK_VK_TO_VSC);
         if (GetKeyNameTextW(static_cast<LONG>(Scan << 16), Prefix + Len,
                             static_cast<int>(256 - Len))
             == 0)
@@ -987,7 +987,7 @@ void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, un
     if ((Binding->Modifiers & kKeyModAlt) != 0)
     {
         size_t const Len = wcslen(Prefix);
-        UINT const Scan = MapVirtualKeyA(0x12, MAPVK_VK_TO_VSC);
+        UINT const Scan = MapVirtualKeyA(VK_MENU, MAPVK_VK_TO_VSC);
         if (GetKeyNameTextW(static_cast<LONG>(Scan << 16), Prefix + Len,
                             static_cast<int>(256 - Len))
             == 0)

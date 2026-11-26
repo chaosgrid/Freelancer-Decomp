@@ -7,6 +7,7 @@
 #include "Space/Effects/cli_tractor_beam.h"
 
 #include "Space/Effects/client_equip_fx.h"   // FClientEquip
+#include "Space/Effects/effect_type_info.h"  // EFT_TRACTORBEAM
 #include "Space/Effects/effect_type_list.h"  // EffectTypeListLink (FUN_004f7af0)
 #include "Space/Cameras/space_camera.h"      // FSpaceCamera
 #include "Common/Graphics/texture_shapes.h"    // G_EffectShapeDB (DAT_00674f24)
@@ -31,7 +32,7 @@ namespace
     constexpr float kByteToUnit = 1.0f / 255.0f;
 
     // The tractor effect's type bucket, EFT_TRACTORBEAM.
-    constexpr unsigned kTractorBeamEffectType = 0x2du;
+    constexpr unsigned kTractorBeamEffectType = EFT_TRACTORBEAM;
 
     // LAB_00512da0's constants: DAT_005cf100 (0.2 as a double), DAT_005db708 (0.8 pi as a
     // double), DAT_005d3e08 (0.3f); the rest are immediates.

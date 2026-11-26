@@ -109,7 +109,7 @@ namespace
         WinControl* const Alert = Parent->CreateStaticControl(
             Name, MeshPath, Position, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
         uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
-        Alert->SetProperty(0x18, Red, Red);
+        Alert->SetProperty(kStaticPropColours, Red, Red);
         if (Ids != 0)
             Alert->SetProperty(kWinPropToolTip, Ids, 0);
         Alert->SetProperty(kWinPropHide, 1, 0);
@@ -162,8 +162,8 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     Scanner = nullptr;
     ScanEntries = nullptr;
     RayObject = nullptr;
-    WaypointRecord.TypeFlags = 0x200;
-    BestPathRecord.TypeFlags = 0x200;
+    WaypointRecord.TypeFlags = OBJ_WAYPOINT;
+    BestPathRecord.TypeFlags = OBJ_WAYPOINT;
     MissileBlinkTimer = 0.1f;         // DAT_005d8ef0
     MissileBlinkPeriod = 0.1f;
     bMissileBlinkOn = 1;
@@ -449,10 +449,10 @@ Vector* HudTargetableObjects::GetAimPoint(Vector* Out) const
 void HudTargetableObjects::HideAlerts()
 {
     // FUN_004ec400's body.
-    MissileAlert->Flags &= 0xfc;
-    TrailAlert->Flags &= 0xfc;
-    RadiationAlert->Flags &= 0xfc;
-    LagAlert->Flags &= 0xfc;
+    MissileAlert->Flags &= ~(kWin3DActive | kWin3DVisible);
+    TrailAlert->Flags &= ~(kWin3DActive | kWin3DVisible);
+    RadiationAlert->Flags &= ~(kWin3DActive | kWin3DVisible);
+    LagAlert->Flags &= ~(kWin3DActive | kWin3DVisible);
 }
 
 void HudTargetableObjectsHideAlertsInLetterbox()
@@ -669,18 +669,18 @@ void HudTargetableObjects::RebuildContacts()
         {
             Record.bPlayerShip = 1;
         }
-        if ((Type & 0x20004000u) != 0)
+        if ((Type & (OBJ_NON_TARGETABLE | OBJ_ASTEROID)) != 0)
             continue;
 
         // The client gameobj's +0xa8 byte, looked up in the bucket of the type (1 ships, 2 other
         // simples, 7 0x10000000).
         int Kind = 0;
-        if ((Type & 0x7f0000u) != 0)
-            Kind = 1;
-        else if ((Type & 0xfdffu) != 0)
-            Kind = 2;
-        else if ((Type & 0x10000000u) != 0)
-            Kind = 7;
+        if ((Type & OBJ_SHIP_MASK) != 0)
+            Kind = static_cast<int>(EClientGameobjKind::Ship);
+        else if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
+            Kind = static_cast<int>(EClientGameobjKind::Solar);
+        else if ((Type & OBJ_LOOT) != 0)
+            Kind = static_cast<int>(EClientGameobjKind::Loot);
         if (Kind != 0)
         {
             FClientGameobj* const Gameobj = ClientObjDb_FindObject(Object->get_id(), Kind);
@@ -1031,7 +1031,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
                 if (!Solar->GetParentNickname().IsEmpty())
                 {
                     FClientGameobj* const Parent =
-                        ClientObjDb_FindObject(Solar->GetParentNickname().Id, 2);   // FUN_005416c0
+                        ClientObjDb_FindObject(Solar->GetParentNickname().Id, static_cast<int>(EClientGameobjKind::Solar));   // FUN_005416c0
                     if (Parent != nullptr)
                         PickId = static_cast<IObjRW*>(Parent)->get_id();
                 }
@@ -1147,9 +1147,9 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
     if (!bOutOfRange)
     {
         unsigned const Type = Simple->TypeBits;
-        if ((Type & 0x20004000u) == 0)
+        if ((Type & (OBJ_NON_TARGETABLE | OBJ_ASTEROID)) == 0)
         {
-            if ((Type & 7u) != 0)
+            if ((Type & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
             {
                 *OutId = Simple->Id;
             }
@@ -1187,7 +1187,7 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
         if (!Solar->GetParentNickname().IsEmpty())
         {
             FClientGameobj* const Parent =
-                ClientObjDb_FindObject(Solar->GetParentNickname().Id, 2);   // FUN_005416c0
+                ClientObjDb_FindObject(Solar->GetParentNickname().Id, static_cast<int>(EClientGameobjKind::Solar));   // FUN_005416c0
             if (Parent != nullptr)
             {
                 *OutId = static_cast<IObjRW*>(Parent)->get_id();
@@ -1208,7 +1208,7 @@ FClientGameobj* HudTargetableObjects::FindPickableNearCursor()
     // FUN_004ee100. Bucket 2 of the client ObjDB (FUN_00540fc0).
     FClientGameobj* Best = nullptr;
     float BestDistance = 1.0e20f;
-    int const Kind = 2;
+    int const Kind = static_cast<int>(EClientGameobjKind::Solar);
     for (FClientGameobj* Gameobj = ClientObjDb_GetKindHead(&Kind); Gameobj != nullptr;
          Gameobj = Gameobj->ListNext)
     {
@@ -1290,7 +1290,7 @@ IObjRW* HudTargetableObjects::FindHostileContactNearCursor()
         FHudContactRecord const& Record = Contacts.data()[Index];
         if (Record.bOnScreen == 0)
             continue;
-        if ((Record.TypeFlags & 0x10000u) == 0)
+        if ((Record.TypeFlags & OBJ_FIGHTER) == 0)
             continue;
         // FUN_0045a490 -- hostile only.
         if (GetAttitudeClass(Player, Object) != -1)
@@ -1391,7 +1391,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     // fully cloaked ships passed over.
     G_HudHoverRecord = nullptr;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
-    CObject* const IgnoreObject = PlayerObjectOfClass(Player, 1u);
+    CObject* const IgnoreObject = PlayerObjectOfClass(Player, CObject::ClassObject);
     int CursorX = 0;
     int CursorY = 0;
     int CursorZ = 0;
@@ -1532,7 +1532,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                 if (!Solar->GetParentNickname().IsEmpty())
                 {
                     FClientGameobj* const Parent =
-                        ClientObjDb_FindObject(Solar->GetParentNickname().Id, 2);
+                        ClientObjDb_FindObject(Solar->GetParentNickname().Id, static_cast<int>(EClientGameobjKind::Solar));
                     if (Parent != nullptr)
                         Contact = Parent;
                 }
@@ -1661,7 +1661,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             if (!Solar->GetParentNickname().IsEmpty())
             {
                 FClientGameobj* const Parent =
-                    ClientObjDb_FindObject(Solar->GetParentNickname().Id, 2);
+                    ClientObjDb_FindObject(Solar->GetParentNickname().Id, static_cast<int>(EClientGameobjKind::Solar));
                 if (Parent != nullptr)
                 {
                     CObject* const ParentObject = CObjectOfGameobj(Parent);
@@ -1909,7 +1909,7 @@ void HudTargetableObjects::DrawContactMarkers()
     Win3DDisable(kWin3DFog);
     EngineLightClearRegisteredList();  // FUN_004101e0
     DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);   // white
-    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);    // none
+    DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);    // none
     Win3DEnable(kWin3DBlend);                    // FUN_00421dd0
     Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);   // FUN_004220c0
 
@@ -1947,7 +1947,7 @@ void HudTargetableObjects::DrawContactMarkers()
 
         // Type 0x10000000 is white.
         unsigned const TypeFlags = Record.TypeFlags;
-        unsigned const WhiteTypeBit = TypeFlags & 0x10000000u;
+        unsigned const WhiteTypeBit = TypeFlags & OBJ_LOOT;
         if (WhiteTypeBit != 0)
             Color = 0xffffffffu;
 
@@ -1984,7 +1984,7 @@ void HudTargetableObjects::DrawContactMarkers()
         }
 
         // The bracket for types 0x107f0000, the best-path object and watch-listed objects.
-        if ((TypeFlags & 0x107f0000u) != 0 || Record.bIsBestPath != 0 || Record.bWatchListed != 0)
+        if ((TypeFlags & (OBJ_SHIP_MASK | OBJ_LOOT)) != 0 || Record.bIsBestPath != 0 || Record.bWatchListed != 0)
             DrawContactBracket(&Record, &Color, bHostile, Record.bWatchListed != 0);
 
         // An on-screen contact the ship may lead: of types 0x7f0000 only
@@ -1992,12 +1992,12 @@ void HudTargetableObjects::DrawContactMarkers()
         // 0x4000000 always; and only when CShip::get_tgt_lead_fire_pos finds a position.
         if (Record.bOnScreen == 0)
             continue;
-        if ((TypeFlags & 0x7f0000u) != 0)
+        if ((TypeFlags & OBJ_SHIP_MASK) != 0)
         {
             if (!bHostile)
                 continue;
         }
-        else if ((TypeFlags & 0x1000000u) != 0)
+        else if ((TypeFlags & OBJ_GUIDED) != 0)
         {
             IObjRW* ContactTarget = nullptr;
             Contact->get_target(ContactTarget);
@@ -2006,7 +2006,7 @@ void HudTargetableObjects::DrawContactMarkers()
             if (ContactTarget->get_id() != Player->get_id())
                 continue;
         }
-        else if ((TypeFlags & 0x4000000u) == 0)
+        else if ((TypeFlags & OBJ_MINE) == 0)
         {
             continue;
         }
@@ -2297,7 +2297,7 @@ void HudTargetableObjects::DrawTargetReticle()
     TargetRecord.bValid = 1;
     ShipTarget->get_type(TargetRecord.TypeFlags);
     TargetRecord.World = ShipTarget->get_position();
-    if ((TargetRecord.TypeFlags & 0x107ffdffu) != 0)
+    if ((TargetRecord.TypeFlags & (OBJ_SOLAR_NO_WAYPOINT_MASK | OBJ_SHIP_MASK | OBJ_LOOT)) != 0)
     {
         FClientGameobj* const Gameobj = ClientObjDb_FindObject(ShipTarget->get_id(), 0);   // FUN_005416c0
         if (Gameobj != nullptr)
@@ -2578,7 +2578,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     if (SelectPulse < 0.3f)
     {
         if (SelectPulse == 0.0f)
-            PlayOrRewindUiSoundSlot(0x24);
+            PlayOrRewindUiSoundSlot(kUiSoundTargetExpandBrackets);
         double const Pulse = GetClientFrameTimeCapped() + static_cast<double>(SelectPulse);
         SelectPulse = static_cast<float>(Pulse);
         double const Fraction = Pulse / static_cast<double>(0.3f);
@@ -2785,7 +2785,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     unsigned const RecordType = Record->TypeFlags;
     double const ReticleHeight = static_cast<double>(ReticleRect.Top);
     double const ReticleWidth = static_cast<double>(ReticleRect.Width);
-    if ((RecordType & 0x200u) != 0)
+    if ((RecordType & OBJ_WAYPOINT) != 0)
     {
         Vector const RangePoint = WithY(
             P, static_cast<float>(ReticleHeight * static_cast<double>(0.4f) * static_cast<double>(Scale) +
@@ -2987,7 +2987,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
 
     // With no type bits in 0xfdff, the lead-fire marker. No null test on the player's ship, as
     // retail. Retail projects into an uninitialised stack vector; the port starts it at zero.
-    if ((RecordType & 0xfdffu) == 0)
+    if ((RecordType & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0)
     {
         CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
         Vector Lead;
@@ -3015,15 +3015,15 @@ unsigned long* HudTargetMarkerColor(unsigned long* OutArgb, IObjRW* Object)
     unsigned Type = 0;
     if (Object->get_type(Type) == 0)   // a failure keeps the cyan
     {
-        if ((Type & 0x200u) != 0)
+        if ((Type & OBJ_WAYPOINT) != 0)
         {
             Color = G_NnPaletteViolet;
         }
-        else if ((Type & 0x10000000u) != 0)
+        else if ((Type & OBJ_LOOT) != 0)
         {
             Color = 0xffffffffu;
         }
-        else if ((Type & 0x5000000u) != 0)
+        else if ((Type & (OBJ_GUIDED | OBJ_MINE)) != 0)
         {
             Color = G_NnPaletteRed;
         }
@@ -3140,7 +3140,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     // FUN_004f0900. A ship-typed record (0x7f0000) needs a ship CObject whose vibe has an
     // affiliation.
     unsigned Affiliation = 0;
-    if ((Record->TypeFlags & 0x7f0000u) != 0)
+    if ((Record->TypeFlags & OBJ_SHIP_MASK) != 0)
     {
         CObject const* const ShipObject = Object->cobject();
         if (ShipObject == nullptr)
@@ -3516,7 +3516,7 @@ void HudTargetableObjects::CollectLeadMarkers()
     int const LastRow = static_cast<int>(G_RenderSurfaceHeight) - 1;     // DAT_00610854
 
     // Every gameobj of ObjDB bucket 9 (FUN_00540fc0).
-    int const Kind = 9;
+    int const Kind = static_cast<int>(EClientGameobjKind::DynamicAsteroid);
     for (FClientGameobj* Gameobj = ClientObjDb_GetKindHead(&Kind); Gameobj != nullptr;
          Gameobj = Gameobj->ListNext)
     {
@@ -3622,7 +3622,7 @@ void HudTargetableObjects::DrawLeadMarkers()
 #endif
         if (Object == PlayerTarget)
             Size = static_cast<float>(Unit * 6.0);
-        else if ((Type & 0x55f0000u) != 0)
+        else if ((Type & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_GUNBOAT | OBJ_CRUISER | OBJ_TRANSPORT | OBJ_MINING | OBJ_GUIDED | OBJ_MINE)) != 0)
             Size = static_cast<float>(Unit + Unit);
         else
             continue;
@@ -3834,7 +3834,7 @@ void HudTargetableObjects::UpdateMissileAlert()
                 ObjRwFromWatchable(const_cast<Watchable*>(ScanEntries->Entries[Index].target()));
             if (Missile == nullptr)
                 continue;
-            if ((Contacts.data()[Index].TypeFlags & 0x1000000u) == 0)
+            if ((Contacts.data()[Index].TypeFlags & OBJ_GUIDED) == 0)
                 continue;
             IObjRW* MissileTarget = nullptr;
             if (Missile->get_target(MissileTarget) != 0)
@@ -3858,7 +3858,7 @@ void HudTargetableObjects::UpdateMissileAlert()
             bMissileWarned = 1;
             Archetype::Root const* const Arch = Missile->cobject()->get_archetype();
             if (Arch != nullptr &&
-                static_cast<Archetype::Munition const*>(Arch)->HpType == 0xa)
+                static_cast<Archetype::Munition const*>(Arch)->HpType == HpTypeTorpedo)
             {
                 QueueHazardVoiceLine(G_VoiceIncomingTorpedo);
             }
@@ -3882,7 +3882,7 @@ void HudTargetableObjects::UpdateMissileAlert()
         return;
     }
     if (bToggled)
-        PlayOrRewindUiSoundSlot(0x19);   // FUN_005645c0
+        PlayOrRewindUiSoundSlot(kUiSoundIncomingMissile);   // FUN_005645c0
     double const Period = std::sqrt(static_cast<double>(Nearest)) * 0.001;
     MissileBlinkPeriod = static_cast<float>(Period);
     if (Period < static_cast<double>(0.1f))
@@ -3941,13 +3941,13 @@ void HudTargetableObjects::UpdateLagAlert()
     {
         bLagBlinkOn = (bLagBlinkOn == 0) ? 1 : 0;
         uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
-        LagAlert->SetProperty(0x18, Red, Red);
+        LagAlert->SetProperty(kStaticPropColours, Red, Red);
     }
     else
     {
         uintptr_t const Amber = reinterpret_cast<uintptr_t>(&G_NnPaletteAmber);
         bLagBlinkOn = 0;
-        LagAlert->SetProperty(0x18, Amber, Amber);
+        LagAlert->SetProperty(kStaticPropColours, Amber, Amber);
     }
     uintptr_t const bHide = (bSlow && bLagBlinkOn == 0) ? 0u : 1u;
     LagAlert->SetProperty(kWinPropHide, bHide, 0);
@@ -4044,7 +4044,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
             if (Candidate == nullptr)
                 continue;
             unsigned Type = 0;
-            if (Candidate->get_type(Type) != 0 || Type != 0x800u)
+            if (Candidate->get_type(Type) != 0 || Type != OBJ_JUMP_HOLE)
                 continue;
             Vector const& Pos = Candidate->get_position();
             // The differences are rounded to float; the squares are summed z, y, x in double.
@@ -4092,7 +4092,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
     {
         // Radiation is only reported outside an atmosphere.
         bool const bShipHullOk = (Ship != nullptr && Ship->AtmosphereSolar == nullptr);
-        unsigned const Radiation = NewFlags & 0x40000u;
+        unsigned const Radiation = NewFlags & Universe::kZonePropDamage;
         if (Radiation != 0)
         {
             if (bShipHullOk)
@@ -4104,7 +4104,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
         }
 
         // One announcement per newly entered hazard, first match wins.
-        if (Radiation != 0 && (ZoneFlags & 0x40000u) == 0)
+        if (Radiation != 0 && (ZoneFlags & Universe::kZonePropDamage) == 0)
         {
             if (bShipHullOk)
             {
@@ -4122,12 +4122,12 @@ void FHudHazardWarning::Update(float DeltaSeconds)
             QueueHazardVoiceLine(G_VoiceDanger);
             QueueHazardVoiceLine(G_VoiceVolatileGases);
         }
-        else if ((NewFlags & 0x100000u) != 0 && (ZoneFlags & 0x100000u) == 0)
+        else if ((NewFlags & Universe::kZonePropInterference) != 0 && (ZoneFlags & Universe::kZonePropInterference) == 0)
         {
             QueueHazardVoiceLine(G_VoiceWarning);
             QueueHazardVoiceLine(G_VoiceSensorEfficiency);
         }
-        else if ((NewFlags & 0x80000u) != 0 && (ZoneFlags & 0x80000u) == 0)
+        else if ((NewFlags & Universe::kZonePropDrag) != 0 && (ZoneFlags & Universe::kZonePropDrag) == 0)
         {
             QueueHazardVoiceLine(G_VoiceWarning);
             QueueHazardVoiceLine(G_VoiceIncreasedDrag);

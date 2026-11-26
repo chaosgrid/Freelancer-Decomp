@@ -106,9 +106,9 @@ namespace
     float const kHostileAttitudeLoose = -0.2f;
     // The object-type mask BuildAiTargetList scans and filters with
     // (0x7FFFFF minus bit 0x200).
-    unsigned const kScanTypeMask = 0x7FFDFFu;
+    unsigned const kScanTypeMask = OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK;
     // The narrower "ship-ish" mask both scan loops re-test each candidate against.
-    unsigned const kShipTypeMask = 0x7F0000u;
+    unsigned const kShipTypeMask = OBJ_SHIP_MASK;
     // .rdata:0x47C35000 -- FindClosestHostileTarget's seed distance.
     float const kMaxConsideredDistance = 100000.0f;
 }

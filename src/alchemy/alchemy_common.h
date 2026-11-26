@@ -42,6 +42,9 @@ namespace AlchemyImpl
     // Used as an array bound (char NameBuf[kAleNameMax]) across translation
     // units, so it must be a real constant expression, not an extern const.
     constexpr unsigned long kAleNameMax = 0x100;
+
+    // Node_ClassName, the first property of every node's set (alchemy_genericfx.cpp's base table).
+    constexpr unsigned long kNodeClassNameHash = 0xF54EF296u;
     extern const unsigned long kCrc32Poly;
 
     extern const char kAlchemySection[];

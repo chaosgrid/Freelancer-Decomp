@@ -19,6 +19,19 @@ class CServerConfigDlg : public CDialog
 {
 public:
 	enum { IDD = 0x84 };
+	// Control ids of the dialog template.
+	enum EControl
+	{
+		kControlServerName = 1006,
+		kControlDescription = 1007,
+		kControlPassword = 1008,
+		kControlAllowNewPlayers = 1010,
+		kControlMaxPlayersSpin = 1011,
+		kControlMaxPlayersEdit = 1012,
+		kControlInternetAccessible = 1014,
+		kControlAllowPvp = 1059,
+		kControlLegalNotice = 1070,
+	};
 
 	explicit CServerConfigDlg(CWnd* Parent = nullptr);
 

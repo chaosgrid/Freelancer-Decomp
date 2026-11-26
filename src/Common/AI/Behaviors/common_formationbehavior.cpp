@@ -46,7 +46,7 @@ void FormationBehavior::OnEngage()
     {
         Flag28c = 1;
         MatchThrottle.SetFlag39(true);
-        Move.SetField44(2);                                         // FUN_062d88b0
+        Move.SetField44(kMoveStopFlyThrough);                                         // FUN_062d88b0
     }
     bDirectionSet2a8 = 0;
 }
@@ -59,7 +59,7 @@ void FormationBehavior::OnDisengage()
         return;
     (void)SysMgr->FormationLeaders.RequestRelease();     // FUN_062ecd30
     unsigned int const Id = ObjInspectOf(OwnerContext)->get_id();
-    (void)ObjAffectOf(OwnerContext)->request_cancel(1, &Id, -1);
+    (void)ObjAffectOf(OwnerContext)->request_cancel(kRequestEventFormation, &Id, -1);
 }
 
 // Slot 5, FUN_062cc030 (argument unread).
@@ -151,7 +151,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
         }
     }
 
-    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & 0x7f0000u) == 0)
+    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & OBJ_SHIP_MASK) == 0)
         return EvalSkip;
 
     // Against the owner's ship captured at the top.
@@ -194,7 +194,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
 bool FormationBehavior::OnApplyDirective(void* DirectiveOp)
 {
     (void)DirectiveOp;
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     return true;
 }
 

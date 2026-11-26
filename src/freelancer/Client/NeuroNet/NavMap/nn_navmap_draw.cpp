@@ -527,9 +527,9 @@ namespace
     {
         if (FilterMode == 1)
             return Population != 0 && !Zone->HasPathLabel();
-        if (FilterMode == 2)
+        if (FilterMode == kNavMapFilterPatrol)
             return Population != 0 && Zone->HasPathLabel();
-        if (FilterMode == 5)
+        if (FilterMode == kNavMapFilterMineable)
             return IsZoneVisited(Zone, 4);
         if (Population == 0)
             return false;
@@ -712,7 +712,7 @@ void NeuroNetNavMap::Draw()
     Win3DApplyCamera(AsCamera(&Camera));          // FUN_00422950
 
     int const FilterMode = G_NavMapFilterMode; // DAT_006720a0
-    if (FilterMode != 6 && FilterMode != 7 && FilterMode != 4)
+    if (FilterMode != kNavMapFilterInfoCard && FilterMode != kNavMapFilterBaseList && FilterMode != kNavMapFilterLegend)
     {
         // The map meshes by view -- the flat one on the universe view,
         // the zoomed ones in a system (and while a transition heads for them).
@@ -753,7 +753,7 @@ void NeuroNetNavMap::Draw()
         }
 
         // The markers, with the map-marker option (0x1b) on.
-        if (GetGameOption(0x1b) != 0) // FUN_005792b0
+        if (GetGameOption(kGameOptObjectsGroup) != 0) // FUN_005792b0
         {
             IEngine* const Engine = DALib::Engine;
             for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
@@ -791,18 +791,18 @@ void NeuroNetNavMap::Draw()
                 // (Kind 2) and the targeted star (Kind 0 with the target's id).
                 if (bDrawnOnce != 0)
                 {
-                    if (Item->Kind == 2 && bBlink != 0)
+                    if (Item->Kind == kNavMapItemPlayer && bBlink != 0)
                         continue;
-                    if (Item->Kind == 0 && bBlink != 0 && Item->Id == TargetId)
+                    if (Item->Kind == kNavMapItemSolar && bBlink != 0 && Item->Id == TargetId)
                         continue;
                 }
 
                 // The waypoint markers (Kind 3 / 4) are drawn with
                 // their numbers once drawn; a best-path stop without a number (-1) not at all.
                 int const Number = Item->Variant;
-                if (bDrawnOnce != 0 && Item->Kind == 4 && Number == -1)
+                if (bDrawnOnce != 0 && Item->Kind == kNavMapItemBestPath && Number == -1)
                     continue;
-                if (bDrawnOnce == 0 || (Item->Kind != 3 && Item->Kind != 4))
+                if (bDrawnOnce == 0 || (Item->Kind != kNavMapItemWaypoint && Item->Kind != kNavMapItemBestPath))
                 {
                     // The transform is read (unused), then the draw.
                     Engine->GetInstanceTransform(Item->Mesh.EngineInstance); // IEngine slot 40
@@ -892,7 +892,7 @@ void NeuroNetNavMap::Draw()
         Engine->UpdateInstance(ZoomedMapMesh.EngineInstance, 0, nullptr);
 
         // The legend (mode 4), loaded on first use and stretched.
-        if (G_NavMapFilterMode == 4)
+        if (G_NavMapFilterMode == kNavMapFilterLegend)
         {
             if (LegendMesh.EngineInstance == InvalidInstanceIndex)
             {
@@ -966,7 +966,7 @@ void NeuroNetNavMap::Draw()
     }
 
     // The base list (mode 7) -- each row lit by the cursor ray.
-    if (G_NavMapFilterMode == 7)
+    if (G_NavMapFilterMode == kNavMapFilterBaseList)
     {
         // The cursor's ray through the Win3D camera: the screen point
         // to the near plane, rotated by the camera (I3DMathEngine slot 11), normalised.
@@ -1065,12 +1065,12 @@ void NeuroNetNavMap::Draw()
     // The legend's five labels (mode 4, untested), else the system's
     // name outside the info-card / base-list modes.
     int const ModeNow = G_NavMapFilterMode;
-    if (ModeNow == 4)
+    if (ModeNow == kNavMapFilterLegend)
     {
         for (int Index = 0; Index < 5; ++Index)
             LegendLabels[Index]->Draw();
     }
-    else if (ModeNow != 6 && ModeNow != 7 && SystemNameText != nullptr && IsShown(SystemNameText))
+    else if (ModeNow != kNavMapFilterInfoCard && ModeNow != kNavMapFilterBaseList && SystemNameText != nullptr && IsShown(SystemNameText))
     {
         SystemNameText->Draw();
     }
@@ -1098,14 +1098,14 @@ void NeuroNetNavMap::DrawJumpLinks()
         memcpy(From, ClientMeshHolderGetPosition(&Link->From->Mesh), sizeof(From));
         float To[3];
         memcpy(To, ClientMeshHolderGetPosition(&Link->To->Mesh), sizeof(To));
-        if (Link->Kind == 0)
+        if (Link->Kind == kNavMapLinkPlain)
         {
             // A plain link, blue {00,40,80,ff} fading to {00,10,20,00}.
             unsigned char const Center[4] = {0x00, 0x40, 0x80, 0xff};
             unsigned char const Edge[4] = {0x00, 0x10, 0x20, 0x00};
             NavMapDrawBand(From, To, Center, Edge, kNavMapLinkWidth); // FUN_00498470
         }
-        else if (Link->Kind == 2 || Link->Kind == 1)
+        else if (Link->Kind == kNavMapLinkBestPath || Link->Kind == kNavMapLinkWaypoint)
         {
             // A route link in the palette colour DAT_00679b80, its
             // alpha byte cleared for the edges.
@@ -1221,7 +1221,7 @@ void NeuroNetNavMap::DrawLabels()
 {
     // FUN_004999d0: not in the info-card / legend / base-list modes.
     int const Mode = G_NavMapFilterMode;
-    if (Mode == 4 || Mode == 6 || Mode == 7)
+    if (Mode == kNavMapFilterLegend || Mode == kNavMapFilterInfoCard || Mode == kNavMapFilterBaseList)
         return;
 
     // Last frame's rects dropped (FUN_004a3bf0 erase), lighting and
@@ -1236,20 +1236,20 @@ void NeuroNetNavMap::DrawLabels()
     // follows the width of a 4:3 surface of this height, by range rather than exact match.
     int const SurfaceWidth = static_cast<int>(WidescreenEquivalentSurfaceWidth() + 0.5);
     char const* FontName = "NavMap800";
-    if (SurfaceWidth >= 0x640)
+    if (SurfaceWidth >= 1600)
         FontName = "NavMap1600";
-    else if (SurfaceWidth >= 0x480)
+    else if (SurfaceWidth >= 1152)
         FontName = "NavMap1280";
-    else if (SurfaceWidth >= 0x400)
+    else if (SurfaceWidth >= 1024)
         FontName = "NavMap1024";
 #else
     int const SurfaceWidth = static_cast<int>(G_RenderSurfaceWidth); // DAT_00610850
     char const* FontName = "NavMap800";
-    if (SurfaceWidth >= 0x640)
+    if (SurfaceWidth >= 1600)
         FontName = "NavMap1600";
-    else if (SurfaceWidth == 0x400)
+    else if (SurfaceWidth == 1024)
         FontName = "NavMap1024";
-    else if (SurfaceWidth == 0x500 || SurfaceWidth == 0x480)
+    else if (SurfaceWidth == 1280 || SurfaceWidth == 1152)
         FontName = "NavMap1280";
 #endif
     IFont* const Font = FindMenuFontImp(FontName); // FUN_004177b0
@@ -1283,7 +1283,7 @@ void NeuroNetNavMap::DrawLabels()
         for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
         {
             FNavMapItem* const Item = *It;
-            if (Item->StridName == 0 || Item->bShown == 0 || Item->Kind != 0 ||
+            if (Item->StridName == 0 || Item->bShown == 0 || Item->Kind != kNavMapItemSolar ||
                 (static_cast<unsigned>(Item->Type) & PassMasks[Pass]) == 0)
                 continue;
             EnsureItemLabel(Font, Item); // FUN_004997d0
@@ -1727,7 +1727,7 @@ void NeuroNetNavMap::DrawZoneShading()
 {
     // FUN_0049dcc0: only in filter modes 1 / 2 / 3 / 5.
     int const Mode = G_NavMapFilterMode;
-    if (Mode != 1 && Mode != 2 && Mode != 3 && Mode != 5)
+    if (Mode != kNavMapFilterPolitical && Mode != kNavMapFilterPatrol && Mode != kNavMapFilterMission && Mode != kNavMapFilterMineable)
         return;
     bool const bRebuilt = BuildZoneShading(); // FUN_0049c740
     if (ShadeVertexCount == 0)
@@ -1756,7 +1756,7 @@ void NeuroNetNavMap::DrawZoneShading()
     if (G_NavMapIndexBuffer->SelectIb(reinterpret_cast<void*>(static_cast<intptr_t>(-1)),
                                       ShadeVbOffset, 0, 0) != 0) // +0x24
         return;
-    G_NavMapDraw->DrawIndexedPrimitive(4, 0, static_cast<unsigned>(ShadeVertexCount), IndexOffset,
+    G_NavMapDraw->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, static_cast<unsigned>(ShadeVertexCount), IndexOffset,
                                        static_cast<unsigned>(ShadeIndexCount)); // +0x0c
 
     // The state table 0x005d2e4c, twice.
@@ -1792,7 +1792,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             if (!ShadeZoneQualifies(Zone, Population, G_NavMapFilterMode, MissionZoneIds,
                                     MissionZoneCount))
                 continue;
-            if (bDebugShowAll != 0 || IsZoneVisited(Zone, 1))
+            if (bDebugShowAll != 0 || IsZoneVisited(Zone, kVisitShown))
                 ++Count;
         }
         if (Count == ShadeZoneCount)
@@ -1821,7 +1821,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         if (!ShadeZoneQualifies(Zone, Population, G_NavMapFilterMode, MissionZoneIds,
                                 MissionZoneCount))
             continue;
-        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
+        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, kVisitShown))
             continue;
 
         // The population's feeling towards the player, weighted.
@@ -1856,22 +1856,22 @@ bool NeuroNetNavMap::BuildZoneShading()
         // Filter modes 1 / 2 keep only the zone filter's band -- all
         // (0): neither hostile nor friendly; 1: at or below -0.6; 2: at or above 0.6.
         int const Mode = G_NavMapFilterMode;
-        if (Mode == 1 || Mode == 2)
+        if (Mode == kNavMapFilterPolitical || Mode == kNavMapFilterPatrol)
         {
             int const ZoneFilter = G_NavMapZoneFilter;
-            if (ZoneFilter == 0)
+            if (ZoneFilter == kNavMapZoneFilterAll)
             {
                 if (!(Feel > kNavMapHostileFeel))
                     continue;
                 if (!(Feel < kNavMapFriendlyFeel))
                     continue;
             }
-            else if (ZoneFilter == 1)
+            else if (ZoneFilter == kNavMapZoneFilterHostile)
             {
                 if (Feel > kNavMapHostileFeel)
                     continue;
             }
-            else if (ZoneFilter == 2)
+            else if (ZoneFilter == kNavMapZoneFilterFriendly)
             {
                 if (Feel < kNavMapFriendlyFeel)
                     continue;
@@ -1882,11 +1882,11 @@ bool NeuroNetNavMap::BuildZoneShading()
         // modes 1 / 2.
         unsigned long ColourDword = 0;
         NnReputationColorArgb(&ColourDword, Feel); // FUN_0045a650
-        if (Mode == 5)
+        if (Mode == kNavMapFilterMineable)
             ColourDword = G_NnPaletteAmber;
         unsigned char Rgba[4];
         memcpy(Rgba, &ColourDword, sizeof(Rgba));
-        if (Mode != 2 && Mode != 1)
+        if (Mode != kNavMapFilterPatrol && Mode != kNavMapFilterPolitical)
             Rgba[3] = static_cast<unsigned char>(
                 static_cast<int>(static_cast<double>(Rgba[3]) * static_cast<double>(kNavMapHalf)));
 
@@ -2161,9 +2161,9 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         for (int Index = 0; Index < ZoneCount; ++Index)
         {
             Universe::IZone const* const Zone = MapZones[static_cast<size_t>(Index)];
-            if ((Zone->GetProperties() & 0x3ffc0) == 0)
+            if ((Zone->GetProperties() & (Universe::kZonePropObjectZone | Universe::kZonePropNebula | Universe::kZonePropExclusionZone)) == 0)
                 continue;
-            if (bDebugShowAll != 0 || IsZoneVisited(Zone, 1))
+            if (bDebugShowAll != 0 || IsZoneVisited(Zone, kVisitShown))
                 ++Count;
         }
         if (Count == TerrainZoneCount)
@@ -2188,9 +2188,9 @@ bool NeuroNetNavMap::BuildTerrainPatches()
     {
         Universe::IZone const* const Zone = MapZones[static_cast<size_t>(ZoneIndex)];
         unsigned long const Properties = Zone->GetProperties();
-        if ((Properties & 0x3ffc0) == 0)
+        if ((Properties & (Universe::kZonePropObjectZone | Universe::kZonePropNebula | Universe::kZonePropExclusionZone)) == 0)
             continue;
-        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
+        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, kVisitShown))
             continue;
 
         // The terrain texture by the first property bit; a 0x8000
@@ -2214,7 +2214,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             Shape = 3;
         else if ((Properties & 0x2000) != 0)
             Shape = 4;
-        else if ((Properties & 0x8000) != 0)
+        else if ((Properties & Universe::kZonePropNebula) != 0)
         {
             Shape = 2;
             Vector const& Tint = Zone->GetFogColor();
@@ -2230,7 +2230,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
 
         // 0x30000 zones are black, texture 2, unjittered; no texture
         // at all (or a missing shape) is no patch.
-        if ((Properties & 0x30000) != 0)
+        if ((Properties & Universe::kZonePropExclusionZone) != 0)
         {
             Colour[0] = 0.0f;
             Colour[1] = 0.0f;
@@ -2287,7 +2287,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         Transform const Xform = ZoneMapTransform(Zone, SystemScale);
         unsigned const ZoneShape = Zone->GetShape();
         float Points[33][3];
-        if (ZoneShape == 1)
+        if (ZoneShape == Universe::ZoneShapeSphere)
         {
             // 32 points round the sphere's equator.
             float Angle = 0.0f;
@@ -2301,7 +2301,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
                     JitterTerrainPoint(Points[Index]);
             }
         }
-        else if (ZoneShape == 2)
+        else if (ZoneShape == Universe::ZoneShapeEllipsoid)
         {
             // 32 points of the ellipsoid's outline.
             float Angle = 0.0f;
@@ -2417,7 +2417,7 @@ void NeuroNetNavMap::DrawTradeLanes()
     if (G_NavMapIndexBuffer->SelectIb(reinterpret_cast<void*>(static_cast<intptr_t>(-1)),
                                       TradeLaneVbOffset, 0, 0) != 0)
         return;
-    G_NavMapDraw->DrawIndexedPrimitive(4, 0, static_cast<unsigned>(TradeLaneVertexCount), IndexOffset,
+    G_NavMapDraw->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, static_cast<unsigned>(TradeLaneVertexCount), IndexOffset,
                                        static_cast<unsigned>(TradeLaneIndexCount));
 
     // The texture off, the state table 0x005d2e4c.

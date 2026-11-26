@@ -791,7 +791,7 @@ void FMissionScript::OnMissionSucceed()
         FmtStr MissionMsg;
         MissionMsg.begin_mad_lib(StateMessageId);
         MissionMsg.end_mad_lib();
-        pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_1, true);
+        pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_SUCCESS, true);
         // FUN_06f49090.
         PlayerState->CountRandomMissionCompleted(7);
         DestroyMissionObjects();
@@ -807,7 +807,7 @@ void FMissionScript::OnMissionFail()
     FmtStr MissionMsg;
     MissionMsg.begin_mad_lib(StateMessageId);
     MissionMsg.end_mad_lib();
-    pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_0, true);
+    pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_FAILURE, true);
     std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.begin();
     for (; It != NpcObjects.end(); ++It)
         It->second->SetCommMuted(true);
@@ -1332,7 +1332,7 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
     {
         FmtStr EmptyMsg;
         pub::Player::DisplayMissionMessage(PlayerId, EmptyMsg,
-                                           static_cast<MissionMessageType>(0xa), true);
+                                           MISSION_MSG_PRUNE_HISTORY, true);
     }
     DispatchTriggerEvent(&EventId, MessageParms);
     if (StoryEvents != nullptr)
@@ -1461,7 +1461,7 @@ void FMissionScript::OnAbortMission(void const* MessageParms)
     FmtStr MissionMsg;
     MissionMsg.begin_mad_lib(StateMessageId);
     MissionMsg.end_mad_lib();
-    pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_0, true);
+    pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_FAILURE, true);
     bPendingDestroy = 1;
 }
 

@@ -35,9 +35,9 @@ FSystemPathTable* GetSystemPathTable(int Type)
 {
     switch (Type)
     {
-    case 0: return &GSystemPathsAll;
-    case 1: return &GSystemPathsGate;
-    case 2: return &GSystemPathsHole;
+    case CONN_TYPE_ALL: return &GSystemPathsAll;
+    case CONN_TYPE_JUMP_GATE: return &GSystemPathsGate;
+    case CONN_TYPE_JUMP_HOLE: return &GSystemPathsHole;
     default: return nullptr;
     }
 }
@@ -83,10 +83,10 @@ void BuildSystemPathsFrom(unsigned int SourceSystemId, int Type, FSystemPathTabl
         CopyShortestPath(&Queue, &Path);
         unsigned int const LastSystemId = Path.back();
 
-        unsigned int const CheckedSystemId = (Type == 0) ? SourceSystemId : LastSystemId;
+        unsigned int const CheckedSystemId = (Type == CONN_TYPE_ALL) ? SourceSystemId : LastSystemId;
         if (FindSystemInfo(&CheckedSystemId) == nullptr)
         {
-            if (Type != 0)
+            if (Type != CONN_TYPE_ALL)
                 Queue.remove(Path);
             continue;
         }
@@ -419,11 +419,11 @@ void __cdecl BuildSystemPathTables(bool bWrite)
     std::map<unsigned int, FSystemInfo> const Systems(GSystemInfos);
 
     for (std::map<unsigned int, FSystemInfo>::const_iterator It = Systems.begin(); It != Systems.end(); ++It)
-        BuildSystemPathsFrom(It->first, 0, &GSystemPathsAll);
+        BuildSystemPathsFrom(It->first, CONN_TYPE_ALL, &GSystemPathsAll);
     for (std::map<unsigned int, FSystemInfo>::const_iterator It = Systems.begin(); It != Systems.end(); ++It)
-        BuildSystemPathsFrom(It->first, 1, &GSystemPathsGate);
+        BuildSystemPathsFrom(It->first, CONN_TYPE_JUMP_GATE, &GSystemPathsGate);
     for (std::map<unsigned int, FSystemInfo>::const_iterator It = Systems.begin(); It != Systems.end(); ++It)
-        BuildSystemPathsFrom(It->first, 2, &GSystemPathsHole);
+        BuildSystemPathsFrom(It->first, CONN_TYPE_JUMP_HOLE, &GSystemPathsHole);
 
     if (bWrite)
         WriteSystemPathTables();

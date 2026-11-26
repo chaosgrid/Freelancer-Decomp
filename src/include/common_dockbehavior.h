@@ -34,6 +34,23 @@
 // class's own members: they write up to +0x46c, past FormationBehavior's 0x2b8.
 // ============================================================================
 
+// DockBehavior::ModeState320 (+0x320), the state EnterState (FUN_062c3d10) switches into and
+// UpdateApproachTail / CheckCanProceed switch on. Only the states whose job the code shows are
+// named; 6, 7, 9 and 10 (the final approach moves to the dock hardpoints, and the hand-off to
+// the trade lane) stay numbers.
+enum EDockState
+{
+    kDockStateIdle = 0,         // Disengage / OnApplyDirective leave it here
+    kDockStateGoto = 1,         // flying to the target under the Goto behavior (NavPilotPtr)
+    kDockStateApproach = 2,     // flying to InterceptPoint39c with the Move / Face ideas
+    kDockStateRequest = 3,      // UpdateApproachTail issues the dock request (request_event)
+    kDockStateAwaitReply = 4,   // stopped while the request is pending (Flag39a); OnResult answers
+    kDockStateSpline = 8,       // trade lane / jump gate final approach on the spline (SplineMove)
+    kDockStateCooldown = 0xb,   // waits StateTimer340, then Disengage + RecomputeApproach
+    kDockStateDone = 0xc,       // finishes with SetDirectiveResult(BEHAVIOR_DOCK, 0)
+    kDockStateFailed = 0xd,     // finishes with SetDirectiveResult(BEHAVIOR_DOCK, 2)
+};
+
 // Behavior (0x2c bytes) comes first, so the RequestCB vptr lands at +0x2c and the
 // sub-objects start at +0x30.
 class DockBehavior : public Behavior, public IObjAffect::RequestCB

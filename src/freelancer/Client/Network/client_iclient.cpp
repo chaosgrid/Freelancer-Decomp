@@ -498,7 +498,7 @@ void IClientImpl::SendCommonPlayerTradeInitiateTrade(unsigned int /*ClientId*/, 
     WinFactoryCreate("NN_Trade", "NN_Trade", nullptr, nullptr);
     Vector const Where = {0.0f, 0.35f, -1.4f};
     G_NnTrade->SetPosition(&Where);
-    G_NnTrade->Flags = static_cast<unsigned char>(G_NnTrade->Flags | 0x03);
+    G_NnTrade->Flags = static_cast<unsigned char>(G_NnTrade->Flags | kWin3DActive | kWin3DVisible);
     G_NnTrade->SetTarget(ShipId); // FUN_004c2510
     ChatGroupTradeRequestRemoved(ShipId); // FUN_0046b520
 }
@@ -603,7 +603,7 @@ void IClientImpl::SendCommonPlayerTradeRequestTrade(unsigned int /*ClientId*/, u
     if (Found != nullptr && Found->ManagerKind == EClientGameobjKind::Ship)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
-        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags | 0x04);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags | kShipFlagTradeRequest);
         ChatGroupTradeRequestReceived(ShipId); // FUN_0046b500
     }
     ++G_PendingTradeRequestCount;
@@ -616,7 +616,7 @@ void IClientImpl::SendCommonPlayerTradeStopTradeRequest(unsigned int /*ClientId*
     if (Found != nullptr && Found->ManagerKind == EClientGameobjKind::Ship)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
-        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfb);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & ~kShipFlagTradeRequest);
         ChatGroupTradeRequestRemoved(ShipId); // FUN_0046b520
     }
     G_bTradeRequested = 0; // DAT_00674b00

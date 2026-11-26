@@ -346,32 +346,32 @@ int DACOM_API FRoomCamera::ClassifySphere(const Vector* Center, float Radius)
 
     // Each compare below keeps retail's polarity, so a NaN takes the same branch as on the x87.
     if (R - static_cast<double>(ZNear) < Z)
-        return 1;
+        return kSphereOutside;
 
-    int Result = 4;
+    int Result = kSphereInside;
     const double S = R + Z;
     if (!(S < -static_cast<double>(ZNear)))
-        Result = 3;
+        Result = kSphereStraddling;
     if (S < -static_cast<double>(ZFar))
-        return 1;
+        return kSphereOutside;
     if (!(R - static_cast<double>(ZFar) < Z))
-        Result = 3;
+        Result = kSphereStraddling;
 
     // Side planes, against the float -R.
     const float NegRadius = -Radius;
     double Dist = fabs(static_cast<double>(Center->x)) * static_cast<double>(PlaneX[0]) +
                   static_cast<double>(PlaneX[2]) * Z;
     if (Dist > R)
-        return 1;
+        return kSphereOutside;
     if (!(Dist < static_cast<double>(NegRadius)))
-        Result = 3;
+        Result = kSphereStraddling;
 
     Dist = fabs(static_cast<double>(Center->y)) * static_cast<double>(PlaneY[1]) +
            static_cast<double>(PlaneY[2]) * Z;
     if (Dist > R)
-        return 1;
+        return kSphereOutside;
     if (!(Dist < static_cast<double>(NegRadius)))
-        Result = 3;
+        Result = kSphereStraddling;
 
     // |z| below 1e-4 (or a NaN) skips the size test.
     if (!(fabs(Z) >= kClassifyEpsilon))
@@ -382,7 +382,7 @@ int DACOM_API FRoomCamera::ClassifySphere(const Vector* Center, float Radius)
     const double Area = static_cast<double>(YScale) * static_cast<double>(XScale) * Q * Q *
                         static_cast<double>(kMinusPi);
     if (Area < 1.0)
-        return 2;
+        return kSphereTooSmall;
     return Result;
 }
 

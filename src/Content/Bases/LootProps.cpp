@@ -189,7 +189,7 @@ bool __cdecl CreateBarMissionOffer(FBaseNpcMission const* Mission, FContentPlaye
         if (0.0f == Request.Difficulty)
             return false;
         Result = Out->Loader->CreateMission(&Request, &Out->Mission);
-        if (Result == 0 || Result == 1 || Result == 3)
+        if (Result == kRmCreateOk || Result == kRmCreateNoEnemyGroup || Result == kRmCreateNoObjective)
             break;
     }
 
@@ -227,7 +227,7 @@ namespace
         while (Faction != Items.end())
         {
             unsigned int const Mask = GetVibeFeelingMask(Faction->first, State->GetReputation());
-            if (Mask == 1 || Mask == 2)
+            if (Mask == kFeelingFriendly || Mask == kFeelingNeutral)
                 ++Faction;
             else
                 Faction = Items.erase(Faction);
@@ -344,10 +344,10 @@ namespace
                         {
                             // Loader slot 3.
                             int const Code = Offer.Loader->CreateMission(&Request, &Offer.Mission);
-                            bool const bCreated = Code == 0;
-                            if (Code == 3)
+                            bool const bCreated = Code == kRmCreateOk;
+                            if (Code == kRmCreateNoObjective)
                                 Result = Code;
-                            else if (Code != 0)
+                            else if (Code != kRmCreateOk)
                                 Result = 4;
                             if (bCreated)
                             {

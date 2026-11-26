@@ -240,9 +240,9 @@ unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo
     CAccount* Account = static_cast<CAccount*>(account_ptr);
     if (Account != nullptr) {
         if (Account->m_bLocked)
-            return 7;
+            return kLoginAccountLocked;
         if (!Account->m_bNotBanned)
-            return 0;
+            return kLoginBanned;
     }
     client_id = SessionId;
     if (Account != nullptr)
@@ -262,7 +262,7 @@ unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo
             int FindResult = 0;
             while (FindResult == 0) {
                 if (load_saved_character(AccountDir, FindData.name)) {
-                    Result = 3;
+                    Result = kLoginAccepted;
                     if (!bFoundRestart && _stricmp(FindData.name, RestartName) == 0)
                         bFoundRestart = true;
                 }
@@ -274,10 +274,10 @@ unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo
         if (SinglePlayer()) {
             if (!bFoundRestart && Players.create_restart_file(AccountDir) &&
                 load_saved_character(AccountDir, RestartName)) {
-                Result = 3;
+                Result = kLoginAccepted;
             }
         } else {
-            Result = 3;
+            Result = kLoginAccepted;
             if (!SinglePlayer()) {                                          // re-tested in retail
                 FDUMP(kFdumpNotice, "LOG: Login on account %S (\"%s\")\n",
                       Info.AccountName, AccountDir);
@@ -470,7 +470,7 @@ bool PlayerData::check_position_bound(Vector const* Position) {
     double const DistSq = X * X + Y * Y + Z * Z;
     if (!(DistSq > 562500000000.0))
         return true;
-    ShipObj->destroy(1, ship_object_id);
+    ShipObj->destroy(DESTROY_FUSE, ship_object_id);
     return false;
 }
 
@@ -1021,7 +1021,7 @@ namespace {
             if (Hull.get_legal_hps(Chain[Index]) != nullptr)
                 return Chain[Index];
         }
-        return static_cast<HpAttachmentType>(0);
+        return HpTypeNone;
     }
 
     // FUN_06d50120 -- reason 3, "Equipment exceeds ship specs". Two 0-terminated chains of
@@ -1090,7 +1090,7 @@ namespace {
             // observable behaviour.
             if (Class == Archetype::AClassGun) {
                 Archetype::Gun const* GunArch = static_cast<Archetype::Gun const*>(Equip);
-                HpAttachmentType Best = static_cast<HpAttachmentType>(0);
+                HpAttachmentType Best = HpTypeNone;
                 int const Types = GunArch->get_number_of_hp_types();
                 for (int TypeIndex = 0; TypeIndex < Types; ++TypeIndex) {
                     HpAttachmentType const Candidate = GunArch->get_hp_type_by_index(TypeIndex);
@@ -1275,8 +1275,8 @@ static void Server_FormatMissionLogEntry(char* Out, FmtStr const& Entry) {
                 (unsigned int)Node->TypeTag,
                 (unsigned int)Node->Flags);
 
-        // 0x21 = nested FmtStr (common_text.h): bare ',' then recurse after it.
-        if (Node->TypeTag == 0x21) {
+        // TagFmtStr = nested FmtStr (common_text.h): bare ',' then recurse after it.
+        if (Node->TypeTag == FmtStr::TagFmtStr) {
             char* const Tail = Out + strlen(Out);
             *Tail = ',';
             Server_FormatMissionLogEntry(Tail + 1, *Node->Subtree);
@@ -1415,7 +1415,7 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
     unsigned int const GroupCount = GlobalReputation::group_count();
     GlobalReputation::Relation* const Relations = static_cast<GlobalReputation::Relation*>(
         operator new(GroupCount * sizeof(GlobalReputation::Relation)));
-    unsigned int Affiliation = 0xffffffffu;
+    unsigned int Affiliation = kNoAffiliation;
     unsigned int Rank = 0;
     unsigned char RelationCount = 0;
     FmtStr Name1;
@@ -1453,7 +1453,7 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
             fprintf(Out, "%s = %s\n", "house", HouseBuf);
         }
 
-        if (Affiliation != 0xffffffffu) {
+        if (Affiliation != kNoAffiliation) {
             TString<16> AffilNick;
             AffilNick.Length = 0;
             AffilNick.Data[0] = '\0';
@@ -3092,7 +3092,7 @@ unsigned char PlayerDB::login(const SLoginInfo& Info, unsigned int SessionId) {
     PlayerData* Current = traverse_active(nullptr);
     while (Current != nullptr) {
         if (_wcsicmp(Current->AccountName, LoginName) == 0) {
-            return 1; // Account already logged in
+            return kLoginAlreadyLoggedIn;
         }
         Current = traverse_active(Current);
     }

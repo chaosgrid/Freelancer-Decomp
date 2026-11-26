@@ -186,6 +186,25 @@ struct FmtStr
         unsigned int Data[5];
     };
 
+    // Val::TypeTag: the kind of value a node holds. The letters are the ASCII codes of the
+    // append_* that stamps them (FUN_0630d8e0 .. FUN_0630dd50); every tag but TagFmtStr and
+    // TagNavMarker keeps the id or number itself in Val::Value.
+    enum ValTag
+    {
+        TagFmtStr = 0x21,       // '!' append_fmt_str: Val::Subtree, an owned nested FmtStr
+        TagNavMarker = 0x4E,    // 'N' append_nav_marker: Val::Marker, an owned 0x14-byte block
+        TagSystem = 0x53,       // 'S' append_system
+        TagBase = 0x42,         // 'B' append_base
+        TagString = 0x73,       // 's' append_string (an IDS id)
+        TagGood = 0x47,         // 'G' append_good
+        TagInt = 0x64,          // 'd' append_int
+        TagRepInstance = 0x52,  // 'R' append_rep_instance
+        TagRepGroup = 0x46,     // 'F' append_rep_group
+        TagZoneId = 0x5A,       // 'Z' append_zone_id
+        TagSpaceObjId = 0x4F,   // 'O' append_spaceobj_id
+        TagInstallation = 0x49, // 'I' append_installation
+        TagLoot = 0x4C          // 'L' append_loot
+    };
     // Which counter each append_* uses; the value is the byte offset minus 0x08. Only
     // KindUnused0D (+0x0D) is never stamped by an exported append_*.
     enum ValueKind
@@ -273,6 +292,20 @@ struct VisualSize
     int Descent;    // +0x0C
 };
 static_assert(sizeof(VisualSize) == 0x10, "VisualSize must be 0x10");
+
+// The bit fields of TextRenderAttributes::Packed (the "data" / "mask" of an RDLX <TRA> node):
+// bits 0-2 the bold / italic / underline switches (rdlx attributes "bold", "italic",
+// "underline"), bits 3-7 the font style index ("font", 1-based in the file), bits 8-31 the
+// colour ("color"). DeviceTRC indexes its font cache with the low byte, (Style << 3) | styles.
+enum ETextAttr : unsigned int
+{
+    kTextAttrBold = 0x01,
+    kTextAttrItalic = 0x02,
+    kTextAttrUnderline = 0x04,
+    kTextAttrStyleMask = 0x07,
+    kTextAttrFontMask = 0xf8,
+    kTextAttrColorMask = 0xffffff00,
+};
 
 // ============================================================================
 // TextRenderAttributes — opaque attribute bundle. Retail copies only first dword.

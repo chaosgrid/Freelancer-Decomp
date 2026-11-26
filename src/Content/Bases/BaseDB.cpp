@@ -661,7 +661,7 @@ FBarCharacterDesc::FBarCharacterDesc()
 
 // FUN_06ea9340 06ea9361-06ea93af.
 FBarCharacter::FBarCharacter()
-    : UseCount(1), Behavior(0xffffffff), CharacterId(0), RoomId(0), Affiliation(0xffffffff),
+    : UseCount(1), Behavior(0xffffffff), CharacterId(0), RoomId(0), Affiliation(kNoAffiliation),
       Placement(-1), PlayerId(0), Gender(-1), Voice(0), TalkCount(0)
 {
     Role.Length = 0;
@@ -1006,13 +1006,13 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
 
     // greet..offer (1, 0, 2, 3) paired with 0, then decision 1, accept 2, decline 3 --
     // seven inlined copies of FUN_06f01ab0 in retail.
-    AppendBehaviorText(&Behavior, Script->FindActionText(1), 0);            // FUN_06ed4470
-    AppendBehaviorText(&Behavior, Script->FindActionText(0), 0);
-    AppendBehaviorText(&Behavior, Script->FindActionText(2), 0);
-    AppendBehaviorText(&Behavior, Script->FindActionText(3), 0);
-    AppendBehaviorText(&Behavior, Script->FindActionText(4), 1);
-    AppendBehaviorText(&Behavior, Script->FindActionText(5), 2);
-    AppendBehaviorText(&Behavior, Script->FindActionText(6), 3);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionWalkup), 0);            // FUN_06ed4470
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionGreet), 0);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionAction), 0);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionOffer), 0);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionDecision), 1);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionAccept), 2);
+    AppendBehaviorText(&Behavior, Script->FindActionText(kEncounterActionDecline), 3);
 
     Behavior.StartRoomLocationId = Script->StartRoomLocationId;
     Behavior.IdArrayCount = 0;
@@ -1020,7 +1020,7 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     Behavior.NameFmtStr.begin_mad_lib(static_cast<unsigned int>(Script->MissionTextId));
     Behavior.NameFmtStr.end_mad_lib();
     // Only the offer text pointer is tested.
-    Behavior.DialogType = Script->FindActionText(3) != nullptr ? 3 : 5;
+    Behavior.DialogType = Script->FindActionText(kEncounterActionOffer) != nullptr ? kDialogMission : kDialogStory;
     Behavior.Filter = PlayerId;
     Behavior.OfferId = ControllerId;
     Behavior.OfferKind = pub::Controller::MissionOfferController;

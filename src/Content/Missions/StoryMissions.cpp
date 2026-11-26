@@ -431,7 +431,7 @@ namespace
             MissionMsg.begin_mad_lib(0x5faa);
             MissionMsg.end_mad_lib();
             pub::Player::DisplayMissionMessage(TargetPlayerId, MissionMsg,
-                                               static_cast<MissionMessageType>(9), true);
+                                               MISSION_MSG_OBJECTIVE_HISTORY, true);
         }
     };
 

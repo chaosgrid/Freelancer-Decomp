@@ -35,7 +35,7 @@ void ImeUi_RenderToolbar(const _IMEUI_APPEARANCE& Appearance, const RECT& Boundi
     const double Height = static_cast<unsigned>(ScreenHeight);
     switch (Appearance.SymbolPosition)
     {
-    case 0:
+    case kImeSymbolBesideInput:
         // Right side on greater/equal; less or unordered takes the left.
         if (Width >= static_cast<double>(Diameter) + Bounding.right + 4.0)
             Vertices[0].X = static_cast<float>((static_cast<double>(Bounding.right) - Radius) + Diameter + 4.0);
@@ -43,19 +43,19 @@ void ImeUi_RenderToolbar(const _IMEUI_APPEARANCE& Appearance, const RECT& Boundi
             Vertices[0].X = static_cast<float>(static_cast<double>(Diameter) * -0.5 + Bounding.left - 4.0);
         Vertices[0].Y = static_cast<float>(static_cast<double>(Bounding.bottom) - (Appearance.SymbolHeight >> 1));
         break;
-    case 1:
+    case kImeSymbolTopLeft:
         Vertices[0].X = static_cast<float>(Radius + 4.0);
         Vertices[0].Y = static_cast<float>(Radius + 4.0);
         break;
-    case 2:
+    case kImeSymbolTopRight:
         Vertices[0].X = static_cast<float>(Width - (Radius + 4.0));
         Vertices[0].Y = static_cast<float>(Radius + 4.0);
         break;
-    case 3:
+    case kImeSymbolBottomRight:
         Vertices[0].X = static_cast<float>(Width - (Radius + 4.0));
         Vertices[0].Y = static_cast<float>(Height - (Radius + 4.0));
         break;
-    case 4:
+    case kImeSymbolBottomLeft:
         Vertices[0].X = static_cast<float>(Radius + 4.0);
         Vertices[0].Y = static_cast<float>(Height - (Radius + 4.0));
         break;
@@ -102,7 +102,7 @@ void ImeUi_RenderToolbar(const _IMEUI_APPEARANCE& Appearance, const RECT& Boundi
 
     // Retail rereads SymbolHeight after the callback, and uses Language&3ff.
     double FontHeight = static_cast<double>(Appearance.SymbolHeight) * 0.625f;
-    if ((Language & 0x3ff) == 0x12 && bActive) FontHeight *= 0.800000011920928955078125f;
+    if ((Language & 0x3ff) == LANG_KOREAN && bActive) FontHeight *= 0.800000011920928955078125f;
     CImeUiFont_Base* Font = Appearance.SymbolFont;
     if (!Font) return;
     FontHeight *= 1.33333337306976318359375f;

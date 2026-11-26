@@ -63,7 +63,7 @@ void SrvTractor::notify(Event Code, void* Param)
             if (Space != 0)
             {
                 // The mask only matches Loot::get_type_bits.
-                GameObject* const LootObj = Owner->OwnerSystem->find_object(Target->Id, 0x10000000u);
+                GameObject* const LootObj = Owner->OwnerSystem->find_object(Target->Id, OBJ_LOOT);
                 if (LootObj != nullptr && !LootObj->is_destroyed())
                 {
                     Owner->OwnerSystem->tractor_loot(static_cast<::Loot*>(LootObj), Owner,
@@ -388,8 +388,8 @@ void StarSystem::add_player(unsigned int SessionId)
                     // only when non-empty.
                     DamageList Damage;
                     Damage.set_destroyed(false);
-                    // The same unnamed cause 0x19 the observer writes; see the note there.
-                    Damage.set_cause(static_cast<DamageCause>(0x19));
+                    // The same cause the observer writes.
+                    Damage.set_cause(DamageCause::InitialSync);
                     Damage.set_inflictor_id(0u);
                     Damage.set_inflictor_owner_player(0u);
                     Obj->get_damage_list(Damage, 1.0f);
@@ -418,7 +418,7 @@ void StarSystem::add_player(unsigned int SessionId)
 
                 // Each functioning gun's target. No CEGun::cast: the traverser's mask
                 // already selects guns.
-                CEquipTraverser Walk(0x80);
+                CEquipTraverser Walk(EquipTypeGun);
                 for (CEquip* Equip = Solar->EquipManager.Traverse(Walk);
                      Equip != nullptr;
                      Equip = Solar->EquipManager.Traverse(Walk)) {
@@ -595,7 +595,7 @@ void StarSystem::remove_player(unsigned int SessionId)
             continue;
         if (Obj->is_destroyed())
             continue;
-        Obj->destroy(0, Obj->get_id());
+        Obj->destroy(DESTROY_VANISH, Obj->get_id());
     }
 }
 
@@ -1025,7 +1025,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
                 MissileBlock[0] = Rec.OwnerId;
                 MissileBlock[1] = Id;
                 FBehaviorManagerEvent MissileEvent;
-                MissileEvent.Type = 6;
+                MissileEvent.Type = FBehaviorManagerEvent::kEventMissileLaunched;
                 MissileEvent.Data = MissileBlock;
                 Behavior->OnEvent(&MissileEvent);
             }
@@ -1436,7 +1436,7 @@ void StarSystem::on_object_destroyed(GameObject* Obj, int Kind)
             // entry is dropped too.
             Slot->cancel_trade_request(/*bDropPartnerEntry*/true);
             // Only Kind == 1 zeroes the health.
-            if (Kind == 1)
+            if (Kind == DESTROY_FUSE)
                 Slot->set_relative_health(0.0f, /*bNotify*/false);
             Slot->ship_object_id = 0;
             unsigned int Payload[2];
@@ -1629,10 +1629,10 @@ unsigned int StarSystem::scan_objects(unsigned int* OutIds, unsigned int MaxCoun
     unsigned int Count = 0;
 
     // Ships first.
-    if ((TypeMask & 0x7f0000u) != 0u)
+    if ((TypeMask & OBJ_SHIP_MASK) != 0u)
         Count = Ships.collect_in_sphere(OutIds, MaxCount, Pos, Radius, TypeMask);
 
-    if ((TypeMask & 0xfdffu) == 0u)
+    if ((TypeMask & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0u)
         return Count;
 
     // A radius that is not strictly positive walks the solar list instead of the spatial
@@ -1717,7 +1717,7 @@ void StarSystem::send_changed_affiliations()
         PlayerData& Slot = Players[Client];
         unsigned int const Ship = Slot.ship_object_id;
         int const Vibe = Slot.rep_vibe;
-        unsigned int Affiliation = 0xffffffffu;
+        unsigned int Affiliation = kNoAffiliation;
         ::Reputation::Vibe::GetAffiliation(Vibe, Affiliation, false);
 
         if (Ship != 0)
@@ -1941,7 +1941,7 @@ unsigned int StarSystem::update(float Dt)
                         if (Owner == 0)
                         {
                             // Nobody owns it, it just goes.
-                            Obj->destroy(0, 0);
+                            Obj->destroy(DESTROY_VANISH, 0);
                         }
                         else
                         {
@@ -2025,7 +2025,7 @@ unsigned int StarSystem::update(float Dt)
 // FUN_06d0c6d0: solars only.
 void StarSystem::add_docking_solar(GameObject* Obj)
 {
-    if ((Obj->get_type_bits() & 0xfdffu) == 0u)
+    if ((Obj->get_type_bits() & OBJ_SOLAR_NO_WAYPOINT_MASK) == 0u)
         return;
     DockingSolars.append(Obj);
 }
@@ -2098,19 +2098,19 @@ GameObject* StarSystem::find_object(unsigned int Id, unsigned int TypeMask)
         return find_object(Id);
 
     ObjectList* List = nullptr;
-    if ((TypeMask & 0x7f0000u) != 0)
+    if ((TypeMask & OBJ_SHIP_MASK) != 0)
         List = &Ships;
-    else if ((TypeMask & 0x10000000u) != 0)
+    else if ((TypeMask & OBJ_LOOT) != 0)
         List = &Loot;
-    else if ((TypeMask & 0xfdffu) != 0)
+    else if ((TypeMask & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
         List = &Solars;
-    else if ((TypeMask & 0x4000000u) != 0)
+    else if ((TypeMask & OBJ_MINE) != 0)
         List = &Mines;
-    else if ((TypeMask & 0x1000000u) != 0)
+    else if ((TypeMask & OBJ_GUIDED) != 0)
         List = &GuidedMunitions;
-    else if ((TypeMask & 0x8000000u) != 0)
+    else if ((TypeMask & OBJ_COUNTERMEASURE) != 0)
         List = &CounterMeasures;
-    else if ((TypeMask & 0x60000000u) != 0)
+    else if ((TypeMask & (OBJ_ASTEROID | OBJ_DYNAMIC_ASTEROID)) != 0)
         List = &MedAsteroids;
     else
         return nullptr;
@@ -2152,7 +2152,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
         Dock->get_type(DockType);
         LeftBlock[1] = DockType;
         FBehaviorManagerEvent LeftEvent;
-        LeftEvent.Type = 3;
+        LeftEvent.Type = FBehaviorManagerEvent::kEventObjectLeftSystem;
         LeftEvent.Data = LeftBlock;
         Behavior->OnEvent(&LeftEvent);
     }
@@ -2177,7 +2177,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
     if (ShipObj->csimple()->OwnerPlayer != 0u)
     {
         // A jump gate / jump hole protects the player's ship while it goes through.
-        if ((Dock->get_type_bits() & 0x40u) != 0u || (Dock->get_type_bits() & 0x800u) != 0u)
+        if ((Dock->get_type_bits() & OBJ_JUMP_GATE) != 0u || (Dock->get_type_bits() & OBJ_JUMP_HOLE) != 0u)
         {
             FInvincibility Cmd;
             Cmd.Type = 2;
@@ -2205,7 +2205,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
 
     // A gate or hole gives the ship 12 seconds to go through.
     Cs->enable_collisions_r(false);
-    if ((Dock->get_type_bits() & 0x40u) != 0u || (Dock->get_type_bits() & 0x800u) != 0u)
+    if ((Dock->get_type_bits() & OBJ_JUMP_GATE) != 0u || (Dock->get_type_bits() & OBJ_JUMP_HOLE) != 0u)
         DockingShip->DockExitTimer = 12.0f;                // .rdata:06d67cc0
     else
         DockingShip->DockExitTimer = 0.0f;
@@ -2227,12 +2227,12 @@ void StarSystem::arrive_ship(GameObject* Obj, GameObject* JumpObj, Vector const&
             (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CShip*>(Raw) : nullptr;
 
-        if ((Bits & 0x40u) != 0u || (Bits & 0x800u) != 0u)
+        if ((Bits & OBJ_JUMP_GATE) != 0u || (Bits & OBJ_JUMP_HOLE) != 0u)
         {
             // Retail passes Obj itself as the jump object.
             Cs->jump_in(static_cast<IObjRW*>(Obj), Pos, Orient, 0.5f);
         }
-        else if ((Bits & 0x400u) != 0u)
+        else if ((Bits & OBJ_AIRLOCK_GATE) != 0u)
         {
             Cs->airlock_in(Pos, Orient);
         }
@@ -2275,7 +2275,7 @@ void StarSystem::collect_dockable_solars(std::list<GameObject*>& Out, unsigned i
             continue;
         }
         unsigned int const Bits = Eq->TypeBits;
-        if ((Bits & 0xc40u) != Bits)
+        if ((Bits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != Bits)
             continue;
         if (BaseId != 0)
             continue;
@@ -2469,10 +2469,10 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
     // The cause from the munition's type: BULLET (0x2000000) -> 2, GUIDED (0x1000000) -> 3,
     // anything else -> 1.
     unsigned int const ObjectType = MunitionArch->ObjectType;
-    if (ObjectType == 0x2000000u)
-        Damage.set_cause(static_cast<DamageCause>(2));
+    if (ObjectType == OBJ_BULLET)
+        Damage.set_cause(DamageCause::Gun);
     else
-        Damage.set_cause(static_cast<DamageCause>((ObjectType == 0x1000000u) ? 3 : 1));
+        Damage.set_cause((ObjectType == OBJ_GUIDED) ? DamageCause::GuidedHit : DamageCause::Collision);
 
     Damage.set_inflictor_id(Info.AttackerId);
 
@@ -2494,7 +2494,7 @@ void StarSystem::badlands_collision(SSPBadLandsObjCollisionInfo const& Info)
         return;
     if (Obj->is_invincible())
         return;
-    Obj->destroy(1, Info.BadLandsObjId);
+    Obj->destroy(DESTROY_FUSE, Info.BadLandsObjId);
 }
 
 // FUN_06d0d730.
@@ -2523,9 +2523,9 @@ void StarSystem::collision_damage(FCollisionDamage const& Rec, GameObject* Targe
     Hit.Damage = Rec.Damage;
     Hit.Field_0x0c = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(&Rec) & 0xffu);
 
-    // Cause 1; the owner player read through the narrowing without a null test.
+    // Collision; the owner player read through the narrowing without a null test.
     DamageList Damage;
-    Damage.Cause = static_cast<DamageCause>(1);
+    Damage.Cause = DamageCause::Collision;
     Damage.InflictorId = Rec.SourceId;
     Damage.InflictorOwner = 0;
     if (Source != nullptr)
@@ -2752,51 +2752,51 @@ IObjRW* __thiscall StarSystem::GetNext(void* IterState)
     GameObject* Found = nullptr;
 
     unsigned int Mask = Cursor->Mask;
-    if ((Mask & 0x7f0000u) != 0) {
+    if ((Mask & OBJ_SHIP_MASK) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &Ships, &Cursor->Node, &Cursor->List,
-                                     (Mask & 0x7f0000u) != 0x7f0000u);
+                                     (Mask & OBJ_SHIP_MASK) != OBJ_SHIP_MASK);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0xfdffu) != 0) {
+    if ((Mask & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &Solars, &Cursor->Node, &Cursor->List,
-                                     (Mask & 0xfdffu) != 0xfdffu);
+                                     (Mask & OBJ_SOLAR_NO_WAYPOINT_MASK) != OBJ_SOLAR_NO_WAYPOINT_MASK);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x10000000u) != 0) {
+    if ((Mask & OBJ_LOOT) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &Loot, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x1000000u) != 0) {
+    if ((Mask & OBJ_GUIDED) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &GuidedMunitions, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x2000000u) != 0) {
+    if ((Mask & OBJ_BULLET) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &Beams, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x4000000u) != 0) {
+    if ((Mask & OBJ_MINE) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &Mines, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x8000000u) != 0) {
+    if ((Mask & OBJ_COUNTERMEASURE) != 0) {
         Found = StarSystem_ObjDbStep(Mask, &CounterMeasures, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
-    if ((Mask & 0x20000000u) != 0)
+    if ((Mask & OBJ_ASTEROID) != 0)
         Found = StarSystem_ObjDbStep(Mask, &MedAsteroids, &Cursor->Node, &Cursor->List, false);
     return Found;
 }
@@ -2852,7 +2852,7 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
         Payload.ExitId = ExitId;
         Payload.ShipId = ShipId;
         FBehaviorManagerEvent LaneEvent;
-        LaneEvent.Type = 4;
+        LaneEvent.Type = FBehaviorManagerEvent::kEventTradelane;
         LaneEvent.Data = &Payload;
         Behavior->OnEvent(&LaneEvent);
     }
@@ -2924,7 +2924,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
         Payload.Field_0x08 = 0u;
         Payload.ShipId = ShipId;
         FBehaviorManagerEvent LaneEvent;
-        LaneEvent.Type = 4;
+        LaneEvent.Type = FBehaviorManagerEvent::kEventTradelane;
         LaneEvent.Data = &Payload;
         Behavior->OnEvent(&LaneEvent);
     }
@@ -3360,7 +3360,7 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
     }
 
     unsigned int const ShipId = Ship->get_id();
-    LootObj->destroy(2, ShipId);
+    LootObj->destroy(DESTROY_TRACTORED, ShipId);
 
     Cl->Units = 0u;
 }

@@ -87,6 +87,17 @@ enum
     kNnLoadSaveModeStoryStar = 3,
 };
 
+// NnLoadSave::ConfirmMode (+0x338): which question NN_Confirm is asking (the answer comes back through
+// kWinMsgConfirmAnswer).
+enum ELoadSaveConfirm
+{
+    kLoadSaveConfirmNone = 0,
+    kLoadSaveConfirmDelete = 1,      // "Delete <name>?"
+    kLoadSaveConfirmMainMenu = 2,    // "Quit to the main menu?"
+    kLoadSaveConfirmSaveFailed = 3,  // saves failed while away (only an OK)
+    kLoadSaveConfirmOverwrite = 4    // "Overwrite?"
+};
+
 class NnLoadSave : public WinControl, public EventHandler
 {
 public:

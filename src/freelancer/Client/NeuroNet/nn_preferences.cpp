@@ -72,12 +72,12 @@ namespace
 
     void ShowControl(Win3D* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags | 3);
+        Control->Flags = static_cast<unsigned char>(Control->Flags | kWin3DActive | kWin3DVisible);
     }
 
     void HideControl(Win3D* Control)
     {
-        Control->Flags = static_cast<unsigned char>(Control->Flags & 0xfc);
+        Control->Flags = static_cast<unsigned char>(Control->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     // The ids text (FUN_004347e0, 0x40 chars) into the control.
@@ -126,7 +126,7 @@ NnPreferences::NnPreferences()
     DialogButtonText[0] = DialogButtonText[1] = nullptr;
     VideoModeCycle = nullptr; VideoBox = nullptr; VideoBox2 = nullptr; VideoModeText = nullptr;
     StaticBar = nullptr; CancelButton = nullptr; CancelText = nullptr; DefaultsButton = nullptr; DefaultsText = nullptr;
-    CreditsText = nullptr; CurPage = 0; ReqPage = 0; CurGroup = 0; Anim = 0.0;
+    CreditsText = nullptr; CurPage = kPrefPageKeyMap; ReqPage = kPrefPageKeyMap; CurGroup = 0; Anim = 0.0;
     bDirty = 0; bCreating = 0; bConfirmMode = 0; bPausedGame = 0; bKeyCapture = 0; bVideoConfirm = 0;
     CaptureRow = FKeyRow();
     bCaptureAlt = 0; bConflictAlt = 0; bConflict = 0; ConflictRow = 0; ConflictCategory = 0; ConflictCommand = 0;
@@ -160,7 +160,7 @@ void NnPreferences::Draw()
     Win3D* Child = ChildHead;
     for (; Child != nullptr; Child = Child->NextSibling)
     {
-        if ((Child->Flags & 2) == 0)
+        if ((Child->Flags & kWin3DVisible) == 0)
             continue;
         if (Child->AsWinControl() == SetKeyFrame)
             Win3DFlushBeforeOverlayDraw();
@@ -223,7 +223,7 @@ void NnPreferences::Update()
                 SetPosition3(BigBox, static_cast<float>(Anim * -1.2), 0.0f, 0.0f);
             }
             if (Anim > -0.8 && Anim < -0.1)
-                PlayUiSoundSlot(0x1b);
+                PlayUiSoundSlot(kUiSoundMotionSwish);
         }
         else
         {
@@ -257,7 +257,7 @@ void NnPreferences::Update()
             }
         }
         if (Anim + 0.6 > 0.0)
-            PlayUiSoundSlot(0x1b);
+            PlayUiSoundSlot(kUiSoundMotionSwish);
         if (Anim < -1.0)
         {
             for (int Index = 0; Index < 6; ++Index)
@@ -285,11 +285,11 @@ void NnPreferences::Update()
                 FlipAngle = 0.0;
                 switch (Page)
                 {
-                case 0: EnterKeyMapPage(); break;
-                case 1: EnterInterfacePage(); break;
-                case 2: EnterVideoPage(); break;
-                case 3: EnterAudioPage(); break;
-                case 4: EnterCreditsPage(); break;
+                case kPrefPageKeyMap: EnterKeyMapPage(); break;
+                case kPrefPageInterface: EnterInterfacePage(); break;
+                case kPrefPageVideo: EnterVideoPage(); break;
+                case kPrefPageAudio: EnterAudioPage(); break;
+                case kPrefPageCredits: EnterCreditsPage(); break;
                 default: break;
                 }
                 bFlipHalf = static_cast<unsigned char>(bFlipHalf == 0);
@@ -312,18 +312,18 @@ void NnPreferences::Update()
     {
         switch (CurPage)
         {
-        case 0: EnterKeyMapPage(); break;
-        case 1: EnterInterfacePage(); break;
-        case 2: EnterVideoPage(); break;
-        case 3: EnterAudioPage(); break;
-        case 4: EnterCreditsPage(); break;
+        case kPrefPageKeyMap: EnterKeyMapPage(); break;
+        case kPrefPageInterface: EnterInterfacePage(); break;
+        case kPrefPageVideo: EnterVideoPage(); break;
+        case kPrefPageAudio: EnterAudioPage(); break;
+        case kPrefPageCredits: EnterCreditsPage(); break;
         default: break;
         }
         bFlipping = 0;
     }
 
     // The credits roll.
-    if (CurPage == 4 && bFlipping == 0)
+    if (CurPage == kPrefPageCredits && bFlipping == 0)
     {
         CreditsScroll = Dt * CreditsSpeed + CreditsScroll;
         CreditsText->SetScrollOrigin(0, static_cast<int>(CreditsScroll));
@@ -349,7 +349,7 @@ void NnPreferences::Update()
 void NnPreferences::SetRowsHidden(bool bHide)
 {
     // FUN_004abdf0
-    if (CurPage == 0)
+    if (CurPage == kPrefPageKeyMap)
     {
         for (int Index = 0; Index < 13; ++Index)
         {
@@ -385,7 +385,7 @@ void NnPreferences::SetRowsHidden(bool bHide)
         HideControl(KeyScroll);
         HideControl(StaticRows[13]);
     }
-    else if (CurPage == 1 || CurPage == 2 || CurPage == 3)
+    else if (CurPage == kPrefPageInterface || CurPage == kPrefPageVideo || CurPage == kPrefPageAudio)
     {
         for (int Index = 0; Index < 14; ++Index)
         {
@@ -470,10 +470,10 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_004ac0a0
     Win3D* const Source = reinterpret_cast<Win3D*>(A);
 
-    if (Msg == 0x46 || Msg == kWinNotifyHover)
+    if (Msg == kWinNotifyTextHover || Msg == kWinNotifyHover)
     {
         // Row tooltips.
-        if (CurPage == 0)
+        if (CurPage == kPrefPageKeyMap)
         {
             for (int Index = 0; Index < 13; ++Index)
             {
@@ -483,7 +483,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     ShowRowTip(Index);
             }
         }
-        else if (CurPage == 1 && (Source == VideoModeCycle || Source == VideoModeText))
+        else if (CurPage == kPrefPageInterface && (Source == VideoModeCycle || Source == VideoModeText))
         {
             // LoadOptList pads every section to at least 15 rows, so 14 rows are always there.
             for (int Index = 0; Index < 14; ++Index)
@@ -519,7 +519,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         if (Source == OverwriteButton)
         {
-            if (CurPage == 0)
+            if (CurPage == kPrefPageKeyMap)
             {
                 char const* const UserPath = EnsureUserKeyMapPath();
                 GetKeyMapIniRelPath();
@@ -630,13 +630,13 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         std::vector<FPrefOption>* Options = nullptr;
         switch (CurPage)
         {
-        case 0:
+        case kPrefPageKeyMap:
             if (Source == KeyScroll)
                 FillKeyRows(static_cast<int>(B));
             return 0;
-        case 1: Options = &OptionsA; break;
-        case 2: Options = &OptionsC; break;
-        case 3: Options = &OptionsB; break;
+        case kPrefPageInterface: Options = &OptionsA; break;
+        case kPrefPageVideo: Options = &OptionsC; break;
+        case kPrefPageAudio: Options = &OptionsB; break;
         default: return 0;
         }
         // Every section holds at least 15 rows (LoadOptList pads).
@@ -645,7 +645,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (Source == OptScroll[Index])
                 SetSliderOption((*Options)[Index].Id, static_cast<int>(B), Index);
         }
-        if (CurPage == 1 && Source == VideoModeCycle)
+        if (CurPage == kPrefPageInterface && Source == VideoModeCycle)
         {
             int Row = -1;
             for (int Index = 0; Index < 14; ++Index)
@@ -661,18 +661,18 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (Msg == kWinNotifyRelease)
     {
         // A slider released on the audio page stops its preview sound.
-        if (CurPage != 3)
+        if (CurPage != kPrefPageAudio)
             return 0;
         for (int Index = 0; Index < 14; ++Index)
         {
             if (Source != OptScroll[Index])
                 continue;
             if (OptionsB[Index].Id == 0x581)
-                StopUiSoundSlot(0x1e);
+                StopUiSoundSlot(kUiSoundVoiceTest);
             if (OptionsB[Index].Id == 0x538)
-                StopUiSoundSlot(0x1f);
+                StopUiSoundSlot(kUiSoundEffectsTest);
             if (OptionsB[Index].Id == 0x539)
-                StopUiSoundSlot(0x20);
+                StopUiSoundSlot(kUiSoundMusicTest);
         }
         return 0;
     }
@@ -683,7 +683,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // Clicks, per page.
     switch (CurPage)
     {
-    case 0:
+    case kPrefPageKeyMap:
     {
         for (int Index = 0; Index < 3; ++Index)
         {
@@ -720,11 +720,11 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         break;
     }
-    case 1:
-    case 2:
-    case 3:
+    case kPrefPageInterface:
+    case kPrefPageVideo:
+    case kPrefPageAudio:
     {
-        std::vector<FPrefOption>& Options = CurPage == 1 ? OptionsA : (CurPage == 2 ? OptionsC : OptionsB);
+        std::vector<FPrefOption>& Options = CurPage == kPrefPageInterface ? OptionsA : (CurPage == kPrefPageVideo ? OptionsC : OptionsB);
         if (Source == CancelButton)
         {
             Revert(true);
@@ -748,7 +748,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             // The x87 product is exact (24 x 7 bits), so double, not a rounded float, reaches ftol.
             FPerfOption* const Graphics = FindPerfOption("default_graphics");
             SetSliderOption(0x767, static_cast<int>(static_cast<double>(Graphics->Applied) * 100.0), -1);
-            if (CurPage == 1)
+            if (CurPage == kPrefPageInterface)
             {
                 // The default video mode from the device caps.
                 unsigned long Ability4 = 0;
@@ -758,15 +758,15 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 VideoMemory >>= 20;
                 RefreshRows(-1);
                 int Width = 0x320;
-                int Bpp = 0x10;
+                int Bpp = 16;
                 if (Ability4 != 0)
                 {
                     Width = 0x400;
-                    Bpp = 0x20;
+                    Bpp = 32;
                 }
                 else if (VideoMemory > 0x10)
                 {
-                    Bpp = 0x20;
+                    Bpp = 32;
                 }
                 SelWidth = Width;
                 int CycleValue = 0;
@@ -804,10 +804,10 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 if (Source == OptToggle[Index])
                 {
                     int Value = 0;
-                    OptToggle[Index]->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&Value), 0);
+                    OptToggle[Index]->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&Value), 0);
                     SetToggleOption(Options[Index].Id, Value, Index);
                 }
-                else if (CurPage == 1 && Source == SmallButton[Index])
+                else if (CurPage == kPrefPageInterface && Source == SmallButton[Index])
                 {
                     SetToggleOption(Options[Index].Id, 0, Index);
                 }
@@ -815,7 +815,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         break;
     }
-    case 4:
+    case kPrefPageCredits:
         if (Source == DefaultsButton)
             CreditsScroll = 0.0;
         break;
@@ -824,7 +824,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     // The column buttons.
-    int const PageOfButton[5] = {0, 1, 2, 3, 4};
+    int const PageOfButton[5] = {kPrefPageKeyMap, kPrefPageInterface, kPrefPageVideo, kPrefPageAudio, kPrefPageCredits};
     for (int Button = 0; Button < 5; ++Button)
     {
         if (Source != PageButtons[Button])
@@ -843,9 +843,9 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // Close / main menu.
     if (Source == CloseButton || Source == PageButtons[5])
     {
-        if (CurPage == 5)
+        if (CurPage == kPrefPageClose)
             return 0;
-        ReqPage = 5;
+        ReqPage = kPrefPageClose;
         LeaveCurrentPage();
         if (bDirty == 0)
             GotoRequestedPage();
@@ -954,19 +954,19 @@ bool NnPreferences::KeyEvent(unsigned Key, unsigned char* Modifiers)
 
     if (bKeyCapture != 0)
     {
-        if ((Modifiers[0] & 2) == 0)
+        if ((Modifiers[0] & kWin3DKeyPressed) == 0)
             return false;
         unsigned const State = KeyMapGetModifierState();
-        if (Key == 0x73)
+        if (Key == VK_F4)
         {
-            if (State == 0x10)
+            if (State == kKeyModAlt)
                 return false; // Alt+F4 passes through
         }
         else
         {
-            if (Key == 0x2a)
+            if (Key == VK_PRINT)
                 return false;
-            if (Key == 0x1b)
+            if (Key == VK_ESCAPE)
             {
                 bKeyCapture = 0;
                 Win3DRemoveCapture(this);
@@ -974,34 +974,34 @@ bool NnPreferences::KeyEvent(unsigned Key, unsigned char* Modifiers)
                 return true;
             }
         }
-        unsigned Mods = 0;
+        unsigned Mods = kKeyModNone;
         if (GetKeyState(VK_SHIFT) < 0)
-            Mods = 1;
+            Mods = kKeyModShift;
         else if (GetKeyState(VK_CONTROL) < 0)
-            Mods = 4;
+            Mods = kKeyModControl;
         else if (GetKeyState(VK_MENU) < 0)
-            Mods = 0x10;
+            Mods = kKeyModAlt;
         TryBindKey(static_cast<int>(Key), Mods);
         return true;
     }
 
-    if ((Modifiers[0] & 2) == 0 || Key != 0x1b)
+    if ((Modifiers[0] & kWin3DKeyPressed) == 0 || Key != VK_ESCAPE)
         return false;
     if (bConfirmMode != 0)
     {
         CancelChanges();
         return true;
     }
-    if (CurPage != 6)
+    if (CurPage != kPrefPageEscape)
     {
-        ReqPage = 6;
+        ReqPage = kPrefPageEscape;
         LeaveCurrentPage();
         if (bDirty == 0)
             GotoRequestedPage();
     }
-    StopUiSoundSlot(0x1e);
-    StopUiSoundSlot(0x1f);
-    StopUiSoundSlot(0x20);
+    StopUiSoundSlot(kUiSoundVoiceTest);
+    StopUiSoundSlot(kUiSoundEffectsTest);
+    StopUiSoundSlot(kUiSoundMusicTest);
     return true;
 }
 
@@ -1067,11 +1067,11 @@ void NnPreferences::SelectGroup(int Group)
 void NnPreferences::EnterKeyMapPage()
 {
     // FUN_004ae4b0
-    if (CurPage == 0 && bFlipping == 0)
+    if (CurPage == kPrefPageKeyMap && bFlipping == 0)
         return;
     if (bFlipping == 0)
     {
-        CurPage = 0;
+        CurPage = kPrefPageKeyMap;
         bFlipping = 1;
         wchar_t Unused[0x40];
         GetIdsStringWWithRawFallback(0x52f, Unused, 0x40);
@@ -1120,11 +1120,11 @@ namespace
 void NnPreferences::EnterInterfacePage()
 {
     // FUN_004ae650
-    if (CurPage == 1 && bFlipping == 0)
+    if (CurPage == kPrefPageInterface && bFlipping == 0)
         return;
     if (bFlipping == 0)
     {
-        CurPage = 1;
+        CurPage = kPrefPageInterface;
         bFlipping = 1;
         PageTexts[1]->TextColour = G_NnPaletteAmber;
         return;
@@ -1146,11 +1146,11 @@ void NnPreferences::EnterInterfacePage()
 void NnPreferences::EnterVideoPage()
 {
     // FUN_004ae770
-    if (CurPage == 2 && bFlipping == 0)
+    if (CurPage == kPrefPageVideo && bFlipping == 0)
         return;
     if (bFlipping == 0)
     {
-        CurPage = 2;
+        CurPage = kPrefPageVideo;
         bFlipping = 1;
         PageTexts[2]->TextColour = G_NnPaletteAmber;
         return;
@@ -1172,11 +1172,11 @@ void NnPreferences::EnterVideoPage()
 void NnPreferences::EnterAudioPage()
 {
     // FUN_004ae890
-    if (CurPage == 3 && bFlipping == 0)
+    if (CurPage == kPrefPageAudio && bFlipping == 0)
         return;
     if (bFlipping == 0)
     {
-        CurPage = 3;
+        CurPage = kPrefPageAudio;
         bFlipping = 1;
         PageTexts[3]->TextColour = G_NnPaletteAmber;
         return;
@@ -1197,11 +1197,11 @@ void NnPreferences::EnterAudioPage()
 void NnPreferences::EnterCreditsPage()
 {
     // FUN_004ae9a0
-    if (CurPage == 4 && bFlipping == 0)
+    if (CurPage == kPrefPageCredits && bFlipping == 0)
         return;
     if (bFlipping == 0)
     {
-        CurPage = 4;
+        CurPage = kPrefPageCredits;
         bFlipping = 1;
         PageTexts[4]->TextColour = G_NnPaletteAmber;
         return;
@@ -1279,7 +1279,7 @@ void NnPreferences::LeaveInterfacePage()
     for (int Index = 0; Index < 14; ++Index)
     {
         HideOptionRow(this, Index);
-        OptToggle[Index]->ButtonBits2 = static_cast<unsigned char>(OptToggle[Index]->ButtonBits2 | 2);
+        OptToggle[Index]->ButtonBits2 = static_cast<unsigned char>(OptToggle[Index]->ButtonBits2 | kButtonEnabled);
     }
     HideControl(VideoModeCycle);
     HideControl(VideoBox);
@@ -1348,11 +1348,11 @@ void NnPreferences::LeaveCurrentPage()
     // 0x004add98, 0x004af108); pages 5 and 6 leave nothing.
     switch (CurPage)
     {
-    case 0: LeaveKeyMapPage(); break;
-    case 1: LeaveInterfacePage(); break;
-    case 2: LeaveVideoPage(); break;
-    case 3: LeaveAudioPage(); break;
-    case 4: LeaveCreditsPage(); break;
+    case kPrefPageKeyMap: LeaveKeyMapPage(); break;
+    case kPrefPageInterface: LeaveInterfacePage(); break;
+    case kPrefPageVideo: LeaveVideoPage(); break;
+    case kPrefPageAudio: LeaveAudioPage(); break;
+    case kPrefPageCredits: LeaveCreditsPage(); break;
     default: break;
     }
 }
@@ -1360,19 +1360,19 @@ void NnPreferences::LeaveCurrentPage()
 void NnPreferences::GotoRequestedPage()
 {
     // FUN_004aee30
-    if (ReqPage != 5 && ReqPage != 6)
+    if (ReqPage != kPrefPageClose && ReqPage != kPrefPageEscape)
     {
-        PlayOrRewindUiSoundSlot(2);
-        PlayOrRewindUiSoundSlot(5);
+        PlayOrRewindUiSoundSlot(kUiSoundWindowOpen);
+        PlayOrRewindUiSoundSlot(kUiSoundNavMapExpand);
     }
     switch (ReqPage)
     {
-    case 0: EnterKeyMapPage(); return;
-    case 1: EnterInterfacePage(); return;
-    case 2: EnterVideoPage(); return;
-    case 3: EnterAudioPage(); return;
-    case 4: EnterCreditsPage(); return;
-    case 5:
+    case kPrefPageKeyMap: EnterKeyMapPage(); return;
+    case kPrefPageInterface: EnterInterfacePage(); return;
+    case kPrefPageVideo: EnterVideoPage(); return;
+    case kPrefPageAudio: EnterAudioPage(); return;
+    case kPrefPageCredits: EnterCreditsPage(); return;
+    case kPrefPageClose:
         if (bInGame == 0)
         {
             // The main-menu closing slide.
@@ -1382,7 +1382,7 @@ void NnPreferences::GotoRequestedPage()
             for (int Index = 0; Index < 5; ++Index)
             {
                 NnButtonControl* const Button = PageButtons[Slide[Index]];
-                Button->ButtonBits2 = static_cast<unsigned char>(Button->ButtonBits2 & 0xfd);
+                Button->ButtonBits2 = static_cast<unsigned char>(Button->ButtonBits2 & ~kButtonEnabled);
             }
             LeaveCurrentPage();
             SavePerfOptions(kPerfOptionsFile);
@@ -1393,7 +1393,7 @@ void NnPreferences::GotoRequestedPage()
         G_bNnScreenUp = false;
         SavePerfOptions(kPerfOptionsFile);
         break;
-    case 6:
+    case kPrefPageEscape:
         bClosed = 1;
         G_bNnScreenUp = false;
         if (bInGame == 0)
@@ -1485,7 +1485,7 @@ namespace
                 FPrefVideoMode Entry;
                 Entry.Width = Mode.Width;
                 Entry.Height = Mode.Height;
-                Entry.Bpp = 0x10;
+                Entry.Bpp = 16;
                 Picked.push_back(Entry);
             }
         }
@@ -1511,8 +1511,8 @@ namespace
             }
             Modes[Index + kPrefVideoResolutionCount].Width = Modes[Index].Width;
             Modes[Index + kPrefVideoResolutionCount].Height = Modes[Index].Height;
-            Modes[Index].Bpp = 0x10;
-            Modes[Index + kPrefVideoResolutionCount].Bpp = 0x20;
+            Modes[Index].Bpp = 16;
+            Modes[Index + kPrefVideoResolutionCount].Bpp = 32;
         }
     }
 #endif
@@ -1659,12 +1659,12 @@ void NnPreferences::AddKeyRow(int CommandId, int Category)
             Row.Alt.NicknameId = AltLookup.NicknameId;
             Row.Alt.VirtualKey = AltLookup.VirtualKey;
             Row.Alt.Modifiers = AltLookup.Modifiers;
-            Row.BindingKind = bAlt ? 2 : 1;
+            Row.BindingKind = bAlt ? kKeyBindingPrimaryAndAlt : kKeyBindingPrimaryOnly;
         }
         else
         {
             Row.Primary.NicknameId = Lookup.NicknameId;
-            Row.BindingKind = 3;
+            Row.BindingKind = kKeyBindingNoPrimary;
         }
         if (FindKeyCmdById(Id) != nullptr)
         {
@@ -1687,7 +1687,7 @@ void NnPreferences::AddKeyRow(int CommandId, int Category)
     }
     else
     {
-        Row.BindingKind = 0;
+        Row.BindingKind = kKeyBindingNone;
         Row.CommandId = 0;
     }
     Row.NameIds = NameIds;
@@ -1714,7 +1714,7 @@ void NnPreferences::FillKeyRows(int First)
         NnTextControl* const KeyText = KeyRows[Index];
         NnTextControl* const AltText = KeyAltRows[Index];
         CommandRows[Index]->TextColour = G_NnPaletteCyan;
-        KeyBtnRows[Index]->EdgeMask = 0xa;
+        KeyBtnRows[Index]->EdgeMask = kWireEdgeRight | kWireEdgeLeft;
         if (Row.bEditable != 0)
         {
             KeyText->TextColour = G_NnPaletteCyan;
@@ -1726,7 +1726,7 @@ void NnPreferences::FillKeyRows(int First)
             AltText->TextColour = G_NnPaletteGrey;
         }
         FKeyBindingLookup Lookup;
-        if (Row.BindingKind == 1)
+        if (Row.BindingKind == kKeyBindingPrimaryOnly)
         {
             Lookup.NicknameId = Row.Primary.NicknameId;
             Lookup.VirtualKey = Row.Primary.VirtualKey;
@@ -1735,7 +1735,7 @@ void NnPreferences::FillKeyRows(int First)
             KeyText->SetText(Name);
             AltText->SetText(Row.bEditable != 0 ? L"" : Name); // 0x005c8ce0 is L""
         }
-        else if (Row.BindingKind == 2)
+        else if (Row.BindingKind == kKeyBindingPrimaryAndAlt)
         {
             Lookup.NicknameId = Row.Primary.NicknameId;
             Lookup.VirtualKey = Row.Primary.VirtualKey;
@@ -1765,7 +1765,7 @@ void NnPreferences::BeginKeyCapture(int Row, bool bAlt)
     // FUN_004afb80 (RET 8)
     std::vector<FKeyRow> const Rows = GetCurGroupRows();
     FKeyRow const& Entry = Rows[Row];
-    if (Entry.BindingKind == 0 || Entry.bEditable == 0)
+    if (Entry.BindingKind == kKeyBindingNone || Entry.bEditable == 0)
         return;
     bKeyCapture = 1;
     Win3DPushCapture(this);
@@ -1784,12 +1784,12 @@ void NnPreferences::BeginKeyCapture(int Row, bool bAlt)
     if (bAlt)
     {
         bCaptureAlt = 1;
-        bOverwrite = Entry.BindingKind == 2;
+        bOverwrite = Entry.BindingKind == kKeyBindingPrimaryAndAlt;
     }
     else
     {
         bCaptureAlt = 0;
-        bOverwrite = Entry.BindingKind != 3;
+        bOverwrite = Entry.BindingKind != kKeyBindingNoPrimary;
     }
     if (bOverwrite)
     {
@@ -1904,11 +1904,11 @@ void NnPreferences::TakeSnapshot()
     FPrefOption Row = BlankOption();
     for (int Index = 0; Index < 14; ++Index)
     {
-        if (CurPage == 1)
+        if (CurPage == kPrefPageInterface)
             Row = OptionsA[Index];
-        else if (CurPage == 2)
+        else if (CurPage == kPrefPageVideo)
             Row = OptionsC[Index];
-        else if (CurPage == 3)
+        else if (CurPage == kPrefPageAudio)
             Row = OptionsB[Index];
         if (Row.bHeader != 0)
         {
@@ -1923,16 +1923,16 @@ void NnPreferences::TakeSnapshot()
         else
         {
             unsigned Value = 0;
-            OptToggle[Index]->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&Value), 0);
+            OptToggle[Index]->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&Value), 0);
             int bOn = 1;
             if (static_cast<double>(static_cast<long long>(Value)) < 0.999)
                 bOn = 0;
             Snapshot[Index] = static_cast<float>(bOn);
         }
     }
-    StopUiSoundSlot(0x1e);
-    StopUiSoundSlot(0x1f);
-    StopUiSoundSlot(0x20);
+    StopUiSoundSlot(kUiSoundVoiceTest);
+    StopUiSoundSlot(kUiSoundEffectsTest);
+    StopUiSoundSlot(kUiSoundMusicTest);
 }
 
 void NnPreferences::ShowConfirmDialog(bool bShow)
@@ -1980,7 +1980,7 @@ void NnPreferences::ShowConfirmDialog(bool bShow)
 void NnPreferences::CancelChanges()
 {
     // FUN_004b2700
-    if (CurPage == 0)
+    if (CurPage == kPrefPageKeyMap)
     {
         char const* const UserPath = EnsureUserKeyMapPath();
         char const* const DefaultPath = GetKeyMapIniRelPath();
@@ -2246,7 +2246,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             swprintf(Text, 0x40, L"%d x %d", Found.Width, Found.Height); // 0x005d5190
             if (bBigVram != 0)
             {
-                bSel32 = static_cast<unsigned char>(Found.Bpp == 0x20);
+                bSel32 = static_cast<unsigned char>(Found.Bpp == 32);
                 // Retail formats the buffer into itself (0x004b1851); the port copies it first.
                 wchar_t Size[0x40];
                 wcscpy(Size, Text);
@@ -2281,7 +2281,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             // DIFFICULTY_SCALE = Value * 0.5, only when it differs from the shared slot 6
             // (FUN_005b3510); then the server hears of it. The option is not null-tested.
             float const Scale = static_cast<float>(static_cast<double>(Value) * 0.5);
-            if (GetPerfOptionSlot(6) != Scale)
+            if (GetPerfOptionSlot(kPerfSlotDifficultyScale) != Scale)
             {
                 SetPerfOptionValue(Option, Scale);
                 unsigned const Connection = GetPlayerConnectionId();
@@ -2313,8 +2313,8 @@ bool NnPreferences::TryApplyVideoMode(int Width, unsigned char b32)
     DisplaySettings Mode;
     memcpy(&Mode, &g_display, 0x28);
     CurWidth = Mode.width;
-    bCur32 = static_cast<unsigned char>(Mode.color_bpp == 0x20);
-    int const Bpp = b32 != 0 ? 0x20 : 0x10;
+    bCur32 = static_cast<unsigned char>(Mode.color_bpp == 32);
+    int const Bpp = b32 != 0 ? 32 : 16;
     Mode.width = 0;
     Mode.height = 0;
     Mode.color_bpp = Bpp;
@@ -2395,11 +2395,11 @@ void NnPreferences::UpdateDirty(int Id, float Value)
     FPrefOption Row = BlankOption();
     for (int Index = 0; Index < 14 && !bFound; ++Index)
     {
-        if (CurPage == 1)
+        if (CurPage == kPrefPageInterface)
             Row = OptionsA[Index];
-        else if (CurPage == 2)
+        else if (CurPage == kPrefPageVideo)
             Row = OptionsC[Index];
-        else if (CurPage == 3)
+        else if (CurPage == kPrefPageAudio)
             Row = OptionsB[Index];
         if (Row.bHeader != 0)
             continue;
@@ -2414,7 +2414,7 @@ void NnPreferences::UpdateDirty(int Id, float Value)
             continue;
         }
         // Toggles count only while visible.
-        if ((OptToggle[Index]->Flags & 2) == 0)
+        if ((OptToggle[Index]->Flags & kWin3DVisible) == 0)
             continue;
         if (Row.Id == Id)
         {
@@ -2425,7 +2425,7 @@ void NnPreferences::UpdateDirty(int Id, float Value)
             continue;
         }
         unsigned State = 0;
-        OptToggle[Index]->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
+        OptToggle[Index]->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
         int const bOn = static_cast<double>(static_cast<long long>(State)) > 0.999 ? 1 : 0;
         if (static_cast<float>(bOn) != Snapshot[Index])
             bFound = true;
@@ -2454,7 +2454,7 @@ namespace
 void NnPreferences::ShowRowTip(int Row)
 {
     // FUN_004b2130 (RET 4): the row's info ids in the rollover.
-    if (CurPage == 0)
+    if (CurPage == kPrefPageKeyMap)
     {
         int const First = static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0));
         // Deviation: retail reads an uninitialised local for a group outside 0..2 (0x004b21cb);
@@ -2472,11 +2472,11 @@ void NnPreferences::ShowRowTip(int Row)
         return;
     }
     FPrefOption Entry;
-    if (CurPage == 1)
+    if (CurPage == kPrefPageInterface)
         Entry = OptionsA[Row];
-    else if (CurPage == 2)
+    else if (CurPage == kPrefPageVideo)
         Entry = OptionsC[Row];
-    else if (CurPage == 3)
+    else if (CurPage == kPrefPageAudio)
         Entry = OptionsB[Row];
     else
         return;
@@ -2505,7 +2505,7 @@ void NnPreferences::ProbeModes(int)
         if (bModeAvail[Index] == 0)
             continue;
         // 32-bit modes need more than 16 MB of video memory.
-        if (bBigVram == 0 && Modes[Index].Bpp != 0x10)
+        if (bBigVram == 0 && Modes[Index].Bpp != 16)
         {
             bModeAvail[Index] = 0;
             continue;
@@ -2524,11 +2524,11 @@ void NnPreferences::Revert(bool bApply)
     FPrefOption Row = BlankOption();
     for (int Index = 0; Index < 14; ++Index)
     {
-        if (CurPage == 1)
+        if (CurPage == kPrefPageInterface)
             Row = OptionsA[Index];
-        else if (CurPage == 2)
+        else if (CurPage == kPrefPageVideo)
             Row = OptionsC[Index];
-        else if (CurPage == 3)
+        else if (CurPage == kPrefPageAudio)
             Row = OptionsB[Index];
         if (Row.bHeader != 0)
             continue;
@@ -2543,7 +2543,7 @@ void NnPreferences::Revert(bool bApply)
                 {
                     if (bModeAvail[Mode] == 0 || Modes[Mode].Width != CurWidth)
                         continue;
-                    if (static_cast<int>(bCur32) != (Modes[Mode].Bpp == 0x20 ? 1 : 0))
+                    if (static_cast<int>(bCur32) != (Modes[Mode].Bpp == 32 ? 1 : 0))
                         continue;
                     if (bApply)
                     {
@@ -2574,17 +2574,17 @@ void NnPreferences::Revert(bool bApply)
             continue;
         }
         // Toggles only while their text is visible.
-        if ((OptToggleText[Index]->Flags & 2) == 0)
+        if ((OptToggleText[Index]->Flags & kWin3DVisible) == 0)
             continue;
         // "Less than 0.999" (and unordered) is off; the button and the option get the opposite.
         int const bOn = static_cast<double>(Snapshot[Index]) >= 0.999 ? 1 : 0;
         int const State = bOn == 0 ? 1 : 0;
-        OptToggle[Index]->SetProperty(0x30, static_cast<uintptr_t>(State), 0);
+        OptToggle[Index]->SetProperty(kTogglePropSetState, static_cast<uintptr_t>(State), 0);
         SetToggleOption(Row.Id, State, bApply ? Index : -1);
     }
-    StopUiSoundSlot(0x1e);
-    StopUiSoundSlot(0x1f);
-    StopUiSoundSlot(0x20);
+    StopUiSoundSlot(kUiSoundVoiceTest);
+    StopUiSoundSlot(kUiSoundEffectsTest);
+    StopUiSoundSlot(kUiSoundMusicTest);
 }
 
 namespace
@@ -2611,12 +2611,12 @@ namespace
         if (bGreyed)
         {
             Toggle->bUseColour = 1;
-            Toggle->ButtonBits2 = static_cast<unsigned char>(Toggle->ButtonBits2 & 0xfd);
+            Toggle->ButtonBits2 = static_cast<unsigned char>(Toggle->ButtonBits2 & ~kButtonEnabled);
         }
         else
         {
             Toggle->bUseColour = 0;
-            Toggle->ButtonBits2 = static_cast<unsigned char>(Toggle->ButtonBits2 | 2);
+            Toggle->ButtonBits2 = static_cast<unsigned char>(Toggle->ButtonBits2 | kButtonEnabled);
         }
         Self->ScrollTextLeft[Index]->TextColour = Colour;
         Self->ScrollTextRight[Index]->TextColour = Colour;
@@ -2644,17 +2644,17 @@ void NnPreferences::RefreshRows(int Id)
     {
         bool bDisabled = false;
         if (bSeedMode == 0)
-            OptToggle[Index]->ButtonBits2 = static_cast<unsigned char>(OptToggle[Index]->ButtonBits2 | 2);
+            OptToggle[Index]->ButtonBits2 = static_cast<unsigned char>(OptToggle[Index]->ButtonBits2 | kButtonEnabled);
         // Only the id and the three bytes are reset; pages 1..3 copy the row.
         Row.Id = -1;
         Row.bSlider = 0;
         Row.bDisabledInGame = 0;
         Row.bHeader = 0;
-        if (CurPage == 1 || CurPage == 2 || CurPage == 3)
+        if (CurPage == kPrefPageInterface || CurPage == kPrefPageVideo || CurPage == kPrefPageAudio)
         {
-            if (CurPage == 1)
+            if (CurPage == kPrefPageInterface)
                 Row = OptionsA[Index];
-            else if (CurPage == 2)
+            else if (CurPage == kPrefPageVideo)
                 Row = OptionsC[Index];
             else
                 Row = OptionsB[Index];
@@ -2667,7 +2667,7 @@ void NnPreferences::RefreshRows(int Id)
             else if (Row.Id == 0x67f)
             {
                 // Dithering is pointless in 32-bit colour (DAT_00679bc0 +0x10).
-                bDisabled = g_display.color_bpp == 0x20;
+                bDisabled = g_display.color_bpp == 32;
             }
             else if (Row.Id == 0x57f)
             {
@@ -2726,7 +2726,7 @@ void NnPreferences::RefreshRows(int Id)
             {
                 // Only "greater than 0.999" is on.
                 int const bOn = static_cast<double>(Option->Applied) > 0.999 ? 1 : 0;
-                OptToggle[Index]->SetProperty(0x30, static_cast<uintptr_t>(bOn), 0);
+                OptToggle[Index]->SetProperty(kTogglePropSetState, static_cast<uintptr_t>(bOn), 0);
                 ShowControl(OptToggle[Index]);
                 GetIdsStringWWithRawFallback(bOn != 0 ? 0x65fu : 0x67au, Text, 0x40);
                 OptToggleText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
@@ -2769,7 +2769,7 @@ void NnPreferences::RefreshRows(int Id)
                     continue;
                 CurWidth = Modes[Mode].Width;
                 SelWidth = Modes[Mode].Width;
-                bSel32 = static_cast<unsigned char>(Modes[Mode].Bpp == 0x20);
+                bSel32 = static_cast<unsigned char>(Modes[Mode].Bpp == 32);
                 swprintf(ModeText, 0x40, L"%d x %d", Modes[Mode].Width, Modes[Mode].Height); // 0x005d5190
                 VideoModeCycle->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(CycleIndex[Mode]), 0);
                 bFound = true;
@@ -2779,7 +2779,7 @@ void NnPreferences::RefreshRows(int Id)
                 // None: the display's own size, cycle at 0.
                 CurWidth = g_display.width;
                 SelWidth = g_display.width;
-                bSel32 = static_cast<unsigned char>(g_display.color_bpp == 0x20);
+                bSel32 = static_cast<unsigned char>(g_display.color_bpp == 32);
                 swprintf(ModeText, 0x40, L"%d x %d", g_display.width, g_display.height);
                 VideoModeCycle->SetProperty(kScrollPropSetValue, 0, 0);
             }
@@ -2917,8 +2917,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     {
         Modes[Index + 5].Width = Modes[Index].Width;
         Modes[Index + 5].Height = Modes[Index].Height;
-        Modes[Index].Bpp = 0x10;
-        Modes[Index + 5].Bpp = 0x20;
+        Modes[Index].Bpp = 16;
+        Modes[Index + 5].Bpp = 32;
     }
 #endif
     for (int Index = 0; Index < kPrefVideoModeCount; ++Index)
@@ -2935,7 +2935,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     G_bNnScreenUp = true;
     if (bInGame != 0)
         bPausedGame = NnModalPauseGame();
-    CurPage = 0;
+    CurPage = kPrefPageKeyMap;
 
     Vector const Zero = {0.0f, 0.0f, 0.0f};
     if (bInGame != 0)
@@ -2960,7 +2960,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     // The display mode is DAT_00679bc0; 32 bpp without the big-VRAM flag counts as 16.
     SelWidth = 0;
     CurWidth = 0;
-    bCur32 = static_cast<unsigned char>(g_display.color_bpp == 0x20 ? 1 : 0);
+    bCur32 = static_cast<unsigned char>(g_display.color_bpp == 32 ? 1 : 0);
     bSel32 = bCur32;
     if (bBigVram == 0 && bCur32 == 1)
     {
@@ -3146,7 +3146,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             Name, "Interface\\NeuroNet\\Inventory\\check.3db",
             "Interface\\NeuroNet\\Inventory\\repairblackbox.3db", "ui_shipview_select", nullptr,
             &TogglePosition, nullptr, &ToggleExtents, 0, 0, 0, 0, 0x65f, 0x67a));
-        OptToggle[Index]->SetProperty(0x35, 1, 0);
+        OptToggle[Index]->SetProperty(kButtonPropGlow, 1, 0);
         memcpy(OptToggle[Index]->Colour, &G_NnPaletteGrey, 4);
 
         // {0.28, TY - 0.003f, 0}, 0.22 x 0.03, scale 0.9.

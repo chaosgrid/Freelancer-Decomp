@@ -147,7 +147,7 @@ bool UiTextMsgButton::Create(Win3D* NewParent, void* Data)
         MessageArg = Payload->ExtraInt;
     }
 
-    SetAlignMode(2);
+    SetAlignMode(kRichAlignMiddle);
 
     // Retail: the payload is read here on both paths, even when it was null above (0059a098
     // `mov eax,[edi+14h]` after the 0059a08f null jump).

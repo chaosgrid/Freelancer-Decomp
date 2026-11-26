@@ -170,13 +170,13 @@ namespace
         WinControl* const Control = Found->AsWinControl();
         if (Control == nullptr)
             return;
-        Control->SetProperty(0x4e, 0, 0);
+        Control->SetProperty(kWinPropCloseFromOutside, 0, 0);
     }
 
     // A Win3D shown and parented: [+0x6c] & 2 and [+0x04].
     bool IsShownWindow(Win3D const* Window)
     {
-        return Window != nullptr && (Window->Flags & 2) != 0 && Window->GetParent() != nullptr;
+        return Window != nullptr && (Window->Flags & kWin3DVisible) != 0 && Window->GetParent() != nullptr;
     }
 
     // FUN_0059da10("NavBar") -> slot 2 (the wrappers' shared head).
@@ -401,7 +401,7 @@ void NavBar::Refresh()
             FNavBarButton& Button = *It;
             if (Button.bRoomSwitch != 0)
             {
-                Button.Control->SetProperty(0xc, Button.Type == Location ? 1 : 0, 0);
+                Button.Control->SetProperty(kWinPropLit, Button.Type == Location ? 1 : 0, 0);
             }
             else if (Button.Type == kHotspotFrontDesk)
             {
@@ -431,7 +431,7 @@ void NavBar::Refresh()
             {
                 char const* const Switch = Button.Hotspot->RoomSwitch;
                 bool const bHere = Switch != nullptr && strcmp(VirtualRoom.c_str(), Switch) == 0;
-                Button.Control->SetProperty(0xc, bHere ? 1 : 0, 0);
+                Button.Control->SetProperty(kWinPropLit, bHere ? 1 : 0, 0);
             }
             else if (Button.Type == kHotspotFrontDesk)
             {
@@ -472,7 +472,7 @@ void NavBar::LayoutTabs(bool bAnimate)
         if (Button.bRoomSwitch == 0)
             continue;
         Step = 0.0f;
-        if ((static_cast<NnButtonControl*>(Button.Control)->GetButtonBits() & 0x40) != 0)
+        if ((static_cast<NnButtonControl*>(Button.Control)->GetButtonBits() & kButtonSelected) != 0)
         {
             Selected = &Button;
             if (bFirst)
@@ -812,7 +812,7 @@ void NavBar::Update()
             return;
         }
         ClosingButton = Button;
-        PlayOrRewindUiSoundSlot(0x1b);
+        PlayOrRewindUiSoundSlot(kUiSoundMotionSwish);
         MakeServiceBackground(Button->Type, 1.0f);
         float const Scale = ServiceScale(Button->Type);
         ButtonScaler::Start(kAnimSeconds);
@@ -1084,7 +1084,7 @@ FNavBarButton* NavBar::AddButton(unsigned Type, int /*Unused*/, unsigned char bR
         Button->Control->SetProperty(kWinPropToolTip, 0x1968, 0);
     Button->Control->UserData = Ids;
     if (bRoomSwitch == 0)
-        Button->Control->SetProperty(0x36, 1, 0);
+        Button->Control->SetProperty(kButtonPropSpin, 1, 0);
 
     // Its mesh from IniValues; without an entry the default mesh, and
     // the path the control reports (property 0xb) recorded under the hotspot name.
@@ -1193,7 +1193,7 @@ void NavBar::OpenService(FNavBarButton* Button)
         return;
     }
     NnMainButtonOnModalOpen();
-    PlayOrRewindUiSoundSlot(0x1b);
+    PlayOrRewindUiSoundSlot(kUiSoundMotionSwish);
 
     // A service tab slides from where it is to its type's target
     // (the repair tab also asks for the desk afterwards).
@@ -1233,7 +1233,7 @@ void NavBar::CloseService(FNavBarButton* Button)
     }
     // The background at full size shrinks to the type's scale.
     ClosingButton = Button;
-    PlayOrRewindUiSoundSlot(0x1b);
+    PlayOrRewindUiSoundSlot(kUiSoundMotionSwish);
     MakeServiceBackground(Button->Type, 1.0f);
     float const Scale = ServiceScale(Button->Type);
     ButtonScaler::Start(kAnimSeconds);

@@ -89,15 +89,15 @@ static FRpVertexSrcDesc* TriMeshDescNew()
 // (1 position +0x10, 8 normal +0x24, 2 tex0 +0x4C, 4 tex1 +0x60, 0x10 diffuse +0x38).
 static bool TriMeshDescHasIndexArrays(const FRpVertexSrcDesc* Desc, unsigned char Channels)
 {
-    if ((Channels & 0x1) != 0 && Desc->Position.IndexArray == nullptr)
+    if ((Channels & kMeshChannelPosition) != 0 && Desc->Position.IndexArray == nullptr)
         return false;
-    if ((Channels & 0x8) != 0 && Desc->Normal.IndexArray == nullptr)
+    if ((Channels & kMeshChannelNormal) != 0 && Desc->Normal.IndexArray == nullptr)
         return false;
-    if ((Channels & 0x2) != 0 && Desc->Tex[0].IndexArray == nullptr)
+    if ((Channels & kMeshChannelTex0) != 0 && Desc->Tex[0].IndexArray == nullptr)
         return false;
-    if ((Channels & 0x4) != 0 && Desc->Tex[1].IndexArray == nullptr)
+    if ((Channels & kMeshChannelTex1) != 0 && Desc->Tex[1].IndexArray == nullptr)
         return false;
-    if ((Channels & 0x10) != 0 && Desc->Diffuse.IndexArray == nullptr)
+    if ((Channels & kMeshChannelDiffuse) != 0 && Desc->Diffuse.IndexArray == nullptr)
         return false;
     return true;
 }
@@ -321,20 +321,20 @@ void FTriMeshGroup::CopyHeader(const FTriMeshGroup* Source)
 // FUN_06c28f50 (thiscall).
 bool FTriMeshGroup::HasChannels(unsigned long Channels) const
 {
-    if ((Channels & 0x80) != 0 && this->EdgeIndices == nullptr)
+    if ((Channels & kMeshChannelEdgeIndices) != 0 && this->EdgeIndices == nullptr)
         return false;
-    if ((Channels & 0x100) != 0 && this->EdgeAngles == nullptr)
+    if ((Channels & kMeshChannelEdgeAngles) != 0 && this->EdgeAngles == nullptr)
         return false;
-    if ((Channels & 0x4000) != 0 &&
+    if ((Channels & kMeshChannelExtra0) != 0 &&
         (this->ExtraStreams == nullptr || this->ExtraStreams[0].IndexArray == nullptr))
         return false;
-    if ((Channels & 0x8000) != 0 &&
+    if ((Channels & kMeshChannelExtra1) != 0 &&
         (this->ExtraStreams == nullptr || this->ExtraStreams[1].IndexArray == nullptr))
         return false;
-    if ((Channels & 0x10000) != 0 &&
+    if ((Channels & kMeshChannelExtra2) != 0 &&
         (this->ExtraStreams == nullptr || this->ExtraStreams[2].IndexArray == nullptr))
         return false;
-    if ((Channels & 0x20000) != 0 &&
+    if ((Channels & kMeshChannelExtra3) != 0 &&
         (this->ExtraStreams == nullptr || this->ExtraStreams[3].IndexArray == nullptr))
         return false;
     return TriMeshDescHasIndexArrays(this->Vertices, (unsigned char)Channels);
@@ -805,7 +805,7 @@ int DACOM_API FTriMeshArch::CloseFaceGroup()
     CloseFaceGroupChannels();
     UnlockFaceGroupChannels();
     Cursor = Groups.size();
-    if (EditMode == 2)
+    if (EditMode == kMeshOpenEdit)
     {
         ShareGroupVertices(false);
         CompactVertices();
@@ -945,7 +945,8 @@ int DACOM_API FTriMeshArch::LockFaceGroupChannels(unsigned long Mask)
     if (!Groups[Cursor]->HasChannels(Mask))
         return (int)0xFFFFFFF8;
     PrivatizeCursorGroup();
-    const unsigned long Order[9] = { 0x1, 0x8, 0x2, 0x4, 0x10, 0x4000, 0x8000, 0x10000, 0x20000 };
+    const unsigned long Order[9] = { kMeshChannelPosition, kMeshChannelNormal, kMeshChannelTex0, kMeshChannelTex1, kMeshChannelDiffuse,
+                                     kMeshChannelExtra0, kMeshChannelExtra1, kMeshChannelExtra2, kMeshChannelExtra3 };
     for (int Index = 0; Index < 9; ++Index)
     {
         const unsigned long Bit = Order[Index];
@@ -956,13 +957,13 @@ int DACOM_API FTriMeshArch::LockFaceGroupChannels(unsigned long Mask)
             LockedMask |= Bit;
         }
     }
-    if ((Mask & 0x80) != 0 && (LockedMask & 0x80) == 0)
-        LockedMask |= 0x80;
-    if ((Mask & 0x100) != 0 && (LockedMask & 0x100) == 0)
+    if ((Mask & kMeshChannelEdgeIndices) != 0 && (LockedMask & kMeshChannelEdgeIndices) == 0)
+        LockedMask |= kMeshChannelEdgeIndices;
+    if ((Mask & kMeshChannelEdgeAngles) != 0 && (LockedMask & kMeshChannelEdgeAngles) == 0)
     {
         if (LockEdgeAngles() < 0)
             return -1;
-        LockedMask |= 0x100;
+        LockedMask |= kMeshChannelEdgeAngles;
     }
     return ((LockedMask & Mask) == Mask) ? 0 : -1;
 }
@@ -974,13 +975,14 @@ int DACOM_API FTriMeshArch::UnlockFaceGroupChannels()
         return -1;
     if (LockedMask == 0)
         return 0;
-    const unsigned long Order[9] = { 0x1, 0x8, 0x2, 0x4, 0x10, 0x4000, 0x8000, 0x10000, 0x20000 };
+    const unsigned long Order[9] = { kMeshChannelPosition, kMeshChannelNormal, kMeshChannelTex0, kMeshChannelTex1, kMeshChannelDiffuse,
+                                     kMeshChannelExtra0, kMeshChannelExtra1, kMeshChannelExtra2, kMeshChannelExtra3 };
     for (int Index = 0; Index < 9; ++Index)
     {
         if ((LockedMask & Order[Index]) != 0)
             UnlockChannel(Order[Index]);
     }
-    if ((LockedMask & 0x100) != 0)
+    if ((LockedMask & kMeshChannelEdgeAngles) != 0)
         UnlockEdgeAngles();
     LockedMask = 0;
     return 0;
@@ -998,39 +1000,39 @@ int DACOM_API FTriMeshArch::GetFaceGroupData(int Channel, void** A, void** B, vo
     const FRpVertexStream* Stream = nullptr;
     switch (Bits)
     {
-    case 0x1:
-    case 0x80:
+    case kMeshChannelPosition:
+    case kMeshChannelEdgeIndices:
         Stream = &Group->Vertices->Position;
         break;
-    case 0x2:
+    case kMeshChannelTex0:
         Stream = &Group->Vertices->Tex[0];
         break;
-    case 0x4:
+    case kMeshChannelTex1:
         Stream = &Group->Vertices->Tex[1];
         break;
-    case 0x8:
+    case kMeshChannelNormal:
         Stream = &Group->Vertices->Normal;
         break;
-    case 0x10:
+    case kMeshChannelDiffuse:
         Stream = &Group->Vertices->Diffuse;
         break;
-    case 0x100:
+    case kMeshChannelEdgeAngles:
         *A = Group->EdgeAngles;
         *B = (void*)((uintptr_t)4);
         *D = (void*)((uintptr_t)(Group->EdgeCount >> 1));
         *C = (void*)((uintptr_t)4);
         return 0;
-    case 0x4000:
-    case 0x8000:
-    case 0x10000:
-    case 0x20000:
+    case kMeshChannelExtra0:
+    case kMeshChannelExtra1:
+    case kMeshChannelExtra2:
+    case kMeshChannelExtra3:
     {
         int Extra = 0;
-        if (Bits == 0x8000)
+        if (Bits == kMeshChannelExtra1)
             Extra = 1;
-        else if (Bits == 0x10000)
+        else if (Bits == kMeshChannelExtra2)
             Extra = 2;
-        else if (Bits == 0x20000)
+        else if (Bits == kMeshChannelExtra3)
             Extra = 3;
         if (Group->ExtraStreams == nullptr)
         {
@@ -1089,7 +1091,7 @@ int DACOM_API FTriMeshArch::SetFaceGroupData(int Channel, void* A, void* B, void
 {
     if (CursorAtEnd())
         return -1;
-    if (EditMode != 2)
+    if (EditMode != kMeshOpenEdit)
         return -1;
     FTriMeshGroup* Group = Groups[Cursor];
     const unsigned char* Src = (const unsigned char*)A;
@@ -1098,34 +1100,34 @@ int DACOM_API FTriMeshArch::SetFaceGroupData(int Channel, void* A, void* B, void
     const unsigned long Count = (unsigned long)((uintptr_t)D);
     switch ((unsigned long)Channel)
     {
-    case 0x1:
+    case kMeshChannelPosition:
         if (Count != Group->Vertices->Position.Count)
             Group->SetEdges(0, nullptr, nullptr);
         TriMeshStreamWrite(&Group->Vertices->Position, Src, SrcStride, Size, Count);
         return 0;
-    case 0x2:
+    case kMeshChannelTex0:
         TriMeshStreamWrite(&Group->Vertices->Tex[0], Src, SrcStride, Size, Count);
         return 0;
-    case 0x4:
+    case kMeshChannelTex1:
         TriMeshStreamWrite(&Group->Vertices->Tex[1], Src, SrcStride, Size, Count);
         return 0;
-    case 0x8:
+    case kMeshChannelNormal:
         TriMeshStreamWrite(&Group->Vertices->Normal, Src, SrcStride, Size, Count);
         return 0;
-    case 0x10:
+    case kMeshChannelDiffuse:
         TriMeshStreamWrite(&Group->Vertices->Diffuse, Src, SrcStride, Size, Count);
         return 0;
-    case 0x4000:
-    case 0x8000:
-    case 0x10000:
-    case 0x20000:
+    case kMeshChannelExtra0:
+    case kMeshChannelExtra1:
+    case kMeshChannelExtra2:
+    case kMeshChannelExtra3:
     {
         int Extra = 0;
-        if (Channel == 0x8000)
+        if (Channel == kMeshChannelExtra1)
             Extra = 1;
-        else if (Channel == 0x10000)
+        else if (Channel == kMeshChannelExtra2)
             Extra = 2;
-        else if (Channel == 0x20000)
+        else if (Channel == kMeshChannelExtra3)
             Extra = 3;
         if (Group->ExtraStreams == nullptr)
             Group->AllocateExtraStreams();
@@ -1143,16 +1145,16 @@ static int TriMeshLockedSlot(unsigned long Channel)
 {
     switch (Channel)
     {
-    case 0x1: return 0;
-    case 0x8: return 1;
-    case 0x2: return 2;
-    case 0x4: return 3;
-    case 0x10: return 4;
-    case 0x100: return 5;
-    case 0x4000: return 6;
-    case 0x8000: return 7;
-    case 0x10000: return 8;
-    case 0x20000: return 9;
+    case kMeshChannelPosition: return 0;
+    case kMeshChannelNormal: return 1;
+    case kMeshChannelTex0: return 2;
+    case kMeshChannelTex1: return 3;
+    case kMeshChannelDiffuse: return 4;
+    case kMeshChannelEdgeAngles: return 5;
+    case kMeshChannelExtra0: return 6;
+    case kMeshChannelExtra1: return 7;
+    case kMeshChannelExtra2: return 8;
+    case kMeshChannelExtra3: return 9;
     default: return -1;
     }
 }
@@ -1164,7 +1166,7 @@ int DACOM_API FTriMeshArch::GetFaceGroupIndices(int Channel, void** A, void** B)
         return -1;
     FTriMeshGroup* Group = Groups[Cursor];
     const unsigned long Bits = (unsigned long)Channel;
-    if (Bits == 0x80)
+    if (Bits == kMeshChannelEdgeIndices)
     {
         *A = Group->EdgeIndices;
         *B = (void*)((uintptr_t)Group->EdgeCount);
@@ -1174,7 +1176,7 @@ int DACOM_API FTriMeshArch::GetFaceGroupIndices(int Channel, void** A, void** B)
     if (Slot < 0)
         return -1;
     *A = Locked[Slot];
-    if (Bits == 0x100)
+    if (Bits == kMeshChannelEdgeAngles)
         *B = (void*)((uintptr_t)(Group->EdgeCount >> 1));
     else
         *B = (void*)((uintptr_t)Group->IndexCount);
@@ -1186,7 +1188,7 @@ int DACOM_API FTriMeshArch::SetFaceGroupIndices(int Channel, void* Src, int Coun
 {
     if (CursorAtEnd())
         return -1;
-    if (EditMode != 2)
+    if (EditMode != kMeshOpenEdit)
         return -1;
     const unsigned long Bits = (unsigned long)Channel;
     if ((LockedMask & Bits) == 0)
@@ -1194,7 +1196,7 @@ int DACOM_API FTriMeshArch::SetFaceGroupIndices(int Channel, void* Src, int Coun
     FTriMeshGroup* Group = Groups[Cursor];
     if ((unsigned long)Count != Group->IndexCount)
         return -1;
-    if (Bits == 0x80 || Bits == 0x100)
+    if (Bits == kMeshChannelEdgeIndices || Bits == kMeshChannelEdgeAngles)
         return -1;
     const int Slot = TriMeshLockedSlot(Bits);
     if (Slot < 0)
@@ -1227,7 +1229,7 @@ int DACOM_API FTriMeshArch::SetFaceGroupIndexCount(int Selector, int Count)
 {
     if (CursorAtEnd())
         return -1;
-    if (EditMode != 2)
+    if (EditMode != kMeshOpenEdit)
         return -1;
     if (LockedMask != 0)
         return -1;
@@ -1250,7 +1252,7 @@ int DACOM_API FTriMeshArch::AddFaceGroupChannels(unsigned long Flags)
 {
     if (CursorAtEnd())
         return -1;
-    if (EditMode != 2)
+    if (EditMode != kMeshOpenEdit)
         return -1;
     if (LockedMask != 0)
         return -1;
@@ -1258,52 +1260,52 @@ int DACOM_API FTriMeshArch::AddFaceGroupChannels(unsigned long Flags)
     PrivatizeCursorGroup();
     FTriMeshGroup* Group = Groups[Cursor];
     FRpVertexSrcDesc* Desc = Group->Vertices;
-    if ((Flags & 0x1) != 0)
+    if ((Flags & kMeshChannelPosition) != 0)
     {
         Result = 0;
         if (Desc->Position.IndexArray == nullptr)
         {
             Desc->Position.IndexArray = (unsigned long*)new unsigned char[Desc->SrcCount * 4];
-            Desc->SrcFvf |= 0x2;
+            Desc->SrcFvf |= D3DFVF_XYZ;
         }
     }
-    if ((Flags & 0x8) != 0)
+    if ((Flags & kMeshChannelNormal) != 0)
     {
         Result = 0;
         if (Desc->Normal.IndexArray == nullptr)
         {
             Desc->Normal.IndexArray = (unsigned long*)new unsigned char[Desc->SrcCount * 4];
-            Desc->SrcFvf |= 0x10;
+            Desc->SrcFvf |= D3DFVF_NORMAL;
         }
     }
-    if ((Flags & 0x2) != 0)
+    if ((Flags & kMeshChannelTex0) != 0)
     {
         Result = 0;
         if (Desc->Tex[0].IndexArray == nullptr)
         {
             Desc->Tex[0].IndexArray = (unsigned long*)new unsigned char[Desc->SrcCount * 4];
-            Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF1FF) | 0x100;
+            Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF1FF) | D3DFVF_TEX1;
         }
     }
-    if ((Flags & 0x4) != 0)
+    if ((Flags & kMeshChannelTex1) != 0)
     {
         Result = 0;
         if (Desc->Tex[1].IndexArray == nullptr)
         {
             Desc->Tex[1].IndexArray = (unsigned long*)new unsigned char[Desc->SrcCount * 4];
-            Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF2FF) | 0x200;
+            Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF2FF) | D3DFVF_TEX2;
         }
     }
-    if ((Flags & 0x10) != 0)
+    if ((Flags & kMeshChannelDiffuse) != 0)
     {
         Result = 0;
         if (Desc->Diffuse.IndexArray == nullptr)
         {
             Desc->Diffuse.IndexArray = (unsigned long*)new unsigned char[Desc->SrcCount * 4];
-            Desc->SrcFvf |= 0x40;
+            Desc->SrcFvf |= D3DFVF_DIFFUSE;
         }
     }
-    const unsigned long ExtraBits[4] = { 0x4000, 0x8000, 0x10000, 0x20000 };
+    const unsigned long ExtraBits[4] = { kMeshChannelExtra0, kMeshChannelExtra1, kMeshChannelExtra2, kMeshChannelExtra3 };
     for (int Extra = 0; Extra < 4; ++Extra)
     {
         if ((Flags & ExtraBits[Extra]) == 0)
@@ -1318,9 +1320,9 @@ int DACOM_API FTriMeshArch::AddFaceGroupChannels(unsigned long Flags)
             Group->ExtraIndexCounts[Extra] = Desc->SrcCount;
         }
     }
-    if ((Flags & 0x80) != 0)
+    if ((Flags & kMeshChannelEdgeIndices) != 0)
         Result = -1;
-    if ((Flags & 0x100) != 0)
+    if ((Flags & kMeshChannelEdgeAngles) != 0)
         Result = -1;
     return Result;
 }
@@ -1330,7 +1332,7 @@ int DACOM_API FTriMeshArch::RemoveFaceGroupChannels(unsigned long Flags)
 {
     if (CursorAtEnd())
         return -1;
-    if (EditMode != 2)
+    if (EditMode != kMeshOpenEdit)
         return -1;
     if (LockedMask != 0)
         return -1;
@@ -1338,37 +1340,37 @@ int DACOM_API FTriMeshArch::RemoveFaceGroupChannels(unsigned long Flags)
     PrivatizeCursorGroup();
     FTriMeshGroup* Group = Groups[Cursor];
     FRpVertexSrcDesc* Desc = Group->Vertices;
-    if ((Flags & 0x1) != 0)
+    if ((Flags & kMeshChannelPosition) != 0)
     {
         TriMeshStreamFree(&Desc->Position);
-        Desc->SrcFvf &= 0xFFFFFFFD;
+        Desc->SrcFvf &= ~D3DFVF_XYZ;
         Result = 0;
     }
-    if ((Flags & 0x8) != 0)
+    if ((Flags & kMeshChannelNormal) != 0)
     {
         TriMeshStreamFree(&Desc->Normal);
-        Desc->SrcFvf &= 0xFFFFFFEF;
+        Desc->SrcFvf &= ~D3DFVF_NORMAL;
         Result = 0;
     }
-    if ((Flags & 0x2) != 0)
+    if ((Flags & kMeshChannelTex0) != 0)
     {
         TriMeshStreamFree(&Desc->Tex[0]);
-        Desc->SrcFvf &= 0xFFFFF0FF;
+        Desc->SrcFvf &= ~D3DFVF_TEXCOUNT_MASK;
         Result = 0;
     }
-    if ((Flags & 0x4) != 0)
+    if ((Flags & kMeshChannelTex1) != 0)
     {
         TriMeshStreamFree(&Desc->Tex[1]);
-        Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF1FF) | 0x100;
+        Desc->SrcFvf = (Desc->SrcFvf & 0xFFFFF1FF) | D3DFVF_TEX1;
         Result = 0;
     }
-    if ((Flags & 0x10) != 0)
+    if ((Flags & kMeshChannelDiffuse) != 0)
     {
         TriMeshStreamFree(&Desc->Diffuse);
-        Desc->SrcFvf &= 0xFFFFFFBF;
+        Desc->SrcFvf &= ~D3DFVF_DIFFUSE;
         Result = 0;
     }
-    const unsigned long ExtraBits[4] = { 0x4000, 0x8000, 0x10000, 0x20000 };
+    const unsigned long ExtraBits[4] = { kMeshChannelExtra0, kMeshChannelExtra1, kMeshChannelExtra2, kMeshChannelExtra3 };
     for (int Extra = 0; Extra < 4; ++Extra)
     {
         if ((Flags & ExtraBits[Extra]) != 0 && Group->ExtraStreams != nullptr)
@@ -1378,7 +1380,7 @@ int DACOM_API FTriMeshArch::RemoveFaceGroupChannels(unsigned long Flags)
             Result = 0;
         }
     }
-    if ((Flags & 0x80) != 0)
+    if ((Flags & kMeshChannelEdgeIndices) != 0)
     {
         delete[] (const unsigned char*)Group->EdgeIndices;
         Group->EdgeIndices = nullptr;
@@ -1386,7 +1388,7 @@ int DACOM_API FTriMeshArch::RemoveFaceGroupChannels(unsigned long Flags)
             Group->EdgeCount = 0;
         Result = 0;
     }
-    if ((Flags & 0x100) != 0)
+    if ((Flags & kMeshChannelEdgeAngles) != 0)
     {
         delete[] (const unsigned char*)Group->EdgeAngles;
         Group->EdgeAngles = nullptr;
@@ -1453,11 +1455,11 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
                        IMaterialLibrary* InLibrary, int bTristrips)
 {
     File->ResolvePath(Name, "", 0x104);
-    Flags &= 0xFFFFFFFE;
+    Flags &= ~TriMeshArchLoaded;
     if (File->OpenNode("Mesh") == 0)
         return -1;
     std::memset(&Vertices, 0, sizeof(Vertices));
-    Vertices.Flags |= 0x4;
+    Vertices.Flags |= kRpVertexSrcIndexed;
 
     if (File->OpenNode("Geometry") != 0)
     {
@@ -1474,7 +1476,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
                 Vertices.Position.Count = Count;
         }
         Vertices.Position.Base = PoolBase;
-        Vertices.SrcFvf = 0x2;
+        Vertices.SrcFvf = D3DFVF_XYZ;
         Vertices.Position.Stride = 0xC;
         Vertices.Position.ByteSize = 0xC;
         TriMeshReadCornerIndices(File, "Point_indices", &Vertices, &Vertices.Position);
@@ -1486,7 +1488,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
         }
         if (Vertices.Normal.Count != 0)
         {
-            Vertices.SrcFvf |= 0x10;
+            Vertices.SrcFvf |= D3DFVF_NORMAL;
             Vertices.Normal.Base = PoolBase;
             Vertices.Normal.Stride = 0xC;
             Vertices.Normal.ByteSize = 0xC;
@@ -1500,7 +1502,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
         }
         if (Vertices.Tex[0].Count != 0)
         {
-            Vertices.SrcFvf = (Vertices.SrcFvf & 0xFFFFF1FF) | 0x100;
+            Vertices.SrcFvf = (Vertices.SrcFvf & 0xFFFFF1FF) | D3DFVF_TEX1;
             Vertices.Tex[0].Base = PoolBase;
             Vertices.Tex[0].Stride = 0x8;
             Vertices.Tex[0].ByteSize = 0x8;
@@ -1515,7 +1517,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
         }
         if (Vertices.Tex[1].Count != 0)
         {
-            Vertices.SrcFvf = (Vertices.SrcFvf & 0xFFFFF2FF) | 0x200;
+            Vertices.SrcFvf = (Vertices.SrcFvf & 0xFFFFF2FF) | D3DFVF_TEX2;
             Vertices.Tex[1].Base = PoolBase;
             Vertices.Tex[1].Stride = 0x8;
             Vertices.Tex[1].ByteSize = 0x8;
@@ -1531,7 +1533,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
         }
         if (Vertices.Diffuse.Count != 0)
         {
-            Vertices.SrcFvf |= 0x40;
+            Vertices.SrcFvf |= D3DFVF_DIFFUSE;
             Vertices.Diffuse.Base = ColorBase;
             Vertices.Diffuse.Stride = 0x4;
             Vertices.Diffuse.ByteSize = 0x4;
@@ -1638,7 +1640,7 @@ int FTriMeshArch::Load(IFileSystem* File, IRenderPipeline* InPipeline, IVertexBu
         File->OpenNode("..");
     }
     File->OpenNode("..");
-    Flags |= 0x1;
+    Flags |= TriMeshArchLoaded;
     return 0;
 }
 
@@ -1689,15 +1691,15 @@ const unsigned long** FTriMeshGroup::ChannelIndexArray(unsigned long Channel)
     FRpVertexSrcDesc* Desc = Vertices;
     switch (Channel)
     {
-    case 0x1: return &Desc->Position.IndexArray;
-    case 0x8: return &Desc->Normal.IndexArray;
-    case 0x2: return &Desc->Tex[0].IndexArray;
-    case 0x4: return &Desc->Tex[1].IndexArray;
-    case 0x10: return &Desc->Diffuse.IndexArray;
-    case 0x4000: return &ExtraStreams[0].IndexArray;
-    case 0x8000: return &ExtraStreams[1].IndexArray;
-    case 0x10000: return &ExtraStreams[2].IndexArray;
-    case 0x20000: return &ExtraStreams[3].IndexArray;
+    case kMeshChannelPosition: return &Desc->Position.IndexArray;
+    case kMeshChannelNormal: return &Desc->Normal.IndexArray;
+    case kMeshChannelTex0: return &Desc->Tex[0].IndexArray;
+    case kMeshChannelTex1: return &Desc->Tex[1].IndexArray;
+    case kMeshChannelDiffuse: return &Desc->Diffuse.IndexArray;
+    case kMeshChannelExtra0: return &ExtraStreams[0].IndexArray;
+    case kMeshChannelExtra1: return &ExtraStreams[1].IndexArray;
+    case kMeshChannelExtra2: return &ExtraStreams[2].IndexArray;
+    case kMeshChannelExtra3: return &ExtraStreams[3].IndexArray;
     default: return nullptr;
     }
 }
@@ -1706,7 +1708,7 @@ const unsigned long** FTriMeshGroup::ChannelIndexArray(unsigned long Channel)
 int FTriMeshArch::LockChannel(unsigned long Channel)
 {
     FTriMeshGroup* Group = Groups[Cursor];
-    if (Channel == 0x4000 || Channel == 0x8000 || Channel == 0x10000 || Channel == 0x20000)
+    if (Channel == kMeshChannelExtra0 || Channel == kMeshChannelExtra1 || Channel == kMeshChannelExtra2 || Channel == kMeshChannelExtra3)
     {
         if (Group->ExtraStreams == nullptr)
             Group->AllocateExtraStreams();
@@ -1735,7 +1737,7 @@ int FTriMeshArch::UnlockChannel(unsigned long Channel)
     FTriMeshGroup* Group = Groups[Cursor];
     unsigned long* Dest = nullptr;
     unsigned short** Slot = nullptr;
-    const bool bExtra = (Channel == 0x4000 || Channel == 0x8000 || Channel == 0x10000 || Channel == 0x20000);
+    const bool bExtra = (Channel == kMeshChannelExtra0 || Channel == kMeshChannelExtra1 || Channel == kMeshChannelExtra2 || Channel == kMeshChannelExtra3);
     if (!bExtra || Group->ExtraStreams != nullptr)
     {
         // Non-null exactly for the nine mapped channels (see LockChannel).
@@ -1746,7 +1748,7 @@ int FTriMeshArch::UnlockChannel(unsigned long Channel)
             Slot = &Locked[TriMeshLockedSlot(Channel)];
         }
     }
-    if (EditMode == 2)
+    if (EditMode == kMeshOpenEdit)
     {
         Group->MinIndex = 0;
         FTriMeshGroup* Edited = Groups[Cursor];
@@ -1830,9 +1832,9 @@ bool FTriMeshArch::GetPrebuiltListing(void** Out)
 // FUN_06c25790.
 int FTriMeshArch::GetBox(float* Out)
 {
-    if ((Flags & 0x1) == 0)
+    if ((Flags & TriMeshArchLoaded) == 0)
         return -1;
-    if ((Flags & 0x4) == 0)
+    if ((Flags & TriMeshArchBoxCached) == 0)
     {
         for (int Index = 0; Index < 6; ++Index)
             Box[Index] = 0.0f;
@@ -1863,7 +1865,7 @@ int FTriMeshArch::GetBox(float* Out)
                     Box[5] = Point[2];
                 Point += 3;
             }
-            Flags |= 0x4;
+            Flags |= TriMeshArchBoxCached;
         }
     }
     for (int Index = 0; Index < 6; ++Index)
@@ -1875,9 +1877,9 @@ int FTriMeshArch::GetBox(float* Out)
 // and the cache is tested with bit 0x2 (the sphere bit) but recorded in bit 0x8.
 int FTriMeshArch::GetCenter(Vector* Out)
 {
-    if ((Flags & 0x1) == 0)
+    if ((Flags & TriMeshArchLoaded) == 0)
         return -1;
-    if ((Flags & 0x2) != 0)
+    if ((Flags & TriMeshArchSphereCached) != 0)
     {
         Out->x = Center.x;
         Out->y = Center.y;
@@ -1902,7 +1904,7 @@ int FTriMeshArch::GetCenter(Vector* Out)
         Center.x = (float)(Scale * Center.x);
         Center.y = (float)(Scale * Center.y);
         Center.z = (float)(Scale * Center.z);
-        Flags |= 0x8;
+        Flags |= TriMeshArchCenterCached;
     }
     Out->x = Center.x;
     Out->y = Center.y;
@@ -1913,9 +1915,9 @@ int FTriMeshArch::GetCenter(Vector* Out)
 // FUN_06c258c0.
 int FTriMeshArch::GetSphere(Vector* OutCenter, float* OutRadius)
 {
-    if ((Flags & 0x1) == 0)
+    if ((Flags & TriMeshArchLoaded) == 0)
         return -1;
-    if ((Flags & 0x2) != 0)
+    if ((Flags & TriMeshArchSphereCached) != 0)
     {
         OutCenter->x = SphereCenter.x;
         OutCenter->y = SphereCenter.y;
@@ -2009,7 +2011,7 @@ int FTriMeshArch::GetSphere(Vector* OutCenter, float* OutRadius)
             SphereCenter.y = (float)((double)SumCenterY * Inverse);
             SphereCenter.z = (float)((double)SumCenterZ * Inverse);
         }
-        Flags |= 0x2;
+        Flags |= TriMeshArchSphereCached;
     }
     OutCenter->x = SphereCenter.x;
     OutCenter->y = SphereCenter.y;
@@ -2077,19 +2079,19 @@ static int TriMeshCompactInto(FTriMeshGroup** List, int GroupCount, const FRpVer
 {
     long* VertexMap = TriMeshNewMap(Source->SrcCount);
     long* PositionMap = nullptr;
-    if (((unsigned char)Source->SrcFvf & 0x2) != 0)
+    if (((unsigned char)Source->SrcFvf & D3DFVF_XYZ) != 0)
         PositionMap = TriMeshNewMap(Source->Position.Count);
     long* NormalMap = nullptr;
-    if (((unsigned char)Source->SrcFvf & 0x10) != 0)
+    if (((unsigned char)Source->SrcFvf & D3DFVF_NORMAL) != 0)
         NormalMap = TriMeshNewMap(Source->Normal.Count);
     long* Tex0Map = nullptr;
-    if ((Source->SrcFvf & 0xF00) >= 0x100)
+    if ((Source->SrcFvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX1)
         Tex0Map = TriMeshNewMap(Source->Tex[0].Count);
     long* Tex1Map = nullptr;
-    if ((Source->SrcFvf & 0xF00) >= 0x200)
+    if ((Source->SrcFvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX2)
         Tex1Map = TriMeshNewMap(Source->Tex[1].Count);
     long* ColorMap = nullptr;
-    if (((unsigned char)Source->SrcFvf & 0x40) != 0)
+    if (((unsigned char)Source->SrcFvf & D3DFVF_DIFFUSE) != 0)
         ColorMap = TriMeshNewMap(Source->Diffuse.Count);
 
     unsigned long VerticesUsed = 0;
@@ -2216,7 +2218,7 @@ void FTriMeshGroup::PrivatizeVertices()
 // FUN_06c26610: in EditMode 2 the edited group is made private (FUN_06c27aa0). 0.
 int FTriMeshArch::PrivatizeCursorGroup()
 {
-    if (EditMode == 2)
+    if (EditMode == kMeshOpenEdit)
         Groups[Cursor]->PrivatizeVertices();
     return 0;
 }
@@ -2294,15 +2296,15 @@ int FTriMeshArch::CompactVertices()
         {
             const unsigned long Fvf = Desc->SrcFvf;
             SumVertices += Desc->SrcCount;
-            if (((unsigned char)Fvf & 0x2) != 0)
+            if (((unsigned char)Fvf & D3DFVF_XYZ) != 0)
                 SumPositions += Desc->Position.Count;
-            if (((unsigned char)Fvf & 0x10) != 0)
+            if (((unsigned char)Fvf & D3DFVF_NORMAL) != 0)
                 SumNormals += Desc->Normal.Count;
-            if ((Fvf & 0xF00) >= 0x100)
+            if ((Fvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX1)
                 SumTex0 += Desc->Tex[0].Count;
-            if ((Fvf & 0xF00) >= 0x200)
+            if ((Fvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX2)
                 SumTex1 += Desc->Tex[1].Count;
-            if (((unsigned char)Fvf & 0x40) != 0)
+            if (((unsigned char)Fvf & D3DFVF_DIFFUSE) != 0)
                 SumColors += Desc->Diffuse.Count;
         }
         else
@@ -2536,18 +2538,18 @@ int FTriMeshArch::SplitByPlane(const float* Plane, float PlaneD, unsigned char S
                 FrontCount += 1;
             else if (Class == TriMeshTriangleAllBack)
                 BackCount += 1;
-            else if ((SplitFlags & 0x1) == 0 && (Class & 0x8) != 0)
+            else if ((SplitFlags & 0x1) == 0 && (Class & TriMeshTriangleStraddles) != 0)
             {
                 if ((SplitFlags & 0xC) != 0)
                     StraddleCount += 1;
-                else if ((Class & 0x380) != 0)
+                else if ((Class & (TriMeshPatternFrontFrontBack | TriMeshPatternFrontBackFront | TriMeshPatternBackFrontFront)) != 0)
                 {
-                    Classes[Triangle] = 1;
+                    Classes[Triangle] = TriMeshTriangleAllFront;
                     FrontCount += 1;
                 }
                 else
                 {
-                    Classes[Triangle] = 2;
+                    Classes[Triangle] = TriMeshTriangleAllBack;
                     BackCount += 1;
                 }
             }
@@ -2739,8 +2741,8 @@ void FTriMeshGroup::ClipStraddling(FTriMeshGroup* Front, FTriMeshGroup* Back, co
     FRpVertexSrcDesc* BackDesc = Back->Vertices;
     const unsigned long Fvf = SourceDesc->SrcFvf;
     const bool bNormal = ((Fvf >> 4) & 1) != 0;
-    const bool bTex0 = (Fvf & 0xF00) >= 0x100;
-    const bool bTex1 = (Fvf & 0xF00) >= 0x200;
+    const bool bTex0 = (Fvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX1;
+    const bool bTex1 = (Fvf & D3DFVF_TEXCOUNT_MASK) >= D3DFVF_TEX2;
     const bool bColor = ((Fvf >> 6) & 1) != 0;
     TriMeshStreamGrow(&FrontDesc->Position, FrontDesc->SrcCount, FrontDesc->SrcCount + Added);
     TriMeshStreamGrow(&BackDesc->Position, BackDesc->SrcCount, BackDesc->SrcCount + Added);
@@ -2790,15 +2792,15 @@ void FTriMeshGroup::ClipStraddling(FTriMeshGroup* Front, FTriMeshGroup* Back, co
     for (unsigned long Triangle = 0; Triangle < Triangles; ++Triangle)
     {
         const unsigned long Class = Classes[Triangle];
-        if ((Class & 0x8) == 0)
+        if ((Class & TriMeshTriangleStraddles) == 0)
             continue;
         const unsigned short* Corner = this->Indices + Triangle * 3;
         // Which corner pair is cut, as retail routes it: 0 = (P0, P2), 1 = (P1, P2),
         // 2 = (P0, P1).
         int Cut = 0;
-        if ((Class & 0x10) != 0 || (Class & 0x200) != 0)
+        if ((Class & TriMeshPatternFrontBackBack) != 0 || (Class & TriMeshPatternBackFrontFront) != 0)
             Cut = 2;
-        else if ((Class & 0x20) != 0 || (Class & 0x100) != 0)
+        else if ((Class & TriMeshPatternBackFrontBack) != 0 || (Class & TriMeshPatternFrontBackFront) != 0)
             Cut = 1;
         // A = (Keep0, Keep1, M) / B = (M, Keep2, Keep3) in corner indices, per the table above
         // (the 0x18 / 0x208 case puts M second in A).

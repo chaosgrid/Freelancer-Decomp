@@ -12,6 +12,7 @@
 // blocks, name value readers) is NpcShips.h.
 
 #include "Core/ContentPlayerState.h"   // FContentPlayerStateBase
+#include "common_reputation.h"     // kNoAffiliation
 #include "common_text.h"          // FmtStr
 
 struct FMsnNpc;                   // NpcShips.h
@@ -51,7 +52,7 @@ struct FNpcNameParams
     FmtStr Second;                      // +0x18 the Reputation::Alloc nickname
     // +0x30: 1 male / 2 female; passed to PickPilotName and PickSpaceCostume.
     int Gender = 0;
-    unsigned int Affiliation = 0xffffffffu;   // +0x34 written by BuildNpcName
+    unsigned int Affiliation = kNoAffiliation;   // +0x34 written by BuildNpcName
 };
 
 // The reputation handle of a named NPC (0xc bytes, vtable 06fb940c).

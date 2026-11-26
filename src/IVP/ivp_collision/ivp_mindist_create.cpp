@@ -346,8 +346,8 @@ void IVP_Create_Exact_Mindists(IVP_Real_Object* Object0, IVP_Real_Object* Object
                 // A new exact mindist: the recursive variant (0x94) when
                 // either ledge has `SizeAndFlags & 3`, else the plain one (0x80).
                 IVP_Ledge_Mindist* Mindist;
-                if ((Ledge0->SizeAndFlags & 3) == 0 &&
-                    (Ledge1->SizeAndFlags & 3) == 0)
+                if ((Ledge0->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) == 0 &&
+                    (Ledge1->SizeAndFlags & IVP_Compact_Ledge::kHasChildrenMask) == 0)
                     Mindist = new IVP_Ledge_Mindist(Environment, Delegator);   // FUN_0634dd10
                 else
                     Mindist = new IVP_Complex_Mindist(Environment, Delegator); // FUN_06362ab0

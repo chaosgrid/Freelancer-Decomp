@@ -198,7 +198,7 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
             SmallIcons[Index] = CreateStaticControl(Name, kBlackBoxMesh, &Position, nullptr, &Small, 0,
                                                     0, 0, 1, 0, 1, 1, 0x6e, 0, 0, &Zero);
             // Not pickable.
-            SmallIcons[Index]->Flags = static_cast<unsigned char>(SmallIcons[Index]->Flags & 0xf7);
+            SmallIcons[Index]->Flags = static_cast<unsigned char>(SmallIcons[Index]->Flags & ~kWin3DPickable);
         }
         sprintf(Name, "RepairTextArea%d", Index);
         {
@@ -226,7 +226,7 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
             ItemDamages[Index] = CreateCargoBarControl(Name, "", &Position, nullptr, &Half, 1, 0x43c,
                                                        G_NnPaletteGreen,
                                                        G_NnPaletteGreen);
-            ItemDamages[Index]->SetProperty(0x19, 0x10000, 0);
+            ItemDamages[Index]->SetProperty(kWinPropRenderFlags, kRenderArgNoWireRender, 0);
         }
     }
 
@@ -305,15 +305,15 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             TextAreas[Row]->SetProperty(Msg, 0, 0);
         return 0;
     }
-    case 0x4e:
+    case kWinPropCloseFromOutside:
     {
         // Closed from outside: no NavBar.
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         Win3DReparent(this, nullptr); // FUN_0059dd00
         Win3DDeleteTree(this);
         return 0;
     }
-    case 0x30:
+    case kWinNotifyToggled:
     {
         // A check box changed; B == 0 checks its item. Every row is tested (no break); an item
         // index past the list is ignored (unsigned compare).
@@ -341,7 +341,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
         SetPosition(&Position);
-        PlayOrRewindUiSoundSlot(2); // FUN_005645c0
+        PlayOrRewindUiSoundSlot(kUiSoundWindowOpen); // FUN_005645c0
         return 0;
     }
     case kWinNotifyClick:
@@ -353,9 +353,9 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (A != PointerArg(IconFrames[Row]) && A != PointerArg(TextAreas[Row]))
                 continue;
             int State = 0;
-            CheckBoxes[Row]->SetProperty(0x2f, PointerArg(&State), 0);
-            CheckBoxes[Row]->SetProperty(0x30, static_cast<uintptr_t>(State), 0);
-            SetProperty(0x30, PointerArg(CheckBoxes[Row]), (State != 0) ? 0u : 1u);
+            CheckBoxes[Row]->SetProperty(kTogglePropGetState, PointerArg(&State), 0);
+            CheckBoxes[Row]->SetProperty(kTogglePropSetState, static_cast<uintptr_t>(State), 0);
+            SetProperty(kWinNotifyToggled, PointerArg(CheckBoxes[Row]), (State != 0) ? 0u : 1u);
             return 0;
         }
         if (A == PointerArg(OkButton))
@@ -366,7 +366,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == PointerArg(CancelButton))
         {
-            Flags = static_cast<unsigned char>(Flags & 0xfc);
+            Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
             Win3DReparent(this, nullptr); // FUN_0059dd00
             NavBarCloseService(false);    // FUN_004424f0(0)
             Win3DDeleteTree(this);
@@ -431,7 +431,7 @@ void NnRepair::PopulateList()
     {
         FRepairItem Item;
         memset(&Item, 0, sizeof(Item));
-        Item.Kind = 0;
+        Item.Kind = kRepairItemHull;
         Item.Id = 0;
         Item.NameIds = 0x428;
         Item.Cost = HullCost;
@@ -465,7 +465,7 @@ void NnRepair::PopulateList()
 
         FRepairItem Item;
         memset(&Item, 0, sizeof(Item));
-        Item.Kind = 1;
+        Item.Kind = kRepairItemCollisionGroup;
         Item.Id = Desc.Id;
         Item.NameIds = NameIds;
         Item.Cost = Cost;
@@ -535,7 +535,7 @@ void NnRepair::PopulateList()
             Cost = 1;
         FRepairItem Item;
         memset(&Item, 0, sizeof(Item));
-        Item.Kind = 2;
+        Item.Kind = kRepairItemEquipment;
         Item.Id = Desc.Id;
         Item.NameIds = IdsName;
         Item.Cost = Cost;
@@ -571,7 +571,7 @@ void NnRepair::RefreshRows()
         ItemNames[Row]->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Item.NameIds), 0);
         swprintf(Buffer, 0x100, kCountFormat, Item.Cost);
         ItemPrices[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
-        CheckBoxes[Row]->SetProperty(0x30, Item.bSelected, 0);
+        CheckBoxes[Row]->SetProperty(kTogglePropSetState, Item.bSelected, 0);
 
         if (Item.IconMesh == nullptr)
             SmallIcons[Row]->SetProperty(kWinPropMesh, PointerArg(kBlackBoxMesh), 0);
@@ -579,7 +579,7 @@ void NnRepair::RefreshRows()
             SmallIcons[Row]->SetProperty(kWinPropMesh, PointerArg(Item.IconMesh), PointerArg(Item.IconMaterial));
 
         int const Percent = Item.HealthPercent;
-        ItemDamages[Row]->SetProperty(0x40, 100, static_cast<uintptr_t>(Percent));
+        ItemDamages[Row]->SetProperty(kBarPropFill, 100, static_cast<uintptr_t>(Percent));
         unsigned Colour = 0;
         if (Percent >= 0x46)
             Colour = 0xff30c24bu; // bytes 4b c2 30 ff
@@ -587,7 +587,7 @@ void NnRepair::RefreshRows()
             Colour = 0xff26eaf5u; // bytes f5 ea 26 ff
         else
             Colour = 0xff2626ffu; // bytes ff 26 26 ff
-        ItemDamages[Row]->SetProperty(0x3f, Colour, 0);
+        ItemDamages[Row]->SetProperty(kBarPropColour, Colour, 0);
 
         ++Row;
         if (Row >= 9)
@@ -606,7 +606,7 @@ void NnRepair::RefreshRows()
         IconFrames[Row]->SetProperty(kWinPropDisable, 1, 0);
         TextAreas[Row]->SetProperty(kWinPropDisable, 1, 0);
         ItemDamages[Row]->SetProperty(kWinPropHide, 1, 0);
-        CheckBoxes[Row]->SetProperty(0x30, 0, 0);
+        CheckBoxes[Row]->SetProperty(kTogglePropSetState, 0, 0);
         SmallIcons[Row]->SetProperty(kWinPropHide, 1, 0);
     }
 }
@@ -633,10 +633,10 @@ void NnRepair::DoRepair()
             continue;
         switch (Item.Kind)
         {
-        case 0:
+        case kRepairItemHull:
             ReqPlayerHullStatusRetail(1.0f); // FUN_004c4f50
             break;
-        case 1:
+        case kRepairItemCollisionGroup:
             for (std::list<CollisionGroupDesc>::iterator It = Groups.begin(); It != Groups.end(); ++It)
             {
                 if (It->Id == Item.Id)
@@ -646,7 +646,7 @@ void NnRepair::DoRepair()
                 }
             }
             break;
-        case 2:
+        case kRepairItemEquipment:
             for (std::list<EquipDesc>::iterator It = Equipment.Items.begin();
                  It != Equipment.Items.end(); ++It)
             {
@@ -770,7 +770,7 @@ bool NnRepair::OnEvent(unsigned MsgId)
     // cancel button. (Retail tests the adjusted `this` for null.)
     if (MsgId != USER_STACKABLE_CANCEL)
         return false;
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     Win3DReparent(this, nullptr); // FUN_0059dd00
     NavBarCloseService(false);    // FUN_004424f0(0)
     Win3DDeleteTree(this);

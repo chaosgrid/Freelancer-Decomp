@@ -1696,7 +1696,7 @@ int CShip::update(float Dt, unsigned Flags)
 
     if (ObjectDb != nullptr && PhySys::GetCollisionState(this))
     {
-        ISpatialPartition* const Bucket = (ISpatialPartition*)ObjectDb->GetBucket(0xfdff);
+        ISpatialPartition* const Bucket = (ISpatialPartition*)ObjectDb->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
         if (Bucket != nullptr)
         {
             Geometry::Sphere Query;
@@ -1975,7 +1975,7 @@ void CShip::request_exit_tradelane()
               "request_exit_tradelane");
 
         FBehaviorManagerEvent Event;
-        Event.Type = 4;
+        Event.Type = FBehaviorManagerEvent::kEventTradelane;
         Event.Data = &Payload;
         BehMgr->OnEvent(&Event);
     }
@@ -2263,7 +2263,7 @@ IObjRW* CShip::next_target(bool bReverse)
             continue;
         // TypeBits (+0xe0) is read with no null test: a non-CSimple object faults, as in retail.
         CObject const* const Obj = Candidate->cobject();
-        CSimple const* const Simple = (Obj != nullptr && (Obj->ObjectClass & 3) == 3)
+        CSimple const* const Simple = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
             ? (CSimple const*)Obj : nullptr;
         if (Simple->TypeBits == 0 || Simple->TypeBits == OBJ_ASTEROID)
             continue;

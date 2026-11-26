@@ -92,7 +92,7 @@ namespace
     // tested; Out stays -1 when it writes nothing).
     unsigned PlayerAffiliation()
     {
-        unsigned Affiliation = 0xffffffffu;
+        unsigned Affiliation = kNoAffiliation;
         if (!SinglePlayer())
         {
             int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670
@@ -211,7 +211,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
     {
         Vector const Position = {0.01f, 0.172f, 0.0f}; // 0x3c23d70a, 0x3e3020c5
         FactionInfoCard = CreateRichTextWin("FactionInfoCard", 0.384f, 0.34f, &Position, true);
-        FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags & 0xfd);
+        FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags & ~kWin3DVisible);
     }
     // ids 0x32b "Close the Infocard."
     {
@@ -227,8 +227,8 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
         CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", &Position,
                                               nullptr, 0.262f, 0.03f, 1.9f, 0x3a1, 1, 0, 1);
     }
-    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
-    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
+    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & ~(kWin3DActive | kWin3DVisible));
+    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & ~(kWin3DActive | kWin3DVisible));
 
     // Six faction rows.
     char ControlName[0x80];
@@ -276,7 +276,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
         unsigned char Colour[4];
         memcpy(Colour, G_HudChromeColorRgba, sizeof(Colour)); // DAT_00679bb4
         Colour[3] = static_cast<unsigned char>(Colour[3] / 3);
-        UnfriendlyBars[Row]->SetProperty(0x18, reinterpret_cast<uintptr_t>(Colour),
+        UnfriendlyBars[Row]->SetProperty(kStaticPropColours, reinterpret_cast<uintptr_t>(Colour),
                                          reinterpret_cast<uintptr_t>(Colour));
 
         sprintf(ControlName,"PlayerInfofriendlyBar%d", Row);
@@ -285,7 +285,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
             FriendlyBars[Row] = CreateStaticControl(ControlName,kFriendlyBarMesh, &Position, nullptr,
                                                     &Half, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, &Zero);
         }
-        FriendlyBars[Row]->SetProperty(0x18, reinterpret_cast<uintptr_t>(Colour),
+        FriendlyBars[Row]->SetProperty(kStaticPropColours, reinterpret_cast<uintptr_t>(Colour),
                                        reinterpret_cast<uintptr_t>(Colour));
     }
 
@@ -326,8 +326,8 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
 
             if (!SinglePlayer() && (TableIndex == 1 || TableIndex == 2))
             {
-                Heading->Flags = static_cast<unsigned char>(Heading->Flags & 0xfc);
-                StatValues[Pair]->Flags = static_cast<unsigned char>(StatValues[Pair]->Flags & 0xfc);
+                Heading->Flags = static_cast<unsigned char>(Heading->Flags & ~(kWin3DActive | kWin3DVisible));
+                StatValues[Pair]->Flags = static_cast<unsigned char>(StatValues[Pair]->Flags & ~(kWin3DActive | kWin3DVisible));
             }
             else
             {
@@ -370,16 +370,16 @@ intptr_t NnPlayerInfo::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // Every statistic shown again (outside single player not the worth and next-level
         // pairs).
-        FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags & 0xfd);
-        CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
-        CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
+        FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags & ~kWin3DVisible);
+        CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & ~(kWin3DActive | kWin3DVisible));
+        CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & ~(kWin3DActive | kWin3DVisible));
         for (int Stat = 0; Stat < 13; ++Stat)
         {
             if (SinglePlayer() || (Stat != 1 && Stat != 2))
             {
-                StatValues[Stat]->Flags = static_cast<unsigned char>(StatValues[Stat]->Flags | 3);
+                StatValues[Stat]->Flags = static_cast<unsigned char>(StatValues[Stat]->Flags | kWin3DActive | kWin3DVisible);
                 StatHeadings[Stat]->Flags =
-                    static_cast<unsigned char>(StatHeadings[Stat]->Flags | 3);
+                    static_cast<unsigned char>(StatHeadings[Stat]->Flags | kWin3DActive | kWin3DVisible);
             }
         }
         PlayerStatsTitle->SetProperty(kTextPropSetIds, 0x640, 0);
@@ -422,18 +422,18 @@ void NnPlayerInfo::Draw()
         int const Index = FirstRow + Row;
         if (Index >= FactionCount)
         {
-            FactionNames[Row]->Flags = static_cast<unsigned char>(FactionNames[Row]->Flags & 0xfc);
+            FactionNames[Row]->Flags = static_cast<unsigned char>(FactionNames[Row]->Flags & ~(kWin3DActive | kWin3DVisible));
             FactionFrames[Row]->Flags =
-                static_cast<unsigned char>(FactionFrames[Row]->Flags & 0xfc);
+                static_cast<unsigned char>(FactionFrames[Row]->Flags & ~(kWin3DActive | kWin3DVisible));
             UnfriendlyBars[Row]->Flags =
-                static_cast<unsigned char>(UnfriendlyBars[Row]->Flags & 0xfc);
-            FriendlyBars[Row]->Flags = static_cast<unsigned char>(FriendlyBars[Row]->Flags & 0xfc);
+                static_cast<unsigned char>(UnfriendlyBars[Row]->Flags & ~(kWin3DActive | kWin3DVisible));
+            FriendlyBars[Row]->Flags = static_cast<unsigned char>(FriendlyBars[Row]->Flags & ~(kWin3DActive | kWin3DVisible));
             continue;
         }
-        FactionNames[Row]->Flags = static_cast<unsigned char>(FactionNames[Row]->Flags | 3);
-        FactionFrames[Row]->Flags = static_cast<unsigned char>(FactionFrames[Row]->Flags | 3);
-        UnfriendlyBars[Row]->Flags = static_cast<unsigned char>(UnfriendlyBars[Row]->Flags | 3);
-        FriendlyBars[Row]->Flags = static_cast<unsigned char>(FriendlyBars[Row]->Flags | 3);
+        FactionNames[Row]->Flags = static_cast<unsigned char>(FactionNames[Row]->Flags | kWin3DActive | kWin3DVisible);
+        FactionFrames[Row]->Flags = static_cast<unsigned char>(FactionFrames[Row]->Flags | kWin3DActive | kWin3DVisible);
+        UnfriendlyBars[Row]->Flags = static_cast<unsigned char>(UnfriendlyBars[Row]->Flags | kWin3DActive | kWin3DVisible);
+        FriendlyBars[Row]->Flags = static_cast<unsigned char>(FriendlyBars[Row]->Flags | kWin3DActive | kWin3DVisible);
 
         FNnPlayerInfoFaction const& Faction = Factions.data()[Index];
 
@@ -597,11 +597,11 @@ void NnPlayerInfo::OnPlayerStats(FNnPlayerStatsBlock const* Stats,
         if (ShipArch == nullptr)
             continue;
         unsigned const Type = ShipArch->ObjectType;
-        if ((Type & 0x20000u) != 0)
+        if ((Type & OBJ_FREIGHTER) != 0)
             Freighters += Kills.Count;
-        else if ((Type & 0x100000u) != 0)
+        else if ((Type & OBJ_TRANSPORT) != 0)
             Transports += Kills.Count;
-        else if ((Type & 0x280000u) != 0)
+        else if ((Type & (OBJ_CRUISER | OBJ_CAPITAL)) != 0)
             Battleships += Kills.Count;
         else
             Fighters += Kills.Count;
@@ -667,12 +667,12 @@ void NnPlayerInfo::ShowFactionInfocard(int Row)
 
     for (int Stat = 0; Stat < 13; ++Stat)
     {
-        StatValues[Stat]->Flags = static_cast<unsigned char>(StatValues[Stat]->Flags & 0xfc);
-        StatHeadings[Stat]->Flags = static_cast<unsigned char>(StatHeadings[Stat]->Flags & 0xfc);
+        StatValues[Stat]->Flags = static_cast<unsigned char>(StatValues[Stat]->Flags & ~(kWin3DActive | kWin3DVisible));
+        StatHeadings[Stat]->Flags = static_cast<unsigned char>(StatHeadings[Stat]->Flags & ~(kWin3DActive | kWin3DVisible));
     }
-    FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags | 2);
-    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags | 3);
-    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags | 3);
+    FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags | kWin3DVisible);
+    CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags | kWin3DActive | kWin3DVisible);
+    CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags | kWin3DActive | kWin3DVisible);
 
     RenderDisplayList Card;
     {

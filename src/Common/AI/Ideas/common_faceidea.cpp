@@ -47,7 +47,7 @@ FaceIdea::FaceIdea()
     , TurnThrottle(1.0f)
     , AngleWeight98(BitsToFloat(0x3f1c28f6u))
     , AngleWeight9c(BitsToFloat(0x3e490fdbu))
-    , TargetKind(0)
+    , TargetKind(kFaceTargetNone)
     , OpaqueA4{}
     , RemainingAngle(3.14159274f)        // 0x40490fdb
     , PadAc(0)
@@ -97,13 +97,13 @@ void FaceIdea::SetWatchObject(void const* Object2)
 {
     if (Object2 == nullptr)
     {
-        TargetKind = 0;
+        TargetKind = kFaceTargetNone;
         Watcher.set(nullptr);
         return;
     }
 
     // IObjRW -> Watchable adjustment, as in MoveIdea::SetWatchObject.
-    TargetKind = 1;
+    TargetKind = kFaceTargetObject;
     Watcher.set(reinterpret_cast<Watchable const*>(
         static_cast<unsigned char const*>(Object2) + 8));
 }
@@ -111,21 +111,21 @@ void FaceIdea::SetWatchObject(void const* Object2)
 // FUN_062d7560.
 void FaceIdea::SetPosition(Vector const& Point)
 {
-    TargetKind = 2;
+    TargetKind = kFaceTargetPoint;
     Position1c = Point;
 }
 
 // FUN_062d7590. No renormalization, unlike MoveIdea::SetDirection.
 void FaceIdea::SetDirection(Vector const& Dir)
 {
-    TargetKind = 3;
+    TargetKind = kFaceTargetDirection;
     Direction28 = Dir;
 }
 
 // FUN_062d75c0.
 void FaceIdea::SetBasis(Matrix const& Basis)
 {
-    TargetKind = 4;
+    TargetKind = kFaceTargetBasis;
     // Nine dwords to +0x34: sizeof(Matrix), and the extent of the ctor-zeroed block.
     std::memcpy(&ZeroBlock34, &Basis, sizeof(ZeroBlock34));
 }
@@ -133,7 +133,7 @@ void FaceIdea::SetBasis(Matrix const& Basis)
 // FUN_062d75e0.
 void FaceIdea::SetAxis(Vector const& Axis)
 {
-    TargetKind = 5;
+    TargetKind = kFaceTargetAxis;
     Vector58 = Axis;
 }
 
@@ -240,10 +240,10 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
     switch (TargetKind)
     {
-    case 0:
+    case kFaceTargetNone:
         return 3;
 
-    case 1:
+    case kFaceTargetObject:
     {
         Watchable* const Watched = const_cast<Watchable*>(Watcher.target());
         if (Watched == nullptr)
@@ -285,7 +285,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         break;
     }
 
-    case 2:
+    case kFaceTargetPoint:
     {
         // Delta to this->0x1c is common to all three paths; the gates pick only
         // the frame builder and its up hint:
@@ -323,7 +323,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         break;
     }
 
-    case 3:
+    case kFaceTargetDirection:
     {
         // Direction28 is used as-is (no subtraction of the cached position, unlike
         // cases 1/2); the gate picks the builder as in the fallback.
@@ -341,7 +341,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         break;
     }
 
-    case 4:
+    case kFaceTargetBasis:
         // Raw 9-float frame, copied verbatim (no orientation rebuild at all).
         WorkingFrame = ZeroBlock34;
         break;
@@ -350,7 +350,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         // A tag above 5 goes straight to the shared tail.
         break;
 
-    case 5:
+    case kFaceTargetAxis:
     {
         // Does not reach the shared tail: always ends in SetAxisThrottle and
         // returns 0. Retail's three paths collapse to two: non-player, or player
@@ -384,7 +384,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
     // DodgeIdea uses at its analogous site), recompute the frame toward
     // Pathfind->AvoidTargetPoint. Retail writes the same stack frame every case filled.
     Matrix& ThrottleFrame = WorkingFrame;
-    if ((static_cast<unsigned char>(Pathfind->AvoidRecordKind) & 0x2) != 0)
+    if ((static_cast<unsigned char>(Pathfind->AvoidRecordKind) & kAvoidRecordPoint) != 0)
     {
         bool const Gate = Sys->Thrust.CheckSteeringGate();
         RefreshCachedIfacePosition(Sys);

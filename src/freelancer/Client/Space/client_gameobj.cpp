@@ -19,6 +19,7 @@
 #include "common_ini.h"          // INI_Reader (Solar ReadIni, FUN_005485c0)
 #include "common_newchar.h"      // pub::StateGraph::get_state_graph
 #include "common_server.h"       // IServer (DAT_0067ecd0)
+#include "server_cobject.h"      // DestroyType
 #include "common_misc.h"         // SinglePlayer, GetFileSysPath (Common exports)
 #include "dacom.h"               // FDUMP
 #include "common_goods.h"        // FindHardpoint_PS / HardpointInfo
@@ -397,7 +398,7 @@ void FClientGameobj::PostCreateInit()
     // get_type's result is not tested.
     uint Type = 0;
     get_type(Type);
-    if ((Type & 0x107ffdffu) != 0u && bWatchListed != 0)
+    if ((Type & (OBJ_LOOT | OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK)) != 0u && bWatchListed != 0)
         GameobjWatchListAdd(this);
 }
 
@@ -470,12 +471,12 @@ void FClientGameobj::ApplyDamageList(DamageList const& Damage)
 void FClientGameobj::Destroy(int DestroyType)
 {
     // FUN_0053a820
-    if (DestroyType == 0)
+    if (DestroyType == DESTROY_VANISH)
     {
         MarkForRemoval(true);
         return;
     }
-    if (DestroyType == 1)
+    if (DestroyType == DESTROY_FUSE)
     {
         Flags = static_cast<unsigned char>(Flags | 4u);
         Explode(nullptr);
@@ -509,7 +510,7 @@ void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj*
     (void)B;
     Vector const* const Hit = static_cast<Vector const*>(A);
     Archetype::Munition const* const MunArch =
-        static_cast<Archetype::Munition const*>(NarrowObject(Munition, 0x7u)->Archetype);
+        static_cast<Archetype::Munition const*>(NarrowObject(Munition, CObject::ClassProjectile)->Archetype);
     // FUN_00407450: the distance record for the munition's hull_damage.
     FEffectArch* const HullEffect =
         Archetype::CliObjPickDistanceRecord(CompanionOfObjectArchetype(Object), MunArch->HullDamage);
@@ -518,7 +519,7 @@ void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj*
     SpawnSurfaceHitEffect(Shot->OwnerId, HullEffect, Hit, Hit + 1, nullptr);
     // FUN_00408a70: a random live effect of the munition's companion.
     FEffectArch* const LiveEffect = Archetype::CliMunitionPickLiveEffect(
-        NarrowObject(Munition, 0x7u)->Archetype->Companion);
+        NarrowObject(Munition, CObject::ClassProjectile)->Archetype->Companion);
     Vector const Velocity = NarrowObject(Munition, CObject::ClassObject)->get_velocity();
     SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
 }
@@ -711,7 +712,7 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
             for (Index = 0; Index < kHitEffectSlotCount; ++Index)
             {
                 FParticleEffect* const Slot = HitEffects[Index];
-                if (Slot == nullptr || (Slot->Flags08 & 2u) != 0)
+                if (Slot == nullptr || (Slot->Flags08 & kEffectFlagDeactivated) != 0)
                 {
                     Chosen = Index;
                     break;
@@ -1077,11 +1078,10 @@ FClientEquippedObj::~FClientEquippedObj()
 
 void FClientEquippedObj::notify(Event Code, void* Param)
 {
-    // FUN_00534730 (INotify slot 0 on the +0xac sub-object). The numeric codes are Common's;
-    // none of 5..8 has a name in INotify::Event yet.
+    // FUN_00534730 (INotify slot 0 on the +0xac sub-object).
     switch (static_cast<int>(Code))
     {
-    case 5:
+    case INotify::EquipSeparated:
     {
         // An attached part came off. Its debris object is taken over before the slot-85
         // test; AttachedEquipArch is fetched for SeparationExplosion first.
@@ -1098,14 +1098,14 @@ void FClientEquippedObj::notify(Event Code, void* Param)
         }
         break;
     }
-    case 6:
+    case INotify::EquipDetachedInPlace:
         // The part's effects stop (FUN_004fd230, no new owner).
         CliEffectListDetachPart(&EffectList,
                                 static_cast<CAttachedEquip*>(Param)->GetRootIndex(), nullptr);
         break;
-    case 7:
+    case INotify::ArchGroupSeparated:
     {
-        // A CArchGroup was destroyed; as case 5 (ExplosionTypeName is fetched first).
+        // A CArchGroup was destroyed; as EquipSeparated (ExplosionTypeName is fetched first).
         CArchGroup* const Group = static_cast<CArchGroup*>(Param);
         CObject* const PartObject = Group->RetreiveDestroyedObj();
         if (IsExploding())
@@ -1119,7 +1119,7 @@ void FClientEquippedObj::notify(Event Code, void* Param)
         }
         break;
     }
-    case 8:
+    case INotify::ArchGroupDetachedInPlace:
         CliEffectListDetachPart(&EffectList, static_cast<CArchGroup*>(Param)->GetRootIndex(),
                                 nullptr);
         break;
@@ -1408,7 +1408,7 @@ void FClientEquippedObj::Explode(Vector const* Pos)
         CArchGroup* const Group = EqObj->ArchGroups.Traverse(Groups);
         if (Group == nullptr)
             break;
-        if (Group->State == 3)
+        if (Group->State == CArchGroup::STATE_DESTROYED)
             continue;
         Group->Kill(DamageEntry::SubObjFate::Destroyed);
     }
@@ -1781,7 +1781,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
     // A star is drawn only with option 0x24 on, and gives {4, 0xffff}.
     if (StarSphere != nullptr)
     {
-        if (GetGameOption(0x24) == 0)
+        if (GetGameOption(kGameOptSun) == 0)
         {
             *OutLod = Lod;
             return OutLod;
@@ -1796,7 +1796,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
     if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
     {
         // Planet / star / moon -> drawn only with option 0x23 on.
-        if (GetGameOption(0x23) == 0)
+        if (GetGameOption(kGameOptPlanets) == 0)
         {
             *OutLod = Lod;
             return OutLod;
@@ -1916,7 +1916,7 @@ void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const*
 {
     // LAB_00548520: a solar of type bits 0..3 ignores the hit (no null test on the narrowed
     // object).
-    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & 0xfu) != 0)
+    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_BLACKHOLE)) != 0)
         return;
     FClientEquippedObj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
@@ -1924,7 +1924,7 @@ void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const*
 void FClientSolarGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00548570: the same test.
-    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & 0xfu) != 0)
+    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_BLACKHOLE)) != 0)
         return;
     FClientEquippedObj::OnMunitionHit(A, B, Munition);
 }
@@ -2031,7 +2031,7 @@ FClientShipGameobj::FClientShipGameobj()
         TradeLaneTunnelCompanion[CompanionSlot] = nullptr;
     TradeLaneFlags = 0;
     // Retail clears bits 0..1 and then stores 0 over the whole dword.
-    ShipFlags = static_cast<unsigned char>(ShipFlags & 0xfcu);
+    ShipFlags = static_cast<unsigned char>(ShipFlags & ~(kShipFlagHullHit | kShipFlagShieldHit));
     JumpEffect = nullptr;
     ShipFlags = 0;
     Pad18d[0] = 0;
@@ -2200,7 +2200,7 @@ namespace
         // Alive: a particle without the deactivated bit, an active sound, or a light with no
         // animation keys.
         FParticleEffect* const LiveParticle = static_cast<FParticleEffect*>(Companion[2]);
-        if (LiveParticle != nullptr && (LiveParticle->Flags08 & 2u) == 0u)
+        if (LiveParticle != nullptr && (LiveParticle->Flags08 & kEffectFlagDeactivated) == 0u)
             return true;
         ISoundSource* const LiveSound = static_cast<ISoundSource*>(Companion[1]);
         if (LiveSound != nullptr && LiveSound->IsActive() != 0)
@@ -2371,33 +2371,44 @@ unsigned G_ShipVoiceWaitingToDockId = CreateID("waiting_to_dock");          // D
 unsigned G_ShipVoiceDockTooFarId = CreateID("nnv_dock_too_far");            // DAT_00678b1c, LAB_00542af0
 unsigned G_ShipVoiceFormationLostId = CreateID("nnv_formation_lost");       // DAT_00678b10, LAB_00542b50
 
+namespace
+{
+    // The collision group types of the engine nozzles.
+    unsigned const kEngineGroupTypeMask =
+        Archetype::CollisionGroup::kGroupTypeEngine | Archetype::CollisionGroup::kGroupTypePortEngine |
+        Archetype::CollisionGroup::kGroupTypeMiddleEngine |
+        Archetype::CollisionGroup::kGroupTypeStarboardEngine |
+        Archetype::CollisionGroup::kGroupTypeTopEngine |
+        Archetype::CollisionGroup::kGroupTypeBottomEngine;
+}
+
 void FClientShipGameobj::notify(Event Code, void* Param)
 {
     // FUN_00545670 (INotify slot 0 on the +0xac sub-object), then always EquippedObj's notify.
     switch (static_cast<int>(Code))
     {
-    case 2:
+    case INotify::BayStateChanged:
         ShipBayDoorSound(this, *static_cast<unsigned char const*>(Param) != 0);
         break;
-    case 3:
+    case INotify::EquipExpired:
         // The player's ship only; FUN_00489e80 is the NN voice queue.
         if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
             NnVoiceEnqueue(G_ShipVoiceWeaponExpiredId, 0);
         break;
-    case 4:
+    case INotify::CargoExpired:
         if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
             NnVoiceEnqueue(G_ShipVoiceCargoExpiredId, 0);
         break;
-    case 9:
+    case INotify::ArchGroupDamaged:
     {
-        // The player's ship, a CArchGroup whose collision group type has a bit of 0x3f00 and
+        // The player's ship, a CArchGroup whose collision group type has an engine bit and
         // whose relative health is below double 0.05 (DAT_005d5b58; equal and NaN stop).
         if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
             break;
         CArchGroup* const Group = static_cast<CArchGroup*>(Param);
         if (Group == nullptr)
             break;
-        if ((Group->GetCollisionGroupType() & 0x3f00u) == 0u)
+        if ((Group->GetCollisionGroupType() & kEngineGroupTypeMask) == 0u)
             break;
         if (!(static_cast<double>(Group->GetRelativeHealth()) < 0.05))
             break;
@@ -2440,7 +2451,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
     // FUN_005478f0 (INotify slot 0 on the +0xac sub-object). Codes 0, 1 and 0x11; every path
     // ends in EquippedObj's notify.
     int const Kind = static_cast<int>(Code);
-    if (Kind == 0)
+    if (Kind == INotify::DockAnimEnded)
     {
         // The archetype is read through the narrowing without a null test.
         CObject* const Obj = Object;
@@ -2453,7 +2464,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         if (SolarArch->bDockingCamera)
             SolarDoorSound(this, *static_cast<unsigned char const*>(Param) != 0);
     }
-    else if (Kind == 1)
+    else if (Kind == INotify::SolarGateStateChanged)
     {
         // A sub-code in the first dword of Param -- 0, 2 and 3 (1 does nothing). The "has a
         // jump gate effect" test calls GetTypeBits twice, as retail does.
@@ -2488,9 +2499,10 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             }
         }
     }
-    else if (Kind == 0x11)
+    else if (Kind == INotify::ShieldOfflineStateChanged)
     {
-        // A trade lane ring (TypeBits bit 7) switches its lane (FUN_00516910). No null test on
+        // A trade lane ring (TypeBits bit 7) switches its lane (FUN_00516910) when its shield
+        // goes offline or back online. No null test on
         // the narrowed object.
         CObject* const Obj = Object;
         CSimple const* const Simple =
@@ -2520,7 +2532,7 @@ void FClientShipGameobj::PostCreateInit()
 {
     // FUN_005447b0
     FClientEquippedObj::PostCreateInit();
-    ShipFlags = static_cast<unsigned char>(ShipFlags & 0xfcu);
+    ShipFlags = static_cast<unsigned char>(ShipFlags & ~(kShipFlagHullHit | kShipFlagShieldHit));
     SetJumpState(kJumpStateNone);
 
     // The ship companion's pilot_mesh (+0x64). No null test on the narrowed CShip.
@@ -2818,10 +2830,10 @@ void FClientShipGameobj::update(float Dt)
     {
         // It leaves the effect list once the ship stops colliding, leaves the atmosphere or is
         // landing (+0x18c bit 3).
-        if (!bCollides || Atmosphere == nullptr || (ShipFlags & 0x8u) != 0)
+        if (!bCollides || Atmosphere == nullptr || (ShipFlags & kShipFlagLanding) != 0)
             CliEffectListRemove(reinterpret_cast<unsigned char*>(this) + 0x28, AtmosphereBurnCompanion);
     }
-    else if (bCollides && Atmosphere != nullptr && (ShipFlags & 0x8u) == 0)
+    else if (bCollides && Atmosphere != nullptr && (ShipFlags & kShipFlagLanding) == 0)
     {
         ID_String BurnEffect;
         BurnEffect.Id = CreateID("atmosphere_burn");
@@ -2947,7 +2959,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
     // The pilot mesh. Retail tests the signed high word against 2 and then 1.
     unsigned short const LodLow = static_cast<unsigned short>(CachedLod & 0xffffu);
     short const LodHigh = static_cast<short>(CachedLod >> 16);
-    if (GetGameOption(0x1d) > 0 && LodLow >= 3 && LodHigh < 2 && LodHigh < 1 &&
+    if (GetGameOption(kGameOptShips) > 0 && LodLow >= 3 && LodHigh < 2 && LodHigh < 1 &&
         ClientMeshHolderHasInstance(&PilotMeshHolder))
     {
         // A cloaking ship passes its appearance value on to the pilot. No null test on the
@@ -2971,7 +2983,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
         Transform Copy;
         CopyTransform12(&Copy, &PilotXform);
         ClientMeshHolderSetMatrix(&PilotMeshHolder, &Copy);
-        DALib::Renderer->RenderInstance(Camera, PilotMeshHolder.EngineInstance, 1.0f, 8u, nullptr, Extra);
+        DALib::Renderer->RenderInstance(Camera, PilotMeshHolder.EngineInstance, 1.0f, kDrawPickSwitch, nullptr, Extra);
     }
 
     SetAppearanceDirectionalLightEnabled(0);
@@ -3005,7 +3017,7 @@ void FClientShipGameobj::ApplyDamageList(DamageList const& Damage)
 {
     // LAB_00545f50. Damage of cause 6 on the player's ship drops cruise. No null test on the
     // narrowed object.
-    if (static_cast<int>(Damage.Cause) == 6 && this == GetPlayerObjRW())
+    if (Damage.Cause == DamageCause::CruiseDisrupter && this == GetPlayerObjRW())
     {
         static_cast<IObjAffect*>(this)->toggle_cruise(false, true,
                                                 static_cast<int>(GetPlayerConnectionId()));
@@ -3059,9 +3071,9 @@ void FClientShipGameobj::OnMunitionHit(void const* A, void const* B, FClientGame
 
     unsigned short const SubObj = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(B));
     if (SubObjectID::IsShieldEquipID(SubObj))
-        ShipFlags |= 2;
+        ShipFlags |= kShipFlagShieldHit;
     else
-        ShipFlags |= 1;
+        ShipFlags |= kShipFlagHullHit;
 
     if (this != GetPlayerObjRW())
         return;
@@ -3156,7 +3168,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
             continue;
         unsigned SelfId = get_id();
         FBehaviorManagerEvent Event;
-        Event.Type = 7;
+        Event.Type = FBehaviorManagerEvent::kEventObjectDying;
         Event.Data = &SelfId;
         Behavior->OnEvent(&Event);
     }
@@ -3179,7 +3191,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
             continue;
         unsigned SelfId = get_id();
         FBehaviorManagerEvent Event;
-        Event.Type = 7;
+        Event.Type = FBehaviorManagerEvent::kEventObjectDying;
         Event.Data = &SelfId;
         Behavior->OnEvent(&Event);
     }
@@ -3483,8 +3495,8 @@ int FClientShipGameobj::go_tradelane(IObjInspect const* EntranceRing, IObjInspec
     LocalServer()->GoTradelane(GetPlayerConnectionId(), Info);
 
     // FUN_00515890's result is not used.
-    FClientGameobj* const EntranceGo = ClientObjDb_FindObject(EntranceRing->get_id(), 2);
-    FClientGameobj* const ExitGo = ClientObjDb_FindObject(ExitRing->get_id(), 2);
+    FClientGameobj* const EntranceGo = ClientObjDb_FindObject(EntranceRing->get_id(), static_cast<int>(EClientGameobjKind::Solar));
+    FClientGameobj* const ExitGo = ClientObjDb_FindObject(ExitRing->get_id(), static_cast<int>(EClientGameobjKind::Solar));
     TradeLaneShipGoHandler(this, EntranceGo, ExitGo);
     return 0;
 }
@@ -3509,7 +3521,7 @@ int FClientShipGameobj::stop_tradelane()
     Block.EntranceId = Ship->get_tradelane_entrance_ring();
     Block.ExitId = 0;
     FBehaviorManagerEvent Event;
-    Event.Type = 4;
+    Event.Type = FBehaviorManagerEvent::kEventTradelane;
     Event.Data = &Block;
     Behavior->OnEvent(&Event);
 
@@ -3533,13 +3545,13 @@ int FClientShipGameobj::slot_6c(int ArgA, int ArgB)
     unsigned VoiceId = 0;
     switch (ArgA)
     {
-    case 0:
+    case kShipVoiceDockTooFar:
         VoiceId = G_ShipVoiceDockTooFarId;
         break;
-    case 1:
+    case kShipVoiceTradeLaneDisrupted:
         VoiceId = G_ShipVoiceTradeLaneDisruptedId;
         break;
-    case 5:
+    case kShipVoiceFormationLost:
         VoiceId = G_ShipVoiceFormationLostId;
         break;
     default:
@@ -3571,20 +3583,20 @@ void FClientShipGameobj::RequestReturned(int Result, int Code, int Extra)
     {
         switch (Code)
         {
-        case 0:
+        case DOCK_HOST_RESPONSE_DENIED_HOSTILE:
             VoiceId = G_ShipVoiceDockDeniedHostileId;
             break;
-        case 1:
+        case DOCK_HOST_RESPONSE_ACCESS_DENIED:
             VoiceId = G_ShipVoiceDockDeniedLockedId;
             break;
-        case 2:
-        case 5:
+        case DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL:
+        case DOCK_HOST_RESPONSE_NO_TERMINAL:
             VoiceId = G_ShipVoiceCannotDockId;
             break;
-        case 3:
+        case DOCK_HOST_RESPONSE_BUSY:
             VoiceId = G_ShipVoiceWaitingToDockId;
             break;
-        case 4:
+        case DOCK_HOST_RESPONSE_PROCEED:
             VoiceId = G_ShipVoiceDockGrantedId;
             break;
         default:
@@ -3595,13 +3607,13 @@ void FClientShipGameobj::RequestReturned(int Result, int Code, int Extra)
     {
         switch (Code)
         {
-        case 0:
-        case 1:
-        case 2:
-        case 5:
+        case DOCK_HOST_RESPONSE_DENIED_HOSTILE:
+        case DOCK_HOST_RESPONSE_ACCESS_DENIED:
+        case DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL:
+        case DOCK_HOST_RESPONSE_NO_TERMINAL:
             VoiceId = G_ShipVoiceCannotDockId;
             break;
-        case 4:
+        case DOCK_HOST_RESPONSE_PROCEED:
             VoiceId = G_ShipVoiceDockGrantedId;
             break;
         default:
@@ -3635,7 +3647,7 @@ int FClientShipGameobj::jump_in_complete(unsigned SystemId)
 void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* BaseId)
 {
     // FUN_00543b40
-    ShipFlags |= 8;
+    ShipFlags |= kShipFlagLanding;
 
     if (DockGo != nullptr)
     {
@@ -3669,7 +3681,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
             Csys.Translation.y = 0.0f;
             Csys.Translation.z = 0.0f;
             char HardpointName[0x40];
-            sprintf(HardpointName, "%s%c", "HPDockCam", 0x41);
+            sprintf(HardpointName, "%s%c", "HPDockCam", 'A');
             if (DockGo->get_hardpoint(HardpointName, &Csys.Translation, &Csys.Rotation) == 0)
             {
                 CloseRearAndTurretViewsForDocking();
@@ -3935,7 +3947,7 @@ void FClientShipGameobj::LaunchFromDock(FClientGameobj* DockGo, int LaunchIndex)
     Csys.Translation.z = 0.0f;
 
     char HardpointName[0x40];
-    int const Suffix = LaunchIndex + 0x41;
+    int const Suffix = LaunchIndex + 'A';
     sprintf(HardpointName, "%s%c", "HPLaunchCam", Suffix);
 
     // 0 is success. No null test on the dock here.
@@ -4010,7 +4022,7 @@ void FClientProjectileGameobj::PostCreateInit()
     // FUN_005426e0
     FClientGameobj::PostCreateInit();
     // No null test on the narrowed object.
-    Archetype::ICliObj* const Companion = NarrowObject(this, 0x7u)->Archetype->Companion;
+    Archetype::ICliObj* const Companion = NarrowObject(this, CObject::ClassProjectile)->Archetype->Companion;
     ID_String const* const Effect = Archetype::CliProjConstEffect(Companion);
     if (Effect->IsEmpty())
         return;
@@ -4044,7 +4056,7 @@ void FClientProjectileGameobj::update(float Dt)
     Transform Xform;
     GetConstEffectTransform(&Xform);
     // No null test on the narrowed object.
-    Archetype::ICliObj* const Companion = NarrowObject(this, 0x7u)->Archetype->Companion;
+    Archetype::ICliObj* const Companion = NarrowObject(this, CObject::ClassProjectile)->Archetype->Companion;
     long const EngineIndex = get_index();
     ProjectileStartConstEffect(this, Archetype::CliProjConstEffect(Companion), EngineIndex,
                                Xform);
@@ -4146,11 +4158,11 @@ void FClientBeamGameobj::update(float Dt)
     // LAB_0053f610
     FClientProjectileGameobj::update(Dt);
     // No null test; result dropped.
-    NarrowObject(this, 0x7u)->update(Dt, CObject::UPDATE_DEFAULT);
+    NarrowObject(this, CObject::ClassProjectile)->update(Dt, CObject::UPDATE_DEFAULT);
     if (IsExploding())
         return;
     // A NaN life also expires the beam.
-    CProjectile const* const Projectile = static_cast<CProjectile const*>(NarrowObject(this, 0x7u));
+    CProjectile const* const Projectile = static_cast<CProjectile const*>(NarrowObject(this, CObject::ClassProjectile));
     if (!(Projectile->Lifetime >= 0.0f))
         MarkForRemoval(true);
 }
@@ -4196,11 +4208,11 @@ void FClientBeamGameobj::ReportCollisionToServer(void const* A, void const* B, F
     // test on the narrowed object).
     if (!SinglePlayer())
     {
-        CProjectile const* const Shot = static_cast<CProjectile const*>(NarrowObject(this, 0x7u));
+        CProjectile const* const Shot = static_cast<CProjectile const*>(NarrowObject(this, CObject::ClassProjectile));
         if (Shot->OwnerId != GetPlayerCharacterId())
             return;
     }
-    CObject* const Obj = NarrowObject(this, 0x7u);
+    CObject* const Obj = NarrowObject(this, CObject::ClassProjectile);
     Vector const* const HitPos = static_cast<Vector const*>(A);
     SSPMunitionCollisionInfo Info;
     Info.ProjectileArchId = Obj->Archetype->Nickname.Id;
@@ -4219,7 +4231,7 @@ void FClientBeamGameobj::ReportCollisionToServer(void const* A, void const* B, F
 unsigned FClientBeamGameobj::GetTypeBits() const
 {
     // LAB_0052e130
-    return 0x2000000u;
+    return OBJ_BULLET;
 }
 
 // ===========================================================================
@@ -4447,7 +4459,7 @@ void FClientGuidedGameobj::ReportCollisionToServer(void const* A, void const* B,
             return;
     }
     // No null test on the narrowed object.
-    CObject* const Obj = NarrowObject(this, 0x7u);
+    CObject* const Obj = NarrowObject(this, CObject::ClassProjectile);
     Vector const* const HitPos = static_cast<Vector const*>(A);
     SSPMunitionCollisionInfo Info;
     Info.AttackerId = static_cast<CProjectile const*>(Obj)->OwnerId;
@@ -4485,7 +4497,7 @@ void FClientGuidedGameobj::UpdateNebula(float Dt)
 unsigned FClientGuidedGameobj::GetTypeBits() const
 {
     // LAB_0053d430
-    return 0x1000000u;
+    return OBJ_GUIDED;
 }
 
 void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
@@ -4500,7 +4512,7 @@ void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
     // The CliMunition companion's HP_trail_parent (+0x60); no null test on the narrowed
     // object.
     char const* const TrailParent =
-        Archetype::CliMunitionHpTrailParent(NarrowObject(this, 0x7u)->Archetype->Companion);
+        Archetype::CliMunitionHpTrailParent(NarrowObject(this, CObject::ClassProjectile)->Archetype->Companion);
     if (TrailParent[0] != '\0')
     {
         long Handle = -1;
@@ -4515,7 +4527,7 @@ void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
         }
         // The text is read again for the error; then on to the renderer.
         char const* const TrailParentAgain =
-            Archetype::CliMunitionHpTrailParent(NarrowObject(this, 0x7u)->Archetype->Companion);
+            Archetype::CliMunitionHpTrailParent(NarrowObject(this, CObject::ClassProjectile)->Archetype->Companion);
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s: Missing HP_trail_parent(%s).",
               kMunitionSourceFile, 0xe1, Object->get_archetype()->Nickname.get_string(),
               TrailParentAgain);
@@ -4695,7 +4707,7 @@ void FClientLootGameobj::ApplyDamageList(DamageList const& Damage)
 void FClientLootGameobj::Destroy(int DestroyType)
 {
     // LAB_0053e8a0
-    if (DestroyType != 2)
+    if (DestroyType != DESTROY_TRACTORED)
     {
         FClientSimpleGameobj::Destroy(DestroyType);
         return;

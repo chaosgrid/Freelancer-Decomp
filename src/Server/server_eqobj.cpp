@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "../include/server_gameobject.h"
+#include "../include/server_chat.h"
 #include "../include/common_timing.h"  // Timing::read
 #include "../include/server_sysdb.h"   // StarSystem::on_object_destroyed (GameObject::destroy)
 #include "../include/common_misc.h"    // SUBOBJ_ID_NONE (Ship::allocate_equip_id)
@@ -252,7 +253,7 @@ int EqObj::fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector c
         CEGun* const Gun = CEGun::cast(Equip);
         if (Gun == nullptr)
             continue;
-        if (Gun->MunitionArch()->Seeker != 0)
+        if (Gun->MunitionArch()->Seeker != Archetype::Munition::SeekerNone)
             continue;
 
         Fired.insert(Fired.end(), 1, Gun->Id);
@@ -430,7 +431,7 @@ int EqObj::set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigne
                 if (Target != nullptr)
                 {
                     CObject const* const Raw = Target->cobject();
-                    if (Raw != nullptr && (static_cast<unsigned>(Raw->ObjectClass) & 3u) == 3u)
+                    if (Raw != nullptr && (static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                         Simple = const_cast<CSimple*>(static_cast<CSimple const*>(Raw));
                 }
                 bChanged = Gun->SetTarget(Simple, SubTarget);
@@ -567,7 +568,7 @@ int EqObj::use_repair_kits(unsigned short EquipId, Archetype::RepairKit const* K
     DamageList Unused;
     Unused.Count = 0;
     Unused.bDestroyed = false;
-    Unused.Cause = static_cast<DamageCause>(0x12);
+    Unused.Cause = DamageCause::RepairKit;
     Unused.InflictorId = 0;
     Unused.InflictorOwner = 0;
     (void)Unused;
@@ -586,7 +587,7 @@ int EqObj::use_repair_kits(unsigned short EquipId, Archetype::RepairKit const* K
     DamageList Damage;
     Damage.Count = 0;
     Damage.bDestroyed = false;
-    Damage.Cause = static_cast<DamageCause>(0x12);
+    Damage.Cause = DamageCause::RepairKit;
     Damage.InflictorId = get_id();
     Damage.InflictorOwner = csimple()->OwnerPlayer;
 
@@ -667,7 +668,7 @@ int EqObj::use_shield_batteries(unsigned short EquipId, Archetype::ShieldBattery
     DamageList Damage;
     Damage.Count = 0;
     Damage.bDestroyed = false;
-    Damage.Cause = static_cast<DamageCause>(0x13);
+    Damage.Cause = DamageCause::ShieldBattery;
     Damage.InflictorId = get_id();
     Damage.InflictorOwner = csimple()->OwnerPlayer;
 
@@ -750,7 +751,7 @@ void EqObj::process_dock_queue(float Dt)
     std::list<FDockRequest>::iterator It = DockQueue.begin();
     while (It != DockQueue.end())
     {
-        GameObject* const ShipObj = OwnerSystem->find_object(It->ShipId, 0x7f0000u);   // FUN_06d0c8d0
+        GameObject* const ShipObj = OwnerSystem->find_object(It->ShipId, OBJ_SHIP_MASK);   // FUN_06d0c8d0
         if (ShipObj == nullptr)
         {
             // The ship is gone.
@@ -799,11 +800,11 @@ void EqObj::process_dock_queue(float Dt)
 
         // This bay's own type bits.
         unsigned int const Bits = get_type_bits();
-        if (Bits == (Bits & 0x440u))
+        if (Bits == (Bits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE)))
         {
             OwnerSystem->complete_dock(ShipObj, this);   // FUN_06d0c970
         }
-        else if ((Bits & 0x800u) != 0)
+        else if ((Bits & OBJ_JUMP_HOLE) != 0)
         {
             OwnerSystem->complete_dock(ShipObj, this);
         }
@@ -895,7 +896,7 @@ bool EqObj::update(float Dt)
     {
         double const Now = Timing::read();
         DamageList Repair;
-        Repair.Cause = static_cast<DamageCause>(0x1a);
+        Repair.Cause = DamageCause::WeaponRecovery;
 
         // Relative health <= 0 (unordered skips) and more than 60 s
         // (DAT_06d65530, double) since the last damage: root back to max.
@@ -958,7 +959,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
         {
             // An AI object killed outright (kind 1) first gets its death fuse,
             // if the controller hands out a lifetime.
-            if (Kind == 1)
+            if (Kind == DESTROY_FUSE)
             {
                 // Controller event 0x38.
                 FDeathFuseEvent Ev;
@@ -982,7 +983,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
                         {
                             unsigned int SelfId = get_id();
                             FBehaviorManagerEvent Event;
-                            Event.Type = 7;
+                            Event.Type = FBehaviorManagerEvent::kEventObjectDying;
                             Event.Data = &SelfId;
                             Behavior->OnEvent(&Event);
                         }
@@ -999,12 +1000,12 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
                 }
             }
         }
-        else if (!SinglePlayer() && Kind == 1 && is_player())
+        else if (!SinglePlayer() && Kind == DESTROY_FUSE && is_player())
         {
             // A player's ship died in multiplayer: control message 0x14 with the
             // player's id to every active player (FUN_06d19110), counted in
             // ServerStats+0x10.
-            Server_BroadcastGroupControl(0x14, owner_player());
+            Server_BroadcastGroupControl(kGroupMsgPlayerDied, owner_player());
             ++GServerStats.PlayerDeathCount;
         }
     }
@@ -1019,14 +1020,14 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
     Ev.OwnerPlayer = csimple()->OwnerPlayer;
     Ev.Kind = Kind;
     Ev.Position = get_position();                                  // vt +0x00
-    if (Kind == 1)
+    if (Kind == DESTROY_FUSE)
         collect_droppable_equip(Ev.DroppedEquip);                  // vt +0x1f4
     Server_ControllerDispatch(0, pub::Controller::EMessage::ObjectDestroyed, &Ev);
 
     OwnerSystem->on_object_destroyed(this, Kind);                  // FUN_06d0b160
     destroy_notify();                                              // vt +0x15c
 
-    if (Kind == 1)
+    if (Kind == DESTROY_FUSE)
     {
         explode();                                                 // vt +0x1f0
         if (SinglePlayer() || csimple()->OwnerPlayer == 0)
@@ -1174,22 +1175,22 @@ void EqObj::create_server_equip(unsigned short EquipId)
     // constructors here).
     switch (Equip->Type)
     {
-    case 0x80:       // new(0x18), vt .rdata:06d655ac
+    case EquipTypeGun:       // new(0x18), vt .rdata:06d655ac
         ServerEquips.push_back(new SrvGun(Equip, this));
         break;
-    case 0x40:       // new(0x18), vt .rdata:06d65590
+    case EquipTypeCmDropper:       // new(0x18), vt .rdata:06d65590
         ServerEquips.push_back(new SrvCounterMeasureDropper(Equip, this));
         break;
-    case 0x20:       // new(0x18), vt .rdata:06d65574
+    case EquipTypeMineDropper:       // new(0x18), vt .rdata:06d65574
         ServerEquips.push_back(new SrvMineDropper(Equip, this));
         break;
-    case 0x400:      // new(0x0c), vt .rdata:06d65564
+    case EquipTypeThruster:      // new(0x0c), vt .rdata:06d65564
         ServerEquips.push_back(new SrvThruster(Equip, this));
         break;
-    case 0x200000:   // new(0x14)
+    case EquipTypeRepairDroid:   // new(0x14)
         ServerEquips.push_back(new SrvRepairDroid(Equip, this));
         break;
-    case 0x100000:   // new(0x0c), vt .rdata:06d65544
+    case EquipTypeTractor:   // new(0x0c), vt .rdata:06d65544
         ServerEquips.push_back(new SrvTractor(Equip, this));
         break;
     default:         // no wrapper
@@ -1395,7 +1396,7 @@ void EqObj::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
     if (Behavior != nullptr)
     {
         FBehaviorManagerEvent Event;
-        Event.Type = 1;
+        Event.Type = FBehaviorManagerEvent::kEventMunitionHit;
         Event.Data = const_cast<FMunitionImpact*>(&Hit);
         Behavior->OnEvent(&Event);
     }
@@ -1516,7 +1517,7 @@ void EqObj::explosion_hit_subobjs(ExplosionDamageEvent const& Blast, DamageList&
 
     // The attached equipment (const traversal, mask 0x1ee0; the manager is
     // fixed before the loop).
-    CEquipTraverser Walk(0x1ee0);
+    CEquipTraverser Walk(kEquipMaskAttachedNoShield);
     CEquipManager const& Equipment = Ce->EquipManager;
     for (CEquip const* Equip = Equipment.Traverse(Walk); Equip != nullptr; Equip = Equipment.Traverse(Walk))
     {
@@ -1680,7 +1681,7 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                 // Fate 4 asks the controller (event 0x13) and takes the desc it
                 // hands back; fate 5 reads it.
                 EquipDesc Desc;
-                if (static_cast<int>(Fate) == 4)
+                if (Fate == DamageEntry::SubObjFate::Loot)
                 {
                     FEquipLootEvent Event;
                     Event.SystemId = 0;
@@ -1724,7 +1725,7 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                         // Cause 0x16 drops it in mode 1, anything else 2.
                         Record.ContentsHitPts = Desc.Health * Record.ContentsArch->HitPts;
                         Record.Count = Desc.Count;
-                        int const Mode = (static_cast<int>(Out.Cause) == 0x16) ? 1 : 2;
+                        int const Mode = (Out.Cause == DamageCause::CargoPodJettison) ? 1 : 2;
                         OwnerSystem->create_loot(get_id(), Mode, &Record, 1);
 
                         // The visit recorded (FUN_06d4b270), owner re-read.
@@ -1786,7 +1787,7 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
             {
                 // Event 0x13 for fate 4.
                 EquipDesc Desc;
-                if (static_cast<int>(Fate) == 4)
+                if (Fate == DamageEntry::SubObjFate::Loot)
                 {
                     FEquipLootEvent Event;
                     Event.SystemId = 0;
@@ -1834,7 +1835,7 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                             float const HitPts = Desc.Health * Record.ContentsArch->HitPts;
                             Record.ContentsHitPts = HitPts;
                             Record.HitPts = HitPts;
-                            int const Mode = (static_cast<int>(Out.Cause) == 0x16) ? 1 : 2;
+                            int const Mode = (Out.Cause == DamageCause::CargoPodJettison) ? 1 : 2;
                             OwnerSystem->create_loot(get_id(), Mode, &Record, 1);
                         }
                     }
@@ -2038,7 +2039,7 @@ bool EqObj::damage_shield(CEShield* Shield, float Damage, DamageList& Out)
 void EqObj::destroy_group(CArchGroup* Group, DamageEntry::SubObjFate Fate, DamageList& Out,
                           bool bWithChildren)
 {
-    if (Group->State == 2 || Group->State == 3)
+    if (Group->State == CArchGroup::STATE_KILLED || Group->State == CArchGroup::STATE_DESTROYED)
         return;
 
     // A group with hit points left (or unordered) is destroyed regardless; an
@@ -2067,7 +2068,7 @@ bool EqObj::damage_group(CArchGroup* Group, float Damage, DamageList& Out)
     if (Damage == 0.0f)
         return false;
     // Killed (2) or destroyed (3) groups are done.
-    if (Group->State == 2 || Group->State == 3)
+    if (Group->State == CArchGroup::STATE_KILLED || Group->State == CArchGroup::STATE_DESTROYED)
         return false;
     // Only a group with hit points above 0 (or unordered) takes damage.
     if (!(Group->GetHitPoints() > 0.0f) && !(Group->GetHitPoints() != Group->GetHitPoints()))
@@ -2166,7 +2167,7 @@ void EqObj::damage_linked_equipment(CArchGroup* Group, DamageList& Out)
     if (LinkedType == 0)
         return;
 
-    if (LinkedType == 0x100)
+    if (LinkedType == EquipTypeShield)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Server\\Space\\EqObj.cpp", 0x91b,
@@ -2192,7 +2193,7 @@ void EqObj::destroy_group_contents(CArchGroup* Group, DamageList& Out)
 
     // External equipment (mask 0x1fe3) mounted under the group's instance,
     // except types 1 and 2, is destroyed (fate 1).
-    CEquipTraverser Walk(0x1fe3);
+    CEquipTraverser Walk(kEquipMaskExternal);
     CEquipManager const& Equipment = Ce->EquipManager;
     for (CEquip const* Equip = Equipment.Traverse(Walk); Equip != nullptr; Equip = Equipment.Traverse(Walk))
     {
@@ -2335,7 +2336,7 @@ void EqObj::apply_damage_list(DamageList& Damage)
         !is_destroyed() &&                                         // vt +0x160
         !ceqobj()->bWeaponsOffline)
     {
-        destroy(1, Damage.InflictorId);                            // vt +0x158
+        destroy(DESTROY_FUSE, Damage.InflictorId);                            // vt +0x158
     }
 
     set_in_damage_callback(false);                                 // vt +0x190
@@ -2393,7 +2394,7 @@ static void EqObj_NotifyBehaviorOfDamage(IBehaviorManager* Behavior, FSubObjDama
     Record.RelativeDamage = Ev.RelativeDamage;
     Record.RelativeHealth = Ev.RelativeHealth;
     FBehaviorManagerEvent Event;
-    Event.Type = 0;
+    Event.Type = FBehaviorManagerEvent::kEventDamageTaken;
     Event.Data = &Record;
     Behavior->OnEvent(&Event);
 }
@@ -2497,7 +2498,7 @@ void EqObj::apply_equip_entry(DamageList const& Damage, DamageEntry const& Entry
 
     // A shield-battery list (cause 0x13) boosts the shield instead of setting
     // its hit points.
-    if (static_cast<int>(Damage.Cause) == 0x13)
+    if (Damage.Cause == DamageCause::ShieldBattery)
     {
         static_cast<CEShield*>(Equip)->ShieldBatteryBoost(Entry.HitPts);
         return;
@@ -2533,7 +2534,7 @@ void EqObj::apply_group_entry(DamageList const& Damage, DamageEntry& Entry)
     {
         if (ceqobj() != nullptr)
             DockQueue.clear();
-        if (static_cast<int>(Entry.Fate) == 4)
+        if (Entry.Fate == DamageEntry::SubObjFate::Loot)
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                   "E:\\FL\\Scratch\\Source\\Server\\Space\\EqObj.cpp", 0xaf5,
@@ -2609,7 +2610,7 @@ void EqObj::apply_power_entry(DamageList const& Damage, DamageEntry const& Entry
     Ev.SystemId = OwnerSystem->SystemInfo->NicknameId;
     Ev.InflictorId = Damage.InflictorId;
     Ev.ObjId = get_id();
-    Ev.EquipType = 0x40000;
+    Ev.EquipType = EquipTypePower;
     Ev.Cause = Damage.Cause;
     Ev.Damage = Ce->Power - Entry.HitPts;
     Ev.RelativeDamage = Ev.Damage / Ce->MaxPower;

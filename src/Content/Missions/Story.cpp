@@ -180,7 +180,7 @@ namespace
         FContentPlayerState* PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState == nullptr)
             return;
-        if (NextChapter == 42)
+        if (NextChapter == kStoryChapterComplete)
         {
             PlayerState->RecalculateRank();
             return;
@@ -211,40 +211,40 @@ namespace
         switch (MissionNum)
         {
         case 5:
-            StartMission(7, "Mission_02");
+            StartMission(kStoryChapterMission02, "Mission_02");
             break;
         case 9:
-            StartMission(10, "Mission_03");
+            StartMission(kStoryChapterMission03, "Mission_03");
             break;
         case 12:
-            StartMission(13, "Mission_04");
+            StartMission(kStoryChapterMission04, "Mission_04");
             break;
         case 15:
-            StartMission(16, "Mission_05");
+            StartMission(kStoryChapterMission05, "Mission_05");
             break;
         case 18:
-            StartMission(19, "Mission_06");
+            StartMission(kStoryChapterMission06, "Mission_06");
             break;
         case 21:
-            StartMission(22, "Mission_07");
+            StartMission(kStoryChapterMission07, "Mission_07");
             break;
         case 24:
-            StartMission(25, "Mission_08");
+            StartMission(kStoryChapterMission08, "Mission_08");
             break;
         case 27:
-            StartMission(28, "Mission_09");
+            StartMission(kStoryChapterMission09, "Mission_09");
             break;
         case 30:
-            StartMission(31, "Mission_10");
+            StartMission(kStoryChapterMission10, "Mission_10");
             break;
         case 33:
-            StartMission(34, "Mission_11");
+            StartMission(kStoryChapterMission11, "Mission_11");
             break;
         case 36:
-            StartMission(37, "Mission_12");
+            StartMission(kStoryChapterMission12, "Mission_12");
             break;
         case 39:
-            StartMission(40, "Mission_13");
+            StartMission(kStoryChapterMission13, "Mission_13");
             break;
         default:
             break;
@@ -297,7 +297,7 @@ namespace
         }
         case 20:
             FinishMission(ControllerToDestroy, 21);
-            StartMission(22, "Mission_07");
+            StartMission(kStoryChapterMission07, "Mission_07");
             break;
         case 23:
             FinishMission(ControllerToDestroy, 24);
@@ -307,19 +307,19 @@ namespace
             break;
         case 29:
             FinishMission(ControllerToDestroy, 30);
-            StartMission(31, "Mission_10");
+            StartMission(kStoryChapterMission10, "Mission_10");
             break;
         case 32:
             FinishMission(ControllerToDestroy, 33);
-            StartMission(34, "Mission_11");
+            StartMission(kStoryChapterMission11, "Mission_11");
             break;
         case 35:
             FinishMission(ControllerToDestroy, 36);
-            StartMission(37, "Mission_12");
+            StartMission(kStoryChapterMission12, "Mission_12");
             break;
         case 38:
             FinishMission(ControllerToDestroy, 39);
-            StartMission(40, "Mission_13");
+            StartMission(kStoryChapterMission13, "Mission_13");
             break;
         case 41:
             FinishMission(ControllerToDestroy, 42);
@@ -419,7 +419,7 @@ namespace
         {
         case pub::Controller::EMessage::PlayerWorthChanged:
             // x87: unordered does not exit.
-            if (DeltaWorth != -1.0f && MissionNum != 42 &&
+            if (DeltaWorth != -1.0f && MissionNum != kStoryChapterComplete &&
                 *static_cast<unsigned int const*>(MessageParms) == PlayerId)
                 AdvanceMission();
             break;
@@ -438,7 +438,7 @@ namespace
                 SetShipBoughtReputation();
             break;
         case pub::Controller::EMessage::PlayerMissionChanged:
-            if (DeltaWorth != -1.0f && MissionNum != 42 &&
+            if (DeltaWorth != -1.0f && MissionNum != kStoryChapterComplete &&
                 static_cast<unsigned int const*>(MessageParms)[1] == PlayerId &&
                 (static_cast<unsigned int const*>(MessageParms)[0] & GIdValueMask) == 0)
                 AdvanceMission();

@@ -425,7 +425,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
         Game->ClearColor[0] = Fog[0];
         Game->ClearColor[1] = Fog[1];
         Game->ClearColor[2] = Fog[2];
-        Game->Flags = static_cast<unsigned char>(Game->Flags | 3);
+        Game->Flags = static_cast<unsigned char>(Game->Flags | kGameCameraClearColour | kGameCameraClearDepth);
         GameCameraClear(Game);
     }
 
@@ -662,7 +662,7 @@ void NotifyCinematicView(bool bActive)
     const unsigned Connection = GetPlayerConnectionId();
     const unsigned ShipId = Ship->get_id();
     static_cast<IServer*>(GetLocalServerInterface())
-        ->SPRequestInvincibility(ShipId, bActive, INVINCIBILITY_REASON_5, Connection);
+        ->SPRequestInvincibility(ShipId, bActive, INVINCIBILITY_CAMERA, Connection);
 }
 
 void SetDockingCameraTransform(const float* Csys12)
@@ -849,34 +849,34 @@ int DACOM_API FSpaceCamera::ClassifySphere(const Vector* Center, float Radius)
     const float NearEdge = -Center->z - Radius;
     const float FarEdge = Radius - Center->z;
 
-    int Result = 4;
+    int Result = kSphereInside;
 
     if (FarEdge < this->ZNear)
-        return 1;
+        return kSphereOutside;
     if (NearEdge < this->ZNear)
-        Result = 3;
+        Result = kSphereStraddling;
 
     // The left/right pair, folded into one test by taking |x|. The distance is never rounded
     // to float.
     const double DistX = static_cast<double>(fabsf(Center->x)) * this->PlaneX[0] +
                          static_cast<double>(this->PlaneX[2]) * Center->z;
     if (DistX > Radius)
-        return 1;
+        return kSphereOutside;
     if (DistX > -Radius)
-        Result = 3;
+        Result = kSphereStraddling;
 
     // The top/bottom pair, same shape.
     const double DistY = static_cast<double>(fabsf(Center->y)) * this->PlaneY[1] +
                          static_cast<double>(this->PlaneY[2]) * Center->z;
     if (DistY > Radius)
-        return 1;
+        return kSphereOutside;
     if (DistY > -Radius)
-        Result = 3;
+        Result = kSphereStraddling;
 
     if (NearEdge > this->ZFar)
-        return 1;
+        return kSphereOutside;
     if (FarEdge > this->ZFar)
-        Result = 3;
+        Result = kSphereStraddling;
 
     return Result;
 }

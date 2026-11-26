@@ -88,7 +88,7 @@ void CEThruster::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     if (Owner != nullptr)
     {
         CObject* Candidate = Owner;
-        if ((Candidate->ObjectClass & 0x503u) == 0x503u)
+        if ((Candidate->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
             Ship = (CShip*)(Owner);
     }
 

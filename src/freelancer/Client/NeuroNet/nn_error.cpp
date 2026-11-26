@@ -138,9 +138,9 @@ void NnError::Draw()
 bool NnError::KeyEvent(unsigned Key, unsigned char* Modifiers)
 {
     // LAB_00472940: only with modifier bit 1 set, Escape or Enter dismisses.
-    if ((*Modifiers & 0x02) == 0)
+    if ((*Modifiers & kWin3DKeyPressed) == 0)
         return false;
-    if (Key != 0x1b && Key != 0xd)
+    if (Key != VK_ESCAPE && Key != VK_RETURN)
         return false;
     Dismiss();
     return true;
@@ -188,7 +188,7 @@ namespace
         Vector const Zero = {0.0f, 0.0f, 0.0f};
         Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
         if (Dialog->Title != nullptr)
-            Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags & 0xfc);
+            Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags & ~(kWin3DActive | kWin3DVisible));
         if (Dialog->Text != nullptr)
             Dialog->Text->SetProperty(kTextPropSetIds, Ids, 0);
         Dialog->CaptureMouse();
@@ -256,7 +256,7 @@ bool NnErrorRunModalMessage(char const* Message)
             Vector const Zero = {0.0f, 0.0f, 0.0f};
             Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
             if (Dialog->Title != nullptr)
-                Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags | 0x03);
+                Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags | kWin3DActive | kWin3DVisible);
             wchar_t Wide[0x400];
             mbstowcs(Wide, Message, 0x400);
             if (Dialog->Text != nullptr)

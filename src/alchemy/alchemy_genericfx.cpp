@@ -25,7 +25,6 @@ namespace AlchemyImpl
     namespace
     {
         // The base set's hashes (.data 0x062572b0 table below).
-        const unsigned long kNodeClassNameHash = 0xF54EF296u;
         const unsigned long kNodeNameHash = 0xEFA8CE01u;
         const unsigned long kNodeLifeSpanHash = 0xF27FDE7Du;
         const unsigned long kNodeTransformHash = 0xE13A59A1u;
@@ -33,10 +32,10 @@ namespace AlchemyImpl
 
         // The base set's property table, .data 0x062572b0 (walked by FUN_0623f960).
         const FNodePropertyRow kNodePropertyRows[] = {
-            {"Node_ClassName", kNodeClassNameHash, 0x103, 0.0f, 0.0f},
-            {"Node_Name", kNodeNameHash, 0x103, 0.0f, 0.0f},
-            {"Node_LifeSpan", kNodeLifeSpanHash, 3, 0.0f, kNodePropertyRowMax},
-            {"Node_Transform", kNodeTransformHash, 0x105, 0.0f, 0.0f},
+            {"Node_ClassName", kNodeClassNameHash, kFxPropName, 0.0f, 0.0f},
+            {"Node_Name", kNodeNameHash, kFxPropName, 0.0f, 0.0f},
+            {"Node_LifeSpan", kNodeLifeSpanHash, kFxPropFloat, 0.0f, kNodePropertyRowMax},
+            {"Node_Transform", kNodeTransformHash, kFxPropTransform, 0.0f, 0.0f},
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
 
@@ -285,8 +284,8 @@ namespace AlchemyImpl
           PrimarySizeRamp(nullptr), TexFrameRamp(nullptr), AxisOverrideRamp(nullptr),
           FrameRamp(nullptr), CommonTexFrameRamp(nullptr), LocalTransform(nullptr)
     {
-        BlendInfo[0] = 5;
-        BlendInfo[1] = 2;
+        BlendInfo[0] = D3DBLEND_SRCALPHA;
+        BlendInfo[1] = D3DBLEND_ONE;
     }
 
     // The ramps and the transform are smart-pointer members in retail; their teardown
@@ -452,8 +451,8 @@ namespace AlchemyImpl
         TexInfoLibrary()->ReleaseTextureRecord(Record);
         Handle = Id;
         Frame[0] = 0.0f;
-        TexInfoLibrary()->SetWrapMode(Id, 0);
-        TexInfoLibrary()->GetFrame(Handle, -1, reinterpret_cast<unsigned long*>(Frame));
+        TexInfoLibrary()->SetWrapMode(Id, kTextureWrapClamp);
+        TexInfoLibrary()->GetFrame(Handle, kTextureFrameCurrent, reinterpret_cast<unsigned long*>(Frame));
     }
 
     // FUN_06244f30.
@@ -622,7 +621,7 @@ namespace AlchemyImpl
             *OutSlot = &NodeLocalXform_;
             return GR_OK;
         }
-        return static_cast<GENRESULT>(0xfffffffe);
+        return GR_INVALID_PARMS;
     }
 
     // FUN_062400f0.
@@ -632,16 +631,16 @@ namespace AlchemyImpl
         if (Index == 0)
         {
             std::memcpy(&NodeWorldXform_, Source, sizeof(NodeWorldXform_));
-            NodeFlags_ |= 0x8;
+            NodeFlags_ |= kNodeFlagWorldXformSet;
             return GR_OK;
         }
         if (Index == 1)
         {
             std::memcpy(&NodeLocalXform_, Source, sizeof(NodeLocalXform_));
-            NodeFlags_ |= 0x4;
+            NodeFlags_ |= kNodeFlagLocalXformSet;
             return GR_OK;
         }
-        return static_cast<GENRESULT>(0xfffffffe);
+        return GR_INVALID_PARMS;
     }
 
     // FUN_062401a0. The first argument is never read; every branch takes the parent from
@@ -657,15 +656,15 @@ namespace AlchemyImpl
                                                                    const Transform* Parent)
     {
         const unsigned long Flags = NodeFlags_;
-        if ((Flags & 0x8) != 0)
+        if ((Flags & kNodeFlagWorldXformSet) != 0)
         {
-            NodeFlags_ = Flags & ~0x8ul;
+            NodeFlags_ = Flags & ~static_cast<unsigned long>(kNodeFlagWorldXformSet);
             return GR_OK;
         }
 
-        const bool bSkipAnim = (Flags & 0x2) != 0 || FindNodeAnimatedTransform()->IsIdentity() != 0;
+        const bool bSkipAnim = (Flags & kNodeFlagSkipNodeAnim) != 0 || FindNodeAnimatedTransform()->IsIdentity() != 0;
 
-        if ((Flags & 0x4) == 0)
+        if ((Flags & kNodeFlagLocalXformSet) == 0)
         {
             if (bSkipAnim)
             {
@@ -774,7 +773,7 @@ namespace AlchemyImpl
         Age_ += Dt;
         if (Age_ > Duration_)
         {
-            NodeFlags_ |= 1;
+            NodeFlags_ |= kNodeFlagLifetimeOver;
         }
         return GR_OK;
     }

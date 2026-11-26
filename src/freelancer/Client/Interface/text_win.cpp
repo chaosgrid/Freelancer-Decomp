@@ -60,7 +60,7 @@ bool TextWin::Create(Win3D* NewParent, void* /*Data*/)
     // FUN_004b5180 (RET 8).
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
-    Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
+    Flags = static_cast<unsigned char>((Flags & ~kWin3DUnregistered) | kWin3DActive | kWin3DVisible);
     InitTextDefaults();
     Width = 0.1f;
     Height = 0.1f;

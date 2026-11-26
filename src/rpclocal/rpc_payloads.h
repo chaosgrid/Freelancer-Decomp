@@ -850,16 +850,6 @@ struct FPayloadServerMiscObjUpdate {
 // are not VC6's 0x10 bytes each); FPacket_FLPACKET_SERVER_MISCOBJUPDATE holds it as a
 // typed member, so the class is 0x20 + sizeof(this struct), not operator new(0x6c).
 
-const unsigned short kMiscObjUpdateFlagGroupId     = 0x0001;
-const unsigned short kMiscObjUpdateFlagMission     = 0x0002;
-const unsigned short kMiscObjUpdateFlagPlayerId    = 0x0004;
-const unsigned short kMiscObjUpdateFlagObjectId    = 0x0008;
-const unsigned short kMiscObjUpdateFlagText        = 0x0010;
-const unsigned short kMiscObjUpdateFlagAffiliation = 0x0020;
-const unsigned short kMiscObjUpdateFlagRank        = 0x0040;
-const unsigned short kMiscObjUpdateFlagSystemId    = 0x0080;
-const unsigned short kMiscObjUpdateFlagIds         = 0x0100;
-
 // The sender variant, prepended to the argument dwords the way SendTradePacket prepends
 // PLAYER_TRADE's sub-type. One value per retail sender slot (113..120), in slot order,
 // named after the IClient::SendServerMiscObjUpdate* suffix.

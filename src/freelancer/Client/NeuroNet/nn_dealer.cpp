@@ -235,13 +235,13 @@ void NnDealer::CreateControls()
         Vector const InfoOffset = {0.09f, -0.537f, 0.0f};
         CreateRichTextWin("InfoCard_Info", 1.09f, 0.255f, &InfoOffset, true);
         InfoCardFacts = CreateRichTextWin("InfoCard_Facts", 0.5f, 0.265f, &InfoOffset, true); // +0x398
-        InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags & 0xfc);
+        InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags & ~(kWin3DActive | kWin3DVisible));
         Vector const StatsOffset = {0.69f, -0.537f, 0.0f};
         InfoCardStats = CreateRichTextWin("InfoCard_Stats", 0.29f, 0.265f, &StatsOffset, true); // +0x39c
-        InfoCardStats->Flags = static_cast<unsigned char>(InfoCardStats->Flags & 0xfc);
+        InfoCardStats->Flags = static_cast<unsigned char>(InfoCardStats->Flags & ~(kWin3DActive | kWin3DVisible));
         Vector const ValuesOffset = {0.99f, -0.537f, 0.0f};
         InfoCardValues = CreateRichTextWin("InfoCard_Values", 0.17f, 0.265f, &ValuesOffset, true); // +0x3a0
-        InfoCardValues->Flags = static_cast<unsigned char>(InfoCardValues->Flags & 0xfc);
+        InfoCardValues->Flags = static_cast<unsigned char>(InfoCardValues->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     // "Inventory_Scroll" (FUN_005a17e0); the result is not kept.
@@ -425,7 +425,7 @@ void NnDealer::CreateControls()
                                                    nullptr, &DamageHalfExtents, 1, 0x43c,
                                                    G_NnPaletteGreen,
                                                    G_NnPaletteGreen); // FUN_005a1080
-        TransferItemDamage->SetProperty(0x19, 0x10000, 0);
+        TransferItemDamage->SetProperty(kWinPropRenderFlags, kRenderArgNoWireRender, 0);
     }
     {
         // x = the price column + 0.728 (the float at 0x005d1b40).
@@ -519,8 +519,8 @@ void NnDealer::CreateControls()
         Vector const EditPosition = {0.864f, TextY, 0.0f};
         QuantityEdit = CreateEditControl("QuantityEdit", "Normal", &EditPosition, nullptr, 0.384f,
                                          0.06f, 1.6f, 0, 0, 0);
-        QuantityEdit->SetProperty(0x43, 1, 8);
-        QuantityEdit->SetProperty(0x44, 1, 0);
+        QuantityEdit->SetProperty(kEditPropEditable, 1, 8);
+        QuantityEdit->SetProperty(kEditPropDigitsOnly, 1, 0);
     }
 
     ContinueButton = nullptr;   // +0x9e0
@@ -580,7 +580,7 @@ void NnDealer::Update()
     // while it has none, this window's three info card panes.
     if (Inventory != nullptr)
     {
-        Flags = static_cast<unsigned char>((Flags & ~2u) | (Inventory->Flags & 2u));
+        Flags = static_cast<unsigned char>((Flags & ~kWin3DVisible) | (Inventory->Flags & kWin3DVisible));
         if (Inventory->InfoCardFacts == nullptr)
         {
             Inventory->InfoCardFacts = InfoCardFacts;   // +0x398
@@ -663,7 +663,7 @@ void NnDealer::Update()
     // plays UI sound 0x25 on a buy (WireStaticControl +0x380).
     if (TradeMode != kTradeModeCommodity)
     {
-        TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags & 0xfc);
+        TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags & ~(kWin3DActive | kWin3DVisible));
     }
     else
     {
@@ -727,7 +727,7 @@ void NnDealer::Update()
             {
                 unsigned const GoodId = GetSelectedMarketGood(); // FUN_00483580
                 MaxCount = GetMaxBuyCount(GoodId, &Reason);      // FUN_004837a0
-                if (Reason == 0 || Reason == 2)
+                if (Reason == kBuyReasonNone || Reason == kBuyReasonNoCredits)
                 {
                     // Docked (DAT_0066873c, unsigned) at a base with a market
                     // (FUN_0043a510 on DAT_00668708, null-tested).
@@ -749,13 +749,13 @@ void NnDealer::Update()
                         if (SinglePlayer() && Rank >= 0 && Rank < 0x3e7 &&
                             static_cast<double>(Rank) < static_cast<double>(RankRequired))
                         {
-                            Reason = 5;
+                            Reason = kBuyReasonRankTooLow;
                             MaxCount = 0;
                         }
                         else if (static_cast<double>(BaseFeeling) <
                                  static_cast<double>(FeelingRequired))
                         {
-                            Reason = 6;
+                            Reason = kBuyReasonFeelingTooLow;
                             MaxCount = 0;
                         }
 
@@ -770,13 +770,13 @@ void NnDealer::Update()
                             if (View->FindHardpointForGood(GoodId, true) == nullptr)
                             {
                                 MaxCount = 0;
-                                Reason = 7;
+                                Reason = kBuyReasonNoHardpoint;
                             }
                             else if (MaxCount > 0 &&
                                      View->FindHardpointForGood(GoodId, false) == nullptr)
                             {
                                 MaxCount = 0;
-                                Reason = 8;
+                                Reason = kBuyReasonNoFreeHardpoint;
                             }
                         }
                     }
@@ -806,7 +806,7 @@ void NnDealer::Update()
                                 if (MaxCount >= Fit)
                                     MaxCount = Fit;
                                 if (MaxCount == 0)
-                                    Reason = 4;
+                                    Reason = kBuyReasonShipHoldFull;
                             }
                         }
                     }
@@ -830,7 +830,7 @@ void NnDealer::Update()
                             if (MaxCount <= 0)
                             {
                                 MaxCount = 0;
-                                Reason = bNanobots ? 9 : 10;
+                                Reason = bNanobots ? kBuyReasonNanobotLimit : kBuyReasonShieldBatteryLimit;
                             }
                         }
                     }
@@ -854,17 +854,17 @@ void NnDealer::Update()
                 // Why nothing can be bought.
                 switch (Reason)
                 {
-                case 1: ShowErrorText(0x47e, 0); break;
-                case 2: ShowErrorText(0x47f, 0); break;
-                case 3: ShowErrorText(0x480, 0); break;
-                case 4: ShowErrorText(0x490, 0); break;
-                case 5: ShowErrorText(0x61b, static_cast<int>(RankRequired)); break; // ftol
-                case 6: ShowErrorText(0x61c, 0); break;
-                case 7: ShowErrorText(0x637, 0); break;
-                case 8: ShowErrorText(0x63f, 0); break;
-                case 9: ShowErrorText(0x3a4, 0); break;
-                case 10: ShowErrorText(0x3a5, 0); break;
-                case 11: ShowErrorText(0x3cf, 0); break;
+                case kBuyReasonHoldFull: ShowErrorText(0x47e, 0); break;
+                case kBuyReasonNoCredits: ShowErrorText(0x47f, 0); break;
+                case kBuyReasonNoShip: ShowErrorText(0x480, 0); break;
+                case kBuyReasonShipHoldFull: ShowErrorText(0x490, 0); break;
+                case kBuyReasonRankTooLow: ShowErrorText(0x61b, static_cast<int>(RankRequired)); break; // ftol
+                case kBuyReasonFeelingTooLow: ShowErrorText(0x61c, 0); break;
+                case kBuyReasonNoHardpoint: ShowErrorText(0x637, 0); break;
+                case kBuyReasonNoFreeHardpoint: ShowErrorText(0x63f, 0); break;
+                case kBuyReasonNanobotLimit: ShowErrorText(0x3a4, 0); break;
+                case kBuyReasonShieldBatteryLimit: ShowErrorText(0x3a5, 0); break;
+                case kBuyReasonAmmoLimit: ShowErrorText(0x3cf, 0); break;
                 default: break;
                 }
             }
@@ -875,12 +875,12 @@ void NnDealer::Update()
             TransferItemQuantity->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             if (MaxCount > 1)
             {
-                QuantityEdit->SetProperty(0x43, 1, 8);
+                QuantityEdit->SetProperty(kEditPropEditable, 1, 8);
                 QuantityPrompt->SetProperty(kWinPropHide, 0, 0);
             }
             else
             {
-                QuantityEdit->SetProperty(0x43, 0, 0);
+                QuantityEdit->SetProperty(kEditPropEditable, 0, 0);
                 QuantityPrompt->SetProperty(kWinPropHide, 1, 0);
             }
             Archetype::Equipment* const Shown = Archetype::GetEquipment(TransferItemArchId);
@@ -904,9 +904,9 @@ void NnDealer::Update()
             swprintf(ToolTipText, 0xff, L"%d", TransferItemMaxCount);
             TransferItemQuantity->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             if (TransferItemMaxCount > 1)
-                QuantityEdit->SetProperty(0x43, 1, 8);
+                QuantityEdit->SetProperty(kEditPropEditable, 1, 8);
             else
-                QuantityEdit->SetProperty(0x43, 0, 0);
+                QuantityEdit->SetProperty(kEditPropEditable, 0, 0);
         }
 
         FormatGroupedNumber(ToolTipText, Quantity * TransferItemUnitPrice, -1);
@@ -918,9 +918,9 @@ void NnDealer::Update()
     if (TradeMode == kTradeModeShip)
     {
         if (SelectedIndex == -1 && Inventory->SelectedIndex == -1)
-            WelcomeHelp->Flags = static_cast<unsigned char>(WelcomeHelp->Flags | 3);
+            WelcomeHelp->Flags = static_cast<unsigned char>(WelcomeHelp->Flags | kWin3DActive | kWin3DVisible);
         else
-            WelcomeHelp->Flags = static_cast<unsigned char>(WelcomeHelp->Flags & 0xfc);
+            WelcomeHelp->Flags = static_cast<unsigned char>(WelcomeHelp->Flags & ~(kWin3DActive | kWin3DVisible));
 
         int const OwnResale = NnLoadoutResaleValue(&Ship.Loadout, &Ship,
                                                    &Inventory->SavedLoadout); // FUN_004c6f70
@@ -987,12 +987,12 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // The row hover goes to NN_Inventory (FUN_00479d10).
         return NnInventory::SetProperty(Msg, A, B);
 
-    case 0x15:
+    case kWinNotifyShipViewPick:
         // The ship view picked an instance -- select the row of its hardpoint.
         SelectHardpoint(Ship.ShipView->GetHardpointOfInstance(static_cast<long>(A))); // FUN_00585e20, FUN_0047e270
         return 0;
 
-    case 0x16:
+    case kWinNotifyShipViewDrop:
     {
         // An item dropped on hardpoint A. The name goes into the argument's slot.
         CacheString Hardpoint;
@@ -1062,7 +1062,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         return 0;
 
-    case 0x45:
+    case kWinNotifyEditChanged:
     {
         // The quantity edit's text changed.
         wchar_t const* const Text = reinterpret_cast<wchar_t const*>(A);
@@ -1261,8 +1261,8 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
     Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : kNnFilterNone); // FUN_004c6a50
 
     // A commodity dealer puts its partner on the cargo filter.
-    if (Inventory != nullptr && TradeMode == kTradeModeCommodity && Inventory->Mode != 4)
-        Inventory->SetMode(4, false); // FUN_0047f240
+    if (Inventory != nullptr && TradeMode == kTradeModeCommodity && Inventory->Mode != kNnFilterCommodity)
+        Inventory->SetMode(kNnFilterCommodity, false); // FUN_0047f240
 
     // The partner's +0x394 names the hardpoint the selected good would go
     // on (this dealer's weapons / equipment filters).
@@ -1270,7 +1270,7 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
     {
         Inventory->PendingMountHardpoint.clear();
         unsigned const GoodId = GetSelectedMarketGood(); // FUN_00483580
-        if (GoodId != 0 && (Mode == 0 || Mode == 2))
+        if (GoodId != 0 && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
         {
             char const* const Hardpoint =
                 Inventory->Ship.ShipView->FindHardpointForGood(GoodId, false); // FUN_00585f20
@@ -1639,7 +1639,7 @@ void NnDealer::SortEquipmentMarketGoods(std::list<FClientMarketGood const*>* Goo
             {
                 // A munition is special when its hp type (+0xa8) is 0xa or 0x23.
                 unsigned const HpType = static_cast<Archetype::Munition const*>(Equip)->HpType;
-                if (HpType == 0xa || HpType == 0x23)
+                if (HpType == HpTypeTorpedo || HpType == HpTypeTorpedoSpecial2)
                     bSpecial = true;
             }
         }
@@ -1699,10 +1699,10 @@ void NnDealer::SortEquipmentMarketGoods(std::list<FClientMarketGood const*>* Goo
 int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
 {
     // FUN_004837a0. Caller: Update.
-    *OutReason = 0;
+    *OutReason = kBuyReasonNone;
     if (GetPlayerShipArchetypeIdRetail() == 0) // FUN_004c3e10
     {
-        *OutReason = 3;
+        *OutReason = kBuyReasonNoShip;
         return 0;
     }
     if (GoodId == 0)
@@ -1722,7 +1722,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
     int Count = static_cast<int>(GetPlayerCreditsRetail() / PackagePrice); // FUN_004c4ce0
     if (Count <= 0)
     {
-        *OutReason = 2;
+        *OutReason = kBuyReasonNoCredits;
         return 0;
     }
 
@@ -1736,7 +1736,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
         {
             Inventory->PendingMountHardpoint.clear();
             unsigned const Selected = GetSelectedMarketGood(); // FUN_00483580
-            if (Selected != 0 && (Mode == 0 || Mode == 2))
+            if (Selected != 0 && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             {
                 char const* const Hardpoint =
                     Inventory->Ship.ShipView->FindHardpointForGood(Selected, false);
@@ -1787,10 +1787,10 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
     // less the count already carried (find_matching_cargo(arch, 0, 1.0f) on the partner's
     // loadout); none left -- reason 9 / 10 and n = 0.
     int const PartnerMode = Inventory->Mode;
-    if (PartnerMode == 0 || PartnerMode == 2 || PartnerMode == 3)
+    if (PartnerMode == kNnFilterWeapons || PartnerMode == kNnFilterEquipment || PartnerMode == kNnFilterCargoBay)
     {
         bool const bPackedGood =
-            PartnerMode == 3 && (ArchId == G_NanobotArchId || ArchId == G_ShieldBatteryArchId);
+            PartnerMode == kNnFilterCargoBay && (ArchId == G_NanobotArchId || ArchId == G_ShieldBatteryArchId);
         if (!bPackedGood && Count > 1)
             Count = 1;
 
@@ -1811,7 +1811,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
                         Count = Room;
                     if (Count <= 0)
                     {
-                        *OutReason = 9;
+                        *OutReason = kBuyReasonNanobotLimit;
                         Count = 0;
                     }
                 }
@@ -1826,7 +1826,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
                         Count = Room;
                     if (Count <= 0)
                     {
-                        *OutReason = 10;
+                        *OutReason = kBuyReasonShieldBatteryLimit;
                         Count = 0;
                     }
                 }
@@ -1839,7 +1839,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
     // returns n as it stands.
     if (Inventory->Mode == 1)
     {
-        if (*OutReason != 0)
+        if (*OutReason != kBuyReasonNone)
             return Count;
         int Room = MAX_PLAYER_AMMO;
         EquipDesc const* const Carried = Inventory->Ship.Loadout.find_matching_cargo(ArchId, 0, 1.0f);
@@ -1849,17 +1849,17 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
             Count = Room;
         if (Count <= 0)
         {
-            *OutReason = 11;
+            *OutReason = kBuyReasonAmmoLimit;
             return 0;
         }
     }
 
     // A reason, or a positive hold cap, returns n; otherwise reason 1, 0.
-    if (*OutReason != 0)
+    if (*OutReason != kBuyReasonNone)
         return Count;
     if (HoldCap > 0)
         return Count;
-    *OutReason = 1;
+    *OutReason = kBuyReasonHoldFull;
     return 0;
 }
 

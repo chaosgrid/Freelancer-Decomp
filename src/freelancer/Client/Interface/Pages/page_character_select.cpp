@@ -177,12 +177,12 @@ namespace
     {
         if (bLive)
         {
-            Button->Flags = static_cast<unsigned char>(Button->Flags | 1);
+            Button->Flags = static_cast<unsigned char>(Button->Flags | kWin3DActive);
             Button->bInteractive = 1;
         }
         else
         {
-            Button->Flags = static_cast<unsigned char>(Button->Flags & 0xfe);
+            Button->Flags = static_cast<unsigned char>(Button->Flags & ~kWin3DActive);
             Button->bInteractive = 0;
         }
     }
@@ -232,7 +232,7 @@ PageCharacterSelect::PageCharacterSelect()
     , DetailsBoxHome{0.0f, 0.0f, 0.0f}
     , SlideT(0.0)
     , bLeaving(0)
-    , LeaveDirection(0)
+    , LeaveDirection(kCharSelectLeaveNone)
     , bLoadRequested(0)
     , bIntroBaseLeft(0)
 {
@@ -314,7 +314,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
     RegisterEvent(USER_CANCEL);
 
     // Tip mode 3: one tip per cell.
-    CharacterTable->SetTipMode(3);
+    CharacterTable->SetTipMode(kTableTipCell);
     CharacterTable->SetToolTipEnabled(true);
     UpPip = CharacterTable->GetDeviceTRC()->create_image("interface\\intro\\images\\uppip.bmp");
     DownPip =
@@ -469,7 +469,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
 
     SlideT = -1.0;
     bLeaving = 0;
-    LeaveDirection = -1;
+    LeaveDirection = kCharSelectLeaveMainMenu;
 
     LoadCharacter->SetSkipUpload(true);
     NewCharacter->SetSkipUpload(true);
@@ -655,23 +655,23 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     // FUN_00569670.
     if (Msg == kWinMsgCommand)
     {
-        PlayOrRewindUiSoundSlot(0);
-        int Direction = 0;
+        PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
+        int Direction = kCharSelectLeaveNone;
         switch (A)
         {
-        case 0x3e9:
-            Direction = -1;
+        case kCharSelectCmdMainMenu:
+            Direction = kCharSelectLeaveMainMenu;
             break;
-        case 0x3ea:
-            Direction = -2;
+        case kCharSelectCmdBack:
+            Direction = kCharSelectLeaveBack;
             break;
-        case 0x3001:
-            Direction = 2;
+        case kCharSelectCmdNew:
+            Direction = kCharSelectLeaveNew;
             break;
-        case 0x3003:
-            Direction = 1;
+        case kCharSelectCmdLoad:
+            Direction = kCharSelectLeaveLoad;
             break;
-        case 0x3002:
+        case kCharSelectCmdDelete:
         {
             // Delete: the confirm box with the selected character's name.
             unsigned SelectedRow = A;
@@ -712,7 +712,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         HideWin3D(Title);
         HideWin3D(CharacterTable);
         HideWin3D(CharacterScroll);
-        PlayUiSoundSlot(0x1b);
+        PlayUiSoundSlot(kUiSoundMotionSwish);
         DisableToolTips();
         LeaveDirection = Direction;
         return true;
@@ -887,7 +887,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         if (static_cast<uintptr_t>(A) != reinterpret_cast<uintptr_t>(CharacterTable))
             return false;
         BeginLeave();
-        LeaveDirection = 1;
+        LeaveDirection = kCharSelectLeaveLoad;
         return true;
     }
 
@@ -1029,7 +1029,7 @@ void PageCharacterSelect::Update()
         }
 
         if (SlideT > -0.5 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b);
+            PlayUiSoundSlot(kUiSoundMotionSwish);
     }
     else if (bLeaving != 0)
     {
@@ -1075,11 +1075,11 @@ void PageCharacterSelect::Update()
             HideWin3D(MotdBox);
             HideWin3D(ServerDetailsBox);
             bLeaving = 0;
-            if (LeaveDirection == 1)
+            if (LeaveDirection == kCharSelectLeaveLoad)
             {
                 bLoadRequested = 1;
             }
-            else if (LeaveDirection == 2)
+            else if (LeaveDirection == kCharSelectLeaveNew)
             {
                 // The character-create pick: faction record 0, its id and the first key of each
                 // set, with no empty test (as retail).
@@ -1094,7 +1094,7 @@ void PageCharacterSelect::Update()
                 G_CharacterCreateSelection.Info.PilotId = *Faction.Pilots.begin();
                 Result = kMenuStateCharacterCreate;
             }
-            else if (LeaveDirection == -2)
+            else if (LeaveDirection == kCharSelectLeaveBack)
             {
                 ShutdownServerConnection();
                 Result = kMenuStateMainMenu;
@@ -1168,7 +1168,7 @@ void PageCharacterSelect::BeginLeave()
     HideWin3D(Title);
     HideWin3D(CharacterTable);
     HideWin3D(CharacterScroll);
-    PlayUiSoundSlot(0x1b);
+    PlayUiSoundSlot(kUiSoundMotionSwish);
     DisableToolTips(); // inlined in retail
 }
 

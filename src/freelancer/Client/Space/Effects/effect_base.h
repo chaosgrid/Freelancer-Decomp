@@ -18,6 +18,13 @@ struct FEffectArch;
 struct FVisEffectArch;
 struct FSpaceCamera;
 
+// FEffectBase::Flags08 (+0x08).
+enum EEffectFlag
+{
+    kEffectFlagLive = 0x1,        // FCliEquipLight: set by the owner's effect-list sweep (FUN_004fd040), cleared by UpdateVisibility; IsAlive is this bit
+    kEffectFlagDeactivated = 0x2  // the effect is dead: Start failed, the run time elapsed, or it was frozen to the world
+};
+
 struct FEffectBase
 {
     explicit FEffectBase(unsigned TypeId);

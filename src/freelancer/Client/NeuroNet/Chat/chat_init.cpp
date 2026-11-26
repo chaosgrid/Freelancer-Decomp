@@ -566,7 +566,7 @@ void ChatInit()
     {
         Vector const Position = {0.0f, 0.0f, -1.0f};
         G_ChatGroupControl->SetPosition(&Position);
-        G_ChatGroupControl->Flags = static_cast<unsigned char>(G_ChatGroupControl->Flags & 0xfc);
+        G_ChatGroupControl->Flags = static_cast<unsigned char>(G_ChatGroupControl->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 }
 
@@ -841,7 +841,7 @@ namespace
 
         G_bChatMsgWinWanted = false;
         if (G_ChatMsgWin != nullptr)
-            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & 0xfc);
+            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & ~(kWin3DActive | kWin3DVisible));
 
         ChatSetInputOpen(false);   // FUN_0046a3c0(0)
 
@@ -878,12 +878,12 @@ void ChatShowMsgWin(bool bShow)
     if (bShow)
     {
         if (G_ChatMsgWin != nullptr)
-            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | 0x03);
+            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | kWin3DActive | kWin3DVisible);
     }
     else
     {
         if (G_ChatMsgWin != nullptr)
-            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & 0xfc);
+            G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 }
 
@@ -1025,9 +1025,9 @@ void ChatCreateMsgWin()
     // Retail does not test the window again here.
     G_ChatMsgWin->Snapshot = G_ChatRecentMessages;
     G_ChatMsgWin->SnapshotGeneration = 0;
-    G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | 0x03);
+    G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | kWin3DActive | kWin3DVisible);
     G_ChatMsgWin->SetDrawFrame(false);
-    G_ChatMsgWin->SetAlignMode(3);
+    G_ChatMsgWin->SetAlignMode(kRichAlignBottom);
     G_ChatMsgWin->SetAutoScrollbar(false);
 }
 

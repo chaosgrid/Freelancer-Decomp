@@ -26,19 +26,19 @@ FreeFlightBehavior::~FreeFlightBehavior()
 void FreeFlightBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
+    Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);
     Flag365 = 1;
     Flag3fc = 0;
     Move.SetAngle38(3.14159274f);                             // 0x40490fdb
     ArrivalRange = 0.0f;
     Move.SetRange3c(0.0f);
     Move.SetEnabled(false);                                   // FUN_062d5a10
-    Move.SetField44(2);                                       // FUN_062d88b0
+    Move.SetField44(kMoveStopFlyThrough);                                       // FUN_062d88b0
     // The lock value is ThrustManager::bAutoAvoidance, read through the ICF fold named
     // EquipDesc::get_temporary.
     SystemManager* const Sys = SysMgr;
-    SetAvoidanceAllowed(Sys->Thrust.bAutoAvoidance, 3);                   // FUN_062d21d0
-    GotoKind = 1;
+    SetAvoidanceAllowed(Sys->Thrust.bAutoAvoidance, kAvoidanceObstacleNudge | kAvoidancePoint);                   // FUN_062d21d0
+    GotoKind = kGotoKindPoint;
     Flag2ea = 1;
     SteerAxis.x = 0.0f;
     SteerAxis.y = 0.0f;
@@ -77,7 +77,7 @@ EvaluateResult FreeFlightBehavior::evaluate(unsigned int Context)
 bool FreeFlightBehavior::OnApplyDirective(void* DirectiveOp)
 {
     (void)DirectiveOp;
-    Flags28 = static_cast<unsigned char>((Flags28 & 0xfe) | 0x2);
+    Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDisengageRequested) | kBehaviorFlagDirectiveAccepted);
     SteerAxis.x = 0.0f;
     SteerAxis.y = 0.0f;
     SteerAxis.z = 0.0f;

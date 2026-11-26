@@ -20,10 +20,13 @@
 
 // DestroyType -- a GLOBAL enum in retail, not pub::SpaceObj's:
 //   ?Destroy@SpaceObj@pub@@YAHIW4DestroyType@@@Z
+//   0 = the object just goes away (expired countermeasure / mine / loot, out of range);
+//   1 = it is killed: the controller gets the death-fuse event, the explosion plays, loot drops.
+//   2 = a loot crate tractored in (the client explodes it with the tractored_explosion).
 enum DestroyType {
-    DESTROY_NORMAL = 0,
-    DESTROY_TYPE1 = 1,
-    DESTROY_TYPE2 = 2,
+    DESTROY_VANISH = 0,
+    DESTROY_FUSE = 1,
+    DESTROY_TRACTORED = 2,
 };
 
 // EQUIPMENT_RTYPE -- return type for ActivateEquipment, also GLOBAL:
@@ -218,11 +221,13 @@ struct TerminalInfo {
 // Server.dll 0x19900. Value is the docking sphere's type.
 SERVER_API int __cdecl GetTerminalInfo(const unsigned int& ObjId, int Index, TerminalInfo& OutInfo);
 
-// PosSelectionType — position selection algorithm for GetEmptyPos
+// PosSelectionType — position selection algorithm for GetEmptyPos: the offset is placed on a
+// circle of the radius in the plane (0 XY: (cos, sin, 0), 1 YZ: (0, cos, sin), 2 XZ:
+// (cos, 0, sin)) or inside the box of that edge (3), then transformed by the base transform.
 enum PosSelectionType {
     POS_SEL_XY_PLANE = 0,
-    POS_SEL_XZ_PLANE = 1,
-    POS_SEL_YZ_PLANE = 2,
+    POS_SEL_YZ_PLANE = 1,
+    POS_SEL_XZ_PLANE = 2,
     POS_SEL_3D_VOLUME = 3,
 };
 

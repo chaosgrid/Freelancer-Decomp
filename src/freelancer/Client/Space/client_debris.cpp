@@ -217,7 +217,7 @@ FClientDebrisGameobj::~FClientDebrisGameobj()
 int FClientDebrisGameobj::get_type(uint& OutType) const
 {
     // LAB_00530610
-    OutType = 0x80000000u;
+    OutType = OBJ_DEBRIS;
     return 0;
 }
 
@@ -427,7 +427,7 @@ FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
     Arch->Release();
 
     // No null test on the narrowed object.
-    CObject* const Simple = NarrowDebrisObject(Debris, 1u);
+    CObject* const Simple = NarrowDebrisObject(Debris, CObject::ClassObject);
     Simple->WorldPosition = *Pos;
 
     // The current system (FUN_00554e90) is read last.
