@@ -623,9 +623,9 @@ int PhysicalSystem::FindRayCollisions(Vector const& From, Vector const& To, PhyS
 int PhysicalSystem::FindSphereCollisions(Vector const& Center, float Radius, CObject** OutObjects, int MaxObjects)
 {
     FIVP_Sphere_Query_Record Record;
-    Record.Center[0] = Center.x;
-    Record.Center[1] = Center.y;
-    Record.Center[2] = Center.z;
+    Record.Center.x = Center.x;
+    Record.Center.y = Center.y;
+    Record.Center.z = Center.z;
     Record.Unwritten_0x0c = 0.0f;  // uninitialised in retail; never read
     Record.Radius = Radius;
     Record.MaxLedgeTreeDepth = 4;

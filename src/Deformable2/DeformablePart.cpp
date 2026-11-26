@@ -21,8 +21,8 @@
 #include <new>
 #include <vector>
 
-static void NegateVec3(const float* Source, float* Dest);
-static void Transpose3x3(const float* Source, float* Dest);
+static void NegateVec3(const Vector* Source, Vector* Dest);
+static void Transpose3x3(const Matrix* Source, Matrix* Dest);
 static int FvfTexcoordBytes(unsigned long Fvf);
 static int FvfColorBytes(unsigned long Fvf);
 
@@ -118,20 +118,20 @@ unsigned char FDeformPart::BindMeshes(FLodHolder* Holder, FDeformMesh** InMeshes
 }
 
 // FUN_065f68c0 (thiscall on the part: OutRadius, OutCenter): the first mesh's slot 4.
-unsigned char FDeformPart::BoundSphere(float* OutRadius, float* OutCenter)
+unsigned char FDeformPart::BoundSphere(float* OutRadius, Vector* OutCenter)
 {
     const unsigned char bOk = Meshes[0]->GetBoundSphere(OutRadius, OutCenter);
     if (bOk != 0)
     {
         I3DMathEngine* Math = AcquireMathEngine();
-        float* BoneAtC = Lod->BoneSlots[0].LocalTransform;
-        float Transformed[3];
-        Math->TransformXform(*(Vector*)Transformed,
-                             *(const Transform*)BoneAtC,
-                             *(const Vector*)OutCenter); // +0x28
-        OutCenter[0] = Transformed[0];
-        OutCenter[1] = Transformed[1];
-        OutCenter[2] = Transformed[2];
+        Transform* BoneAtC = &Lod->BoneSlots[0].LocalTransform;
+        Vector Transformed;
+        Math->TransformXform(Transformed,
+                             *BoneAtC,
+                             *OutCenter); // +0x28
+        OutCenter->x = Transformed.x;
+        OutCenter->y = Transformed.y;
+        OutCenter->z = Transformed.z;
     }
     return bOk;
 }
@@ -199,59 +199,63 @@ unsigned char FDeformPart::DrawLive(ICamera* Camera, void* /*Unused*/)
 }
 
 // FUN_065f6ad0: out[i] = weight * matrix[i] (12 floats).
-static void ScaleBoneMatrix(float* Out, const float* Matrix, float Weight)
+static void ScaleBoneMatrix(Transform* Out, const Transform* Bone, float Weight)
 {
+    float* const OutFloats = &Out->Rotation.E[0][0];
+    const float* const BoneFloats = &Bone->Rotation.E[0][0];
     int Index = 0;
     while (Index < 12)
     {
-        Out[Index] = Weight * Matrix[Index];
+        OutFloats[Index] = Weight * BoneFloats[Index];
         Index += 1;
     }
 }
 
 // FUN_065f6b00: out[i] += weight * matrix[i], one float rounding per element.
-static void AccumulateBoneMatrix(float* Out, const float* Matrix, float Weight)
+static void AccumulateBoneMatrix(Transform* Out, const Transform* Bone, float Weight)
 {
+    float* const OutFloats = &Out->Rotation.E[0][0];
+    const float* const BoneFloats = &Bone->Rotation.E[0][0];
     int Index = 0;
     while (Index < 12)
     {
-        Out[Index] = (float)((double)Weight * Matrix[Index] +
-                                        (double)Out[Index]);
+        OutFloats[Index] = (float)((double)Weight * BoneFloats[Index] +
+                                        (double)OutFloats[Index]);
         Index += 1;
     }
 }
 
 // FUN_065f6b30: out = M3x4 * point (translation m[9..11]).
-static void TransformPoint(float* Out, const float* Matrix, const float* Point)
+static void TransformPoint(float* Out, const Transform* Xform, const float* Point)
 {
     // Point is re-read per row, as retail does (matters only if Out aliases it).
-    Out[0] = (float)((((double)Matrix[2] * Point[2] +
-                                  (double)Matrix[1] * Point[1]) +
-                                 (double)Matrix[0] * Point[0]) +
-                                Matrix[9]);
-    Out[1] = (float)((((double)Matrix[5] * Point[2] +
-                                  (double)Matrix[3] * Point[0]) +
-                                 (double)Matrix[4] * Point[1]) +
-                                Matrix[10]);
-    Out[2] = (float)((((double)Matrix[8] * Point[2] +
-                                  (double)Matrix[6] * Point[0]) +
-                                 (double)Matrix[7] * Point[1]) +
-                                Matrix[11]);
+    Out[0] = (float)((((double)Xform->Rotation.E[0][2] * Point[2] +
+                                  (double)Xform->Rotation.E[0][1] * Point[1]) +
+                                 (double)Xform->Rotation.E[0][0] * Point[0]) +
+                                Xform->Translation.x);
+    Out[1] = (float)((((double)Xform->Rotation.E[1][2] * Point[2] +
+                                  (double)Xform->Rotation.E[1][0] * Point[0]) +
+                                 (double)Xform->Rotation.E[1][1] * Point[1]) +
+                                Xform->Translation.y);
+    Out[2] = (float)((((double)Xform->Rotation.E[2][2] * Point[2] +
+                                  (double)Xform->Rotation.E[2][0] * Point[0]) +
+                                 (double)Xform->Rotation.E[2][1] * Point[1]) +
+                                Xform->Translation.z);
 }
 
 // FUN_065f6b90: out = M3x3 * direction; FUN_065f6b30 without the translation, same summation
 // order.
-static void TransformDirection(float* Out, const float* Matrix, const float* Direction)
+static void TransformDirection(float* Out, const Transform* Xform, const float* Direction)
 {
-    Out[0] = (float)(((double)Matrix[2] * Direction[2] +
-                                 (double)Matrix[1] * Direction[1]) +
-                                (double)Matrix[0] * Direction[0]);
-    Out[1] = (float)(((double)Matrix[5] * Direction[2] +
-                                 (double)Matrix[3] * Direction[0]) +
-                                (double)Matrix[4] * Direction[1]);
-    Out[2] = (float)(((double)Matrix[8] * Direction[2] +
-                                 (double)Matrix[6] * Direction[0]) +
-                                (double)Matrix[7] * Direction[1]);
+    Out[0] = (float)(((double)Xform->Rotation.E[0][2] * Direction[2] +
+                                 (double)Xform->Rotation.E[0][1] * Direction[1]) +
+                                (double)Xform->Rotation.E[0][0] * Direction[0]);
+    Out[1] = (float)(((double)Xform->Rotation.E[1][2] * Direction[2] +
+                                 (double)Xform->Rotation.E[1][0] * Direction[0]) +
+                                (double)Xform->Rotation.E[1][1] * Direction[1]);
+    Out[2] = (float)(((double)Xform->Rotation.E[2][2] * Direction[2] +
+                                 (double)Xform->Rotation.E[2][0] * Direction[0]) +
+                                (double)Xform->Rotation.E[2][1] * Direction[1]);
 }
 
 // LAB_065f6bf0 FVF stride. ParseTag 0x112 → xyz 0xC + nrm 0xC + uv0 8 = 0x20.
@@ -291,13 +295,13 @@ static unsigned char EnsurePartVertexBuffer(FDeformVbDesc* Vb, IRPVertexBuffer* 
 // LAB_065f6bf0, the DFM mesh's slot 3 (Holder, &part+0x14, bForce).
 unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsigned char bForce)
 {
-    const float* const Root =
-        Holder->BoneSlots[0].LocalTransform;
-    float RootPos[3];
-    MathTransformVec3(RootPos, Root, Root + 9);
-    float InverseRoot[12];
-    NegateVec3(RootPos, InverseRoot + 9);
-    Transpose3x3(Root, InverseRoot);
+    const Transform* const Root =
+        &Holder->BoneSlots[0].LocalTransform;
+    Vector RootPos;
+    MathTransformVec3(&RootPos, &Root->Rotation, &Root->Translation);
+    Transform InverseRoot;
+    NegateVec3(&RootPos, &InverseRoot.Translation);
+    Transpose3x3(&Root->Rotation, &InverseRoot.Rotation);
 
     SkinnedVertexCount = 0;
     SkinnedBoneCount = 0;
@@ -315,14 +319,14 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
                 SkinnedBoneCount += 1;
                 if (bSkinned == 0)
                 {
-                    WriteIdentity3x3(Bone->WorldMatrix);
-                    Bone->WorldMatrix[11] = 0.0f;
-                    Bone->WorldMatrix[10] = 0.0f;
-                    Bone->WorldMatrix[9] = 0.0f;
+                    WriteIdentity3x3(&Bone->WorldMatrix.Rotation);
+                    Bone->WorldMatrix.Translation.z = 0.0f;
+                    Bone->WorldMatrix.Translation.y = 0.0f;
+                    Bone->WorldMatrix.Translation.x = 0.0f;
                 }
                 else
                 {
-                    Bone->ComposeWorldMatrix(InverseRoot);
+                    Bone->ComposeWorldMatrix(&InverseRoot);
                     unsigned char* const Dirty = FaceFlags;
                     const unsigned short* Cursor = List->Start;
                     while (List->Finish != Cursor)
@@ -378,7 +382,7 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
             const FSkinPair* const Pairs = SkinVertex->Pairs;
             const float* const Source =
                 (const float*)(Positions + (size_t)Vertex * 0x18);
-            const float* const First = Holder->BoneSlots[Pairs[0].BoneId].WorldMatrix;
+            const Transform* const First = &Holder->BoneSlots[Pairs[0].BoneId].WorldMatrix;
             float Out[6];
             const int Count = SkinVertex->BoneCount;
             if (Count == 1)
@@ -388,19 +392,19 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
             }
             else
             {
-                float Blend[12];
-                ScaleBoneMatrix(Blend, First, Pairs[0].Weight);
+                Transform Blend;
+                ScaleBoneMatrix(&Blend, First, Pairs[0].Weight);
                 if (Count == 4)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[3].BoneId].WorldMatrix,
+                    AccumulateBoneMatrix(&Blend, &Holder->BoneSlots[Pairs[3].BoneId].WorldMatrix,
                                          Pairs[3].Weight);
                 if (Count == 4 || Count == 3)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[2].BoneId].WorldMatrix,
+                    AccumulateBoneMatrix(&Blend, &Holder->BoneSlots[Pairs[2].BoneId].WorldMatrix,
                                          Pairs[2].Weight);
                 if (Count == 4 || Count == 3 || Count == 2)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[1].BoneId].WorldMatrix,
+                    AccumulateBoneMatrix(&Blend, &Holder->BoneSlots[Pairs[1].BoneId].WorldMatrix,
                                          Pairs[1].Weight);
-                TransformPoint(Out, Blend, Source);
-                TransformDirection(Out + 3, Blend, Source + 3);
+                TransformPoint(Out, &Blend, Source);
+                TransformDirection(Out + 3, &Blend, Source + 3);
                 const float LenSq = (float)(
                     ((double)Out[4] * Out[4] + (double)Out[5] * Out[5]) +
                     (double)Out[3] * Out[3]);
@@ -432,41 +436,41 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
 }
 
 // FUN_065f70b0 (thiscall): dest = -this[0..2].
-static void NegateVec3(const float* Source, float* Dest)
+static void NegateVec3(const Vector* Source, Vector* Dest)
 {
-    Dest[0] = -Source[0];
-    Dest[1] = -Source[1];
-    Dest[2] = -Source[2];
+    Dest->x = -Source->x;
+    Dest->y = -Source->y;
+    Dest->z = -Source->z;
 }
 
 // FUN_065f70d0 (thiscall): 3x3 transpose. Retail loads every element before the first store,
 // so an in-place transpose works; the copy keeps that.
-static void Transpose3x3(const float* Source, float* Dest)
+static void Transpose3x3(const Matrix* Source, Matrix* Dest)
 {
-    float Copy[9];
-    std::memcpy(Copy, Source, sizeof(Copy));
-    Dest[0] = Copy[0];
-    Dest[1] = Copy[3];
-    Dest[2] = Copy[6];
-    Dest[3] = Copy[1];
-    Dest[4] = Copy[4];
-    Dest[5] = Copy[7];
-    Dest[6] = Copy[2];
-    Dest[7] = Copy[5];
-    Dest[8] = Copy[8];
+    Matrix Copy;
+    std::memcpy(&Copy, Source, sizeof(Copy));
+    Dest->E[0][0] = Copy.E[0][0];
+    Dest->E[0][1] = Copy.E[1][0];
+    Dest->E[0][2] = Copy.E[2][0];
+    Dest->E[1][0] = Copy.E[0][1];
+    Dest->E[1][1] = Copy.E[1][1];
+    Dest->E[1][2] = Copy.E[2][1];
+    Dest->E[2][0] = Copy.E[0][2];
+    Dest->E[2][1] = Copy.E[1][2];
+    Dest->E[2][2] = Copy.E[2][2];
 }
 
 // FUN_065f7120: math (DAT_066031a4) +0x38 into a temp, copied to Dest. No tests.
-void MathTransformVec3(float* Dest, const float* A, const float* B)
+void MathTransformVec3(Vector* Dest, const Matrix* Rotation, const Vector* In)
 {
     I3DMathEngine* Math = AcquireMathEngine();
-    float Tmp[3];
-    Math->TransposeTransform(*(Vector*)Tmp,
-                                                          *(const Matrix*)A,
-                                                          *(const Vector*)B); // +0x38
-    Dest[0] = Tmp[0];
-    Dest[1] = Tmp[1];
-    Dest[2] = Tmp[2];
+    Vector Tmp;
+    Math->TransposeTransform(Tmp,
+                                                          *Rotation,
+                                                          *In); // +0x38
+    Dest->x = Tmp.x;
+    Dest->y = Tmp.y;
+    Dest->z = Tmp.z;
 }
 
 // FUN_065f71c0: texcoord extra from FVF bits 8–11 count, sizes at bit 16+.
@@ -568,43 +572,43 @@ int FFaceGroup::Draw(FMaterialSubmitContext* Context, int StartIndex)
 unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
 {
     FBoneRuntime* const BoneSlots = Part->Lod->BoneSlots;
-    const float* const Root =
-        BoneSlots[0].LocalTransform;
-    const float* const View = (const float*)Camera->GetViewTransform();
+    const Transform* const Root =
+        &BoneSlots[0].LocalTransform;
+    const Transform* const View = Camera->GetViewTransform();
     int bHaveView = 1;
     G_Pipeline->GetPipelineState(7, &bHaveView);
     if (bHaveView != 0)
     {
-        float Composed[12];
-        AcquireMathEngine()->MulTransform(*(Transform*)Composed,
-                                          *(const Transform*)View,
-                                          *(const Transform*)Root); // +0x1C
-        float Modelview[12];
-        std::memcpy(Modelview, Composed, sizeof(Modelview));
-        G_Pipeline->SetModelview((const Transform*)Modelview);
+        Transform Composed;
+        AcquireMathEngine()->MulTransform(Composed,
+                                          *View,
+                                          *Root); // +0x1C
+        Transform Modelview;
+        std::memcpy(&Modelview, &Composed, sizeof(Modelview));
+        G_Pipeline->SetModelview(&Modelview);
     }
     else
     {
-        float Identity[12];
-        Identity[0] = 1.0f;
-        Identity[1] = 0.0f;
-        Identity[2] = 0.0f;
-        Identity[3] = 0.0f;
-        Identity[4] = 1.0f;
-        Identity[5] = 0.0f;
-        Identity[6] = 0.0f;
-        Identity[7] = 0.0f;
-        Identity[8] = 1.0f;
-        Identity[9] = 0.0f;
-        Identity[10] = 0.0f;
-        Identity[11] = 0.0f;
-        G_Pipeline->SetWorld((const Transform*)Identity);
+        Transform Identity;
+        Identity.Rotation.E[0][0] = 1.0f;
+        Identity.Rotation.E[0][1] = 0.0f;
+        Identity.Rotation.E[0][2] = 0.0f;
+        Identity.Rotation.E[1][0] = 0.0f;
+        Identity.Rotation.E[1][1] = 1.0f;
+        Identity.Rotation.E[1][2] = 0.0f;
+        Identity.Rotation.E[2][0] = 0.0f;
+        Identity.Rotation.E[2][1] = 0.0f;
+        Identity.Rotation.E[2][2] = 1.0f;
+        Identity.Translation.x = 0.0f;
+        Identity.Translation.y = 0.0f;
+        Identity.Translation.z = 0.0f;
+        G_Pipeline->SetWorld(&Identity);
     }
 
     FMaterialSubmitContext Context;
     Context.Inst = BoneSlots[0].Instance;
-    Context.World = (const Transform*)Root;
-    Context.View = (const Transform*)View;
+    Context.World = Root;
+    Context.View = View;
     Context.SourceVertices = nullptr;
     Context.Indices = nullptr;
     Context.VbListing = &Part->Vb.Listing;

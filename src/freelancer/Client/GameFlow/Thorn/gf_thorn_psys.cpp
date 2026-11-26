@@ -135,12 +135,12 @@ GENRESULT DACOM_API FThornPsys::Tick(int DeltaMs)
     float const Dt = static_cast<float>(static_cast<double>(DeltaMs) * 0.001);
     if (Particles.Effect != nullptr)
     {
-        float Xform[12];
-        memcpy(Xform, &Local.Orient, sizeof(float) * 9);
-        Xform[9] = Local.Pos.x;
-        Xform[10] = Local.Pos.y;
-        Xform[11] = Local.Pos.z;
-        Particles.Effect->SetTransform(1, (const Transform*)Xform);
+        Transform Xform;
+        memcpy(&Xform, &Local.Orient, sizeof(float) * 9);
+        Xform.Translation.x = Local.Pos.x;
+        Xform.Translation.y = Local.Pos.y;
+        Xform.Translation.z = Local.Pos.z;
+        Particles.Effect->SetTransform(1, &Xform);
         Particles.Effect->ComposeTransforms(FloatArg(Dt));
         Particles.Effect->Update(FloatArg(Dt));
     }

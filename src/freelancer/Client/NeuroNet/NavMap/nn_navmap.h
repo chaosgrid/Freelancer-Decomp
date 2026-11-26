@@ -74,7 +74,7 @@ struct FNavMapItem
     int Kind;                   // +0x00 FUN_00491f90 argument 1
     int Type;                   // +0x04 argument 2 (bit 2 = a universe-view system)
     FClientMeshHolder Mesh;     // +0x08 "...\SpaceObjects\<name>.3db"
-    float Position[3];          // +0x30 arguments 3..5
+    Vector Position;          // +0x30 arguments 3..5
     float Size;                 // +0x3c argument 6 (the universe view passes a random
                                 //       3000..4999): the marker's size -- FUN_00496600 scales
                                 //       the mesh by it, FUN_00496d40 picks within it;
@@ -193,9 +193,9 @@ public:
 
     // --- WinControl / Win3D overrides ---
     // slot 4 LAB_00492270 (RET 4)
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 LAB_004948a0 (RET 4)
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 9 LAB_0048eba0 (RET 8)
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 23 LAB_004945e0 (RET 0xc) -- 0xef01 show, 0xef02 close and delete.
@@ -294,7 +294,7 @@ public:
     // FUN_00491be0 (RET 8) -- the player's marker: the universe view's system point, or the
     // system view's position (the docked base's solar) and heading in degrees, scaled by
     // SystemScale.
-    void PlayerMapPosition(float* OutPos, float* OutHeading);
+    void PlayerMapPosition(Vector* OutPos, float* OutHeading);
 
     // --- The per-frame work (nn_navmap_update.cpp / nn_navmap_view.cpp) ---
     // slot 11 LAB_00494920 -- see nn_navmap_update.cpp. Win3D's face: ButtonMover::Update
@@ -305,16 +305,16 @@ public:
     void PlaceItems();
     // FUN_00496d40 (RET 8) -- the first shown item whose pick circle holds MapPos (Kind 3 / 4
     // skipped when bSkipWaypoints); null when none.
-    FNavMapItem* ItemAt(float const* MapPos, unsigned char bSkipWaypoints);
+    FNavMapItem* ItemAt(Vector const* MapPos, unsigned char bSkipWaypoints);
     // FUN_00492410 (RET 4) -- the cursor's point on the map in map units; false when the cursor
     // is outside ScreenRect or the view is not 0 / 1 / 2.
-    bool MapPointUnderCursor(float* OutMapPos);
+    bool MapPointUnderCursor(Vector* OutMapPos);
     // FUN_0049e890 (RET 4) -- the cursor's point on the Win3D camera's near plane (in the map's
     // screen space), false outside ScreenRect.
-    bool CursorRayPoint(float* OutPoint);
+    bool CursorRayPoint(Vector* OutPoint);
     // FUN_004a21f0 (RET 4) -- the reputation id of the group member whose marker holds MapPos
     // in the current system; -1 when none or in single player.
-    int GroupMemberAt(float const* MapPos);
+    int GroupMemberAt(Vector const* MapPos);
     // FUN_004963d0 (RET 8) -- the zoomed map mesh (View 2) or the flat one: scale, pan and
     // alpha.
     void SetMapMeshTransform(int View, float Alpha);
@@ -391,7 +391,7 @@ public:
     FClientMeshHolder ZoomedMapMesh2;   // +0x378 zoomedmap_liberty.3db
     FClientMeshHolder PrettyMapMesh;    // +0x3a0 NAV_prettymap.3db, [0] * 1.175, [4] * 1.5
     float MapLabelOrigin[3];            // +0x3c8 SetPosition: position + (0.2, -0.25, 0); [2] is label depth
-    float MapRotation[9];               // +0x3d4 ctor 3x3 identity rotation for BindMapModelview
+    Matrix MapRotation;                 // +0x3d4 ctor 3x3 identity rotation for BindMapModelview
     float ZoomScale;                    // +0x3f8 ctor 1.0f; the map's zoom (MapExtentX /
                                         //        (ZoomDistance + PanOffset z) at the end of a
                                         //        transition, 8.6 zoomed in)
@@ -513,8 +513,8 @@ public:
     WinControl* AbortMissionText;       // +0x908 "NavMapAbortMissionText"
     // +0x90c..+0x92b -- the map click the object tools opened on (MouseEvent): the picked point in map units, the cursor's ray point then, and the click in
     // map-frame fractions (Update also sets the two fractions from G_NavMapRequestedPos).
-    float ClickMapPos[3];               // +0x90c
-    float ClickRayPos[3];               // +0x918
+    Vector ClickMapPos;               // +0x90c
+    Vector ClickRayPos;                 // +0x918
     float ClickU;                       // +0x924
     float ClickV;                       // +0x928
     unsigned char bObjectToolsShown;    // +0x92c ctor 0; FUN_0049f0e0 0

@@ -24,7 +24,7 @@ public:
     ~UiWinObject() override;
 
     // slot 5 (+0x14) — LAB_0059ab10.
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 8 (+0x20) — LAB_0059a900.
     void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) — FUN_0059a760: false when Payload is null or the mesh load fails.

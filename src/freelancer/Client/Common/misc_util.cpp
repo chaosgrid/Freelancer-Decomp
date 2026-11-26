@@ -536,17 +536,16 @@ namespace
 }
 
 // FUN_0041c8d0.
-bool MiscUtilSphereInView(ICamera* Camera, float const* Center, float Radius)
+bool MiscUtilSphereInView(ICamera* Camera, Vector const* Center, float Radius)
 {
     const float* const View = (const float*)Camera->GetViewTransform();
     if (G_MiscUtilMath == nullptr)
         G_MiscUtilMath = Acquire3DMathEngine();
     Vector InView;
-    G_MiscUtilMath->TransformXform(InView, *reinterpret_cast<Transform const*>(View),
-                                   *reinterpret_cast<Vector const*>(Center));
-    float Local[3];
-    Local[0] = InView.x;
-    Local[1] = InView.y;
-    Local[2] = InView.z;
-    return Camera->ClassifySphere((const Vector*)Local, Radius) >= 3;
+    G_MiscUtilMath->TransformXform(InView, *reinterpret_cast<Transform const*>(View), *Center);
+    Vector Local;
+    Local.x = InView.x;
+    Local.y = InView.y;
+    Local.z = InView.z;
+    return Camera->ClassifySphere(&Local, Radius) >= 3;
 }

@@ -445,9 +445,9 @@ namespace AlchemyImpl
         void CreatePropertySet() override;
 
     private:
-        float ViewXform_[12];    // node+0xec
+        Transform ViewXform_;    // node+0xec
         float LastDt_;           // node+0x11c
-        float LastCameraPos_[3]; // node+0x120
+        Vector LastCameraPos_;   // node+0x120
         float LastCameraStep_;   // node+0x12c
     };
 

@@ -264,7 +264,7 @@ HUD_DamageIndicator::HUD_DamageIndicator(INI_Reader& /*Reader*/)
     G_HudDamageIndicator = this;
     HUDItem::Name = "DamageIndicator";
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     Win3D::Create(nullptr, nullptr);
     Win3D::SetName("HUD_DamageIndicator");
     ClassName = "HUD_DamageIndicator";
@@ -280,7 +280,7 @@ bool HUD_DamageIndicator::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004f3d70 (this = the WinControl face).
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 

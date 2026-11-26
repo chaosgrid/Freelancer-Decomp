@@ -38,7 +38,7 @@ struct IRenderer2 : IDAComponent
     virtual int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F,
                                 void* G) = 0; // slot 6
     virtual int DACOM_API RenderInstance(void* Camera, InstanceIndex Inst, float Threshold, unsigned long Flags,
-                                void* Matrix, void* Extra) = 0; // slot 7
+                                const Transform* Xform, void* Extra) = 0; // slot 7
     virtual int DACOM_API GetInstanceLodCount(InstanceIndex Inst, void* Out) = 0; // slot 8
     virtual int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, void* Out) = 0; // slot 9
     virtual int DACOM_API SetInstanceLod(InstanceIndex Inst, int Index) = 0; // slot 10
@@ -76,7 +76,7 @@ struct IRenderComponent : IDAComponent
     virtual int DACOM_API SplitByPlane(void* Handle, void* A, void* B, void* C, void* D, void* E,
                                  void* F) = 0; // slot 15
     virtual int DACOM_API RenderInstance(ICamera* Camera, void* Handle, InstanceIndex Inst, unsigned long Flags,
-                                 void* Matrix, void* Extra) = 0; // slot 16
+                                 const Transform* Xform, void* Extra) = 0; // slot 16
     virtual int DACOM_API BindMeshInstance(InstanceIndex Inst, void* Handle) = 0; // slot 17
 };
 
@@ -104,7 +104,7 @@ struct IVMeshPart : IDAComponent
 {
     // +0x0C LAB_06c319e0 (RET 0x14): draw every facegroup of the part.
     virtual bool DACOM_API Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags,
-                                const void* Matrix, IMaterial* Override) = 0;
+                                const Transform* Xform, IMaterial* Override) = 0;
     // +0x10 FUN_06c31950 (RET 8): make the group VB/IB current; fills a 12-byte VB listing
     // {VB, FVF, base vertex} and an 8-byte IB scratch {IB, start index}.
     virtual bool DACOM_API Prepare(void* Listing, void* Scratch) = 0;
@@ -169,7 +169,7 @@ struct FVmeshRef
     unsigned short FacegroupStart; // +0x10
     unsigned short FacegroupCount; // +0x12
     unsigned long Bounds[6];    // +0x14 bounding box, copied out whole by FUN_06c310a0 (IRenderComponent GetBounds)
-    float Center[3];            // +0x2C (FUN_06c310c0 / FUN_06c310f0)
+    Vector Center;              // +0x2C (FUN_06c310c0 / FUN_06c310f0)
     float Radius;               // +0x38 (FUN_06c310c0 / SetInstanceExtent)
 };
 

@@ -346,7 +346,7 @@ struct FGfScriptSequence
     void* PlayerDeformInstance;    // +0x68 FGfScript +0x98
     FCharacterObject* PlayerCharacter; // +0x6c FGfScript +0x9c
     float CameraPos[3];            // +0x70 the room camera at Setup
-    float CameraOrient[9];         // +0x7c
+    float CameraOrient[9];           // +0x7c
     float CameraHalfFovX;          // +0xa0
     float CameraZNear;             // +0xa4
     float CameraZFar;              // +0xa8

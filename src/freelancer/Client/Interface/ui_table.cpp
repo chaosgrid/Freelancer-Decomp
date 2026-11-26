@@ -49,13 +49,13 @@ namespace
 
     // The mouse ray scaled onto the table's z plane (the quotient stays double), then taken into
     // table space through the +0xf4 inverse.
-    Vector UiTableRayToLocal(UiTable const* Table, float const* Ray)
+    Vector UiTableRayToLocal(UiTable const* Table, Vector const* Ray)
     {
-        double const Scale = static_cast<double>(Table->Position.z) / Ray[2];
+        double const Scale = static_cast<double>(Table->Position.z) / Ray->z;
         Vector Scaled;
-        Scaled.x = static_cast<float>(Ray[0] * Scale);
-        Scaled.y = static_cast<float>(Ray[1] * Scale);
-        Scaled.z = static_cast<float>(Ray[2] * Scale);
+        Scaled.x = static_cast<float>(Ray->x * Scale);
+        Scaled.y = static_cast<float>(Ray->y * Scale);
+        Scaled.z = static_cast<float>(Ray->z * Scale);
         Vector Local;
         UiTableMath()->TransformXform(Local, Table->InverseTransform, Scaled);
         return Local;
@@ -274,7 +274,7 @@ void UiTable::SetTransform(Transform const* NewXform)
 {
     // LAB_005987e0: both setters are virtual calls; then the inverse and a full Layout.
     SetOrientation(&NewXform->Rotation);
-    SetPosition(&NewXform->Translation.x);
+    SetPosition(&NewXform->Translation);
     float W = 0.0f;
     Transform Inverse;
     UiTableMath()->GeneralInverse(Inverse, W, Placement);
@@ -282,12 +282,12 @@ void UiTable::SetTransform(Transform const* NewXform)
     Layout(0, 0, 0, 0);
 }
 
-void UiTable::SetPosition(float const* NewPosition)
+void UiTable::SetPosition(Vector const* NewPosition)
 {
     // LAB_00598850.
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
     float W = 0.0f;
     Transform Inverse;
     UiTableMath()->GeneralInverse(Inverse, W, Placement);
@@ -303,9 +303,9 @@ void UiTable::Update()
     if (Win3DGetCapture() == this && bDragging != 0)
     {
         // Dragging an edge: follow the mouse with the grab offset kept.
-        float Ray[3];
-        Win3DGetMouseRay(Ray);
-        Vector const Local = UiTableRayToLocal(this, Ray);
+        Vector Ray;
+        Win3DGetMouseRay(&Ray);
+        Vector const Local = UiTableRayToLocal(this, &Ray);
         if (bDragColumn != 0)
         {
             SetColumnEdge(DragEdge, Local.x + DragOffset);
@@ -321,9 +321,9 @@ void UiTable::Update()
     if (Win3DGetCapture() != nullptr)
         return;
 
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    Vector const Local = UiTableRayToLocal(this, Ray);
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector const Local = UiTableRayToLocal(this, &Ray);
     bHovered = 0;
     bDragArmed = 0;
     bDragging = 0;
@@ -461,7 +461,7 @@ bool UiTable::MouseEvent(FWin3DMouseEvent const* Event)
     return false;
 }
 
-bool UiTable::HitTest(float const* Ray)
+bool UiTable::HitTest(Vector const* Ray)
 {
     // LAB_00599160: the given ray on the table plane, in table space, inside
     // [0, Width) x (-Height, 0].

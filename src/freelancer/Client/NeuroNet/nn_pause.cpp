@@ -76,22 +76,22 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
     NnRolloverHideGlobal();
     MouseSetCursor("arrow", false);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
     // Flags: NoZEnable 0, ZClear 0, NoMeshRender 0, NoWireRender 1, NoColoring 1,
     // RenderToWindow 0, NoClearRender 1.
-    float const PlanePosition[3] = {0.0f, 0.0f, -1.0f};
-    CreateStaticControl("Pause_BlackPlane", kPauseBlackPlaneMesh, PlanePosition, nullptr, Zero, 0,
-                        0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+    Vector const PlanePosition = {0.0f, 0.0f, -1.0f};
+    CreateStaticControl("Pause_BlackPlane", kPauseBlackPlaneMesh, &PlanePosition, nullptr, &Zero, 0,
+                        0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
 
     // {0, 0.009, -1}
-    float const FramePosition[3] = {0.0f, NnFloatBits(0x3c1374c0), -1.0f};
-    CreateStaticControl("PauseFrame", kPauseFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
-                        0, 1, 0, 0, 0, Zero);
+    Vector const FramePosition = {0.0f, NnFloatBits(0x3c1374c0), -1.0f};
+    CreateStaticControl("PauseFrame", kPauseFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1, 1,
+                        0, 1, 0, 0, 0, &Zero);
 
     // {-1.49e-8 (0xb2800000), 0.22, -1}, 0.35 x 0.03, 2.7.
-    float const TitlePosition[3] = {NnFloatBits(0xb2800000), NnFloatBits(0x3e6147af), -1.0f};
-    Title = CreateTextControl("PauseTitle", "PageHeader", TitlePosition, nullptr,
+    Vector const TitlePosition = {NnFloatBits(0xb2800000), NnFloatBits(0x3e6147af), -1.0f};
+    Title = CreateTextControl("PauseTitle", "PageHeader", &TitlePosition, nullptr,
                               NnFloatBits(0x3eb33333), NnFloatBits(0x3cf5c28f),
                               NnFloatBits(0x402ccccd), 0, 1, 0, 0);
 
@@ -147,9 +147,9 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
 
         // Half extents {0.175, 0.028, 0}.
         sprintf(Name, "PauseButtonBox%d", Index);
-        float const BoxPosition[3] = {0.0f, RowY, -1.0f};
-        float const BoxExtents[3] = {NnFloatBits(0x3e333333), NnFloatBits(0x3ce56042), 0.0f};
-        ButtonBox[Index] = CreateWireButtonControl(Name, nullptr, BoxPosition, BoxExtents, 0, 0, 0,
+        Vector const BoxPosition = {0.0f, RowY, -1.0f};
+        Vector const BoxExtents = {NnFloatBits(0x3e333333), NnFloatBits(0x3ce56042), 0.0f};
+        ButtonBox[Index] = CreateWireButtonControl(Name, nullptr, &BoxPosition, &BoxExtents, 0, 0, 0,
                                                    0, 0);
         // The last box flushes the line batchers after its Draw (+0x35d |= 1, no null test).
         if (Index == Count - 1)
@@ -162,8 +162,8 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         sprintf(Name, "PauseButtonText%d", Index);
         float const TextY = static_cast<float>(static_cast<double>(RowY) +
                                                static_cast<double>(NnFloatBits(0x3ba3d70a)));
-        float const TextPosition[3] = {NnFloatBits(0x32300000), TextY, -1.0f};
-        ButtonText[Index] = CreateTextControl(Name, "ButtonText", TextPosition, nullptr,
+        Vector const TextPosition = {NnFloatBits(0x32300000), TextY, -1.0f};
+        ButtonText[Index] = CreateTextControl(Name, "ButtonText", &TextPosition, nullptr,
                                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                               NnFloatBits(0x3fc00000), 0, 1, 0, 0);
     }
@@ -262,7 +262,7 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         return 0;
     }
     if (Msg == kWinMsgConfirmAnswer && A == 1)
@@ -372,7 +372,7 @@ void NnPauseOpen()
     if (Created == nullptr)
         return;
     NnPause* const Pause = static_cast<NnPause*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Pause->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Pause->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     Pause->CaptureMouse();
 }

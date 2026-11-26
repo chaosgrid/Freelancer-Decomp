@@ -66,6 +66,6 @@ void SubmitWin3DOutlinedEngineInstance(void* Camera, InstanceIndex EngineInstanc
 void Win3DUnprojectScreenRayDir(FSpaceCamera* Cam, float ScreenX, float ScreenY, float OutDir[3]);
 
 // FUN_005a1130 (thiscall on the half extents, RET 8) — three slab tests, strict < half.
-bool Win3DRayHitsAabbHalfExtents(float const HalfExtents[3], float const Matrix3x4[12],
-                                 float const RayDir[3]);
+bool Win3DRayHitsAabbHalfExtents(Vector const* HalfExtents, Transform const* Xform,
+                                 Vector const* RayDir);
 

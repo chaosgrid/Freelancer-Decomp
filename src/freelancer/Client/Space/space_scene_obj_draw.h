@@ -58,17 +58,17 @@ void SpaceCameraSetNearFar(FSpaceCamera* Cam, float ZNear, float ZFar);
 // PreSubmitDraw, the PickLod LOD pick written back over CachedLod, the gate (low word < 3 or high
 // word >= 2 returns the LOD), the effect-list sweep FUN_004fd040 (high word < 1), UpdateDrawLighting, the
 // player flags, the IFLAppearance envmap arm, IRenderer2::Slot7(Camera, get_index, 1.0f, Flags,
-// Matrix, Extra), FlushAll(1) on a result >= 3; *OutLod = {result, 0xffff}. The draw drain
+// Xform, Extra), FlushAll(1) on a result >= 3; *OutLod = {result, 0xffff}. The draw drain
 // reaches it through the node slot LAB_0051f7a0 (vt+0x188(&scratch, Cam, node LOD, 0, 0)).
 unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
-                                  unsigned CachedLod, void* Matrix, void* Extra);
+                                  unsigned CachedLod, Transform const* Xform, void* Extra);
 
 // FUN_00533780 -- EquippedObj's vt+0x188 body, for FClientEquippedObj::SubmitDraw: the CEqObj's
 // +0x140 fade above 0 pushes 1 - fade through IFLAppearance Slot3 (latch +0xe0 = 1) and, for a
 // non-nomad archetype, Slot8(3, &Extra); otherwise a set latch is cleared through Slot5. Then
 // FUN_00539980 non-virtually. Also called directly from two other draw slots.
 unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod, void* Camera,
-                                      unsigned CachedLod, void* Matrix, void* Extra);
+                                      unsigned CachedLod, Transform const* Xform, void* Extra);
 
 // FUN_00533880 / FUN_00533930 -- DALib::Engine QI for IFLAppearance, then Slot3 (InstId,
 // Value) / Slot8 (Index, Out); true when the call returned >= 0, false when the QI failed.

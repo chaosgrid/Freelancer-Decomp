@@ -213,8 +213,8 @@ void NeuroNetNavMap::PlaceGridLabels()
             continue;
         }
         Label->SetProperty(kWinPropHide, 0, 0);
-        float const Pos[3] = {X, kNavMapGridLetterRow, 0.0f};
-        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
+        Vector const Pos = {X, kNavMapGridLetterRow, 0.0f};
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
     }
 
     // The numbers 1..8 down the left side.
@@ -232,8 +232,8 @@ void NeuroNetNavMap::PlaceGridLabels()
             continue;
         }
         Label->SetProperty(kWinPropHide, 0, 0);
-        float const Pos[3] = {kNavMapGridNumberColumn, Y, 0.0f};
-        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
+        Vector const Pos = {kNavMapGridNumberColumn, Y, 0.0f};
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
     }
 }
 
@@ -414,9 +414,9 @@ void NeuroNetNavMap::EnterUniverseView()
             continue;
         if (Item->System->GetId() != PlayerSystem)
             continue;
-        PlayerItem->Position[0] = Item->Position[0];
-        PlayerItem->Position[1] = Item->Position[1];
-        PlayerItem->Position[2] = Item->Position[2];
+        PlayerItem->Position.x = Item->Position.x;
+        PlayerItem->Position.y = Item->Position.y;
+        PlayerItem->Position.z = Item->Position.z;
         break;
     }
 
@@ -514,19 +514,19 @@ void NeuroNetNavMap::SlideSidePanels(unsigned char bOpen)
     // The two side windows (z -0.22). Opening, the
     // left one comes in from 1.045 to 0.657 and the right one goes out from 0.19 to 0.585;
     // closing reverses both.
-    float const LeftOut[3] = {1.045f, -0.23f, -0.22f};
-    float const LeftIn[3] = {0.657f, -0.23f, -0.22f};
-    float const RightIn[3] = {0.19f, -0.23f, -0.22f};
-    float const RightOut[3] = {0.585f, -0.23f, -0.22f};
+    Vector const LeftOut = {1.045f, -0.23f, -0.22f};
+    Vector const LeftIn = {0.657f, -0.23f, -0.22f};
+    Vector const RightIn = {0.19f, -0.23f, -0.22f};
+    Vector const RightOut = {0.585f, -0.23f, -0.22f};
     if (bOpen != 0)
     {
-        ButtonMover::AddButton(LeftWindow, LeftOut, LeftIn);
-        ButtonMover::AddButton(RightWindow, RightIn, RightOut);
+        ButtonMover::AddButton(LeftWindow, &LeftOut, &LeftIn);
+        ButtonMover::AddButton(RightWindow, &RightIn, &RightOut);
     }
     else
     {
-        ButtonMover::AddButton(LeftWindow, LeftIn, LeftOut);
-        ButtonMover::AddButton(RightWindow, RightOut, RightIn);
+        ButtonMover::AddButton(LeftWindow, &LeftIn, &LeftOut);
+        ButtonMover::AddButton(RightWindow, &RightOut, &RightIn);
     }
 
     // Every panel control, in this
@@ -577,11 +577,11 @@ void NeuroNetNavMap::SlideSidePanels(unsigned char bOpen)
     for (int Index = 0; Index < 17; ++Index)
     {
         FNavMapSlide const& Slide = Slides[Index];
-        float const Off[3] = {Slide.OffX, Slide.Y, 0.0f};
-        float const On[3] = {Slide.OnX, Slide.Y, 0.0f};
+        Vector const Off = {Slide.OffX, Slide.Y, 0.0f};
+        Vector const On = {Slide.OnX, Slide.Y, 0.0f};
         if (bOpen != 0)
-            ButtonMover::AddButton(Slide.Control, Off, On);
+            ButtonMover::AddButton(Slide.Control, &Off, &On);
         else
-            ButtonMover::AddButton(Slide.Control, On, Off);
+            ButtonMover::AddButton(Slide.Control, &On, &Off);
     }
 }

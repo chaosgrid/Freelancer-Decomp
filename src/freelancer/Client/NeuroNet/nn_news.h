@@ -96,7 +96,7 @@ public:
     WinControl* IconFrames[5];           // +0x5d0 "NewsHeadlineIconFrame%d"
     WinControl* HeadlineBoxes[5];        // +0x5e4 "NewsHeadlineBox%d"
     WinControl* Headlines[5];            // +0x5f8 "NewsHeadlineHeadline%d"
-    float HeadlinePositions[5][3];       // +0x60c each headline's position, from Create
+    Vector HeadlinePositions[5];         // +0x60c each headline's position, from Create
     UiScroll* Scroll;                    // +0x648 "NewsHeadlineScroll"
     WinControl* StoryHeadline;           // +0x64c "NewsStoryHeadline"
     RichTextWin* StoryText;              // +0x650 "NewsStoryText"

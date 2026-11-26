@@ -204,8 +204,8 @@ namespace
         Win3DSetBlendFunc(2, 4);                // FUN_004220c0
         Win3DColor4ub(0, 0, 0, 0x0a);           // FUN_00421b70
         Win3DBegin(kWin3DQuads);                // FUN_00421670(8)
-        float const HalfX = Bar->HalfExtents[0];
-        float const HalfY = Bar->HalfExtents[1];
+        float const HalfX = Bar->HalfExtents.x;
+        float const HalfY = Bar->HalfExtents.y;
         Win3DVertex3f(HalfX, HalfY, 0.0f);      // FUN_00421cc0
         Win3DVertex3f(HalfX, -HalfY, 0.0f);
         Win3DVertex3f(X, -HalfY, 0.0f);
@@ -220,9 +220,9 @@ namespace
     // Kept at full precision and rounded to a float at the vertex.
     float CargoFillX(WinControl const* Bar, double Ratio)
     {
-        double X = static_cast<double>(Bar->HalfExtents[0]) * Ratio;
+        double X = static_cast<double>(Bar->HalfExtents.x) * Ratio;
         X = X + X;
-        X = X - static_cast<double>(Bar->HalfExtents[0]);
+        X = X - static_cast<double>(Bar->HalfExtents.x);
         return static_cast<float>(X);
     }
 
@@ -358,8 +358,8 @@ bool NnTrade::GetHardpointTransform(char const* Name, Transform* OutXform)
             memcpy(&Local.Rotation, Blob + 0x10, sizeof(Local.Rotation));
             memcpy(&Local.Translation, Blob + 0x04, sizeof(Local.Translation));
             memcpy(OutXform, &Local, sizeof(Local));
-            OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
-            OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
+            OutXform->Translation.x = Offset.x + OutXform->Translation.x;
+            OutXform->Translation.y = Offset.y + OutXform->Translation.y;
             OutXform->Translation.z = 0.0f;
             return true;
         }
@@ -410,42 +410,42 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerShip = Ship;
     PlayerCargoUsed = GetPlayerEquipDescListRetail().get_cargo_space_occupied(); // FUN_004c4640
 
-    Offset[0] = G_NnTradeOffsetX;
-    Offset[1] = G_NnTradeOffsetY;
-    Offset[2] = 0.0f;
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Offset.x = G_NnTradeOffsetX;
+    Offset.y = G_NnTradeOffsetY;
+    Offset.z = 0.0f;
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
     SetMesh(kBackgroundMesh, 0); // slot 38
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
 
     FormatTradeWidgetName("TitleFrame");
-    TitleFrame = CreateStaticControl(G_TradeWidgetName, kTitleBoxMesh, Zero, "hp_title_frame", Zero,
-                                     1, 1, 1, 0, 0, 0, 1, 0, 0, 0, Zero);
+    TitleFrame = CreateStaticControl(G_TradeWidgetName, kTitleBoxMesh, &Zero, "hp_title_frame", &Zero,
+                                     1, 1, 1, 0, 0, 0, 1, 0, 0, 0, &Zero);
     TitleFrame->SetProperty(kWinPropHide, 1, 0);
 
     FormatTradeWidgetName("TitleArrow");
-    TitleArrow = CreateStaticControl(G_TradeWidgetName, kTitleArrowMesh, Zero, "hp_title_arrow",
-                                     Zero, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    TitleArrow = CreateStaticControl(G_TradeWidgetName, kTitleArrowMesh, &Zero, "hp_title_arrow",
+                                     &Zero, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
 
     FormatTradeWidgetName("TitleText");
-    TitleText = CreateTextControl(G_TradeWidgetName, "PageHeader", Zero, "hp_title_text", 0.172f,
+    TitleText = CreateTextControl(G_TradeWidgetName, "PageHeader", &Zero, "hp_title_text", 0.172f,
                                   0.051f, 2.0f, 0x754, 1, 0, 0);
 
     FormatTradeWidgetName("PlayerName");
-    PlayerName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", Zero, "hp_player_name",
+    PlayerName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", &Zero, "hp_player_name",
                                    0.415f, 0.039f, 2.0f, 0, 1, 0, 0);
     FormatTradeWidgetName("TargetName");
-    TargetName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", Zero, "hp_target_name",
+    TargetName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", &Zero, "hp_target_name",
                                    0.415f, 0.039f, 2.0f, 0, 1, 0, 0);
     PlayerName->SetProperty(kTextPropSetText, PointerArg(GetPlayerCharacterNameRetail()), 0); // DAT_006732f0
     TargetName->SetProperty(kTextPropSetText, PointerArg(kTargetNamePlaceholder), 0);
 
     // The two "accepted" texts start as red "not accepted" (ids 0x75a).
     FormatTradeWidgetName("PlayerAcceptedText");
-    PlayerAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", Zero,
+    PlayerAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
                                                   "hp_player_accepted", 0.415f, 0.029f, 1.5f, 0,
                                                   1, 0, 0));
     FormatTradeWidgetName("TargetAcceptedText");
-    TargetAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", Zero,
+    TargetAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
                                                   "hp_target_accepted", 0.415f, 0.029f, 1.5f, 0,
                                                   1, 0, 0));
     PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
@@ -455,44 +455,44 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
 
     // The player's full cargo bar, its half extents from the mesh.
     FormatTradeWidgetName("PlayerCargoBarFull");
-    PlayerCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, Zero,
-                                          "hp_player_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
-                                          0, 0, 0, Zero);
-    WinControlHalfExtentsFromMesh(PlayerCargoFull->HalfExtents, &PlayerCargoFull->MeshHolder);
+    PlayerCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, &Zero,
+                                          "hp_player_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
+                                          0, 0, 0, &Zero);
+    WinControlHalfExtentsFromMesh(&PlayerCargoFull->HalfExtents, &PlayerCargoFull->MeshHolder);
     SetCargoBarColours(AsStatic(PlayerCargoFull));
 
     // Its caption, as wide as the bar.
     FormatTradeWidgetName("PlayerCargoText");
-    PlayerCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", Zero, "hp_player_cargo_text",
-                                        PlayerCargoFull->HalfExtents[0] + PlayerCargoFull->HalfExtents[0],
+    PlayerCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero, "hp_player_cargo_text",
+                                        PlayerCargoFull->HalfExtents.x + PlayerCargoFull->HalfExtents.x,
                                         0.051f, 1.25f, 0x755, 1, 0, 0);
 
     // The empty bar under the same name and hardpoint; the full one is hidden.
     FormatTradeWidgetName("PlayerCargoBarFull");
-    PlayerCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, Zero,
-                                           "hp_player_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
-                                           0, 0, 0, Zero);
+    PlayerCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, &Zero,
+                                           "hp_player_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
+                                           0, 0, 0, &Zero);
     PlayerCargoFull->SetProperty(kWinPropHide, 1, 0);
 
     // The other player's full bar with the same colours, hidden.
     FormatTradeWidgetName("TargetCargoBarFull");
-    TargetCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, Zero,
-                                          "hp_target_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
-                                          0, 0, 0, Zero);
-    WinControlHalfExtentsFromMesh(TargetCargoFull->HalfExtents, &TargetCargoFull->MeshHolder);
+    TargetCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, &Zero,
+                                          "hp_target_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
+                                          0, 0, 0, &Zero);
+    WinControlHalfExtentsFromMesh(&TargetCargoFull->HalfExtents, &TargetCargoFull->MeshHolder);
     SetCargoBarColours(AsStatic(TargetCargoFull));
     TargetCargoFull->SetProperty(kWinPropHide, 1, 0);
 
     // Its caption (retail's hardpoint name is spelt "traget").
     FormatTradeWidgetName("TargetCargoText");
-    TargetCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", Zero, "hp_traget_cargo_text",
-                                        TargetCargoFull->HalfExtents[0] + TargetCargoFull->HalfExtents[0],
+    TargetCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero, "hp_traget_cargo_text",
+                                        TargetCargoFull->HalfExtents.x + TargetCargoFull->HalfExtents.x,
                                         0.051f, 1.25f, 0x755, 1, 0, 0);
 
     FormatTradeWidgetName("TargetCargoBarFull");
-    TargetCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, Zero,
-                                           "hp_target_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
-                                           0, 0, 0, Zero);
+    TargetCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, &Zero,
+                                           "hp_target_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
+                                           0, 0, 0, &Zero);
 
     // The quantity panel's item row, 0.015 right and 0.032 down (DAT_005d1f04, DAT_005d69c0) of
     // the centre list's hardpoint.
@@ -502,97 +502,97 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     Centre.Translation.y = 0.0f;
     Centre.Translation.z = 0.0f;
     GetHardpointTransform("hp_center_inventory_list", &Centre);
-    float RowAt[3];
-    RowAt[0] = Centre.Translation.x + 0.015f;
-    RowAt[1] = Centre.Translation.y - 0.032f;
-    RowAt[2] = Centre.Translation.z;
+    Vector RowAt;
+    RowAt.x = Centre.Translation.x + 0.015f;
+    RowAt.y = Centre.Translation.y - 0.032f;
+    RowAt.z = Centre.Translation.z;
     QuantityLine = new CTradeEquipListLine(nullptr); // operator_new(0x2c), ctor inlined
-    QuantityLine->Init(this, RowAt);
+    QuantityLine->Init(this, &RowAt);
 
     FormatTradeWidgetName("QuantTitTxt");
-    QuantityTitle = CreateTextControl(G_TradeWidgetName, "ItemName", Zero, "hp_quantity_title",
+    QuantityTitle = CreateTextControl(G_TradeWidgetName, "ItemName", &Zero, "hp_quantity_title",
                                       0.415f, 0.051f, 1.5f, 0, 1, 0, 0);
 
     FormatTradeWidgetName("QuantFrame");
-    QuantityFrame = CreateStaticControl(G_TradeWidgetName, kQuantityBoxMesh, Zero,
-                                        "hp_quantity_number_frame", Zero, 1, 1, 1, 0, 0, 0, 1, 0,
-                                        0, 0, Zero);
-    WinControlHalfExtentsFromMesh(QuantityFrame->HalfExtents, &QuantityFrame->MeshHolder);
+    QuantityFrame = CreateStaticControl(G_TradeWidgetName, kQuantityBoxMesh, &Zero,
+                                        "hp_quantity_number_frame", &Zero, 1, 1, 1, 0, 0, 0, 1, 0,
+                                        0, 0, &Zero);
+    WinControlHalfExtentsFromMesh(&QuantityFrame->HalfExtents, &QuantityFrame->MeshHolder);
 
     // The number, 0.01 up (DAT_005c99c8), as wide as the box and as high as its half height.
-    float const NumberAt[3] = {Zero[0], Zero[1] + 0.01f, Zero[2]};
+    Vector const NumberAt = {Zero.x, Zero.y + 0.01f, Zero.z};
     FormatTradeWidgetName("QuantText");
     QuantityText = AsText(CreateTextControl(
-        G_TradeWidgetName, "ItemName", NumberAt, "hp_quantity_number_frame",
-        QuantityFrame->HalfExtents[0] + QuantityFrame->HalfExtents[0], QuantityFrame->HalfExtents[1],
+        G_TradeWidgetName, "ItemName", &NumberAt, "hp_quantity_number_frame",
+        QuantityFrame->HalfExtents.x + QuantityFrame->HalfExtents.x, QuantityFrame->HalfExtents.y,
         1.5f, 0, 1, 0, 0));
     SetQuantity(0);
 
     FormatTradeWidgetName("QuantAccept");
     QuantityAccept = CreateButtonControl(G_TradeWidgetName, kExecuteMesh, kExecuteMesh, nullptr,
-                                         nullptr, Zero, "hp_center_add_accept", Zero, 0, 0, 0, 1,
+                                         nullptr, &Zero, "hp_center_add_accept", &Zero, 0, 0, 0, 1,
                                          0, 0, 0);
-    WinControlHalfExtentsFromMesh(QuantityAccept->HalfExtents, &QuantityAccept->MeshHolder);
+    WinControlHalfExtentsFromMesh(&QuantityAccept->HalfExtents, &QuantityAccept->MeshHolder);
     FormatTradeWidgetName("QuantReject");
     QuantityReject = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr, nullptr,
-                                         Zero, "hp_center_add_cancel", Zero, 0, 0, 0, 1, 0, 0, 0);
-    WinControlHalfExtentsFromMesh(QuantityReject->HalfExtents, &QuantityReject->MeshHolder);
+                                         &Zero, "hp_center_add_cancel", &Zero, 0, 0, 0, 1, 0, 0, 0);
+    WinControlHalfExtentsFromMesh(&QuantityReject->HalfExtents, &QuantityReject->MeshHolder);
 
     // The quantity bar [0, 100], page 1.
     FormatTradeWidgetName("QuantScrollBar");
     QuantityBar = static_cast<ScrollControl*>(CreateScrollControl(
-        G_TradeWidgetName, kQuantityBarMesh, Zero, "hp_center_quantity_bar", Zero, true,
-        kRightArrowMesh, Zero, "hp_center_quantity_right", Zero, false, kLeftArrowMesh, Zero,
-        "hp_center_quantity_left", Zero, false, kQuantityHandleMesh, Zero, Zero,
-        "hp_center_quantity_thumb_left", "hp_center_quantity_thumb_right", Zero, false, 0, 100, 1,
+        G_TradeWidgetName, kQuantityBarMesh, &Zero, "hp_center_quantity_bar", &Zero, true,
+        kRightArrowMesh, &Zero, "hp_center_quantity_right", &Zero, false, kLeftArrowMesh, &Zero,
+        "hp_center_quantity_left", &Zero, false, kQuantityHandleMesh, &Zero, &Zero,
+        "hp_center_quantity_thumb_left", "hp_center_quantity_thumb_right", &Zero, false, 0, 100, 1,
         false, false));
-    WinControlHalfExtentsFromMesh(&QuantityBar->Back.MouseSize.x, &QuantityBar->Back.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->Next.MouseSize.x, &QuantityBar->Next.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize.x, &QuantityBar->Prev.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->ThumbMouse.x, &QuantityBar->ThumbHolder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Back.MouseSize, &QuantityBar->Back.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Next.MouseSize, &QuantityBar->Next.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize, &QuantityBar->Prev.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->ThumbMouse, &QuantityBar->ThumbHolder);
 
     // The "accept trade" box (+0x331 bit 0 set) and its caption filling it.
     FormatTradeWidgetName("AcceptTradeFrame");
     AcceptTradeFrame = CreateButtonControl(G_TradeWidgetName, kAcceptTradeMesh, kAcceptTradeMesh,
-                                           nullptr, nullptr, Zero, "hp_center_trade_accept", Zero,
+                                           nullptr, nullptr, &Zero, "hp_center_trade_accept", &Zero,
                                            1, 0, 0, 1, 0, 0, 0);
-    WinControlHalfExtentsFromMesh(AcceptTradeFrame->HalfExtents, &AcceptTradeFrame->MeshHolder);
+    WinControlHalfExtentsFromMesh(&AcceptTradeFrame->HalfExtents, &AcceptTradeFrame->MeshHolder);
     FormatTradeWidgetName("AcceptTradeText");
     AcceptTradeText = CreateTextControl(
-        G_TradeWidgetName, "ButtonText", Zero, "hp_center_trade_accept",
-        AcceptTradeFrame->HalfExtents[0] + AcceptTradeFrame->HalfExtents[0],
-        AcceptTradeFrame->HalfExtents[1] + AcceptTradeFrame->HalfExtents[1], 2.0f, 0x756, 1, 0, 0);
+        G_TradeWidgetName, "ButtonText", &Zero, "hp_center_trade_accept",
+        AcceptTradeFrame->HalfExtents.x + AcceptTradeFrame->HalfExtents.x,
+        AcceptTradeFrame->HalfExtents.y + AcceptTradeFrame->HalfExtents.y, 2.0f, 0x756, 1, 0, 0);
 
     // The player's info card, hidden: frame, close button, a turning ship view (+0x518 bit 7
     // cleared), the item's name and a RichTextWin for the info text.
-    float const CardFrameAt[3] = {0.002f, -0.007f, 0.0f};
+    Vector const CardFrameAt = {0.002f, -0.007f, 0.0f};
     FormatTradeWidgetName("PICFrame");
-    PlayerCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, CardFrameAt,
-                                          "hp_player_infocard_center", Zero, 0, 1, 1, 0, 0, 0, 1,
-                                          0, 0, 0, Zero);
+    PlayerCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, &CardFrameAt,
+                                          "hp_player_infocard_center", &Zero, 0, 1, 1, 0, 0, 0, 1,
+                                          0, 0, 0, &Zero);
     PlayerCardFrame->SetProperty(kWinPropHide, 1, 0);
 
     FormatTradeWidgetName("PICClose");
     PlayerCardClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr,
-                                          nullptr, Zero, "hp_player_infocard_close", Zero, 0, 0, 0,
+                                          nullptr, &Zero, "hp_player_infocard_close", &Zero, 0, 0, 0,
                                           1, 0, 0, 0);
-    WinControlHalfExtentsFromMesh(PlayerCardClose->HalfExtents, &PlayerCardClose->MeshHolder);
+    WinControlHalfExtentsFromMesh(&PlayerCardClose->HalfExtents, &PlayerCardClose->MeshHolder);
     PlayerCardClose->SetProperty(kWinPropHide, 1, 0);
 
     unsigned const NoColour = 0;
-    float const ModelViewSize[3] = {0.13f, -0.047f, 0.0f};
-    float const ModelYpr[3] = {0.0f, 270.0f, 0.0f};
-    float const ModelRotSpeed[3] = {0.0f, 0.0f, 30.0f};
+    Vector const ModelViewSize = {0.13f, -0.047f, 0.0f};
+    Vector const ModelYpr = {0.0f, 270.0f, 0.0f};
+    Vector const ModelRotSpeed = {0.0f, 0.0f, 30.0f};
     FormatTradeWidgetName("PICModel");
     PlayerCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
-        G_TradeWidgetName, ModelRotSpeed, Zero, ModelYpr, ModelViewSize, "hp_player_infocard_model",
+        G_TradeWidgetName, &ModelRotSpeed, &Zero, &ModelYpr, &ModelViewSize, "hp_player_infocard_model",
         false, false, &NoColour, &NoColour));
     PlayerCardModel->SetProperty(kWinPropHide, 1, 0);
     PlayerCardModel->ViewFlags &= 0x7f;
 
-    float const PlayerTitleAt[3] = {0.095f, 0.0125f, 0.0f};
+    Vector const PlayerTitleAt = {0.095f, 0.0125f, 0.0f};
     FormatTradeWidgetName("PICTitle");
-    PlayerCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", PlayerTitleAt,
+    PlayerCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", &PlayerTitleAt,
                                         "hp_player_infocard_itemname", 0.255f, 0.01f, 1.5f, 0, 0,
                                         0, 0);
     PlayerCardTitle->SetProperty(kWinPropHide, 1, 0);
@@ -602,37 +602,37 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardInfo = static_cast<RichTextWin*>(
         WinFactoryCreate(G_TradeWidgetName, "RichTextWin", PlayerCardFrame, nullptr));
     PlayerCardInfo->SetNormSize(0.23f, 0.205f);             // FUN_00579cc0
-    float const PlayerInfoAt[3] = {-0.124f, 0.0325f, 0.0f};
-    PlayerCardInfo->SetAttachOffset(PlayerInfoAt);          // FUN_00579c40
+    Vector const PlayerInfoAt = {-0.124f, 0.0325f, 0.0f};
+    PlayerCardInfo->SetAttachOffset(&PlayerInfoAt);          // FUN_00579c40
     PlayerCardInfo->Flags &= 0xfc;
 
     // The other player's info card, the same, a little further right.
-    float const TargetFrameAt[3] = {0.01f, -0.007f, 0.0f};
+    Vector const TargetFrameAt = {0.01f, -0.007f, 0.0f};
     FormatTradeWidgetName("TICFrame");
-    TargetCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, TargetFrameAt,
-                                          "hp_target_infocard_center", Zero, 0, 1, 1, 0, 0, 0, 1,
-                                          0, 0, 0, Zero);
+    TargetCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, &TargetFrameAt,
+                                          "hp_target_infocard_center", &Zero, 0, 1, 1, 0, 0, 0, 1,
+                                          0, 0, 0, &Zero);
     TargetCardFrame->SetProperty(kWinPropHide, 1, 0);
 
-    float const TargetCloseAt[3] = {0.01f, 0.0f, 0.0f};
+    Vector const TargetCloseAt = {0.01f, 0.0f, 0.0f};
     FormatTradeWidgetName("TICClose");
     TargetCardClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr,
-                                          nullptr, TargetCloseAt, "hp_target_infocard_close", Zero,
+                                          nullptr, &TargetCloseAt, "hp_target_infocard_close", &Zero,
                                           0, 0, 0, 1, 0, 0, 0);
-    WinControlHalfExtentsFromMesh(TargetCardClose->HalfExtents, &TargetCardClose->MeshHolder);
+    WinControlHalfExtentsFromMesh(&TargetCardClose->HalfExtents, &TargetCardClose->MeshHolder);
     TargetCardClose->SetProperty(kWinPropHide, 1, 0);
 
-    float const TargetModelAt[3] = {0.01f, 0.0f, 0.0f};
+    Vector const TargetModelAt = {0.01f, 0.0f, 0.0f};
     FormatTradeWidgetName("TICModel");
     TargetCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
-        G_TradeWidgetName, ModelRotSpeed, TargetModelAt, ModelYpr, ModelViewSize,
+        G_TradeWidgetName, &ModelRotSpeed, &TargetModelAt, &ModelYpr, &ModelViewSize,
         "hp_target_infocard_model", false, false, &NoColour, &NoColour));
     TargetCardModel->SetProperty(kWinPropHide, 1, 0);
     TargetCardModel->ViewFlags &= 0x7f;
 
-    float const TargetTitleAt[3] = {0.105f, 0.0125f, 0.0f};
+    Vector const TargetTitleAt = {0.105f, 0.0125f, 0.0f};
     FormatTradeWidgetName("TICTitle");
-    TargetCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", TargetTitleAt,
+    TargetCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", &TargetTitleAt,
                                         "hp_target_infocard_itemname", 0.255f, 0.01f, 1.5f, 0, 0,
                                         0, 0);
     TargetCardTitle->SetProperty(kWinPropHide, 1, 0);
@@ -642,14 +642,14 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetCardInfo = static_cast<RichTextWin*>(
         WinFactoryCreate(G_TradeWidgetName, "RichTextWin", TargetCardFrame, nullptr));
     TargetCardInfo->SetNormSize(0.23f, 0.205f);
-    float const TargetInfoAt[3] = {-0.117f, 0.0325f, 0.0f};
-    TargetCardInfo->SetAttachOffset(TargetInfoAt);
+    Vector const TargetInfoAt = {-0.117f, 0.0325f, 0.0f};
+    TargetCardInfo->SetAttachOffset(&TargetInfoAt);
     TargetCardInfo->Flags &= 0xfc;
 
     FormatTradeWidgetName("TradeClose");
     TradeClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr, nullptr,
-                                     Zero, "hp_tradecancel", Zero, 0, 0, 0, 1, 0, 0, 0);
-    WinControlHalfExtentsFromMesh(TradeClose->HalfExtents, &TradeClose->MeshHolder);
+                                     &Zero, "hp_tradecancel", &Zero, 0, 0, 0, 1, 0, 0, 0);
+    WinControlHalfExtentsFromMesh(&TradeClose->HalfExtents, &TradeClose->MeshHolder);
 
     // The three lists; the player's is filled at once.
     TargetList = new CTradeEquipList(this, "hp_target_inventory_list", "hp_target_scroll_bar",

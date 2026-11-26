@@ -459,9 +459,9 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     DALib::Deform->GetFirstBone(Lod.Instance, &Bone);
     if (Bone != -1)
     {
-        DALib::Deform->SetPosePos(Lod.Instance, const_cast<float*>(&Desc.Pos.x));
+        DALib::Deform->SetPosePos(Lod.Instance, &Desc.Pos);
         SetFloorHeight(Desc.Pos.y);
-        DALib::Deform->SetPoseOri(Lod.Instance, const_cast<Matrix*>(&Desc.Orient));
+        DALib::Deform->SetPoseOri(Lod.Instance, &Desc.Orient);
     }
     Hardpoints.analyze_instance(Bone);
     RefreshLoadingProgress();
@@ -613,15 +613,15 @@ void FCharacterObject::Update(double DeltaSeconds)
     // A pose other than last frame's (compared bitwise, dword by dword) marks the pose dirty.
     float Pos[3];
     memcpy(Pos, DALib::Engine->GetInstancePosition(GetEngineInstance()), sizeof(Pos));
-    float Orient[9];
-    memcpy(Orient, DALib::Engine->GetInstanceOrientation(GetEngineInstance()), sizeof(Orient));
+    Matrix Orient;
+    memcpy(&Orient, DALib::Engine->GetInstanceOrientation(GetEngineInstance()), sizeof(Orient));
     if (bHasLastPose == 0 || memcmp(LastPos, Pos, sizeof(Pos)) != 0 ||
-        memcmp(LastOrient, Orient, sizeof(Orient)) != 0)
+        memcmp(&LastOrient, &Orient, sizeof(Orient)) != 0)
     {
         bPoseDirty = 1;
     }
     memcpy(LastPos, Pos, sizeof(Pos));
-    memcpy(LastOrient, Orient, sizeof(Orient));
+    memcpy(&LastOrient, &Orient, sizeof(Orient));
     bHasLastPose = 1;
 
     // IAnimation2 slot 27 and IEngine slot 27.
@@ -767,9 +767,9 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     ICamera* const RoomCamera = GetRoomRuntimeCamera(Owner);
     Hotspot->UpdateScreenRect(RoomCamera);
     float Radius = 0.0f;
-    float Center[3];
-    DALib::Deform->GetBoundSphere(Lod.Instance, &Radius, Center);
-    if (!MiscUtilSphereInView(RoomCamera, Center, Radius))
+    Vector Center;
+    DALib::Deform->GetBoundSphere(Lod.Instance, &Radius, &Center);
+    if (!MiscUtilSphereInView(RoomCamera, &Center, Radius))
         return;
     if (Camera == nullptr)
         return;
@@ -1337,7 +1337,7 @@ void PlacePlayerAtSetpoint(char const* SetpointName)
     if (Player == nullptr)
         return;
     void* const Instance = Player->Lod.Instance;
-    DALib::Deform->SetPosePos(Instance, &Pos.x);
+    DALib::Deform->SetPosePos(Instance, &Pos);
     DALib::Deform->SetPoseOri(Instance, &Orient);
     Player->SetFloorHeight(Pos.y);
 }

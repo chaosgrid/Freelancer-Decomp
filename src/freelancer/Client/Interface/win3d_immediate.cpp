@@ -1038,20 +1038,20 @@ void Win3DDrawWireSphere(void* Camera, Transform const* Xform, float Radius, int
     Win3DDrawSphereGrid(Points, Cols, Rows);
 }
 
-void Win3DVec3Add(float* Out, float const* A, float const* B)
+void Win3DVec3Add(Vector* Out, Vector const* A, Vector const* B)
 {
     // FUN_00423b30
-    Out[0] = A[0] + B[0];
-    Out[1] = A[1] + B[1];
-    Out[2] = A[2] + B[2];
+    Out->x = A->x + B->x;
+    Out->y = A->y + B->y;
+    Out->z = A->z + B->z;
 }
 
-void Win3DVec3Sub(float* Out, float const* A, float const* B)
+void Win3DVec3Sub(Vector* Out, Vector const* A, Vector const* B)
 {
     // FUN_00423b60.
-    Out[0] = A[0] - B[0];
-    Out[1] = A[1] - B[1];
-    Out[2] = A[2] - B[2];
+    Out->x = A->x - B->x;
+    Out->y = A->y - B->y;
+    Out->z = A->z - B->z;
 }
 
 namespace
@@ -1062,67 +1062,67 @@ namespace
     constexpr float kFuzzyArcQuadScale = 1.2f;
 
     // FUN_00410190 (thiscall on the vector): sqrt((x*x + y*y) + z*z), unrounded.
-    double FuzzyVecLength(float const* V)
+    double FuzzyVecLength(Vector const* V)
     {
-        return sqrt(static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1] +
-                    static_cast<double>(V[2]) * V[2]);
+        return sqrt(static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y +
+                    static_cast<double>(V->z) * V->z);
     }
 
     // The drawers' inline length, `(y*y + z*z) + x*x` (or z first -- the same sum), unrounded.
-    double FuzzyInlineLength(float const* V)
+    double FuzzyInlineLength(Vector const* V)
     {
-        return sqrt(static_cast<double>(V[1]) * V[1] + static_cast<double>(V[2]) * V[2] +
-                    static_cast<double>(V[0]) * V[0]);
+        return sqrt(static_cast<double>(V->y) * V->y + static_cast<double>(V->z) * V->z +
+                    static_cast<double>(V->x) * V->x);
     }
 
     // The cross product both drawers build inline: Out = D x E, each component rounded to float.
-    void FuzzyCross(float* Out, float const* D, float const* E)
+    void FuzzyCross(Vector* Out, Vector const* D, Vector const* E)
     {
-        Out[0] = static_cast<float>(static_cast<double>(E[2]) * D[1] -
-                                    static_cast<double>(E[1]) * D[2]);
-        Out[1] = static_cast<float>(static_cast<double>(D[2]) * E[0] -
-                                    static_cast<double>(E[2]) * D[0]);
-        Out[2] = static_cast<float>(static_cast<double>(E[1]) * D[0] -
-                                    static_cast<double>(D[1]) * E[0]);
+        Out->x = static_cast<float>(static_cast<double>(E->z) * D->y -
+                                    static_cast<double>(E->y) * D->z);
+        Out->y = static_cast<float>(static_cast<double>(D->z) * E->x -
+                                    static_cast<double>(E->z) * D->x);
+        Out->z = static_cast<float>(static_cast<double>(E->y) * D->x -
+                                    static_cast<double>(D->y) * E->x);
     }
 
     // Common's RandomVector(Radius) added to P.
-    void FuzzyJitter(float* Out, float const* P, float Radius)
+    void FuzzyJitter(Vector* Out, Vector const* P, float Radius)
     {
         Vector const Offset = RandomVector(Radius);
-        float const OffsetXyz[3] = {Offset.x, Offset.y, Offset.z};
-        Win3DVec3Add(Out, P, OffsetXyz);
+        Vector const OffsetXyz = {Offset.x, Offset.y, Offset.z};
+        Win3DVec3Add(Out, P, &OffsetXyz);
     }
 
     // Scale V in place by Wanted / |V|, each product rounded to float.
-    void FuzzyRescale(float* V, float Wanted)
+    void FuzzyRescale(Vector* V, float Wanted)
     {
         double const Scale = static_cast<double>(Wanted) / FuzzyVecLength(V);
-        V[0] = static_cast<float>(V[0] * Scale);
-        V[1] = static_cast<float>(V[1] * Scale);
-        V[2] = static_cast<float>(V[2] * Scale);
+        V->x = static_cast<float>(V->x * Scale);
+        V->y = static_cast<float>(V->y * Scale);
+        V->z = static_cast<float>(V->z * Scale);
     }
 
     // One camera-facing quad: (0,0) Mid + Along, (1,0) Mid + Side, (1,1) Mid - Along,
     // (0,1) Mid - Side.
-    void FuzzyEmitQuad(unsigned long Handle, float const* Mid, float const* Along,
-                       float const* Side)
+    void FuzzyEmitQuad(unsigned long Handle, Vector const* Mid, Vector const* Along,
+                       Vector const* Side)
     {
-        float Corner[3];
+        Vector Corner;
         Win3DBindTexture(reinterpret_cast<void*>(Handle));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(0.0f, 0.0f);
-        Win3DVec3Add(Corner, Mid, Along);
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        Win3DVec3Add(&Corner, Mid, Along);
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
         Win3DTexCoord2f(1.0f, 0.0f);
-        Win3DVec3Add(Corner, Mid, Side);
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        Win3DVec3Add(&Corner, Mid, Side);
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
         Win3DTexCoord2f(1.0f, 1.0f);
-        Win3DVec3Sub(Corner, Mid, Along);
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        Win3DVec3Sub(&Corner, Mid, Along);
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
         Win3DTexCoord2f(0.0f, 1.0f);
-        Win3DVec3Sub(Corner, Mid, Side);
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        Win3DVec3Sub(&Corner, Mid, Side);
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
         Win3DEnd();
     }
 }
@@ -1137,15 +1137,15 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
     }
 
     // The length is kept as a float, but divided unrounded for the segment count.
-    float Dir[3];
-    Win3DVec3Sub(Dir, Line->End, Line->Start);
-    double const LengthExt = FuzzyInlineLength(Dir);
+    Vector Dir;
+    Win3DVec3Sub(&Dir, &Line->End, &Line->Start);
+    double const LengthExt = FuzzyInlineLength(&Dir);
     float const Length = static_cast<float>(LengthExt);
     int const Count = static_cast<int>(floor(LengthExt / Line->Width) + 1.0);
 
     float const Step = static_cast<float>(static_cast<double>(Length) / Count);
-    float Unit[3] = {Dir[0], Dir[1], Dir[2]};
-    FuzzyRescale(Unit, Step);
+    Vector Unit = {Dir.x, Dir.y, Dir.z};
+    FuzzyRescale(&Unit, Step);
 
     // The colour, on both paths.
     Win3DColor3f(Line->Color[0], Line->Color[1], Line->Color[2]);
@@ -1158,27 +1158,27 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
         Win3DDisable(kWin3DTexture2D);
         Win3DDisable(kWin3DBlend);
         Win3DBegin(kWin3DLineStrip);
-        Win3DVertex3f(Line->Start[0], Line->Start[1], Line->Start[2]);
+        Win3DVertex3f(Line->Start.x, Line->Start.y, Line->Start.z);
         for (int Index = 1; Index < Count; ++Index)
         {
             double const Scale = static_cast<double>(Index);
-            float const StepY = static_cast<float>(Unit[1] * Scale);
-            float const StepZ = static_cast<float>(Unit[2] * Scale);
-            float const OnLine[3] = {
-                static_cast<float>(Unit[0] * Scale + Line->Start[0]),
-                StepY + Line->Start[1],
-                StepZ + Line->Start[2]};
-            float Point[3];
-            FuzzyJitter(Point, OnLine, Jitter);
-            Win3DVertex3f(Point[0], Point[1], Point[2]);
+            float const StepY = static_cast<float>(Unit.y * Scale);
+            float const StepZ = static_cast<float>(Unit.z * Scale);
+            Vector const OnLine = {
+                static_cast<float>(Unit.x * Scale + Line->Start.x),
+                StepY + Line->Start.y,
+                StepZ + Line->Start.z};
+            Vector Point;
+            FuzzyJitter(&Point, &OnLine, Jitter);
+            Win3DVertex3f(Point.x, Point.y, Point.z);
         }
-        Win3DVertex3f(Line->End[0], Line->End[1], Line->End[2]);
+        Win3DVertex3f(Line->End.x, Line->End.y, Line->End.z);
         Win3DEnd();
         return;
     }
 
     // Frame 0 of the texture, additive blend.
-    float Cur[3] = {Line->Start[0], Line->Start[1], Line->Start[2]};
+    Vector Cur = {Line->Start.x, Line->Start.y, Line->Start.z};
     unsigned long Frame[5];
     DALib::TextureLib->GetTextureFrame(Line->Texture, 0, Frame);
     Win3DEnable(kWin3DBlend);
@@ -1187,85 +1187,85 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
     for (int Index = 1; Index <= Count; ++Index)
     {
         // The last point is End itself, the others Start + Unit * i jittered.
-        float Next[3];
+        Vector Next;
         if (Index == Count)
         {
-            Next[0] = Line->End[0];
-            Next[1] = Line->End[1];
-            Next[2] = Line->End[2];
+            Next.x = Line->End.x;
+            Next.y = Line->End.y;
+            Next.z = Line->End.z;
         }
         else
         {
-            float Offset[3];
-            float OnLine[3];
-            ScaleVec3(Offset, Unit, static_cast<float>(Index));
-            Win3DVec3Add(OnLine, Line->Start, Offset);
-            FuzzyJitter(Next, OnLine, Jitter);
+            Vector Offset;
+            Vector OnLine;
+            ScaleVec3(&Offset.x, &Unit.x, static_cast<float>(Index));
+            Win3DVec3Add(&OnLine, &Line->Start, &Offset);
+            FuzzyJitter(&Next, &OnLine, Jitter);
         }
 
         // The side direction (Next - Cur) x (Eye - Cur).
-        float ToEye[3];
-        float Segment[3];
-        float Side[3];
-        Win3DVec3Sub(ToEye, Line->EyePos, Cur);
-        Win3DVec3Sub(Segment, Next, Cur);
-        FuzzyCross(Side, Segment, ToEye);
+        Vector ToEye;
+        Vector Segment;
+        Vector Side;
+        Win3DVec3Sub(&ToEye, &Line->EyePos, &Cur);
+        Win3DVec3Sub(&Segment, &Next, &Cur);
+        FuzzyCross(&Side, &Segment, &ToEye);
 
         // The midpoint, and the side rescaled to half of |Mid - Cur| (0.5 as a double).
-        float Half[3];
-        float HalfScaled[3];
-        float Mid[3];
-        float FromCur[3];
-        Win3DVec3Sub(Half, Next, Cur);
-        ScaleVec3(HalfScaled, Half, 0.5f);
-        Win3DVec3Add(Mid, Cur, HalfScaled);
-        Win3DVec3Sub(FromCur, Mid, Cur);
-        FuzzyRescale(Side, static_cast<float>(FuzzyInlineLength(FromCur) * 0.5));
+        Vector Half;
+        Vector HalfScaled;
+        Vector Mid;
+        Vector FromCur;
+        Win3DVec3Sub(&Half, &Next, &Cur);
+        ScaleVec3(&HalfScaled.x, &Half.x, 0.5f);
+        Win3DVec3Add(&Mid, &Cur, &HalfScaled);
+        Win3DVec3Sub(&FromCur, &Mid, &Cur);
+        FuzzyRescale(&Side, static_cast<float>(FuzzyInlineLength(&FromCur) * 0.5));
 
         // Along = (Cur - Mid) * 1.25, Side * 1.25 * SideScale.
-        float Back[3];
-        Win3DVec3Sub(Back, Cur, Mid);
-        float const Along[3] = {Back[0] * kFuzzyLineQuadScale, Back[1] * kFuzzyLineQuadScale,
-                                Back[2] * kFuzzyLineQuadScale};
-        float const SideWide[3] = {Side[0] * kFuzzyLineQuadScale, Side[1] * kFuzzyLineQuadScale,
-                                   Side[2] * kFuzzyLineQuadScale};
-        float const SideQuad[3] = {SideWide[0] * Line->SideScale, SideWide[1] * Line->SideScale,
-                                   SideWide[2] * Line->SideScale};
+        Vector Back;
+        Win3DVec3Sub(&Back, &Cur, &Mid);
+        Vector const Along = {Back.x * kFuzzyLineQuadScale, Back.y * kFuzzyLineQuadScale,
+                              Back.z * kFuzzyLineQuadScale};
+        float const SideWide[3] = {Side.x * kFuzzyLineQuadScale, Side.y * kFuzzyLineQuadScale,
+                                   Side.z * kFuzzyLineQuadScale};
+        Vector const SideQuad = {SideWide[0] * Line->SideScale, SideWide[1] * Line->SideScale,
+                                 SideWide[2] * Line->SideScale};
 
-        FuzzyEmitQuad(Frame[0], Mid, Along, SideQuad);
+        FuzzyEmitQuad(Frame[0], &Mid, &Along, &SideQuad);
 
-        Cur[0] = Next[0];
-        Cur[1] = Next[1];
-        Cur[2] = Next[2];
+        Cur.x = Next.x;
+        Cur.y = Next.y;
+        Cur.z = Next.z;
     }
 }
 
 void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
 {
     // FUN_004231f0.
-    float FromCentre[3];
-    float ToEnd[3];
-    Win3DVec3Sub(FromCentre, Line->Start, Line->Control);
-    Win3DVec3Sub(ToEnd, Line->End, Line->Control);
+    Vector FromCentre;
+    Vector ToEnd;
+    Win3DVec3Sub(&FromCentre, &Line->Start, &Line->Control);
+    Win3DVec3Sub(&ToEnd, &Line->End, &Line->Control);
 
     // Either radius below 0.001 (compared with the unrounded root) draws nothing.
-    double const RadiusExt = FuzzyInlineLength(FromCentre);
+    double const RadiusExt = FuzzyInlineLength(&FromCentre);
     float const Radius = static_cast<float>(RadiusExt);
     if (RadiusExt < 0.001)
         return;
-    if (FuzzyInlineLength(ToEnd) < 0.001)
+    if (FuzzyInlineLength(&ToEnd) < 0.001)
         return;
 
     // ToEnd rescaled to the start radius.
     float const Jitter = Line->JitterScale * Line->Width;
-    FuzzyRescale(ToEnd, Radius);
+    FuzzyRescale(&ToEnd, Radius);
 
     // The swept angle. The cosine is compared unrounded with -1.0f and then, rounded, with 1.0f;
     // NaN passes both.
     float const RadiusSq = Radius * Radius;
-    double const CosineExt = (static_cast<double>(ToEnd[2]) * FromCentre[2] +
-                              static_cast<double>(ToEnd[1]) * FromCentre[1] +
-                              static_cast<double>(ToEnd[0]) * FromCentre[0]) /
+    double const CosineExt = (static_cast<double>(ToEnd.z) * FromCentre.z +
+                              static_cast<double>(ToEnd.y) * FromCentre.y +
+                              static_cast<double>(ToEnd.x) * FromCentre.x) /
                              RadiusSq;
     float Cosine = static_cast<float>(CosineExt);
     if (CosineExt < -1.0)
@@ -1287,10 +1287,10 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         floor(static_cast<double>(Angle) / acos(static_cast<double>(ChordCosine))) + 1.0);
     float const Step = static_cast<float>(static_cast<double>(Angle) / Count);
 
-    float Axis[3];
-    FuzzyCross(Axis, FromCentre, ToEnd);
+    Vector Axis;
+    FuzzyCross(&Axis, &FromCentre, &ToEnd);
 
-    Vector const Source = {FromCentre[0], FromCentre[1], FromCentre[2]};
+    Vector const Source = {FromCentre.x, FromCentre.y, FromCentre.z};
 
     if (Line->Texture == nullptr)
     {
@@ -1300,19 +1300,19 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         Win3DDisable(kWin3DBlend);
         Win3DColor3f(Line->Color[0], Line->Color[1], Line->Color[2]);
         Win3DBegin(kWin3DLineStrip);
-        Win3DVertex3f(Line->Start[0], Line->Start[1], Line->Start[2]);
+        Win3DVertex3f(Line->Start.x, Line->Start.y, Line->Start.z);
         for (int Index = 1; Index < Count; ++Index)
         {
             // x87: the half angle stays double; the axis length is the inline
             // (x*x + z*z) + y*y root.
             double const HalfAngle = static_cast<double>(Index) * Step * 0.5f;
-            double const AxisLength = sqrt(static_cast<double>(Axis[0]) * Axis[0] +
-                                           static_cast<double>(Axis[2]) * Axis[2] +
-                                           static_cast<double>(Axis[1]) * Axis[1]);
+            double const AxisLength = sqrt(static_cast<double>(Axis.x) * Axis.x +
+                                           static_cast<double>(Axis.z) * Axis.z +
+                                           static_cast<double>(Axis.y) * Axis.y);
             Quaternion Rotation;
             Rotation.w = static_cast<float>(cos(HalfAngle));
             float Vec[3];
-            ScaleVec3(Vec, Axis, static_cast<float>(sin(HalfAngle) / AxisLength));
+            ScaleVec3(Vec, &Axis.x, static_cast<float>(sin(HalfAngle) / AxisLength));
             Rotation.x = Vec[0];
             Rotation.y = Vec[1];
             Rotation.z = Vec[2];
@@ -1323,20 +1323,20 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             Vector Rotated;
             Win3DTransformMathEngine()->TransformMatrix(Rotated, Mat, Source);
 
-            float const OnArc[3] = {Rotated.x + Line->Control[0], Rotated.y + Line->Control[1],
-                                    Rotated.z + Line->Control[2]};
-            float Point[3];
-            FuzzyJitter(Point, OnArc, Jitter);
-            Win3DVertex3f(Point[0], Point[1], Point[2]);
+            Vector const OnArc = {Rotated.x + Line->Control.x, Rotated.y + Line->Control.y,
+                                  Rotated.z + Line->Control.z};
+            Vector Point;
+            FuzzyJitter(&Point, &OnArc, Jitter);
+            Win3DVertex3f(Point.x, Point.y, Point.z);
         }
-        Win3DVertex3f(ToEnd[0] + Line->Control[0], ToEnd[1] + Line->Control[1],
-                      ToEnd[2] + Line->Control[2]);
+        Win3DVertex3f(ToEnd.x + Line->Control.x, ToEnd.y + Line->Control.y,
+                      ToEnd.z + Line->Control.z);
         Win3DEnd();
         return;
     }
 
     // Frame 0 of the texture, additive blend. No colour is set on this path.
-    float Cur[3] = {Line->Start[0], Line->Start[1], Line->Start[2]};
+    Vector Cur = {Line->Start.x, Line->Start.y, Line->Start.z};
     unsigned long Frame[5];
     DALib::TextureLib->GetTextureFrame(Line->Texture, 0, Frame);
     Win3DEnable(kWin3DBlend);
@@ -1344,10 +1344,10 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
 
     for (int Index = 1; Index <= Count; ++Index)
     {
-        float Next[3];
+        Vector Next;
         if (Index == Count)
         {
-            Win3DVec3Add(Next, Line->Control, ToEnd);
+            Win3DVec3Add(&Next, &Line->Control, &ToEnd);
         }
         else
         {
@@ -1358,7 +1358,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             Quaternion Rotation;
             Rotation.w = static_cast<float>(cos(static_cast<double>(HalfAngle)));
             float Vec[3];
-            ScaleVec3(Vec, Axis, static_cast<float>(Sine / FuzzyVecLength(Axis)));
+            ScaleVec3(Vec, &Axis.x, static_cast<float>(Sine / FuzzyVecLength(&Axis)));
             Rotation.x = Vec[0];
             Rotation.y = Vec[1];
             Rotation.z = Vec[2];
@@ -1367,42 +1367,42 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             Win3DTransformMathEngine()->QuaternionToMatrix(Mat, Rotation);
             Vector Rotated;
             Win3DTransformByMatrix(Rotated, Mat, Source);
-            float const RotatedXyz[3] = {Rotated.x, Rotated.y, Rotated.z};
-            float OnArc[3];
-            Win3DVec3Add(OnArc, Line->Control, RotatedXyz);
-            FuzzyJitter(Next, OnArc, Jitter);
+            Vector const RotatedXyz = {Rotated.x, Rotated.y, Rotated.z};
+            Vector OnArc;
+            Win3DVec3Add(&OnArc, &Line->Control, &RotatedXyz);
+            FuzzyJitter(&Next, &OnArc, Jitter);
         }
 
-        float ToEye[3];
-        float Segment[3];
-        float Side[3];
-        Win3DVec3Sub(ToEye, Line->EyePos, Cur);
-        Win3DVec3Sub(Segment, Next, Cur);
-        FuzzyCross(Side, Segment, ToEye);
+        Vector ToEye;
+        Vector Segment;
+        Vector Side;
+        Win3DVec3Sub(&ToEye, &Line->EyePos, &Cur);
+        Win3DVec3Sub(&Segment, &Next, &Cur);
+        FuzzyCross(&Side, &Segment, &ToEye);
 
         // The side rescaled to |Mid - Cur| (no halving here, unlike the straight drawer).
-        float Half[3];
-        float HalfScaled[3];
-        float Mid[3];
-        float FromCur[3];
-        Win3DVec3Sub(Half, Next, Cur);
-        ScaleVec3(HalfScaled, Half, 0.5f);
-        Win3DVec3Add(Mid, HalfScaled, Cur);
-        Win3DVec3Sub(FromCur, Mid, Cur);
-        FuzzyRescale(Side, static_cast<float>(FuzzyInlineLength(FromCur)));
+        Vector Half;
+        Vector HalfScaled;
+        Vector Mid;
+        Vector FromCur;
+        Win3DVec3Sub(&Half, &Next, &Cur);
+        ScaleVec3(&HalfScaled.x, &Half.x, 0.5f);
+        Win3DVec3Add(&Mid, &HalfScaled, &Cur);
+        Win3DVec3Sub(&FromCur, &Mid, &Cur);
+        FuzzyRescale(&Side, static_cast<float>(FuzzyInlineLength(&FromCur)));
 
         // Along = (Cur - Mid) * 1.2, Side * 1.2 (no SideScale).
-        float Back[3];
-        Win3DVec3Sub(Back, Cur, Mid);
-        float const Along[3] = {Back[0] * kFuzzyArcQuadScale, Back[1] * kFuzzyArcQuadScale,
-                                Back[2] * kFuzzyArcQuadScale};
-        float const SideQuad[3] = {Side[0] * kFuzzyArcQuadScale, Side[1] * kFuzzyArcQuadScale,
-                                   Side[2] * kFuzzyArcQuadScale};
+        Vector Back;
+        Win3DVec3Sub(&Back, &Cur, &Mid);
+        Vector const Along = {Back.x * kFuzzyArcQuadScale, Back.y * kFuzzyArcQuadScale,
+                              Back.z * kFuzzyArcQuadScale};
+        Vector const SideQuad = {Side.x * kFuzzyArcQuadScale, Side.y * kFuzzyArcQuadScale,
+                                 Side.z * kFuzzyArcQuadScale};
 
-        FuzzyEmitQuad(Frame[0], Mid, Along, SideQuad);
+        FuzzyEmitQuad(Frame[0], &Mid, &Along, &SideQuad);
 
-        Cur[0] = Next[0];
-        Cur[1] = Next[1];
-        Cur[2] = Next[2];
+        Cur.x = Next.x;
+        Cur.y = Next.y;
+        Cur.z = Next.z;
     }
 }

@@ -15,6 +15,7 @@
 
 #include <cstdint>
 
+#include "math3d.h" // Vector
 #include "../ivp_utility/ivp_math.h"
 #include "../ivp_utility/ivp_u_vector.h"
 
@@ -26,7 +27,7 @@ class IVP_OV_Tree_Manager;
 // The 6-dword record 0628d450 builds at local_248 and hands to collect_objects.
 struct FIVP_Sphere_Query_Record
 {
-    float Center[3];            // +0x00
+    Vector Center;              // +0x00
     float Unwritten_0x0c;       // +0x0c: retail copies an uninitialised stack dword here;
                                 //        06350740 never reads it
     float Radius;               // +0x10

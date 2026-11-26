@@ -256,7 +256,7 @@ void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Fla
     DALib::Renderer->RenderInstance(Camera, Holder->EngineInstance, 1.0f, Flags, nullptr, nullptr);
 }
 
-void ClientMeshHolderSetPosition(FMeshHolder* Holder, float const Position[3])
+void ClientMeshHolderSetPosition(FMeshHolder* Holder, Vector const* Position)
 {
     // FUN_00420fd0.
     DALib::Engine->SetInstancePosition(Holder->EngineInstance, (const Vector*)Position);

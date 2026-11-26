@@ -214,7 +214,7 @@ void FMixerLeaf::UpdateDeltaRate(float Dt)
 }
 
 // FUN_06616410: typed slot 0x38.
-float* FMixerLeaf::SampleDisplacement(float* Out, float Dt)
+Vector* FMixerLeaf::SampleDisplacement(Vector* Out, float Dt)
 {
     Typed->Step(Out, Dt);
     return Out;
@@ -281,23 +281,23 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
         // to the stack, double ones stay on the FPU.
         const double Inv = (double)(InvDuration);
         const double Now = (double)(Time);
-        const double Ctrl0 = (double)(PoseCtrl[0]) * 0.5;
-        const double Ctrl1 = (double)(PoseCtrl[1]) * 0.5;
-        const float Ctrl2 = (float)((double)(PoseCtrl[2]) * 0.5);
+        const double Ctrl0 = (double)(PoseCtrl.x) * 0.5;
+        const double Ctrl1 = (double)(PoseCtrl.y) * 0.5;
+        const float Ctrl2 = (float)((double)(PoseCtrl.z) * 0.5);
         const float Ctrl0Inv = (float)(Ctrl0 * Inv);
         const double Ctrl1Inv = Ctrl1 * Inv;
         const double Ctrl2InvNow = (double)(Ctrl2) * Inv * Now;
         const float Term0 = (float)((double)(Ctrl0Inv) * Now);
         const float Term1 = (float)(Ctrl1Inv * Now);
-        const double Rate0 = (double)(Term0) + PoseRate[0];
-        const float Rate1 = (float)((double)(Term1) + PoseRate[1]);
-        const float Rate2 = (float)(Ctrl2InvNow + PoseRate[2]);
+        const double Rate0 = (double)(Term0) + PoseRate.x;
+        const float Rate1 = (float)((double)(Term1) + PoseRate.y);
+        const float Rate2 = (float)(Ctrl2InvNow + PoseRate.z);
         const double Pos0 = Rate0 * Now;
         const double Pos1 = (double)(Rate1) * Now;
         const float Pos2 = (float)((double)(Rate2) * Now);
-        Out[0] = (float)(Pos0 + PoseStart[0]);
-        Out[1] = (float)(Pos1 + PoseStart[1]);
-        Out[2] = (float)((double)(Pos2) + PoseStart[2]);
+        Out[0] = (float)(Pos0 + PoseStart.x);
+        Out[1] = (float)(Pos1 + PoseStart.y);
+        Out[2] = (float)((double)(Pos2) + PoseStart.z);
 
         // Put the kept axis back. With none of the three bits set retail discards it.
         if ((Axis & 0x8) != 0)
@@ -357,7 +357,7 @@ void FMixerBlend::UpdateDeltaRate(float Dt)
 }
 
 // LAB_066156d0: forwards to the predecessor.
-float* FMixerBlend::SampleDisplacement(float* Out, float Dt)
+Vector* FMixerBlend::SampleDisplacement(Vector* Out, float Dt)
 {
     Prev->SampleDisplacement(Out, Dt);
     return Out;
@@ -372,10 +372,10 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     Type = MixerOverlayNode;
     if (Desc->Kind == 0)
     {
-        const unsigned long* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
+        const FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
         if (Relative != nullptr)
         {
-            Count = MixerJointValueCount(Relative[0]);
+            Count = MixerJointValueCount(Relative->Type);
             G_AnimEngine->GetJointParams((InstanceIndex)Desc->Instance, 0, Values);
         }
         // Relative == null leaves Count as operator new handed it over; retail writes nothing
@@ -389,11 +389,11 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
         Values[0] = Position->x;
         Values[1] = Position->y;
         Values[2] = Position->z;
-        const float* Orientation = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Desc->Instance); // +0x98
+        const Matrix* Orientation = G_AnimEngine->GetInstanceOrientation((InstanceIndex)Desc->Instance); // +0x98
         I3DMathEngine* Math = Acquire3DMathEngine();             // DAT_0662b0f8
         Quaternion Quat;
         Math->MatrixToQuaternion(Quat,
-                                 *(const Matrix*)(Orientation)); // +0x50
+                                 *Orientation); // +0x50
         Values[3] = Quat.w;
         Values[4] = Quat.x;
         Values[5] = Quat.y;
@@ -425,12 +425,12 @@ void FMixerOverlay::UpdateDeltaRate(float Dt)
 }
 
 // LAB_06612170: zero three floats.
-float* FMixerOverlay::SampleDisplacement(float* Out, float Dt)
+Vector* FMixerOverlay::SampleDisplacement(Vector* Out, float Dt)
 {
     (void)Dt;
-    Out[0] = 0.0f;
-    Out[1] = 0.0f;
-    Out[2] = 0.0f;
+    Out->x = 0.0f;
+    Out->y = 0.0f;
+    Out->z = 0.0f;
     return Out;
 }
 
@@ -582,7 +582,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
                 if ((Blend->Flags & 2) != 0)
                 {
                     FTypedChannel* PrevTyped = ((FMixerLeaf*)(Blend->Prev))->Typed;
-                    const float* Position = (const float*)G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance);
+                    const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance);
                     PrevTyped->SetOverlayPos(Position);
                 }
                 if ((Blend->Flags & 1) != 0)
@@ -669,9 +669,9 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         unsigned long Kind = 0;
         if (Desc->Kind == 0)
         {
-            const unsigned long* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
+            const FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
             if (Relative != nullptr)
-                Kind = MixerJointValueCount(Relative[0]);
+                Kind = MixerJointValueCount(Relative->Type);
         }
         else if (Desc->Kind == 1)
             Kind = 7;
@@ -811,30 +811,30 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
     if ((Flags & 0x38) == 0)
         return;
 
-    float Predicted[3];
-    Leaf->SampleDisplacement(Predicted, Duration);
+    Vector Predicted;
+    Leaf->SampleDisplacement(&Predicted, Duration);
     Blend->Flags |= 2;
     const Vector* Start = G_AnimEngine->GetInstancePosition(Typed->Instance);
-    Blend->PoseStart[0] = Start->x;
-    Blend->PoseStart[1] = Start->y;
-    Blend->PoseStart[2] = Start->z;
-    float AnchorOut[3];
-    const float* Rate = Anchor->SampleDisplacement(AnchorOut, Duration);
-    Blend->PoseRate[0] = Rate[0];
-    Blend->PoseRate[1] = Rate[1];
-    Blend->PoseRate[2] = Rate[2];
+    Blend->PoseStart.x = Start->x;
+    Blend->PoseStart.y = Start->y;
+    Blend->PoseStart.z = Start->z;
+    Vector AnchorOut;
+    const Vector* Rate = Anchor->SampleDisplacement(&AnchorOut, Duration);
+    Blend->PoseRate.x = Rate->x;
+    Blend->PoseRate.y = Rate->y;
+    Blend->PoseRate.z = Rate->z;
 
     // Scaled1/Scaled2 are spilled to float; component 0 stays on the FPU.
     const double Inv = (double)(Blend->InvDuration);
-    Blend->PoseRate[0] = (float)(Inv * Blend->PoseRate[0]);
-    Blend->PoseRate[1] = (float)(Inv * Blend->PoseRate[1]);
-    Blend->PoseRate[2] = (float)(Inv * Blend->PoseRate[2]);
-    const float Scaled1 = (float)((double)(Predicted[1]) * Inv);
-    const float Scaled2 = (float)((double)(Predicted[2]) * Inv);
-    Blend->PoseCtrl[0] =
-        (float)((double)(Predicted[0]) * Inv - Blend->PoseRate[0]);
-    Blend->PoseCtrl[1] = (float)((double)(Scaled1) - Blend->PoseRate[1]);
-    Blend->PoseCtrl[2] = (float)((double)(Scaled2) - Blend->PoseRate[2]);
+    Blend->PoseRate.x = (float)(Inv * Blend->PoseRate.x);
+    Blend->PoseRate.y = (float)(Inv * Blend->PoseRate.y);
+    Blend->PoseRate.z = (float)(Inv * Blend->PoseRate.z);
+    const float Scaled1 = (float)((double)(Predicted.y) * Inv);
+    const float Scaled2 = (float)((double)(Predicted.z) * Inv);
+    Blend->PoseCtrl.x =
+        (float)((double)(Predicted.x) * Inv - Blend->PoseRate.x);
+    Blend->PoseCtrl.y = (float)((double)(Scaled1) - Blend->PoseRate.y);
+    Blend->PoseCtrl.z = (float)((double)(Scaled2) - Blend->PoseRate.z);
 }
 
 void MixerUnbindTyped(FAnimationObject* Animation, FTypedChannel* Typed)
@@ -985,7 +985,7 @@ void MixerWalkAll(FAnimationObject* Animation, float Dt)
 }
 
 // FUN_06612a70.
-void FAnimPlayback::WriteOverlayPos(const float* Pos, FMixerDescMap* Inner)
+void FAnimPlayback::WriteOverlayPos(const Vector* Pos, FMixerDescMap* Inner)
 {
     unsigned long Index = 0;
     while (Index < this->Typed.size())
@@ -1003,9 +1003,9 @@ void FAnimPlayback::WriteOverlayPos(const float* Pos, FMixerDescMap* Inner)
                     if (Node->Type == MixerOverlayNode)
                     {
                         FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
-                        Overlay->Values[0] = Pos[0];
-                        Overlay->Values[1] = Pos[1];
-                        Overlay->Values[2] = Pos[2];
+                        Overlay->Values[0] = Pos->x;
+                        Overlay->Values[1] = Pos->y;
+                        Overlay->Values[2] = Pos->z;
                     }
                     Node = Node->Next;
                 }
@@ -1017,12 +1017,12 @@ void FAnimPlayback::WriteOverlayPos(const float* Pos, FMixerDescMap* Inner)
 
 // FUN_06612b80: the orientation goes to the channels as the matrix it came in as and to the
 // overlays as a quaternion, converted once up front.
-void FAnimPlayback::WriteOverlayOrient(const float* Mat, FMixerDescMap* Inner)
+void FAnimPlayback::WriteOverlayOrient(const Matrix* Mat, FMixerDescMap* Inner)
 {
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662ace0
     Quaternion Quat;
     Math->MatrixToQuaternion(Quat,
-                             *(const Matrix*)(Mat));
+                             *Mat);
     unsigned long Index = 0;
     while (Index < this->Typed.size())
     {
@@ -1053,7 +1053,7 @@ void FAnimPlayback::WriteOverlayOrient(const float* Mat, FMixerDescMap* Inner)
 }
 
 // FUN_06612c60.
-void FAnimPlayback::AddOverlayPos(const float* Delta, FMixerDescMap* Inner)
+void FAnimPlayback::AddOverlayPos(const Vector* Delta, FMixerDescMap* Inner)
 {
     unsigned long Index = 0;
     while (Index < this->Typed.size())
@@ -1071,9 +1071,9 @@ void FAnimPlayback::AddOverlayPos(const float* Delta, FMixerDescMap* Inner)
                     if (Node->Type == MixerOverlayNode)
                     {
                         FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
-                        Overlay->Values[0] = (float)((double)(Delta[0]) + Overlay->Values[0]);
-                        Overlay->Values[1] = (float)((double)(Delta[1]) + Overlay->Values[1]);
-                        Overlay->Values[2] = (float)((double)(Delta[2]) + Overlay->Values[2]);
+                        Overlay->Values[0] = (float)((double)(Delta->x) + Overlay->Values[0]);
+                        Overlay->Values[1] = (float)((double)(Delta->y) + Overlay->Values[1]);
+                        Overlay->Values[2] = (float)((double)(Delta->z) + Overlay->Values[2]);
                     }
                     Node = Node->Next;
                 }

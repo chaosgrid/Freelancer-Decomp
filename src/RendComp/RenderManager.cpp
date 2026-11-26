@@ -76,7 +76,7 @@ public:
     int DACOM_API GetBounds(ArchetypeIndex Id, float Lod, void* Out) override;
     int DACOM_API GetCentroid(ArchetypeIndex Id, float Lod, void* Out) override;
     int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override;
-    int DACOM_API RenderInstance(void* Camera, InstanceIndex Inst, float Threshold, unsigned long Flags, void* Matrix,
+    int DACOM_API RenderInstance(void* Camera, InstanceIndex Inst, float Threshold, unsigned long Flags, const Transform* Xform,
                         void* Extra) override;
     int DACOM_API GetInstanceLodCount(InstanceIndex Inst, void* Out) override;
     int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, void* Out) override;
@@ -715,14 +715,13 @@ int DACOM_API FRenderManager::NoOp(void* /*A*/, void* /*B*/, void* /*C*/, void* 
 }
 
 int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst, float Threshold, unsigned long Flags,
-                                    void* MatrixArg, void* Extra)
+                                    const Transform* Mat, void* Extra)
 {
     if (Threshold < 0.0f)
         return 1;
 
     ICamera* Camera = (ICamera*)CameraArg;
     const Transform* World = (const Transform*)(G_Engine->GetInstanceTransform(Inst));
-    const Transform* Mat = (const Transform*)MatrixArg;
 
     float Scale = 1.0f;
     if (Mat != nullptr)
@@ -761,10 +760,10 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
         if ((Flags & kDrawConjugate) != 0)
         {
             Vector Offset;
-            TransformPoint3(&Offset.x, (const float*)World, &World->Translation.x);
+            TransformPoint3(&Offset, World, &World->Translation);
             Transform Inverse;
-            VectorNegate3(&Offset.x, &Inverse.Translation.x);
-            TransposeXform3x3((const float*)World, &Inverse.Rotation.E[0][0]);
+            VectorNegate3(&Offset, &Inverse.Translation);
+            TransposeXform3x3(World, &Inverse.Rotation);
             Transform WorldTimesMatrix;
             MathEngineCached(G_MathRenderMgr)->MulTransform(WorldTimesMatrix, *World, Composed);
             const Transform Left = WorldTimesMatrix;
@@ -837,7 +836,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
                     Set->CurrentLod = (int)(Entry - Set->Entries.data());
                     Entry->Plugin->BindMeshInstance(Inst, Entry->Handle);
                     Entry->Plugin->RenderInstance(Camera, Entry->Handle, Inst, SubmitFlags,
-                                          (Transform*)DrawMatrix, Extra);
+                                          DrawMatrix, Extra);
                 }
                 else
                 {
@@ -854,7 +853,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
         while (Child != InvalidInstanceIndex)
         {
             const int ChildRank = RenderInstance(Camera, Child, Threshold, Flags,
-                                        (Transform*)DrawMatrix, Extra);
+                                        DrawMatrix, Extra);
             if (Rank != ChildRank)
             {
                 const int Larger = (Rank < ChildRank) ? ChildRank : Rank;

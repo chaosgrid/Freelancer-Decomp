@@ -28,6 +28,29 @@ struct FEngineName
 // Joint payload contains 23 DWORDs; mixed values are copied without numeric conversion.
 static const unsigned long G_EngineJointPayloadDwords = 0x17;
 
+// The joint block of an instance: the payload CreateJoint copies in and GetInstanceRelative
+// (slot 49) hands out, null for a root. EngBase keeps it as raw dwords at instance +0x5C and
+// writes Type = 0xFFFFFFFF for no joint. Layout as Common reads it (FUN_062940c0 builds a
+// revolute block, CEGun and PhySys read it); which of the fields a joint type uses varies:
+// EngBase's fixed joint takes its translation from +0x10, Deformable2's sphere test reads the
+// vector at +0x10 as an axis.
+struct FEngineJointBlock
+{
+    unsigned long Type;   // +0x00  EngBase's joint kind (revolute is 2)
+    Vector ParentPos;     // +0x04  the parent hardpoint position
+    Vector ChildPos;      // +0x10  the child hardpoint position
+    Matrix Orient;        // +0x1c  parent * child hardpoint orientation
+    Vector Axis;          // +0x40  the rotation axis in that frame
+    float Min;            // +0x4c  angle limits
+    float Max;            // +0x50
+    // +0x54 / +0x58 are never written by FUN_062940c0 (stack garbage in retail); a revolute
+    // joint does not use them.
+    unsigned long Field_0x54;
+    unsigned long Field_0x58;
+};
+static_assert(sizeof(FEngineJointBlock) == G_EngineJointPayloadDwords * sizeof(unsigned long),
+              "FEngineJointBlock is the whole IEngine joint block");
+
 struct IEngine : IDAComponent
 {
     virtual GENRESULT DACOM_API LoadEngineComponents(IDAComponent* SystemContainer) = 0; // 3 +0x0C
@@ -118,7 +141,7 @@ struct IEngine : IDAComponent
     // Detach Child from its current parent; Parent is diagnostic context.
     virtual unsigned long DACOM_API DestroyJoint(InstanceIndex Parent,
                                                  InstanceIndex Child) = 0;             // 48
-    virtual unsigned long* DACOM_API GetInstanceRelative(InstanceIndex Instance) = 0;  // 49
+    virtual FEngineJointBlock* DACOM_API GetInstanceRelative(InstanceIndex Instance) = 0; // 49
     virtual unsigned long DACOM_API SetJointParams(InstanceIndex Instance, unsigned long Index,
                                                     const float* Values) = 0;          // 50
     virtual unsigned long DACOM_API GetJointParams(InstanceIndex Instance, unsigned long Index,
@@ -234,19 +257,21 @@ struct IAnimation2 : IDAComponent
     virtual unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags,
                                                  float Time, float Speed, void* BlendDuration,
                                                  void* Scale, void* TranslationScale,
-                                                 void* Transform) = 0;                   // 11
+                                                 const Transform* Xform) = 0;            // 11
     virtual unsigned long DACOM_API EvalStored(unsigned long PlaybackId) = 0;             // 12
     virtual unsigned long DACOM_API ApplyChannels(unsigned long PlaybackId) = 0;          // 13
     virtual unsigned long DACOM_API StopPlayback(unsigned long PlaybackId) = 0;           // 14
     virtual unsigned long DACOM_API StopChannels(unsigned long PlaybackId, void* Unused) = 0; // 15
     virtual float DACOM_API GetStoredDuration(unsigned long PlaybackId) = 0;              // 16
     virtual unsigned long DACOM_API FilterObjects(void* PlaybackId) = 0;                 // 17
-    virtual unsigned long DACOM_API SetOverlayPos(unsigned long PlaybackId, float* Pos) = 0; // 18
-    virtual unsigned long DACOM_API SetOverlayExtra(unsigned long PlaybackId, float* Extra) = 0; // 19
+    virtual unsigned long DACOM_API SetOverlayPos(unsigned long PlaybackId, const Vector* Pos) = 0; // 18
+    virtual unsigned long DACOM_API SetOverlayExtra(unsigned long PlaybackId,
+                                                    const Matrix* Extra) = 0;          // 19
     virtual unsigned long DACOM_API HasObject(unsigned long PlaybackId, void* Object) = 0; // 20
-    virtual unsigned long DACOM_API TouchMapped(unsigned long PlaybackId, float* Pos,
-                                               float* Extra) = 0;                      // 21
-    virtual unsigned long DACOM_API AddOverlayPos(unsigned long PlaybackId, float* Delta) = 0; // 22
+    virtual unsigned long DACOM_API TouchMapped(unsigned long PlaybackId, Vector* OutPos,
+                                               Vector* OutSampledPos) = 0;             // 21
+    virtual unsigned long DACOM_API AddOverlayPos(unsigned long PlaybackId,
+                                                  const Vector* Delta) = 0;            // 22
     virtual unsigned long DACOM_API GetFirstInstanceField(unsigned long PlaybackId,
                                                       unsigned long* Out) = 0;         // 23
     virtual unsigned long DACOM_API GetDurationIfNamed(unsigned long PlaybackId,
@@ -297,7 +322,7 @@ struct IChannelSink
                                   FChannelKeyBatch* Batch) = 0; // +0x00
     // TODO: purpose of both opaque notification arguments remains unknown.
     virtual void DACOM_API OnOpaqueNotification(void* A, void* B) = 0; // +0x04
-    virtual void DACOM_API OnLoop(unsigned long ChannelKey, float* Transform,
+    virtual void DACOM_API OnLoop(unsigned long ChannelKey, Transform* Xform,
                                   void* Context) = 0; // +0x08
 };
 
@@ -315,12 +340,12 @@ struct IChannel : IDAComponent
     virtual unsigned long DACOM_API Blend(unsigned long Key, float Duration) = 0;        // 10
     virtual GENRESULT DACOM_API SetUser(unsigned long Key, unsigned long User) = 0;         // 11
     virtual float DACOM_API GetUser(unsigned long Key) = 0;                            // 12
-    virtual GENRESULT DACOM_API SetOverlayPos(unsigned long Key, float* Pos) = 0;         // 13
-    virtual GENRESULT DACOM_API SetOverlayExtra(unsigned long Key, float* Extra) = 0;  // 14
+    virtual GENRESULT DACOM_API SetOverlayPos(unsigned long Key, const Vector* Pos) = 0;  // 13
+    virtual GENRESULT DACOM_API SetOverlayExtra(unsigned long Key, const Matrix* Extra) = 0; // 14
     virtual unsigned long DACOM_API InMixer(unsigned long Key) = 0;                    // 15
     // Hidden result buffer precedes Key and receives the 16-byte bind descriptor.
     virtual unsigned long* DACOM_API GetHeader(unsigned long* Out, unsigned long Key) = 0;
-    virtual GENRESULT DACOM_API AddOverlayPos(unsigned long Key, float* Delta) = 0;     // 17
+    virtual GENRESULT DACOM_API AddOverlayPos(unsigned long Key, const Vector* Delta) = 0; // 17
     virtual GENRESULT DACOM_API GetMapped(unsigned long Key, unsigned char* Out) = 0;      // 18
 };
 
@@ -330,7 +355,7 @@ struct IRootData : IDAComponent
     // As IAnimation2::EvalPlayback without a transform block; then the first channel of type 2
     // or 6 is touched (type 6 writes its sampled local position to OutSampledPos) and the
     // playback stops. Nonzero when such a channel exists.
-    virtual unsigned char DACOM_API Eval(unsigned long PlaybackId, void* OutSampledPos,
+    virtual unsigned char DACOM_API Eval(unsigned long PlaybackId, Vector* OutSampledPos,
                                          unsigned long Flags, float Time, float Speed,
                                          void* BlendDuration, void* Scale,
                                          float TranslationScale) = 0; // 3
@@ -450,8 +475,8 @@ struct IDeformable : IDAComponent
                                        int* OutLod, unsigned int Flags) = 0;            // 16
     virtual GENRESULT DACOM_API Unused17(void* A, void* B, void* C, void* D) = 0;         // 17
     virtual GENRESULT DACOM_API GetFirstBone(void* Instance, int* Out) = 0;             // 18
-    virtual GENRESULT DACOM_API SetPosePos(void* Instance, float* Pos3) = 0;           // 19
-    virtual GENRESULT DACOM_API SetPoseOri(void* Instance, void* Ori) = 0;               // 20
+    virtual GENRESULT DACOM_API SetPosePos(void* Instance, const Vector* Pos) = 0;     // 19
+    virtual GENRESULT DACOM_API SetPoseOri(void* Instance, const Matrix* Ori) = 0;       // 20
     virtual GENRESULT DACOM_API Unused21(void* A, void* B) = 0;                        // 21
     virtual GENRESULT DACOM_API Unused22(void* A, void* B) = 0;                        // 22
     virtual GENRESULT DACOM_API Unused23(void* A, void* B) = 0;                        // 23
@@ -472,5 +497,5 @@ struct IDeformable : IDAComponent
                                                void* UserData) = 0;                    // 36
     virtual GENRESULT DACOM_API GetMeshStats(void* Instance, unsigned int* Out) = 0;      // 37
     virtual GENRESULT DACOM_API GetBoundSphere(void* Instance, float* OutRadius,
-                                                 float* OutCenter) = 0;                 // 38
+                                                 Vector* OutCenter) = 0;                // 38
 };

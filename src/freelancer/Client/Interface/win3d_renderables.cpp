@@ -304,7 +304,7 @@ void Win3DImmedBatchFlushAll()
     FlushImmedBatchers();
 }
 
-void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
+void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
                        unsigned long Color, unsigned long EdgeColor, float Width)
 {
     // FUN_005a2a40. Signed compares; the reset is inlined.
@@ -329,8 +329,8 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
 
     // atan2(dx, dy) -- the arguments in that order -- plus DAT_005d3e88. x87: the cosine is
     // rounded to float before the multiply; the sine * Width stays double.
-    double const Dx = static_cast<double>(B[0]) - static_cast<double>(A[0]);
-    double const Dy = static_cast<double>(B[1]) - static_cast<double>(A[1]);
+    double const Dx = static_cast<double>(B->x) - static_cast<double>(A->x);
+    double const Dy = static_cast<double>(B->y) - static_cast<double>(A->y);
     double const Angle = atan2(Dx, Dy) + 1.57079632675;
     float const CosAngle = static_cast<float>(cos(Angle));
     double const SinW = sin(Angle) * static_cast<double>(Width);
@@ -338,18 +338,18 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
 
     // A, A + off, B, B + off, A, A - off, B, B - off with off = (SinW, CosW, 0).
     FImmedVertex Vertices[8];
-    Vertices[0] = {A[0], A[1], A[2], Color};
-    Vertices[1] = {static_cast<float>(static_cast<double>(A[0]) + SinW),
-                   static_cast<float>(static_cast<double>(A[1]) + CosW), A[2], EdgeColor};
-    Vertices[2] = {B[0], B[1], B[2], Color};
-    Vertices[3] = {static_cast<float>(static_cast<double>(B[0]) + SinW),
-                   static_cast<float>(static_cast<double>(B[1]) + CosW), B[2], EdgeColor};
-    Vertices[4] = {A[0], A[1], A[2], Color};
-    Vertices[5] = {static_cast<float>(static_cast<double>(A[0]) - SinW),
-                   static_cast<float>(static_cast<double>(A[1]) - CosW), A[2], EdgeColor};
-    Vertices[6] = {B[0], B[1], B[2], Color};
-    Vertices[7] = {static_cast<float>(static_cast<double>(B[0]) - SinW),
-                   static_cast<float>(static_cast<double>(B[1]) - CosW), B[2], EdgeColor};
+    Vertices[0] = {A->x, A->y, A->z, Color};
+    Vertices[1] = {static_cast<float>(static_cast<double>(A->x) + SinW),
+                   static_cast<float>(static_cast<double>(A->y) + CosW), A->z, EdgeColor};
+    Vertices[2] = {B->x, B->y, B->z, Color};
+    Vertices[3] = {static_cast<float>(static_cast<double>(B->x) + SinW),
+                   static_cast<float>(static_cast<double>(B->y) + CosW), B->z, EdgeColor};
+    Vertices[4] = {A->x, A->y, A->z, Color};
+    Vertices[5] = {static_cast<float>(static_cast<double>(A->x) - SinW),
+                   static_cast<float>(static_cast<double>(A->y) - CosW), A->z, EdgeColor};
+    Vertices[6] = {B->x, B->y, B->z, Color};
+    Vertices[7] = {static_cast<float>(static_cast<double>(B->x) - SinW),
+                   static_cast<float>(static_cast<double>(B->y) - CosW), B->z, EdgeColor};
     for (int Index = 0; Index < 8; ++Index)
     {
         *Batch->VertCursor = Vertices[Index];
@@ -372,7 +372,7 @@ void Win3DImmedBatchDestroyAll()
     DestroyImmedBatch(&G_ImmedBatchB);
 }
 
-void Win3DImmedDrawLine(float const* A, float const* B, unsigned long Color,
+void Win3DImmedDrawLine(Vector const* A, Vector const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width)
 {
     // FUN_005a2940

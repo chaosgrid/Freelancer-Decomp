@@ -46,10 +46,10 @@ struct WinButton : public WinObject
 
     // slot 4 FUN_0059f2e0 -- the cursor (DAT_00616840 / DAT_00616844) inside the mesh's
     // projected screen rectangle, edges included. The ray is not read.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 LAB_004c9320 -- position into +0x60 and the rest pose, then the live transform
     // rebuilt from the rest pose
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_004c92e0 -- orientation into +0x3c, then the live transform becomes the rest
     // pose
     void SetOrientation(Matrix const* NewOrientation) override;
@@ -58,9 +58,9 @@ struct WinButton : public WinObject
     // slot 13 FUN_0059f510
     void Draw() override;
     // slot 14 FUN_004c9380 -- bHover = slot 4 (Ray)
-    void MouseOver(float const* Ray) override;
+    void MouseOver(Vector const* Ray) override;
     // slot 16 LAB_004c93a0 -- bHover = 0
-    void MouseLeave(float const* Ray) override;
+    void MouseLeave(Vector const* Ray) override;
 
     // FUN_004c92b0 -- the twelve dwords into +0x3c, then the holder's
     // instance matrix (FUN_00421050) and FUN_00421070. The rest pose is left alone.

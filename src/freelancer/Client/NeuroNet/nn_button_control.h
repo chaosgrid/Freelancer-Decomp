@@ -57,7 +57,7 @@ public:
     ~NnButtonControl() override;
 
     // slot 5 FUN_0055b4a0 (RET 4)
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_0055b5c0 (RET 4)
     void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_0055a6b0 (RET 8) -- Data is the INI_Reader positioned on this control's section
@@ -67,9 +67,9 @@ public:
     // slot 13 FUN_0055af90
     void Draw() override;
     // slot 15 FUN_0055b8a0 (RET 4)
-    void MouseEnter(float const* Ray) override;
+    void MouseEnter(Vector const* Ray) override;
     // slot 16 FUN_0055b900 (RET 4)
-    void MouseLeave(float const* Ray) override;
+    void MouseLeave(Vector const* Ray) override;
     // slot 19 FUN_0055b950 (RET 4)
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 34 FUN_0055bde0
@@ -83,8 +83,8 @@ public:
     // FUN_0055ac30 (RET 0x38). Callers: WinControl::CreateButtonControl FUN_005a0c90,
     // HUD_Receiver's ctor, ToggleButtonControl::Init.
     void Init(char const* NewMeshPath, char const* NewMesh2, char const* NewSoundName,
-              char const* KeyCommandName, float const* NewOffset, char const* Hardpoint,
-              float const* NewHalfExtents, unsigned char bNoMeshRender,
+              char const* KeyCommandName, Vector const* NewOffset, char const* Hardpoint,
+              Vector const* NewHalfExtents, unsigned char bNoMeshRender,
               unsigned char bActionButton, unsigned char bNoColorChange,
               unsigned char bNewNoZEnable, int NewToolTipIds, int NewToolTip2Ids,
               int NewCommandId);
@@ -156,7 +156,7 @@ public:
     ~NnToggleButtonControl() override;
 
     // slot 5 LAB_0055c510 (RET 4)
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_0055c5a0 (RET 4)
     void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_0055bfd0 (RET 8)
@@ -176,8 +176,8 @@ public:
     // ButtonControl::Init with these thirteen arguments and command 0, then
     // NewMesh2 (when not null) into the +0x378 holder.
     void Init(char const* NewMeshPath, char const* NewMesh2, char const* NewSoundName,
-              char const* KeyCommandName, float const* NewOffset, char const* Hardpoint,
-              float const* NewHalfExtents, unsigned char bNoMeshRender,
+              char const* KeyCommandName, Vector const* NewOffset, char const* Hardpoint,
+              Vector const* NewHalfExtents, unsigned char bNoMeshRender,
               unsigned char bActionButton, unsigned char bNoColorChange,
               unsigned char bNewNoZEnable, int NewToolTipIds, int NewToolTip2Ids);
 

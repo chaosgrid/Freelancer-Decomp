@@ -36,7 +36,7 @@ public:
     ~TextMsgButton() override;
 
     // slot 15 FUN_005664e0 (RET 4) -- the rollover sound while enabled (+0xe6).
-    void MouseEnter(float const* Ray) override;
+    void MouseEnter(Vector const* Ray) override;
     // slot 19 FUN_005664a0 (RET 4).
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
 

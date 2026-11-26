@@ -149,7 +149,7 @@ namespace
     {
         char const* Nickname;
         char const* Mesh;
-        float Offset[3];
+        Vector Offset;
     };
 
     FCase18Static const kCase18Statics[5] = {
@@ -175,7 +175,7 @@ namespace
     // latch; the page's Destroy on the way out destroys the old ones as its children).
     void EnterCase18Chrome(PageCharacterSelectSingle& Page)
     {
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
         for (int Index = 0; Index < 5; ++Index)
         {
             FCase18Static const& Slot = kCase18Statics[Index];
@@ -183,8 +183,8 @@ namespace
             Case18StaticSlot(Page, Index) = Created;
             if (Index < 3 && Created == nullptr)
                 continue;
-            static_cast<NnStaticControl*>(Created)->Init(Slot.Mesh, Slot.Offset, nullptr, Zero, 0, 0,
-                                                         0, 1, 1, 0, 1, 0, 0, 0, Zero);
+            static_cast<NnStaticControl*>(Created)->Init(Slot.Mesh, &Slot.Offset, nullptr, &Zero, 0, 0,
+                                                         0, 1, 1, 0, 1, 0, 0, 0, &Zero);
         }
     }
 }
@@ -258,11 +258,11 @@ namespace
             float const PosY =
                 kMainColumnPosY0 - static_cast<float>(Index) * kMainColumnPosYStep;
             // The same Init flags as case 18's statics.
-            float const Offset[3] = {kMainColumnPosX, PosY, kMainColumnPosZ};
-            float const ZeroVector[3] = {0.0f, 0.0f, 0.0f};
-            static_cast<NnStaticControl*>(Created)->Init(kFrontButtonMesh, Offset, nullptr,
-                                                         ZeroVector, 0, 0, 0, 1, 1, 0, 1, 0, 0,
-                                                         0, ZeroVector);
+            Vector const Offset = {kMainColumnPosX, PosY, kMainColumnPosZ};
+            Vector const ZeroVector = {0.0f, 0.0f, 0.0f};
+            static_cast<NnStaticControl*>(Created)->Init(kFrontButtonMesh, &Offset, nullptr,
+                                                         &ZeroVector, 0, 0, 0, 1, 1, 0, 1, 0, 0,
+                                                         0, &ZeroVector);
         }
 
         for (int Index = 0; Index < 5; ++Index)
@@ -285,8 +285,8 @@ namespace
         {
             // The text comes from property 0x1d below.
             NnTextControl* const VersionText = static_cast<NnTextControl*>(VersionWin);
-            float const VersionPos[3] = {kVersionPosX, kVersionPosY, kVersionPosZ};
-            VersionText->Init("Normal", VersionPos, nullptr, kMainColumnBoxWidth, BoxHeight, 1.0f,
+            Vector const VersionPos = {kVersionPosX, kVersionPosY, kVersionPosZ};
+            VersionText->Init("Normal", &VersionPos, nullptr, kMainColumnBoxWidth, BoxHeight, 1.0f,
                               0u, 1, 0, 0);
 
             wchar_t Format[0x100];

@@ -72,9 +72,9 @@ public:
     ~UiTable() override;
 
     // slot 4 LAB_00599160
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 LAB_00598850
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 8 LAB_005987e0
     void SetTransform(Transform const* NewXform) override;
     // slot 9 LAB_00598490 (RET 8)

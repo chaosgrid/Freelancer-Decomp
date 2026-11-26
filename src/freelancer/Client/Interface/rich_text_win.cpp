@@ -186,15 +186,15 @@ BaseRichTextWin::~BaseRichTextWin()
     ReleaseRichTextSurface(&Surface);
 }
 
-bool BaseRichTextWin::HitTest(float const* Ray)
+bool BaseRichTextWin::HitTest(Vector const* Ray)
 {
     // LAB_0057aa80 (RET 4). The y of the ray's point is rounded to float; the x difference
     // stays double.
     if (bNeverHit != 0)
         return false;
-    double const T = static_cast<double>(Position.z) / Ray[2];
-    float const PointY = static_cast<float>(T * Ray[1]);
-    double const DeltaX = T * Ray[0] - Position.x;
+    double const T = static_cast<double>(Position.z) / Ray->z;
+    float const PointY = static_cast<float>(T * Ray->y);
+    double const DeltaX = T * Ray->x - Position.x;
     if (DeltaX < 0.0)
         return false;
     if (!(DeltaX <= static_cast<double>(WorldRect[2]) - WorldRect[0]))
@@ -207,14 +207,14 @@ bool BaseRichTextWin::HitTest(float const* Ray)
     return true;
 }
 
-void BaseRichTextWin::SetPosition(float const* NewPosition)
+void BaseRichTextWin::SetPosition(Vector const* NewPosition)
 {
     // FUN_0057b0a0 (RET 4).
-    float Moved[3];
-    Moved[0] = AttachOffset[0] + NewPosition[0];
-    Moved[1] = AttachOffset[1] + NewPosition[1];
-    Moved[2] = AttachOffset[2] + NewPosition[2];
-    WinControl::SetPosition(Moved);
+    Vector Moved;
+    Moved.x = AttachOffset[0] + NewPosition->x;
+    Moved.y = AttachOffset[1] + NewPosition->y;
+    Moved.z = AttachOffset[2] + NewPosition->z;
+    WinControl::SetPosition(&Moved);
 }
 
 bool BaseRichTextWin::Create(Win3D* NewParent, void* /*Data*/)
@@ -252,9 +252,9 @@ void BaseRichTextWin::FeedToolTipIfHovered()
     FToolTipHoverInfo* const Info = GetToolTipHoverInfo();
     if (Info == nullptr)
         return;
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    if (HitTest(Ray))
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    if (HitTest(&Ray))
         NnToolTipFeedHover(Info);
 }
 
@@ -474,7 +474,7 @@ intptr_t BaseRichTextWin::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_0057ebb0 (RET 0xc): property 6 is SetAttachOffset inlined.
     if (Msg != kWinPropOffset)
         return WinControl::SetProperty(Msg, A, B);
-    SetAttachOffset(reinterpret_cast<float const*>(A));
+    SetAttachOffset(reinterpret_cast<Vector const*>(A));
     return 1;
 }
 
@@ -662,20 +662,20 @@ float BaseRichTextWin::GetScrollBarGap()
     return ScrollBarGap;
 }
 
-void BaseRichTextWin::SetAttachOffset(float const* NewOffset)
+void BaseRichTextWin::SetAttachOffset(Vector const* NewOffset)
 {
     // FUN_00579c40 (RET 4): move by the change of the offset. x and y stay double between the
     // subtraction and the addition; z is rounded to float in between.
     float const Old[3] = {AttachOffset[0], AttachOffset[1], AttachOffset[2]};
-    AttachOffset[0] = NewOffset[0];
-    AttachOffset[1] = NewOffset[1];
-    AttachOffset[2] = NewOffset[2];
+    AttachOffset[0] = NewOffset->x;
+    AttachOffset[1] = NewOffset->y;
+    AttachOffset[2] = NewOffset->z;
     Vector Moved;
     float const DeltaZ = Position.z - Old[2];
     Moved.x = static_cast<float>(static_cast<double>(Position.x) - Old[0] + AttachOffset[0]);
     Moved.y = static_cast<float>(static_cast<double>(Position.y) - Old[1] + AttachOffset[1]);
     Moved.z = DeltaZ + AttachOffset[2];
-    WinControl::SetPosition(&Moved.x);
+    WinControl::SetPosition(&Moved);
 }
 
 void BaseRichTextWin::SetNormSize(float Width, float Height)

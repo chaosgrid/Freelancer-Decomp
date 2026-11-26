@@ -41,21 +41,21 @@ void ButtonMover::OnMoveFinished()
 }
 
 // LAB_0043d8a0.
-bool ButtonMover::OnMoveStep(WinControl* /*Control*/, float const* /*Position*/)
+bool ButtonMover::OnMoveStep(WinControl* /*Control*/, Vector const*)
 {
     return false;
 }
 
 // FUN_0055dee0 (an inlined vector insert-at-end).
-void ButtonMover::AddButton(WinControl* Control, float const* Start, float const* End)
+void ButtonMover::AddButton(WinControl* Control, Vector const* Start, Vector const* End)
 {
     FButtonMoveEntry Entry;
-    Entry.Start[0] = Start[0];
-    Entry.Start[1] = Start[1];
-    Entry.Start[2] = Start[2];
-    Entry.End[0] = End[0];
-    Entry.End[1] = End[1];
-    Entry.End[2] = End[2];
+    Entry.Start[0] = Start->x;
+    Entry.Start[1] = Start->y;
+    Entry.Start[2] = Start->z;
+    Entry.End[0] = End->x;
+    Entry.End[1] = End->y;
+    Entry.End[2] = End->z;
     Entry.Control = Control;
     Entries.push_back(Entry);
 }
@@ -95,14 +95,14 @@ void ButtonMover::Update()
         float const Dz = Entry.End[2] - Entry.Start[2];
         float const DxT = (Entry.End[0] - Entry.Start[0]) * T;
         float const DyT = (Entry.End[1] - Entry.Start[1]) * T;
-        float Position[3];
-        Position[0] = DxT + Entry.Start[0];
-        Position[1] = DyT + Entry.Start[1];
-        Position[2] = Dz * T + Entry.Start[2];
-        if (!OnMoveStep(Entry.Control, Position))
+        Vector Position;
+        Position.x = DxT + Entry.Start[0];
+        Position.y = DyT + Entry.Start[1];
+        Position.z = Dz * T + Entry.Start[2];
+        if (!OnMoveStep(Entry.Control, &Position))
         {
             // Property 6 sets the control's position.
-            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
+            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Position), 0);
         }
     }
 
@@ -125,13 +125,13 @@ void ButtonMover::Finish()
     for (int Index = 0; Index < Count; ++Index)
     {
         FButtonMoveEntry const& Entry = Entries[Index];
-        float Position[3];
-        Position[0] = Entry.End[0];
-        Position[1] = Entry.End[1];
-        Position[2] = Entry.End[2];
-        if (!OnMoveStep(Entry.Control, Position))
+        Vector Position;
+        Position.x = Entry.End[0];
+        Position.y = Entry.End[1];
+        Position.z = Entry.End[2];
+        if (!OnMoveStep(Entry.Control, &Position))
         {
-            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
+            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Position), 0);
         }
     }
 

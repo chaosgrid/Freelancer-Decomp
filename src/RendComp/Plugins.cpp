@@ -820,13 +820,13 @@ public:
         LastHitKey = (void*)InstId;
         LastHitAnim = Anim;
         bLastHit = 1;
-        float Center[3];
-        Center[0] = 0.0f;
-        Center[1] = 0.0f;
-        Center[2] = 0.0f;
+        Vector Center;
+        Center.x = 0.0f;
+        Center.y = 0.0f;
+        Center.z = 0.0f;
         float Radius = 0.0f;
-        Arch->GetSphere(Center, &Radius);
-        G_Engine->SetInstanceExtent(InstId, 1, Radius, (const Vector*)Center);
+        Arch->GetSphere(&Center, &Radius);
+        G_Engine->SetInstanceExtent(InstId, 1, Radius, &Center);
         return 1;
     }
 
@@ -896,7 +896,7 @@ public:
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        ((FTriMeshArch*)Handle)->GetCenter((float*)Out);
+        ((FTriMeshArch*)Handle)->GetCenter((Vector*)Out);
         return 1;
     }
 
@@ -924,7 +924,7 @@ public:
     }
 
     int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long Flags,
-                         void* Transform, void* Extra) override
+                         const Transform* Xform, void* Extra) override
     {
         LookupCount += 1;
         FTriMeshAnim* Anim = FindInstance((void*)Inst);
@@ -937,7 +937,7 @@ public:
             Remapped |= 0x2;
         if ((Flags & 0x8000) != 0)
             Remapped |= 0x80;
-        return Anim->Draw(Camera, Remapped, Transform, (IMaterial*)Extra);
+        return Anim->Draw(Camera, Remapped, Xform, (IMaterial*)Extra);
     }
 };
 
@@ -2284,14 +2284,14 @@ public:
             return 0;
         // FUN_06c2afb0: radius < 0.0f (unordered included) -> extent = radius, else
         // Scale * Radius.
-        float Center[3];
-        Center[0] = 0.0f;
-        Center[1] = 0.0f;
-        Center[2] = 0.0f;
+        Vector Center;
+        Center.x = 0.0f;
+        Center.y = 0.0f;
+        Center.z = 0.0f;
         float Extent = Sphere->Radius;
         if (0.0f <= Sphere->Radius)
             Extent = Sphere->Scale * Sphere->Radius;
-        G_Engine->SetInstanceExtent(InstId, 1, Extent, (const Vector*)Center);
+        G_Engine->SetInstanceExtent(InstId, 1, Extent, &Center);
         // FUN_06c2a060: a non-multi insert. An InstId already mapped keeps its old node and the
         // new instance leaks; the returned iterator is never end(), so retail's == end branch
         // (FUN_06c2b3c0 on the instance, return 0) cannot run.
@@ -2383,21 +2383,21 @@ public:
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        float* CenterOut = (float*)Out;
-        CenterOut[2] = 0.0f;
-        CenterOut[1] = 0.0f;
-        CenterOut[0] = 0.0f;
+        Vector* CenterOut = (Vector*)Out;
+        CenterOut->z = 0.0f;
+        CenterOut->y = 0.0f;
+        CenterOut->x = 0.0f;
         return 1;
     }
 
     int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long /*Flags*/,
-                         void* Matrix, void* Extra) override
+                         const Transform* Xform, void* Extra) override
     {
         LookupCount += 1;
         FSphereAnim* Anim = FindSphereCached((void*)Inst);
         if (Anim == nullptr)
             return 0;
-        return Anim->Draw(Camera, (const Transform*)Matrix,
+        return Anim->Draw(Camera, Xform,
                           (IMaterial*)Extra)
                    ? 1
                    : 0;

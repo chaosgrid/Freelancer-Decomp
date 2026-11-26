@@ -291,7 +291,7 @@ public:
 
     // --- WinControl face ---
     // LAB_004e7d20
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // FUN_004e7980
     void Update() override;
     // FUN_004e7890

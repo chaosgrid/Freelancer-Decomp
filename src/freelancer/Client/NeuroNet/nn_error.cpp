@@ -57,14 +57,14 @@ bool NnError::Create(Win3D* NewParent, void* Data)
     // FUN_004725b0.
     MouseSetCursor("Arrow", false); // FUN_0041dde0
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float FramePosition[3] = {0.0f, 0.0f, NnFloatBits(0xbfd9999a)};
-    CreateStaticControl("Frame", kErrorFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1, 0,
-                        1, 0, 0, 0, Zero);
+    Vector FramePosition = {0.0f, 0.0f, NnFloatBits(0xbfd9999a)};
+    CreateStaticControl("Frame", kErrorFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1, 1, 0,
+                        1, 0, 0, 0, &Zero);
 
-    float TextPosition[3] = {0.0f, 0.0f, -1.0f};
-    Text = CreateTextControl("Text", "SubHeader", TextPosition, nullptr, NnFloatBits(0x3f07ae14),
+    Vector TextPosition = {0.0f, 0.0f, -1.0f};
+    Text = CreateTextControl("Text", "SubHeader", &TextPosition, nullptr, NnFloatBits(0x3f07ae14),
                              NnFloatBits(0x3e08b439), NnFloatBits(0x3fa00000), 0, 1, 0, 0);
     // Text's Font::String goes multi-line (re-laid out) unless it already is. No null test.
     FFontString* const TextFont = static_cast<NnTextControl*>(Text)->GetFontString();
@@ -74,18 +74,18 @@ bool NnError::Create(Win3D* NewParent, void* Data)
         TextFont->LayoutGen = 0;
     }
 
-    float ButtonPosition[3] = {NnFloatBits(0xbc449ba6), NnFloatBits(0xbd99999a), -1.0f};
-    float ButtonExtents[3] = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
-    OkayButton = CreateWireButtonControl("ErrorOkayButton", "ui_select_item", ButtonPosition,
-                                         ButtonExtents, 0, 0, 0, 0, 0);
+    Vector ButtonPosition = {NnFloatBits(0xbc449ba6), NnFloatBits(0xbd99999a), -1.0f};
+    Vector ButtonExtents = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
+    OkayButton = CreateWireButtonControl("ErrorOkayButton", "ui_select_item", &ButtonPosition,
+                                         &ButtonExtents, 0, 0, 0, 0, 0);
 
-    float OkayPosition[3] = {NnFloatBits(0xbcbc6a7f), NnFloatBits(0xbdb851ec), -1.0f};
-    OkayText = CreateTextControl("ErrorOkayText", "ButtonText", OkayPosition, nullptr,
+    Vector OkayPosition = {NnFloatBits(0xbcbc6a7f), NnFloatBits(0xbdb851ec), -1.0f};
+    OkayText = CreateTextControl("ErrorOkayText", "ButtonText", &OkayPosition, nullptr,
                                  NnFloatBits(0x3e21cac1), NnFloatBits(0x3d75c28f),
                                  NnFloatBits(0x3fa00000), 0x411, 1, 0, 0);
 
-    float TitlePosition[3] = {NnFloatBits(0xbe6c8b44), NnFloatBits(0x3def9db2), -1.0f};
-    Title = CreateTextControl("ErrorDialogTitle", "PageHeader", TitlePosition, nullptr,
+    Vector TitlePosition = {NnFloatBits(0xbe6c8b44), NnFloatBits(0x3def9db2), -1.0f};
+    Title = CreateTextControl("ErrorDialogTitle", "PageHeader", &TitlePosition, nullptr,
                               NnFloatBits(0x3ee66666), NnFloatBits(0x3d75c28f),
                               NnFloatBits(0x3f99999a), 0x3e8, 1, 0, 1);
     // The same Font::String poke on the title.
@@ -160,7 +160,7 @@ intptr_t NnError::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
     }
     return 0;
 }
@@ -185,8 +185,8 @@ namespace
         if (Created == nullptr)
             return;
         NnError* const Dialog = static_cast<NnError*>(Created);
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
         if (Dialog->Title != nullptr)
             Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags & 0xfc);
         if (Dialog->Text != nullptr)
@@ -253,8 +253,8 @@ bool NnErrorRunModalMessage(char const* Message)
         if (Created != nullptr)
         {
             NnError* const Dialog = static_cast<NnError*>(Created);
-            float const Zero[3] = {0.0f, 0.0f, 0.0f};
-            Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+            Vector const Zero = {0.0f, 0.0f, 0.0f};
+            Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
             if (Dialog->Title != nullptr)
                 Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags | 0x03);
             wchar_t Wide[0x400];

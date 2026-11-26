@@ -32,7 +32,7 @@ public:
     ~WinObject() override;
 
     // slot 5 FUN_004c91a0
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 10 FUN_004c9150
     void Destroy() override;
     // slot 11 FUN_004c91d0

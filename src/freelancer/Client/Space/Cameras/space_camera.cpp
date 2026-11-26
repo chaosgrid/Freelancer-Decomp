@@ -420,7 +420,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
         // (colour and depth clear), then FUN_0051b500 clears now. Every camera the controller
         // installs is a GameCamera.
         unsigned char Fog[4];
-        StarSysGetFogColor(reinterpret_cast<Vector const*>(AsCamera(NewCam)->GetPosition()), Fog);
+        StarSysGetFogColor(AsCamera(NewCam)->GetPosition(), Fog);
         FGameCamera* const Game = reinterpret_cast<FGameCamera*>(NewCam);
         Game->ClearColor[0] = Fog[0];
         Game->ClearColor[1] = Fog[1];
@@ -803,7 +803,7 @@ int DACOM_API FSpaceCamera::Project(float* OutX, float* OutY, float* OutZ, const
         G_CameraMathEngine = Acquire3DMathEngine();
     Vector Local;
     G_CameraMathEngine->InverseTransform(Local, this->WorldXform,
-                                         *reinterpret_cast<Vector const*>(World));
+                                         *World);
 
     // Only -ZNear >= z (ordered) projects; a point exactly on the near plane does.
     if (!(-this->ZNear >= Local.z))

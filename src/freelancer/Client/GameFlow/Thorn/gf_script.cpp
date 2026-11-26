@@ -37,9 +37,9 @@ namespace
     void ResetSlot(FGfCameraSlot& Slot)
     {
         Slot.Camera = nullptr;
-        Slot.Pos[0] = 0.0f;
-        Slot.Pos[1] = 0.0f;
-        Slot.Pos[2] = 0.0f;
+        Slot.Pos.x = 0.0f;
+        Slot.Pos.y = 0.0f;
+        Slot.Pos.z = 0.0f;
         int Index = 0;
         for (Index = 0; Index < 9; ++Index)
             Slot.Orient[Index] = 0.0f;
@@ -143,7 +143,7 @@ void FGfCameraPool::Free(int Slot)
 
     // FUN_00556cb0 / cc0 / ce0 / e00 / f10.
     FGfCameraSlot& Next = Slots[Best];
-    RoomCameraSetPosition(Next.Camera, Next.Pos);
+    RoomCameraSetPosition(Next.Camera, &Next.Pos);
     RoomCameraSetOrientation(Next.Camera, Next.Orient);
     RoomCameraSetHalfFovX(Next.Camera, Next.HalfFovXDeg);
     RoomCameraSetZNear(Next.Camera, Next.ZNear);
@@ -200,7 +200,7 @@ void GfLightRegistryRemove(int Index)
 }
 
 FGfLightWrapper* GfLightWrapperCreate(float const* Frame12, FD3dLight8 const* Source,
-                                      float const* Direction3, unsigned char Group)
+                                      Vector const* Direction, unsigned char Group)
 {
     // FUN_00556fd0: operator new(8), both fields zeroed.
     FGfLightWrapper* Wrapper = new FGfLightWrapper;
@@ -208,7 +208,7 @@ FGfLightWrapper* GfLightWrapperCreate(float const* Frame12, FD3dLight8 const* So
     Wrapper->Group = 0;
     // The 0xc8 light, its source, position and look-at orientation, then the enable through its
     // slot 1 -- all of it is EngineLightCreate.
-    Wrapper->Light = EngineLightCreate(Frame12, Source, Direction3);
+    Wrapper->Light = EngineLightCreate(Frame12, Source, Direction);
     Wrapper->Group = Group;
     return Wrapper;
 }
@@ -249,7 +249,7 @@ void GfSetSceneAmbient(float R, float G, float B)
     EngineLightSetAmbientRgbBytes(Rgb);
 }
 
-bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, float const* Dir3,
+bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, Vector const* Dir3,
                   float const* Pos3, float /*Radius*/, float* OutScore)
 {
     // FUN_005586f0 (cdecl; the fifth argument is never read). The x87 sequence is modelled at
@@ -286,9 +286,9 @@ bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, float const* Di
         // The cone test runs unless DistSq < 1e-5 (DAT_005c75f0).
         if (!(DistSq < 1e-5))
         {
-            double const Dot = (static_cast<double>(Dir3[2]) * Dz +
-                                static_cast<double>(Dir3[1]) * Dy) +
-                               static_cast<double>(Dx) * Dir3[0];
+            double const Dot = (static_cast<double>(Dir3->z) * Dz +
+                                static_cast<double>(Dir3->y) * Dy) +
+                               static_cast<double>(Dx) * Dir3->x;
             double const CosAngle = Dot / sqrt(DistSq);
             float const CosAngleStored = static_cast<float>(CosAngle);
             // 2.0 is kept only when the angle is strictly inside the half cone.
@@ -327,10 +327,10 @@ void GfLightsSelectNearest(FGfLightWrapper* const* List, int Count, float const*
             continue;
 
         // FUN_00411370, then FUN_005586f0.
-        float Dir[3];
-        float* DirOut = EngineLightComputeDirection(Light, Dir, nullptr, nullptr);
+        Vector Dir;
+        Vector* DirOut = EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
         float Score = 0.0f;
-        if (!GfLightScore(&Light->D3d, Light->Position, DirOut, Pos3, Radius, &Score))
+        if (!GfLightScore(&Light->D3d, &Light->Position.x, DirOut, Pos3, Radius, &Score))
             continue;
 
         // The arrays run from the highest score down.

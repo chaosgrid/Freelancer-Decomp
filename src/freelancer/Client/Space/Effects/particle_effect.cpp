@@ -1106,7 +1106,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
         if (static_cast<int>(Light->EngineIndex) == -1)
         {
             EngineLightSetTransform((FEngineLight*)Light, &LocalXform->Rotation.E[0][0],
-                                    &LocalXform->Translation.x);
+                                    &LocalXform->Translation);
         }
         else
         {

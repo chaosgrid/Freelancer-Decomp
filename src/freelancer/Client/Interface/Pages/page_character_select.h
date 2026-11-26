@@ -118,9 +118,9 @@ public:
     unsigned char bCharacterChosen;          // +0x599 -- set once the load sequence picked one
     int FirstVisible;                        // +0x59c -- ftol(scroll value) at the last rebuild
     FUiFastTableEdges Edges;                 // +0x5a0 -- HKCU\...\CharacterTable "Columns"/"Rows"
-    float CharacterBoxHome[3];               // +0x5c0 -- CharacterBox's position after Create
-    float MotdBoxHome[3];                    // +0x5cc
-    float DetailsBoxHome[3];                 // +0x5d8
+    Vector CharacterBoxHome;               // +0x5c0 -- CharacterBox's position after Create
+    Vector MotdBoxHome;                    // +0x5cc
+    Vector DetailsBoxHome;                 // +0x5d8
     double SlideT;                           // +0x5e8 -- Create -1.0; 0..2 in, 0..-0.9 leaving
     unsigned char bLeaving;                  // +0x5f0
     int LeaveDirection;                      // +0x5f4 -- 1 load, 2 new, -1 main menu, -2 back

@@ -228,8 +228,8 @@ void Win3DDrawWireSphere(void* Camera, Transform const* Xform, float Radius, int
 
 // FUN_00423b30 / FUN_00423b60 (cdecl Out, A, B): Out = A + B / Out = A - B, each component
 // rounded to float. Out may alias an input (all loads precede the stores).
-void Win3DVec3Add(float* Out, float const* A, float const* B);
-void Win3DVec3Sub(float* Out, float const* A, float const* B);
+void Win3DVec3Add(Vector* Out, Vector const* A, Vector const* B);
+void Win3DVec3Sub(Vector* Out, Vector const* A, Vector const* B);
 
 // The argument of the fuzzy-line drawers, 0x50 bytes. Retail has no name for it; the only
 // builder is the tractor beam draw (LAB_00512da0).
@@ -239,11 +239,11 @@ struct FWin3DFuzzyLine
     unsigned char Pad01[3];  // +0x01
     void* Texture;           // +0x04 ITextureLibrary2 record (a shape's FTextureRef::Texture); null
                              //       = an untextured line strip
-    float Start[3];          // +0x08
-    float End[3];            // +0x14 the straight line's end; the arc ends at Control + (End -
+    Vector Start;          // +0x08
+    Vector End;            // +0x14 the straight line's end; the arc ends at Control + (End -
                              //       Control) rescaled to |Start - Control|
-    float Control[3];        // +0x20 the arc's centre (read only when bCurved)
-    float EyePos[3];         // +0x2c the camera position the textured quads turn towards
+    Vector Control;        // +0x20 the arc's centre (read only when bCurved)
+    Vector EyePos;         // +0x2c the camera position the textured quads turn towards
     float Color[3];          // +0x38 Win3DColor3f
     float Width;             // +0x44 segment length, and the arc's chord for the step angle
     float JitterScale;       // +0x48 RandomVector radius = JitterScale * Width

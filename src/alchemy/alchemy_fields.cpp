@@ -303,12 +303,12 @@ namespace AlchemyImpl
     void DACOM_API FxGravityField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
         // LAB_062241a0: the down vector in the appearance's space, cached at node+0xa4.
-        float Xform12[12];
-        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        Transform Xform;
+        ComputeRelativeTransform(Appearance, &Xform);
         const Vector Source = { 0.0f, -Gravity_, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
         Vector Result;
-        Math->Rotate(Result, *reinterpret_cast<const Transform*>(Xform12), Source);
+        Math->Rotate(Result, Xform, Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
@@ -394,12 +394,12 @@ namespace AlchemyImpl
     void DACOM_API FxAirField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
         // LAB_06214bf0: as Gravity, with (0, Magnitude, 0) cached at node+0xac.
-        float Xform12[12];
-        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        Transform Xform;
+        ComputeRelativeTransform(Appearance, &Xform);
         const Vector Source = { 0.0f, Magnitude_, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
         Vector Result;
-        Math->Rotate(Result, *reinterpret_cast<const Transform*>(Xform12), Source);
+        Math->Rotate(Result, Xform, Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
@@ -502,16 +502,16 @@ namespace AlchemyImpl
     // LAB_06236ea0: the field origin in the appearance's space, cached at node+0xb4.
     void DACOM_API FxRadialField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
-        float Xform12[12] = {
-            1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 0.0f
+        Transform Xform = {
+            Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+            {0.0f, 0.0f, 0.0f}
         };
-        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        ComputeRelativeTransform(Appearance, &Xform);
         const Vector Origin = { 0.0f, 0.0f, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
         Vector TransformedOrigin;
         Math->TransformXform(TransformedOrigin,
-            *reinterpret_cast<const Transform*>(Xform12), Origin);
+            Xform, Origin);
         std::memcpy(Cache_, &TransformedOrigin, sizeof(TransformedOrigin));
     }
 
@@ -928,13 +928,13 @@ namespace AlchemyImpl
     void DACOM_API FLDustField::ApplyFieldToVel(float* PosVel6, float* Age, float /*Dt*/)
     {
         I3DMathEngine* Math = Shared3DMath();
-        float Local[3] = { 0.0f, 0.0f, 0.0f };
-        Math->InverseTransform(*reinterpret_cast<Vector*>(Local),
+        Vector Local = { 0.0f, 0.0f, 0.0f };
+        Math->InverseTransform(Local,
                                           NodeWorldXform_,
                                           *reinterpret_cast<const Vector*>(PosVel6)); // +0x3C
-        const double DistSqExt = (static_cast<double>(Local[1]) * Local[1] +
-                                  static_cast<double>(Local[0]) * Local[0]) +
-                                 static_cast<double>(Local[2]) * Local[2];
+        const double DistSqExt = (static_cast<double>(Local.y) * Local.y +
+                                  static_cast<double>(Local.x) * Local.x) +
+                                 static_cast<double>(Local.z) * Local.z;
         float DistSq;
         StoreAlchemyFpuFloat(DistSq, DistSqExt);
         if (DistSqExt > RadiusSq_)
@@ -944,10 +944,10 @@ namespace AlchemyImpl
             return;
         }
         const double Height =
-            1.0 - (static_cast<double>(Radius_) - Local[2]) /
+            1.0 - (static_cast<double>(Radius_) - Local.z) /
                       (static_cast<double>(Radius_) + static_cast<double>(Radius_));
         double Fade = 1.0;
-        if (Local[2] < 0.0f)
+        if (Local.z < 0.0f)
         {
             const float Band = RadiusSq_ * 0.8f;
             if (DistSq > Band)

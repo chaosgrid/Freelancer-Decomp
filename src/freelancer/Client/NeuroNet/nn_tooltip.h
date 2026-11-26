@@ -33,7 +33,7 @@ public:
     void InitToolTipDefaults();
 
     // slot 4 FUN_0053f330 -- never picked.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
 
     // slot 9 FUN_004bd830 -- TextWin's setup, hidden, sub-layer 7.
     bool Create(Win3D* NewParent, void* Data) override;

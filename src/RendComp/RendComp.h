@@ -231,9 +231,9 @@ inline I3DMathEngine* MathEngineCached(I3DMathEngine*& Cache)
 
 void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraXform,
                          const Transform** OutCameraView, const Transform** OutWorld); // FUN_06c294f0 part
-void VectorNegate3(const float* Src, float* Dest);                       // FUN_06c33090
-float* TransposeXform3x3(const float* Src12, float* Dest9);             // FUN_06c330b0
-float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3); // FUN_06c33100
+void VectorNegate3(const Vector* Src, Vector* Dest);                     // FUN_06c33090
+Matrix* TransposeXform3x3(const Transform* Src, Matrix* Dest);             // FUN_06c330b0
+Vector* TransformPoint3(Vector* Dest, const Transform* Xform, const Vector* Point); // FUN_06c33100
 
 // VMeshData layer (src/RendComp/VMeshData.cpp).
 FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name);   // FUN_06c2dd20

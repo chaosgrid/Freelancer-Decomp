@@ -93,7 +93,7 @@ namespace
 
     // The slide targets: the toggle button's expanded spot and the y every bottom-row button
     // drops to while the panel animates.
-    float const kToggleOpen[3] = {-0.375f, -0.27f, 0.0f};
+    Vector const kToggleOpen = {-0.375f, -0.27f, 0.0f};
     float const kRowY = -0.37f;
     float const kRowLoweredY = -0.4f;
 
@@ -148,8 +148,8 @@ namespace
 
     void SetPos(WinControl* Control, float X, float Y, float Z)
     {
-        float const Pos[3] = {X, Y, Z};
-        Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
+        Vector const Pos = {X, Y, Z};
+        Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
     }
 
     // Inlined by retail at three sites.
@@ -488,121 +488,121 @@ HudTarget::~HudTarget()
 bool HudTarget::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004e0ee0 (this = the WinControl face).
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float const BackgroundPos[3] = {-0.3405f, -0.243f, -0.91f};
+    Vector const BackgroundPos = {-0.3405f, -0.243f, -0.91f};
     ViewPanel = CreateStaticControl("TargetBackground", "Interface\\hud\\HUD_target.cmp",
-                                    BackgroundPos, nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                    Zero);
+                                    &BackgroundPos, nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                    &Zero);
 
-    float const MinimizedPos[3] = {-0.4105f, -0.37f, -1.0f};
+    Vector const MinimizedPos = {-0.4105f, -0.37f, -1.0f};
     MinimizedFrame = CreateStaticControl("TargetMinimizedFrame",
-                                         "Interface\\hud\\HUD_target_min.cmp", MinimizedPos,
-                                         nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+                                         "Interface\\hud\\HUD_target_min.cmp", &MinimizedPos,
+                                         nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
 
     // The collapsed hit box.
-    HalfExtents[0] = 0.109f;  // 0x3ddf3b64
-    HalfExtents[1] = 0.02f;   // 0x3ca3d70a
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = -0.402f;   // 0xbecdd2f2
-    HitOffset[1] = -0.371f;   // 0xbebdf3b6
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.109f;  // 0x3ddf3b64
+    HalfExtents.y = 0.02f;   // 0x3ca3d70a
+    HalfExtents.z = 0.0f;
+    HitOffset.x = -0.402f;   // 0xbecdd2f2
+    HitOffset.y = -0.371f;   // 0xbebdf3b6
+    HitOffset.z = 0.0f;
 
-    float const ToggleHalf[3] = {0.02f, 0.02f, 0.0f};
+    Vector const ToggleHalf = {0.02f, 0.02f, 0.0f};
     ToggleButton = CreateButtonControl("HudTargetOpen", "interface\\hud\\hud_ShipTarget.3db",
-                                       nullptr, "ui_window_open", nullptr, &HomePosition.x,
-                                       nullptr, ToggleHalf, 0, 1, 0, 0, 0x3fe, 0, 0);
+                                       nullptr, "ui_window_open", nullptr, &HomePosition,
+                                       nullptr, &ToggleHalf, 0, 1, 0, 0, 0x3fe, 0, 0);
     ToggleButton->SetProperty(0x36, 1, 0);
 
-    float const ShipNamePos[3] = {-0.488f, -0.2f, 0.0f};
-    ShipName = CreateTextControl("TargetShipName", "HudSmall", ShipNamePos, nullptr, 0.205f,
+    Vector const ShipNamePos = {-0.488f, -0.2f, 0.0f};
+    ShipName = CreateTextControl("TargetShipName", "HudSmall", &ShipNamePos, nullptr, 0.205f,
                                  0.03f, 1.0f, 0, 1, 0, 1);
     ShipName->SetProperty(kTextPropTypewriter, 1, 0x14);
-    ShipName->HomeOffset[0] = ShipNamePos[0];
-    ShipName->HomeOffset[1] = ShipNamePos[1];
-    ShipName->HomeOffset[2] = ShipNamePos[2];
+    ShipName->HomeOffset.x = ShipNamePos.x;
+    ShipName->HomeOffset.y = ShipNamePos.y;
+    ShipName->HomeOffset.z = ShipNamePos.z;
 
-    float const SubNamePos[3] = {-0.488f, -0.218f, 0.0f};
-    SubtargetName = CreateTextControl("SubtargetName", "HudSmall", SubNamePos, nullptr, 0.205f,
+    Vector const SubNamePos = {-0.488f, -0.218f, 0.0f};
+    SubtargetName = CreateTextControl("SubtargetName", "HudSmall", &SubNamePos, nullptr, 0.205f,
                                       0.03f, 1.0f, 0, 1, 0, 1);
     SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
-    SubtargetName->HomeOffset[0] = SubNamePos[0];
-    SubtargetName->HomeOffset[1] = SubNamePos[1];
-    SubtargetName->HomeOffset[2] = SubNamePos[2];
+    SubtargetName->HomeOffset.x = SubNamePos.x;
+    SubtargetName->HomeOffset.y = SubNamePos.y;
+    SubtargetName->HomeOffset.z = SubNamePos.z;
 
-    float const SmallHalf[3] = {0.014f, 0.014f, 0.0f}; // 0x3c656042
+    Vector const SmallHalf = {0.014f, 0.014f, 0.0f}; // 0x3c656042
 
-    float const PreviousPos[3] = {-0.262f, -0.237f, 0.0f};
+    Vector const PreviousPos = {-0.262f, -0.237f, 0.0f};
     PreviousButton = CreateButtonControl("TargetPreviousButton",
                                          "interface\\hud\\HUD_previoussub.3db", nullptr,
-                                         "ui_item_select", nullptr, PreviousPos, nullptr,
-                                         SmallHalf, 0, 1, 0, 0, 0x420, 0, 0);
+                                         "ui_item_select", nullptr, &PreviousPos, nullptr,
+                                         &SmallHalf, 0, 1, 0, 0, 0x420, 0, 0);
 
-    float const NextPos[3] = {-0.262f, -0.268f, 0.0f};
+    Vector const NextPos = {-0.262f, -0.268f, 0.0f};
     NextButton = CreateButtonControl("TargetNextButton", "interface\\hud\\HUD_nextsub.3db",
-                                     nullptr, "ui_item_select", nullptr, NextPos, nullptr,
-                                     SmallHalf, 0, 1, 0, 0, 0x41f, 0, 0);
+                                     nullptr, "ui_item_select", nullptr, &NextPos, nullptr,
+                                     &SmallHalf, 0, 1, 0, 0, 0x41f, 0, 0);
 
-    float const ScanPos[3] = {-0.411f, -0.37f, 0.0f};
+    Vector const ScanPos = {-0.411f, -0.37f, 0.0f};
     ScanButton = CreateButtonControl("TargetScanButton",
                                      "interface\\hud\\HUD_scanshipinactive.3db", nullptr,
-                                     "ui_item_select", nullptr, ScanPos, nullptr, SmallHalf, 0,
+                                     "ui_item_select", nullptr, &ScanPos, nullptr, &SmallHalf, 0,
                                      1, 0, 0, 0x440, 0, 0x8a);
 
     TractorButton = CreateButtonControl("TargetTractorButton",
                                         "interface\\hud\\HUD_tractorbeam2.3db", nullptr,
-                                        "ui_item_select", nullptr, ScanPos, nullptr, SmallHalf,
+                                        "ui_item_select", nullptr, &ScanPos, nullptr, &SmallHalf,
                                         0, 1, 0, 0, 0xbc2, 0, 0x8b);
 
-    float const CommPos[3] = {-0.445f, -0.37f, 0.0f};
+    Vector const CommPos = {-0.445f, -0.37f, 0.0f};
     CommButton = CreateButtonControl("TargetCommButton",
                                      "interface\\hud\\HUD_communication.3db", nullptr,
-                                     "ui_item_select", nullptr, CommPos, nullptr, SmallHalf, 0,
+                                     "ui_item_select", nullptr, &CommPos, nullptr, &SmallHalf, 0,
                                      1, 0, 0, 0x3fd, 0, 0);
 
     RequestGroupButton = CreateButtonControl("TargetRequestGroupButton",
                                              "interface\\hud\\HUD_grouprequest.3db", nullptr,
-                                             "ui_item_select", nullptr, CommPos, nullptr,
-                                             SmallHalf, 0, 1, 0, 0, 0x621, 0, 0);
+                                             "ui_item_select", nullptr, &CommPos, nullptr,
+                                             &SmallHalf, 0, 1, 0, 0, 0x621, 0, 0);
 
-    float const TradePos[3] = {-0.202f, -0.37f, 0.0f};
+    Vector const TradePos = {-0.202f, -0.37f, 0.0f};
     TradeButton = CreateButtonControl("TargetTradeButton", "interface\\hud\\HUD_trade.3db",
-                                      nullptr, "ui_item_select", nullptr, TradePos, nullptr,
-                                      SmallHalf, 0, 1, 0, 0, 0xbc3, 0, 0);
+                                      nullptr, "ui_item_select", nullptr, &TradePos, nullptr,
+                                      &SmallHalf, 0, 1, 0, 0, 0xbc3, 0, 0);
 
-    float const ClosePos[3] = {-0.386f, -0.308f, -0.5f};
+    Vector const ClosePos = {-0.386f, -0.308f, -0.5f};
     CloseButton = CreateButtonControl("TargetCloseButton",
                                       "interface\\NeuroNet\\Inventory\\x.3db", nullptr,
-                                      "ui_select_item", nullptr, ClosePos, nullptr, SmallHalf, 0,
+                                      "ui_select_item", nullptr, &ClosePos, nullptr, &SmallHalf, 0,
                                       1, 0, 0, 0x409, 0, 0);
 
-    float const ContactListPos[3] = {-0.343f, -0.37f, 0.0f};
+    Vector const ContactListPos = {-0.343f, -0.37f, 0.0f};
     ContactListButton = CreateButtonControl("SwitchToContactList",
                                             "interface\\hud\\HUD_contactlist.3db", nullptr,
-                                            "ui_select_item", nullptr, ContactListPos, nullptr,
-                                            SmallHalf, 0, 1, 0, 0, 0x448, 0, 0x54);
+                                            "ui_select_item", nullptr, &ContactListPos, nullptr,
+                                            &SmallHalf, 0, 1, 0, 0, 0x448, 0, 0x54);
 
-    float const TargetPos[3] = {-0.377f, -0.37f, 0.0f};
+    Vector const TargetPos = {-0.377f, -0.37f, 0.0f};
     TargetButton = CreateButtonControl("SwitchToTarget",
                                        "interface\\HUD\\HUD_targetedobject.3db", nullptr,
-                                       "ui_select_item", nullptr, TargetPos, nullptr, SmallHalf,
+                                       "ui_select_item", nullptr, &TargetPos, nullptr, &SmallHalf,
                                        0, 1, 0, 0, 0x5ff, 0, 0x58);
 
-    float const NextEnemyPos[3] = {-0.479f, -0.37f, 0.0f};
+    Vector const NextEnemyPos = {-0.479f, -0.37f, 0.0f};
     NextEnemyButton = CreateButtonControl("NextEnemyButton",
                                           "interface\\HUD\\HUD_nextenemy.3db", nullptr,
-                                          "ui_select_item", nullptr, NextEnemyPos, nullptr,
-                                          SmallHalf, 0, 1, 0, 0, 0x3e2, 0, 0x26);
+                                          "ui_select_item", nullptr, &NextEnemyPos, nullptr,
+                                          &SmallHalf, 0, 1, 0, 0, 0x3e2, 0, 0x26);
 
-    float const FormationPos[3] = {-0.278f, -0.37f, 0.0f};
+    Vector const FormationPos = {-0.278f, -0.37f, 0.0f};
     FormationButton = CreateButtonControl("FormationList",
                                           "interface\\HUD\\HUD_formation.3db", nullptr,
-                                          "ui_select_item", nullptr, FormationPos, nullptr,
-                                          SmallHalf, 0, 1, 0, 0, 0x60c, 0, 0x59);
+                                          "ui_select_item", nullptr, &FormationPos, nullptr,
+                                          &SmallHalf, 0, 1, 0, 0, 0x60c, 0, 0x59);
     FormationButton->SetProperty(kWinPropHide, 1, 0);
 
-    float const RankPos[3] = {-0.49f, -0.361f, 0.0f};
-    RankText = CreateTextControl("TargetRankText", "HudSmall", RankPos, nullptr, 0.228f, 0.03f,
+    Vector const RankPos = {-0.49f, -0.361f, 0.0f};
+    RankText = CreateTextControl("TargetRankText", "HudSmall", &RankPos, nullptr, 0.228f, 0.03f,
                                  0.9f, 0, 1, 0x574, 1);
 
     HideExpandedControls(true);
@@ -626,7 +626,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     }
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -647,7 +647,7 @@ void HudTarget::ToggleExpanded()
         // Opening: slide the toggle from its rest spot to the panel corner and drop the bottom
         // row from y -0.37 to -0.4.
         ButtonMover::Start(kAnimSeconds);
-        ButtonMover::AddButton(ToggleButton, &HomePosition.x, kToggleOpen);
+        ButtonMover::AddButton(ToggleButton, &HomePosition, &kToggleOpen);
 
         WinControl* const Row[8] = {NextEnemyButton, ScanButton, TractorButton,
                                     CommButton, RequestGroupButton, ContactListButton,
@@ -657,9 +657,9 @@ void HudTarget::ToggleExpanded()
         float const RowZ[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f};
         for (int Index = 0; Index < 8; ++Index)
         {
-            float const FromPos[3] = {RowX[Index], kRowY, RowZ[Index]};
-            float const ToPos[3] = {RowX[Index], kRowLoweredY, RowZ[Index]};
-            ButtonMover::AddButton(Row[Index], FromPos, ToPos);
+            Vector const FromPos = {RowX[Index], kRowY, RowZ[Index]};
+            Vector const ToPos = {RowX[Index], kRowLoweredY, RowZ[Index]};
+            ButtonMover::AddButton(Row[Index], &FromPos, &ToPos);
         }
 
         LabelRefreshTimer = kOne;
@@ -848,14 +848,14 @@ void HudTarget::UpdateLabels()
     {
         NnTextControl* const Label = Labels[Index];
         Label->SetFont(bPlayerShip ? PlayerNameFont : SmallFont);
-        Label->Offset[0] = Label->HomeOffset[0];
-        Label->Offset[1] = Label->HomeOffset[1];
-        Label->Offset[2] = Label->HomeOffset[2];
+        Label->Offset.x = Label->HomeOffset.x;
+        Label->Offset.y = Label->HomeOffset.y;
+        Label->Offset.z = Label->HomeOffset.z;
         if (bPlayerShip)
         {
-            Label->Offset[1] = static_cast<float>(static_cast<double>(Label->Offset[1]) - 0.004);
+            Label->Offset.y = static_cast<float>(static_cast<double>(Label->Offset.y) - 0.004);
         }
-        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Label->Offset), 0);
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Label->Offset), 0);
     }
 
     // The name line (Mode 0) with the faction short name.
@@ -1402,12 +1402,12 @@ void HudTarget::OnMoveFinished()
     ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
     TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
     FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
-    HalfExtents[0] = 0.109f;
-    HalfExtents[1] = 0.02f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = -0.402f;
-    HitOffset[1] = -0.371f;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.109f;
+    HalfExtents.y = 0.02f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = -0.402f;
+    HitOffset.y = -0.371f;
+    HitOffset.z = 0.0f;
     LabelRefreshTimer = kOne;
 }
 
@@ -1462,19 +1462,19 @@ void HudTarget::OnScaleFinished()
         ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
         TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
         FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
-        HalfExtents[0] = 0.131f;  // 0x3e0624dd
-        HalfExtents[1] = 0.117f;  // 0x3def9db2
-        HalfExtents[2] = 0.0f;
-        HitOffset[0] = -0.379f;   // 0xbec20c4a
-        HitOffset[1] = -0.266f;   // 0xbe883127
-        HitOffset[2] = 0.0f;
+        HalfExtents.x = 0.131f;  // 0x3e0624dd
+        HalfExtents.y = 0.117f;  // 0x3def9db2
+        HalfExtents.z = 0.0f;
+        HitOffset.x = -0.379f;   // 0xbec20c4a
+        HitOffset.y = -0.266f;   // 0xbe883127
+        HitOffset.z = 0.0f;
         return;
     }
 
     // The view panel shrank away: slide the toggle home and raise the bottom row back from
     // -0.4 to -0.37 (the buttons are put at -0.4 first, the minimized frame shown there).
     ButtonMover::Start(kAnimSeconds);
-    ButtonMover::AddButton(ToggleButton, kToggleOpen, &HomePosition.x);
+    ButtonMover::AddButton(ToggleButton, &kToggleOpen, &HomePosition);
 
     SetPos(NextEnemyButton, -0.479f, kRowLoweredY, 0.0f);
     SetPos(ScanButton, -0.411f, kRowLoweredY, 0.0f);
@@ -1494,9 +1494,9 @@ void HudTarget::OnScaleFinished()
     float const RowZ[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f};
     for (int Index = 0; Index < 8; ++Index)
     {
-        float const FromPos[3] = {RowX[Index], kRowLoweredY, RowZ[Index]};
-        float const ToPos[3] = {RowX[Index], kRowY, RowZ[Index]};
-        ButtonMover::AddButton(Row[Index], FromPos, ToPos);
+        Vector const FromPos = {RowX[Index], kRowLoweredY, RowZ[Index]};
+        Vector const ToPos = {RowX[Index], kRowY, RowZ[Index]};
+        ButtonMover::AddButton(Row[Index], &FromPos, &ToPos);
     }
 }
 

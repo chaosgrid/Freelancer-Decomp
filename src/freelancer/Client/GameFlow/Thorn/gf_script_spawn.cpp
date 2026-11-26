@@ -47,12 +47,12 @@ namespace
         return static_cast<FThornEntitySnap const*>(Engine->GetEntityDesc(Index));
     }
 
-    // The geo facet (+0x0c) slots 3 / 4 take non-const pointers; retail hands them the
-    // snapshot's / a local's floats directly.
-    void SetGeoPose(FThornComponent* Object, float const* Pos3, float const* Orient9)
+    // The geo facet (+0x0c) slots 3 / 4: retail hands them the snapshot's / a local's floats
+    // directly.
+    void SetGeoPose(FThornComponent* Object, Vector const* Pos, Matrix const* Orient)
     {
-        Object->SetPosition((const Vector*)(const_cast<float*>(Pos3)));
-        Object->SetOrientation((const Matrix*)(const_cast<float*>(Orient9)));
+        Object->SetPosition(Pos);
+        Object->SetOrientation(Orient);
     }
 
 }
@@ -202,7 +202,7 @@ void FGfScript::Spawn()
             if (Type == kThornEntityCompound || Type == kThornEntityDeformable ||
                 Type == kThornEntityCamera || Type == kThornEntitySound || Type == kThornEntityPsys)
             {
-                SetGeoPose(Object, Snap->Pos, Snap->Orient);
+                SetGeoPose(Object, &Snap->Pos, &Snap->Orient);
             }
             if (Type == kThornEntityDeformable)
                 Object->SetFloorHeight(Snap->FloorHeight); // identity slot 5
@@ -258,7 +258,7 @@ void FGfScript::ApplySpecialMarker(FThornEntitySnap const* Snap, FThornComponent
     }
 
     Csys const Local = Frame.trans_to_frame(Info->Frame);
-    SetGeoPose(Obj, &Local.Pos.x, &Local.Orient.E[0][0]);
+    SetGeoPose(Obj, &Local.Pos, &Local.Orient);
     if (_stricmp(EntityName, "special/p") != 0)
         return;
     FCharacterObject* const Player = RoomControlPlayerCharacter(Room);
@@ -274,7 +274,7 @@ FThornComponent* FGfScript::SpawnMarker(FThornEntitySnap const* Snap)
     if ((Snap->Flags & 1) == 0)
     {
         FThornMarker* const Marker = new FThornMarker(Frame, this, Snap);
-        SetGeoPose(Marker, Snap->Pos, Snap->Orient);
+        SetGeoPose(Marker, &Snap->Pos, &Snap->Orient);
         return Marker;
     }
 
@@ -292,11 +292,11 @@ FThornComponent* FGfScript::SpawnMarker(FThornEntitySnap const* Snap)
     if (Info != nullptr)
     {
         Csys const Local = Frame.trans_to_frame(Info->Frame);
-        SetGeoPose(Marker, &Local.Pos.x, &Local.Orient.E[0][0]);
+        SetGeoPose(Marker, &Local.Pos, &Local.Orient);
     }
     else
     {
-        SetGeoPose(Marker, Snap->Pos, Snap->Orient);
+        SetGeoPose(Marker, &Snap->Pos, &Snap->Orient);
     }
     return Marker;
 }
@@ -339,7 +339,7 @@ void FGfScript::ApplySpecialCamera(FThornEntitySnap const* Snap, FThornComponent
     }
 
     Csys const Local = Frame.trans_to_frame(Info->Frame);
-    SetGeoPose(Obj, &Local.Pos.x, &Local.Orient.E[0][0]);
+    SetGeoPose(Obj, &Local.Pos, &Local.Orient);
     Obj->SetFov(&CameraProps4[0]);
     Obj->SetNear(&CameraProps4[1]);
     Obj->SetFar(&CameraProps4[2]);
@@ -385,7 +385,7 @@ FThornComponent* FGfScript::SpawnCameraReference(FThornEntitySnap const* Snap)
     memcpy(&Fov, &Snap->Fovh, sizeof(Fov));
     memcpy(&Near, &Snap->NearPlane, sizeof(Near));
     memcpy(&Far, &Snap->FarPlane, sizeof(Far));
-    SetGeoPose(Camera, &Info->Frame.Pos.x, &Info->Frame.Orient.E[0][0]);
+    SetGeoPose(Camera, &Info->Frame.Pos, &Info->Frame.Orient);
     Camera->SetFov(&Fov);
     Camera->SetNear(&Near);
     Camera->SetFar(&Far);
@@ -603,10 +603,10 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
     Data.Template = PropSnap->TemplateName;
     Data.Name = PropSnap->Name;
     Data.Type = OldCategory;
-    Data.Pos.x = PropSnap->Pos[0];
-    Data.Pos.y = PropSnap->Pos[1];
-    Data.Pos.z = PropSnap->Pos[2];
-    memcpy(&Data.Orient.E[0][0], PropSnap->Orient, sizeof(Data.Orient.E));
+    Data.Pos.x = PropSnap->Pos.x;
+    Data.Pos.y = PropSnap->Pos.y;
+    Data.Pos.z = PropSnap->Pos.z;
+    memcpy(&Data.Orient, &PropSnap->Orient, sizeof(Data.Orient));
     char const* const Loadout = ThornGetUserString(Engine, Index, "loadout");
     Data.Loadout = Loadout != nullptr ? Loadout : "";
 
@@ -684,10 +684,10 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
         CharacterProperties Props;
         GetCostumeDescriptions()->get_costume(Snap->TemplateName, Props.Cost);
         Csys CharacterFrame;
-        CharacterFrame.Pos.x = Snap->Pos[0];
-        CharacterFrame.Pos.y = Snap->Pos[1];
-        CharacterFrame.Pos.z = Snap->Pos[2];
-        memcpy(&CharacterFrame.Orient.E[0][0], Snap->Orient, sizeof(CharacterFrame.Orient.E));
+        CharacterFrame.Pos.x = Snap->Pos.x;
+        CharacterFrame.Pos.y = Snap->Pos.y;
+        CharacterFrame.Pos.z = Snap->Pos.z;
+        memcpy(&CharacterFrame.Orient, &Snap->Orient, sizeof(CharacterFrame.Orient));
         Character = CreateCharacterObject(Props, nullptr, -1, Room, 1, CharacterFrame);
         Sequence->AddCharacter(Character, Actor);
     }

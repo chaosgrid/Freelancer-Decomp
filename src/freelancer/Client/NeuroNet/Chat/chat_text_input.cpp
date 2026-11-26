@@ -290,12 +290,12 @@ bool ChatTextInputDisplay::Create(Win3D* NewParent, void* /*Data*/)
     // DAT_005c75e0 = 0.5f.
     float const HalfW = NormWidth * 0.5f;
     float const HalfH = NormHeight * 0.5f;
-    HalfExtents[0] = HalfW;
-    HalfExtents[1] = HalfH;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = HalfW;
-    HitOffset[1] = HalfH;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = HalfW;
+    HalfExtents.y = HalfH;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = HalfW;
+    HitOffset.y = HalfH;
+    HitOffset.z = 0.0f;
     DrawLayer = 7;
     DrawSubLayer = 7;
     return bResult;

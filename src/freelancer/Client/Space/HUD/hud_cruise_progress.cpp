@@ -48,8 +48,8 @@ HUD_CruiseProgress::~HUD_CruiseProgress()
 bool HUD_CruiseProgress::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004d5db0 (this = the WinControl face).
-    float const TextPos[3] = {-0.243f, -0.263f, 0.0f}; // 0xbe78d4fe, 0xbe86a7f0, 0
-    CruiseProgressText = CreateTextControl("CruiseProgressText", "SubHeader", TextPos, nullptr,
+    Vector const TextPos = {-0.243f, -0.263f, 0.0f}; // 0xbe78d4fe, 0xbe86a7f0, 0
+    CruiseProgressText = CreateTextControl("CruiseProgressText", "SubHeader", &TextPos, nullptr,
                                            0.485f, 0.04f, 0.9f, 0, 1, 0, 1);
 
     // The label's Font::String goes multi-line (and its layout is dropped) unless it already

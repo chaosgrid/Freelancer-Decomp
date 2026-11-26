@@ -65,11 +65,11 @@ namespace
     // FUN_00557d00 -- normalise in place with the 0x5f3759df inverse square root and one Newton
     // step (1.5f DAT_005ca220, 0.5f DAT_005c75e0); LenSq is rounded to float, the factor kept
     // double.
-    void FlashLightNormalizeFast(float* V)
+    void FlashLightNormalizeFast(Vector* V)
     {
         float const LenSq = static_cast<float>(
-            (static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1]) +
-            static_cast<double>(V[2]) * V[2]);
+            (static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y) +
+            static_cast<double>(V->z) * V->z);
         int Bits = 0;
         memcpy(&Bits, &LenSq, sizeof(Bits));
         int const GuessBits = 0x5f3759df - (Bits >> 1);
@@ -77,49 +77,49 @@ namespace
         memcpy(&Guess, &GuessBits, sizeof(Guess));
         double const Scale =
             (1.5 - static_cast<double>(Guess) * Guess * LenSq * 0.5) * static_cast<double>(Guess);
-        V[0] = static_cast<float>(Scale * V[0]);
-        V[1] = static_cast<float>(Scale * V[1]);
-        V[2] = static_cast<float>(Scale * V[2]);
+        V->x = static_cast<float>(Scale * V->x);
+        V->y = static_cast<float>(Scale * V->y);
+        V->z = static_cast<float>(Scale * V->z);
     }
 
     // The quad both flare passes emit (inlined identically in FUN_005579b0 and FUN_00557d70).
     // Corners Center - R + U, Center + R + U, Center + R - U, Center - R - U at texture (0,0),
     // (1,0), (1,1), (0,1), rounded as retail rounds them.
-    void EmitFlareQuad(float const* Center, float const* R, float const* U)
+    void EmitFlareQuad(Vector const* Center, Vector const* R, Vector const* U)
     {
         Win3DTexCoord2f(0.0f, 0.0f);
-        float Left[3];
-        Win3DVec3Sub(Left, Center, R);
-        float Corner[3];
-        Win3DVec3Add(Corner, Left, U);
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        Vector Left;
+        Win3DVec3Sub(&Left, Center, R);
+        Vector Corner;
+        Win3DVec3Add(&Corner, &Left, U);
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
 
         Win3DTexCoord2f(1.0f, 0.0f);
-        float RightEdge[3] = {Center[0] + R[0], Center[1] + R[1], Center[2] + R[2]};
-        Corner[0] = U[0] + RightEdge[0];
-        Corner[1] = U[1] + RightEdge[1];
-        Corner[2] = U[2] + RightEdge[2];
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        float RightEdge[3] = {Center->x + R->x, Center->y + R->y, Center->z + R->z};
+        Corner.x = U->x + RightEdge[0];
+        Corner.y = U->y + RightEdge[1];
+        Corner.z = U->z + RightEdge[2];
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
 
         // Center + R is recomputed.
         Win3DTexCoord2f(1.0f, 1.0f);
-        RightEdge[0] = Center[0] + R[0];
-        RightEdge[1] = Center[1] + R[1];
-        RightEdge[2] = Center[2] + R[2];
-        Corner[0] = RightEdge[0] - U[0];
-        Corner[1] = RightEdge[1] - U[1];
-        Corner[2] = RightEdge[2] - U[2];
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        RightEdge[0] = Center->x + R->x;
+        RightEdge[1] = Center->y + R->y;
+        RightEdge[2] = Center->z + R->z;
+        Corner.x = RightEdge[0] - U->x;
+        Corner.y = RightEdge[1] - U->y;
+        Corner.z = RightEdge[2] - U->z;
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
 
         // Center - R - U: x and y keep Center - R unrounded, z rounds it to float first.
         Win3DTexCoord2f(0.0f, 1.0f);
-        float const LeftZ = Center[2] - R[2];
-        Corner[0] = static_cast<float>(
-            (static_cast<double>(Center[0]) - static_cast<double>(R[0])) - static_cast<double>(U[0]));
-        Corner[1] = static_cast<float>(
-            (static_cast<double>(Center[1]) - static_cast<double>(R[1])) - static_cast<double>(U[1]));
-        Corner[2] = LeftZ - U[2];
-        Win3DVertex3f(Corner[0], Corner[1], Corner[2]);
+        float const LeftZ = Center->z - R->z;
+        Corner.x = static_cast<float>(
+            (static_cast<double>(Center->x) - static_cast<double>(R->x)) - static_cast<double>(U->x));
+        Corner.y = static_cast<float>(
+            (static_cast<double>(Center->y) - static_cast<double>(R->y)) - static_cast<double>(U->y));
+        Corner.z = LeftZ - U->z;
+        Win3DVertex3f(Corner.x, Corner.y, Corner.z);
     }
 }
 
@@ -237,7 +237,7 @@ void FFlashLight::Update(float Delta)
 void FFlashLight::DrawShine(ICamera* Camera)
 {
     // FUN_005579b0. (Retail also copies the orientation to the stack and never reads it.)
-    float const Center[3] = {Pos.x, Pos.y, Pos.z};
+    Vector const Center = {Pos.x, Pos.y, Pos.z};
 
     // Nothing for a black GlowColor (any NaN component draws).
     if (GlowColor.x == 0.0f && GlowColor.y == 0.0f && GlowColor.z == 0.0f)
@@ -246,14 +246,14 @@ void FFlashLight::DrawShine(ICamera* Camera)
     double Level = 1.0;
     if (FlareConeOuterCos > FlareConeInnerCos)
     {
-        float Dir[3];
-        Win3DVec3Sub(Dir, &Pos.x, (const float*)Camera->GetPosition());
-        FlashLightNormalizeFast(Dir);
+        Vector Dir;
+        Win3DVec3Sub(&Dir, &Pos, Camera->GetPosition());
+        FlashLightNormalizeFast(&Dir);
         // The light's third axis; the dot (z + y) + x stays unrounded.
         float const Axis[3] = {Orient.E[0][2], Orient.E[1][2], Orient.E[2][2]};
         double const DotWide =
-            (static_cast<double>(Dir[2]) * Axis[2] + static_cast<double>(Dir[1]) * Axis[1]) +
-            static_cast<double>(Dir[0]) * Axis[0];
+            (static_cast<double>(Dir.z) * Axis[2] + static_cast<double>(Dir.y) * Axis[1]) +
+            static_cast<double>(Dir.x) * Axis[0];
         // The first compare uses the unrounded dot, the second the rounded copy.
         float const Dot = static_cast<float>(DotWide);
         if (DotWide < static_cast<double>(FlareConeInnerCos))
@@ -277,18 +277,18 @@ void FFlashLight::DrawShine(ICamera* Camera)
     float const Right[3] = {View[0], View[3], View[6]};
     View = (const float*)Camera->GetOrientation();
     float const Up[3] = {View[1], View[4], View[7]};
-    float R[3];
-    ScaleVec3(R, Right, GlowSize);
-    float U[3];
-    ScaleVec3(U, Up, GlowSize);
+    Vector R;
+    ScaleVec3(&R.x, Right, GlowSize);
+    Vector U;
+    ScaleVec3(&U.x, Up, GlowSize);
 
-    EmitFlareQuad(Center, R, U);
+    EmitFlareQuad(&Center, &R, &U);
 }
 
 void FFlashLight::DrawBulb(ICamera* Camera)
 {
     // FUN_00557d70. (Retail also copies the orientation to the stack and never reads it.)
-    float const Center[3] = {Pos.x, Pos.y, Pos.z};
+    Vector const Center = {Pos.x, Pos.y, Pos.z};
 
     // Nothing for a black BlendColor.
     if (BlendColor.x == 0.0f && BlendColor.y == 0.0f && BlendColor.z == 0.0f)
@@ -301,12 +301,12 @@ void FFlashLight::DrawBulb(ICamera* Camera)
     float const Right[3] = {View[0], View[3], View[6]};
     View = (const float*)Camera->GetOrientation();
     float const Up[3] = {View[1], View[4], View[7]};
-    float R[3];
-    ScaleVec3(R, Right, BulbSize);
-    float U[3];
-    ScaleVec3(U, Up, BulbSize);
+    Vector R;
+    ScaleVec3(&R.x, Right, BulbSize);
+    Vector U;
+    ScaleVec3(&U.x, Up, BulbSize);
 
-    EmitFlareQuad(Center, R, U);
+    EmitFlareQuad(&Center, &R, &U);
 }
 
 FFlashLightSet::FFlashLightSet()

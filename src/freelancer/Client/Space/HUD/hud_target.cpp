@@ -1355,11 +1355,11 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
 
     // Retail stores |Max - Center| (FUN_00423b60, FUN_00410190) to ViewRadius and then
     // overwrites it below.
-    float Reach[3];
-    Reach[0] = Bounds.Max.x - ViewCenter.x;
-    Reach[1] = Bounds.Max.y - ViewCenter.y;
-    Reach[2] = Bounds.Max.z - ViewCenter.z;
-    ViewRadius = static_cast<float>(Vec3Length(Reach));
+    Vector Reach;
+    Reach.x = Bounds.Max.x - ViewCenter.x;
+    Reach.y = Bounds.Max.y - ViewCenter.y;
+    Reach.z = Bounds.Max.z - ViewCenter.z;
+    ViewRadius = static_cast<float>(Vec3Length(&Reach));
 
     // The X span wins only when strictly larger (NaN takes Z); * 0.5 is DAT_005c75e8, double.
     float const SpanX = Bounds.Max.x - Bounds.Min.x;
@@ -1858,13 +1858,13 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     memcpy(&Orientation, &UiCamera->World, sizeof(Orientation));
     Vector Direction;
     HudTargetMath()->TransformMatrix(Direction, Orientation, Near);
-    if (!HitTest(&Direction.x))
+    if (!HitTest(&Direction))
     {
         return 0;
     }
 
     FHudSpherePick Pick(1);
-    Pick.Setup(reinterpret_cast<Vector const*>(Camera->GetPosition()), &RayEnd);
+    Pick.Setup(Camera->GetPosition(), &RayEnd);
 
     unsigned Result = 0;
 
@@ -1902,7 +1902,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     return Result;
 }
 
-bool HudTargetBase::HitTest(float const* Ray)
+bool HudTargetBase::HitTest(Vector const* Ray)
 {
     // LAB_004e7d20.
     if (GetClientMouseCursorDrawFlag() == 0)
@@ -1921,9 +1921,9 @@ bool HudTargetBase::HitTest(float const* Ray)
     if (bExpanded != 0)
     {
         // The ray scaled to the hit plane's depth, tested against the box around HitCenter.
-        float const Scale = HitCenter.z / Ray[2];
-        float const PlaneX = Scale * Ray[0];
-        float const PlaneY = Scale * Ray[1];
+        float const Scale = HitCenter.z / Ray->z;
+        float const PlaneX = Scale * Ray->x;
+        float const PlaneY = Scale * Ray->y;
         float const Dx = PlaneX - (HitCenter.x - HitHalfWidth);
         float const Dy = (HitCenter.y + HitHalfHeight) - PlaneY;
         // DAT_005c7474 = 0.0f. Each test falls through to the base on false or unordered.

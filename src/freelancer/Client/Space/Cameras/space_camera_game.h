@@ -268,13 +268,13 @@ void ResetCameraShakeAmount();
 // FUN_0051dbd0: HudCameraUpdateShake, then with a positive amplitude two random rotations of the
 // 3x3 orientation (rows 0/2, then rows 0/1) by angles in [-amp, amp). Called by the FirstPerson
 // and RearView updates.
-void HudCameraApplyShake(FHudCamera* Cam, float* Orientation);
+void HudCameraApplyShake(FHudCamera* Cam, Matrix* Orientation);
 
 // FUN_00516fe0 (called by the third-person solver FUN_00518f20 and the turret FUN_0051a7d0).
 // Keeps M's forward column (column 2) and rebuilds the other two around Up:
 // right = normalise(Up x F) unless |F . Up| >= 0.999, when M's column 0 is kept; then
 // C = F x right. Out is row-major {right, C, F} by column. Out must not alias M.
-void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up);
+void CameraOrientFromForwardAndUp(Matrix* Out, Matrix const* M, const Vector* Up);
 
 // The IObjRW the watcher currently holds, or null. Retail spells this `watched - 8` inline at
 // every use site.

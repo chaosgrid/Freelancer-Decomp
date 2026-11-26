@@ -415,8 +415,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         IFont* const NormalFont = FindMenuFontImp("Normal");
         float const Height =
             static_cast<float>(static_cast<unsigned>(NormalFont->GetLineHeight())) * 0.002f;
-        float const Position[3] = {0.319999993f, -0.349999994f, -1.0f};
-        VersionText->Init("Normal", Position, nullptr, 0.25f, Height, 1.0f, 0u, 1, 0, 0);
+        Vector const Position = {0.319999993f, -0.349999994f, -1.0f};
+        VersionText->Init("Normal", &Position, nullptr, 0.25f, Height, 1.0f, 0u, 1, 0, 0);
         wchar_t Format[0x100];
         GetIdsStringWWithRawFallback(0x4f7u, Format, 0x100);
         unsigned const VersionWord =
@@ -635,8 +635,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     Refresh->SetSkipUpload(true);
     for (int Axis = 0; Axis < 3; ++Axis)
     {
-        InfoBoxHome[Axis] = (&ServerInfoBox->Position.x)[Axis];
-        SelectBoxHome[Axis] = (&ServerSelectBox->Position.x)[Axis];
+        (&InfoBoxHome.x)[Axis] = (&ServerInfoBox->Position.x)[Axis];
+        (&SelectBoxHome.x)[Axis] = (&ServerSelectBox->Position.x)[Axis];
     }
 
     // Retail inlines RefreshDetailsText a second time here.
@@ -1242,28 +1242,28 @@ void PageServerSelect::Update()
         // In place once past 0; an unordered SlideT also arrives.
         if (SlideT <= 0.0)
         {
-            float Right[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
-            float Left[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
-            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
-            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
-            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
-            float BoxPosition[3];
-            Win3DVec3Add(BoxPosition, InfoBoxHome, Left);
-            ServerInfoBox->SetPosition(BoxPosition);
-            Win3DVec3Add(BoxPosition, SelectBoxHome, Right);
-            ServerSelectBox->SetPosition(BoxPosition);
+            Vector Right = {static_cast<float>(SlideT), 0.0f, 0.0f};
+            Vector Left = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Right), 0);
+            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Right), 0);
+            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Left), 0);
+            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Left), 0);
+            Vector BoxPosition;
+            Win3DVec3Add(&BoxPosition, &InfoBoxHome, &Left);
+            ServerInfoBox->SetPosition(&BoxPosition);
+            Win3DVec3Add(&BoxPosition, &SelectBoxHome, &Right);
+            ServerSelectBox->SetPosition(&BoxPosition);
         }
         else
         {
             // Everything in place, shown and live; SlideT parked at 2.0.
-            float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            ServerInfoBox->SetPosition(InfoBoxHome);
-            ServerSelectBox->SetPosition(SelectBoxHome);
+            Vector ZeroOffset = {0.0f, 0.0f, 0.0f};
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            ServerInfoBox->SetPosition(&InfoBoxHome);
+            ServerSelectBox->SetPosition(&SelectBoxHome);
             ShowWin3D(ServerTable);
             ShowWin3D(Legend);
             ShowWin3D(ServerDetails);
@@ -1294,17 +1294,17 @@ void PageServerSelect::Update()
     if (bLeaving != 0 && LeaveDirection != 0)
     {
         SlideT = SlideT - GetClientFrameTimeCapped() * 1.5;
-        float Right[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
-        float Left[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-        MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
-        SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
-        Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
-        Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
-        float BoxPosition[3];
-        Win3DVec3Add(BoxPosition, InfoBoxHome, Left);
-        ServerInfoBox->SetPosition(BoxPosition);
-        Win3DVec3Add(BoxPosition, SelectBoxHome, Right);
-        ServerSelectBox->SetPosition(BoxPosition);
+        Vector Right = {static_cast<float>(SlideT), 0.0f, 0.0f};
+        Vector Left = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+        MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Right), 0);
+        SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Right), 0);
+        Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Left), 0);
+        Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Left), 0);
+        Vector BoxPosition;
+        Win3DVec3Add(&BoxPosition, &InfoBoxHome, &Left);
+        ServerInfoBox->SetPosition(&BoxPosition);
+        Win3DVec3Add(&BoxPosition, &SelectBoxHome, &Right);
+        ServerSelectBox->SetPosition(&BoxPosition);
 
         // -1.5 is DAT_005e2bb0.
         if (SlideT <= -1.5)

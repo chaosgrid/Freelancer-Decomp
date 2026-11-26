@@ -66,7 +66,7 @@ inline void MatrixSetIdentity(Matrix& Out)
             Out.E[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
     }
 }
-void CsysFromPosOrient(Csys& Out, float const* Pos3, float const* Orient9);
+void CsysFromPosOrient(Csys& Out, Vector const& Pos, Matrix const& Orient);
 
 // 0x063038b0. Orthonormal 3x3: column 2 = -normalize(Dir).
 COMMON_API Matrix __cdecl LookMatrix(Vector const& Direction);

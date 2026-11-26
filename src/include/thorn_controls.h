@@ -111,10 +111,10 @@ struct ICompoundControl : IDAComponent
     // two entity indices, +0x2c / +0x30 the two hardpoint names).
     virtual GENRESULT DACOM_API ConnectHardpoints(void* Desc) = 0;
     virtual GENRESULT DACOM_API DisconnectHardpoints(void* Desc) = 0;
-    // 9: ThornScene sends (int TargetType, const char* Name, float* OutXform12). The out is a
-    // Common Transform: the 3x3 orientation, then the position at +0x24.
+    // 9: ThornScene sends (int TargetType, const char* Name, Transform* OutXform). The out is
+    // a Common Transform: the 3x3 orientation, then the position at +0x24.
     virtual GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
-                                                  float* OutXform12) = 0;
+                                                  Transform* OutXform) = 0;
     // 10: GET, not set. Retail's thorn at 0x06f497fa does `LEA EAX,[ESI+0x70]; PUSH EAX;
     // PUSH ECX; CALL [EDX+0x28]` -- slot 10, and the argument is an address.
     virtual GENRESULT DACOM_API GetFloorHeight(float* OutHeight) = 0;
@@ -129,12 +129,12 @@ struct ICompoundControl : IDAComponent
 // FUN_00452a30 / LAB_00452680).
 struct IIKControl : IDAComponent
 {
-    // 3 and 5: ThornScene sends (void* Desc, float* Position, float* Orientation) to both.
+    // 3 and 5: ThornScene sends (void* Desc, Vector* Position, Matrix* Orientation) to both.
     // Deformable: 3 starts an aim on a free slot, 4 stops the slot whose event id matches, 5
     // moves a running aim's target.
-    virtual GENRESULT DACOM_API StartIk(void* Desc, float* Position, float* Orientation) = 0;
+    virtual GENRESULT DACOM_API StartIk(void* Desc, Vector* Position, Matrix* Orientation) = 0;
     virtual GENRESULT DACOM_API StopIk(void* Desc) = 0;
-    virtual GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) = 0;
+    virtual GENRESULT DACOM_API UpdateIk(void* Desc, Vector* Position, Matrix* Orientation) = 0;
 };
 
 // "1.11_ILightControl" -- light and scene entities. ThornScene sends the cone cutoff to slot 6
@@ -150,14 +150,14 @@ struct IIKControl : IDAComponent
 struct ILightControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetColor(int* Rgb) = 0;        // 3
-    virtual GENRESULT DACOM_API SetDirection(float* Dir3) = 0; // 4
+    virtual GENRESULT DACOM_API SetDirection(Vector* Dir) = 0; // 4
     virtual GENRESULT DACOM_API SetRange(float Range) = 0;     // 5
     virtual GENRESULT DACOM_API SetCutoff(float Radians) = 0;  // 6
     virtual GENRESULT DACOM_API SetOn(int On) = 0;             // 7
     // 8: ThornScene sends `(Type == 3) ? 1 : 0` (D3DLIGHT_DIRECTIONAL == 3).
     virtual GENRESULT DACOM_API SetInfinite(int IsInfinite) = 0;
     virtual GENRESULT DACOM_API GetColor(float* OutRgb) = 0;      // 9
-    virtual GENRESULT DACOM_API GetDirection(float* OutDir3) = 0; // 10
+    virtual GENRESULT DACOM_API GetDirection(Vector* OutDir) = 0; // 10
     virtual GENRESULT DACOM_API GetRange(float* OutRange) = 0;    // 11
     virtual GENRESULT DACOM_API GetCutoff(float* OutRadians) = 0; // 12
     // 13 / 14: the light GET (06f457bf..06f457e2) writes them to light props +0x20 (On) and
@@ -188,10 +188,10 @@ struct ID3DLightControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetOn(int On) = 0;                   // 3
     virtual GENRESULT DACOM_API SetLight(void const* D3dLight8) = 0; // 4
-    virtual GENRESULT DACOM_API SetDirection(float* Dir3) = 0;       // 5
+    virtual GENRESULT DACOM_API SetDirection(Vector* Dir) = 0;       // 5
     virtual GENRESULT DACOM_API GetOn(int* OutOn) = 0;               // 6
     virtual GENRESULT DACOM_API GetLight(void* OutD3dLight8) = 0;    // 7
-    virtual GENRESULT DACOM_API GetDirection(float* OutDir3) = 0;    // 8
+    virtual GENRESULT DACOM_API GetDirection(Vector* OutDir) = 0;    // 8
     // Six slots (Thorn_Component 0x005cc610..0x005cc624, all LAB_00454190: one argument).
 };
 

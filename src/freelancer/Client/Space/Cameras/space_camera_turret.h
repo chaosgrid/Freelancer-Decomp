@@ -75,7 +75,7 @@ bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4);
 // rates (+0x11c/+0x120) or, after 0.25s of left-button / locked mouse flight, by the cursor's
 // offset from the surface centre. Answers true (Out12 untouched) when the watcher does not hold
 // a client ship; false otherwise. The last argument is passed by both callers and never read.
-bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSeconds, bool bAttach);
+bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float DeltaSeconds, bool bAttach);
 
 // Slot 0x58 (FUN_0051a6a0): zero the four angles, HUDCamera's attach, then the view on an
 // identity 3x4 into the world transform.

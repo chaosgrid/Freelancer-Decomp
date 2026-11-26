@@ -503,7 +503,7 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform 
     // Copied to a second local first, as retail does (FUN_00410fe0).
     Transform const Copy = World;
     EngineLightSetTransform(static_cast<FEngineLight*>(ExplosionFx), &Copy.Rotation.E[0][0],
-                            &Copy.Translation.x);
+                            &Copy.Translation);
 
     // The free-motion velocity +0x120..+0x128 = 0.
     *reinterpret_cast<float*>(Base + 0x120) = 0.0f;
@@ -1029,12 +1029,12 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         }
 
         // A white point light at the barrel with the flash radius.
-        float Pos3[3];
-        Pos3[0] = BarrelWs.x;
-        Pos3[1] = BarrelWs.y;
-        Pos3[2] = BarrelWs.z;
+        Vector Pos3;
+        Pos3.x = BarrelWs.x;
+        Pos3.y = BarrelWs.y;
+        Pos3.z = BarrelWs.z;
         unsigned char const Rgba[4] = {0xff, 0xff, 0xff, 0xff};
-        FGameLight* const Light = GameLightCreatePoint(Pos3, Rgba, Companion->FlashRadius);
+        FGameLight* const Light = GameLightCreatePoint(&Pos3, Rgba, Companion->FlashRadius);
         if (Light == nullptr)
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Light creation for gun failed: %s\n",

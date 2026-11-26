@@ -757,17 +757,17 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
     // reads it.
     Transform ZoneXf;
     ZoneToTransform(*Zone, ZoneXf);
-    Vector const CamPos = *(Vector const*)((ICamera*)Camera)->GetPosition();
+    Vector const CamPos = *((ICamera*)Camera)->GetPosition();
     Vector Scratch;
     AcquirePanelsMath()->InverseTransform(Scratch, ZoneXf, CamPos);
 
     // FUN_004215b0, then FUN_00422690(camera, &matrix).
-    float World12[12];
-    Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(World12));
-    World12[11] = 0.0f;
-    World12[10] = 0.0f;
-    World12[9] = 0.0f;
-    Win3DBindModelview(Camera, reinterpret_cast<Transform const*>(World12));
+    Transform World;
+    Win3DIdentityRotation3x3(&World.Rotation);
+    World.Translation.z = 0.0f;
+    World.Translation.y = 0.0f;
+    World.Translation.x = 0.0f;
+    Win3DBindModelview(Camera, &World);
 
     // Zero skips straight to the restorers.
     if (SetupPanelPipeline(this) != 0)
@@ -1291,12 +1291,12 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
 
     // FUN_004215b0, FUN_00422690(0, &m).
     {
-        float Ident12[12];
-        Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(Ident12));
-        Ident12[9] = 0.0f;
-        Ident12[10] = 0.0f;
-        Ident12[11] = 0.0f;
-        Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Ident12));
+        Transform Ident;
+        Win3DIdentityRotation3x3(&Ident.Rotation);
+        Ident.Translation.x = 0.0f;
+        Ident.Translation.y = 0.0f;
+        Ident.Translation.z = 0.0f;
+        Win3DBindModelview(nullptr, &Ident);
     }
 
     // Retail quirk: without alpha both stores name SRCBLEND (0x13); DESTBLEND is never set.
@@ -1388,14 +1388,14 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         if (Depth > AheadThreshold)
         {
             // The squared length is kept on the FPU and also stored as a float.
-            float T[3];
-            T[0] = 0.0f;
-            T[1] = 0.0f;
-            T[2] = -Clouds->CentreAhead;
-            float D[3];
-            Win3DVec3Sub(D, T, &VP.x);
-            double const Dist2 = (static_cast<double>(D[2]) * D[2] + static_cast<double>(D[1]) * D[1]) +
-                                 static_cast<double>(D[0]) * D[0];
+            Vector T;
+            T.x = 0.0f;
+            T.y = 0.0f;
+            T.z = -Clouds->CentreAhead;
+            Vector D;
+            Win3DVec3Sub(&D, &T, &VP);
+            double const Dist2 = (static_cast<double>(D.z) * D.z + static_cast<double>(D.y) * D.y) +
+                                 static_cast<double>(D.x) * D.x;
             float const Dist2f = static_cast<float>(Dist2);
             if (Dist2 > RadiusSq)
                 continue;
@@ -1494,34 +1494,34 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             continue;
 
         // FUN_00411d60, FUN_00423b60 / FUN_00423b30.
-        float SP[3];
-        ScaleVec3(SP, P, Size);
-        float SQ[3];
-        ScaleVec3(SQ, Q, Size);
-        float Tmp[3];
-        float C0[3];
-        Win3DVec3Sub(Tmp, &VP.x, SQ);
-        Win3DVec3Sub(C0, Tmp, SP);
-        float Cc1[3];
-        Win3DVec3Add(Tmp, &VP.x, SQ);
-        Win3DVec3Sub(Cc1, Tmp, SP);
-        float Cc2[3];
-        Win3DVec3Add(Tmp, &VP.x, SQ);
-        Win3DVec3Add(Cc2, Tmp, SP);
-        float Cc3[3];
-        Win3DVec3Sub(Tmp, &VP.x, SQ);
-        Win3DVec3Add(Cc3, Tmp, SP);
+        Vector SP;
+        ScaleVec3(&SP.x, P, Size);
+        Vector SQ;
+        ScaleVec3(&SQ.x, Q, Size);
+        Vector Tmp;
+        Vector C0;
+        Win3DVec3Sub(&Tmp, &VP, &SQ);
+        Win3DVec3Sub(&C0, &Tmp, &SP);
+        Vector Cc1;
+        Win3DVec3Add(&Tmp, &VP, &SQ);
+        Win3DVec3Sub(&Cc1, &Tmp, &SP);
+        Vector Cc2;
+        Win3DVec3Add(&Tmp, &VP, &SQ);
+        Win3DVec3Add(&Cc2, &Tmp, &SP);
+        Vector Cc3;
+        Win3DVec3Sub(&Tmp, &VP, &SQ);
+        Win3DVec3Add(&Cc3, &Tmp, &SP);
 
         // Two triangles, one diffuse word.
-        float const* const Pos[6] = {C0, Cc1, Cc2, Cc2, Cc3, C0};
+        Vector const* const Pos[6] = {&C0, &Cc1, &Cc2, &Cc2, &Cc3, &C0};
         float const Us[6] = {Shape->U0, Shape->U1, Shape->U1, Shape->U1, Shape->U0, Shape->U0};
         float const Vs[6] = {Shape->V0, Shape->V0, Shape->V1, Shape->V1, Shape->V1, Shape->V0};
         for (int Vert = 0; Vert < 6; ++Vert)
         {
             float* const OutPos = reinterpret_cast<float*>(PosCursor.Ptr);
-            OutPos[0] = Pos[Vert][0];
-            OutPos[1] = Pos[Vert][1];
-            OutPos[2] = Pos[Vert][2];
+            OutPos[0] = Pos[Vert]->x;
+            OutPos[1] = Pos[Vert]->y;
+            OutPos[2] = Pos[Vert]->z;
             *reinterpret_cast<unsigned*>(DiffCursor.Ptr) = Diffuse;
             float* const OutUv = reinterpret_cast<float*>(UvCursor.Ptr);
             OutUv[0] = Us[Vert];

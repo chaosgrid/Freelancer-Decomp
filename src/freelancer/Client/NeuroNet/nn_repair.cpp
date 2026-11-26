@@ -138,26 +138,26 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004b2c90 (RET 8).
     SetMesh(kBackgroundMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder); // FUN_005a1340
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder); // FUN_005a1340
 
     {
-        float const Position[3] = {0.0f, -0.204f, 0.0f};
-        float const Half[3] = {0.133f, 0.026f, 0.0f};
-        OkButton = CreateWireButtonControl("RepairOkButton", "ui_execute_transaction", Position,
-                                           Half, 0, 0, 0x438, 0, 0);
+        Vector const Position = {0.0f, -0.204f, 0.0f};
+        Vector const Half = {0.133f, 0.026f, 0.0f};
+        OkButton = CreateWireButtonControl("RepairOkButton", "ui_execute_transaction", &Position,
+                                           &Half, 0, 0, 0x438, 0, 0);
         OkButton->SetProperty(kWinPropHide, 1, 0);
     }
     {
-        float const Position[3] = {0.0f, -0.216f, 0.0f};
-        RepairText = CreateTextControl("RepairText", "ButtonText", Position, nullptr, 0.265f, 0.06f,
+        Vector const Position = {0.0f, -0.216f, 0.0f};
+        RepairText = CreateTextControl("RepairText", "ButtonText", &Position, nullptr, 0.265f, 0.06f,
                                        1.5f, 0x427, 1, 0, 0);
         RepairText->SetProperty(kWinPropHide, 1, 0);
     }
     {
-        float const Position[3] = {0.22f, 0.231f, 0.0f};
-        float const Half[3] = {0.02f, 0.02f, 0.0f};
+        Vector const Position = {0.22f, 0.231f, 0.0f};
+        Vector const Half = {0.02f, 0.02f, 0.0f};
         CancelButton = CreateButtonControl("RepairCancelButton", kCloseMesh, nullptr, kSelectSound,
-                                           nullptr, Position, nullptr, Half, 0, 0, 0, 0, 0x2148, 0,
+                                           nullptr, &Position, nullptr, &Half, 0, 0, 0, 0, 0x2148, 0,
                                            0);
     }
 
@@ -170,60 +170,60 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
         float const CheckY = 0.14f - Step;
         float const RowY = 0.141f - Step;
         float const DamageY = 0.13f - Step;
-        float const Small[3] = {0.014f, 0.014f, 0.0f};
+        Vector const Small = {0.014f, 0.014f, 0.0f};
 
         sprintf(Name, "RepairCheckBox%d", Index);
         {
-            float const Position[3] = {-0.215f, CheckY, 0.0f};
+            Vector const Position = {-0.215f, CheckY, 0.0f};
             CheckBoxes[Index] = CreateToggleButtonControl(Name, kCheckMesh, kBlackBoxMesh,
-                                                          kSelectSound, nullptr, Position, nullptr,
-                                                          Small, 0, 0, 1, 0, 0x43a, 0);
+                                                          kSelectSound, nullptr, &Position, nullptr,
+                                                          &Small, 0, 0, 1, 0, 0x43a, 0);
         }
         sprintf(Name, "RepairCheckBoxFrame%d", Index);
         {
-            float const Position[3] = {-0.215f, CheckY, 0.0f};
-            CheckBoxFrames[Index] = CreateWireButtonControl(Name, kSelectSound, Position, Small, 0, 0,
+            Vector const Position = {-0.215f, CheckY, 0.0f};
+            CheckBoxFrames[Index] = CreateWireButtonControl(Name, kSelectSound, &Position, &Small, 0, 0,
                                                             0, 0, 0);
         }
         sprintf(Name, "RepairIconFrames%d", Index);
         {
-            float const Position[3] = {-0.176f, RowY, 0.0f};
-            IconFrames[Index] = CreateWireButtonControl(Name, kSelectSound, Position, Small, 0, 0, 0,
+            Vector const Position = {-0.176f, RowY, 0.0f};
+            IconFrames[Index] = CreateWireButtonControl(Name, kSelectSound, &Position, &Small, 0, 0, 0,
                                                         0, 0);
         }
         sprintf(Name, "RepairSmallIcons%d", Index);
         {
-            float const Position[3] = {-0.176f, RowY, -1.1f};
-            float const Zero[3] = {0.0f, 0.0f, 0.0f};
-            SmallIcons[Index] = CreateStaticControl(Name, kBlackBoxMesh, Position, nullptr, Small, 0,
-                                                    0, 0, 1, 0, 1, 1, 0x6e, 0, 0, Zero);
+            Vector const Position = {-0.176f, RowY, -1.1f};
+            Vector const Zero = {0.0f, 0.0f, 0.0f};
+            SmallIcons[Index] = CreateStaticControl(Name, kBlackBoxMesh, &Position, nullptr, &Small, 0,
+                                                    0, 0, 1, 0, 1, 1, 0x6e, 0, 0, &Zero);
             // Not pickable.
             SmallIcons[Index]->Flags = static_cast<unsigned char>(SmallIcons[Index]->Flags & 0xf7);
         }
         sprintf(Name, "RepairTextArea%d", Index);
         {
-            float const Position[3] = {0.02f, RowY, 0.0f};
-            float const Half[3] = {0.171f, 0.014f, 0.0f};
-            TextAreas[Index] = CreateWireButtonControl(Name, kSelectSound, Position, Half, 0, 0, 0, 0,
+            Vector const Position = {0.02f, RowY, 0.0f};
+            Vector const Half = {0.171f, 0.014f, 0.0f};
+            TextAreas[Index] = CreateWireButtonControl(Name, kSelectSound, &Position, &Half, 0, 0, 0, 0,
                                                        0);
         }
         sprintf(Name, "RepairItemName%d", Index);
         {
-            float const Position[3] = {-0.01f, RowY, 0.0f};
-            ItemNames[Index] = CreateTextControl(Name, "ItemName", Position, nullptr, 0.27f, 0.03f,
+            Vector const Position = {-0.01f, RowY, 0.0f};
+            ItemNames[Index] = CreateTextControl(Name, "ItemName", &Position, nullptr, 0.27f, 0.03f,
                                                  1.2f, 0x3f6, 0, 0, 0);
         }
         sprintf(Name, "RepairItemPrice%d", Index);
         {
-            float const Position[3] = {0.136f, RowY, 0.0f};
-            ItemPrices[Index] = CreateTextControl(Name, "ItemName", Position, nullptr, 0.105f, 0.03f,
+            Vector const Position = {0.136f, RowY, 0.0f};
+            ItemPrices[Index] = CreateTextControl(Name, "ItemName", &Position, nullptr, 0.105f, 0.03f,
                                                   1.2f, 0x40e, 2, 0, 0);
         }
         sprintf(Name, "RepairItemDamage%d", Index);
         {
-            float const Position[3] = {-0.176f, DamageY, 0.001f};
-            float const Half[3] = {0.014f, 0.002f, 0.0f};
-            ItemDamages[Index] = CreateCargoBarControl(Name, "", Position, nullptr, Half, 1, 0x43c,
+            Vector const Position = {-0.176f, DamageY, 0.001f};
+            Vector const Half = {0.014f, 0.002f, 0.0f};
+            ItemDamages[Index] = CreateCargoBarControl(Name, "", &Position, nullptr, &Half, 1, 0x43c,
                                                        G_NnPaletteGreen,
                                                        G_NnPaletteGreen);
             ItemDamages[Index]->SetProperty(0x19, 0x10000, 0);
@@ -231,39 +231,39 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
     }
 
     {
-        float const Position[3] = {0.19f, 0.14f, -1.0f};
-        Scroll = CreateUIScroll("RepairScroll", Position, 0.018f, 0.23f, 0, 5, 9, 0);
+        Vector const Position = {0.19f, 0.14f, -1.0f};
+        Scroll = CreateUIScroll("RepairScroll", &Position, 0.018f, 0.23f, 0, 5, 9, 0);
     }
     {
-        float const Position[3] = {0.01f, 0.233f, 0.0f};
-        CreateTextControl("RepairList", "PageHeader", Position, nullptr, 0.483f, 0.03f, 1.7f, 0x4a8,
+        Vector const Position = {0.01f, 0.233f, 0.0f};
+        CreateTextControl("RepairList", "PageHeader", &Position, nullptr, 0.483f, 0.03f, 1.7f, 0x4a8,
                           1, 0, 0);
     }
     {
-        float const Position[3] = {-0.215f, -0.13f, 0.0f};
-        float const Half[3] = {0.02f, 0.02f, 0.0f};
+        Vector const Position = {-0.215f, -0.13f, 0.0f};
+        Vector const Half = {0.02f, 0.02f, 0.0f};
         ToggleChecks = CreateButtonControl("RepairToggleChecks", kCheckToggleMesh, nullptr,
-                                           kSelectSound, nullptr, Position, nullptr, Half, 0, 0, 0,
+                                           kSelectSound, nullptr, &Position, nullptr, &Half, 0, 0, 0,
                                            0, 0x439, 0, 0);
     }
     {
-        float const Position[3] = {0.005f, 0.192f, 0.0f};
-        PlayerCash = CreateTextControl("RepairPlayerCash", "Normal", Position, nullptr, 0.488f, 0.03f,
+        Vector const Position = {0.005f, 0.192f, 0.0f};
+        PlayerCash = CreateTextControl("RepairPlayerCash", "Normal", &Position, nullptr, 0.488f, 0.03f,
                                        1.4f, 0, 1, 0, 0);
     }
     {
-        float const Position[3] = {-0.067f, -0.13f, 0.0f};
-        CreateTextControl("RepairTotalCostText", "Normal", Position, nullptr, 0.15f, 0.03f, 1.2f,
+        Vector const Position = {-0.067f, -0.13f, 0.0f};
+        CreateTextControl("RepairTotalCostText", "Normal", &Position, nullptr, 0.15f, 0.03f, 1.2f,
                           0x4a9, 0, 0, 0);
     }
     {
-        float const Position[3] = {0.12f, -0.13f, 0.0f};
-        TotalCost = CreateTextControl("RepairTotalCost", "Normal", Position, nullptr, 0.15f, 0.03f,
+        Vector const Position = {0.12f, -0.13f, 0.0f};
+        TotalCost = CreateTextControl("RepairTotalCost", "Normal", &Position, nullptr, 0.15f, 0.03f,
                                       1.2f, 0, 2, 0, 0);
     }
     {
-        float const Position[3] = {0.005f, -0.195f, 0.0f};
-        NotEnoughCash = CreateTextControl("RepairNotEnoughCash", "Normal", Position, nullptr, 0.488f,
+        Vector const Position = {0.005f, -0.195f, 0.0f};
+        NotEnoughCash = CreateTextControl("RepairNotEnoughCash", "Normal", &Position, nullptr, 0.488f,
                                           0.03f, 1.2f, 0x4aa, 1, 0, 0);
         NotEnoughCash->SetProperty(kWinPropHide, 1, 0);
     }
@@ -340,7 +340,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         PlayOrRewindUiSoundSlot(2); // FUN_005645c0
         return 0;
     }

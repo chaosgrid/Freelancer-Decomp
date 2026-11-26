@@ -161,15 +161,15 @@ NeuroNetNavMap::NeuroNetNavMap()
     MapLabelOrigin[0] = 0.0f;
     MapLabelOrigin[1] = 0.0f;
     MapLabelOrigin[2] = 0.0f;
-    MapRotation[0] = 1.0f;
-    MapRotation[1] = 0.0f;
-    MapRotation[2] = 0.0f;
-    MapRotation[3] = 0.0f;
-    MapRotation[4] = 1.0f;
-    MapRotation[5] = 0.0f;
-    MapRotation[6] = 0.0f;
-    MapRotation[7] = 0.0f;
-    MapRotation[8] = 1.0f;
+    MapRotation.E[0][0] = 1.0f;
+    MapRotation.E[0][1] = 0.0f;
+    MapRotation.E[0][2] = 0.0f;
+    MapRotation.E[1][0] = 0.0f;
+    MapRotation.E[1][1] = 1.0f;
+    MapRotation.E[1][2] = 0.0f;
+    MapRotation.E[2][0] = 0.0f;
+    MapRotation.E[2][1] = 0.0f;
+    MapRotation.E[2][2] = 1.0f;
 
     // Retail re-stores the holders' instance slot (already -1).
     ZoomedMapMesh.EngineInstance = InvalidInstanceIndex;
@@ -400,7 +400,7 @@ NeuroNetNavMap::~NeuroNetNavMap()
 // WinControl overrides
 // ----------------------------------------------------------------------------------------
 
-bool NeuroNetNavMap::HitTest(float const* Ray)
+bool NeuroNetNavMap::HitTest(Vector const* Ray)
 {
     // LAB_00492270.
     if (WinControl::HitTest(Ray)) // FUN_005a0340
@@ -408,32 +408,32 @@ bool NeuroNetNavMap::HitTest(float const* Ray)
     if (bSidePanelsOpen == 0)
         return false;
 
-    float Transform[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    Transform Xform = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f), {0.0f, 0.0f, 0.0f}};
     if (ClientMeshHolderHasInstance(&MeshHolder))
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-               sizeof(Transform));
+        memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+               sizeof(Xform));
 
     // The side panels' boxes.
-    float const HalfExtents[3] = {0.19f, 0.28f, 0.0f};
-    float Box[12];
-    memcpy(Box, Transform, sizeof(Box));
-    Box[9] = Transform[9] + 0.54f;
-    if (Win3DRayHitsAabbHalfExtents(HalfExtents, Box, Ray))
+    Vector const HalfExtents = {0.19f, 0.28f, 0.0f};
+    Transform Box;
+    memcpy(&Box, &Xform, sizeof(Box));
+    Box.Translation.x = Xform.Translation.x + 0.54f;
+    if (Win3DRayHitsAabbHalfExtents(&HalfExtents, &Box, Ray))
         return true;
 
     // DAT_005d3dc0.
-    memcpy(Box, Transform, sizeof(Box));
-    Box[9] = Transform[9] - 0.536f;
-    return Win3DRayHitsAabbHalfExtents(HalfExtents, Box, Ray);
+    memcpy(&Box, &Xform, sizeof(Box));
+    Box.Translation.x = Xform.Translation.x - 0.536f;
+    return Win3DRayHitsAabbHalfExtents(&HalfExtents, &Box, Ray);
 }
 
-void NeuroNetNavMap::SetPosition(float const* NewPosition)
+void NeuroNetNavMap::SetPosition(Vector const* NewPosition)
 {
     // LAB_004948a0.
     WinControl::SetPosition(NewPosition);
-    MapLabelOrigin[0] = NewPosition[0] + 0.2f;
-    MapLabelOrigin[1] = NewPosition[1] - 0.25f;
-    MapLabelOrigin[2] = NewPosition[2];
+    MapLabelOrigin[0] = NewPosition->x + 0.2f;
+    MapLabelOrigin[1] = NewPosition->y - 0.25f;
+    MapLabelOrigin[2] = NewPosition->z;
 }
 
 bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
@@ -442,48 +442,48 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     bBriefing = IsMissionBriefingNavMapUp(); // FUN_0043d570
     SetMesh("Interface\\NeuroNet\\NavMap\\NewNavMap\\navmap_background.cmp", 0);
 
-    float const Zero3[3] = {0.0f, 0.0f, 0.0f};
-    float const Zero3b[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero3 = {0.0f, 0.0f, 0.0f};
+    Vector const Zero3b = {0.0f, 0.0f, 0.0f};
 
     {
-        float const Position[3] = {0.19f, -0.23f, -0.22f};
+        Vector const Position = {0.19f, -0.23f, -0.22f};
         RightWindow = CreateStaticControl(
             "NavMapRightWindow", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_navmap_right.cmp",
-            Position, nullptr, Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero3b);
+            &Position, nullptr, &Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero3b);
     }
     {
-        float const Position[3] = {1.045f, -0.23f, -0.22f};
+        Vector const Position = {1.045f, -0.23f, -0.22f};
         LeftWindow = CreateStaticControl(
             "NavMapLeftWindow", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_navmap_left.cmp",
-            Position, nullptr, Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero3b);
+            &Position, nullptr, &Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero3b);
     }
 
     // The map's own pick box. Without it WinControl::HitTest never hits the map area, Win3DPick
     // never returns the map and the click falls through to the space pick.
-    HalfExtents[0] = 0.35f;
-    HalfExtents[1] = 0.33f;
-    HalfExtents[2] = 0.0f;
+    HalfExtents.x = 0.35f;
+    HalfExtents.y = 0.33f;
+    HalfExtents.z = 0.0f;
 
     // The frame buttons: 0.018 half extents on the top edge (y 0.295).
-    float const SmallHalf[3] = {0.018f, 0.018f, 0.0f};
+    Vector const SmallHalf = {0.018f, 0.018f, 0.0f};
     {
-        float const Position[3] = {-0.26f, 0.295f, 0.0f};
+        Vector const Position = {-0.26f, 0.295f, 0.0f};
         UniverseButton = CreateButtonControl(
             "NavMapUniverseButton", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_universebutton.3db",
-            nullptr, "ui_select_item", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x219c, 0,
+            nullptr, "ui_select_item", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x219c, 0,
             0);
     }
     {
-        float const Position[3] = {-0.214f, 0.295f, 0.0f};
+        Vector const Position = {-0.214f, 0.295f, 0.0f};
         LabelButton = CreateButtonControl(
             "NavMapLabelButton", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_labels.3db", nullptr,
-            "ui_select_item", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x416, 0, 0);
+            "ui_select_item", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x416, 0, 0);
     }
     {
-        float const Position[3] = {0.258f, 0.295f, 0.0f};
+        Vector const Position = {0.258f, 0.295f, 0.0f};
         CloseButton = CreateButtonControl(
             "NavMapCloseButton", "Interface\\NeuroNet\\Inventory\\x.3db", nullptr,
-            "ui_select_item", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x409, 0, 0);
+            "ui_select_item", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x409, 0, 0);
     }
 
     // Briefing only -- no close button, the briefing text and the
@@ -492,232 +492,232 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     {
         CloseButton->Flags = static_cast<unsigned char>(CloseButton->Flags & 0xfc);
         {
-            float const Position[3] = {-0.76f, 0.47f, 0.0f};
+            Vector const Position = {-0.76f, 0.47f, 0.0f};
             MissionBriefingText = CreateTextControl("MissionBriefingText", "MissionObjective",
-                                                    Position, nullptr, 1.48f, 0.06f, 4.0f, 0x627,
+                                                    &Position, nullptr, 1.48f, 0.06f, 4.0f, 0x627,
                                                     1, 0, 1);
         }
         {
-            float const HalfExtents[3] = {0.153f, 0.036f, 0.0f};
-            float const Position[3] = {-0.004f, -0.443f, 0.0f};
+            Vector const HalfExtents = {0.153f, 0.036f, 0.0f};
+            Vector const Position = {-0.004f, -0.443f, 0.0f};
             ContinueButton = CreateWireButtonControl("NavMapContinueButton", "ui_select_item",
-                                                     Position, HalfExtents, 0, 0, 0x326, 0, 0);
+                                                     &Position, &HalfExtents, 0, 0, 0x326, 0, 0);
         }
         {
-            float const Position[3] = {-0.76f, -0.418f, 0.0f};
-            ContinueText = CreateTextControl("NavMapContinueText", "ButtonText", Position,
+            Vector const Position = {-0.76f, -0.418f, 0.0f};
+            ContinueText = CreateTextControl("NavMapContinueText", "ButtonText", &Position,
                                              nullptr, 1.51f, 0.03f, 3.0f, 0x48e, 1, 0, 1);
         }
         RegisterEvent(USER_CANCEL); // FUN_005760d0
     }
 
     {
-        float const Position[3] = {0.212f, 0.295f, 0.0f};
+        Vector const Position = {0.212f, 0.295f, 0.0f};
         ShipButton = CreateButtonControl(
             "NavMapShipButton", "Interface\\neuronet\\inventory\\gotoship.3db", nullptr,
-            "ui_select_item", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x4de, 0, 0);
+            "ui_select_item", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x4de, 0, 0);
     }
     {
-        float const Position[3] = {-0.274f, -0.252f, 0.0f};
-        SystemNameText = CreateTextControl("NavMapSystemName", "SubHeader", Position, nullptr,
+        Vector const Position = {-0.274f, -0.252f, 0.0f};
+        SystemNameText = CreateTextControl("NavMapSystemName", "SubHeader", &Position, nullptr,
                                            0.549f, 0.06f, 2.2f, 0, 1, 0, 1);
     }
     {
-        float const Position[3] = {-0.314f, -0.222f, 0.0f};
-        DebugText = CreateTextControl("NavMapDebugText", "Normal", Position, nullptr, 0.64f,
+        Vector const Position = {-0.314f, -0.222f, 0.0f};
+        DebugText = CreateTextControl("NavMapDebugText", "Normal", &Position, nullptr, 0.64f,
                                       0.06f, 2.2f, 0x4d2, 1, 0, 1);
     }
     DebugText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteAmber), 1);
     {
-        float const Position[3] = {-0.314f, -0.222f, 0.0f};
-        NoBestPathText = CreateTextControl("NavMapNoBestPathText", "Normal", Position, nullptr,
+        Vector const Position = {-0.314f, -0.222f, 0.0f};
+        NoBestPathText = CreateTextControl("NavMapNoBestPathText", "Normal", &Position, nullptr,
                                            0.64f, 0.06f, 2.2f, 0x573, 1, 0, 1);
     }
     NoBestPathText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteAmber), 1);
 
     // The filter toggles along the top edge.
     {
-        float const Position[3] = {0.092f, 0.295f, 0.0f};
+        Vector const Position = {0.092f, 0.295f, 0.0f};
         LegendFilter = CreateButtonControl(
             "NavMapLegendFilter", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_legendtoggle.3db",
-            nullptr, "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x54e,
+            nullptr, "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x54e,
             0, 0);
     }
     {
-        float const Position[3] = {0.138f, 0.295f, 0.0f};
+        Vector const Position = {0.138f, 0.295f, 0.0f};
         BaseListFilter = CreateButtonControl(
             "NavMapBaseListFilter", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_knownbases.3db",
-            nullptr, "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x3c7,
+            nullptr, "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x3c7,
             0, 0);
     }
     {
-        float const Position[3] = {-0.092f, 0.295f, 0.0f};
+        Vector const Position = {-0.092f, 0.295f, 0.0f};
         PhysicalFilter = CreateButtonControl(
             "NavMapPhysicalFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_filter_physical.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x4d3, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x4d3, 0, 0);
     }
     PhysicalFilter->SetProperty(0xc, 1, 0);
     {
-        float const Position[3] = {-0.046f, 0.295f, 0.0f};
+        Vector const Position = {-0.046f, 0.295f, 0.0f};
         PoliticalFilter = CreateButtonControl(
             "NavMapPoliticalFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_filter_political.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x4d4, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x4d4, 0, 0);
     }
     {
-        float const Position[3] = {0.0f, 0.295f, 0.0f};
+        Vector const Position = {0.0f, 0.295f, 0.0f};
         PatrolFilter = CreateButtonControl(
             "NavMapPatrolFilter", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_patrol.3db",
-            nullptr, "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x521,
+            nullptr, "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x521,
             0, 0);
     }
     {
-        float const Position[3] = {0.046f, 0.295f, 0.0f};
+        Vector const Position = {0.046f, 0.295f, 0.0f};
         MineableFilter = CreateButtonControl(
             "NavMapmineableFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_minablezonefilter.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x54f, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x54f, 0, 0);
     }
     {
-        float const Position[3] = {-0.018f, 0.295f, 0.0f};
+        Vector const Position = {-0.018f, 0.295f, 0.0f};
         MissionFilter = CreateButtonControl(
             "NavMapMissionFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_filter_missions.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x522, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x522, 0, 0);
     }
     {
-        float const Position[3] = {0.161f, 0.246f, 0.0f};
+        Vector const Position = {0.161f, 0.246f, 0.0f};
         AllFilter = CreateButtonControl(
             "NavMapAllFilter", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_allzonefilter.3db",
-            nullptr, "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x559,
+            nullptr, "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x559,
             0, 0);
     }
     AllFilter->SetProperty(kWinPropHide, 1, 0);
     {
-        float const Position[3] = {0.207f, 0.246f, 0.0f};
+        Vector const Position = {0.207f, 0.246f, 0.0f};
         HostileFilter = CreateButtonControl(
             "NavMapHostileFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_hostilezonefilter.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x55a, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x55a, 0, 0);
     }
     HostileFilter->SetProperty(kWinPropHide, 1, 0);
     {
-        float const Position[3] = {0.253f, 0.246f, 0.0f};
+        Vector const Position = {0.253f, 0.246f, 0.0f};
         FriendlyFilter = CreateButtonControl(
             "NavMapFriendlyFilter",
             "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_friendlyzonefilter.3db", nullptr,
-            "ui_filter_select", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x55b, 0, 0);
+            "ui_filter_select", nullptr, &Position, nullptr, &SmallHalf, 0, 0, 0, 0, 0x55b, 0, 0);
     }
     FriendlyFilter->SetProperty(kWinPropHide, 1, 0);
 
     // The object tools, each mesh scaled by 1.7.
-    float const ToolHalf[3] = {0.02f, 0.02f, 0.0f};
-    float const ZoomPosition[3] = {0.25f, 0.298f, 0.0f};
-    float const WaypointPosition[3] = {-0.68f, 0.228f, 0.0f};
+    Vector const ToolHalf = {0.02f, 0.02f, 0.0f};
+    Vector const ZoomPosition = {0.25f, 0.298f, 0.0f};
+    Vector const WaypointPosition = {-0.68f, 0.228f, 0.0f};
     InZoomButton = CreateButtonControl(
         "NavMapInZoom", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_zoomin.cmp", nullptr,
-        "ui_select_item", nullptr, ZoomPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x4d5, 0, 0);
+        "ui_select_item", nullptr, &ZoomPosition, nullptr, &ToolHalf, 0, 0, 0, 0, 0x4d5, 0, 0);
     ScaleToolButtonMesh(InZoomButton);
     OutZoomButton = CreateButtonControl(
         "NavMapOutZoom", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_zoomout.cmp", nullptr,
-        "ui_select_item", nullptr, ZoomPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x4d6, 0, 0);
+        "ui_select_item", nullptr, &ZoomPosition, nullptr, &ToolHalf, 0, 0, 0, 0, 0x4d6, 0, 0);
     ScaleToolButtonMesh(OutZoomButton);
     SetWaypointButton = CreateButtonControl(
         "NavMapSetWaypointButton", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_addwaypoint.cmp",
-        nullptr, "ui_select_item", nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0,
+        nullptr, "ui_select_item", nullptr, &WaypointPosition, nullptr, &ToolHalf, 0, 0, 0, 0,
         0x4d7, 0, 0);
     ScaleToolButtonMesh(SetWaypointButton);
     BestPathButton = CreateButtonControl(
         "NavMapBestPathButton", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_shortestpath.cmp",
-        nullptr, "ui_select_item", nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0,
+        nullptr, "ui_select_item", nullptr, &WaypointPosition, nullptr, &ToolHalf, 0, 0, 0, 0,
         0x56e, 0, 0);
     ScaleToolButtonMesh(BestPathButton);
     JumpGateButton = CreateButtonControl(
         "NavMapJumpGateButton", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_jumptosystem.cmp",
-        nullptr, "ui_select_item", nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0,
+        nullptr, "ui_select_item", nullptr, &WaypointPosition, nullptr, &ToolHalf, 0, 0, 0, 0,
         0x571, 0, 0);
     ScaleToolButtonMesh(JumpGateButton);
     SelectObjectButton = CreateButtonControl(
         "NavMapSelectObjectButton",
         "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_selectorhand.cmp", nullptr, "ui_select_item",
-        nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x572, 0, 0);
+        nullptr, &WaypointPosition, nullptr, &ToolHalf, 0, 0, 0, 0, 0x572, 0, 0);
     ScaleToolButtonMesh(SelectObjectButton);
     InfoButton = CreateButtonControl(
         "NavMapInfo", "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_info.cmp", nullptr,
-        "ui_select_item", nullptr, ZoomPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x4d9, 0, 0);
+        "ui_select_item", nullptr, &ZoomPosition, nullptr, &ToolHalf, 0, 0, 0, 0, 0x4d9, 0, 0);
     ScaleToolButtonMesh(InfoButton);
     ClearWaypointButton = CreateButtonControl(
         "NavMapClearWaypointButton",
         "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_subtractwaypoint.cmp", nullptr,
-        "ui_select_item", nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x4d8, 0, 0);
+        "ui_select_item", nullptr, &WaypointPosition, nullptr, &ToolHalf, 0, 0, 0, 0, 0x4d8, 0, 0);
     ScaleToolButtonMesh(ClearWaypointButton);
 
     // The info text and the info card (both lose +0x6c bit 1).
     {
-        float const AttachOffset[3] = {kNavMapPanelBaseA + 0.93f, -0.06f, 0.0f};
-        InfoText = CreateRichTextWin("NavMapInfoText", 0.27f, 0.33f, AttachOffset, true);
+        Vector const AttachOffset = {kNavMapPanelBaseA + 0.93f, -0.06f, 0.0f};
+        InfoText = CreateRichTextWin("NavMapInfoText", 0.27f, 0.33f, &AttachOffset, true);
     }
     InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & 0xfd);
     {
-        float const AttachOffset[3] = {0.4f, -0.02f, 0.0f};
-        InfoCard = CreateRichTextWin("NavMapInfoCard", 0.43f, 0.41f, AttachOffset, true);
+        Vector const AttachOffset = {0.4f, -0.02f, 0.0f};
+        InfoCard = CreateRichTextWin("NavMapInfoCard", 0.43f, 0.41f, &AttachOffset, true);
     }
     InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & 0xfd);
     {
-        float const Position[3] = {kNavMapPanelBaseA + 0.36f, 0.256f, 0.0f};
-        InfoTitle = CreateTextControl("NavMapInfoTitle", "Normal", Position, nullptr, 0.32f,
+        Vector const Position = {kNavMapPanelBaseA + 0.36f, 0.256f, 0.0f};
+        InfoTitle = CreateTextControl("NavMapInfoTitle", "Normal", &Position, nullptr, 0.32f,
                                       0.03f, 2.1f, 0, 1, 0, 1);
     }
 
     // The waypoint / mission buttons under the info text.
     {
-        float const HalfExtents[3] = {0.146f, 0.026f, 0.0f};
-        float const Position[3] = {kNavMapPanelBaseB - 0.516f, -0.237f, 0.0f};
+        Vector const HalfExtents = {0.146f, 0.026f, 0.0f};
+        Vector const Position = {kNavMapPanelBaseB - 0.516f, -0.237f, 0.0f};
         ClearAllWaypointsButton = CreateWireButtonControl(
-            "NavMapClearAllWaypointsButton", "ui_select_item", Position, HalfExtents, 0, 0, 0x327,
+            "NavMapClearAllWaypointsButton", "ui_select_item", &Position, &HalfExtents, 0, 0, 0x327,
             0, 0);
     }
     {
-        float const Position[3] = {kNavMapPanelBaseB - 0.659f, -0.209f, 0.0f};
+        Vector const Position = {kNavMapPanelBaseB - 0.659f, -0.209f, 0.0f};
         ClearAllWaypointsText = CreateTextControl("NavMapClearAllWaypointsText", "ButtonText",
-                                                  Position, nullptr, 0.288f, 0.03f, 1.9f,
+                                                  &Position, nullptr, 0.288f, 0.03f, 1.9f,
                                                   0x219d, 1, 0, 1);
     }
     {
-        float const HalfExtents[3] = {0.133f, 0.026f, 0.0f};
-        float const Position[3] = {kNavMapPanelBaseA + 0.53f, -0.23f, 0.0f};
+        Vector const HalfExtents = {0.133f, 0.026f, 0.0f};
+        Vector const Position = {kNavMapPanelBaseA + 0.53f, -0.23f, 0.0f};
         AbortMissionButton = CreateWireButtonControl(
-            "NavMapAbortMissionButton", "ui_select_item", Position, HalfExtents, 0, 0, 0x328, 0,
+            "NavMapAbortMissionButton", "ui_select_item", &Position, &HalfExtents, 0, 0, 0x328, 0,
             0);
     }
     {
-        float const Position[3] = {kNavMapPanelBaseA + 0.397f, -0.206f, 0.0f};
-        AbortMissionText = CreateTextControl("NavMapAbortMissionText", "ButtonText", Position,
+        Vector const Position = {kNavMapPanelBaseA + 0.397f, -0.206f, 0.0f};
+        AbortMissionText = CreateTextControl("NavMapAbortMissionText", "ButtonText", &Position,
                                              nullptr, 0.266f, 0.03f, 1.9f, 0x4da, 1, 0, 1);
     }
     AbortMissionButton->SetProperty(kWinPropHide, 1, 0);
     AbortMissionText->SetProperty(kWinPropHide, 1, 0);
     {
-        float const HalfExtents[3] = {0.067f, 0.026f, 0.0f};
-        float const Position[3] = {kNavMapPanelBaseA + 0.447f, -0.23f, 0.0f};
+        Vector const HalfExtents = {0.067f, 0.026f, 0.0f};
+        Vector const Position = {kNavMapPanelBaseA + 0.447f, -0.23f, 0.0f};
         AbortYesButton = CreateWireButtonControl("NavMapAbortYesButton", "ui_select_item",
-                                                 Position, HalfExtents, 0, 0, 0x329, 0, 0);
+                                                 &Position, &HalfExtents, 0, 0, 0x329, 0, 0);
     }
     {
-        float const Position[3] = {kNavMapPanelBaseA + 0.381f, -0.206f, 0.0f};
-        AbortYesText = CreateTextControl("NavMapAbortYesText", "ButtonText", Position, nullptr,
+        Vector const Position = {kNavMapPanelBaseA + 0.381f, -0.206f, 0.0f};
+        AbortYesText = CreateTextControl("NavMapAbortYesText", "ButtonText", &Position, nullptr,
                                          0.132f, 0.03f, 1.9f, 0x4dc, 1, 0, 1);
     }
     {
-        float const HalfExtents[3] = {0.067f, 0.026f, 0.0f};
-        float const Position[3] = {kNavMapPanelBaseA + 0.617f, -0.23f, 0.0f};
+        Vector const HalfExtents = {0.067f, 0.026f, 0.0f};
+        Vector const Position = {kNavMapPanelBaseA + 0.617f, -0.23f, 0.0f};
         AbortNoButton = CreateWireButtonControl("NavMapAbortNoButton", "ui_select_item",
-                                                Position, HalfExtents, 0, 0, 0x32a, 0, 0);
+                                                &Position, &HalfExtents, 0, 0, 0x32a, 0, 0);
     }
     {
-        float const Position[3] = {kNavMapPanelBaseA + 0.55f, -0.206f, 0.0f};
-        AbortNoText = CreateTextControl("NavMapAbortNoText", "ButtonText", Position, nullptr,
+        Vector const Position = {kNavMapPanelBaseA + 0.55f, -0.206f, 0.0f};
+        AbortNoText = CreateTextControl("NavMapAbortNoText", "ButtonText", &Position, nullptr,
                                         0.132f, 0.03f, 1.9f, 0x4dd, 1, 0, 1);
     }
     AbortYesButton->SetProperty(kWinPropHide, 1, 0);
@@ -727,77 +727,77 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
 
     OptionBridge = CreateStaticControl("NavMapOptionBridge",
                                        "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_selector.3db",
-                                       Zero3, nullptr, Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                       Zero3b);
+                                       &Zero3, nullptr, &Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                       &Zero3b);
     OptionBridge->SetProperty(kWinPropHide, 1, 0);
 
     // The three objective boxes, their scroll bar and texts.
     {
-        float const HalfExtents[3] = {0.146f, 0.068f, 0.0f};
+        Vector const HalfExtents = {0.146f, 0.068f, 0.0f};
         float const X = kNavMapPanelBaseB - 0.547f;
-        float const Position1[3] = {X, 0.181f, 0.0f};
-        MissionObjective[0] = CreateWireStaticControl("NavMapMissionObjective1", Position1,
-                                                      HalfExtents, 0, 0, 0, 0);
-        float const Position2[3] = {X, 0.046f, 0.0f};
-        MissionObjective[1] = CreateWireStaticControl("NavMapMissionObjective2", Position2,
-                                                      HalfExtents, 0, 0, 0, 0);
-        float const Position3[3] = {X, -0.089f, 0.0f};
-        MissionObjective[2] = CreateWireStaticControl("NavMapMissionObjective3", Position3,
-                                                      HalfExtents, 0, 0, 0, 0);
+        Vector const Position1 = {X, 0.181f, 0.0f};
+        MissionObjective[0] = CreateWireStaticControl("NavMapMissionObjective1", &Position1,
+                                                      &HalfExtents, 0, 0, 0, 0);
+        Vector const Position2 = {X, 0.046f, 0.0f};
+        MissionObjective[1] = CreateWireStaticControl("NavMapMissionObjective2", &Position2,
+                                                      &HalfExtents, 0, 0, 0, 0);
+        Vector const Position3 = {X, -0.089f, 0.0f};
+        MissionObjective[2] = CreateWireStaticControl("NavMapMissionObjective3", &Position3,
+                                                      &HalfExtents, 0, 0, 0, 0);
     }
     {
-        float const Position[3] = {kNavMapPanelBaseB + 0.3261f, -0.058f, 0.0f};
-        ObjectiveScroll = CreateUIScroll("NavMapMissionObjectiveScroll", Position, 0.019f,
+        Vector const Position = {kNavMapPanelBaseB + 0.3261f, -0.058f, 0.0f};
+        ObjectiveScroll = CreateUIScroll("NavMapMissionObjectiveScroll", &Position, 0.019f,
                                          0.285f, 0, 5, 3, 0);
     }
     {
         float const X = kNavMapPanelBaseB - 0.686f;
-        float const Position1[3] = {X, NnFloatBits(0x3e808313), 0.0f}; // 0.251 (listing bits)
+        Vector const Position1 = {X, NnFloatBits(0x3e808313), 0.0f}; // 0.251 (listing bits)
         ObjectiveText[0] = CreateTextControl("NavMapMissionObjectiveText1", "NewsMission",
-                                             Position1, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
+                                             &Position1, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
         ObjectiveText[0]->SetProperty(0x22, 0, 5);
         SetObjectiveTextMultiLine(ObjectiveText[0]);
-        float const Position2[3] = {X, 0.116f, 0.0f};
+        Vector const Position2 = {X, 0.116f, 0.0f};
         ObjectiveText[1] = CreateTextControl("NavMapMissionObjectiveText2", "NewsMission",
-                                             Position2, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
+                                             &Position2, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
         ObjectiveText[1]->SetProperty(0x22, 0, 5);
         SetObjectiveTextMultiLine(ObjectiveText[1]);
-        float const Position3[3] = {X, NnFloatBits(0xbc9ba5e4), 0.0f}; // -0.019 (DAT bits)
+        Vector const Position3 = {X, NnFloatBits(0xbc9ba5e4), 0.0f}; // -0.019 (DAT bits)
         ObjectiveText[2] = CreateTextControl("NavMapMissionObjectiveText3", "NewsMission",
-                                             Position3, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
+                                             &Position3, nullptr, 0.285f, 0.03f, 1.4f, 0, 0, 0, 1);
         ObjectiveText[2]->SetProperty(0x22, 0, 5);
         SetObjectiveTextMultiLine(ObjectiveText[2]);
     }
 
     // The four faction labels of the universe view, hidden.
     {
-        float const Position[3] = {-0.055f, -0.09f, 0.0f};
-        FactionLabels[0] = CreateTextControl("NavMapLibertyLabel", "SubHeader", Position,
+        Vector const Position = {-0.055f, -0.09f, 0.0f};
+        FactionLabels[0] = CreateTextControl("NavMapLibertyLabel", "SubHeader", &Position,
                                              nullptr, 0.132f, 0.03f, 1.9f, 0x4e1, 0, 0, 1);
     }
     FactionLabels[0]->SetProperty(kWinPropHide, 1, 0);
     {
-        float const Position[3] = {-0.245f, -0.123f, 0.0f};
-        FactionLabels[1] = CreateTextControl("NavMapBretoniaLabel", "SubHeader", Position,
+        Vector const Position = {-0.245f, -0.123f, 0.0f};
+        FactionLabels[1] = CreateTextControl("NavMapBretoniaLabel", "SubHeader", &Position,
                                              nullptr, 0.132f, 0.03f, 1.9f, 0x4e2, 0, 0, 1);
     }
     FactionLabels[1]->SetProperty(kWinPropHide, 1, 0);
     {
-        float const Position[3] = {0.005f, 0.121f, 0.0f};
-        FactionLabels[2] = CreateTextControl("NavMapKusariLabel", "SubHeader", Position,
+        Vector const Position = {0.005f, 0.121f, 0.0f};
+        FactionLabels[2] = CreateTextControl("NavMapKusariLabel", "SubHeader", &Position,
                                              nullptr, 0.132f, 0.03f, 1.9f, 0x4e3, 0, 0, 1);
     }
     FactionLabels[2]->SetProperty(kWinPropHide, 1, 0);
     {
-        float const Position[3] = {0.065f, -0.15f, 0.0f};
-        FactionLabels[3] = CreateTextControl("NavMapRheinlandLabel", "SubHeader", Position,
+        Vector const Position = {0.065f, -0.15f, 0.0f};
+        FactionLabels[3] = CreateTextControl("NavMapRheinlandLabel", "SubHeader", &Position,
                                              nullptr, 0.132f, 0.03f, 1.9f, 0x4e4, 0, 0, 1);
     }
     FactionLabels[3]->SetProperty(kWinPropHide, 1, 0);
 
     {
-        float const Position[3] = {-0.274f, 0.266f, 0.0f};
-        FilterTitle = CreateTextControl("NavMapFilterTitle", "Normal", Position, nullptr, 0.547f,
+        Vector const Position = {-0.274f, 0.266f, 0.0f};
+        FilterTitle = CreateTextControl("NavMapFilterTitle", "Normal", &Position, nullptr, 0.547f,
                                         0.03f, 1.5f, 0, 1, 0, 1);
     }
 
@@ -806,20 +806,20 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     for (int Index = 0; Index < 8; ++Index)
     {
         sprintf(Name, "NavMapGridLetter%c", 'A' + Index);
-        float const Position[3] = {
+        Vector const Position = {
             static_cast<float>(static_cast<double>(Index) * 0.07f - 0.279f), -0.294f, 0.0f};
         GridLetters[Index] =
-            CreateTextControl(Name, "Normal", Position, nullptr, 0.08f, 0.03f, 1.9f,
+            CreateTextControl(Name, "Normal", &Position, nullptr, 0.08f, 0.03f, 1.9f,
                               static_cast<unsigned>(Index + 0x506), 1, 0, 1);
     }
     // The grid numbers 1..8 (ids 0x515 + i), y = 0.252 - i * 0.07.
     for (int Index = 0; Index < 8; ++Index)
     {
         sprintf(Name, "NavMapGridNumber%d", Index + 1);
-        float const Position[3] = {
+        Vector const Position = {
             -0.309f, static_cast<float>(0.252f - static_cast<double>(Index) * 0.07f), 0.0f};
         GridNumbers[Index] =
-            CreateTextControl(Name, "Normal", Position, nullptr, 0.032f, 0.03f, 1.9f,
+            CreateTextControl(Name, "Normal", &Position, nullptr, 0.032f, 0.03f, 1.9f,
                               static_cast<unsigned>(Index + 0x515), 1, 0, 1);
     }
 
@@ -833,8 +833,8 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     static unsigned const kLegendIds[5] = {0x553, 0x555, 0x556, 0x557, 0x3af};
     for (int Index = 0; Index < 5; ++Index)
     {
-        float const Position[3] = {-0.159f, kLegendY[Index], 0.0f};
-        LegendLabels[Index] = CreateTextControl(kLegendNames[Index], "Normal", Position, nullptr,
+        Vector const Position = {-0.159f, kLegendY[Index], 0.0f};
+        LegendLabels[Index] = CreateTextControl(kLegendNames[Index], "Normal", &Position, nullptr,
                                                 0.53f, 0.03f, 2.2f, kLegendIds[Index], 0, 0, 1);
         LegendLabels[Index]->SetProperty(kWinPropHide, 1, 0);
         LegendLabels[Index]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&LegendColor), 1);
@@ -842,15 +842,15 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
 
     // The info card's close button and caption, hidden.
     {
-        float const HalfExtents[3] = {0.133f, 0.026f, 0.0f};
-        float const Position[3] = {0.0f, -0.254f, 0.0f};
+        Vector const HalfExtents = {0.133f, 0.026f, 0.0f};
+        Vector const Position = {0.0f, -0.254f, 0.0f};
         CloseInfocardButton = CreateWireButtonControl("NavMapCloseInfocardButton",
-                                                      "ui_select_item", Position, HalfExtents, 0,
+                                                      "ui_select_item", &Position, &HalfExtents, 0,
                                                       0, 0x32b, 0, 0);
     }
     {
-        float const Position[3] = {-0.133f, -0.229f, 0.0f};
-        CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", Position,
+        Vector const Position = {-0.133f, -0.229f, 0.0f};
+        CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", &Position,
                                               nullptr, 0.266f, 0.03f, 1.9f, 0x3a1, 1, 0, 1);
     }
     CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
@@ -861,27 +861,27 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     {
         sprintf(Name, "NavMapBaseText%d", Index);
         float const Y = static_cast<float>(0.171f - static_cast<double>(Index) * 0.03f);
-        float const BasePosition[3] = {-0.259f, Y, 0.0f};
-        BaseTexts[Index] = CreateTextControl(Name, "ItemName", BasePosition, nullptr, 0.39f,
+        Vector const BasePosition = {-0.259f, Y, 0.0f};
+        BaseTexts[Index] = CreateTextControl(Name, "ItemName", &BasePosition, nullptr, 0.39f,
                                              0.03f, 1.9f, 0, 0, 0, 1);
         sprintf(Name, "NavMapBaseSystemText%d", Index);
-        float const SystemPosition[3] = {0.019f, Y, 0.0f};
-        BaseSystemTexts[Index] = CreateTextControl(Name, "ItemName", SystemPosition, nullptr,
+        Vector const SystemPosition = {0.019f, Y, 0.0f};
+        BaseSystemTexts[Index] = CreateTextControl(Name, "ItemName", &SystemPosition, nullptr,
                                                    0.21f, 0.03f, 1.9f, 0, 0, 0, 1);
     }
     {
-        float const Position[3] = {0.829f, -0.058f, 0.0f};
-        BaseListScroll = CreateUIScroll("NavMapBaseListScroll", Position, 0.019f, 0.406f, 0, 5,
+        Vector const Position = {0.829f, -0.058f, 0.0f};
+        BaseListScroll = CreateUIScroll("NavMapBaseListScroll", &Position, 0.019f, 0.406f, 0, 5,
                                         3, 0);
     }
     {
-        float const Position[3] = {-0.261f, 0.219f, 0.0f};
-        BaseTitleText = CreateTextControl("NavMapBaseTitleText", "SubHeader", Position, nullptr,
+        Vector const Position = {-0.261f, 0.219f, 0.0f};
+        BaseTitleText = CreateTextControl("NavMapBaseTitleText", "SubHeader", &Position, nullptr,
                                           0.279f, 0.03f, 1.9f, 0x3cc, 0, 0, 1);
     }
     {
-        float const Position[3] = {0.016f, 0.219f, 0.0f};
-        SystemTitleText = CreateTextControl("NavMapSystemTitleText", "SubHeader", Position,
+        Vector const Position = {0.016f, 0.219f, 0.0f};
+        SystemTitleText = CreateTextControl("NavMapSystemTitleText", "SubHeader", &Position,
                                             nullptr, 0.219f, 0.03f, 1.9f, 0x3cd, 0, 0, 1);
     }
 
@@ -915,7 +915,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     // (through slot 5), then FUN_004b5060.
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     SetOffset(0.624f, -0.23f, -0.22f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -927,7 +927,7 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (GetParent() != nullptr)
-            SetPosition(&GetParent()->Position.x);
+            SetPosition(&GetParent()->Position);
         InitialShow();
         TransitionTime = TransitionDuration;
         Flags = static_cast<unsigned char>(Flags | 3);
@@ -1227,9 +1227,9 @@ FNavMapItem* NeuroNetNavMap::AddItem(int Kind, int Type, float X, float Y, float
     // FUN_00491f90.
     FNavMapItem* const Item = new FNavMapItem();
 
-    Item->Position[0] = X;
-    Item->Position[1] = Y;
-    Item->Position[2] = Z;
+    Item->Position.x = X;
+    Item->Position.y = Y;
+    Item->Position.z = Z;
     Item->Type = Type;
     Item->Size = Arg6;
     Item->Kind = Kind;

@@ -977,7 +977,7 @@ void HudCameraUpdateShake(FHudCamera* Cam)
     }
 }
 
-void HudCameraApplyShake(FHudCamera* Cam, float* Orientation)
+void HudCameraApplyShake(FHudCamera* Cam, Matrix* Orientation)
 {
     // FUN_0051dbd0 on a 3x3 row-major orientation. The same two-rotation shake as the death
     // camera.
@@ -999,10 +999,10 @@ void HudCameraApplyShake(FHudCamera* Cam, float* Orientation)
         // Rows 0 and 2.
         for (int Column = 0; Column < 3; ++Column)
         {
-            const float Row0 = Orientation[Column];
-            const float Row2 = Orientation[6 + Column];
-            Orientation[Column] = static_cast<float>(SinA * Row2 + static_cast<double>(Row0) * CosA);
-            Orientation[6 + Column] =
+            const float Row0 = Orientation->E[0][Column];
+            const float Row2 = Orientation->E[2][Column];
+            Orientation->E[0][Column] = static_cast<float>(SinA * Row2 + static_cast<double>(Row0) * CosA);
+            Orientation->E[2][Column] =
                 static_cast<float>(static_cast<double>(CosA) * Row2 - Row0 * SinA);
         }
     }
@@ -1019,26 +1019,26 @@ void HudCameraApplyShake(FHudCamera* Cam, float* Orientation)
 
         for (int Column = 0; Column < 3; ++Column)
         {
-            const float Row0 = Orientation[Column];
-            const float Row1 = Orientation[3 + Column];
-            Orientation[Column] =
+            const float Row0 = Orientation->E[0][Column];
+            const float Row1 = Orientation->E[1][Column];
+            Orientation->E[0][Column] =
                 static_cast<float>(static_cast<double>(CosB) * Row0 - SinB * Row1);
-            Orientation[3 + Column] =
+            Orientation->E[1][Column] =
                 static_cast<float>(static_cast<double>(CosB) * Row1 + Row0 * SinB);
         }
     }
 }
 
-void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up)
+void CameraOrientFromForwardAndUp(Matrix* Out, Matrix const* M, const Vector* Up)
 {
     // FUN_00516fe0. Forward F = column 2 of M (M[2], M[5], M[8]).
-    const double A2 = M[2];
-    const double A5 = M[5];
-    const float A8 = M[8];   // retail spills it to a float local and reloads it
+    const double A2 = M->E[0][2];
+    const double A5 = M->E[1][2];
+    const float A8 = M->E[2][2];   // retail spills it to a float local and reloads it
 
     // Summed as (a2*u0 + a8*u2) + a5*u1.
-    double Dot = A2 * Up[0] + static_cast<double>(A8) * Up[2];
-    Dot = Dot + A5 * Up[1];
+    double Dot = A2 * Up->x + static_cast<double>(A8) * Up->z;
+    Dot = Dot + A5 * Up->y;
 
     float Rx;
     float Ry;
@@ -1048,9 +1048,9 @@ void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up)
     {
         // R = Up x F, normalised. z is rounded to float once and the square uses z * (float)z;
         // the reciprocal length is rounded to float before use.
-        const double X = static_cast<double>(A8) * Up[1] - A5 * Up[2];
-        const double Y = A2 * Up[2] - static_cast<double>(A8) * Up[0];
-        const double Z = A5 * Up[0] - A2 * Up[1];
+        const double X = static_cast<double>(A8) * Up->y - A5 * Up->z;
+        const double Y = A2 * Up->z - static_cast<double>(A8) * Up->x;
+        const double Z = A5 * Up->x - A2 * Up->y;
         const float Zf = static_cast<float>(Z);
         double SumSq = Z * Zf + Y * Y;
         SumSq = SumSq + X * X;
@@ -1062,9 +1062,9 @@ void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up)
     else
     {
         // Column 0 of M.
-        Rx = M[0];
-        Ry = M[3];
-        Rz = M[6];
+        Rx = M->E[0][0];
+        Ry = M->E[1][0];
+        Rz = M->E[2][0];
     }
 
     // C = F x R, each component rounded to float.
@@ -1073,15 +1073,15 @@ void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up)
     const float C2 = static_cast<float>(static_cast<double>(Ry) * A2 - static_cast<double>(Rx) * A5);
 
     // Columns {R, C, F}.
-    Out[0] = Rx;
-    Out[1] = C0;
-    Out[2] = M[2];
-    Out[3] = Ry;
-    Out[4] = C1;
-    Out[5] = M[5];
-    Out[6] = Rz;
-    Out[7] = C2;
-    Out[8] = A8;
+    Out->E[0][0] = Rx;
+    Out->E[0][1] = C0;
+    Out->E[0][2] = M->E[0][2];
+    Out->E[1][0] = Ry;
+    Out->E[1][1] = C1;
+    Out->E[1][2] = M->E[1][2];
+    Out->E[2][0] = Rz;
+    Out->E[2][1] = C2;
+    Out->E[2][2] = A8;
 }
 
 void FGameCamera::GetVelocity(Vector* OutVelocity)

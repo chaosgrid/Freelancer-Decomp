@@ -96,7 +96,7 @@ namespace
         Win->AppendNode(Node);
     }
 
-    void SetButtonOffset(UiTextMsgButton* Button, float const* Offset)
+    void SetButtonOffset(UiTextMsgButton* Button, Vector const* Offset)
     {
         Button->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
     }
@@ -471,8 +471,8 @@ bool PageCharacterCreate::MouseEvent(FWin3DMouseEvent const* Event)
     if (Event->Action == kWin3DMousePress)
     {
         CharacterName->Deactivate(false);
-        float Ray[3];
-        if (CharacterName->HitTest(Win3DGetMouseRay(Ray)))
+        Vector Ray;
+        if (CharacterName->HitTest(Win3DGetMouseRay(&Ray)))
             CharacterName->Activate();
     }
     return false;
@@ -522,21 +522,21 @@ void PageCharacterCreate::Update()
 
         if (SlideT < 0.0)
         {
-            float const BackOffset[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
-            SetButtonOffset(Back, BackOffset);
-            float const ShipOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-            SetButtonOffset(SelectShip, ShipOffset);
-            float const FrameOffset[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
+            Vector const BackOffset = {static_cast<float>(SlideT), 0.0f, 0.0f};
+            SetButtonOffset(Back, &BackOffset);
+            Vector const ShipOffset = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+            SetButtonOffset(SelectShip, &ShipOffset);
+            Vector const FrameOffset = {0.0f, static_cast<float>(SlideT), 0.0f};
             Vector FramePosition;
-            Win3DVec3Add(&FramePosition.x, &DataFrameHome.x, FrameOffset);
-            DataFrame->SetPosition(&FramePosition.x);
+            Win3DVec3Add(&FramePosition, &DataFrameHome, &FrameOffset);
+            DataFrame->SetPosition(&FramePosition);
         }
         else
         {
-            float const Zero[3] = {0.0f, 0.0f, 0.0f};
-            SetButtonOffset(Back, Zero);
-            SetButtonOffset(SelectShip, Zero);
-            DataFrame->SetPosition(&DataFrameHome.x);
+            Vector const Zero = {0.0f, 0.0f, 0.0f};
+            SetButtonOffset(Back, &Zero);
+            SetButtonOffset(SelectShip, &Zero);
+            DataFrame->SetPosition(&DataFrameHome);
             ShowWin3D(CharacterName);
             ShowWin3D(BaseCostume);
             ShowWin3D(NameLabel);
@@ -561,14 +561,14 @@ void PageCharacterCreate::Update()
         SlideT = SlideT - Dt * 1.5;
         float const Slide = static_cast<float>(SlideT);
 
-        float const BackOffset[3] = {Slide, 0.0f, 0.0f};
-        SetButtonOffset(Back, BackOffset);
-        float const ShipOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-        SetButtonOffset(SelectShip, ShipOffset);
+        Vector const BackOffset = {Slide, 0.0f, 0.0f};
+        SetButtonOffset(Back, &BackOffset);
+        Vector const ShipOffset = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+        SetButtonOffset(SelectShip, &ShipOffset);
 
         Vector const FramePosition = {DataFrameHome.x, Slide + DataFrameHome.y,
-                                        DataFrameHome.z};
-        DataFrame->SetPosition(&FramePosition.x);
+                                      DataFrameHome.z};
+        DataFrame->SetPosition(&FramePosition);
 
         // -0.9 is DAT_005e1b90; unordered keeps sliding.
         if (SlideT <= -0.9)

@@ -107,9 +107,9 @@ namespace
     {
         double const InvScale = 1.0 / static_cast<double>(Map.SystemScale);
         float Pos[3];
-        Pos[0] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos[0]));
-        Pos[1] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos[1]));
-        Pos[2] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos[2]));
+        Pos[0] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos.x));
+        Pos[1] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos.y));
+        Pos[2] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos.z));
         Universe::IZone const* const Zone =
             NavMapZoneAt(Map.CurrentSystem, Pos, 0, 1, Map.bDebugShowAll); // FUN_004a1b50
         if (Zone == nullptr)
@@ -221,7 +221,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // The item at the click (waypoint markers skipped), else the
         // zone there.
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 1); // FUN_00496d40
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 1); // FUN_00496d40
         if (Item != nullptr)
         {
             ShowItemInfoCard(*this, Item);
@@ -236,18 +236,18 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // waypoint at the clicked item (not a waypoint marker) or point.
         if (BestPathHasText()) // FUN_004c58e0
             return 1;
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
         if (Item != nullptr && Item->Kind != 3 && Item->Kind != 4)
         {
-            ClickMapPos[0] = Item->Position[0];
-            ClickMapPos[1] = Item->Position[1];
-            ClickMapPos[2] = Item->Position[2];
+            ClickMapPos.x = Item->Position.x;
+            ClickMapPos.y = Item->Position.y;
+            ClickMapPos.z = Item->Position.z;
         }
         double const InvScale = 1.0 / static_cast<double>(SystemScale);
         Vector Pos;
-        Pos.x = static_cast<float>(static_cast<double>(ClickMapPos[0]) * InvScale);
-        Pos.y = static_cast<float>(static_cast<double>(ClickMapPos[1]) * InvScale);
-        Pos.z = static_cast<float>(static_cast<double>(ClickMapPos[2]) * InvScale);
+        Pos.x = static_cast<float>(static_cast<double>(ClickMapPos.x) * InvScale);
+        Pos.y = static_cast<float>(static_cast<double>(ClickMapPos.y) * InvScale);
+        Pos.z = static_cast<float>(static_cast<double>(ClickMapPos.z) * InvScale);
         AddPlayerWaypointRetail(Pos, CurrentSystem->GetId(), 0); // FUN_004c4780
         PlayOrRewindUiSoundSlot(10);
         HideObjectTools(); // FUN_0049f0e0
@@ -263,13 +263,13 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // Ask the server for a route from the player (in its own
         // system's scale) to the clicked item (its id as the tag) or point.
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
         unsigned TargetId = 0;
         if (Item != nullptr && Item->Kind != 3 && Item->Kind != 4)
         {
-            ClickMapPos[0] = Item->Position[0];
-            ClickMapPos[1] = Item->Position[1];
-            ClickMapPos[2] = Item->Position[2];
+            ClickMapPos.x = Item->Position.x;
+            ClickMapPos.y = Item->Position.y;
+            ClickMapPos.z = Item->Position.z;
             TargetId = Item->Id;
         }
         float const SavedScale = SystemScale;
@@ -279,20 +279,20 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (PlayerSystem != nullptr)
             SystemScale = PlayerSystem->GetNavMapScale();
         float const PlayerScale = SystemScale;
-        float PlayerPos[3];
+        Vector PlayerPos;
         float PlayerHeading = 0.0f;
-        PlayerMapPosition(PlayerPos, &PlayerHeading); // FUN_00491be0
+        PlayerMapPosition(&PlayerPos, &PlayerHeading); // FUN_00491be0
         double const InvSaved = 1.0 / static_cast<double>(SavedScale);
         SystemScale = SavedScale;
         Vector To;
-        To.x = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos[0]));
-        To.y = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos[1]));
-        To.z = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos[2]));
+        To.x = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos.x));
+        To.y = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos.y));
+        To.z = static_cast<float>(InvSaved * static_cast<double>(ClickMapPos.z));
         double const InvPlayer = 1.0 / static_cast<double>(PlayerScale);
         Vector From;
-        From.x = static_cast<float>(static_cast<double>(PlayerPos[0]) * InvPlayer);
-        From.y = static_cast<float>(static_cast<double>(PlayerPos[1]) * InvPlayer);
-        From.z = static_cast<float>(static_cast<double>(PlayerPos[2]) * InvPlayer);
+        From.x = static_cast<float>(static_cast<double>(PlayerPos.x) * InvPlayer);
+        From.y = static_cast<float>(static_cast<double>(PlayerPos.y) * InvPlayer);
+        From.z = static_cast<float>(static_cast<double>(PlayerPos.z) * InvPlayer);
         RequestBestPathRetail(From, To, TargetId, CurrentSystem->GetId()); // FUN_004c4eb0
         PlayOrRewindUiSoundSlot(10);
         HideObjectTools();
@@ -302,7 +302,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (A == reinterpret_cast<uintptr_t>(ClearWaypointButton))
     {
         // Remove the clicked waypoint marker's waypoint.
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
         if (Item != nullptr && Item->Kind == 3)
         {
             int const Count = GetPlayerWaypointCountRetail();
@@ -416,7 +416,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         HideObjectTools();
         if (ViewMode != kNavMapViewSystem && ViewMode != kNavMapViewSystemZoomed)
             return 0;
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
         if (Item == nullptr)
             return 0;
         if (Item->Kind == 3)
@@ -447,7 +447,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         HideObjectTools();
         if (ViewMode != kNavMapViewSystem && ViewMode != kNavMapViewSystemZoomed)
             return 0;
-        FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+        FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
         if (Item == nullptr)
             return 0;
         if (Item->Kind == 0 && Item->System != nullptr)
@@ -476,7 +476,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Item->Kind != 4)
             return 0;
-        FNavMapItem* const Under = ItemAt(ClickMapPos, 1);
+        FNavMapItem* const Under = ItemAt(&ClickMapPos, 1);
         if (Under == nullptr || Under->Kind != 0 || Under->System == nullptr)
             return 0;
         PendingSystem = Under->System;
@@ -490,7 +490,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (ViewMode == kNavMapViewUniverse)
         {
             // Into the clicked star's system.
-            FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
+            FNavMapItem* const Item = ItemAt(&ClickMapPos, 0);
             if (Item == nullptr || (Item->Kind != 0 && Item->Kind != 1))
                 return 1;
             CurrentSystem = Item->System;
@@ -642,10 +642,10 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     {
         // The info card of the star under the cursor, else of the
         // zone at the LAST CLICK (retail reads ClickMapPos here, not the cursor's point).
-        float MapPos[3];
-        if (!MapPointUnderCursor(MapPos)) // FUN_00492410
+        Vector MapPos;
+        if (!MapPointUnderCursor(&MapPos)) // FUN_00492410
             return true;
-        FNavMapItem* const Item = ItemAt(MapPos, 0);
+        FNavMapItem* const Item = ItemAt(&MapPos, 0);
         if (Item != nullptr)
         {
             if (Item->Kind != 0)
@@ -673,17 +673,17 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     if (ViewMode == kNavMapViewUniverse) // retail's own test
         return true;
-    float MapPos[3];
-    if (!MapPointUnderCursor(MapPos))
+    Vector MapPos;
+    if (!MapPointUnderCursor(&MapPos))
         return true;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
     if (Player == nullptr)
         return true;
     double const InvScale = 1.0 / static_cast<double>(SystemScale);
     Vector Pos;
-    Pos.x = static_cast<float>(static_cast<double>(MapPos[0]) * InvScale);
-    Pos.y = static_cast<float>(static_cast<double>(MapPos[1]) * InvScale);
-    Pos.z = static_cast<float>(static_cast<double>(MapPos[2]) * InvScale);
+    Pos.x = static_cast<float>(static_cast<double>(MapPos.x) * InvScale);
+    Pos.y = static_cast<float>(static_cast<double>(MapPos.y) * InvScale);
+    Pos.z = static_cast<float>(static_cast<double>(MapPos.z) * InvScale);
     // The IObjInspectImpl's CBase (+0xc) and its object, when that
     // object's class has bit 0; retail calls through it untested.
     CObject* Object = nullptr;
@@ -723,11 +723,11 @@ bool NeuroNetNavMap::CursorMapFraction(float* OutU, float* OutV)
     // The camera ray (slot 0x38) scaled to the map plane, as
     // fractions of the map frame: U = x / (MapSize x / 2), V = -y / (MapSize y / 2), each
     // then * 0.5 + 0.5.
-    float Ray[3];
-    AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
-    double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
-    double const RayX = static_cast<double>(Ray[0]) * K;
-    float const RayY = static_cast<float>(static_cast<double>(Ray[1]) * K);
+    Vector Ray;
+    AsCamera(&Camera)->Unproject(&Ray, ScreenX, ScreenY);
+    double const K = kNavMapPlaneDepth / static_cast<double>(Ray.z);
+    double const RayX = static_cast<double>(Ray.x) * K;
+    float const RayY = static_cast<float>(static_cast<double>(Ray.y) * K);
     *OutU = static_cast<float>(RayX / (static_cast<double>(MapSize[0]) * 0.5));
     *OutV = static_cast<float>(-(static_cast<double>(RayY) /
                                  (static_cast<double>(MapSize[1]) * 0.5)));
@@ -742,11 +742,11 @@ void NeuroNetNavMap::ShowObjectTools()
     // ray point and frame fractions.
     if (bTransition != 0)
         return;
-    float MapPos[3];
-    if (!MapPointUnderCursor(MapPos)) // FUN_00492410
+    Vector MapPos;
+    if (!MapPointUnderCursor(&MapPos)) // FUN_00492410
         return;
-    float RayPos[3];
-    if (!CursorRayPoint(RayPos)) // FUN_0049e890
+    Vector RayPos;
+    if (!CursorRayPoint(&RayPos)) // FUN_0049e890
         return;
     float U = 0.0f;
     float V = 0.0f;
@@ -761,38 +761,38 @@ void NeuroNetNavMap::ShowObjectTools()
 
     // The tools around the ray point -- zoom / jump left, waypoint /
     // select right, info above, clear / best path below (property 6 = position).
-    float Pos[3];
-    Pos[0] = static_cast<float>(static_cast<double>(RayPos[0]) -
+    Vector Pos;
+    Pos.x = static_cast<float>(static_cast<double>(RayPos.x) -
                                 static_cast<double>(kNavMapToolSpacing));
-    Pos[1] = RayPos[1];
-    Pos[2] = RayPos[2];
-    InZoomButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    OutZoomButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    JumpGateButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    Pos[0] = static_cast<float>(static_cast<double>(RayPos[0]) +
+    Pos.y = RayPos.y;
+    Pos.z = RayPos.z;
+    InZoomButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    OutZoomButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    JumpGateButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    Pos.x = static_cast<float>(static_cast<double>(RayPos.x) +
                                 static_cast<double>(kNavMapToolSpacing));
-    Pos[1] = RayPos[1];
-    Pos[2] = RayPos[2];
-    SetWaypointButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    SelectObjectButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    Pos[0] = RayPos[0];
-    Pos[1] = static_cast<float>(static_cast<double>(RayPos[1]) +
+    Pos.y = RayPos.y;
+    Pos.z = RayPos.z;
+    SetWaypointButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    SelectObjectButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    Pos.x = RayPos.x;
+    Pos.y = static_cast<float>(static_cast<double>(RayPos.y) +
                                 static_cast<double>(kNavMapToolSpacing));
-    Pos[2] = RayPos[2];
-    InfoButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    Pos[0] = RayPos[0];
-    Pos[1] = static_cast<float>(static_cast<double>(RayPos[1]) -
+    Pos.z = RayPos.z;
+    InfoButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    Pos.x = RayPos.x;
+    Pos.y = static_cast<float>(static_cast<double>(RayPos.y) -
                                 static_cast<double>(kNavMapToolSpacing));
-    Pos[2] = RayPos[2];
-    ClearWaypointButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
-    BestPathButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
+    Pos.z = RayPos.z;
+    ClearWaypointButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
+    BestPathButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
 
     // What is under the cursor.
     unsigned char bInfo = 0;
     unsigned char bJump = 0;
     unsigned char bWaypointEnd = 0;
     unsigned char bWaypointMarker = 0;
-    FNavMapItem* const Item = ItemAt(MapPos, 0); // FUN_00496d40
+    FNavMapItem* const Item = ItemAt(&MapPos, 0); // FUN_00496d40
     if (Item != nullptr)
     {
         if (Item->Kind == 3)
@@ -832,7 +832,7 @@ void NeuroNetNavMap::ShowObjectTools()
         else if (Item->Kind == 4)
         {
             // A best-path stop over a star (in a system view).
-            FNavMapItem* const Under = ItemAt(MapPos, 1);
+            FNavMapItem* const Under = ItemAt(&MapPos, 1);
             if (Under != nullptr && ViewMode != kNavMapViewUniverse && Under->System != nullptr)
             {
                 bInfo = 1;
@@ -849,7 +849,7 @@ void NeuroNetNavMap::ShowObjectTools()
         // LAB_0049ed01: a waypoint marker or stop over a Kind 0 item has its info.
         if (Item->Kind == 3 || Item->Kind == 4)
         {
-            FNavMapItem* const Under = ItemAt(MapPos, 1);
+            FNavMapItem* const Under = ItemAt(&MapPos, 1);
             if (Under != nullptr && Under->Kind == 0)
                 bInfo = 1;
         }
@@ -863,9 +863,9 @@ void NeuroNetNavMap::ShowObjectTools()
     {
         double const InvScale = 1.0 / static_cast<double>(SystemScale);
         float Scaled[3];
-        Scaled[0] = static_cast<float>(static_cast<double>(MapPos[0]) * InvScale);
-        Scaled[1] = static_cast<float>(static_cast<double>(MapPos[1]) * InvScale);
-        Scaled[2] = static_cast<float>(InvScale * static_cast<double>(MapPos[2]));
+        Scaled[0] = static_cast<float>(static_cast<double>(MapPos.x) * InvScale);
+        Scaled[1] = static_cast<float>(static_cast<double>(MapPos.y) * InvScale);
+        Scaled[2] = static_cast<float>(InvScale * static_cast<double>(MapPos.z));
         if (NavMapZoneAt(CurrentSystem, Scaled, 0, 1, bDebugShowAll) != nullptr) // FUN_004a1b50
         {
             bInfo = 1;
@@ -875,23 +875,23 @@ void NeuroNetNavMap::ShowObjectTools()
 
     // LAB_0049eda3: remember the click, show the option bridge at the ray point
     // plus its attach position (RayPos moved in place).
-    ClickMapPos[0] = MapPos[0];
-    ClickMapPos[1] = MapPos[1];
-    ClickMapPos[2] = MapPos[2];
-    ClickRayPos[0] = RayPos[0];
-    ClickRayPos[1] = RayPos[1];
-    ClickRayPos[2] = RayPos[2];
+    ClickMapPos.x = MapPos.x;
+    ClickMapPos.y = MapPos.y;
+    ClickMapPos.z = MapPos.z;
+    ClickRayPos.x = RayPos.x;
+    ClickRayPos.y = RayPos.y;
+    ClickRayPos.z = RayPos.z;
     ClickV = V;
     ClickU = U;
     bObjectToolsShown = 1;
     OptionBridge->SetProperty(kWinPropHide, 0, 0);
-    RayPos[0] = static_cast<float>(static_cast<double>(RayPos[0]) +
+    RayPos.x = static_cast<float>(static_cast<double>(RayPos.x) +
                                    static_cast<double>(OptionBridge->AttachPosition.x));
-    RayPos[1] = static_cast<float>(static_cast<double>(RayPos[1]) +
+    RayPos.y = static_cast<float>(static_cast<double>(RayPos.y) +
                                    static_cast<double>(OptionBridge->AttachPosition.y));
-    RayPos[2] = static_cast<float>(static_cast<double>(RayPos[2]) +
+    RayPos.z = static_cast<float>(static_cast<double>(RayPos.z) +
                                    static_cast<double>(OptionBridge->AttachPosition.z));
-    OptionBridge->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RayPos), 0);
+    OptionBridge->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RayPos), 0);
 
     // The zoom button of the view, hidden when the jump applies.
     WinControl* const ZoomButton = ViewMode == kNavMapViewSystemZoomed ? OutZoomButton : InZoomButton;

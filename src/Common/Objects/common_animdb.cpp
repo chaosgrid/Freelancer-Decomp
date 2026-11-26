@@ -482,12 +482,12 @@ void __cdecl Update(float Dt)
                 // Same (W,X,Y,Z) -> (X,Y,Z,W) rotation as the mode-2 branch.
                 Quaternion GolemQuat = {0.0f, 0.0f, 0.0f, 0.0f};
                 GolemMath->MatrixToQuaternion(GolemQuat, Obj->Orientation);
-                float const GolemIvpQuat[4] = {GolemQuat.x, GolemQuat.y, GolemQuat.z, GolemQuat.w};
+                IVP_U_Quat const GolemIvpQuat = {GolemQuat.x, GolemQuat.y, GolemQuat.z, GolemQuat.w};
 
                 Vector const GolemZeroSpeed = {0.0f, 0.0f, 0.0f};
 
                 PhySys::GolemSetTargetPosition(Golem, Obj->WorldPosition, GolemZeroSpeed, Now);
-                PhySys::GolemSetTargetQuaternion(Golem, GolemIvpQuat, Now, nullptr, 0.0f);
+                PhySys::GolemSetTargetQuaternion(Golem, &GolemIvpQuat, Now, nullptr, 0.0f);
             }
             continue;
         }
@@ -503,11 +503,11 @@ void __cdecl Update(float Dt)
         Math->MatrixToQuaternion(MathQuat, Obj->Orientation);   // slot +0x50
 
         // Retail rotates the dwords by one slot: Quaternion (W,X,Y,Z) becomes IVP's (X,Y,Z,W).
-        float const IvpQuat[4] = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
+        IVP_U_Quat const IvpQuat = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
 
         // FUN_06343cc0(0, BodyPtr, IvpQuat, &Pos, 0), see common_controllergolem.cpp. The fifth
         // argument is never read by the callee, so the port drops it.
-        PhySys::BeamBodyToWorldPose(nullptr, Obj->BodyPtr, IvpQuat, Pos);
+        PhySys::BeamBodyToWorldPose(nullptr, Obj->BodyPtr, &IvpQuat, Pos);
     }
 
     // ---- Phase F: FUN_0627f190, list::erase(begin, end) ---------------------

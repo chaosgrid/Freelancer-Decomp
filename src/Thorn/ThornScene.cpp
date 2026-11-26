@@ -300,12 +300,12 @@ namespace
         }
     }
 
-    void IdentityOrient(float* Out9)
+    void IdentityOrient(Matrix* Out9)
     {
         std::memset(Out9, 0, sizeof(float) * 9);
-        Out9[0] = 1.0f;
-        Out9[4] = 1.0f;
-        Out9[8] = 1.0f;
+        Out9->E[0][0] = 1.0f;
+        Out9->E[1][1] = 1.0f;
+        Out9->E[2][2] = 1.0f;
     }
 
     void Copy8(float* Dst, const float* Src)
@@ -349,11 +349,28 @@ namespace
         }
     }
 
+    void CopyPoseWordsForward(Vector* Dst, const Vector* Src)
+    {
+        CopyPoseWordsForward(&Dst->x, &Src->x, 3);
+    }
+
+    void CopyPoseWordsForward(Matrix* Dst, const Matrix* Src)
+    {
+        CopyPoseWordsForward(&Dst->E[0][0], &Src->E[0][0], 9);
+    }
+
     void Copy3(float* Dst, const float* Src)
     {
         Dst[0] = Src[0];
         Dst[1] = Src[1];
         Dst[2] = Src[2];
+    }
+
+    void Copy3(Vector* Dst, const Vector* Src)
+    {
+        Dst->x = Src->x;
+        Dst->y = Src->y;
+        Dst->z = Src->z;
     }
 
     void Copy9(float* Dst, const float* Src)
@@ -362,26 +379,31 @@ namespace
             Dst[Index] = Src[Index];
     }
 
+    void Copy9(Matrix* Dst, const Matrix* Src)
+    {
+        Copy9(&Dst->E[0][0], &Src->E[0][0]);
+    }
+
     void Copy12(float* Dst, const float* Src)
     {
         for (int Index = 0; Index < 12; ++Index)
             Dst[Index] = Src[Index];
     }
 
-    void PackXform(float* Out12, const float* Orient9, const float* Pos3)
+    void PackXform(Transform* Out12, const Matrix* Orient9, const Vector* Pos3)
     {
-        Copy9(Out12, Orient9);
-        Copy3(&Out12[9], Pos3);
+        Copy9(&Out12->Rotation, Orient9);
+        Copy3(&Out12->Translation, Pos3);
     }
 
-    void UnpackXform(const float* Xform12, float* Orient9, float* Pos3)
+    void UnpackXform(const Transform* Xform12, Matrix* Orient9, Vector* Pos3)
     {
-        Copy9(Orient9, Xform12);
-        Copy3(Pos3, &Xform12[9]);
+        Copy9(Orient9, &Xform12->Rotation);
+        Copy3(Pos3, &Xform12->Translation);
     }
 
     // FUN_06f2ecc0: keep Z/Y/X differences on x87 until every input is read.
-    void Cross3(float* Result, const float* A, const float* B)
+    void Cross3(Vector* Result, const Vector* A, const Vector* B)
     {
         __asm
         {
@@ -410,7 +432,7 @@ namespace
     }
 
     // FUN_06f2ec80: (X*X + Y*Y) + Z*Z, then extended reciprocal.
-    void Normalize3(float* V)
+    void Normalize3(Vector* V)
     {
         const float One = 1.0f;
         __asm
@@ -445,7 +467,7 @@ namespace
     }
 
     // FUN_06f23090: separate input/output, all FLD/FCHS before stores.
-    void NegateVector3(float* Result, const float* Source)
+    void NegateVector3(Vector* Result, const Vector* Source)
     {
         __asm
         {
@@ -496,22 +518,22 @@ namespace
         return Prop->first.c_str();
     }
 
-    void WriteColumn(float* M9, int Col, const float* V)
+    void WriteColumn(Matrix* M9, int Col, const Vector* V)
     {
         // FUN_06f2ed60/80/a0 interleave raw word reads and stores. Floating
         // loads would quiet signalling NaNs in the Debug build.
         for (int Index = 0; Index != 3; ++Index)
         {
             unsigned int Word;
-            std::memcpy(&Word, V + Index, sizeof(Word));
-            std::memcpy(M9 + Col + Index * 3, &Word, sizeof(Word));
+            std::memcpy(&Word, &V->x + Index, sizeof(Word));
+            std::memcpy(&M9->E[Index][Col], &Word, sizeof(Word));
         }
     }
 
     // FUN_06f2ed00/20/40: column getters convert via x87, Z/Y/X load order.
-    void ReadColumn(const float* M9, int Col, float* V)
+    void ReadColumn(const Matrix* M9, int Col, Vector* V)
     {
-        const float* Source = M9 + Col;
+        const float* Source = &M9->E[0][Col];
         __asm
         {
             mov ecx, Source
@@ -527,7 +549,7 @@ namespace
 
     // FUN_06f3b670: load all eight FP words before output; word3 is raw.
     // Preserve x87 sNaN conversion and input/output overlap ordering.
-    void Transpose9(float* Out9, const float* In9)
+    void Transpose9(Matrix* Out9, const Matrix* In9)
     {
         unsigned int RawWord;
         __asm
@@ -560,15 +582,15 @@ namespace
     // FUN_06f3b9a0: math +0x38 TransposeTransform(out, csys.orient, csys.pos).
     // Retail consumes the result without testing the GENRESULT and has no
     // manual-math fallback.
-    void TransposeTransformCsysPos(float* Out3, const FThornCsys* Csys)
+    void TransposeTransformCsysPos(Vector* Out3, const FThornCsys* Csys)
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
         // Snapshot the live input only after factory acquisition, as retail does.
         Matrix Orientation;
         Vector Position;
         Vector Result;
-        std::memcpy(&Orientation, Csys->Orient, sizeof(Orientation));
-        std::memcpy(&Position, Csys->Pos, sizeof(Position));
+        std::memcpy(&Orientation, &Csys->Rotation, sizeof(Orientation));
+        std::memcpy(&Position, &Csys->Translation, sizeof(Position));
         Math->TransposeTransform(Result, Orientation, Position);
         std::memcpy(Out3, &Result, sizeof(Result));
     }
@@ -595,15 +617,15 @@ namespace
     }
 
     // FUN_06f3b9a0 + FUN_06f23090 + FUN_06f3b670 + pack. Inverse of parent Csys.
-    void InvertParentCsys(float* Out12, const FThornCsys* Csys)
+    void InvertParentCsys(Transform* Out12, const FThornCsys* Csys)
     {
-        float Tmp[3];
-        TransposeTransformCsysPos(Tmp, Csys);
-        float Neg[3];
-        NegateVector3(Neg, Tmp);
-        float Transposed[9];
-        Transpose9(Transposed, Csys->Orient);
-        PackCsysWords(Out12, Transposed, Neg);
+        Vector Tmp;
+        TransposeTransformCsysPos(&Tmp, Csys);
+        Vector Neg;
+        NegateVector3(&Neg, &Tmp);
+        Matrix Transposed;
+        Transpose9(&Transposed, &Csys->Rotation);
+        PackCsysWords(Out12, &Transposed, &Neg);
     }
 
     enum class EEventInverseNegateOrder
@@ -614,57 +636,57 @@ namespace
     };
 
     // FUN_06f409a0's inline negate: each component is stored before the next.
-    void NegateInversePositionWords(float* Words)
+    void NegateInversePositionWords(Vector* Words)
     {
-        Words[0] = -Words[0];
-        Words[1] = -Words[1];
-        Words[2] = -Words[2];
+        Words->x = -Words->x;
+        Words->y = -Words->y;
+        Words->z = -Words->z;
     }
 
     // FUN_06f40b30's inline negate runs Z/Y/X.
-    void NegateInverseOrientationWords(float* Words)
+    void NegateInverseOrientationWords(Vector* Words)
     {
-        Words[2] = -Words[2];
-        Words[1] = -Words[1];
-        Words[0] = -Words[0];
+        Words->z = -Words->z;
+        Words->y = -Words->y;
+        Words->x = -Words->x;
     }
 
     // Inline inverse in entity/event consumers uses DAT_06f61e20, distinct
     // from FUN_06f3b9a0's DAT_06f61e1c. The foreign output is consumed even
     // when its GENRESULT reports failure.
-    void InvertEventParentCsys(float* Out12, const FThornCsys* Csys,
+    void InvertEventParentCsys(Transform* Out12, const FThornCsys* Csys,
                                EEventInverseNegateOrder NegateOrder = EEventInverseNegateOrder::Shared)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         Matrix OrientationInput;
         Vector PositionInput;
         Vector TransformedPosition;
-        std::memcpy(&OrientationInput, Csys->Orient, sizeof(OrientationInput));
-        std::memcpy(&PositionInput, Csys->Pos, sizeof(PositionInput));
+        std::memcpy(&OrientationInput, &Csys->Rotation, sizeof(OrientationInput));
+        std::memcpy(&PositionInput, &Csys->Translation, sizeof(PositionInput));
         Math->TransposeTransform(TransformedPosition, OrientationInput, PositionInput);
-        float Tmp[3];
-        std::memcpy(Tmp, &TransformedPosition, sizeof(Tmp));
-        float Neg[3];
+        Vector Tmp;
+        std::memcpy(&Tmp, &TransformedPosition, sizeof(Tmp));
+        Vector Neg;
         if (NegateOrder == EEventInverseNegateOrder::Shared)
-            NegateVector3(Neg, Tmp);
+            NegateVector3(&Neg, &Tmp);
         else
         {
-            std::memcpy(Neg, Tmp, sizeof(Neg));
+            std::memcpy(&Neg, &Tmp, sizeof(Neg));
             if (NegateOrder == EEventInverseNegateOrder::Position)
-                NegateInversePositionWords(Neg);
+                NegateInversePositionWords(&Neg);
             else
-                NegateInverseOrientationWords(Neg);
+                NegateInverseOrientationWords(&Neg);
         }
         // Raw word transpose, as in the inline inverse of FUN_06f409a0/06f40b30.
         unsigned int Transposed[9];
         const int SourceIndices[9] = {0, 3, 6, 1, 4, 7, 2, 5, 8};
         for (int Index = 0; Index < 9; ++Index)
-            std::memcpy(&Transposed[Index], &Csys->Orient[SourceIndices[Index]], sizeof(Transposed[Index]));
-        PackCsysWords(Out12, Transposed, Neg);
+            std::memcpy(&Transposed[Index], &Csys->Rotation.E[0][0] + SourceIndices[Index], sizeof(Transposed[Index]));
+        PackCsysWords(Out12, Transposed, &Neg);
     }
 
     // Retail calls the typed foreign slots without native wrapper guards.
-    GENRESULT SceneMathTransform(I3DMathEngine* Math, float* Out, const float* Xform, const float* Source)
+    GENRESULT SceneMathTransform(I3DMathEngine* Math, Vector* Out, const Transform* Xform, const Vector* Source)
     {
         // All callers pass a distinct output buffer.
         Transform TransformInput;
@@ -677,7 +699,7 @@ namespace
         return Status;
     }
 
-    GENRESULT SceneMathMulMatrix(I3DMathEngine* Math, float* Out, const float* A, const float* B)
+    GENRESULT SceneMathMulMatrix(I3DMathEngine* Math, Matrix* Out, const Matrix* A, const Matrix* B)
     {
         Matrix LeftInput;
         Matrix RightInput;
@@ -689,7 +711,7 @@ namespace
         return Status;
     }
 
-    GENRESULT SceneMathMulTransform(I3DMathEngine* Math, float* Out, const float* A, const float* B)
+    GENRESULT SceneMathMulTransform(I3DMathEngine* Math, Transform* Out, const Transform* A, const Transform* B)
     {
         Transform LeftInput;
         Transform RightInput;
@@ -701,7 +723,7 @@ namespace
         return Status;
     }
 
-    GENRESULT SceneMathRotate(I3DMathEngine* Math, float* Out, const float* Xform, const float* Source)
+    GENRESULT SceneMathRotate(I3DMathEngine* Math, Vector* Out, const Transform* Xform, const Vector* Source)
     {
         Transform TransformInput;
         Vector SourceInput;
@@ -713,7 +735,7 @@ namespace
         return Status;
     }
 
-    GENRESULT SceneQuatToMatrix(I3DMathEngine* Math, float* Out, const Quaternion& Source)
+    GENRESULT SceneQuatToMatrix(I3DMathEngine* Math, Matrix* Out, const Quaternion& Source)
     {
         Quaternion QuaternionInput;
         Matrix MatrixResult;
@@ -725,56 +747,56 @@ namespace
 
     // FUN_06f44ce0: takes an already prepared inverse; builds none and checks
     // no pointers.
-    void MulTransformByPreparedInverse(const float* Inverse, float* Destination, const float* Source)
+    void MulTransformByPreparedInverse(const Transform* Inverse, Transform* Destination, const Transform* Source)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        float Result[12];
-        SceneMathMulTransform(Math, Result, Inverse, Source);
-        std::memcpy(Destination, Result, sizeof(Result));
+        Transform Result;
+        SceneMathMulTransform(Math, &Result, Inverse, Source);
+        std::memcpy(Destination, &Result, sizeof(Result));
     }
 
     // Hardpoint callers use FUN_06f3b9a0 (math DAT_06f61e1c), then pass the
     // inverse to FUN_06f44ce0 (math DAT_06f61e20); both caches are kept.
-    void MulXformByInverseCsys(const FThornCsys* Csys, float* Xform12)
+    void MulXformByInverseCsys(const FThornCsys* Csys, Transform* Xform12)
     {
-        float Inverse[12];
-        InvertParentCsys(Inverse, Csys);
-        MulTransformByPreparedInverse(Inverse, Xform12, Xform12);
+        Transform Inverse;
+        InvertParentCsys(&Inverse, Csys);
+        MulTransformByPreparedInverse(&Inverse, Xform12, Xform12);
     }
 
     // Csys math cache, Z/Y/X negate, raw transpose, then the event math cache.
-    void TransformFloorHardpoint(const FThornCsys* Parent, float* Hardpoint)
+    void TransformFloorHardpoint(const FThornCsys* Parent, Transform* Hardpoint)
     {
-        float NegativePosition[3];
-        TransposeTransformCsysPos(NegativePosition, Parent);
-        NegateInverseOrientationWords(NegativePosition);
+        Vector NegativePosition;
+        TransposeTransformCsysPos(&NegativePosition, Parent);
+        NegateInverseOrientationWords(&NegativePosition);
         unsigned int Transposed[9];
         const int SourceIndices[9] = {0, 3, 6, 1, 4, 7, 2, 5, 8};
         for (int Index = 0; Index < 9; ++Index)
-            std::memcpy(Transposed + Index, Parent->Orient + SourceIndices[Index], sizeof(unsigned int));
-        float Inverse[12];
-        PackCsysWords(Inverse, Transposed, NegativePosition);
-        MulTransformByPreparedInverse(Inverse, Hardpoint, Hardpoint);
+            std::memcpy(Transposed + Index, &Parent->Rotation.E[0][0] + SourceIndices[Index], sizeof(unsigned int));
+        Transform Inverse;
+        PackCsysWords(&Inverse, Transposed, &NegativePosition);
+        MulTransformByPreparedInverse(&Inverse, Hardpoint, Hardpoint);
     }
 
     // Type 11 after FUN_06f2e440 (LAB_06f44140): math +0x28 Transform pos,
     // +0x20 MulMatrix orient. Neither GENRESULT is tested.
-    void ApplyForwardCsys(const FThornCsys* Csys, float* Pos, float* Orient)
+    void ApplyForwardCsys(const FThornCsys* Csys, Vector* Pos, Matrix* Orient)
     {
         if (Csys == nullptr || Pos == nullptr || Orient == nullptr)
             return;
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        float WorldPos[3];
-        SceneMathTransform(Math, WorldPos, Csys->Orient, Pos);
-        Copy3(Pos, WorldPos);
-        float WorldOrient[9];
-        SceneMathMulMatrix(Math, WorldOrient, Csys->Orient, Orient);
-        Copy9(Orient, WorldOrient);
+        Vector WorldPos;
+        SceneMathTransform(Math, &WorldPos, Csys, Pos);
+        Copy3(Pos, &WorldPos);
+        Matrix WorldOrient;
+        SceneMathMulMatrix(Math, &WorldOrient, &Csys->Rotation, Orient);
+        Copy9(Orient, &WorldOrient);
     }
 
     // Each inlined axis normalization multiplies by the still-extended
     // reciprocal and pops it last.
-    void NormalizeAxis3(float* V)
+    void NormalizeAxis3(Vector* V)
     {
         const float One = 1.0f;
         __asm
@@ -812,10 +834,10 @@ namespace
 
     // Inlined in FUN_06f2e440: Up cross Front, Z/Y/X float stores.
     // The initial basis differs only in the operand order of the final product.
-    void CrossAxisSide3(float* Result, const float* Up, const float* Front, bool bInitial)
+    void CrossAxisSide3(Vector* Result, const Vector* Up, const Vector* Front, bool bInitial)
     {
-        const float* LastLeft = bInitial ? Front + 1 : Up + 2;
-        const float* LastRight = bInitial ? Up + 2 : Front + 1;
+        const float* LastLeft = bInitial ? &Front->y : &Up->z;
+        const float* LastRight = bInitial ? &Up->z : &Front->y;
         __asm
         {
             mov ecx, Up
@@ -845,7 +867,7 @@ namespace
     }
 
     // Inlined in FUN_06f2e440: Dir cross Side, Z/Y/X float stores.
-    void CrossAxisUp3(float* Result, const float* Dir, const float* Side)
+    void CrossAxisUp3(Vector* Result, const Vector* Dir, const Vector* Side)
     {
         __asm
         {
@@ -873,7 +895,7 @@ namespace
         }
     }
 
-    bool AxisDotNotGreater(const float* Up, const float* Dir)
+    bool AxisDotNotGreater(const Vector* Up, const Vector* Dir)
     {
         // DAT_06f5a248 = 3fefae147ae147ae (double 0.99).
         const double Threshold = 0.99;
@@ -901,10 +923,10 @@ namespace
     }
 
     // FUN_06f2e440: look-at frame from direction + Lua up/front axis IDs (0..5).
-    void BuildAxisFrame(float* Out9, const float* Direction, unsigned FrontAxis, unsigned UpAxis,
+    void BuildAxisFrame(Matrix* Out9, const Vector* Direction, unsigned FrontAxis, unsigned UpAxis,
                         const unsigned int* SceneFrontAxis, const unsigned int* SceneUpAxis)
     {
-        static const float kAxisTable[6][3] = {
+        static const Vector kAxisTable[6] = {
             {1.0f, 0.0f, 0.0f},  {0.0f, 1.0f, 0.0f},  {0.0f, 0.0f, 1.0f},
             {-1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}};
 
@@ -918,41 +940,41 @@ namespace
                 FrontIdx = static_cast<int>(*SceneFrontAxis);
         }
 
-        float TableFront[3];
-        Copy3(TableFront, kAxisTable[FrontIdx]);
-        float TableUp[3];
-        Copy3(TableUp, kAxisTable[UpIdx]);
-        float TableSide[3];
-        CrossAxisSide3(TableSide, TableUp, TableFront, true);
+        Vector TableFront;
+        Copy3(&TableFront, &kAxisTable[FrontIdx]);
+        Vector TableUp;
+        Copy3(&TableUp, &kAxisTable[UpIdx]);
+        Vector TableSide;
+        CrossAxisSide3(&TableSide, &TableUp, &TableFront, true);
 
-        float Dir[3];
-        Copy3(Dir, Direction);
-        NormalizeAxis3(Dir);
+        Vector Dir;
+        Copy3(&Dir, Direction);
+        NormalizeAxis3(&Dir);
 
-        float UpVec[3];
-        Copy3(UpVec, TableUp);
+        Vector UpVec;
+        Copy3(&UpVec, &TableUp);
 
         if (FrontAxis > 2)
-            NegateVector3(Dir, Dir);
+            NegateVector3(&Dir, &Dir);
         if (UpAxis > 2)
-            NegateVector3(UpVec, UpVec);
+            NegateVector3(&UpVec, &UpVec);
 
-        float OrthoUp[3];
-        float Side[3];
-        if (AxisDotNotGreater(UpVec, Dir))
+        Vector OrthoUp;
+        Vector Side;
+        if (AxisDotNotGreater(&UpVec, &Dir))
         {
-            CrossAxisSide3(Side, UpVec, Dir, false);
-            NormalizeAxis3(Side);
-            CrossAxisUp3(OrthoUp, Dir, Side);
-            NormalizeAxis3(OrthoUp);
+            CrossAxisSide3(&Side, &UpVec, &Dir, false);
+            NormalizeAxis3(&Side);
+            CrossAxisUp3(&OrthoUp, &Dir, &Side);
+            NormalizeAxis3(&OrthoUp);
         }
         else
         {
             // Near-parallel: build the final up directly from Dir x TableSide.
-            CrossAxisUp3(OrthoUp, Dir, TableSide);
-            NormalizeAxis3(OrthoUp);
-            CrossAxisSide3(Side, OrthoUp, Dir, false);
-            NormalizeAxis3(Side);
+            CrossAxisUp3(&OrthoUp, &Dir, &TableSide);
+            NormalizeAxis3(&OrthoUp);
+            CrossAxisSide3(&Side, &OrthoUp, &Dir, false);
+            NormalizeAxis3(&Side);
         }
 
         bool bCol0 = false;
@@ -963,17 +985,17 @@ namespace
         {
         case 0:
         case 3:
-            WriteColumn(Out9, 0, Dir);
+            WriteColumn(Out9, 0, &Dir);
             bCol0 = true;
             break;
         case 1:
         case 4:
-            WriteColumn(Out9, 1, Dir);
+            WriteColumn(Out9, 1, &Dir);
             bCol1 = true;
             break;
         case 2:
         case 5:
-            WriteColumn(Out9, 2, Dir);
+            WriteColumn(Out9, 2, &Dir);
             bCol2 = true;
             break;
         }
@@ -981,17 +1003,17 @@ namespace
         {
         case 0:
         case 3:
-            WriteColumn(Out9, 0, OrthoUp);
+            WriteColumn(Out9, 0, &OrthoUp);
             bUpColumn0 = true;
             break;
         case 1:
         case 4:
-            WriteColumn(Out9, 1, OrthoUp);
+            WriteColumn(Out9, 1, &OrthoUp);
             bCol1 = true;
             break;
         case 2:
         case 5:
-            WriteColumn(Out9, 2, OrthoUp);
+            WriteColumn(Out9, 2, &OrthoUp);
             bCol2 = true;
             break;
         }
@@ -999,49 +1021,49 @@ namespace
         // Retail: up in column 0 skips the missing-X handling.
         if (!bUpColumn0 && !bCol0)
         {
-            float ColY[3];
-            float ColZ[3];
-            float ColX[3];
+            Vector ColY;
+            Vector ColZ;
+            Vector ColX;
             // Retail reads Z as raw DWORDs before the x87 Y getter.
-            std::memcpy(ColZ, Out9 + 2, 4);
-            std::memcpy(ColZ + 1, Out9 + 5, 4);
-            std::memcpy(ColZ + 2, Out9 + 8, 4);
-            ReadColumn(Out9, 1, ColY);
-            Cross3(ColX, ColY, ColZ);
-            Normalize3(ColX);
-            WriteColumn(Out9, 0, ColX);
+            std::memcpy(&ColZ.x, &Out9->E[0][2], 4);
+            std::memcpy(&ColZ.y, &Out9->E[1][2], 4);
+            std::memcpy(&ColZ.z, &Out9->E[2][2], 4);
+            ReadColumn(Out9, 1, &ColY);
+            Cross3(&ColX, &ColY, &ColZ);
+            Normalize3(&ColX);
+            WriteColumn(Out9, 0, &ColX);
             return;
         }
         if (bCol1)
         {
             if (!bCol2)
             {
-                float ColX[3];
-                float ColY[3];
-                float ColZ[3];
-                ReadColumn(Out9, 1, ColY);
-                ReadColumn(Out9, 0, ColX);
-                Cross3(ColZ, ColX, ColY);
-                Normalize3(ColZ);
-                WriteColumn(Out9, 2, ColZ);
+                Vector ColX;
+                Vector ColY;
+                Vector ColZ;
+                ReadColumn(Out9, 1, &ColY);
+                ReadColumn(Out9, 0, &ColX);
+                Cross3(&ColZ, &ColX, &ColY);
+                Normalize3(&ColZ);
+                WriteColumn(Out9, 2, &ColZ);
             }
             return;
         }
-        float ColX[3];
-        float ColZ[3];
-        float ColY[3];
-        ReadColumn(Out9, 0, ColX);
-        ReadColumn(Out9, 2, ColZ);
-        Cross3(ColY, ColZ, ColX);
-        Normalize3(ColY);
-        WriteColumn(Out9, 1, ColY);
+        Vector ColX;
+        Vector ColZ;
+        Vector ColY;
+        ReadColumn(Out9, 0, &ColX);
+        ReadColumn(Out9, 2, &ColZ);
+        Cross3(&ColY, &ColZ, &ColX);
+        Normalize3(&ColY);
+        WriteColumn(Out9, 1, &ColY);
     }
 
-    void Lerp3(float* Out, const float* A, const float* B, float T)
+    void Lerp3(Vector* Out, const Vector* A, const Vector* B, float T)
     {
-        Out[0] = A[0] + (B[0] - A[0]) * T;
-        Out[1] = A[1] + (B[1] - A[1]) * T;
-        Out[2] = A[2] + (B[2] - A[2]) * T;
+        Out->x = A->x + (B->x - A->x) * T;
+        Out->y = A->y + (B->y - A->y) * T;
+        Out->z = A->z + (B->z - A->z) * T;
     }
 
     float Lerp1(float A, float B, float T) { return A + (B - A) * T; }
@@ -1354,7 +1376,7 @@ namespace
         Out->Color[0] = static_cast<int>(Entity->LightColor[0]);
         Out->Color[1] = static_cast<int>(Entity->LightColor[1]);
         Out->Color[2] = static_cast<int>(Entity->LightColor[2]);
-        Copy3(Out->Direction, Entity->LightDirection);
+        Copy3(&Out->Direction, &Entity->LightDirection);
         Out->RangeTemp = Entity->LightRange;
         Out->Range = Entity->LightRange;
         Out->CutoffTemp = Entity->LightCutoff;
@@ -1389,7 +1411,7 @@ namespace
         Entity->LightColor[0] = static_cast<float>(In->Color[0]);
         Entity->LightColor[1] = static_cast<float>(In->Color[1]);
         Entity->LightColor[2] = static_cast<float>(In->Color[2]);
-        Copy3(Entity->LightDirection, In->Direction);
+        Copy3(&Entity->LightDirection, &In->Direction);
         Entity->LightRange = In->Range;
         Entity->LightCutoff = In->Cutoff;
         Entity->LightTheta = In->Theta;
@@ -1419,7 +1441,7 @@ namespace
     // Keeps the X/Y differences on x87, rounds Z's difference and X's product
     // to float, and stores each result before the next final FSTP. Plain C++
     // changed these lifetimes in both Debug and Release.
-    void InterpolateLightDirection(float* Out, const float* From, const float* To, const float* U)
+    void InterpolateLightDirection(Vector* Out, const Vector* From, const Vector* To, const float* U)
     {
         float Capture[3];
         float DifferenceZ;
@@ -1514,7 +1536,7 @@ namespace
         if ((Mask & kThornLightBitInfinite) != 0 && IsLightInterpolationComplete(U))
             Out->Infinite = Target->Infinite;
         if ((Mask & kThornLightBitDirection) != 0)
-            InterpolateLightDirection(Out->Direction, Capture->Direction, Target->Direction, U);
+            InterpolateLightDirection(&Out->Direction, &Capture->Direction, &Target->Direction, U);
         if ((Mask & kThornLightBitOn) != 0 && IsLightInterpolationComplete(U))
             Out->On = Target->On;
     }
@@ -1555,7 +1577,7 @@ namespace
         Output.z = 0.0f;
     }
 
-    void CopyQuat4(float* Dst, const float* Src)
+    void CopyQuat4(Quaternion* Dst, const Quaternion* Src)
     {
         // Raw copy, no FP evaluation.
         std::memcpy(Dst, Src, sizeof(float) * 4);
@@ -1572,7 +1594,7 @@ namespace
 
     // LAB_06f46a40 (math +0x54): the GENRESULT is not tested and there is no
     // identity fallback.
-    void Quat4ToMat9(float* Out9, const float* Src4)
+    void Quat4ToMat9(Matrix* Out9, const Quaternion* Src4)
     {
         Quaternion Quat;
         std::memcpy(&Quat, Src4, sizeof(Quat));
@@ -1580,7 +1602,7 @@ namespace
         SceneQuatToMatrix(Math, Out9, Quat);
     }
 
-    void SlerpQuat4(float* Out4, const Quaternion& From4, const Quaternion& To4, const float* U)
+    void SlerpQuat4(Quaternion* Out4, const Quaternion& From4, const Quaternion& To4, const float* U)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         Quaternion FromQuat;
@@ -1594,7 +1616,7 @@ namespace
     }
 
     // Each subtraction/product stays on x87 until its final float store.
-    void LerpSpatialPosition(float* ResultPosition, const float* From, const float* To, const float* Scale)
+    void LerpSpatialPosition(Vector* ResultPosition, const Vector* From, const Vector* To, const float* Scale)
     {
         __asm
         {
@@ -1642,14 +1664,14 @@ namespace
     // FCOS is stored to float, FSIN stays on x87 through all three columns, and
     // the radian product has no intermediate float store.
     // Axis 0/3=X, 1/4=Y, 2/5=Z; unsigned >5 keeps identity without trig.
-    void InitializeEventFrameWords(float* Frame);
+    void InitializeEventFrameWords(Matrix* Frame);
 
-    void ApplyAxisRotFpu(float* Orient9, const Quaternion& BaseQuat4, int AxisId, const float* DeltaDeg)
+    void ApplyAxisRotFpu(Matrix* Orient9, const Quaternion& BaseQuat4, int AxisId, const float* DeltaDeg)
     {
         const unsigned int PiOver180Bits = 0x3c8efa35u;
         const unsigned int Kind = static_cast<unsigned int>(AxisId);
-        float Rot[9];
-        InitializeEventFrameWords(Rot);
+        Matrix Rot;
+        InitializeEventFrameWords(&Rot);
         if (Kind <= 5u)
         {
             float CosValue;
@@ -1744,16 +1766,16 @@ namespace
         Matrix BaseMatrix;
         std::memcpy(&BaseQuaternion, &BaseQuat4, sizeof(BaseQuaternion));
         Math->QuaternionToMatrix(BaseMatrix, BaseQuaternion);
-        float Base9[9];
-        std::memcpy(Base9, &BaseMatrix, sizeof(BaseMatrix));
+        Matrix Base9;
+        std::memcpy(&Base9, &BaseMatrix, sizeof(BaseMatrix));
         Math = AcquireSceneEventMathEngine();
-        float ResultMatrix[9];
+        Matrix ResultMatrix;
         if (Kind <= 2u)
-            SceneMathMulMatrix(Math, ResultMatrix, Rot, Base9);
+            SceneMathMulMatrix(Math, &ResultMatrix, &Rot, &Base9);
         else
-            SceneMathMulMatrix(Math, ResultMatrix, Base9, Rot);
+            SceneMathMulMatrix(Math, &ResultMatrix, &Base9, &Rot);
         // Raw nine-word copy before the primary orientation callback.
-        std::memcpy(Orient9, ResultMatrix, sizeof(ResultMatrix));
+        std::memcpy(Orient9, &ResultMatrix, sizeof(ResultMatrix));
     }
 
     struct FThornSceneFogSnapshot
@@ -1827,12 +1849,12 @@ namespace
             {
                 Entity->D3dLightControl->GetLight(Blob + 0x28);
                 Entity->D3dLightControl->GetOn(reinterpret_cast<int*>(Blob + 0x20));
-                Entity->D3dLightControl->GetDirection(reinterpret_cast<float*>(Blob + 0x0C));
+                Entity->D3dLightControl->GetDirection(&Out->Direction);
             }
             else if (Entity->LightControl != nullptr)
             {
                 Entity->LightControl->GetColor(reinterpret_cast<float*>(Blob + 0x00));
-                Entity->LightControl->GetDirection(reinterpret_cast<float*>(Blob + 0x0C));
+                Entity->LightControl->GetDirection(&Out->Direction);
                 Entity->LightControl->GetRange(reinterpret_cast<float*>(Blob + 0x18));
                 Entity->LightControl->GetCutoff(reinterpret_cast<float*>(Blob + 0x1C));
                 Entity->LightControl->GetInfinite(reinterpret_cast<int*>(Blob + 0x24));
@@ -1894,7 +1916,7 @@ namespace
         if (D3dLight != nullptr)
         {
             D3dLight->SetOn(Live.On);
-            Entity->D3dLightControl->SetDirection(Live.Direction);
+            Entity->D3dLightControl->SetDirection(&Live.Direction);
             Entity->D3dLightControl->SetLight(&Live.Type);
         }
         ILightControl* Light = Entity->LightControl;
@@ -1905,7 +1927,7 @@ namespace
             Color[1] = LightColorToInteger(&Live.Diffuse[1]);
             Color[2] = LightColorToInteger(&Live.Diffuse[2]);
             Light->SetColor(Color);
-            Entity->LightControl->SetDirection(Live.Direction);
+            Entity->LightControl->SetDirection(&Live.Direction);
             Entity->LightControl->SetRange(Live.Range);
             if (Live.Type == 1)
                 Entity->LightControl->SetCutoff(-1.0f);
@@ -1931,14 +1953,14 @@ namespace
         ApplyEntityLightRuntimeProps(Entity, Props);
     }
 
-    void GetLivePose(FThornEntity* Entity, float* Pos, float* Orient)
+    void GetLivePose(FThornEntity* Entity, Vector* Pos, Matrix* Orient)
     {
-        Copy3(Pos, Entity->Snap.Pos);
-        Copy9(Orient, Entity->Snap.Orient);
+        Copy3(Pos, &Entity->Snap.Pos);
+        Copy9(Orient, &Entity->Snap.Orient);
         if (Entity->GeoControl != nullptr)
         {
-            Entity->GeoControl->GetPosition((Vector*)Pos);
-            Entity->GeoControl->GetOrientation((Matrix*)Orient);
+            Entity->GeoControl->GetPosition(Pos);
+            Entity->GeoControl->GetOrientation(Orient);
         }
     }
 
@@ -2029,40 +2051,40 @@ namespace
 
     // FUN_06f409a0: GeoControl GetPosition, then the inline parent inverse and
     // TransformXform through the DAT_06f61e20 math engine.
-    void GetRetailRelativePosition(FThornEntity* Entity, float* Pos)
+    void GetRetailRelativePosition(FThornEntity* Entity, Vector* Position)
     {
         if (Entity->GeoControl == nullptr)
             return;
-        Entity->GeoControl->GetPosition((Vector*)Pos);
+        Entity->GeoControl->GetPosition(Position);
         if (Entity->ParentCsys != nullptr)
         {
             const FThornCsys* Parent = Entity->ParentCsys;
-            float Inv[12];
-            InvertEventParentCsys(Inv, Parent, EEventInverseNegateOrder::Position);
+            Transform Inv;
+            InvertEventParentCsys(&Inv, Parent, EEventInverseNegateOrder::Position);
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
-            float Result[3];
-            SceneMathTransform(Math, Result, Inv, Pos);
-            std::memcpy(Pos, Result, sizeof(Result));
+            Vector Result;
+            SceneMathTransform(Math, &Result, &Inv, Position);
+            std::memcpy(Position, &Result, sizeof(Result));
         }
     }
 
     // FUN_06f40b30: GeoControl GetOrientation, then the inline parent inverse
     // and MulMatrix through DAT_06f61e20. Retail still computes the inverse
     // translation although only the rotation is used. The GENRESULT is not tested.
-    void GetRetailRelativeOrientation(FThornEntity* Entity, float* Orient)
+    void GetRetailRelativeOrientation(FThornEntity* Entity, Matrix* Orientation)
     {
         if (Entity->GeoControl == nullptr)
             return;
-        Entity->GeoControl->GetOrientation((Matrix*)Orient);
+        Entity->GeoControl->GetOrientation(Orientation);
         if (Entity->ParentCsys != nullptr)
         {
             const FThornCsys* Parent = Entity->ParentCsys;
-            float Inv[12];
-            InvertEventParentCsys(Inv, Parent, EEventInverseNegateOrder::Orientation);
+            Transform Inv;
+            InvertEventParentCsys(&Inv, Parent, EEventInverseNegateOrder::Orientation);
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
-            float Result[9];
-            SceneMathMulMatrix(Math, Result, Inv, Orient);
-            std::memcpy(Orient, Result, sizeof(Result));
+            Matrix Result;
+            SceneMathMulMatrix(Math, &Result, &Inv.Rotation, Orientation);
+            std::memcpy(Orientation, &Result, sizeof(Result));
         }
     }
 
@@ -2073,14 +2095,14 @@ namespace
     {
         if (Entity == nullptr)
             return 0.0f;
-        return Entity->InnerGetPos()[1];
+        return Entity->InnerGetPos()->y;
     }
 
-    // ICompoundControl +0x24: (ctrl, target_type int, name, xform12).
-    bool ResolveCompoundHardpoint(FThornEntity* Entity, int TypeId, const char* Name, float* Xform12,
+    // ICompoundControl +0x24: (ctrl, target_type int, name, xform).
+    bool ResolveCompoundHardpoint(FThornEntity* Entity, int TypeId, const char* Name, Transform* Xform,
                                   bool bRequireType12)
     {
-        if (Entity == nullptr || Entity->CompoundControl == nullptr || Xform12 == nullptr)
+        if (Entity == nullptr || Entity->CompoundControl == nullptr || Xform == nullptr)
             return false;
         if (bRequireType12)
         {
@@ -2088,30 +2110,30 @@ namespace
             if (EntType != kThornEntityCompound && EntType != kThornEntityDeformable)
                 return false;
         }
-        return Entity->CompoundControl->GetHardpointXform(TypeId, Name, Xform12) == GR_OK;
+        return Entity->CompoundControl->GetHardpointXform(TypeId, Name, Xform) == GR_OK;
     }
 
     // Retail stores the position Z/Y/X and the target X/Y/Z; the child word
     // is the first x87 operand.
-    void AddAttachOffset(float* Result, const float* ChildPosition, const float* OffsetVector, bool bReverseStores)
+    void AddAttachOffset(Vector* Result, const Vector* ChildPosition, const Vector* OffsetVector, bool bReverseStores)
     {
         if (bReverseStores)
         {
-            Result[2] = ChildPosition[2] + OffsetVector[2];
-            Result[1] = ChildPosition[1] + OffsetVector[1];
-            Result[0] = ChildPosition[0] + OffsetVector[0];
+            Result->z = ChildPosition->z + OffsetVector->z;
+            Result->y = ChildPosition->y + OffsetVector->y;
+            Result->x = ChildPosition->x + OffsetVector->x;
         }
         else
         {
-            Result[0] = ChildPosition[0] + OffsetVector[0];
-            Result[1] = ChildPosition[1] + OffsetVector[1];
-            Result[2] = ChildPosition[2] + OffsetVector[2];
+            Result->x = ChildPosition->x + OffsetVector->x;
+            Result->y = ChildPosition->y + OffsetVector->y;
+            Result->z = ChildPosition->z + OffsetVector->z;
         }
     }
 
     // Squared-length test keeps the Y/Z differences on x87. Zero exits;
     // nonzero or unordered goes on to the look-at helper.
-    bool BuildAttachLookDirection(float* DirectionOut, const float* Target, const float* Origin)
+    bool BuildAttachLookDirection(Vector* DirectionOut, const Vector* Target, const Vector* Origin)
     {
         unsigned char bUseDirection;
         const float Zero = 0.0f;
@@ -2149,7 +2171,7 @@ namespace
     }
 
     // Identity written with raw MOVs, even with a pending x87 trap.
-    void InitializeEventFrameWords(float* Frame)
+    void InitializeEventFrameWords(Matrix* Frame)
     {
         static const unsigned int Words[9] = {
             0x3f800000u, 0u, 0u, 0u, 0x3f800000u, 0u, 0u, 0u, 0x3f800000u};
@@ -2157,22 +2179,22 @@ namespace
     }
     // The effector xform is event-owned and kept after the first hardpoint write.
     void BuildIkPose(FThornEvent* Event, FThornEntity* Primary, FThornEntity** SecondaryEntry,
-                     float* Pos, float* Orient)
+                     Vector* Pos, Matrix* Orient)
     {
         if (Primary->CompoundControl != nullptr)
         {
             Primary->CompoundControl->GetHardpointXform(kThornTargetPart, Event->EndEffector,
-                                                      Event->IkEffectorXform);
+                                                      &Event->IkEffectorXform);
             const FThornCsys* Parent = Event->ParentCsys;
             if (Parent != nullptr)
-                MulXformByInverseCsys(Parent, Event->IkEffectorXform);
+                MulXformByInverseCsys(Parent, &Event->IkEffectorXform);
         }
 
         // Only the local frame is initialized: slot 5 returns the position and
         // neither IK body reads the secondary's orientation.
         InitializeEventFrameWords(Orient);
         std::memset(Pos, 0, sizeof(float) * 3);
-        const float* SecondaryPosition = (*SecondaryEntry)->InnerGetPos();
+        const Vector* SecondaryPosition = (*SecondaryEntry)->InnerGetPos();
         std::memcpy(Pos, SecondaryPosition, sizeof(float) * 3);
 
         if (Event->TargetPart != nullptr && Event->TargetType != 0)
@@ -2183,48 +2205,48 @@ namespace
                 ICompoundControl* Compound = (*SecondaryEntry)->CompoundControl;
                 if (Compound != nullptr)
                 {
-                    float Hardpoint[12];
-                    PackCsysWords(Hardpoint, Orient, Pos);
-                    Compound->GetHardpointXform(Event->TargetType, Event->TargetPart, Hardpoint);
+                    Transform Hardpoint;
+                    PackCsysWords(&Hardpoint, Orient, Pos);
+                    Compound->GetHardpointXform(Event->TargetType, Event->TargetPart, &Hardpoint);
                     const FThornCsys* Parent = Event->ParentCsys;
                     // With no parent the hardpoint result is ignored: the
                     // secondary position and identity frame stay.
                     if (Parent != nullptr)
                     {
-                        MulXformByInverseCsys(Parent, Hardpoint);
-                        std::memcpy(Orient, Hardpoint, sizeof(float) * 9);
-                        std::memcpy(Pos, Hardpoint + 9, sizeof(float) * 3);
+                        MulXformByInverseCsys(Parent, &Hardpoint);
+                        std::memcpy(Orient, &Hardpoint.Rotation, sizeof(float) * 9);
+                        std::memcpy(Pos, &Hardpoint.Translation, sizeof(float) * 3);
                     }
                 }
             }
         }
 
-        float StablePosition[3];
-        std::memcpy(StablePosition, Pos, sizeof(StablePosition));
-        float Direction[3];
-        Direction[0] = Pos[0] - Event->IkEffectorXform[9];
-        Direction[1] = Pos[1] - Event->IkEffectorXform[10];
-        Direction[2] = Pos[2] - Event->IkEffectorXform[11];
-        BuildAxisFrame(Orient, Direction, static_cast<unsigned>(Event->LookAtFrontAxis),
+        Vector StablePosition;
+        std::memcpy(&StablePosition, Pos, sizeof(StablePosition));
+        Vector Direction;
+        Direction.x = Pos->x - Event->IkEffectorXform.Translation.x;
+        Direction.y = Pos->y - Event->IkEffectorXform.Translation.y;
+        Direction.z = Pos->z - Event->IkEffectorXform.Translation.z;
+        BuildAxisFrame(Orient, &Direction, static_cast<unsigned>(Event->LookAtFrontAxis),
                        static_cast<unsigned>(Event->LookAtUpAxis), Event->SceneFrontAxis,
                        Event->SceneUpAxis);
         const FThornCsys* Parent = Event->ParentCsys;
         if (Parent != nullptr)
         {
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
-            float WorldPosition[3];
-            SceneMathTransform(Math, WorldPosition, Parent->Orient, StablePosition);
-            std::memcpy(Pos, WorldPosition, sizeof(WorldPosition));
+            Vector WorldPosition;
+            SceneMathTransform(Math, &WorldPosition, Parent, &StablePosition);
+            std::memcpy(Pos, &WorldPosition, sizeof(WorldPosition));
             // Retail rereads the parent and the math engine after the point transform.
             Parent = Event->ParentCsys;
             Math = AcquireSceneEventMathEngine();
-            float WorldOrientation[9];
-            SceneMathMulMatrix(Math, WorldOrientation, Parent->Orient, Orient);
-            std::memcpy(Orient, WorldOrientation, sizeof(WorldOrientation));
+            Matrix WorldOrientation;
+            SceneMathMulMatrix(Math, &WorldOrientation, &Parent->Rotation, Orient);
+            std::memcpy(Orient, &WorldOrientation, sizeof(WorldOrientation));
         }
     }
 
-    void ApplyGeoPose(FThornEntity* Entity, const float* Pos, const float* Orient)
+    void ApplyGeoPose(FThornEntity* Entity, const Vector* Pos, const Matrix* Orient)
     {
         if (Entity == nullptr)
             return;
@@ -2732,9 +2754,9 @@ void ThornInitLightEntityDefaults(FThornLightProps* Props)
     Props->Color[0] = ReadRetailInt(Retail, 0x44);
     Props->Color[1] = ReadRetailInt(Retail, 0x48);
     Props->Color[2] = ReadRetailInt(Retail, 0x4c);
-    Props->Direction[0] = ReadRetailFloat(Retail, 0x50);
-    Props->Direction[1] = ReadRetailFloat(Retail, 0x54);
-    Props->Direction[2] = ReadRetailFloat(Retail, 0x58);
+    Props->Direction.x = ReadRetailFloat(Retail, 0x50);
+    Props->Direction.y = ReadRetailFloat(Retail, 0x54);
+    Props->Direction.z = ReadRetailFloat(Retail, 0x58);
     Props->RangeTemp = ReadRetailFloat(Retail, 0x5c);
     Props->CutoffTemp = ReadRetailFloat(Retail, 0x60);
     Props->On = ReadRetailInt(Retail, 0x64);
@@ -3088,22 +3110,22 @@ FThornEvent::FThornEvent(int DescriptorStorageType)
     PercentDelta = 1.0f;
     LookAtUpAxis = 1;
     LookAtFrontAxis = 5;
-    std::memset(TargetPos, 0, sizeof(TargetPos));
-    IdentityOrient(TargetOrient);
-    std::memset(CapturePos, 0, sizeof(CapturePos));
-    IdentityOrient(CaptureOrient);
+    std::memset(&TargetPos, 0, sizeof(TargetPos));
+    IdentityOrient(&TargetOrient);
+    std::memset(&CapturePos, 0, sizeof(CapturePos));
+    IdentityOrient(&CaptureOrient);
     IdentityQuat4(TargetQuat);
     IdentityQuat4(CaptureQuat);
     std::memset(CamTarget, 0, sizeof(CamTarget));
     std::memset(CamCapture, 0, sizeof(CamCapture));
     std::memset(&LightTarget, 0, sizeof(LightTarget));
     std::memset(&LightCapture, 0, sizeof(LightCapture));
-    std::memset(PathOffset, 0, sizeof(PathOffset));
+    std::memset(&PathOffset, 0, sizeof(PathOffset));
     std::memset(PointAt, 0, sizeof(PointAt));
-    std::memset(AttachXform, 0, sizeof(AttachXform));
-    AttachXform[0] = 1.0f;
-    AttachXform[4] = 1.0f;
-    AttachXform[8] = 1.0f;
+    std::memset(&AttachXform, 0, sizeof(AttachXform));
+    AttachXform.Rotation.E[0][0] = 1.0f;
+    AttachXform.Rotation.E[1][1] = 1.0f;
+    AttachXform.Rotation.E[2][2] = 1.0f;
     // Retail audio defaults, written into the descriptor packet.
     AudioTarget.Dmin = 50.0f;
     AudioTarget.Dmax = 1000.0f;
@@ -3515,7 +3537,7 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
     TargetPart = nullptr;
     if (ReadEventWord(DescIn, 0) == kThornTypeAttachEntity)
     {
-        std::memcpy(PathOffset, static_cast<const unsigned char*>(DescIn) + 44, sizeof(PathOffset));
+        std::memcpy(&PathOffset, static_cast<const unsigned char*>(DescIn) + 44, sizeof(PathOffset));
         TargetType = ReadEventWord(DescIn, 14);
         LookAtUpAxis = ReadEventWord(DescIn, 15);
         LookAtFrontAxis = ReadEventWord(DescIn, 16);
@@ -3528,7 +3550,7 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
     }
     else
     {
-        std::memset(PathOffset, 0, sizeof(PathOffset));
+        std::memset(&PathOffset, 0, sizeof(PathOffset));
         TargetType = 0;
         LookAtUpAxis = 1;
         LookAtFrontAxis = 5;
@@ -3547,7 +3569,7 @@ void FThornEvent::ApplyPathAnimDesc(const void* DescIn)
         std::memcpy(&StartPercent, static_cast<const unsigned char*>(DescIn) + 44, sizeof(StartPercent));
         std::memcpy(&StopPercent, static_cast<const unsigned char*>(DescIn) + 48, sizeof(StopPercent));
         std::memcpy(&PercentDelta, static_cast<const unsigned char*>(DescIn) + 52, sizeof(PercentDelta));
-        std::memcpy(PathOffset, static_cast<const unsigned char*>(DescIn) + 56, sizeof(PathOffset));
+        std::memcpy(&PathOffset, static_cast<const unsigned char*>(DescIn) + 56, sizeof(PathOffset));
         LookAtUpAxis = ReadEventWord(DescIn, 17);
         LookAtFrontAxis = ReadEventWord(DescIn, 18);
     }
@@ -3556,9 +3578,9 @@ void FThornEvent::ApplyPathAnimDesc(const void* DescIn)
         StartPercent = 0.0f;
         StopPercent = 1.0f;
         PercentDelta = 1.0f;
-        PathOffset[0] = 0.0f;
-        PathOffset[1] = 0.0f;
-        PathOffset[2] = 0.0f;
+        PathOffset.x = 0.0f;
+        PathOffset.y = 0.0f;
+        PathOffset.z = 0.0f;
         LookAtUpAxis = 1;
         LookAtFrontAxis = 5;
     }
@@ -3667,9 +3689,9 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
     const bool bQuaternionOrientation = (Desc.Flags & kThornFlagQuatOrient) != 0;
     // Forward word copy; stays defined if the input aliases this storage.
     for (int Index = 0; Index < 9; ++Index)
-        std::memcpy(TargetOrient + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
+        std::memcpy(&TargetOrient.E[0][0] + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
     for (int Index = 0; Index < 3; ++Index)
-        std::memcpy(TargetPos + Index, static_cast<const unsigned char*>(DescIn) + 84 + Index * 4, 4);
+        std::memcpy(&TargetPos.x + Index, static_cast<const unsigned char*>(DescIn) + 84 + Index * 4, 4);
     if (bQuaternionOrientation)
     {
         for (int Index = 0; Index < 4; ++Index)
@@ -4126,9 +4148,9 @@ void* FThornEvent::GetDesc()
     {
         std::memcpy(&SpatialDesc.Common, &Desc, sizeof(SpatialDesc.Common));
         SpatialDesc.Mask = SpatialMask;
-        std::memcpy(SpatialDesc.Orient, TargetOrient, sizeof(TargetOrient));
-        std::memcpy(SpatialDesc.Position, TargetPos, sizeof(TargetPos));
-        std::memcpy(SpatialDesc.Quaternion, &TargetQuat, sizeof(TargetQuat));
+        std::memcpy(&SpatialDesc.Orient, &TargetOrient, sizeof(TargetOrient));
+        std::memcpy(&SpatialDesc.Position, &TargetPos, sizeof(TargetPos));
+        std::memcpy(&SpatialDesc.Quaternion, &TargetQuat, sizeof(TargetQuat));
         std::memcpy(&SpatialDesc.AxisRotAngle, &AxisRotAngle, sizeof(AxisRotAngle));
         SpatialDesc.AxisRotAxis = AxisRotAxis;
         SpatialDesc.TargetPart = TargetPart;
@@ -4162,7 +4184,7 @@ void* FThornEvent::GetDesc()
 void FThornEvent::PackAttachDesc()
 {
     std::memcpy(&AttachDesc.Common, &Desc, sizeof(AttachDesc.Common));
-    std::memcpy(AttachDesc.Offset, PathOffset, sizeof(AttachDesc.Offset));
+    std::memcpy(&AttachDesc.Offset, &PathOffset, sizeof(AttachDesc.Offset));
     AttachDesc.TargetType = TargetType;
     AttachDesc.UpAxis = LookAtUpAxis;
     AttachDesc.FrontAxis = LookAtFrontAxis;
@@ -4450,11 +4472,11 @@ unsigned char FThornEvent::StartSetCamera(FThornScene* Scene)
 
     // Retail calls the source's live pose getters (vtable +0x14/+0x18), not a
     // cached descriptor copy.
-    float Position[3];
-    float Orient[9];
-    GetLivePose(SourceEnt, Position, Orient);
-    DestEnt->InnerSetPos(Position);
-    DestEnt->InnerSetOrient(Orient);
+    Vector Position;
+    Matrix Orient;
+    GetLivePose(SourceEnt, &Position, &Orient);
+    DestEnt->InnerSetPos(&Position);
+    DestEnt->InnerSetOrient(&Orient);
     return 0;
 }
 
@@ -4476,15 +4498,15 @@ unsigned char FThornEvent::StartSpatialPropAnim(FThornScene* Scene)
     if (PrimaryEntry != nullptr)
     {
         FThornEntity* Primary = *PrimaryEntry;
-        GetRetailRelativePosition(Primary, Primary->Snap.Pos);
-        CopyPoseWordsForward(CapturePos, Primary->Snap.Pos, 3);
+        GetRetailRelativePosition(Primary, &Primary->Snap.Pos);
+        CopyPoseWordsForward(&CapturePos, &Primary->Snap.Pos);
         Primary = *PrimaryEntry;
-        GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
-        CopyPoseWordsForward(CaptureOrient, Primary->Snap.Orient, 9);
+        GetRetailRelativeOrientation(Primary, &Primary->Snap.Orient);
+        CopyPoseWordsForward(&CaptureOrient, &Primary->Snap.Orient);
         Primary = *PrimaryEntry;
-        GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
+        GetRetailRelativeOrientation(Primary, &Primary->Snap.Orient);
         // The third getter's result pointer is kept across the engine acquire.
-        const float* QuaternionMatrix = Primary->Snap.Orient;
+        const Matrix* QuaternionMatrix = &Primary->Snap.Orient;
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         SpatialMatrixToQuaternion(Math, CaptureQuat, QuaternionMatrix);
     }
@@ -4495,8 +4517,8 @@ unsigned char FThornEvent::StartSpatialPropAnim(FThornScene* Scene)
         if (SecondaryEntry != nullptr)
         {
             FThornEntity* Secondary = *SecondaryEntry;
-            GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-            CopyPoseWordsForward(TargetPos, Secondary->Snap.Pos, 3);
+            GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+            CopyPoseWordsForward(&TargetPos, &Secondary->Snap.Pos);
         }
     }
     SpatialWrapLast = 0.0f;
@@ -4515,15 +4537,17 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     if (SecondaryEntry == nullptr)
         return 1;
 
-    float Child[12];
-    IdentityOrient(Child);
-    Child[9] = Child[10] = Child[11] = 0.0f;
+    Transform Child;
+    IdentityOrient(&Child.Rotation);
+    Child.Translation.z = 0.0f;
+    Child.Translation.y = 0.0f;
+    Child.Translation.x = 0.0f;
     FThornEntity* Secondary = *SecondaryEntry;
-    GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-    CopyPoseWordsForward(Child + 9, Secondary->Snap.Pos, 3);
+    GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+    CopyPoseWordsForward(&Child.Translation, &Secondary->Snap.Pos);
     Secondary = *SecondaryEntry;
-    GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
-    CopyPoseWordsForward(Child, Secondary->Snap.Orient, 9);
+    GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
+    CopyPoseWordsForward(&Child.Rotation, &Secondary->Snap.Orient);
     if (TargetPart != nullptr && TargetType != 0)
     {
         const int SecondaryType = (*SecondaryEntry)->Snap.Type;
@@ -4532,37 +4556,39 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
             ICompoundControl* Compound = (*SecondaryEntry)->CompoundControl;
             if (Compound != nullptr)
             {
-                Compound->GetHardpointXform(TargetType, TargetPart, Child);
+                Compound->GetHardpointXform(TargetType, TargetPart, &Child);
                 const FThornCsys* Parent = ParentCsys;
                 if (Parent != nullptr)
-                    MulXformByInverseCsys(Parent, Child);
+                    MulXformByInverseCsys(Parent, &Child);
             }
         }
     }
 
-    float PrimaryXform[12];
-    IdentityOrient(PrimaryXform);
-    PrimaryXform[9] = PrimaryXform[10] = PrimaryXform[11] = 0.0f;
+    Transform PrimaryXform;
+    IdentityOrient(&PrimaryXform.Rotation);
+    PrimaryXform.Translation.z = 0.0f;
+    PrimaryXform.Translation.y = 0.0f;
+    PrimaryXform.Translation.x = 0.0f;
     FThornEntity* Primary = *PrimaryEntry;
-    GetRetailRelativePosition(Primary, Primary->Snap.Pos);
-    CopyPoseWordsForward(PrimaryXform + 9, Primary->Snap.Pos, 3);
+    GetRetailRelativePosition(Primary, &Primary->Snap.Pos);
+    CopyPoseWordsForward(&PrimaryXform.Translation, &Primary->Snap.Pos);
     Primary = *PrimaryEntry;
-    GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
-    CopyPoseWordsForward(PrimaryXform, Primary->Snap.Orient, 9);
+    GetRetailRelativeOrientation(Primary, &Primary->Snap.Orient);
+    CopyPoseWordsForward(&PrimaryXform.Rotation, &Primary->Snap.Orient);
 
     // The child is read only after the math engine is acquired.
-    float TransformedPosition[3];
+    Vector TransformedPosition;
     I3DMathEngine* Math = AcquireSceneEventMathEngine();
     Matrix ChildOrientation;
     Vector ChildPosition;
     Vector ChildInversePosition;
-    std::memcpy(&ChildOrientation, Child, sizeof(ChildOrientation));
-    std::memcpy(&ChildPosition, Child + 9, sizeof(ChildPosition));
+    std::memcpy(&ChildOrientation, &Child.Rotation, sizeof(ChildOrientation));
+    std::memcpy(&ChildPosition, &Child.Translation, sizeof(ChildPosition));
     Math->TransposeTransform(ChildInversePosition, ChildOrientation, ChildPosition);
-    std::memcpy(TransformedPosition, &ChildInversePosition, sizeof(TransformedPosition));
-    float NegativePosition[3];
-    const float* PositionSource = TransformedPosition;
-    float* PositionResult = NegativePosition;
+    std::memcpy(&TransformedPosition, &ChildInversePosition, sizeof(TransformedPosition));
+    Vector NegativePosition;
+    const Vector* PositionSource = &TransformedPosition;
+    Vector* PositionResult = &NegativePosition;
     // Each Z/Y/X word is stored right after its FCHS.
     __asm {
         mov ecx, PositionSource
@@ -4579,21 +4605,21 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     }
     // Raw DWORD transpose (via FUN_06f428b0); unlike FUN_06f3b670 there is no
     // x87 load/store of the matrix words.
-    float InverseChild[12];
+    Transform InverseChild;
     for (int Row = 0; Row < 3; ++Row)
     {
         for (int Column = 0; Column < 3; ++Column)
         {
             unsigned int Word;
-            std::memcpy(&Word, Child + Row + Column * 3, sizeof(Word));
-            std::memcpy(InverseChild + Row * 3 + Column, &Word, sizeof(Word));
+            std::memcpy(&Word, &Child.Rotation.E[Column][Row], sizeof(Word));
+            std::memcpy(&InverseChild.Rotation.E[Row][Column], &Word, sizeof(Word));
         }
     }
-    PackCsysWords(InverseChild, InverseChild, NegativePosition);
-    float Result[12];
+    PackCsysWords(&InverseChild, &InverseChild, &NegativePosition);
+    Transform Result;
     Math = AcquireSceneEventMathEngine();
-    SceneMathMulTransform(Math, Result, InverseChild, PrimaryXform);
-    std::memcpy(AttachXform, Result, sizeof(Result));
+    SceneMathMulTransform(Math, &Result, &InverseChild, &PrimaryXform);
+    std::memcpy(&AttachXform, &Result, sizeof(Result));
     return 1;
 }
 
@@ -4847,8 +4873,8 @@ unsigned char FThornEvent::StartFloorHeightAnim(FThornScene* Scene)
         FThornEntity* Secondary = Scene->EntityAt(SecondaryIndex);
         if (Secondary != nullptr)
         {
-            GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-            std::memcpy(&FloorTarget, Secondary->Snap.Pos + 1, sizeof(FloorTarget));
+            GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+            std::memcpy(&FloorTarget, &Secondary->Snap.Pos.y, sizeof(FloorTarget));
         }
     }
     const unsigned int Zero = 0;
@@ -4868,11 +4894,11 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
         FThornEntity** SecondaryEntry = Scene->FindEntityEntry(SecondaryIndex);
         if (SecondaryEntry == nullptr || Primary->IkControl == nullptr)
             return 0;
-        float Pos[3];
-        float Orient[9];
-        BuildIkPose(this, Primary, SecondaryEntry, Pos, Orient);
+        Vector Pos;
+        Matrix Orient;
+        BuildIkPose(this, Primary, SecondaryEntry, &Pos, &Orient);
         PackIkDesc();
-        return HrToAl(Primary->IkControl->StartIk(&IkDesc.Common, Pos, Orient));
+        return HrToAl(Primary->IkControl->StartIk(&IkDesc.Common, &Pos, &Orient));
     }
     if (NativeEventType == kThornTypeStartSubScene)
     {
@@ -5002,11 +5028,11 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
         ApplyEndTime(this);
         if (Primary == nullptr || Secondary == nullptr || Primary->IkControl == nullptr)
             return 0;
-        float Pos[3];
-        float Orient[9];
-        BuildIkPose(this, Primary, &Secondary, Pos, Orient);
+        Vector Pos;
+        Matrix Orient;
+        BuildIkPose(this, Primary, &Secondary, &Pos, &Orient);
         // Event +0x28: the descriptor, IK fields included.
-        return HrToAl(Primary->IkControl->StartIk(GetDesc(), Pos, Orient));
+        return HrToAl(Primary->IkControl->StartIk(GetDesc(), &Pos, &Orient));
     }
 
     if (Type == kThornTypeStartPsys)
@@ -5282,12 +5308,12 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
                     // The control is reread before each call.
                     Secondary->D3dLightControl->GetLight(&Live.Type);
                     Secondary->D3dLightControl->GetOn(&Live.On);
-                    Secondary->D3dLightControl->GetDirection(Live.Direction);
+                    Secondary->D3dLightControl->GetDirection(&Live.Direction);
                 }
                 else if (Secondary->LightControl != nullptr)
                 {
                     Secondary->LightControl->GetColor(reinterpret_cast<float*>(Live.Color));
-                    Secondary->LightControl->GetDirection(Live.Direction);
+                    Secondary->LightControl->GetDirection(&Live.Direction);
                     Secondary->LightControl->GetRange(&Live.RangeTemp);
                     Secondary->LightControl->GetCutoff(&Live.CutoffTemp);
                     Secondary->LightControl->GetInfinite(&Live.Infinite);
@@ -5357,24 +5383,24 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
     {
         // The position is copied to +0xdc before the orientation getter.
         FThornEntity* Primary = *PrimaryEntry;
-        GetRetailRelativePosition(Primary, Primary->Snap.Pos);
-        std::memcpy(CapturePos, Primary->Snap.Pos, sizeof(CapturePos));
+        GetRetailRelativePosition(Primary, &Primary->Snap.Pos);
+        std::memcpy(&CapturePos, &Primary->Snap.Pos, sizeof(CapturePos));
         Primary = *PrimaryEntry;
-        GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
+        GetRetailRelativeOrientation(Primary, &Primary->Snap.Orient);
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        SpatialMatrixToQuaternion(Math, CaptureQuat, Primary->Snap.Orient);
+        SpatialMatrixToQuaternion(Math, CaptureQuat, &Primary->Snap.Orient);
 
         // The index is reread after the primary math callback.
         FThornEntity** SecondaryEntry = SecondaryIndex != -1 ? Scene->FindEntityEntry(SecondaryIndex) : nullptr;
         if (SecondaryEntry != nullptr)
         {
             FThornEntity* Secondary = *SecondaryEntry;
-            GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-            std::memcpy(TargetPos, Secondary->Snap.Pos, sizeof(TargetPos));
+            GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+            std::memcpy(&TargetPos, &Secondary->Snap.Pos, sizeof(TargetPos));
             Secondary = *SecondaryEntry;
-            GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
+            GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
             Math = AcquireSceneEventMathEngine();
-            SpatialMatrixToQuaternion(Math, TargetQuat, Secondary->Snap.Orient);
+            SpatialMatrixToQuaternion(Math, TargetQuat, &Secondary->Snap.Orient);
             if (TargetPart != nullptr && TargetType != 0)
             {
                 const int SecondaryType = (*SecondaryEntry)->Snap.Type;
@@ -5386,19 +5412,19 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
                     ICompoundControl* Compound = (*SecondaryEntry)->CompoundControl;
                     if (Compound != nullptr)
                     {
-                        float HpXform[12];
-                        InitializeEventFrameWords(HpXform);
-                        std::memset(HpXform + 9, 0, sizeof(float) * 3);
-                        Compound->GetHardpointXform(TargetType, PartName, HpXform);
+                        Transform HpXform;
+                        InitializeEventFrameWords(&HpXform.Rotation);
+                        std::memset(&HpXform.Translation, 0, sizeof(float) * 3);
+                        Compound->GetHardpointXform(TargetType, PartName, &HpXform);
                         const FThornCsys* Parent = ParentCsys;
                         if (Parent != nullptr)
-                            MulXformByInverseCsys(Parent, HpXform);
+                            MulXformByInverseCsys(Parent, &HpXform);
                         // All 12 words are copied and the quaternion rebuilt
                         // even without a parent; the GENRESULT is ignored.
-                        std::memcpy(TargetOrient, HpXform, sizeof(TargetOrient));
-                        std::memcpy(TargetPos, HpXform + 9, sizeof(TargetPos));
+                        std::memcpy(&TargetOrient, &HpXform.Rotation, sizeof(TargetOrient));
+                        std::memcpy(&TargetPos, &HpXform.Translation, sizeof(TargetPos));
                         Math = AcquireSceneEventMathEngine();
-                        SpatialMatrixToQuaternion(Math, TargetQuat, TargetOrient);
+                        SpatialMatrixToQuaternion(Math, TargetQuat, &TargetOrient);
                     }
                 }
             }
@@ -5406,29 +5432,29 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
 
         if ((SpatialMask & kThornSpatialBitPos) != 0)
         {
-            float Pos[3];
-            LerpSpatialPosition(Pos, CapturePos, TargetPos, &Scale);
-            (*PrimaryEntry)->InnerSetPos(Pos);
+            Vector Pos;
+            LerpSpatialPosition(&Pos, &CapturePos, &TargetPos, &Scale);
+            (*PrimaryEntry)->InnerSetPos(&Pos);
         }
 
         // Independent tests: with both bits set the orientation is written,
         // then overwritten by the axis rotation.
         if ((SpatialMask & kThornSpatialBitOrient) != 0)
         {
-            float Quat[4];
-            float Orient[9];
-            SlerpQuat4(Quat, CaptureQuat, TargetQuat, &Scale);
-            Quat4ToMat9(Orient, Quat);
-            (*PrimaryEntry)->InnerSetOrient(Orient);
+            Quaternion Quat;
+            Matrix Orient;
+            SlerpQuat4(&Quat, CaptureQuat, TargetQuat, &Scale);
+            Quat4ToMat9(&Orient, &Quat);
+            (*PrimaryEntry)->InnerSetOrient(&Orient);
         }
         if ((SpatialMask & kThornSpatialBitAxisRot) != 0)
         {
-            float Orient[9];
+            Matrix Orient;
             const int AxisId = AxisRotAxis;
             float DeltaDeg;
             AccumulateAxisDelta(&U, &AxisRotAngle, &AxisRotApplied, &DeltaDeg);
-            ApplyAxisRotFpu(Orient, CaptureQuat, AxisId, &DeltaDeg);
-            (*PrimaryEntry)->InnerSetOrient(Orient);
+            ApplyAxisRotFpu(&Orient, CaptureQuat, AxisId, &DeltaDeg);
+            (*PrimaryEntry)->InnerSetOrient(&Orient);
         }
     }
     return RetailStillRunningPredicate(TimeMs, EndTimeMs);
@@ -5444,15 +5470,17 @@ unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
     if (SecondaryEntry == nullptr)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
 
-    float Child[12];
-    IdentityOrient(Child);
-    Child[9] = Child[10] = Child[11] = 0.0f;
+    Transform Child;
+    IdentityOrient(&Child.Rotation);
+    Child.Translation.z = 0.0f;
+    Child.Translation.y = 0.0f;
+    Child.Translation.x = 0.0f;
     FThornEntity* Secondary = *SecondaryEntry;
-    GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-    Copy3(Child + 9, Secondary->Snap.Pos);
+    GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+    Copy3(&Child.Translation, &Secondary->Snap.Pos);
     Secondary = *SecondaryEntry;
-    GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
-    Copy9(Child, Secondary->Snap.Orient);
+    GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
+    Copy9(&Child.Rotation, &Secondary->Snap.Orient);
     if (TargetPart != nullptr && TargetType != 0)
     {
         const int SecondaryType = (*SecondaryEntry)->Snap.Type;
@@ -5462,71 +5490,71 @@ unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
             if (Compound != nullptr)
             {
                 // Unlike SPATIAL there is no second part-name null test.
-                Compound->GetHardpointXform(TargetType, TargetPart, Child);
+                Compound->GetHardpointXform(TargetType, TargetPart, &Child);
                 const FThornCsys* Parent = ParentCsys;
                 if (Parent != nullptr)
-                    MulXformByInverseCsys(Parent, Child);
+                    MulXformByInverseCsys(Parent, &Child);
             }
         }
     }
     if ((Desc.Flags & kThornFlagParentChild) != 0)
     {
-        float Result[12];
-        SceneMathMulTransform(AcquireSceneEventMathEngine(), Result, Child, AttachXform);
+        Transform Result;
+        SceneMathMulTransform(AcquireSceneEventMathEngine(), &Result, &Child, &AttachXform);
         if ((Desc.Flags & kThornFlagPosition) != 0)
-            (*PrimaryEntry)->InnerSetPos(Result + 9);
+            (*PrimaryEntry)->InnerSetPos(&Result.Translation);
         if ((Desc.Flags & kThornFlagOrientation) != 0)
-            (*PrimaryEntry)->InnerSetOrient(Result);
+            (*PrimaryEntry)->InnerSetOrient(&Result.Rotation);
     }
     else
     {
         if ((Desc.Flags & kThornFlagPosition) != 0)
         {
-            float Offset[3];
-            Copy3(Offset, PathOffset);
+            Vector Offset;
+            Copy3(&Offset, &PathOffset);
             if ((Desc.Flags & kThornFlagEntityRelative) != 0)
             {
-                float Rotated[3];
-                SceneMathRotate(AcquireSceneEventMathEngine(), Rotated, Child, Offset);
-                Copy3(Offset, Rotated);
+                Vector Rotated;
+                SceneMathRotate(AcquireSceneEventMathEngine(), &Rotated, &Child, &Offset);
+                Copy3(&Offset, &Rotated);
             }
-            float Position[3];
-            AddAttachOffset(Position, Child + 9, Offset, true);
-            (*PrimaryEntry)->InnerSetPos(Position);
+            Vector Position;
+            AddAttachOffset(&Position, &Child.Translation, &Offset, true);
+            (*PrimaryEntry)->InnerSetPos(&Position);
         }
         if ((Desc.Flags & kThornFlagOrientation) != 0)
         {
             if ((Desc.Flags & kThornFlagOrientRelative) != 0)
             {
-                float Result[12];
-                SceneMathMulTransform(AcquireSceneEventMathEngine(), Result, Child, AttachXform);
-                (*PrimaryEntry)->InnerSetOrient(Result);
+                Transform Result;
+                SceneMathMulTransform(AcquireSceneEventMathEngine(), &Result, &Child, &AttachXform);
+                (*PrimaryEntry)->InnerSetOrient(&Result.Rotation);
             }
             else
-                (*PrimaryEntry)->InnerSetOrient(Child);
+                (*PrimaryEntry)->InnerSetOrient(&Child.Rotation);
         }
         else if ((Desc.Flags & kThornFlagLookAt) != 0)
         {
-            float Offset[3];
-            Copy3(Offset, PathOffset);
+            Vector Offset;
+            Copy3(&Offset, &PathOffset);
             if ((Desc.Flags & kThornFlagEntityRelative) != 0)
             {
-                float Rotated[3];
-                SceneMathRotate(AcquireSceneEventMathEngine(), Rotated, Child, Offset);
-                Copy3(Offset, Rotated);
+                Vector Rotated;
+                SceneMathRotate(AcquireSceneEventMathEngine(), &Rotated, &Child, &Offset);
+                Copy3(&Offset, &Rotated);
             }
-            float Target[3];
-            AddAttachOffset(Target, Child + 9, Offset, false);
+            Vector Target;
+            AddAttachOffset(&Target, &Child.Translation, &Offset, false);
             // The entity's relative position getter, parent inverse included.
             FThornEntity* Primary = *PrimaryEntry;
-            GetRetailRelativePosition(Primary, Primary->Snap.Pos);
-            float Direction[3];
-            if (BuildAttachLookDirection(Direction, Target, Primary->Snap.Pos))
+            GetRetailRelativePosition(Primary, &Primary->Snap.Pos);
+            Vector Direction;
+            if (BuildAttachLookDirection(&Direction, &Target, &Primary->Snap.Pos))
             {
-                float Orientation[9];
-                BuildAxisFrame(Orientation, Direction, static_cast<unsigned>(LookAtFrontAxis),
+                Matrix Orientation;
+                BuildAxisFrame(&Orientation, &Direction, static_cast<unsigned>(LookAtFrontAxis),
                                static_cast<unsigned>(LookAtUpAxis), SceneFrontAxis, SceneUpAxis);
-                (*PrimaryEntry)->InnerSetOrient(Orientation);
+                (*PrimaryEntry)->InnerSetOrient(&Orientation);
             }
         }
     }
@@ -5549,80 +5577,80 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
 
     // PATH's progress slot is FUN_06f454f0; its extended result is stored once.
     const float Percent = EvaluateControlBackedCurve(PercentDelta, TimeMs);
-    float Position[3];
-    float Orientation[9];
+    Vector Position;
+    Matrix Orientation;
     FThornEntity* Primary = *PrimaryEntry;
-    GetRetailRelativePosition(Primary, Primary->Snap.Pos);
-    Copy3(Position, Primary->Snap.Pos);
+    GetRetailRelativePosition(Primary, &Primary->Snap.Pos);
+    Copy3(&Position, &Primary->Snap.Pos);
     Primary = *PrimaryEntry;
-    GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
-    Copy9(Orientation, Primary->Snap.Orient);
+    GetRetailRelativeOrientation(Primary, &Primary->Snap.Orient);
+    Copy9(&Orientation, &Primary->Snap.Orient);
 
-    float PathVector[3];
+    Vector PathVector;
     if ((Desc.Flags & kThornFlagPosition) != 0 &&
-        Secondary->MotionPath->GetPositionAt(Percent, (Vector*)PathVector) == GR_OK)
+        Secondary->MotionPath->GetPositionAt(Percent, &PathVector) == GR_OK)
     {
-        float PathXform[12];
-        IdentityOrient(PathXform);
-        PathXform[9] = 0.0f;
-        PathXform[10] = 0.0f;
-        PathXform[11] = 0.0f;
-        GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
-        Copy9(PathXform, Secondary->Snap.Orient);
-        GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-        Copy3(PathXform + 9, Secondary->Snap.Pos);
-        float OffsetPosition[3];
+        Transform PathXform;
+        IdentityOrient(&PathXform.Rotation);
+        PathXform.Translation.x = 0.0f;
+        PathXform.Translation.y = 0.0f;
+        PathXform.Translation.z = 0.0f;
+        GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
+        Copy9(&PathXform.Rotation, &Secondary->Snap.Orient);
+        GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+        Copy3(&PathXform.Translation, &Secondary->Snap.Pos);
+        Vector OffsetPosition;
         // Offsets are read after both getters; Z/Y/X stores.
-        AddAttachOffset(OffsetPosition, PathVector, PathOffset, true);
-        float WorldPosition[3];
+        AddAttachOffset(&OffsetPosition, &PathVector, &PathOffset, true);
+        Vector WorldPosition;
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        SceneMathTransform(Math, WorldPosition, PathXform, OffsetPosition);
-        Copy3(Position, WorldPosition);
+        SceneMathTransform(Math, &WorldPosition, &PathXform, &OffsetPosition);
+        Copy3(&Position, &WorldPosition);
     }
     if ((Desc.Flags & kThornFlagOrientation) != 0)
     {
         if ((Desc.Flags & kThornFlagLookAt) != 0)
         {
-            if (Secondary->MotionPath->GetTangentAt(Percent, (Vector*)PathVector) == GR_OK)
+            if (Secondary->MotionPath->GetTangentAt(Percent, &PathVector) == GR_OK)
             {
-                float PathXform[12];
-                IdentityOrient(PathXform);
-                PathXform[9] = 0.0f;
-                PathXform[10] = 0.0f;
-                PathXform[11] = 0.0f;
-                GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
-                Copy9(PathXform, Secondary->Snap.Orient);
-                float Rotated[3];
+                Transform PathXform;
+                IdentityOrient(&PathXform.Rotation);
+                PathXform.Translation.x = 0.0f;
+                PathXform.Translation.y = 0.0f;
+                PathXform.Translation.z = 0.0f;
+                GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
+                Copy9(&PathXform.Rotation, &Secondary->Snap.Orient);
+                Vector Rotated;
                 I3DMathEngine* Math = AcquireSceneEventMathEngine();
-                SceneMathRotate(Math, Rotated, PathXform, PathVector);
-                Copy3(PathVector, Rotated);
-                BuildAxisFrame(Orientation, PathVector,
+                SceneMathRotate(Math, &Rotated, &PathXform, &PathVector);
+                Copy3(&PathVector, &Rotated);
+                BuildAxisFrame(&Orientation, &PathVector,
                                static_cast<unsigned>(LookAtFrontAxis),
                                static_cast<unsigned>(LookAtUpAxis), SceneFrontAxis, SceneUpAxis);
             }
         }
         else
         {
-            float QuaternionWords[4];
-            if (Secondary->MotionPath->GetOrientationAt(Percent, (Quaternion*)QuaternionWords) == GR_OK)
+            Quaternion QuaternionWords;
+            if (Secondary->MotionPath->GetOrientationAt(Percent, &QuaternionWords) == GR_OK)
             {
                 Quaternion Quat;
-                std::memcpy(&Quat, QuaternionWords, sizeof(Quat));
+                std::memcpy(&Quat, &QuaternionWords, sizeof(Quat));
                 Matrix PathMatrix;
                 I3DMathEngine* Math = AcquireSceneEventMathEngine();
                 Math->QuaternionToMatrix(PathMatrix, Quat);
-                GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
+                GetRetailRelativeOrientation(Secondary, &Secondary->Snap.Orient);
                 // The getter's result pointer is kept across the next acquire.
-                const float* SecondaryMatrix = Secondary->Snap.Orient;
+                const Matrix* SecondaryMatrix = &Secondary->Snap.Orient;
                 Math = AcquireSceneEventMathEngine();
-                float Combined[9];
-                SceneMathMulMatrix(Math, Combined, SecondaryMatrix, &PathMatrix.E[0][0]);
-                Copy9(Orientation, Combined);
+                Matrix Combined;
+                SceneMathMulMatrix(Math, &Combined, SecondaryMatrix, &PathMatrix);
+                Copy9(&Orientation, &Combined);
             }
         }
     }
-    (*PrimaryEntry)->InnerSetOrient(Orientation);
-    (*PrimaryEntry)->InnerSetPos(Position);
+    (*PrimaryEntry)->InnerSetOrient(&Orientation);
+    (*PrimaryEntry)->InnerSetPos(&Position);
     return RetailStillRunningPredicate(TimeMs, EndTimeMs);
 }
 
@@ -5648,8 +5676,8 @@ unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
             if (SecondaryEntry != nullptr)
             {
                 FThornEntity* Secondary = *SecondaryEntry;
-                GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
-                std::memcpy(&FloorTarget, Secondary->Snap.Pos + 1, sizeof(FloorTarget));
+                GetRetailRelativePosition(Secondary, &Secondary->Snap.Pos);
+                std::memcpy(&FloorTarget, &Secondary->Snap.Pos.y, sizeof(FloorTarget));
                 if (TargetPart != nullptr && TargetType != 0)
                 {
                     const int SecondaryType = (*SecondaryEntry)->Snap.Type;
@@ -5659,15 +5687,15 @@ unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
                         ICompoundControl* HardpointControl = (*SecondaryEntry)->CompoundControl;
                         if (HardpointControl != nullptr)
                         {
-                            float Hardpoint[12];
-                            IdentityOrient(Hardpoint);
-                            std::memset(Hardpoint + 9, 0, 3 * sizeof(float));
-                            HardpointControl->GetHardpointXform(TargetType, TargetPart, Hardpoint);
+                            Transform Hardpoint;
+                            IdentityOrient(&Hardpoint.Rotation);
+                            std::memset(&Hardpoint.Translation, 0, 3 * sizeof(float));
+                            HardpointControl->GetHardpointXform(TargetType, TargetPart, &Hardpoint);
                             // One parent read serves both math calls.
                             const FThornCsys* Parent = ParentCsys;
                             if (Parent != nullptr)
-                                TransformFloorHardpoint(Parent, Hardpoint);
-                            std::memcpy(&FloorTarget, Hardpoint + 10, sizeof(FloorTarget));
+                                TransformFloorHardpoint(Parent, &Hardpoint);
+                            std::memcpy(&FloorTarget, &Hardpoint.Translation.y, sizeof(FloorTarget));
                         }
                     }
                 }
@@ -5699,11 +5727,11 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
             FThornEntity** SecondaryEntry = Scene->FindEntityEntry(SecondaryIndex);
             if (SecondaryEntry != nullptr && Primary->IkControl != nullptr)
             {
-                float Pos[3];
-                float Orient[9];
-                BuildIkPose(this, Primary, SecondaryEntry, Pos, Orient);
+                Vector Pos;
+                Matrix Orient;
+                BuildIkPose(this, Primary, SecondaryEntry, &Pos, &Orient);
                 PackIkDesc();
-                Primary->IkControl->UpdateIk(&IkDesc.Common, Pos, Orient);
+                Primary->IkControl->UpdateIk(&IkDesc.Common, &Pos, &Orient);
             }
         }
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
@@ -5759,10 +5787,10 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
                  Primary->IkControl != nullptr)
         {
             // LAB_06f444f0: same pose build as Start; IIKControl slot 5.
-            float Pos[3];
-            float Orient[9];
-            BuildIkPose(this, Primary, &Secondary, Pos, Orient);
-            Primary->IkControl->UpdateIk(GetDesc(), Pos, Orient);
+            Vector Pos;
+            Matrix Orient;
+            BuildIkPose(this, Primary, &Secondary, &Pos, &Orient);
+            Primary->IkControl->UpdateIk(GetDesc(), &Pos, &Orient);
         }
         else if (Type == kThornTypeReverbPropAnim && ReverbMask != 0 && Primary != nullptr &&
                  Primary->ReverbControl != nullptr && Primary->Snap.Type == kThornEntityScene)
@@ -5798,16 +5826,16 @@ FThornScene::FThornScene()
       DurationMs_(0), ClockMs_(0), ClockAfterDt_(0), PlaybackState_(0), bLoop_(0),
       LoopCarryMs_(0), SceneUpAxis_(1), SceneFrontAxis_(2)
 {
-    IdentityOrient(SceneForwardCsys_.Orient);
-    SceneForwardCsys_.Pos[0] = 0.0f;
-    SceneForwardCsys_.Pos[1] = 0.0f;
-    SceneForwardCsys_.Pos[2] = 0.0f;
+    IdentityOrient(&SceneForwardCsys_.Rotation);
+    SceneForwardCsys_.Translation.x = 0.0f;
+    SceneForwardCsys_.Translation.y = 0.0f;
+    SceneForwardCsys_.Translation.z = 0.0f;
 }
 
 // Retail sets the scene's axes (+0x98/+0x94) only from a SCENE entity, and
 // binds every entity's output pointers to them after construction. Until a
 // SCENE writes them retail leaves them unwritten; the 1/2 defaults are the port's.
-void FThornScene::BuildInverseCsys(float* Out12) const
+void FThornScene::BuildInverseCsys(Transform* Out12) const
 {
     InvertParentCsys(Out12, &SceneForwardCsys_);
 }
@@ -5984,7 +6012,7 @@ FThornEntity::FThornEntity()
     std::memset(&Snap, 0, sizeof(FThornEntity) - offsetof(FThornEntity, Snap));
     bMotionPathDescriptorOwner = false;
     bMotionPathConstructionComplete = false;
-    IdentityOrient(Snap.Orient);
+    IdentityOrient(&Snap.Orient);
     Snap.Fovh = 60.0f;
     Snap.NearPlane = 0.1f;
     Snap.FarPlane = 100000.0f;
@@ -6001,8 +6029,8 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     // Common construction reads strings before the original descriptor pose.
     AssignEntityName(Desc->Name);
     AssignEntityTemplate(Desc->TemplateName);
-    std::memcpy(LoadPos, Desc->Pos, sizeof(LoadPos));
-    std::memcpy(LoadOrient, Desc->Orient, sizeof(LoadOrient));
+    std::memcpy(&LoadPos, &Desc->Pos, sizeof(LoadPos));
+    std::memcpy(&LoadOrient, &Desc->Orient, sizeof(LoadOrient));
     if (Type == kThornEntityCompound || Type == kThornEntityDeformable)
         Snap.FloorHeight = 0.0f;
     else if (Type == kThornEntityCamera || Type == kThornEntityMonitor)
@@ -6035,42 +6063,42 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     {
         // The typed constructors replay floor and pose after ApplyDesc.
         std::memcpy(&FloorHeight, &Snap.FloorHeight, sizeof(FloorHeight));
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntityCamera || Type == kThornEntityMonitor)
     {
         ApplyCameraProps(this, &Snap.Fovh);
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntityLight)
     {
         ApplyEntityLightRuntimeProps(this, &Snap.Light);
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntityMarker || Type == kThornEntityHardpoint)
     {
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntitySound)
     {
         ApplyAudioProps(this, Snap.Audio);
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntityScene || Type == kThornEntitySubScene)
     {
         ApplySceneBlob(this, Snap.SceneBlob, 0xFF);
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     else if (Type == kThornEntityPsys)
     {
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
     }
     // The MOTION_PATH constructor FUN_06f426f0 follows its ApplyDesc with
     // FUN_06f427d0; the update slot (LAB_06f38bd0) only re-applies the
@@ -6078,8 +6106,8 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     if (Type == kThornEntityMotionPath)
     {
         BindMotionPathFromDescObject();
-        InnerSetPos(LoadPos);
-        InnerSetOrient(LoadOrient);
+        InnerSetPos(&LoadPos);
+        InnerSetOrient(&LoadOrient);
         bMotionPathConstructionComplete = true;
     }
 }
@@ -6223,23 +6251,23 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     // not tested.
     if (ParentCsys != nullptr)
     {
-        float Inv[12];
-        InvertEventParentCsys(Inv, ParentCsys);
+        Transform Inv;
+        InvertEventParentCsys(&Inv, ParentCsys);
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        float LocalPos[3];
-        SceneMathTransform(Math, LocalPos, Inv, Snap.Pos);
-        CopyPoseWordsForward(Snap.Pos, LocalPos, 3);
-        float LocalOrient[9];
-        SceneMathMulMatrix(Math, LocalOrient, Inv, Snap.Orient);
-        CopyPoseWordsForward(Snap.Orient, LocalOrient, 9);
+        Vector LocalPos;
+        SceneMathTransform(Math, &LocalPos, &Inv, &Snap.Pos);
+        CopyPoseWordsForward(&Snap.Pos, &LocalPos);
+        Matrix LocalOrient;
+        SceneMathMulMatrix(Math, &LocalOrient, &Inv.Rotation, &Snap.Orient);
+        CopyPoseWordsForward(&Snap.Orient, &LocalOrient);
     }
 
     // Every per-type ApplyDesc ends with FUN_06f40c40 / FUN_06f40c60: a plain
     // copy of the Snap pose into entity +0x38 / +0x44, no control publish
     // (FUN_06f40900 / FUN_06f40ab0 are called by the constructors only).
     // LoadPos/LoadOrient are what IScriptEngine slots 10/11 report.
-    CopyPoseWordsForward(LoadPos, Snap.Pos, 3);
-    CopyPoseWordsForward(LoadOrient, Snap.Orient, 9);
+    CopyPoseWordsForward(&LoadPos, &Snap.Pos);
+    CopyPoseWordsForward(&LoadOrient, &Snap.Orient);
 
     if (DescriptorOwnerType == kThornEntityPsys &&
         (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityPsys)
@@ -6313,42 +6341,42 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     }
 }
 
-float* FThornEntity::InnerGetPos()
+Vector* FThornEntity::InnerGetPos()
 {
-    GetRetailRelativePosition(this, Snap.Pos);
-    return Snap.Pos;
+    GetRetailRelativePosition(this, &Snap.Pos);
+    return &Snap.Pos;
 }
 
-float* FThornEntity::InnerGetOrient()
+Matrix* FThornEntity::InnerGetOrient()
 {
-    GetRetailRelativeOrientation(this, Snap.Orient);
-    return Snap.Orient;
+    GetRetailRelativeOrientation(this, &Snap.Orient);
+    return &Snap.Orient;
 }
 
-void FThornEntity::InnerSetPos(const float* Pos)
+void FThornEntity::InnerSetPos(const Vector* Pos)
 {
     // FUN_06f40900 / LAB_06f49f00 (vtable +0x0c). CAMERA (FUN_06f41490): after
     // the store, a non-MONITOR fans out to the +0x88 list via child +0x0c.
     for (int Index = 0; Index < 3; ++Index)
     {
         unsigned int Word;
-        std::memcpy(&Word, &Pos[Index], sizeof(Word));
-        std::memcpy(&Snap.Pos[Index], &Word, sizeof(Word));
+        std::memcpy(&Word, &Pos->x + Index, sizeof(Word));
+        std::memcpy(&Snap.Pos.x + Index, &Word, sizeof(Word));
     }
     if (GeoControl != nullptr)
     {
-        float World[3];
-        std::memcpy(World, Pos, sizeof(World));
+        Vector World;
+        std::memcpy(&World, Pos, sizeof(World));
         if (ParentCsys != nullptr)
         {
             const FThornCsys* Parent = ParentCsys;
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
-            float Out[3];
+            Vector Out;
             // The GENRESULT is not tested.
-            SceneMathTransform(Math, Out, Parent->Orient, Pos);
-            std::memcpy(World, Out, sizeof(World));
+            SceneMathTransform(Math, &Out, Parent, Pos);
+            std::memcpy(&World, &Out, sizeof(World));
         }
-        GeoControl->SetPosition((const Vector*)(const_cast<float*>(World)));
+        GeoControl->SetPosition(&World);
     }
     // Only CAMERA/MONITOR entities fan out (FUN_06f41490).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
@@ -6363,7 +6391,7 @@ void FThornEntity::InnerSetPos(const float* Pos)
     }
 }
 
-void FThornEntity::InnerSetOrient(const float* Mat9)
+void FThornEntity::InnerSetOrient(const Matrix* Orient)
 {
     // FUN_06f40ab0 / LAB_06f49f20 (vtable +0x10). CAMERA (FUN_06f414d0): after
     // the store, fans out to the linked list via child +0x10; MONITOR nodes
@@ -6371,23 +6399,23 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
     for (int Index = 0; Index < 9; ++Index)
     {
         unsigned int Word;
-        std::memcpy(&Word, &Mat9[Index], sizeof(Word));
-        std::memcpy(&Snap.Orient[Index], &Word, sizeof(Word));
+        std::memcpy(&Word, &Orient->E[0][0] + Index, sizeof(Word));
+        std::memcpy(&Snap.Orient.E[0][0] + Index, &Word, sizeof(Word));
     }
     if (GeoControl != nullptr)
     {
-        float World[9];
-        std::memcpy(World, Mat9, sizeof(World));
+        Matrix World;
+        std::memcpy(&World, Orient, sizeof(World));
         if (ParentCsys != nullptr)
         {
             const FThornCsys* Parent = ParentCsys;
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
-            float Out9[9];
+            Matrix Out9;
             // The GENRESULT is not tested.
-            SceneMathMulMatrix(Math, Out9, Parent->Orient, Mat9);
-            std::memcpy(World, Out9, sizeof(World));
+            SceneMathMulMatrix(Math, &Out9, &Parent->Rotation, Orient);
+            std::memcpy(&World, &Out9, sizeof(World));
         }
-        GeoControl->SetOrientation((const Matrix*)(const_cast<float*>(World)));
+        GeoControl->SetOrientation(&World);
     }
     // Only CAMERA/MONITOR entities fan out (FUN_06f414d0).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
@@ -6396,7 +6424,7 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
         FThornMonitorLinkNode* Node = MonitorLinks.Sentinel->Next;
         while (Node != MonitorLinks.Sentinel)
         {
-            Node->Entity->InnerSetOrient(Mat9);
+            Node->Entity->InnerSetOrient(Orient);
             Node = Node->Next; // Read after the child callback.
         }
     }
@@ -6624,8 +6652,8 @@ namespace
                               const FThornEntitySnap& Snapshot)
     {
         Destination->Type = Snapshot.Type;
-        std::memcpy(Destination->Orient, Snapshot.Orient, sizeof(Destination->Orient));
-        std::memcpy(Destination->Pos, Snapshot.Pos, sizeof(Destination->Pos));
+        std::memcpy(&Destination->Orient, &Snapshot.Orient, sizeof(Destination->Orient));
+        std::memcpy(&Destination->Pos, &Snapshot.Pos, sizeof(Destination->Pos));
         Destination->LtGrp = Snapshot.LtGrp;
         Destination->SrtGrp = Snapshot.SrtGrp;
         Destination->Flags = Snapshot.Flags;
@@ -6809,7 +6837,7 @@ const char* FThornScene::UserPropKey(int Index, int N) const
     return NthSortedUserPropKey(EntityAt(Index), N);
 }
 
-GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
+GENRESULT FThornScene::GetEntityPos(int Index, Vector* OutVec3)
 {
     if (!EntityExists(Index))
         return GR_GENERIC;
@@ -6817,7 +6845,7 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
     // entity +0x38 (the ApplyDesc-time pose, not the live Snap.Pos) and, with a
     // parent Csys, math +0x28 Transform through it.
     FThornEntity* Entity = EntityAt(Index);
-    CopyPoseWordsForward(OutVec3, Entity->LoadPos, 3);
+    CopyPoseWordsForward(OutVec3, &Entity->LoadPos);
     const FThornCsys* Parent = Entity->ParentCsys;
     if (Parent != nullptr)
     {
@@ -6825,8 +6853,8 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
         Transform ParentInput;
         Vector PositionInput;
         Vector World;
-        std::memcpy(&ParentInput.Rotation, Parent->Orient, sizeof(ParentInput.Rotation));
-        std::memcpy(&ParentInput.Translation, Parent->Pos, sizeof(ParentInput.Translation));
+        std::memcpy(&ParentInput.Rotation, &Parent->Rotation, sizeof(ParentInput.Rotation));
+        std::memcpy(&ParentInput.Translation, &Parent->Translation, sizeof(ParentInput.Translation));
         std::memcpy(&PositionInput, OutVec3, sizeof(PositionInput));
         Math->TransformXform(World, ParentInput, PositionInput);
         // All three result words are loaded before any is stored.
@@ -6837,14 +6865,14 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
     return GR_OK;
 }
 
-GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
+GENRESULT FThornScene::GetEntityOrient(int Index, Matrix* OutMat9)
 {
     if (!EntityExists(Index))
         return GR_GENERIC;
     // LAB_06f38a80: same lookup as slot 10, then 9 dwords from entity +0x44
     // and, with a parent Csys, math +0x20 MulMatrix by its orientation.
     FThornEntity* Entity = EntityAt(Index);
-    CopyPoseWordsForward(OutMat9, Entity->LoadOrient, 9);
+    CopyPoseWordsForward(OutMat9, &Entity->LoadOrient);
     const FThornCsys* Parent = Entity->ParentCsys;
     if (Parent != nullptr)
     {
@@ -6852,12 +6880,12 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
         Matrix ParentOrientation;
         Matrix OrientationInput;
         Matrix World;
-        std::memcpy(&ParentOrientation, Parent->Orient, sizeof(ParentOrientation));
+        std::memcpy(&ParentOrientation, &Parent->Rotation, sizeof(ParentOrientation));
         std::memcpy(&OrientationInput, OutMat9, sizeof(OrientationInput));
         Math->MulMatrix(World, ParentOrientation, OrientationInput);
         float WorldWords[9];
         std::memcpy(WorldWords, &World, sizeof(WorldWords));
-        CopyPoseWordsForward(OutMat9, WorldWords, 9);
+        CopyPoseWordsForward(&OutMat9->E[0][0], WorldWords, 9);
     }
     return GR_OK;
 }
@@ -6981,21 +7009,21 @@ void FThornScene::PushBoundGeoFromScene(const Transform& OldInverse, bool bOrien
         FThornEntity* Entity = Entry->second;
         if (Entity == nullptr || Entity->GeoControl == nullptr)
             continue;
-        float PositionWords[3];
-        float OrientationWords[9];
-        Entity->GeoControl->GetPosition((Vector*)PositionWords);
+        Vector PositionWords;
+        Matrix OrientationWords;
+        Entity->GeoControl->GetPosition(&PositionWords);
         // GeoControl is reloaded without a second null check; orientation is
         // read before any math.
         if (bOrient)
-            Entity->GeoControl->GetOrientation((Matrix*)OrientationWords);
+            Entity->GeoControl->GetOrientation(&OrientationWords);
 
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
         Vector Position;
         Vector PositionResult;
-        std::memcpy(&Position, PositionWords, sizeof(Position));
+        std::memcpy(&Position, &PositionWords, sizeof(Position));
         Math->TransformXform(PositionResult, OldInverse, Position);
-        std::memcpy(PositionWords, &PositionResult, sizeof(PositionWords));
-        Entity->InnerSetPos(PositionWords);
+        std::memcpy(&PositionWords, &PositionResult, sizeof(PositionWords));
+        Entity->InnerSetPos(&PositionWords);
 
         if (bOrient)
         {
@@ -7004,10 +7032,10 @@ void FThornScene::PushBoundGeoFromScene(const Transform& OldInverse, bool bOrien
             Math = AcquireSceneCsysMathEngine();
             Matrix Orientation;
             Matrix OrientationResult;
-            std::memcpy(&Orientation, OrientationWords, sizeof(Orientation));
+            std::memcpy(&Orientation, &OrientationWords, sizeof(Orientation));
             Math->MulMatrix(OrientationResult, OldInverse.Rotation, Orientation);
-            std::memcpy(OrientationWords, &OrientationResult, sizeof(OrientationWords));
-            Entity->InnerSetOrient(OrientationWords);
+            std::memcpy(&OrientationWords, &OrientationResult, sizeof(OrientationWords));
+            Entity->InnerSetOrient(&OrientationWords);
         }
     }
 }
@@ -7947,6 +7975,11 @@ namespace
         return SaveBufAppendText(Buf, Temporary);
     }
 
+    int SaveBufAppendVector(FThornSaveBuf* Buf, const char* Format, const Vector* Values)
+    {
+        return SaveBufAppendVector(Buf, Format, &Values->x);
+    }
+
     // FUN_06f2cec0: reads [1], [2], [0], then sprintf.
     int SaveBufAppendColor(FThornSaveBuf* Buf, const char* Format, const int* Values)
     {
@@ -8252,7 +8285,7 @@ namespace
         if ((Mask & kThornLightBitDirection) != 0)
         {
             SaveLightKey(Buf, Prefix, "direction");
-            SaveBufAppendVector(Buf, "{ %.6f, %.6f, %.6f }, ", Props->Direction);
+            SaveBufAppendVector(Buf, "{ %.6f, %.6f, %.6f }, ", &Props->Direction);
             SaveBufAppendStringValue(Buf, "%s", Suffix);
         }
         if ((Mask & kThornLightBitRange) != 0)
@@ -8344,20 +8377,20 @@ namespace
     }
 
     // FUN_06f2cf60: the matrix is passed in column order 0,3,6,1,4,7,2,5,8.
-    int SaveMatrixValues(FThornSaveBuf* Buf, const char* Format, const float* Matrix)
+    int SaveMatrixValues(FThornSaveBuf* Buf, const char* Format, const Matrix* Orientation)
     {
         char Temporary[512];
         // Read order is retail's: two doubles, then seven float stores before
         // promotion.
-        const double M22 = static_cast<double>(Matrix[8]);
-        const double M12 = static_cast<double>(Matrix[5]);
-        const volatile float M02 = Matrix[2];
-        const volatile float M21 = Matrix[7];
-        const volatile float M11 = Matrix[4];
-        const volatile float M01 = Matrix[1];
-        const volatile float M20 = Matrix[6];
-        const volatile float M10 = Matrix[3];
-        const volatile float M00 = Matrix[0];
+        const double M22 = static_cast<double>(Orientation->E[2][2]);
+        const double M12 = static_cast<double>(Orientation->E[1][2]);
+        const volatile float M02 = Orientation->E[0][2];
+        const volatile float M21 = Orientation->E[2][1];
+        const volatile float M11 = Orientation->E[1][1];
+        const volatile float M01 = Orientation->E[0][1];
+        const volatile float M20 = Orientation->E[2][0];
+        const volatile float M10 = Orientation->E[1][0];
+        const volatile float M00 = Orientation->E[0][0];
         volatile double Arguments[9];
         Arguments[8] = M22;
         Arguments[7] = M12;
@@ -8427,10 +8460,10 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             continue;
         FThornEntitySnap* Entity = EntitySnap(Index);
         // Both are read before any text is written; results ignored.
-        float Pos[3];
-        float Orient[9];
-        GetEntityPos(Index, Pos);
-        GetEntityOrient(Index, Orient);
+        Vector Pos;
+        Matrix Orient;
+        GetEntityPos(Index, &Pos);
+        GetEntityOrient(Index, &Orient);
         if (Entity == nullptr)
             continue;
         const int RegisteredType = Entity->Type; // Read before any text is written.
@@ -8506,10 +8539,10 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         if (SpatialInSave(Entity->Type))
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tspatialprops =\r\n\t\t{\r\n");
-            SaveBufAppendVector(&Buf, "\t\t\tpos = { %.6f, %.6f, %.6f },\r\n", Pos);
+            SaveBufAppendVector(&Buf, "\t\t\tpos = { %.6f, %.6f, %.6f },\r\n", &Pos);
             SaveMatrixValues(&Buf,
                              "\t\t\torient = { { %.6f, %.6f, %.6f },{ %.6f, %.6f, %.6f },"
-                             "{ %.6f, %.6f, %.6f } }\r\n", Orient);
+                             "{ %.6f, %.6f, %.6f } }\r\n", &Orient);
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
 
@@ -8718,7 +8751,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                 static_cast<const void*>(Descriptor));
             SaveBufAppendRawFloat(&Buf, ", start_percent = %.6f", &Packet->StartPercent);
             SaveBufAppendRawFloat(&Buf, ", stop_percent = %.6f", &Packet->StopPercent);
-            SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", Packet->Offset);
+            SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", &Packet->Offset);
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->LookAtUpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->LookAtFrontAxis]);
             SavePathAttachFlags(&Buf, Descriptor, false);
@@ -8740,10 +8773,10 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             if (bWrotePosition)
             {
                 // Copied before the key is written.
-                float Position[3];
-                std::memcpy(Position, Packet->Position, sizeof(Position));
+                Vector Position;
+                std::memcpy(&Position, &Packet->Position, sizeof(Position));
                 SaveBufAppendStringValue(&Buf, "%s = ", "pos");
-                SaveBufAppendVector(&Buf, "{ %.6f, %.6f, %.6f }", Position);
+                SaveBufAppendVector(&Buf, "{ %.6f, %.6f, %.6f }", &Position);
             }
             if ((Packet->Mask & kThornSpatialBitOrient) != 0)
             {
@@ -8757,20 +8790,20 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                         G_SpatialWriterMathEngine = ThornAcquire3DMathEngine();
                     Quaternion Quat;
                     // Raw W/X/Y/Z, read after the lazy acquire.
-                    std::memcpy(&Quat, Packet->Quaternion, sizeof(Quat));
+                    std::memcpy(&Quat, &Packet->Quaternion, sizeof(Quat));
                     Matrix Orientation;
                     G_SpatialWriterMathEngine->QuaternionToMatrix(Orientation, Quat);
-                    float Matrix[9];
-                    std::memcpy(Matrix, Orientation.E, sizeof(Matrix));
-                    SaveMatrixValues(&Buf, "q_orient = { %.6f, %.6f, %.6f, %.6f }", Matrix);
+                    Matrix PrintedOrientation;
+                    std::memcpy(&PrintedOrientation, Orientation.E, sizeof(PrintedOrientation));
+                    SaveMatrixValues(&Buf, "q_orient = { %.6f, %.6f, %.6f, %.6f }", &PrintedOrientation);
                 }
                 else
                 {
-                    float Matrix[9];
-                    std::memcpy(Matrix, Packet->Orient, sizeof(Matrix));
+                    Matrix PrintedOrientation;
+                    std::memcpy(&PrintedOrientation, &Packet->Orient, sizeof(PrintedOrientation));
                     SaveMatrixValues(&Buf,
                                      "orient = { { %.6f, %.6f, %.6f },{ %.6f, %.6f, %.6f },"
-                                     "{ %.6f, %.6f, %.6f } }", Matrix);
+                                     "{ %.6f, %.6f, %.6f } }", &PrintedOrientation);
                 }
             }
             if ((Packet->Mask & kThornSpatialBitAxisRot) != 0)
@@ -8790,7 +8823,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         else if (EvType == kThornTypeAttachEntity)
         {
             const FThornAttachEventDesc* Packet = reinterpret_cast<const FThornAttachEventDesc*>(Descriptor);
-            SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", Packet->Offset);
+            SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", &Packet->Offset);
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->UpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->FrontAxis]);
             if (Packet->TargetPart != nullptr)

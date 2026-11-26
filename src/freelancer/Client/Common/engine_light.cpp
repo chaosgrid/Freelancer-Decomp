@@ -14,6 +14,7 @@
 #include "dacom.h"
 #include "Core/globals.h"
 #include "GameFlow/room_camera.h" // LightsCameraMath (DAT_006799bc)
+#include "thorn_iface.h"          // FThornLightProps
 #include "x86math.h"
 
 #include <stddef.h>
@@ -98,7 +99,7 @@ namespace
         return G_SoftLightMath;
     }
 
-    void SoftCameraRewriteLight(FEngineLight* Light, ICamera* Camera, float const* DirWorld)
+    void SoftCameraRewriteLight(FEngineLight* Light, ICamera* Camera, Vector const* DirWorld)
     {
         // FUN_004104e0's soft arm (DAT_00610588 != 0). Nothing is tested but the type; each arm
         // fetches the view transform and then DAT_006164ec.
@@ -110,10 +111,10 @@ namespace
             I3DMathEngine* const Math = AcquireSoftLightMath();
             Vector CamSpace;
             Math->TransformXform(CamSpace, *View,
-                                 *reinterpret_cast<Vector const*>(Light->Position));
-            Light->D3d.Position[0] = CamSpace.x;
-            Light->D3d.Position[1] = CamSpace.y;
-            Light->D3d.Position[2] = -CamSpace.z;
+                                 Light->Position);
+            Light->D3d.Position.x = CamSpace.x;
+            Light->D3d.Position.y = CamSpace.y;
+            Light->D3d.Position.z = -CamSpace.z;
         }
 
         // Not a point light -> the D3D direction is the world direction rotated into camera
@@ -194,18 +195,18 @@ FEngineLight::FEngineLight(int LightType)
 {
     // FUN_00410ca0 (thiscall, RET 4). No null test, and only the fields below are written:
     // +0x04 / +0x08 (the list links) are left as they are. Stores in retail order.
-    this->Orient[7] = 0.f;
-    this->Orient[6] = 0.f;
-    this->Orient[5] = 0.f;
-    this->Orient[3] = 0.f;
-    this->Orient[2] = 0.f;
-    this->Orient[1] = 0.f;
-    this->Orient[8] = 1.f;
-    this->Orient[4] = 1.f;
-    this->Orient[0] = 1.f;
-    this->Position[2] = 0.f;
-    this->Position[1] = 0.f;
-    this->Position[0] = 0.f;
+    this->Orient.E[2][1] = 0.f;
+    this->Orient.E[2][0] = 0.f;
+    this->Orient.E[1][2] = 0.f;
+    this->Orient.E[1][0] = 0.f;
+    this->Orient.E[0][2] = 0.f;
+    this->Orient.E[0][1] = 0.f;
+    this->Orient.E[2][2] = 1.f;
+    this->Orient.E[1][1] = 1.f;
+    this->Orient.E[0][0] = 1.f;
+    this->Position.z = 0.f;
+    this->Position.y = 0.f;
+    this->Position.x = 0.f;
     this->Flags = 0;
     this->PadB5[0] = 0;
     this->PadB5[1] = 0;
@@ -278,19 +279,19 @@ void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source)
     PushLightUpdate(Light);
 }
 
-void EngineLightSetPosition(FEngineLight* Light, float const* Pos3)
+void EngineLightSetPosition(FEngineLight* Light, Vector const* Pos3)
 {
     // FUN_00410ef0 (thiscall, RET 4). No null tests.
-    Light->Position[0] = Pos3[0];
-    Light->Position[1] = Pos3[1];
-    Light->Position[2] = Pos3[2];
+    Light->Position.x = Pos3->x;
+    Light->Position.y = Pos3->y;
+    Light->Position.z = Pos3->z;
 
     // A directional light has no position; everything else gets it with Z negated.
     if (Light->Type != kLightDirectional)
     {
-        Light->D3d.Position[0] = Light->Position[0];
-        Light->D3d.Position[1] = Light->Position[1];
-        Light->D3d.Position[2] = -Light->Position[2];
+        Light->D3d.Position.x = Light->Position.x;
+        Light->D3d.Position.y = Light->Position.y;
+        Light->D3d.Position.z = -Light->Position.z;
     }
 
     PushLightUpdate(Light);
@@ -300,15 +301,15 @@ void EngineLightSetOrientation(FEngineLight* Light, float const* Orient9)
 {
     // FUN_00410f60 (thiscall, RET 4): anything but a point light also gets the D3D direction
     // from FUN_00411370, z negated. No null tests.
-    memcpy(Light->Orient, Orient9, sizeof(float) * 9);
+    memcpy(&Light->Orient, Orient9, sizeof(float) * 9);
 
     if (Light->Type != kLightPoint)
     {
-        float Dir[3];
-        EngineLightComputeDirection(Light, Dir, nullptr, nullptr);
-        Light->D3d.Direction[0] = Dir[0];
-        Light->D3d.Direction[1] = Dir[1];
-        Light->D3d.Direction[2] = -Dir[2];
+        Vector Dir;
+        EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
+        Light->D3d.Direction[0] = Dir.x;
+        Light->D3d.Direction[1] = Dir.y;
+        Light->D3d.Direction[2] = -Dir.z;
     }
 
     PushLightUpdate(Light);
@@ -330,7 +331,7 @@ bool EngineLightRegister(FEngineLight* Light)
 }
 
 FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
-                                float const* Direction3)
+                                Vector const* Direction)
 {
     // The light part of FUN_00556fd0. The ctor always gets -1, never the source type. No test
     // of any argument anywhere below.
@@ -346,14 +347,13 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
     }
 
     EngineLightSetLight(Light, &Local);
-    EngineLightSetPosition(Light, Frame12);
+    EngineLightSetPosition(Light, reinterpret_cast<Vector const*>(Frame12));
 
-    // Direction3 turned by the frame's orientation (Frame12 + 3, the 3x3 after the position),
+    // Direction turned by the frame's orientation (Frame12 + 3, the 3x3 after the position),
     // then LookMatrixYup on that vector.
     I3DMathEngine* const Math = LightsCameraMath();
     Vector Rotated;
-    Math->TransformMatrix(Rotated, *reinterpret_cast<Matrix const*>(Frame12 + 3),
-                          *reinterpret_cast<Vector const*>(Direction3));
+    Math->TransformMatrix(Rotated, *reinterpret_cast<Matrix const*>(Frame12 + 3), *Direction);
     Vector Dir;
     Dir.x = Rotated.x;
     Dir.y = Rotated.y;
@@ -368,14 +368,14 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
 }
 
 // The two address computations FUN_00452fa0 inlines; no test.
-FD3dLight8 const* ThornLightPropsD3d(float const* Props36)
+FD3dLight8 const* ThornLightPropsD3d(FThornLightProps const* Props)
 {
-    return reinterpret_cast<FD3dLight8 const*>(reinterpret_cast<char const*>(Props36) + 0x28);
+    return reinterpret_cast<FD3dLight8 const*>(&Props->Type); // +0x28
 }
 
-float const* ThornLightPropsTarget(float const* Props36)
+Vector const* ThornLightPropsTarget(FThornLightProps const* Props)
 {
-    return Props36 + 3; // +0x0C
+    return &Props->Direction; // +0x0C
 }
 
 void EngineLightDestroy(FEngineLight* Light)
@@ -410,7 +410,7 @@ void EngineLightPushUpdate(FEngineLight* Light)
     PushLightUpdate(Light);
 }
 
-void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, float const* Pos3)
+void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, Vector const* Pos3)
 {
     // FUN_00410fe0 (thiscall, RET 4) on one {Orient[9], Pos[3]} block: FUN_00410ef0's body,
     // then FUN_00410f60's, inlined. Same order, same two pushes. No null tests.
@@ -443,18 +443,18 @@ void EngineLightSetRadius(FEngineLight* Light, float Radius)
     PushLightUpdate(Light);
 }
 
-void EngineLightSetDirection(FEngineLight* Light, float const* Dir3)
+void EngineLightSetDirection(FEngineLight* Light, Vector const* Dir3)
 {
     // FUN_00411470 (thiscall, RET 4). No null test.
     if (Light->Type != kLightPoint)
     {
-        Light->D3d.Direction[0] = Dir3[0];
-        Light->D3d.Direction[1] = Dir3[1];
-        Light->D3d.Direction[2] = -Dir3[2];
+        Light->D3d.Direction[0] = Dir3->x;
+        Light->D3d.Direction[1] = Dir3->y;
+        Light->D3d.Direction[2] = -Dir3->z;
     }
-    Light->Orient[2] = -Dir3[0];
-    Light->Orient[5] = -Dir3[1];
-    Light->Orient[8] = -Dir3[2];
+    Light->Orient.E[0][2] = -Dir3->x;
+    Light->Orient.E[1][2] = -Dir3->y;
+    Light->Orient.E[2][2] = -Dir3->z;
 
     PushLightUpdate(Light);
 }
@@ -480,19 +480,19 @@ void EngineLightSetConeAngle(FEngineLight* Light, float DegreesFullAngle)
     Light->D3d.Theta = Light->D3d.Phi * 0.5f;
 }
 
-double Vec3Length(float const* V)
+double Vec3Length(Vector const* V)
 {
     // FUN_00410190: the result stays on the x87 stack (returned as double).
-    return sqrt((static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1]) +
-                static_cast<double>(V[2]) * V[2]);
+    return sqrt((static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y) +
+                static_cast<double>(V->z) * V->z);
 }
 
-void Vec3Negate(float* Out, float const* In)
+void Vec3Negate(Vector* Out, Vector const* In)
 {
     // FUN_00411350 (thiscall on In): all loads happen before the stores; no null tests.
-    Out[0] = -In[0];
-    Out[1] = -In[1];
-    Out[2] = -In[2];
+    Out->x = -In->x;
+    Out->y = -In->y;
+    Out->z = -In->z;
 }
 
 void ScaleVec3(float* Out, float const* V, float Scalar)
@@ -563,12 +563,12 @@ int EngineLightParseType(char const* Text)
     return kLightNone;
 }
 
-void MatrixSetColumn2(float* Matrix9, float const* Vec3)
+void MatrixSetColumn2(Matrix* Matrix9, Vector const* Vec3)
 {
     // FUN_00411f70 — __thiscall on the 3x3, RET 4.
-    Matrix9[2] = Vec3[0];
-    Matrix9[5] = Vec3[1];
-    Matrix9[8] = Vec3[2];
+    Matrix9->E[0][2] = Vec3->x;
+    Matrix9->E[1][2] = Vec3->y;
+    Matrix9->E[2][2] = Vec3->z;
 }
 
 FLightCurveName* LightCurveNameInit(FLightCurveName* Name, char const* Source)
@@ -662,14 +662,14 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         Pos[2] = static_cast<float>(ValueNum(Value, 2));
         Pos[1] = static_cast<float>(ValueNum(Value, 1));
         Pos[0] = static_cast<float>(ValueNum(Value, 0));
-        Light->Position[0] = Pos[0];
-        Light->Position[1] = Pos[1];
-        Light->Position[2] = Pos[2];
+        Light->Position.x = Pos[0];
+        Light->Position.y = Pos[1];
+        Light->Position.z = Pos[2];
         if (Light->Type != kLightDirectional)
         {
-            Light->D3d.Position[0] = Light->Position[0];
-            Light->D3d.Position[1] = Light->Position[1];
-            Light->D3d.Position[2] = -Light->Position[2];
+            Light->D3d.Position.x = Light->Position.x;
+            Light->D3d.Position.y = Light->Position.y;
+            Light->D3d.Position.z = -Light->Position.z;
         }
         PushLightUpdate(Light); // FUN_00410ec0
         return true;
@@ -723,27 +723,27 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
 
     if (_stricmp(Name, "direction") == 0)
     {
-        float Dir[3];
-        Dir[2] = static_cast<float>(ValueNum(Value, 2));
-        Dir[1] = static_cast<float>(ValueNum(Value, 1));
-        Dir[0] = static_cast<float>(ValueNum(Value, 0));
+        Vector Dir;
+        Dir.z = static_cast<float>(ValueNum(Value, 2));
+        Dir.y = static_cast<float>(ValueNum(Value, 1));
+        Dir.x = static_cast<float>(ValueNum(Value, 0));
         // FUN_00410190's length, unrounded; no zero test.
-        double const Length = sqrt(static_cast<double>(Dir[0]) * Dir[0] +
-                                   static_cast<double>(Dir[1]) * Dir[1] +
-                                   static_cast<double>(Dir[2]) * Dir[2]);
+        double const Length = sqrt(static_cast<double>(Dir.x) * Dir.x +
+                                   static_cast<double>(Dir.y) * Dir.y +
+                                   static_cast<double>(Dir.z) * Dir.z);
         double const InvLength = 1.0 / Length;
-        Dir[0] = static_cast<float>(Dir[0] * InvLength);
-        Dir[1] = static_cast<float>(Dir[1] * InvLength);
-        Dir[2] = static_cast<float>(Dir[2] * InvLength);
+        Dir.x = static_cast<float>(Dir.x * InvLength);
+        Dir.y = static_cast<float>(Dir.y * InvLength);
+        Dir.z = static_cast<float>(Dir.z * InvLength);
         if (Light->Type != kLightPoint)
         {
-            Light->D3d.Direction[0] = Dir[0];
-            Light->D3d.Direction[1] = Dir[1];
-            Light->D3d.Direction[2] = -Dir[2];
+            Light->D3d.Direction[0] = Dir.x;
+            Light->D3d.Direction[1] = Dir.y;
+            Light->D3d.Direction[2] = -Dir.z;
         }
-        float Negated[3];
-        Vec3Negate(Negated, Dir);                  // FUN_00411350
-        MatrixSetColumn2(Light->Orient, Negated);  // FUN_00411f70 on light +0x74
+        Vector Negated;
+        Vec3Negate(&Negated, &Dir);                  // FUN_00411350
+        MatrixSetColumn2(&Light->Orient, &Negated);  // FUN_00411f70 on light +0x74
         PushLightUpdate(Light);
         return true;
     }
@@ -798,9 +798,9 @@ bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, flo
         return true;
 
     // Kept on the x87 stack (double here); true only when strictly greater (ordered).
-    double const Dx = static_cast<double>(Point3[0]) - Light->Position[0];
-    double const Dy = static_cast<double>(Point3[1]) - Light->Position[1];
-    double const Dz = static_cast<double>(Point3[2]) - Light->Position[2];
+    double const Dx = static_cast<double>(Point3[0]) - Light->Position.x;
+    double const Dy = static_cast<double>(Point3[1]) - Light->Position.y;
+    double const Dz = static_cast<double>(Point3[2]) - Light->Position.z;
     double const Reach = static_cast<double>(Light->D3d.Range) + ExtraRadius;
     double const DistSq = (Dx * Dx + Dz * Dz) + Dy * Dy;
     return Reach * Reach > DistSq;
@@ -849,7 +849,7 @@ bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutCol
     return bModified;
 }
 
-float* EngineLightComputeDirection(FEngineLight* Light, float* OutDir3, float const* Point,
+Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float const* Point,
                                    float* OutDist)
 {
     // FUN_00411370 (thiscall, RET 0xc). No null tests.
@@ -861,9 +861,9 @@ float* EngineLightComputeDirection(FEngineLight* Light, float* OutDir3, float co
     if (Point != nullptr && (bTowardPoint || OutDist != nullptr))
     {
         // x87 precision: dx and dz stay on the stack, dy is rounded to a float.
-        double const Dx = static_cast<double>(Point[0]) - Light->Position[0];
-        float const Dy = Point[1] - Light->Position[1];
-        double const Dz = static_cast<double>(Point[2]) - Light->Position[2];
+        double const Dx = static_cast<double>(Point[0]) - Light->Position.x;
+        float const Dy = Point[1] - Light->Position.y;
+        double const Dz = static_cast<double>(Point[2]) - Light->Position.z;
         double const Len = sqrt((Dz * Dz + Dx * Dx) + static_cast<double>(Dy) * Dy);
         if (OutDist != nullptr)
             *OutDist = static_cast<float>(Len);
@@ -871,17 +871,17 @@ float* EngineLightComputeDirection(FEngineLight* Light, float* OutDir3, float co
         {
             // No zero test.
             double const Inv = 1.0 / Len;
-            OutDir3[0] = static_cast<float>(Dx * Inv);
-            OutDir3[1] = static_cast<float>(static_cast<double>(Dy) * Inv);
-            OutDir3[2] = static_cast<float>(Dz * Inv);
+            OutDir3->x = static_cast<float>(Dx * Inv);
+            OutDir3->y = static_cast<float>(static_cast<double>(Dy) * Inv);
+            OutDir3->z = static_cast<float>(Dz * Inv);
             return OutDir3;
         }
     }
 
     // Default: negate Orient column 2.
-    OutDir3[0] = -Light->Orient[2];
-    OutDir3[1] = -Light->Orient[5];
-    OutDir3[2] = -Light->Orient[8];
+    OutDir3->x = -Light->Orient.E[0][2];
+    OutDir3->y = -Light->Orient.E[1][2];
+    OutDir3->z = -Light->Orient.E[2][2];
     return OutDir3;
 }
 
@@ -893,12 +893,12 @@ bool EngineLightSample(FEngineLight* Light, float const* Point, float* OutDir3,
         return false;
 
     // Retail reuses the Point argument slot for the distance.
-    float Dir[3];
+    Vector Dir;
     float Dist;
-    float const* const Result = EngineLightComputeDirection(Light, Dir, Point, &Dist);
-    OutDir3[0] = Result[0];
-    OutDir3[1] = Result[1];
-    OutDir3[2] = Result[2];
+    Vector const* const Result = EngineLightComputeDirection(Light, &Dir, Point, &Dist);
+    OutDir3[0] = Result->x;
+    OutDir3[1] = Result->y;
+    OutDir3[2] = Result->z;
 
     // The return value is not read.
     EngineLightGetEffectiveColor(Light, Dist, OutColor3);
@@ -964,32 +964,32 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
 {
     // FUN_004104e0 (thiscall, RET 0xc). No argument is tested.
     bool bLit = false;
-    float Dir[3] = {};
+    Vector Dir = {};
     if ((Light->Flags & 8u) != 0)
     {
         if ((Light->Flags & 0x20u) != 0)
         {
-            EngineLightComputeDirection(Light, Dir, nullptr, nullptr);
+            EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
             bLit = true;
         }
         else
         {
             float Dist = -1.0f;
-            EngineLightComputeDirection(Light, Dir, Pos3, &Dist);
+            EngineLightComputeDirection(Light, &Dir, Pos3, &Dist);
 
             if ((Light->Flags & 2u) != 0 && (Light->Type == kLightDirectional || Light->Type == kLightSpot))
             {
                 if (Light->Type != kLightPoint)
                 {
-                    Light->D3d.Direction[0] = Dir[0];
-                    Light->D3d.Direction[1] = Dir[1];
-                    Light->D3d.Direction[2] = -Dir[2];
+                    Light->D3d.Direction[0] = Dir.x;
+                    Light->D3d.Direction[1] = Dir.y;
+                    Light->D3d.Direction[2] = -Dir.z;
                 }
-                float Neg[3];
-                Vec3Negate(Neg, Dir);
-                Light->Orient[2] = Neg[0];
-                Light->Orient[5] = Neg[1];
-                Light->Orient[8] = Neg[2];
+                Vector Neg;
+                Vec3Negate(&Neg, &Dir);
+                Light->Orient.E[0][2] = Neg.x;
+                Light->Orient.E[1][2] = Neg.y;
+                Light->Orient.E[2][2] = Neg.z;
                 EngineLightPushUpdate(Light);
             }
 
@@ -1032,7 +1032,7 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
 
         // DAT_00610588 as it is (no query here) -- non-zero goes soft.
         if (G_PipelineLightState != 0)
-            SoftCameraRewriteLight(Light, Camera, Dir);
+            SoftCameraRewriteLight(Light, Camera, &Dir);
     }
 
     // Bit 4 (list link) follows bLit.
@@ -1258,7 +1258,7 @@ FGameLight::FGameLight() : FEngineLight(kLightNone)
     this->VelocityZ = 0.0f;
 }
 
-FGameLight* GameLightCreatePoint(float const* Pos3, unsigned char const Rgb[3], float Range)
+FGameLight* GameLightCreatePoint(Vector const* Pos3, unsigned char const Rgb[3], float Range)
 {
     // FUN_00537af0 — __cdecl. The block comes straight from the pool (not through
     // FUN_00537a90). Retail quirk: a null block skips the constructor and the setters then run
@@ -1523,11 +1523,11 @@ void GameLightTick(FGameLight* Light, float Dt)
         double const Xv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityX);
         double const Yv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityY);
         float const Zv = static_cast<float>(static_cast<double>(Dt) * static_cast<double>(Light->VelocityZ));
-        float Pos[3];
-        Pos[0] = static_cast<float>(Xv + static_cast<double>(Light->Position[0]));
-        Pos[1] = static_cast<float>(Yv + static_cast<double>(Light->Position[1]));
-        Pos[2] = static_cast<float>(static_cast<double>(Zv) + static_cast<double>(Light->Position[2]));
-        EngineLightSetPosition((FEngineLight*)Light, Pos);
+        Vector Pos;
+        Pos.x = static_cast<float>(Xv + static_cast<double>(Light->Position.x));
+        Pos.y = static_cast<float>(Yv + static_cast<double>(Light->Position.y));
+        Pos.z = static_cast<float>(static_cast<double>(Zv) + static_cast<double>(Light->Position.z));
+        EngineLightSetPosition((FEngineLight*)Light, &Pos);
     }
     else
     {
@@ -1540,7 +1540,7 @@ void GameLightTick(FGameLight* Light, float Dt)
         G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
                                       Light->LocalXform);
         Transform const Copy = World;
-        EngineLightSetTransform((FEngineLight*)Light, &Copy.Rotation.E[0][0], &Copy.Translation.x);
+        EngineLightSetTransform((FEngineLight*)Light, &Copy.Rotation.E[0][0], &Copy.Translation);
     }
     if (Light->Anim.Keys != nullptr)
         GameLightTickAnim(&Light->Anim, Dt, Light);

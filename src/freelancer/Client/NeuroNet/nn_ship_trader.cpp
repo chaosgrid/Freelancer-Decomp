@@ -115,18 +115,18 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
     Selected = -1;
     bDragStart = 1;
     SetMesh(kShipTraderMesh, 0); // slot 38
-    HalfExtents[0] = 0.66f;      // +0xb4
-    HalfExtents[1] = 0.64f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.64f;        // +0xc0
-    HitOffset[1] = -0.27f;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.66f;      // +0xb4
+    HalfExtents.y = 0.64f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.64f;        // +0xc0
+    HitOffset.y = -0.27f;
+    HitOffset.z = 0.0f;
 
     {
-        float const Position[3] = {1.25f, -0.04f, 0.0f};
-        float const Half[3] = {0.02f, 0.02f, 0.0f};
+        Vector const Position = {1.25f, -0.04f, 0.0f};
+        Vector const Half = {0.02f, 0.02f, 0.0f};
         CancelButton = CreateButtonControl("ShipTraderCancelButton", kShipTraderCloseMesh, nullptr,
-                                           "ui_select_item", nullptr, Position, nullptr, Half, 0,
+                                           "ui_select_item", nullptr, &Position, nullptr, &Half, 0,
                                            0, 0, 0, 0x2148, 0, 0);
     }
 
@@ -179,14 +179,14 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
             if (ShipGood != nullptr)
             {
                 sprintf(Name, "ShipTraderShipMesh%d", Row);
-                float const Position[3] = {
+                Vector const Position = {
                     0.277f,
-                    static_cast<float>(0.13f - static_cast<double>(Row) * 0.068f), // DAT_005d0434 / 005d4958
+                    static_cast<float>(0.13f - static_cast<double>(Row) * 0.068f),                            
                     -1.288f};
-                float const Half[3] = {0.036f, 0.041f, 0.0f};
-                float const Zero[3] = {0.0f, 0.0f, 0.0f};
-                ShipMeshes[Row] = CreateStaticControl(Name, ShipGood->ItemIcon.Value, Position, nullptr,
-                                                      Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0, Zero);
+                Vector const Half = {0.036f, 0.041f, 0.0f};
+                Vector const Zero = {0.0f, 0.0f, 0.0f};
+                ShipMeshes[Row] = CreateStaticControl(Name, ShipGood->ItemIcon.Value, &Position, nullptr,
+                                                      &Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0, &Zero);
                 ShipMeshes[Row]->Flags = static_cast<unsigned char>(ShipMeshes[Row]->Flags & 0xf7);
                 RowMeshPaths[Row] = ShipGood->ItemIcon.Value; // +0x78
             }
@@ -197,25 +197,25 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
         float const FrameY = static_cast<float>(-0.2f - static_cast<double>(RowStep)); // DAT_005d58c8
         {
             sprintf(Name, "ShipTraderShipNameIconFrame%d", Row);
-            float const Position[3] = {0.916f, FrameY, 0.0f};
-            float const Half[3] = {0.035f, 0.0335f, 0.0f};
-            NameIconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", Position, Half, 0,
+            Vector const Position = {0.916f, FrameY, 0.0f};
+            Vector const Half = {0.035f, 0.0335f, 0.0f};
+            NameIconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", &Position, &Half, 0,
                                                           0, 0, 0, 0);
         }
 
         {
             sprintf(Name, "ShipTraderShipNameFrame%d", Row);
-            float const Position[3] = {1.098f, FrameY, 0.0f};
-            float const Half[3] = {0.138f, 0.034f, 0.0f};
-            NameFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", Position, Half, 0, 0,
+            Vector const Position = {1.098f, FrameY, 0.0f};
+            Vector const Half = {0.138f, 0.034f, 0.0f};
+            NameFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", &Position, &Half, 0, 0,
                                                       0, 0, 0);
         }
 
         {
             sprintf(Name, "ShipTraderShipName%d", Row);
-            float const Position[3] = {
+            Vector const Position = {
                 0.97f, static_cast<float>(-0.167f - static_cast<double>(RowStep)), 0.0f}; // DAT_005d5890
-            ShipNames[Row] = CreateTextControl(Name, "ItemName", Position, nullptr, 0.264f, 0.03f,
+            ShipNames[Row] = CreateTextControl(Name, "ItemName", &Position, nullptr, 0.264f, 0.03f,
                                                1.6f, static_cast<unsigned>(NameIds), 0, 0, 1);
             RowNameIds[Row] = NameIds;
         }
@@ -224,17 +224,17 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
         float const ClassY = static_cast<float>(-0.195f - static_cast<double>(RowStep)); // DAT_005d5874
         {
             sprintf(Name, "ShipTraderShipClass%d", Row);
-            float const Position[3] = {0.97f, ClassY, 0.0f};
+            Vector const Position = {0.97f, ClassY, 0.0f};
             RowClassTexts[Row] = CreateTextControl(
-                Name, "ItemName", Position, nullptr, 0.15f, 0.03f, 1.6f,
+                Name, "ItemName", &Position, nullptr, 0.15f, 0.03f, 1.6f,
                 static_cast<unsigned>(G_ShipTraderClassIds[RowShipClasses[Row]]), 0, 0, 1);
         }
 
         // The price is created with the name's ids (as in retail), then given the formatted price.
         {
             sprintf(Name, "ShipTraderShipPrice%d", Row);
-            float const Position[3] = {1.078f, ClassY, 0.0f};
-            ShipPrices[Row] = CreateTextControl(Name, "ItemName", Position, nullptr, 0.153f, 0.03f,
+            Vector const Position = {1.078f, ClassY, 0.0f};
+            ShipPrices[Row] = CreateTextControl(Name, "ItemName", &Position, nullptr, 0.153f, 0.03f,
                                                 1.6f, static_cast<unsigned>(NameIds), 2, 0, 1);
             FormatGroupedNumber(PriceText, Price, -1); // FUN_004779a0
             ShipPrices[Row]->SetProperty(kTextPropSetText, PointerArg(PriceText), 0);
@@ -246,56 +246,56 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
 
     // The 3D view.
     {
-        float const RotSpeed[3] = {0.0f, 0.0f, 0.0f};
-        float const ViewOffset[3] = {0.005f, 0.078f, -1.288f};
-        float const Ypr[3] = {0.0f, 0.0f, 0.0f};
-        float const ViewSize[3] = {0.18f, -0.162f, 0.0f};
+        Vector const RotSpeed = {0.0f, 0.0f, 0.0f};
+        Vector const ViewOffset = {0.005f, 0.078f, -1.288f};
+        Vector const Ypr = {0.0f, 0.0f, 0.0f};
+        Vector const ViewSize = {0.18f, -0.162f, 0.0f};
         unsigned const RectColor = 0xffffdc0cu; // bytes 0c dc ff ff
         unsigned const WireColor = 0xffffffffu;
         ShipView = static_cast<ShipViewControl*>(CreateShipViewControl(
-            "ShipTrader3DShip", RotSpeed, ViewOffset, Ypr, ViewSize, nullptr, false, false,
+            "ShipTrader3DShip", &RotSpeed, &ViewOffset, &Ypr, &ViewSize, nullptr, false, false,
             &RectColor, &WireColor));
     }
 
     {
-        float const Position[3] = {0.647f, -0.031f, 0.0f};
-        ViewName = CreateTextControl("ShipTraderViewName", "PageHeader", Position, nullptr, 0.367f,
+        Vector const Position = {0.647f, -0.031f, 0.0f};
+        ViewName = CreateTextControl("ShipTraderViewName", "PageHeader", &Position, nullptr, 0.367f,
                                      0.03f, 1.6f, 0, 1, 0, 0);
     }
     {
-        float const Position[3] = {0.647f, -0.07f, 0.0f};
-        ViewClass = CreateTextControl("ShipTraderViewClass", "SubHeader", Position, nullptr,
+        Vector const Position = {0.647f, -0.07f, 0.0f};
+        ViewClass = CreateTextControl("ShipTraderViewClass", "SubHeader", &Position, nullptr,
                                       0.367f, 0.03f, 1.6f, 0, 1, 0, 0);
     }
 
     {
-        float const Position[3] = {0.642f, -0.472f, 0.0f};
-        float const Half[3] = {0.15f, 0.026f, 0.0f};
-        BuyButton = CreateWireButtonControl("ShipTraderBuyButton", "ui_select_item", Position, Half,
+        Vector const Position = {0.642f, -0.472f, 0.0f};
+        Vector const Half = {0.15f, 0.026f, 0.0f};
+        BuyButton = CreateWireButtonControl("ShipTraderBuyButton", "ui_select_item", &Position, &Half,
                                             0, 0, 0x325, 0, 0);
     }
     {
-        float const Position[3] = {0.64f, -0.465f, 0.0f};
-        BuyText = CreateTextControl("ShipTraderBuytext", "ButtonText", Position, nullptr, 0.198f,
+        Vector const Position = {0.64f, -0.465f, 0.0f};
+        BuyText = CreateTextControl("ShipTraderBuytext", "ButtonText", &Position, nullptr, 0.198f,
                                     0.03f, 1.6f, 0x39a, 1, 0, 0);
     }
 
     {
-        float const Offset[3] = {-0.42f, -0.164f, -1.0f};
-        InfoFacts = CreateRichTextWin("ShipInfoCard_Facts", 0.4f, 0.2f, Offset, true);
+        Vector const Offset = {-0.42f, -0.164f, -1.0f};
+        InfoFacts = CreateRichTextWin("ShipInfoCard_Facts", 0.4f, 0.2f, &Offset, true);
     }
     {
-        float const Offset[3] = {0.01f, -0.164f, -1.0f};
-        InfoStats = CreateRichTextWin("ShipInfoCard_Stats", 0.24f, 0.2f, Offset, true);
+        Vector const Offset = {0.01f, -0.164f, -1.0f};
+        InfoStats = CreateRichTextWin("ShipInfoCard_Stats", 0.24f, 0.2f, &Offset, true);
     }
     {
-        float const Offset[3] = {0.27f, -0.164f, -1.0f};
-        InfoValues = CreateRichTextWin("ShipInfoCard_Values", 0.14f, 0.2f, Offset, true);
+        Vector const Offset = {0.27f, -0.164f, -1.0f};
+        InfoValues = CreateRichTextWin("ShipInfoCard_Values", 0.14f, 0.2f, &Offset, true);
     }
 
     {
-        float const Position[3] = {0.23f, -0.137f, 0.0f};
-        PlayerCash = CreateTextControl("PlayerCash", "Normal", Position, nullptr, 0.413f, 0.03f,
+        Vector const Position = {0.23f, -0.137f, 0.0f};
+        PlayerCash = CreateTextControl("PlayerCash", "Normal", &Position, nullptr, 0.413f, 0.03f,
                                        1.6f, 0, 1, 0, 0);
         wchar_t CashText[0x100];
         FormatGroupedNumber(CashText, static_cast<int>(GetPlayerCreditsRetail()), 0x476); // FUN_004c4ce0
@@ -304,8 +304,8 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
 
     // The title (not kept).
     {
-        float const Position[3] = {1.07f, -0.085f, 0.0f};
-        CreateTextControl("ShipTraderTitle", "PageHeader", Position, nullptr, 0.422f, 0.03f, 1.6f,
+        Vector const Position = {1.07f, -0.085f, 0.0f};
+        CreateTextControl("ShipTraderTitle", "PageHeader", &Position, nullptr, 0.422f, 0.03f, 1.6f,
                           0x460, 1, 0, 0);
     }
 
@@ -316,8 +316,8 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
     if (PlayerShipArchId != 0)
     {
         {
-            float const Position[3] = {0.235f, -0.085f, 0.0f};
-            CreateTextControl("ShipTraderCurrentShipText", "PageHeader", Position, nullptr, 0.41f,
+            Vector const Position = {0.235f, -0.085f, 0.0f};
+            CreateTextControl("ShipTraderCurrentShipText", "PageHeader", &Position, nullptr, 0.41f,
                               0.03f, 1.6f, 0x62e, 1, 0, 0);
         }
         Archetype::Ship const* const Ship = Archetype::GetShip(PlayerShipArchId);
@@ -329,36 +329,36 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
                 GoodInfo const* const ShipGood = Goods->find_by_ship_arch(PlayerShipArchId);
                 if (ShipGood != nullptr)
                 {
-                    float const Position[3] = {-0.557f, 0.13f, -1.288f};
-                    float const Half[3] = {0.035f, 0.041f, 0.0f};
-                    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+                    Vector const Position = {-0.557f, 0.13f, -1.288f};
+                    Vector const Half = {0.035f, 0.041f, 0.0f};
+                    Vector const Zero = {0.0f, 0.0f, 0.0f};
                     CurrentShipMesh = CreateStaticControl("ShipTraderCurrentShipMesh",
-                                                          ShipGood->ItemIcon.Value, Position, nullptr,
-                                                          Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0,
-                                                          Zero);
+                                                          ShipGood->ItemIcon.Value, &Position, nullptr,
+                                                          &Half, 0, 0, 0, 1, 1, 1, 1, 0x50, 0, 0,
+                                                          &Zero);
                     CurrentShipMesh->Flags = static_cast<unsigned char>(CurrentShipMesh->Flags & 0xf7);
                 }
             }
 
             {
-                float const Position[3] = {0.082f, -0.2f, 0.0f};
-                float const Half[3] = {0.035f, 0.0335f, 0.0f};
+                Vector const Position = {0.082f, -0.2f, 0.0f};
+                Vector const Half = {0.035f, 0.0335f, 0.0f};
                 CurrentShipButton = CreateWireButtonControl("ShipTraderCurrentShip",
-                                                            "ui_item_select", Position, Half, 0, 0,
+                                                            "ui_item_select", &Position, &Half, 0, 0,
                                                             0, 0, 0);
             }
             {
-                float const Position[3] = {0.264f, -0.2f, 0.0f};
-                float const Half[3] = {0.138f, 0.034f, 0.0f};
+                Vector const Position = {0.264f, -0.2f, 0.0f};
+                Vector const Half = {0.138f, 0.034f, 0.0f};
                 CurrentShipFrame = CreateWireButtonControl("ShipTraderCurrentShipFrame",
-                                                           "ui_item_select", Position, Half, 0, 0,
+                                                           "ui_item_select", &Position, &Half, 0, 0,
                                                            0, 0, 0);
             }
 
             // The name (not kept).
             {
-                float const Position[3] = {0.135f, -0.167f, 0.0f};
-                CreateTextControl("ShipTraderCurrentShipName", "ItemName", Position, nullptr, 0.26f,
+                Vector const Position = {0.135f, -0.167f, 0.0f};
+                CreateTextControl("ShipTraderCurrentShipName", "ItemName", &Position, nullptr, 0.26f,
                                   0.03f, 1.6f, static_cast<unsigned>(Ship->IdsName), 0, 0, 1);
             }
 
@@ -367,8 +367,8 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
             if (CurrentShipClass < 0 || CurrentShipClass >= 4)
                 CurrentShipClass = 0;
             {
-                float const Position[3] = {0.135f, -0.198f, 0.0f};
-                CreateTextControl("ShipTraderCurrentShipClass", "ItemName", Position, nullptr,
+                Vector const Position = {0.135f, -0.198f, 0.0f};
+                CreateTextControl("ShipTraderCurrentShipClass", "ItemName", &Position, nullptr,
                                   0.146f, 0.03f, 1.6f,
                                   static_cast<unsigned>(G_ShipTraderClassIds[CurrentShipClass]), 0,
                                   0, 1);
@@ -376,9 +376,9 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
 
             // What the market pays for it (FUN_004c6e90(arch, 1)).
             int const ShipValue = NnShipResaleValue(PlayerShipArchId, true);
-            float const Position[3] = {0.258f, -0.198f, 0.0f};
+            Vector const Position = {0.258f, -0.198f, 0.0f};
             WinControl* const PriceControl = CreateTextControl(
-                "ShipTraderCurrentShipPrice", "ItemName", Position, nullptr, 0.14f, 0.03f, 1.6f, 1,
+                "ShipTraderCurrentShipPrice", "ItemName", &Position, nullptr, 0.14f, 0.03f, 1.6f, 1,
                 2, 0, 1);
             wchar_t ValueText[0x100];
             FormatGroupedNumber(ValueText, ShipValue, -1);
@@ -395,22 +395,22 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
     ViewClass->SetProperty(kWinPropHide, 1, 0);
 
     {
-        float const Position[3] = {0.645f, -0.061f, 0.0f};
-        WelcomeText = CreateTextControl("WelcomeText", "SubHeader", Position, nullptr, 0.37f,
+        Vector const Position = {0.645f, -0.061f, 0.0f};
+        WelcomeText = CreateTextControl("WelcomeText", "SubHeader", &Position, nullptr, 0.37f,
                                         0.06f, 1.6f, 0, 1, 0, 0);
         MakeMultiLine(WelcomeText);
     }
 
     {
-        float const Position[3] = {0.0f, 0.159f, -1.288f};
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        WelcomeLine = CreateStaticControl("WelcomeLine", kWelcomeLineMesh, Position, nullptr, Zero,
-                                          0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+        Vector const Position = {0.0f, 0.159f, -1.288f};
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        WelcomeLine = CreateStaticControl("WelcomeLine", kWelcomeLineMesh, &Position, nullptr, &Zero,
+                                          0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     }
 
     {
-        float const Position[3] = {0.657f, -0.217f, 0.0f};
-        WelcomeHelp = CreateTextControl("WelcomeHelp", "Normal", Position, nullptr, 0.35f, 0.06f,
+        Vector const Position = {0.657f, -0.217f, 0.0f};
+        WelcomeHelp = CreateTextControl("WelcomeHelp", "Normal", &Position, nullptr, 0.35f, 0.06f,
                                         1.4f, 0x485, 0, 0, 0);
         MakeMultiLine(WelcomeHelp);
     }
@@ -435,8 +435,8 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
     }
 
     {
-        float const Position[3] = {0.657f, -0.438f, 0.0f};
-        ErrorHelp = CreateTextControl("ErrorHelp", "Normal", Position, nullptr, 0.37f, 0.06f, 1.4f,
+        Vector const Position = {0.657f, -0.438f, 0.0f};
+        ErrorHelp = CreateTextControl("ErrorHelp", "Normal", &Position, nullptr, 0.37f, 0.06f, 1.4f,
                                       0x49a, 0, 0, 0);
         ErrorHelp->SetProperty(kWinPropHide, 1, 0);
         MakeMultiLine(ErrorHelp);
@@ -451,7 +451,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
 
     DrawLayer = 100;
     SetOffset(-0.64f, 0.33f, -1.288f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
 
     BaseFeeling = NnDealer::GetBaseFactionFeeling(); // FUN_00483df0
     if (SinglePlayer())
@@ -590,8 +590,8 @@ void NnShipTrader::Draw()
 
     // Under the mouse, a held button (DAT_00616850 & 3) drags the ship round; otherwise the next
     // drag starts afresh.
-    float Ray[3];
-    if (ShipView->HitTest(Win3DGetMouseRay(Ray))) // FUN_0059da70, slot 4
+    Vector Ray;
+    if (ShipView->HitTest(Win3DGetMouseRay(&Ray))) // FUN_0059da70, slot 4
     {
         if ((GetClientMouseButtons() & 3) != 0)
         {
@@ -828,9 +828,9 @@ void NnShipTrader::SelectRow(int Row)
     }
 
     {
-        float const Ypr[3] = {162.581f, -71.6442f, 0.0f};
-        ShipView->SetObjectYpr(Ypr); // FUN_00586900
-        ShipView->SetDragYpr(Ypr);   // FUN_00585070
+        Vector const Ypr = {162.581f, -71.6442f, 0.0f};
+        ShipView->SetObjectYpr(&Ypr); // FUN_00586900
+        ShipView->SetDragYpr(&Ypr);   // FUN_00585070
     }
 
     // Why the row cannot be bought, or the buy controls. Retail indexes the row arrays with

@@ -28,7 +28,7 @@ public:
     ~NnTextControl() override;
 
     // FUN_0058a110 (thiscall, RET 0x28). FontScale is never read by the retail body.
-    void Init(char const* StyleName, float const* InPosition, char const* Hardpoint,
+    void Init(char const* StyleName, Vector const* InPosition, char const* Hardpoint,
               float InWidth, float InHeight, float FontScale, unsigned Ids, int InJustification,
               int InTextToolTipIds, unsigned char bInTopLeftAnchor);
 
@@ -64,7 +64,7 @@ public:
     void SetWidth(float NewWidth);
 
     // LAB_0058ae70: anchor text to the centre of the requested rectangle.
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
 
     // slot 9 FUN_00589ed0 (RET 8) -- Win3D's Create body inlined (reparent, register, flags),
     // then the INI_Reader payload's keys: font, offset, hardpoint, width, height, font_scale
@@ -76,7 +76,7 @@ public:
     // text rectangle (identity orientation, centre = Position + Offset + {W/2, -H/2, 0}) against
     // the ray (FUN_005a1130). A hit feeds the tooltip (FUN_004be370) when +0x344 is set and tells
     // the parent's WinControl face property 0x46 with this control; true.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
 
     // slot 19 FUN_0058ad90 (RET 4) -- only with +0x35c: a {-1, 3} event tells the parent
     // property 0x27; a captured control leaves the capture stack and on {-1, 1} tells the

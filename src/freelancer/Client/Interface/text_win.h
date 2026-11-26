@@ -33,7 +33,7 @@ public:
     ~TextWin() override;
 
     // slot 4 FUN_004b51d0
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 9 FUN_004b5180
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 10 FUN_005a1c10
@@ -96,4 +96,4 @@ void TextWinProjectExtent(float Width, float Height, float Z, float* OutWidth,
 
 // FUN_00417730 (cdecl, 8-byte return) -- a world point to its screen position through the
 // Win3D camera; {0, 0} when it is behind the near plane.
-void TextWinProjectPoint(float const* World, float* OutX, float* OutY);
+void TextWinProjectPoint(Vector const* World, float* OutX, float* OutY);

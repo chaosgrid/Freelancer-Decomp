@@ -74,15 +74,15 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
     Mode = Payload->Mode;
 
     // (0, 0, -1.7), NN_Error's frame mesh and argument list.
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    float FramePosition[3] = {0.0f, 0.0f, NnFloatBits(0xbfd9999a)};
-    CreateStaticControl("PromptFrame", kPromptFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1,
-                        1, 0, 1, 0, 0, 0, Zero);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Vector FramePosition = {0.0f, 0.0f, NnFloatBits(0xbfd9999a)};
+    CreateStaticControl("PromptFrame", kPromptFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1,
+                        1, 0, 1, 0, 0, 0, &Zero);
 
     // 0.7 x 0.15 at {-0.35, 0.12, -1}.
-    float TextOffset[3] = {NnFloatBits(0xbeb33333), NnFloatBits(0x3df5c28f), -1.0f};
+    Vector TextOffset = {NnFloatBits(0xbeb33333), NnFloatBits(0x3df5c28f), -1.0f};
     PromptText = CreateRichTextWin("PromptText", NnFloatBits(0x3f333333),
-                                   NnFloatBits(0x3e19999a), TextOffset, true);
+                                   NnFloatBits(0x3e19999a), &TextOffset, true);
 
     if (Mode == 0)
         PromptEdit = static_cast<RichTextEditWin*>(
@@ -94,8 +94,8 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
     {
         // Offset {-0.3, -0.015, -1}.
         PromptEdit->SetNormSize(NnFloatBits(0x3f19999a), NnFloatBits(0x3cf5c28f));
-        float EditOffset[3] = {NnFloatBits(0xbe99999a), NnFloatBits(0xbc75c28f), -1.0f};
-        PromptEdit->SetAttachOffset(EditOffset);
+        Vector EditOffset = {NnFloatBits(0xbe99999a), NnFloatBits(0xbc75c28f), -1.0f};
+        PromptEdit->SetAttachOffset(&EditOffset);
         PromptEdit->SetDrawFrame(false);
         PromptEdit->SetPasswordMode(true);   // FUN_0057be00(1)
         PromptEdit->SetFixedStyle(true);     // FUN_0057bdd0(1)
@@ -138,34 +138,34 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
     int const NoToolTip = Payload->NoToolTipIds;
 
     // The boxes (FUN_005a1950), half extents {0.05, 0.017, 0}.
-    float const ButtonExtents[3] = {NnFloatBits(0x3d4ccccd), NnFloatBits(0x3c8b4396), 0.0f};
+    Vector const ButtonExtents = {NnFloatBits(0x3d4ccccd), NnFloatBits(0x3c8b4396), 0.0f};
     if (Mode == 0)
     {
-        float OkPosition[3] = {0.0f, NnFloatBits(0xbd851eb8), -1.0f};
+        Vector OkPosition = {0.0f, NnFloatBits(0xbd851eb8), -1.0f};
         PromptYes = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "PromptOk", "ui_select_item", OkPosition, ButtonExtents, 0, 0, YesToolTip, 0x411, 0,
+            "PromptOk", "ui_select_item", &OkPosition, &ButtonExtents, 0, 0, YesToolTip, 0x411, 0,
             0));
     }
     else if (Mode == 1 || Mode == 2)
     {
-        float YesPosition[3] = {NnFloatBits(0xbd8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
+        Vector YesPosition = {NnFloatBits(0xbd8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
         unsigned const YesCaption = (Mode == 1) ? 0x4dcu : 0u;
         PromptYes = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "PromptYes", "ui_select_item", YesPosition, ButtonExtents, 0, 0, YesToolTip,
+            "PromptYes", "ui_select_item", &YesPosition, &ButtonExtents, 0, 0, YesToolTip,
             YesCaption, 0, 0));
 
-        float NoPosition[3] = {NnFloatBits(0x3d8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
+        Vector NoPosition = {NnFloatBits(0x3d8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
         unsigned const NoCaption = (Mode == 1) ? 0x4ddu : 0u;
         PromptNo = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "PromptNo", "ui_select_item", NoPosition, ButtonExtents, 0, 0, NoToolTip, NoCaption,
+            "PromptNo", "ui_select_item", &NoPosition, &ButtonExtents, 0, 0, NoToolTip, NoCaption,
             0, 0));
     }
 
     // (0.345, 0.105, -1), half extents (0.02, 0.02, 0).
-    float ExitPosition[3] = {NnFloatBits(0x3eb0a3d7), NnFloatBits(0x3dd70a3d), -1.0f};
-    float ExitExtents[3] = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
+    Vector ExitPosition = {NnFloatBits(0x3eb0a3d7), NnFloatBits(0x3dd70a3d), -1.0f};
+    Vector ExitExtents = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
     PromptExit = CreateButtonControl("PromptExit", kPromptExitMesh, nullptr, "ui_select_item",
-                                     nullptr, ExitPosition, nullptr, ExitExtents, 0, 0, 0, 0, 0,
+                                     nullptr, &ExitPosition, nullptr, &ExitExtents, 0, 0, 0, 0, 0,
                                      0, 0);
 
     DrawLayer = 0x6e;
@@ -250,7 +250,7 @@ intptr_t NnPrompt::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         return 0;
     }
     if (Msg != kWinNotifyClick)
@@ -360,8 +360,8 @@ namespace
 
     void CentrePrompt(NnPrompt* Dialog)
     {
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     }
 
     // Port-only helper for the modal pump the three entry points inline (e.g. 0x00474034).

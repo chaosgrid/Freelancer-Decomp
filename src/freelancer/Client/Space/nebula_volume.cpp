@@ -2967,8 +2967,8 @@ namespace
         }
         FGameLight* const Light = GameLightConstruct(static_cast<FGameLight*>(Memory));
         EngineLightSetType(Light, kLightDirectional, false);
-        const float Zero[3] = {0.0f, 0.0f, 0.0f};
-        EngineLightSetPosition(Light, Zero);
+        const Vector Zero = {0.0f, 0.0f, 0.0f};
+        EngineLightSetPosition(Light, &Zero);
         const unsigned char White[3] = {0xff, 0xff, 0xff};
         EngineLightSetColorBytesAlt(Light, White);
         EngineLightSetRangeRaw(Light, kShipLightRange);
@@ -3071,11 +3071,11 @@ namespace
         for (int Axis = 0; Axis < 3; ++Axis)
             Dir[Axis] = CamPos[Axis] - BestPos[Axis];
         const double Length = std::sqrt(Dir[0] * Dir[0] + Dir[1] * Dir[1] + Dir[2] * Dir[2]);
-        const float DirF[3] = {Length > 1.0e-6 ? (float)(Dir[0] / Length) : 0.0f,
-                               Length > 1.0e-6 ? (float)(Dir[1] / Length) : -1.0f,
-                               Length > 1.0e-6 ? (float)(Dir[2] / Length) : 0.0f};
-        EngineLightSetPosition(Target, CamPosF);
-        EngineLightSetDirection(Target, DirF);
+        const Vector DirF = {Length > 1.0e-6 ? (float)(Dir[0] / Length) : 0.0f,
+                             Length > 1.0e-6 ? (float)(Dir[1] / Length) : -1.0f,
+                             Length > 1.0e-6 ? (float)(Dir[2] / Length) : 0.0f};
+        EngineLightSetPosition(Target, reinterpret_cast<Vector const*>(CamPosF));
+        EngineLightSetDirection(Target, &DirF);
         EngineLightSetColorBytes(Target, Rgb);
         if ((Target->Flags & 0x08) == 0)
             GameLightEnable(Target);
@@ -3627,7 +3627,7 @@ float NebulaVolume::AsteroidSpawnReach(Universe::IZone const* FieldZone, float* 
     return Best;
 }
 
-void NebulaVolume::NoteStarGlow(float const* WorldPos, float Radius, float Alpha)
+void NebulaVolume::NoteStarGlow(Vector const* WorldPos, float Radius, float Alpha)
 {
     if (GEntryCount == 0 || WorldPos == nullptr || !(Radius > 0.0f) || !(Alpha > 0.0f))
         return;
@@ -3636,8 +3636,8 @@ void NebulaVolume::NoteStarGlow(float const* WorldPos, float Radius, float Alpha
     for (int Index = 0; Index < GStarGlowCount; ++Index)
     {
         FStarGlowNote& Note = GStarGlows[Index];
-        if (Note.Centre[0] == (double)(WorldPos[0]) && Note.Centre[1] == (double)(WorldPos[1]) &&
-            Note.Centre[2] == (double)(WorldPos[2]))
+        if (Note.Centre[0] == (double)(WorldPos->x) && Note.Centre[1] == (double)(WorldPos->y) &&
+            Note.Centre[2] == (double)(WorldPos->z))
         {
             if (Radius > Note.Radius)
                 Note.Radius = Radius;
@@ -3649,9 +3649,9 @@ void NebulaVolume::NoteStarGlow(float const* WorldPos, float Radius, float Alpha
     if (GStarGlowCount >= kMaxStarGlows)
         return;
     FStarGlowNote& Note = GStarGlows[GStarGlowCount++];
-    Note.Centre[0] = WorldPos[0];
-    Note.Centre[1] = WorldPos[1];
-    Note.Centre[2] = WorldPos[2];
+    Note.Centre[0] = WorldPos->x;
+    Note.Centre[1] = WorldPos->y;
+    Note.Centre[2] = WorldPos->z;
     Note.Radius = Radius;
     Note.Alpha = Alpha;
 }

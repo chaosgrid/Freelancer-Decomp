@@ -87,7 +87,7 @@ public:
     ~HUD_Maneuvers() override;
 
     // WinControl slot 4 LAB_004d9820 (RET 4) -- WinControl's hit test, else the tab's box.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // WinControl slot 9 FUN_004d7b50 (RET 8) -- frame, four buttons, tab, cruise button, the
     // 24 key commands.
     bool Create(Win3D* NewParent, void* Data) override;
@@ -141,8 +141,8 @@ public:
     unsigned char Byte3cc;               // +0x3cc ctor 0; not read here
     unsigned char Byte3cd;               // +0x3cd ctor 0; not read here
     unsigned char Pad3ce[2];
-    float FrameHalfExtents[3];           // +0x3d0
-    float TabHalfExtents[3];             // +0x3dc
+    Vector FrameHalfExtents;             // +0x3d0
+    Vector TabHalfExtents;               // +0x3dc
     float ThrottleRate;                  // +0x3e8 commands 0x43 / 0x44: +1 / -1 / 0
 
 private:

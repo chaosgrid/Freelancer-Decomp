@@ -521,8 +521,7 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
     if (!GetHardPointInfo(Buf))
         return false;
 
-    Transform const* XformPtr = (Transform const*)(
-        DALib::Engine->GetInstanceTransform(ConnectionIndex));
+    Transform const* XformPtr = DALib::Engine->GetInstanceTransform(ConnectionIndex);
 
     if (OutPos != nullptr)
     {

@@ -17,9 +17,9 @@ struct FBatchRecord
 {
     unsigned long InternalFlags; // +0x00
     FMaterialSubmitContext Context; // +0x04, borrowed views into this queued record
-    float MatrixDataA[12];       // +0x28
-    float MatrixDataB[12];       // +0x58
-    float Combined[12];          // +0x88
+    Transform MatrixDataA;       // +0x28
+    Transform MatrixDataB;       // +0x58
+    Transform Combined;          // +0x88
     unsigned long PrimType;                // +0xB8
     unsigned long Start;         // +0xBC
     unsigned long Count;         // +0xC0

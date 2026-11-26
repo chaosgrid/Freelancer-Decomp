@@ -211,7 +211,7 @@ namespace
 
     // FUN_005097c0 — ambient GameLight at +0x270: SetPosition, flicker accum, colour/enable.
     // Called from NebulaUpdate. No test of `this` or of the position pointer.
-    void NebulaAmbientTick(FNebulaEffect* Nebula, float const* CamPos3)
+    void NebulaAmbientTick(FNebulaEffect* Nebula, Vector const* CamPos3)
     {
         // The light at +0x270 is the one pointer retail tests.
         FGameLight* const GLight = Nebula->DynamicLight;
@@ -261,11 +261,11 @@ namespace
             // No zero-length test.
             float const Inv = static_cast<float>(1.0f / sqrt(X * X + Y * Y + Z * Z));
             // The THIRD rand lands in [0], the first in [2].
-            float Dir[3];
-            Dir[0] = static_cast<float>(Z * Inv);
-            Dir[1] = static_cast<float>(Y * Inv);
-            Dir[2] = static_cast<float>(static_cast<float>(X) * static_cast<double>(Inv));
-            EngineLightSetDirection(Light, Dir);
+            Vector Dir;
+            Dir.x = static_cast<float>(Z * Inv);
+            Dir.y = static_cast<float>(Y * Inv);
+            Dir.z = static_cast<float>(static_cast<float>(X) * static_cast<double>(Inv));
+            EngineLightSetDirection(Light, &Dir);
             // Lit (+0xb4 bit 3) -> GameLight vt+8 (disable).
             if ((Light->Flags & 0x08) != 0)
                 GameLightVirtualDisable(GLight);
@@ -1744,8 +1744,8 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
             This->DynamicLight = Light;
             // Type 3 = directional.
             EngineLightSetType((FEngineLight*)Light, kLightDirectional, false);
-            float Zero[3] = {0.0f, 0.0f, 0.0f};
-            EngineLightSetPosition((FEngineLight*)Light, Zero);
+            Vector Zero = {0.0f, 0.0f, 0.0f};
+            EngineLightSetPosition((FEngineLight*)Light, &Zero);
             unsigned char White[3] = {0xff, 0xff, 0xff};
             EngineLightSetColorBytesAlt((FEngineLight*)Light, White);
             EngineLightSetRangeRaw((FEngineLight*)Light, 500000.0f);
@@ -1864,8 +1864,8 @@ void FNebulaEffect::DrawFogShell(void* Camera)
 
     // 12 dwords: the 3x3 axes and, at +0x24, the position.
     ICamera* const Cam = static_cast<ICamera*>(Camera);
-    float Xform[12];
-    memcpy(Xform, Cam->GetOrientation(), sizeof(Xform));
+    Transform Xform;
+    memcpy(&Xform, Cam->GetOrientation(), sizeof(Xform));
     // The passed camera, not the active space camera.
     Win3DApplyCamera(Cam);
 #ifdef FREELANCER_RP9
@@ -1874,7 +1874,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     // takes without a fill shape; the states around it stay as retail.
     if (!NebulaVolume::ReplacesFillSheets(This))
 #endif
-        NebulaDrawFillSheets(This, Xform[9], Xform[10], Xform[11]);
+        NebulaDrawFillSheets(This, Xform.Translation.x, Xform.Translation.y, Xform.Translation.z);
 
     SetMaterialBatchBinOrder(1u, 1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
@@ -2815,8 +2815,8 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     // Fully inside (< and unordered skip).
     if (Nebula->InsideFade >= 1.0f)
     {
-        float const CamCopy[3] = {CamPos.x, CamPos.y, CamPos.z};
-        NebulaAmbientTick(Nebula, CamCopy);
+        Vector const CamCopy = {CamPos.x, CamPos.y, CamPos.z};
+        NebulaAmbientTick(Nebula, &CamCopy);
     }
 
     Nebula->ExteriorOrientTimer = Dt + Nebula->ExteriorOrientTimer;
@@ -2853,24 +2853,24 @@ namespace
 
     // The FUN_005074e0 fog-sheet edge: normalize, then scale to the zone's reach * 1.15f
     // (Vec3Length is FUN_00410190); both factors on the FPU.
-    void NebulaSheetEdge(Universe::IZone* Zone, float* Edge)
+    void NebulaSheetEdge(Universe::IZone* Zone, Vector* Edge)
     {
         float const LenSq = static_cast<float>(
-            (static_cast<double>(Edge[0]) * Edge[0] + static_cast<double>(Edge[2]) * Edge[2]) +
-            static_cast<double>(Edge[1]) * Edge[1]);
+            (static_cast<double>(Edge->x) * Edge->x + static_cast<double>(Edge->z) * Edge->z) +
+            static_cast<double>(Edge->y) * Edge->y);
         double const Inv = NebulaInvSqrt(LenSq);
-        Edge[0] = static_cast<float>(Edge[0] * Inv);
-        Edge[1] = static_cast<float>(Edge[1] * Inv);
-        Edge[2] = static_cast<float>(Edge[2] * Inv);
+        Edge->x = static_cast<float>(Edge->x * Inv);
+        Edge->y = static_cast<float>(Edge->y * Inv);
+        Edge->z = static_cast<float>(Edge->z * Inv);
         Vector Dir;
-        Dir.x = Edge[0];
-        Dir.y = Edge[1];
-        Dir.z = Edge[2];
+        Dir.x = Edge->x;
+        Dir.y = Edge->y;
+        Dir.z = Edge->z;
         float const Reach = Zone->GetRadiusAlong(Dir) * 1.15f;
         double const Scale = Reach / Vec3Length(Edge);
-        Edge[0] = static_cast<float>(Edge[0] * Scale);
-        Edge[1] = static_cast<float>(Edge[1] * Scale);
-        Edge[2] = static_cast<float>(Edge[2] * Scale);
+        Edge->x = static_cast<float>(Edge->x * Scale);
+        Edge->y = static_cast<float>(Edge->y * Scale);
+        Edge->z = static_cast<float>(Edge->z * Scale);
     }
 }
 
@@ -2940,14 +2940,14 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     else if (FaceA < 0.0)
         FaceA = 0.0f;
 
-    float EdgeA[3];
-    EdgeA[0] = static_cast<float>(static_cast<double>(AxisA[2]) * Look[1] -
+    Vector EdgeA;
+    EdgeA.x = static_cast<float>(static_cast<double>(AxisA[2]) * Look[1] -
                                   static_cast<double>(Look[2]) * AxisA[1]);
-    EdgeA[1] = static_cast<float>(static_cast<double>(Look[2]) * AxisA[0] -
+    EdgeA.y = static_cast<float>(static_cast<double>(Look[2]) * AxisA[0] -
                                   static_cast<double>(AxisA[2]) * Look[0]);
-    EdgeA[2] = static_cast<float>(static_cast<double>(AxisA[1]) * Look[0] -
+    EdgeA.z = static_cast<float>(static_cast<double>(AxisA[1]) * Look[0] -
                                   static_cast<double>(Look[1]) * AxisA[0]);
-    NebulaSheetEdge(Zone, EdgeA);
+    NebulaSheetEdge(Zone, &EdgeA);
 
     double const AxisScale = static_cast<double>(ExtA) * 1.15f;
     AxisA[0] = static_cast<float>(AxisA[0] * AxisScale);
@@ -2976,14 +2976,14 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
             FaceB = 0.0f;
     }
 
-    float EdgeB[3];
-    EdgeB[0] = static_cast<float>(static_cast<double>(Col1[2]) * Look[1] -
+    Vector EdgeB;
+    EdgeB.x = static_cast<float>(static_cast<double>(Col1[2]) * Look[1] -
                                   static_cast<double>(Col1[1]) * Look[2]);
-    EdgeB[1] = static_cast<float>(static_cast<double>(Look[2]) * Col1[0] -
+    EdgeB.y = static_cast<float>(static_cast<double>(Look[2]) * Col1[0] -
                                   static_cast<double>(Col1[2]) * Look[0]);
-    EdgeB[2] = static_cast<float>(static_cast<double>(Col1[1]) * Look[0] -
+    EdgeB.z = static_cast<float>(static_cast<double>(Col1[1]) * Look[0] -
                                   static_cast<double>(Look[1]) * Col1[0]);
-    NebulaSheetEdge(Zone, EdgeB);
+    NebulaSheetEdge(Zone, &EdgeB);
     NebulaScaleVec3(Col1, Size.y * 1.15f);
 
     Win3DDisable(kWin3DLightingCap);
@@ -3004,16 +3004,16 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     {
         Win3DColor4f(Fog[0], Fog[1], Fog[2], FaceA);
         Win3DTexCoord2f(Shape->U0, Shape->V0);
-        T[0] = ZonePos.x + EdgeA[0];
-        T[1] = ZonePos.y + EdgeA[1];
-        T[2] = ZonePos.z + EdgeA[2];
+        T[0] = ZonePos.x + EdgeA.x;
+        T[1] = ZonePos.y + EdgeA.y;
+        T[2] = ZonePos.z + EdgeA.z;
         Win3DVertex3f(T[0] - AxisA[0], T[1] - AxisA[1], T[2] - AxisA[2]);
         Win3DTexCoord2f(Shape->U1, Shape->V0);
         Win3DVertex3f(T[0] + AxisA[0], T[1] + AxisA[1], T[2] + AxisA[2]);
         Win3DTexCoord2f(Shape->U1, Shape->V1);
-        T[0] = ZonePos.x - EdgeA[0];
-        T[1] = ZonePos.y - EdgeA[1];
-        T[2] = ZonePos.z - EdgeA[2];
+        T[0] = ZonePos.x - EdgeA.x;
+        T[1] = ZonePos.y - EdgeA.y;
+        T[2] = ZonePos.z - EdgeA.z;
         Win3DVertex3f(T[0] + AxisA[0], T[1] + AxisA[1], T[2] + AxisA[2]);
         Win3DTexCoord2f(Shape->U0, Shape->V1);
         Win3DVertex3f(T[0] - AxisA[0], T[1] - AxisA[1], T[2] - AxisA[2]);
@@ -3025,26 +3025,26 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     {
         Win3DColor4f(Fog[0], Fog[1], Fog[2], FaceB);
         Win3DTexCoord2f(Shape->U0, Shape->V0);
-        T[0] = ZonePos.x + EdgeB[0];
-        T[1] = EdgeB[1] + ZonePos.y;
-        T[2] = EdgeB[2] + ZonePos.z;
+        T[0] = ZonePos.x + EdgeB.x;
+        T[1] = EdgeB.y + ZonePos.y;
+        T[2] = EdgeB.z + ZonePos.z;
         Win3DVertex3f(T[0] - Col1[0], T[1] - Col1[1], T[2] - Col1[2]);
         Win3DTexCoord2f(Shape->U1, Shape->V0);
         Win3DVertex3f(T[0] + Col1[0], T[1] + Col1[1], T[2] + Col1[2]);
         Win3DTexCoord2f(Shape->U1, Shape->V1);
-        T[0] = ZonePos.x - EdgeB[0];
-        T[1] = ZonePos.y - EdgeB[1];
-        T[2] = ZonePos.z - EdgeB[2];
+        T[0] = ZonePos.x - EdgeB.x;
+        T[1] = ZonePos.y - EdgeB.y;
+        T[2] = ZonePos.z - EdgeB.z;
         V[0] = T[0] + Col1[0];
         V[1] = T[1] + Col1[1];
         V[2] = T[2] + Col1[2];
         Win3DVertex3f(V[0], V[1], V[2]);
         Win3DTexCoord2f(Shape->U0, Shape->V1);
         V[0] = static_cast<float>(
-            (static_cast<double>(ZonePos.x) - EdgeB[0]) - static_cast<double>(Col1[0]));
+            (static_cast<double>(ZonePos.x) - EdgeB.x) - static_cast<double>(Col1[0]));
         V[1] = static_cast<float>(
-            (static_cast<double>(ZonePos.y) - EdgeB[1]) - static_cast<double>(Col1[1]));
-        V[2] = (ZonePos.z - EdgeB[2]) - Col1[2];
+            (static_cast<double>(ZonePos.y) - EdgeB.y) - static_cast<double>(Col1[1]));
+        V[2] = (ZonePos.z - EdgeB.z) - Col1[2];
         Win3DVertex3f(V[0], V[1], V[2]);
     }
 

@@ -62,8 +62,8 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
     {
         IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
 
-        float Orientation[9];
-        memcpy(Orientation, &Object->get_transform().Rotation.E[0][0], sizeof(Orientation));
+        Matrix Orientation;
+        memcpy(&Orientation, &Object->get_transform().Rotation.E[0][0], sizeof(Orientation));
 
         // cos/sin kept double; per row, x' and z' both from the row's original x and z.
         // Column 1 is untouched.
@@ -71,14 +71,14 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
         const double Sin = sin(kRearViewYaw);
         for (int Row = 0; Row < 3; ++Row)
         {
-            const double X = Orientation[Row * 3 + 0];
-            Orientation[Row * 3 + 0] =
-                static_cast<float>(X * Cos - Sin * static_cast<double>(Orientation[Row * 3 + 2]));
-            Orientation[Row * 3 + 2] =
-                static_cast<float>(X * Sin + Cos * static_cast<double>(Orientation[Row * 3 + 2]));
+            const double X = Orientation.E[Row][0];
+            Orientation.E[Row][0] =
+                static_cast<float>(X * Cos - Sin * static_cast<double>(Orientation.E[Row][2]));
+            Orientation.E[Row][2] =
+                static_cast<float>(X * Sin + Cos * static_cast<double>(Orientation.E[Row][2]));
         }
 
-        HudCameraApplyShake(Hud, Orientation);
+        HudCameraApplyShake(Hud, &Orientation);
 
         // The view position (+0x100) through the shaken orientation, using Cockpit.cpp's shared
         // math engine cache DAT_00675220.
@@ -86,7 +86,7 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
             G_FirstPersonMathEngine = Acquire3DMathEngine();
         Vector Offset;
         G_FirstPersonMathEngine->TransformMatrix(
-            Offset, *reinterpret_cast<Matrix const*>(Orientation),
+            Offset, Orientation,
             Cam->ViewPosition);
 
         Vector const& ShipPos = Object->get_position();
@@ -95,7 +95,7 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
         Position[1] = Offset.y + ShipPos.y;
         Position[2] = Offset.z + ShipPos.z;
 
-        memcpy(&Space->World, Orientation, 9 * sizeof(float));
+        memcpy(&Space->World, &Orientation, 9 * sizeof(float));
         Space->WorldPos.x = Position[0];
         Space->WorldPos.y = Position[1];
         Space->WorldPos.z = Position[2];

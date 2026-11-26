@@ -106,9 +106,9 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
     (void)NewParent;
 
     // (-0.45f, 0.24f, 0), 0.95f x 0.06f, 1.4f.
-    float const CaptionPosition[3] = {NnFloatBits(0xbee66666), NnFloatBits(0x3e75c28f), 0.0f};
+    Vector const CaptionPosition = {NnFloatBits(0xbee66666), NnFloatBits(0x3e75c28f), 0.0f};
     Caption = static_cast<NnTextControl*>(CreateTextControl(
-        "ArrivalText", "PageHeader", CaptionPosition, nullptr, NnFloatBits(0x3f733333),
+        "ArrivalText", "PageHeader", &CaptionPosition, nullptr, NnFloatBits(0x3f733333),
         NnFloatBits(0x3d75c28f), NnFloatBits(0x3fb33333), 0, 0, 0, 1));
 
     // The colour override; no null test on the control.
@@ -116,7 +116,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
     Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
 
     HoldTime = 2.0f;
     Delay = 4.0f;

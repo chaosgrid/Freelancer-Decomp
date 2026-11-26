@@ -139,7 +139,7 @@ namespace
     // at PC24/round-down: tangent {-0, min-subnormal, -min-subnormal}
     // produces matrix X 0x3f7fffff instead of 0x3f800000 in Release.
     // Debug also adds denormal-operand status through extra reloads.
-    void BuildSlot5MatrixRetail(const Vector& Tangent, float* Mat9)
+    void BuildSlot5MatrixRetail(const Vector& Tangent, Matrix* Mat9)
     {
         float Scratch[27];
         std::memcpy(Scratch + 3, &Tangent, sizeof(Tangent));
@@ -1525,11 +1525,11 @@ namespace
             // or neighbor array. Preserve the defined output path below.
             if (!EvalTangent(T, &Tangent.x))
                 return static_cast<GENRESULT>(-1);
-            float Mat9[9];
-            BuildSlot5MatrixRetail(Tangent, Mat9);
+            Matrix Mat9;
+            BuildSlot5MatrixRetail(Tangent, &Mat9);
             I3DMathEngine* Math = AcquireSplineMathEngine();
             Matrix MatrixInput;
-            std::memcpy(&MatrixInput, Mat9, sizeof(MatrixInput));
+            std::memcpy(&MatrixInput, &Mat9, sizeof(MatrixInput));
             Quaternion QuaternionResult;
             Math->MatrixToQuaternion(QuaternionResult, MatrixInput);
             std::memcpy(Out, &QuaternionResult, sizeof(QuaternionResult));

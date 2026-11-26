@@ -66,20 +66,6 @@ namespace CmnPhySys
 
 namespace
 {
-    // The engine's per-instance joint block (IEngine::GetInstanceRelative, +0xc4) as
-    // FUN_062883c0 reads it. common_cattachment.cpp's file-local FRevoluteJoint is the same block.
-    struct FPhySysJointBlock
-    {
-        unsigned long Type;  // +0x00  0, 1 or 2 (anything else: the pose is left as the parent's)
-        Vector ParentPoint; // +0x04
-        Vector ChildPoint;  // +0x10
-        Matrix Orient;      // +0x1c
-        Vector Axis;        // +0x40
-    };
-    static_assert(offsetof(FPhySysJointBlock, ParentPoint) == 0x04, "joint block +0x04");
-    static_assert(offsetof(FPhySysJointBlock, ChildPoint) == 0x10, "joint block +0x10");
-    static_assert(offsetof(FPhySysJointBlock, Orient) == 0x1c, "joint block +0x1c");
-    static_assert(offsetof(FPhySysJointBlock, Axis) == 0x40, "joint block +0x40");
     static_assert(sizeof(Transform) == 0x30, "the engine instance transform is 12 floats");
 
     // FUN_06288860 (thiscall on M): M = M * B through the math engine.
@@ -132,17 +118,17 @@ namespace CmnPhySys
             // Called once with the result unused, as in retail.
             Engine->GetInstanceRelative(Child);
 
-            // GetInstanceRelative hands back the child's joint block (typed unsigned long*).
+            // GetInstanceRelative hands back the child's joint block; FUN_062883c0 acts on
+            // Type 0, 1 or 2 (anything else: the pose is left as the parent's).
             Transform Local = *ParentTransform;
-            FPhySysJointBlock const* const Joint =
-                (FPhySysJointBlock const*)Engine->GetInstanceRelative(Child);
+            FEngineJointBlock const* const Joint = Engine->GetInstanceRelative(Child);
             Matrix const ParentRotation = Local.Rotation;
 
             if (Joint->Type == 0)
             {
                 // R = R * Orient; T += ParentR * ChildPoint.
                 PhySys_MatrixMulInPlace(Local.Rotation, Joint->Orient);
-                Vector const Offset = PhySys_MatrixTransform(ParentRotation, Joint->ChildPoint);
+                Vector const Offset = PhySys_MatrixTransform(ParentRotation, Joint->ChildPos);
                 Local.Translation.x = Local.Translation.x + Offset.x;
                 Local.Translation.y = Local.Translation.y + Offset.y;
                 Local.Translation.z = Local.Translation.z + Offset.z;
@@ -154,7 +140,7 @@ namespace CmnPhySys
                 Engine->GetJointParams(Child, 0, &Parameter);
 
                 PhySys_MatrixMulInPlace(Local.Rotation, Joint->Orient);
-                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
+                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPos);
 
                 // Slid = ParentPoint + Axis * Parameter, each product rounded first.
                 Vector Scaled;
@@ -162,9 +148,9 @@ namespace CmnPhySys
                 Scaled.y = Joint->Axis.y * Parameter;
                 Scaled.z = Joint->Axis.z * Parameter;
                 Vector Slid;
-                Slid.x = Joint->ParentPoint.x + Scaled.x;
-                Slid.y = Joint->ParentPoint.y + Scaled.y;
-                Slid.z = Joint->ParentPoint.z + Scaled.z;
+                Slid.x = Joint->ParentPos.x + Scaled.x;
+                Slid.y = Joint->ParentPos.y + Scaled.y;
+                Slid.z = Joint->ParentPos.z + Scaled.z;
 
                 // T += (ParentR * Slid) - ChildOffset.
                 Vector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Slid);
@@ -202,8 +188,8 @@ namespace CmnPhySys
                 PhySys_MatrixMulInPlace(Local.Rotation, PhySys_MatrixMul(JointRotation, Joint->Orient));
 
                 // T += (ParentR * ParentPoint) - (R * ChildPoint).
-                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
-                Vector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Joint->ParentPoint);
+                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPos);
+                Vector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Joint->ParentPos);
                 Vector Delta;
                 Delta.x = ParentOffset.x - ChildOffset.x;
                 Delta.y = ParentOffset.y - ChildOffset.y;

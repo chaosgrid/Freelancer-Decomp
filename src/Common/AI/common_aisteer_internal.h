@@ -69,7 +69,7 @@ namespace CmnAiSteer
     // FaceIdea::Update / DodgeIdea::Update plumbing.
     void RefreshCachedIfacePosition(SystemManager* Sys);
     Vector CachedIfacePosition(SystemManager* Sys);
-    Matrix* IfaceOrientation(SystemManager* Sys);
+    Matrix const* IfaceOrientation(SystemManager* Sys);
 
     // FUN_062e3730, cdecl (Out, Reference, RelDir, UpHint).
     void SteeringFrameFromRelativeDir(Matrix& Out, Matrix const& Reference, Vector const& RelDir, Vector const& UpHint);

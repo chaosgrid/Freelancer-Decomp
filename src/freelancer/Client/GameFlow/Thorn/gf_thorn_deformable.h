@@ -35,15 +35,15 @@ struct FThornDeformable : FThornComponent
     GENRESULT DACOM_API ConnectHardpoints(void* Desc) override;          // 7  FUN_00452d70
     GENRESULT DACOM_API DisconnectHardpoints(void* Desc) override;       // 8  FUN_00452db0
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
-                                          float* OutXform12) override;   // 9  LAB_00452730
+                                          Transform* OutXform) override; // 9  LAB_00452730
     GENRESULT DACOM_API GetFloorHeight(float* OutHeight) override;       // 10 LAB_00452d50
     GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00452b50
     GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00452c70
 
     // IIKControl (0x005cd1a8..0x005cd1b0)
-    GENRESULT DACOM_API StartIk(void* Desc, float* Position, float* Orientation) override;  // LAB_00452460
+    GENRESULT DACOM_API StartIk(void* Desc, Vector* Position, Matrix* Orientation) override;  // LAB_00452460
     GENRESULT DACOM_API StopIk(void* Desc) override;                                        // FUN_00452a30
-    GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) override; // LAB_00452680
+    GENRESULT DACOM_API UpdateIk(void* Desc, Vector* Position, Matrix* Orientation) override; // LAB_00452680
 
     // IGeoTransformControl (0x005cd188..0x005cd194)
     GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // LAB_00452ab0

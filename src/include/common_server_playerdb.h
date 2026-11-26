@@ -273,8 +273,8 @@ struct PlayerData {
         unsigned int LastBaseId;                     // +0x27c
         unsigned int LocationId;                     // +0x280
         unsigned int SystemId;                       // +0x284
-        float Position[3];                           // +0x288 (ctor: untouched)
-        float Orientation[3][3];                     // +0x294 (ctor: untouched)
+        Vector Position;                             // +0x288 (ctor: untouched)
+        Matrix Orientation;                          // +0x294 (ctor: untouched)
         unsigned int StartingRing;                   // +0x2b8 an ID_String; ctor ID_String::clear
         unsigned int Rank;                           // +0x2bc
         std::vector< ::Reputation::Relation> Relations; // +0x2c0 `house` / `group` / `initial_rep`
@@ -299,12 +299,12 @@ struct PlayerData {
               Relations(), RepGroup(0xffffffffu), EquipIdMaker(), WeaponGroups(),
               MissionLog(), Interface(0), Visits() {
             FileName[0] = '\0';
-            Position[0] = 0.0f;
-            Position[1] = 0.0f;
-            Position[2] = 0.0f;
+            Position.x = 0.0f;
+            Position.y = 0.0f;
+            Position.z = 0.0f;
             for (int Row = 0; Row < 3; ++Row)
                 for (int Col = 0; Col < 3; ++Col)
-                    Orientation[Row][Col] = 0.0f;
+                    Orientation.E[Row][Col] = 0.0f;
             ComCostume = Costume();
             BaseCostume = Costume();
             Voice.Length = 0;

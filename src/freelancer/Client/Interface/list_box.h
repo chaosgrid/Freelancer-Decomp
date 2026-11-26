@@ -32,7 +32,7 @@ public:
     ~ListBox() override;
 
     // slot 4 FUN_005a26a0
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 9 LAB_005a2070
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 LAB_005a2230
@@ -40,7 +40,7 @@ public:
     // slot 13 LAB_005a2360
     void Draw() override;
     // slot 14 LAB_0059c8b0
-    void MouseOver(float const* Ray) override;
+    void MouseOver(Vector const* Ray) override;
     // slot 19 FUN_005a2710
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
 

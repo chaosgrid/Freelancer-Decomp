@@ -2419,8 +2419,8 @@ namespace
         float const CosY = static_cast<float>(cos(AngleY));
 
         // Retail calls GetHalfFovXDeg once more and discards the result.
-        float Orient9[9];
-        memcpy(Orient9, Camera->GetOrientation(), sizeof(Orient9));
+        Matrix Orient9;
+        memcpy(&Orient9, Camera->GetOrientation(), sizeof(Orient9));
         const float* const Pos3 = (const float*)Camera->GetPosition();
         Vector const CamPos = AsteroidVec(Pos3[0], Pos3[1], Pos3[2]);
         Camera->GetHalfFovXDeg();
@@ -2440,10 +2440,10 @@ namespace
         }
         else
         {
-            Col0 = AsteroidVec(Orient9[0], Orient9[3], Orient9[6]);
-            Col1 = AsteroidVec(Orient9[1], Orient9[4], Orient9[7]);
-            Col2 = AsteroidVec(Orient9[2], Orient9[5], Orient9[8]);
-            memcpy(s_CachedOrient, Orient9, sizeof(s_CachedOrient));
+            Col0 = AsteroidVec(Orient9.E[0][0], Orient9.E[1][0], Orient9.E[2][0]);
+            Col1 = AsteroidVec(Orient9.E[0][1], Orient9.E[1][1], Orient9.E[2][1]);
+            Col2 = AsteroidVec(Orient9.E[0][2], Orient9.E[1][2], Orient9.E[2][2]);
+            memcpy(s_CachedOrient, &Orient9, sizeof(s_CachedOrient));
             s_CachedPos[0] = CamPos.x;
             s_CachedPos[1] = CamPos.y;
             s_CachedPos[2] = CamPos.z;

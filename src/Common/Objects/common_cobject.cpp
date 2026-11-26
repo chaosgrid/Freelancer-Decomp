@@ -477,7 +477,7 @@ float CObject::get_physical_radius_r(Vector& OutCenter) const
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
-    Math->TransformXform(World, *(Transform const*)&Orientation, OutCenter);
+    Math->TransformXform(World, get_transform(), OutCenter);
     OutCenter = World;
     return Radius;
 }

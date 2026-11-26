@@ -176,14 +176,13 @@ namespace
         ICamera* const Camera = AsCamera(Win3DGetCamera());
         return static_cast<unsigned char>(
                    Camera->Project(&OutScreen->x, &OutScreen->y, &OutScreen->z,
-                                   reinterpret_cast<Vector const*>(&World.x))) != 0;
+                                   &World)) != 0;
     }
 
     // FUN_005a1130 (thiscall on the half extents, RET 8).
-    bool RayHits(Vector const& HalfExtents, Transform const& Xform, float const* Ray)
+    bool RayHits(Vector const& HalfExtents, Transform const& Xform, Vector const* Ray)
     {
-        return Win3DRayHitsAabbHalfExtents(&HalfExtents.x,
-                                           reinterpret_cast<float const*>(&Xform), Ray);
+        return Win3DRayHitsAabbHalfExtents(&HalfExtents, &Xform, Ray);
     }
 
     // One tinted part draw, inlined in every Draw block (the colour conversion is
@@ -321,7 +320,7 @@ void ScrollControl::UpdateLayout()
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
     {
         Vector const Position = {Win3D::Position.x, Win3D::Position.y, Win3D::Position.z};
-        Vector const ControlOffset = {Offset[0], Offset[1], Offset[2]};
+        Vector const ControlOffset = {Offset.x, Offset.y, Offset.z};
 
         Back.Xform = Back.Hp;
         Vector Moved = Add(Add(Back.Offset, Position), ControlOffset);
@@ -399,13 +398,13 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
             bPageTowardMin = 1;
             return;
         }
-        float TrackDir[3];
-        float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
-        double const Dot = (static_cast<double>(MouseDir[2]) * TrackDir[2] +
-                            static_cast<double>(MouseDir[1]) * TrackDir[1]) +
-                           static_cast<double>(MouseDir[0]) * TrackDir[0];
+        Vector TrackDir;
+        Vector MouseDir;
+        HudVec3ScaleByInverse(&TrackDir, &Track, TrackLength);
+        HudVec3ScaleByInverse(&MouseDir, &ToMouse, MouseLength);
+        double const Dot = (static_cast<double>(MouseDir.z) * TrackDir.z +
+                            static_cast<double>(MouseDir.y) * TrackDir.y) +
+                           static_cast<double>(MouseDir.x) * TrackDir.x;
         // Unordered gives 0.
         bPageTowardMin = (Dot * MouseLength < TrackLength) ? 1 : 0;
         return;
@@ -437,16 +436,16 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
         bPageTowardMin = 1;
         return;
     }
-    float TrackDir[3];
-    HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
+    Vector TrackDir;
+    HudVec3ScaleByInverse(&TrackDir, &Track, TrackLength);
     // The reciprocal stays double, the products are rounded to float.
     double const InvMouse = 1.0 / static_cast<double>(MouseLength);
     float const MouseDir[3] = {static_cast<float>(ToMouse.x * InvMouse),
                                static_cast<float>(ToMouse.y * InvMouse),
                                static_cast<float>(ToMouse.z * InvMouse)};
-    double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
-                        static_cast<double>(MouseDir[1]) * TrackDir[1]) +
-                       static_cast<double>(MouseDir[2]) * TrackDir[2];
+    double const Dot = (static_cast<double>(TrackDir.x) * MouseDir[0] +
+                        static_cast<double>(MouseDir[1]) * TrackDir.y) +
+                       static_cast<double>(MouseDir[2]) * TrackDir.z;
     // Unordered gives 1.
     bPageTowardMin = (Dot * MouseLength < TrackLength) ? 0 : 1;
 }
@@ -477,13 +476,13 @@ void ScrollControl::PageStep()
         float const MouseLength = FastLengthStored(SquaredLengthZyx(ToMouse));
         if (TrackLength == 0.0f || MouseLength == 0.0f)
             return;
-        float TrackDir[3];
-        float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
-        double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
-                            static_cast<double>(TrackDir[1]) * MouseDir[1]) +
-                           static_cast<double>(TrackDir[2]) * MouseDir[2];
+        Vector TrackDir;
+        Vector MouseDir;
+        HudVec3ScaleByInverse(&TrackDir, &Track, TrackLength);
+        HudVec3ScaleByInverse(&MouseDir, &ToMouse, MouseLength);
+        double const Dot = (static_cast<double>(TrackDir.x) * MouseDir.x +
+                            static_cast<double>(TrackDir.y) * MouseDir.y) +
+                           static_cast<double>(TrackDir.z) * MouseDir.z;
         // Only strictly below goes on.
         if (!(Dot * MouseLength < TrackLength))
             return;
@@ -510,13 +509,13 @@ void ScrollControl::PageStep()
         float const MouseLength = FastLengthExtended(SquaredLengthZyx(ToMouse));
         if (TrackLength == 0.0f || MouseLength == 0.0f)
             return;
-        float TrackDir[3];
-        float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
-        double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
-                            static_cast<double>(TrackDir[1]) * MouseDir[1]) +
-                           static_cast<double>(TrackDir[2]) * MouseDir[2];
+        Vector TrackDir;
+        Vector MouseDir;
+        HudVec3ScaleByInverse(&TrackDir, &Track, TrackLength);
+        HudVec3ScaleByInverse(&MouseDir, &ToMouse, MouseLength);
+        double const Dot = (static_cast<double>(TrackDir.x) * MouseDir.x +
+                            static_cast<double>(TrackDir.y) * MouseDir.y) +
+                           static_cast<double>(TrackDir.z) * MouseDir.z;
         if (!(Dot * MouseLength < TrackLength))
             return;
         Value += PageSize;
@@ -741,25 +740,25 @@ bool ScrollControl::Create(Win3D* NewParent, void* Data)
     // The linked parent re-applies its own position.
     Win3D* const LinkedParent = Parent;
     if (LinkedParent != nullptr)
-        LinkedParent->SetPosition(&LinkedParent->Position.x);
+        LinkedParent->SetPosition(&LinkedParent->Position);
     return true;
 }
 
-void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char const* BackHp,
-                         float const* BackMouse, bool bBackNoMeshRender, char const* NextMesh,
-                         float const* NextOffset, char const* NextHp, float const* NextMouse,
-                         bool bNextNoMeshRender, char const* PrevMesh, float const* PrevOffset,
-                         char const* PrevHp, float const* PrevMouse, bool bPrevNoMeshRender,
-                         char const* ThumbMesh, float const* NewThumbOffset0,
-                         float const* NewThumbOffset1, char const* NewThumbHp0,
-                         char const* NewThumbHp1, float const* NewThumbMouse,
+void ScrollControl::Init(char const* BackMesh, Vector const* BackOffset, char const* BackHp,
+                         Vector const* BackMouse, bool bBackNoMeshRender, char const* NextMesh,
+                         Vector const* NextOffset, char const* NextHp, Vector const* NextMouse,
+                         bool bNextNoMeshRender, char const* PrevMesh, Vector const* PrevOffset,
+                         char const* PrevHp, Vector const* PrevMouse, bool bPrevNoMeshRender,
+                         char const* ThumbMesh, Vector const* NewThumbOffset0,
+                         Vector const* NewThumbOffset1, char const* NewThumbHp0,
+                         char const* NewThumbHp1, Vector const* NewThumbMouse,
                          bool bNewThumbNoMeshRender, int NewMinRange, int NewMaxRange,
                          int NewPageSize, bool bNewSliderBehavior, bool bNewNoZEnable)
 {
     // FUN_00582120 (RET 0x6c). Hardpoints here are asked of the linked parent (+4).
     if (BackMesh != nullptr)
         LoadPartMesh(this, &Back.Holder, BackMesh, &Back.Xform);
-    Back.Offset = {BackOffset[0], BackOffset[1], BackOffset[2]};
+    Back.Offset = {BackOffset->x, BackOffset->y, BackOffset->z};
     UpdateLayout();
     PushInstancePosition(&Back.Holder, &Back.Xform.Translation);
     if (BackHp != nullptr)
@@ -768,12 +767,12 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
         if (Parent != nullptr)
             AskHardpoint(Parent, BackHp, &Back.Hp);
     }
-    Back.MouseSize = {BackMouse[0], BackMouse[1], BackMouse[2]};
+    Back.MouseSize = {BackMouse->x, BackMouse->y, BackMouse->z};
     Back.bNoMeshRender = bBackNoMeshRender ? 1 : 0;
 
     if (NextMesh != nullptr)
         LoadPartMesh(this, &Next.Holder, NextMesh, &Next.Xform);
-    Next.Offset = {NextOffset[0], NextOffset[1], NextOffset[2]};
+    Next.Offset = {NextOffset->x, NextOffset->y, NextOffset->z};
     UpdateLayout();
     PushInstancePosition(&Next.Holder, &Next.Xform.Translation);
     if (NextHp != nullptr)
@@ -782,14 +781,14 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
         if (Parent != nullptr)
             AskHardpoint(Parent, NextHp, &Next.Hp);
     }
-    Next.MouseSize = {NextMouse[0], NextMouse[1], NextMouse[2]};
+    Next.MouseSize = {NextMouse->x, NextMouse->y, NextMouse->z};
     Next.bNoMeshRender = bNextNoMeshRender ? 1 : 0;
 
     // Prev: all of it only with a mesh name.
     if (PrevMesh != nullptr)
     {
         LoadPartMesh(this, &Prev.Holder, PrevMesh, &Prev.Xform);
-        Prev.Offset = {PrevOffset[0], PrevOffset[1], PrevOffset[2]};
+        Prev.Offset = {PrevOffset->x, PrevOffset->y, PrevOffset->z};
         UpdateLayout();
         PushInstancePosition(&Prev.Holder, &Prev.Xform.Translation);
         if (PrevHp != nullptr)
@@ -798,16 +797,16 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
             if (Parent != nullptr)
                 AskHardpoint(Parent, PrevHp, &Prev.Hp);
         }
-        Prev.MouseSize = {PrevMouse[0], PrevMouse[1], PrevMouse[2]};
+        Prev.MouseSize = {PrevMouse->x, PrevMouse->y, PrevMouse->z};
         Prev.bNoMeshRender = bPrevNoMeshRender ? 1 : 0;
     }
 
     if (ThumbMesh != nullptr)
         LoadPartMesh(this, &ThumbHolder, ThumbMesh, &ThumbXform);
-    ThumbOffset0 = {NewThumbOffset0[0], NewThumbOffset0[1], NewThumbOffset0[2]};
+    ThumbOffset0 = {NewThumbOffset0->x, NewThumbOffset0->y, NewThumbOffset0->z};
     UpdateLayout();
     PushInstancePosition(&ThumbHolder, &ThumbXform.Translation);
-    ThumbOffset1 = {NewThumbOffset1[0], NewThumbOffset1[1], NewThumbOffset1[2]};
+    ThumbOffset1 = {NewThumbOffset1->x, NewThumbOffset1->y, NewThumbOffset1->z};
     UpdateLayout();
     PushInstancePosition(&ThumbHolder, &ThumbXform.Translation);
     if (NewThumbHp0 != nullptr)
@@ -823,7 +822,7 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
             AskHardpoint(Parent, NewThumbHp1, &ThumbHp1);
     }
 
-    ThumbMouse ={NewThumbMouse[0], NewThumbMouse[1], NewThumbMouse[2]};
+    ThumbMouse ={NewThumbMouse->x, NewThumbMouse->y, NewThumbMouse->z};
     bThumbNoMeshRender = bNewThumbNoMeshRender ? 1 : 0;
     MinRange = NewMinRange;
     MaxRange = NewMaxRange;
@@ -832,7 +831,7 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
     bNoZEnable = bNewNoZEnable ? 1 : 0;
 }
 
-bool ScrollControl::HitTest(float const* Ray)
+bool ScrollControl::HitTest(Vector const* Ray)
 {
     // LAB_00583130: any button, or a valid thumb.
     if (RayHits(Back.MouseSize, Back.Xform, Ray))
@@ -846,7 +845,7 @@ bool ScrollControl::HitTest(float const* Ray)
     return false;
 }
 
-void ScrollControl::SetPosition(float const* NewPosition)
+void ScrollControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_00582aa0.
     WinControl::SetPosition(NewPosition);
@@ -991,13 +990,13 @@ void ScrollControl::Draw()
     Win3DDisable(kWin3DDepthTest);
 }
 
-void ScrollControl::MouseOver(float const* Ray)
+void ScrollControl::MouseOver(Vector const* Ray)
 {
     // LAB_00583120: a virtual tail jump to MouseEnter.
     MouseEnter(Ray);
 }
 
-void ScrollControl::MouseEnter(float const* Ray)
+void ScrollControl::MouseEnter(Vector const* Ray)
 {
     // LAB_005830a0 (RET 4): the hover bytes; a hovered valid thumb masks both buttons.
     bNextHover = RayHits(Next.MouseSize, Next.Xform, Ray) ? 1 : 0;
@@ -1013,7 +1012,7 @@ void ScrollControl::MouseEnter(float const* Ray)
     }
 }
 
-void ScrollControl::MouseLeave(float const* Ray)
+void ScrollControl::MouseLeave(Vector const* Ray)
 {
     // LAB_00583120.
     MouseEnter(Ray);
@@ -1088,18 +1087,18 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     double const Inv = 1.0 / sqrt((static_cast<double>(World.x) * World.x +
                                    static_cast<double>(World.y) * World.y) +
                                   static_cast<double>(World.z) * World.z);
-    float Ray[3];
-    Ray[0] = static_cast<float>(World.x * Inv);
-    Ray[1] = static_cast<float>(World.y * Inv);
-    Ray[2] = static_cast<float>(World.z * Inv);
+    Vector Ray;
+    Ray.x = static_cast<float>(World.x * Inv);
+    Ray.y = static_cast<float>(World.y * Inv);
+    Ray.z = static_cast<float>(World.z * Inv);
 
     bool bStartDrag = false;
-    if (bThumbValid != 0 && RayHits(ThumbMouse, ThumbXform, Ray))
+    if (bThumbValid != 0 && RayHits(ThumbMouse, ThumbXform, &Ray))
     {
         Win3DPushCapture(this);
         bStartDrag = true;
     }
-    else if (RayHits(Next.MouseSize, Next.Xform, Ray))
+    else if (RayHits(Next.MouseSize, Next.Xform, &Ray))
     {
         // One step up at once, then auto-repeat from Update.
         Win3DPushCapture(this);
@@ -1115,7 +1114,7 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
         RepeatTime = static_cast<float>(GetClientElapsedTime());
         return true;
     }
-    else if (RayHits(Prev.MouseSize, Prev.Xform, Ray))
+    else if (RayHits(Prev.MouseSize, Prev.Xform, &Ray))
     {
         Win3DPushCapture(this);
         if (Value > MinRange)
@@ -1135,7 +1134,7 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
         // The back plate.
         if (bThumbValid == 0)
             return true;
-        if (!RayHits(Back.MouseSize, Back.Xform, Ray))
+        if (!RayHits(Back.MouseSize, Back.Xform, &Ray))
             return true;
         Win3DPushCapture(this);
         if (bSliderBehavior == 0)
@@ -1175,9 +1174,9 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // WinControl::Offset (+0xa8) from the vector at A, then the layout.
         float const* const NewOffset = reinterpret_cast<float const*>(A);
-        Offset[0] = NewOffset[0];
-        Offset[1] = NewOffset[1];
-        Offset[2] = NewOffset[2];
+        Offset.x = NewOffset[0];
+        Offset.y = NewOffset[1];
+        Offset.z = NewOffset[2];
         UpdateLayout();
         return 0;
     }
@@ -1253,12 +1252,12 @@ void ScrollControl::AddAttachOffset(float const* Delta)
 }
 
 WinControl* WinControl::CreateScrollControl(
-    char const* Name, char const* BackMesh, float const* BackOffset, char const* BackHp,
-    float const* BackMouse, bool bBackNoMeshRender, char const* NextMesh, float const* NextOffset,
-    char const* NextHp, float const* NextMouse, bool bNextNoMeshRender, char const* PrevMesh,
-    float const* PrevOffset, char const* PrevHp, float const* PrevMouse, bool bPrevNoMeshRender,
-    char const* ThumbMesh, float const* ThumbOffset0, float const* ThumbOffset1,
-    char const* ThumbHp0, char const* ThumbHp1, float const* ThumbMouse,
+    char const* Name, char const* BackMesh, Vector const* BackOffset, char const* BackHp,
+    Vector const* BackMouse, bool bBackNoMeshRender, char const* NextMesh, Vector const* NextOffset,
+    char const* NextHp, Vector const* NextMouse, bool bNextNoMeshRender, char const* PrevMesh,
+    Vector const* PrevOffset, char const* PrevHp, Vector const* PrevMouse, bool bPrevNoMeshRender,
+    char const* ThumbMesh, Vector const* ThumbOffset0, Vector const* ThumbOffset1,
+    char const* ThumbHp0, char const* ThumbHp1, Vector const* ThumbMouse,
     bool bThumbNoMeshRender, int MinRange, int MaxRange, int PageSize, bool bSliderBehavior,
     bool bNoZEnableArg)
 {

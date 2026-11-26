@@ -565,7 +565,7 @@ void ChatInit()
     if (G_ChatGroupControl != nullptr)
     {
         Vector const Position = {0.0f, 0.0f, -1.0f};
-        G_ChatGroupControl->SetPosition(&Position.x);
+        G_ChatGroupControl->SetPosition(&Position);
         G_ChatGroupControl->Flags = static_cast<unsigned char>(G_ChatGroupControl->Flags & 0xfc);
     }
 }
@@ -758,7 +758,7 @@ void ChatSetInputOpen(bool bOpen)
             if (Input == nullptr)
                 return;
             Vector const Position = {G_ChatInputX, -0.265f, -1.0f};   // DAT_005ceee4
-            Input->SetPosition(&Position.x);
+            Input->SetPosition(&Position);
         }
         ChatTextInputDisplay* const Line = static_cast<ChatTextInputDisplay*>(Input);
         Line->bCloseAfterSend = 1;
@@ -905,14 +905,14 @@ void ChatPlaceMsgWinForTrade(int Mode)
     {
         // The default place.
         Vector const Position = {-0.51f, 0.25f, -1.0f};
-        G_ChatMsgWin->SetPosition(&Position.x);
+        G_ChatMsgWin->SetPosition(&Position);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
     else if (Mode == 1)
     {
         // Beside the trade window.
         Vector const Position = {-0.275f, 0.045f, -1.0f};
-        G_ChatMsgWin->SetPosition(&Position.x);
+        G_ChatMsgWin->SetPosition(&Position);
         G_ChatMsgWin->SetNormSize(0.56f, 0.39f);
     }
 }
@@ -937,7 +937,7 @@ MsgWin::~MsgWin()
     Snapshot = nullptr;
 }
 
-bool MsgWin::HitTest(float const* /*Ray*/)
+bool MsgWin::HitTest(Vector const* /*Ray*/)
 {
     // Slot 4 of vftable 0x005cffc4 is FUN_0053f330 (returns false), not BaseRichTextWin's
     // LAB_0057aa80: the chat message window is never picked, so the mouse goes through it to
@@ -1019,7 +1019,7 @@ void ChatCreateMsgWin()
     {
         // DAT_005ceec4 / DAT_005ceec8, then DAT_005ceebc / DAT_005ceec0.
         Vector const Position = {-0.51f, 0.25f, -1.0f};
-        G_ChatMsgWin->SetPosition(&Position.x);
+        G_ChatMsgWin->SetPosition(&Position);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
     // Retail does not test the window again here.

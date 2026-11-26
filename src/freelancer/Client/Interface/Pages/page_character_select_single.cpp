@@ -109,7 +109,7 @@ namespace
                 Position.y = 0.0f;
                 Position.z = 0.0f;
             }
-            Images[Index]->SetPosition(&Position.x);
+            Images[Index]->SetPosition(&Position);
         }
     }
 }
@@ -732,8 +732,8 @@ void PageCharacterSelectSingle::Update()
         {
             // UpdateScrollVisibility's test is inlined here.
             Vector const Home = {0.0f, 0.0f, 0.0f};
-            BigBox->SetPosition(&Home.x);
-            SmallBox->SetPosition(&Home.x);
+            BigBox->SetPosition(&Home);
+            SmallBox->SetPosition(&Home);
             ShowWin3D(CharacterMoney);
             ShowWin3D(CharacterRank);
             ShowWin3D(CharacterLocation);
@@ -761,9 +761,9 @@ void PageCharacterSelectSingle::Update()
         {
             // -1.5 is DAT_005e2bb0.
             Vector const BigPosition = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
-            BigBox->SetPosition(&BigPosition.x);
+            BigBox->SetPosition(&BigPosition);
             Vector const SmallPosition = {0.0f, static_cast<float>(SlideT), 0.0f};
-            SmallBox->SetPosition(&SmallPosition.x);
+            SmallBox->SetPosition(&SmallPosition);
         }
 
         // -0.5 is DAT_005e2a50, -0.1 DAT_005d5070.
@@ -794,9 +794,9 @@ void PageCharacterSelectSingle::Update()
         else
         {
             Vector const BigPosition = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
-            BigBox->SetPosition(&BigPosition.x);
+            BigBox->SetPosition(&BigPosition);
             Vector const SmallPosition = {0.0f, static_cast<float>(SlideT), 0.0f};
-            SmallBox->SetPosition(&SmallPosition.x);
+            SmallBox->SetPosition(&SmallPosition);
         }
     }
 

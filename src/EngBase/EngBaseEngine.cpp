@@ -30,11 +30,11 @@ static void EraseRootInstance(FEngineObject* Engine, FEngineInstance* Instance);
 static void DestroyChildNodeValue(FEngineChildNode* Node);
 static unsigned long JointUtfRecordSize(unsigned long Type);
 static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char bForce);
-static void ApplyRevJoint(float* Dest, const float* Rel, const float* JointState);
-static void ApplyPrisJoint(float* Dest, const float* Rel, const float* JointState);
-static void ApplyCylJoint(float* Dest, const float* Rel, const float* JointState);
-static void ApplySphereJoint(float* Dest, const float* Rel, const float* JointState);
-static void ApplyLooseJoint(float* Dest, const float* Rel, const float* JointState);
+static void ApplyRevJoint(Transform* Dest, const float* Rel, const float* JointState);
+static void ApplyPrisJoint(Transform* Dest, const float* Rel, const float* JointState);
+static void ApplyCylJoint(Transform* Dest, const float* Rel, const float* JointState);
+static void ApplySphereJoint(Transform* Dest, const float* Rel, const float* JointState);
+static void ApplyLooseJoint(Transform* Dest, const float* Rel, const float* JointState);
 
 // FEngineObject holds a real std::map (the instance-root map), so only the facet offset is
 // asserted; the retail byte layout is documented on the struct.
@@ -131,17 +131,17 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 }
 
 // Packed 3x3 orientation followed by translation (12 floats).
-static float G_IdentityMatrix[12] = {
-    1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+static Transform G_IdentityMatrix = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                     {0.0f, 0.0f, 0.0f}};
 
-static void InitIdentity3x4(void* Dest)
+static void InitIdentity3x4(Transform* Dest)
 {
-    std::memcpy(Dest, G_IdentityMatrix, sizeof(G_IdentityMatrix));
+    std::memcpy(Dest, &G_IdentityMatrix, sizeof(G_IdentityMatrix));
 }
 
 static void InitInstanceMatrix(FEngineInstance* Instance)
 {
-    InitIdentity3x4(Instance->Matrix);
+    InitIdentity3x4(&Instance->Matrix);
 }
 
 // FUN_0661eb80.
@@ -197,25 +197,25 @@ unsigned char FEngineInstance::ConnectChild(FEngineInstance* Child, const unsign
 }
 
 // FUN_0661ece0 (only caller IEngine slot 33).
-void FEngineInstance::SetExtentAndInvalidate(float Extent, const float* Vec, unsigned char bXform)
+void FEngineInstance::SetExtentAndInvalidate(float Extent, const Vector* Vec, unsigned char bXform)
 {
     if (bXform != 0)
     {
-        Callbacks->set_centered_radius((long)this, Extent, *(const Vector*)Vec);
+        Callbacks->set_centered_radius((long)this, Extent, *Vec);
         InvalidateExtentChain(bXform);
         return;
     }
     this->Extent = Extent;
-    ExtentVec[0] = Vec[0];
-    ExtentVec[1] = Vec[1];
-    ExtentVec[2] = Vec[2];
+    ExtentVec.x = Vec->x;
+    ExtentVec.y = Vec->y;
+    ExtentVec.z = Vec->z;
     InvalidateExtentChain(0);
 }
 
 // FUN_0661ed40: the transform at +4, slot 9. No checks.
-void FEngineInstance::TransformExtra(float* OutExtent, float* OutVec)
+void FEngineInstance::TransformExtra(float* OutExtent, Vector* OutVec)
 {
-    Callbacks->get_centered_radius((long)this, OutExtent, (Vector*)OutVec);
+    Callbacks->get_centered_radius((long)this, OutExtent, OutVec);
 }
 
 // FUN_0661ed60: walk up the parents (+0x10), writing -1 to the extent (+0xD8) until one already
@@ -249,7 +249,7 @@ static double ExtentDistance(const float* A, const float* B)
 
 // FUN_0661ed90: the bounding sphere of the instance and its children, cached in +0xD8.
 void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent,
-                                            float* OutVec)
+                                            Vector* OutVec)
 {
     if (bRecursive == 0)
     {
@@ -259,20 +259,20 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     if (Extent > 0.0f)
     {
         *OutExtent = Extent;
-        OutVec[0] = ExtentVec[0];
-        OutVec[1] = ExtentVec[1];
-        OutVec[2] = ExtentVec[2];
+        OutVec->x = ExtentVec.x;
+        OutVec->y = ExtentVec.y;
+        OutVec->z = ExtentVec.z;
         return;
     }
 
     const Transform* WorldXf = &Callbacks->get_transform((long)this);
     float OwnR = 0.0f;
-    float OwnLocal[3];
-    TransformExtra(&OwnR, OwnLocal);
+    Vector OwnLocal;
+    TransformExtra(&OwnR, &OwnLocal);
     float OwnWorld[3];
     Acquire3DMathEngine()->TransformXform(*(Vector*)OwnWorld,
                                                   *WorldXf,
-                                                  *(const Vector*)OwnLocal);
+                                                  OwnLocal);
 
     float MinV[3];
     float MaxV[3];
@@ -287,12 +287,12 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     {
         const Transform& ChildXf = Child->Callbacks->get_transform((long)Child);
         float ChildR = 0.0f;
-        float ChildLocal[3];
-        Child->ComputeInstanceExtent(1, &ChildR, ChildLocal);
+        Vector ChildLocal;
+        Child->ComputeInstanceExtent(1, &ChildR, &ChildLocal);
         float ChildWorld[3];
         Acquire3DMathEngine()->TransformXform(*(Vector*)ChildWorld,
                                                       ChildXf,
-                                                      *(const Vector*)ChildLocal);
+                                                      ChildLocal);
         for (unsigned long Axis = 0; Axis < 3; ++Axis)
         {
             const float Lo = ChildWorld[Axis] - ChildR;
@@ -325,12 +325,12 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     {
         const Transform& ChildXf = Child->Callbacks->get_transform((long)Child);
         float ChildR = 0.0f;
-        float ChildLocal[3];
-        Child->ComputeInstanceExtent(1, &ChildR, ChildLocal);
+        Vector ChildLocal;
+        Child->ComputeInstanceExtent(1, &ChildR, &ChildLocal);
         float ChildWorld[3];
         Acquire3DMathEngine()->TransformXform(*(Vector*)ChildWorld,
                                                       ChildXf,
-                                                      *(const Vector*)ChildLocal);
+                                                      ChildLocal);
         const float ChildSphere =
             (float)(ExtentDistance(ChildWorld, CenterW) + (double)ChildR);
         if (ChildSphere > Radius)
@@ -338,18 +338,18 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
         Child = Child->NextSibling;
     }
 
-    float LocalCenter[3];
-    Acquire3DMathEngine()->InverseTransform(*(Vector*)LocalCenter,
+    Vector LocalCenter;
+    Acquire3DMathEngine()->InverseTransform(LocalCenter,
                                                     *WorldXf,
                                                     *(const Vector*)CenterW);
     Extent = Radius;
-    ExtentVec[0] = LocalCenter[0];
-    ExtentVec[1] = LocalCenter[1];
-    ExtentVec[2] = LocalCenter[2];
+    ExtentVec.x = LocalCenter.x;
+    ExtentVec.y = LocalCenter.y;
+    ExtentVec.z = LocalCenter.z;
     *OutExtent = Radius;
-    OutVec[0] = LocalCenter[0];
-    OutVec[1] = LocalCenter[1];
-    OutVec[2] = LocalCenter[2];
+    OutVec->x = LocalCenter.x;
+    OutVec->y = LocalCenter.y;
+    OutVec->z = LocalCenter.z;
 }
 
 // The transform's vtable +0x34 with the instance; its AL decides the FUN_0661f210 recursion.
@@ -380,13 +380,13 @@ unsigned char FEngineInstance::ComposeWorld()
     const Transform& ParentWorld = Parent->Callbacks->get_transform((long)Parent);
     if (G_ComposeMath == nullptr)
         G_ComposeMath = Create3DMathEngine();
-    float Composed[12];
-    G_ComposeMath->MulTransform(*(Transform*)Composed, // +0x1C
+    Transform Composed;
+    G_ComposeMath->MulTransform(Composed, // +0x1C
                                         ParentWorld,
-                                        *(const Transform*)(Matrix));
-    float Copy[12];
-    std::memcpy(Copy, Composed, sizeof(Copy));
-    Callbacks->set_transform((long)this, *(const Transform*)Copy);
+                                        Matrix);
+    Transform Copy;
+    std::memcpy(&Copy, &Composed, sizeof(Copy));
+    Callbacks->set_transform((long)this, Copy);
     if ((bApplied & 0xFF) != 0)
     {
         InvalidateExtentChain(1);
@@ -1537,9 +1537,9 @@ static void CopyTransformState(IEngineInstance* Dest, IEngineInstance* Source,
     // radius pair are uninitialised in retail; the port zeroes them.
     Dest->set_transform((long)Instance, Source->get_transform((long)Instance));
     float Extra = 0.0f;
-    float ExtraVec[3] = {0.0f, 0.0f, 0.0f};
-    Source->get_centered_radius((long)Instance, &Extra, (Vector*)ExtraVec);
-    Dest->set_centered_radius((long)Instance, Extra, *(const Vector*)ExtraVec);
+    Vector ExtraVec = {0.0f, 0.0f, 0.0f};
+    Source->get_centered_radius((long)Instance, &Extra, &ExtraVec);
+    Dest->set_centered_radius((long)Instance, Extra, ExtraVec);
     const unsigned long User = Source->get_instance_flags((long)Instance);
     Dest->set_instance_flags((long)Instance, User);
 }
@@ -1636,7 +1636,7 @@ GENRESULT DACOM_API FEngineObject::SetInstanceExtent(InstanceIndex InInstance, u
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance || Instance == nullptr)
         return GR_OK;
-    Instance->SetExtentAndInvalidate(Extent, (const float*)Center, (unsigned char)(Flags & 1));
+    Instance->SetExtentAndInvalidate(Extent, Center, (unsigned char)(Flags & 1));
     return GR_OK;
 }
 
@@ -1658,13 +1658,12 @@ GENRESULT DACOM_API FEngineObject::GetInstanceExtent(InstanceIndex InInstance, u
         OutCenter->x = 0.0f;
         return GR_OK;
     }
-    // FEngineInstance keeps the centre as three floats.
     if ((Flags & 1) != 0)
     {
-        Instance->ComputeInstanceExtent(0, OutExtent, (float*)OutCenter);
+        Instance->ComputeInstanceExtent(0, OutExtent, OutCenter);
         return GR_OK;
     }
-    Instance->ComputeInstanceExtent(1, OutExtent, (float*)OutCenter);
+    Instance->ComputeInstanceExtent(1, OutExtent, OutCenter);
     return GR_OK;
 }
 
@@ -1681,7 +1680,7 @@ const Vector* DACOM_API FEngineObject::GetInstancePosition(InstanceIndex InInsta
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return (const Vector*)(G_IdentityMatrix + 9);
+        return &G_IdentityMatrix.Translation;
     return &Instance->Callbacks->get_position((long)Instance);
 }
 
@@ -1699,7 +1698,7 @@ const Matrix* DACOM_API FEngineObject::GetInstanceOrientation(InstanceIndex InIn
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return (const Matrix*)G_IdentityMatrix;
+        return &G_IdentityMatrix.Rotation;
     return &Instance->Callbacks->get_orientation((long)Instance);
 }
 
@@ -1717,7 +1716,7 @@ const Transform* DACOM_API FEngineObject::GetInstanceTransform(InstanceIndex InI
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return (const Transform*)G_IdentityMatrix;
+        return &G_IdentityMatrix;
     return &Instance->Callbacks->get_transform((long)Instance);
 }
 
@@ -1727,7 +1726,7 @@ static float* DACOM_API EngineGetIdentityMatrix(FEngineObject* This, void* Unuse
 {
     (void)This;
     (void)Unused;
-    return G_IdentityMatrix + 9;
+    return &G_IdentityMatrix.Translation.x;
 }
 
 // LAB_06621c40 (IEngine +0xB4) -> transform +0x2C.
@@ -2084,12 +2083,12 @@ FEngineName* DACOM_API FEngineObject::GetInstanceName(FEngineName* Out, Instance
 }
 
 // LAB_06622580 (IEngine+0xC4): inst+0x5C, or 0 for a root.
-unsigned long* DACOM_API FEngineObject::GetInstanceRelative(InstanceIndex InInstance)
+FEngineJointBlock* DACOM_API FEngineObject::GetInstanceRelative(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr)
         return nullptr;
-    return Instance->Relative;
+    return reinterpret_cast<FEngineJointBlock*>(Instance->Relative);
 }
 
 static void CopyJointFloats(float* Dest, const float* Source, unsigned long Count)
@@ -2419,35 +2418,35 @@ static unsigned long JointUtfRecordSize(unsigned long Type)
     return 0;
 }
 
-static void CopyRelative3x3(float* Dest, const float* Rel)
+static void CopyRelative3x3(Transform* Dest, const float* Rel)
 {
-    std::memcpy(Dest, Rel + 7, 9 * sizeof(float));
+    std::memcpy(&Dest->Rotation, Rel + 7, 9 * sizeof(float));
 }
 
-static void CopyRelativeTranslation(float* Dest, const float* Rel)
+static void CopyRelativeTranslation(Transform* Dest, const float* Rel)
 {
-    Dest[9] = Rel[4];
-    Dest[10] = Rel[5];
-    Dest[11] = Rel[6];
+    Dest->Translation.x = Rel[4];
+    Dest->Translation.y = Rel[5];
+    Dest->Translation.z = Rel[6];
 }
 
-static void ApplyFixJoint(float* Dest, const float* Rel)
+static void ApplyFixJoint(Transform* Dest, const float* Rel)
 {
     CopyRelative3x3(Dest, Rel);
     CopyRelativeTranslation(Dest, Rel);
 }
 
-static void AddVec3(float* Dest, const float* A, const float* B)
+static void AddVec3(Vector* Dest, const float* A, const float* B)
 {
-    Dest[0] = A[0] + B[0];
-    Dest[1] = A[1] + B[1];
-    Dest[2] = A[2] + B[2];
+    Dest->x = A[0] + B[0];
+    Dest->y = A[1] + B[1];
+    Dest->z = A[2] + B[2];
 }
 
-static void ApplyTransJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplyTransJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
     CopyRelative3x3(Dest, Rel);
-    AddVec3(Dest + 9, JointState, Rel + 4);
+    AddVec3(&Dest->Translation, JointState, Rel + 4);
 }
 
 // FUN_06625560 (thiscall on inst+0x5C); only caller FUN_0661f250.
@@ -2460,7 +2459,7 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
     if (Type == 0xFFFFFFFF)
         return 0;
 
-    float* Dest = Instance->Matrix;
+    Transform* Dest = &Instance->Matrix;
     const float* Rel = (const float*)(Instance->Relative);
     const float* State = Instance->JointState;
     if (Type == G_JointTypeFix)
@@ -2489,26 +2488,26 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
 static const float G_JointHalfAngle = 0.5f;
 
 // Quaternion order is W, X, Y, Z; preserve the float spill sites.
-static void AxisAngleToQuat(float* OutQuat, const float* Axis, float Angle)
+static void AxisAngleToQuat(Quaternion* OutQuat, const Vector* Axis, float Angle)
 {
     const double Half = (double)Angle * (double)G_JointHalfAngle;
     const double Sin = std::sin(Half);
-    const double X = Axis[0];
-    const double Y = Axis[1];
-    const double Z = Axis[2];
+    const double X = Axis->x;
+    const double Y = Axis->y;
+    const double Z = Axis->z;
     const double Len = std::sqrt(X * X + Y * Y + Z * Z);
     const float K = (float)(Sin / Len);
-    OutQuat[0] = (float)(std::cos(Half));
-    OutQuat[1] = (float)((double)K * X);
-    OutQuat[2] = (float)((double)K * Y);
-    OutQuat[3] = (float)((double)K * Z);
+    OutQuat->w = (float)(std::cos(Half));
+    OutQuat->x = (float)((double)K * X);
+    OutQuat->y = (float)((double)K * Y);
+    OutQuat->z = (float)((double)K * Z);
 }
 
-static void SubVec3(float* Dest, const float* A, const float* B)
+static void SubVec3(Vector* Dest, const float* A, const Vector* B)
 {
-    Dest[0] = A[0] - B[0];
-    Dest[1] = A[1] - B[1];
-    Dest[2] = A[2] - B[2];
+    Dest->x = A[0] - B->x;
+    Dest->y = A[1] - B->y;
+    Dest->z = A[2] - B->z;
 }
 
 // DAT_0662b1b0: the 3DMathEngine every joint helper re-checks before each call
@@ -2523,88 +2522,88 @@ static I3DMathEngine* JointMath()
 }
 
 // Rev / Sphere tail: T = Rel[1..3] - Dest 3x3 * Rel[4..6], float subtractions.
-static void ApplyRestTranslation(float* Dest, const float* Rel)
+static void ApplyRestTranslation(Transform* Dest, const float* Rel)
 {
-    float Rotated[3];
-    MathTransformVec(JointMath(), Rotated, Dest, Rel + 4);
-    SubVec3(Dest + 9, Rel + 1, Rotated);
+    Vector Rotated;
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, (const Vector*)(Rel + 4));
+    SubVec3(&Dest->Translation, Rel + 1, &Rotated);
 }
 
 // LAB_066255e0 (Rev): the joint rotation multiplies on the LEFT of the rest 3x3.
-static void ApplyRevJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplyRevJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
-    float Quat[4];
-    float Rot[9];
-    AxisAngleToQuat(Quat, Rel + 16, JointState[0]);
-    MathQuatToMatrix(JointMath(), Rot, Quat);
-    float Product[9];
-    MathMulMatrix3(JointMath(), Product, Rot, Rel + 7);
-    std::memcpy(Dest, Product, sizeof(Product));
+    Quaternion Quat;
+    Matrix Rot;
+    AxisAngleToQuat(&Quat, (const Vector*)(Rel + 16), JointState[0]);
+    MathQuatToMatrix(JointMath(), &Rot, &Quat);
+    Matrix Product;
+    MathMulMatrix3(JointMath(), &Product, &Rot, (const Matrix*)(Rel + 7));
+    std::memcpy(Dest, &Product, sizeof(Product));
     ApplyRestTranslation(Dest, Rel);
 }
 
 // Preserve separate float rounding for Y/Z translation intermediates.
-static void SlideTranslation(float* OutT, const float* Rel, float Slide, const float* V)
+static void SlideTranslation(Vector* OutT, const float* Rel, float Slide, const Vector* V)
 {
     const double S = Slide;
     const double Ax = (double)(Rel[16]) * S;
     const float Ty = (float)(S * (double)(Rel[17]));
     const float Tz = (float)(S * (double)(Rel[18]));
     const float Pz = (float)((double)Tz + (double)(Rel[3]));
-    OutT[0] = (float)((Ax + (double)(Rel[1])) - (double)(V[0]));
-    OutT[1] = (float)(((double)Ty + (double)(Rel[2])) -
-                                 (double)(V[1]));
-    OutT[2] = (float)((double)Pz - (double)(V[2]));
+    OutT->x = (float)((Ax + (double)(Rel[1])) - (double)(V->x));
+    OutT->y = (float)(((double)Ty + (double)(Rel[2])) -
+                                 (double)(V->y));
+    OutT->z = (float)((double)Pz - (double)(V->z));
 }
 
 // LAB_06625730 (Pris).
-static void ApplyPrisJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplyPrisJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
     CopyRelative3x3(Dest, Rel);
-    float Rotated[3];
-    MathTransformVec(JointMath(), Rotated, Dest, Rel + 4);
-    SlideTranslation(Dest + 9, Rel, JointState[0], Rotated);
+    Vector Rotated;
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, (const Vector*)(Rel + 4));
+    SlideTranslation(&Dest->Translation, Rel, JointState[0], &Rotated);
 }
 
 // LAB_066257f0 (Cyl): rotation from State[1] multiplies on the RIGHT; slide from State[0].
-static void ApplyCylJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplyCylJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
-    float Quat[4];
-    float Rot[9];
-    AxisAngleToQuat(Quat, Rel + 16, JointState[1]);
-    MathQuatToMatrix(JointMath(), Rot, Quat);
-    float Product[9];
-    MathMulMatrix3(JointMath(), Product, Rel + 7, Rot);
-    std::memcpy(Dest, Product, sizeof(Product));
-    float Rotated[3];
-    MathTransformVec(JointMath(), Rotated, Dest, Rel + 4);
-    SlideTranslation(Dest + 9, Rel, JointState[0], Rotated);
+    Quaternion Quat;
+    Matrix Rot;
+    AxisAngleToQuat(&Quat, (const Vector*)(Rel + 16), JointState[1]);
+    MathQuatToMatrix(JointMath(), &Rot, &Quat);
+    Matrix Product;
+    MathMulMatrix3(JointMath(), &Product, (const Matrix*)(Rel + 7), &Rot);
+    std::memcpy(Dest, &Product, sizeof(Product));
+    Vector Rotated;
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, (const Vector*)(Rel + 4));
+    SlideTranslation(&Dest->Translation, Rel, JointState[0], &Rotated);
 }
 
 // LAB_06625980 (Sphere): quaternion State[3..6].
-static void ApplySphereJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplySphereJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
-    float Quat[4];
-    std::memcpy(Quat, JointState + 3, sizeof(Quat));
-    float Rot[9];
-    MathQuatToMatrix(JointMath(), Rot, Quat);
-    float Product[9];
-    MathMulMatrix3(JointMath(), Product, Rot, Rel + 7);
-    std::memcpy(Dest, Product, sizeof(Product));
+    Quaternion Quat;
+    std::memcpy(&Quat, JointState + 3, sizeof(Quat));
+    Matrix Rot;
+    MathQuatToMatrix(JointMath(), &Rot, &Quat);
+    Matrix Product;
+    MathMulMatrix3(JointMath(), &Product, &Rot, (const Matrix*)(Rel + 7));
+    std::memcpy(Dest, &Product, sizeof(Product));
     ApplyRestTranslation(Dest, Rel);
 }
 
 // LAB_06625af0 (Loose): quaternion State[3..6], translation State[0..2] + Rel[4..6].
-static void ApplyLooseJoint(float* Dest, const float* Rel, const float* JointState)
+static void ApplyLooseJoint(Transform* Dest, const float* Rel, const float* JointState)
 {
-    float Quat[4];
-    std::memcpy(Quat, JointState + 3, sizeof(Quat));
-    float Rot[9];
-    MathQuatToMatrix(JointMath(), Rot, Quat);
-    float Product[9];
-    MathMulMatrix3(JointMath(), Product, Rot, Rel + 7);
-    std::memcpy(Dest, Product, sizeof(Product));
-    AddVec3(Dest + 9, JointState, Rel + 4);
+    Quaternion Quat;
+    std::memcpy(&Quat, JointState + 3, sizeof(Quat));
+    Matrix Rot;
+    MathQuatToMatrix(JointMath(), &Rot, &Quat);
+    Matrix Product;
+    MathMulMatrix3(JointMath(), &Product, &Rot, (const Matrix*)(Rel + 7));
+    std::memcpy(Dest, &Product, sizeof(Product));
+    AddVec3(&Dest->Translation, JointState, Rel + 4);
 }
 
 // FUN_06625bd0: an element's first dword is the next link. The memory is not cleared.

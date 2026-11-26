@@ -289,7 +289,7 @@ int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, const 
     Transform const* Xform = reinterpret_cast<Transform const*>(GetOrientation());
     I3DMathEngine* Math = LightsCameraMath();
     Vector Local;
-    Math->InverseTransform(Local, *Xform, *reinterpret_cast<Vector const*>(World));
+    Math->InverseTransform(Local, *Xform, *World);
 
     // Fails when -near < z or the compare is unordered.
     if (!(-ZNear >= Local.z))
@@ -439,12 +439,12 @@ void DACOM_API FRoomCamera::Slot21()
     // This class's slot 21 is SetTransform (LAB_00556bb0); see room_camera.h.
 }
 
-void FRoomCamera::SetPosition(float const* Pos3)
+void FRoomCamera::SetPosition(Vector const* Pos3)
 {
     // FUN_00556b70.
-    Pos[0] = Pos3[0];
-    Pos[1] = Pos3[1];
-    Pos[2] = Pos3[2];
+    Pos[0] = Pos3->x;
+    Pos[1] = Pos3->y;
+    Pos[2] = Pos3->z;
 }
 
 void FRoomCamera::SetOrientation(float const* Orient9)
@@ -517,7 +517,7 @@ FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
     Cam->Aspect = Cam->TanHalfFovX / Cam->TanHalfFovY;
     Cam->ZFar = ZFar;
 
-    Cam->SetPosition(PosOrient12);
+    Cam->SetPosition(reinterpret_cast<Vector const*>(PosOrient12));
     Cam->SetOrientation(PosOrient12 + 3);
     return Cam;
 }
@@ -544,7 +544,7 @@ void RoomCameraDestroy(FRoomCamera* Camera)
         delete Camera;
 }
 
-void RoomCameraSetPosition(FRoomCamera* Camera, float const* Pos3)
+void RoomCameraSetPosition(FRoomCamera* Camera, Vector const* Pos3)
 {
     // FUN_00556cb0.
     Camera->SetPosition(Pos3);

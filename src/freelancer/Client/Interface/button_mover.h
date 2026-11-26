@@ -28,6 +28,8 @@
 
 #include <vector>
 
+class Vector;
+
 class WinControl;
 
 // Retail 0x1c-byte ButtonMover entry.
@@ -56,10 +58,10 @@ public:
     virtual void OnMoveFinished();
     // slot 1 (LAB_0043d8a0, RET 8) -- per-control hook with the interpolated position; false
     // lets Update apply it through the control's SetProperty(6, Position, 0).
-    virtual bool OnMoveStep(WinControl* Control, float const* Position);
+    virtual bool OnMoveStep(WinControl* Control, Vector const* Position);
 
     // FUN_0055dee0 (RET 0xc) -- append {Start, End, Control}.
-    void AddButton(WinControl* Control, float const* Start, float const* End);
+    void AddButton(WinControl* Control, Vector const* Start, Vector const* End);
     // FUN_0055e120 (RET 4) -- also clears the list, so callers Start first and AddButton after.
     void Start(float Seconds);
     // FUN_0055e170 -- advance by the frame time and move every control.

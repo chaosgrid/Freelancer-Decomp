@@ -49,19 +49,19 @@ bool UiShipViewControl::Create(Win3D* NewParent, void* Payload)
         HalfExtent[1] = Bounds->Bottom * -0.5f;
     }
 
-    float Vector[3];
-    Vector[0] = 0.0f;
-    Vector[1] = 0.0f;
-    Vector[2] = 30.0f;
-    SetRotSpeed(Vector);
-    Vector[0] = 0.0f;
-    Vector[1] = 270.0f;
-    Vector[2] = 0.0f;
-    SetObjectYpr(Vector);
-    Vector[0] = 0.0f;
-    Vector[1] = 0.0f;
-    Vector[2] = 0.0f;
-    SetAttachPosition(Vector);
+    Vector Vector;
+    Vector.x = 0.0f;
+    Vector.y = 0.0f;
+    Vector.z = 30.0f;
+    SetRotSpeed(&Vector);
+    Vector.x = 0.0f;
+    Vector.y = 270.0f;
+    Vector.z = 0.0f;
+    SetObjectYpr(&Vector);
+    Vector.x = 0.0f;
+    Vector.y = 0.0f;
+    Vector.z = 0.0f;
+    SetAttachPosition(&Vector);
     SetShowRect(false);
     SetShowWireframe(true);
     SetRectColor(kUiShipViewRectColor);
@@ -87,14 +87,14 @@ void UiShipViewControl::SetTransform(Transform const* NewXform)
     Source.z = HalfExtent[2];
     UiWidgetMathEngine()->TransformMatrix(Turned, NewXform->Rotation, Source);
 
-    float Corner[3];
-    Corner[0] = Turned.x + Translation[0];
-    Corner[1] = Turned.y + Translation[1];
-    Corner[2] = Turned.z + Translation[2];
+    Vector Corner;
+    Corner.x = Turned.x + Translation[0];
+    Corner.y = Turned.y + Translation[1];
+    Corner.z = Turned.z + Translation[2];
     float const ViewExtent[3] = {Turned.x, Turned.y, Turned.z};
 
     SetOrientation(reinterpret_cast<Matrix const*>(Block));
-    SetPosition(Corner);
+    SetPosition(&Corner);
     SetViewSize(ViewExtent);
 }
 

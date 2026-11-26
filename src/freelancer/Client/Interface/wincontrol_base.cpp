@@ -25,22 +25,22 @@ namespace
     // DAT_005c7f68 -- 1/255 (0x3b808081).
     float const kInv255 = 1.0f / 255.0f;
 
-    void SetIdentity3x3(float* M)
+    void SetIdentity3x3(Matrix* M)
     {
-        M[0] = 1.0f;
-        M[1] = 0.0f;
-        M[2] = 0.0f;
-        M[3] = 0.0f;
-        M[4] = 1.0f;
-        M[5] = 0.0f;
-        M[6] = 0.0f;
-        M[7] = 0.0f;
-        M[8] = 1.0f;
+        M->E[0][0] = 1.0f;
+        M->E[0][1] = 0.0f;
+        M->E[0][2] = 0.0f;
+        M->E[1][0] = 0.0f;
+        M->E[1][1] = 1.0f;
+        M->E[1][2] = 0.0f;
+        M->E[2][0] = 0.0f;
+        M->E[2][1] = 0.0f;
+        M->E[2][2] = 1.0f;
     }
 
     // DALib::Engine vt+0x8c SetInstancePosition then vt+0x6c UpdateInstance(inst, 0, 0), the
     // pair every WinControl slot below issues after moving its instance.
-    void SetInstancePositionAndUpdate(InstanceIndex Instance, float* Position)
+    void SetInstancePositionAndUpdate(InstanceIndex Instance, Vector* Position)
     {
         DALib::Engine->SetInstancePosition(Instance, (const Vector*)Position);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
@@ -66,17 +66,17 @@ WinControl::WinControl()
     MeshHolder.UserFloats[4] = 1.0f;
     MeshHolder.AnimOrArchIndex = -1;
 
-    SetIdentity3x3(&AttachOrientation.E[0][0]);
+    SetIdentity3x3(&AttachOrientation);
     AttachPosition.z = 0.0f;
     AttachPosition.y = 0.0f;
     AttachPosition.x = 0.0f;
 
-    Offset[0] = 0.0f;
-    Offset[1] = 0.0f;
-    Offset[2] = 0.0f;
-    HalfExtents[0] = 0.0f;
-    HalfExtents[1] = 0.0f;
-    HalfExtents[2] = 0.0f;
+    Offset.x = 0.0f;
+    Offset.y = 0.0f;
+    Offset.z = 0.0f;
+    HalfExtents.x = 0.0f;
+    HalfExtents.y = 0.0f;
+    HalfExtents.z = 0.0f;
 
     bCaptured = 0;
     bNoZEnable = 0;
@@ -85,12 +85,12 @@ WinControl::WinControl()
     OwnerData = 0;
     PositionFlags = static_cast<unsigned char>(PositionFlags | 1);
     bIdentityHitOrientation = 1;
-    HitOffset[0] = 0.0f;
-    HitOffset[1] = 0.0f;
-    HitOffset[2] = 0.0f;
-    RequestedPosition[0] = 0.0f;
-    RequestedPosition[1] = 0.0f;
-    RequestedPosition[2] = 10000.0f; // 0x461c4000
+    HitOffset.x = 0.0f;
+    HitOffset.y = 0.0f;
+    HitOffset.z = 0.0f;
+    RequestedPosition.x = 0.0f;
+    RequestedPosition.y = 0.0f;
+    RequestedPosition.z = 10000.0f; // 0x461c4000
     bAttached = 0;
     MeshPath[0] = '\0';
     HardpointName[0] = '\0';
@@ -130,32 +130,32 @@ WinControl* WinControl::AsWinControl()
     return this;
 }
 
-bool WinControl::HitTest(float const* Ray)
+bool WinControl::HitTest(Vector const* Ray)
 {
     // FUN_005a0340.
-    float Transform[12];
-    SetIdentity3x3(Transform);
-    Transform[9] = 0.0f;
-    Transform[10] = 0.0f;
-    Transform[11] = 0.0f;
+    Transform Xform;
+    SetIdentity3x3(&Xform.Rotation);
+    Xform.Translation.x = 0.0f;
+    Xform.Translation.y = 0.0f;
+    Xform.Translation.z = 0.0f;
     if (ClientMeshHolderHasInstance(&MeshHolder))
     {
         const void* const Source = DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance);
-        memcpy(Transform, Source, sizeof(Transform));
+        memcpy(&Xform, Source, sizeof(Xform));
     }
     else
     {
-        Transform[9] = Position.x + Offset[0];
-        Transform[10] = Position.y + Offset[1];
-        Transform[11] = Position.z + Offset[2];
+        Xform.Translation.x = Position.x + Offset.x;
+        Xform.Translation.y = Position.y + Offset.y;
+        Xform.Translation.z = Position.z + Offset.z;
     }
-    Transform[9] = Transform[9] + HitOffset[0];
-    Transform[10] = Transform[10] + HitOffset[1];
-    Transform[11] = Transform[11] + HitOffset[2];
+    Xform.Translation.x = Xform.Translation.x + HitOffset.x;
+    Xform.Translation.y = Xform.Translation.y + HitOffset.y;
+    Xform.Translation.z = Xform.Translation.z + HitOffset.z;
     if (bIdentityHitOrientation != 0)
-        SetIdentity3x3(Transform);
+        SetIdentity3x3(&Xform.Rotation);
 
-    bool const bHit = Win3DRayHitsAabbHalfExtents(HalfExtents, Transform, Ray);
+    bool const bHit = Win3DRayHitsAabbHalfExtents(&HalfExtents, &Xform, Ray);
     if (!bHit)
         return bHit;
 
@@ -180,32 +180,32 @@ bool WinControl::HitTest(float const* Ray)
     return bHit;
 }
 
-void WinControl::SetPosition(float const* NewPosition)
+void WinControl::SetPosition(Vector const* NewPosition)
 {
     // FUN_005a0880.
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
     if (HasInstance(this))
     {
-        float Placed[3];
+        Vector Placed;
         if ((PositionFlags & 1) != 0)
         {
-            Placed[0] = Offset[0] + Position.x;
-            Placed[1] = Position.y + Offset[1];
-            Placed[2] = Position.z + Offset[2];
+            Placed.x = Offset.x + Position.x;
+            Placed.y = Position.y + Offset.y;
+            Placed.z = Position.z + Offset.z;
         }
         else
         {
-            Placed[0] = Position.x;
-            Placed[1] = Position.y;
-            Placed[2] = Position.z;
+            Placed.x = Position.x;
+            Placed.y = Position.y;
+            Placed.z = Position.z;
         }
-        SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
+        SetInstancePositionAndUpdate(MeshHolder.EngineInstance, &Placed);
     }
 
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
-        Child->SetPosition(&Position.x);
+        Child->SetPosition(&Position);
 }
 
 void WinControl::SetOrientation(Matrix const* NewOrientation)
@@ -294,8 +294,8 @@ bool WinControl::MouseEvent(FWin3DMouseEvent const* Event)
     // is taken when the cached mouse ray hits this control.
     if (bCaptured != 0 && Event->Button == kWin3DMouseLeft)
         return true;
-    float Ray[3];
-    return HitTest(Win3DGetMouseRay(Ray));
+    Vector Ray;
+    return HitTest(Win3DGetMouseRay(&Ray));
 }
 
 bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
@@ -304,7 +304,7 @@ bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(&Parent->Position.x);
+            SetPosition(&Parent->Position);
         Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return true;
     }
@@ -347,16 +347,16 @@ void WinControl::LoadIni(char const* Path)
             float const Y = Ini.get_value_float(1);
             float const X = Ini.get_value_float(0);
             float const Z = Ini.get_value_float(2);
-            Offset[0] = X;
-            Offset[1] = Y;
-            Offset[2] = Z;
+            Offset.x = X;
+            Offset.y = Y;
+            Offset.z = Z;
             if (ClientMeshHolderHasInstance(&MeshHolder))
             {
-                float Placed[3];
-                Placed[2] = Offset[2] + Position.z;
-                Placed[1] = Offset[1] + Position.y;
-                Placed[0] = Offset[0] + Position.x;
-                SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
+                Vector Placed;
+                Placed.z = Offset.z + Position.z;
+                Placed.y = Offset.y + Position.y;
+                Placed.x = Offset.x + Position.x;
+                SetInstancePositionAndUpdate(MeshHolder.EngineInstance, &Placed);
             }
             continue;
         }
@@ -367,9 +367,9 @@ void WinControl::LoadIni(char const* Path)
             float const Y = Ini.get_value_float(1);
             float const X = Ini.get_value_float(0);
             float const Z = Ini.get_value_float(2);
-            HalfExtents[0] = X;
-            HalfExtents[1] = Y;
-            HalfExtents[2] = Z;
+            HalfExtents.x = X;
+            HalfExtents.y = Y;
+            HalfExtents.z = Z;
             continue;
         }
         if (Ini.is_value("no_z_enable"))
@@ -416,12 +416,12 @@ void WinControl::SetOffset(float X, float Y, float Z)
 {
     // FUN_005a0250.
     float Delta[3];
-    Delta[0] = X - Offset[0];
-    Delta[1] = Y - Offset[1];
-    Delta[2] = Z - Offset[2];
-    Offset[0] = X;
-    Offset[1] = Y;
-    Offset[2] = Z;
+    Delta[0] = X - Offset.x;
+    Delta[1] = Y - Offset.y;
+    Delta[2] = Z - Offset.z;
+    Offset.x = X;
+    Offset.y = Y;
+    Offset.z = Z;
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
         WinControl* const ChildControl = Child->AsWinControl();
@@ -429,9 +429,9 @@ void WinControl::SetOffset(float X, float Y, float Z)
             ChildControl->AddAttachOffset(Delta);
     }
     if (Parent != nullptr)
-        SetPosition(&Parent->Position.x);
+        SetPosition(&Parent->Position);
     else
-        SetPosition(&Position.x);
+        SetPosition(&Position);
 }
 
 void WinControl::CaptureMouse()
@@ -477,7 +477,7 @@ void WinControl::RefreshAttachment()
     }
     if (Parent != nullptr)
     {
-        SetIdentity3x3(&AttachOrientation.E[0][0]);
+        SetIdentity3x3(&AttachOrientation);
         AttachPosition.z = 0.0f;
         AttachPosition.y = 0.0f;
         AttachPosition.x = 0.0f;
@@ -488,7 +488,7 @@ void WinControl::RefreshAttachment()
                             : 0;
     }
     if (Parent != nullptr)
-        Parent->SetPosition(&Parent->Position.x);
+        Parent->SetPosition(&Parent->Position);
 }
 
 bool WinControl::GetHardpointTransform(char const* Name, Transform* OutXform)
@@ -510,19 +510,19 @@ bool WinControl::GetHardpointTransform(char const* Name, Transform* OutXform)
             memcpy(&Local.Rotation, Blob + 0x10, sizeof(Local.Rotation));
             memcpy(&Local.Translation, Blob + 0x04, sizeof(Local.Translation));
             memcpy(OutXform, &Local, sizeof(Local));
-            OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
-            OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
-            OutXform->Translation.z = Offset[2] + OutXform->Translation.z;
+            OutXform->Translation.x = Offset.x + OutXform->Translation.x;
+            OutXform->Translation.y = Offset.y + OutXform->Translation.y;
+            OutXform->Translation.z = Offset.z + OutXform->Translation.z;
             return true;
         }
     }
-    SetIdentity3x3(&OutXform->Rotation.E[0][0]);
+    SetIdentity3x3(&OutXform->Rotation);
     OutXform->Translation.z = 0.0f;
     OutXform->Translation.y = 0.0f;
     OutXform->Translation.x = 0.0f;
-    OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
-    OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
-    OutXform->Translation.z = Offset[2] + OutXform->Translation.z;
+    OutXform->Translation.x = Offset.x + OutXform->Translation.x;
+    OutXform->Translation.y = Offset.y + OutXform->Translation.y;
+    OutXform->Translation.z = Offset.z + OutXform->Translation.z;
     return false;
 }
 
@@ -548,12 +548,12 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
         ClientMeshLoadFromPath(&MeshHolder, Path, MaterialPath, false);
     if (HasInstance(this))
     {
-        float Matrix[12];
-        SetIdentity3x3(Matrix);
-        Matrix[9] = Offset[0] + Position.x;
-        Matrix[10] = Offset[1] + Position.y;
-        Matrix[11] = Offset[2] + Position.z;
-        DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, (const Transform*)Matrix);
+        Transform Xform;
+        SetIdentity3x3(&Xform.Rotation);
+        Xform.Translation.x = Offset.x + Position.x;
+        Xform.Translation.y = Offset.y + Position.y;
+        Xform.Translation.z = Offset.z + Position.z;
+        DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, &Xform);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
     RefreshAttachment();
@@ -573,7 +573,7 @@ void WinControl::GetAttachOrientation(Matrix* OutOrientation)
         return;
     }
     Matrix Identity;
-    SetIdentity3x3(&Identity.E[0][0]);
+    SetIdentity3x3(&Identity);
     memcpy(OutOrientation, &Identity, sizeof(Identity));
 }
 
@@ -613,50 +613,50 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         SetMesh(reinterpret_cast<char const*>(A), reinterpret_cast<char const*>(B));
         return 1;
     case kWinPropPosition:
-        SetPosition(reinterpret_cast<float const*>(A));
+        SetPosition(reinterpret_cast<Vector const*>(A));
         return 1;
     case kWinPropOffset:
     {
         float const* const NewOffset = reinterpret_cast<float const*>(A);
-        Offset[0] = NewOffset[0];
-        Offset[1] = NewOffset[1];
-        Offset[2] = NewOffset[2];
+        Offset.x = NewOffset[0];
+        Offset.y = NewOffset[1];
+        Offset.z = NewOffset[2];
         if (HasInstance(this))
         {
-            float Placed[3];
+            Vector Placed;
             if ((PositionFlags & 1) != 0)
             {
-                Placed[0] = Offset[0] + Position.x;
-                Placed[1] = Offset[1] + Position.y;
-                Placed[2] = Offset[2] + Position.z;
+                Placed.x = Offset.x + Position.x;
+                Placed.y = Offset.y + Position.y;
+                Placed.z = Offset.z + Position.z;
             }
             else
             {
-                Placed[0] = Position.x;
-                Placed[1] = Position.y;
-                Placed[2] = Position.z;
+                Placed.x = Position.x;
+                Placed.y = Position.y;
+                Placed.z = Position.z;
             }
-            SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
+            SetInstancePositionAndUpdate(MeshHolder.EngineInstance, &Placed);
         }
         return 0;
     }
     case kWinPropGetOffset:
     {
         float* const Out = reinterpret_cast<float*>(A);
-        Out[0] = Offset[0];
-        Out[1] = Offset[1];
-        Out[2] = Offset[2];
+        Out[0] = Offset.x;
+        Out[1] = Offset.y;
+        Out[2] = Offset.z;
         return 0;
     }
     case kWinPropOrientation:
         if (HasInstance(this))
         {
-            float Matrix[12];
-            memcpy(Matrix, reinterpret_cast<float const*>(A), 9 * sizeof(float));
-            Matrix[9] = Position.x + Offset[0];
-            Matrix[10] = Position.y + Offset[1];
-            Matrix[11] = Position.z + Offset[2];
-            DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, (const Transform*)Matrix);
+            Transform Xform;
+            memcpy(&Xform, reinterpret_cast<float const*>(A), 9 * sizeof(float));
+            Xform.Translation.x = Position.x + Offset.x;
+            Xform.Translation.y = Position.y + Offset.y;
+            Xform.Translation.z = Position.z + Offset.z;
+            DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, &Xform);
             DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
         }
         return 1;

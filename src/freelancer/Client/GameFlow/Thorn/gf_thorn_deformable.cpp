@@ -215,7 +215,7 @@ GENRESULT DACOM_API FThornDeformable::DisconnectHardpoints(void* DescArg)
 // LAB_00452730. Unlike the Compound's, the answer is converted into the script frame; an unknown
 // target type answers the origin / identity.
 GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char const* Name,
-                                                        float* OutXform12)
+                                                        Transform* Out)
 {
     Vector Pos;
     Pos.x = 0.0f;
@@ -266,7 +266,6 @@ GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char con
         Orient = InstanceFrame.trans_from_frame(HpOrient);
     }
 
-    Transform* Out = reinterpret_cast<Transform*>(OutXform12);
     Out->Translation = Frame.trans_to_frame(Pos);
     Out->Rotation = Frame.trans_to_frame(Orient);
     return GR_OK;
@@ -282,9 +281,9 @@ GENRESULT DACOM_API FThornDeformable::GetFloorHeight(float* OutHeight)
 // LAB_00452b50. Position first.
 GENRESULT DACOM_API FThornDeformable::SetTransform(const Transform* Transform12)
 {
-    Transform const* In = reinterpret_cast<Transform const*>(Transform12);
+    Transform const* In = Transform12;
     Vector WorldPos = Frame.trans_from_frame(In->Translation);
-    DALib::Deform->SetPosePos(Character->Lod.Instance, &WorldPos.x);
+    DALib::Deform->SetPosePos(Character->Lod.Instance, &WorldPos);
     Matrix WorldOrient = Frame.trans_from_frame(In->Rotation);
     DALib::Deform->SetPoseOri(Character->Lod.Instance, &WorldOrient);
     return GR_OK;
@@ -294,7 +293,7 @@ GENRESULT DACOM_API FThornDeformable::SetTransform(const Transform* Transform12)
 GENRESULT DACOM_API FThornDeformable::GetTransform(Transform* OutTransform12)
 {
     const InstanceIndex Instance = Character->GetEngineInstance();
-    Transform* Out = reinterpret_cast<Transform*>(OutTransform12);
+    Transform* Out = OutTransform12;
     Out->Translation = Frame.trans_to_frame(InstancePosition(Instance));
     Out->Rotation = Frame.trans_to_frame(InstanceOrientation(Instance));
     return GR_OK;
@@ -302,7 +301,7 @@ GENRESULT DACOM_API FThornDeformable::GetTransform(Transform* OutTransform12)
 
 // LAB_00452460. The root ancestor (FUN_0044fa60) is computed before either part is tested.
 // AddAimHandle is FUN_00445700. bActive stays set even when the start fails.
-GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, float* Orientation)
+GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, Vector* Position, Matrix* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
     long const EndPart = Character->FindPart(Desc->EndEffector);
@@ -310,9 +309,8 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
     if (EndPart == -1 || Root == InvalidInstanceIndex)
         return GR_GENERIC;
 
-    Vector const TargetPos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
-    Matrix const TargetOrient =
-        Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orientation));
+    Vector const TargetPos = Frame.trans_from_frame(*Position);
+    Matrix const TargetOrient = Frame.trans_from_frame(*Orientation);
 
     int Slot = -1;
     int Index = 0;
@@ -400,7 +398,7 @@ GENRESULT DACOM_API FThornDeformable::StopIk(void* DescArg)
 
 // LAB_00452680. Retail: with no matching slot the index stays -1 and Aims[-1] (this + 0x23c,
 // see StopIk) is read and written.
-GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, float* Position, float* Orientation)
+GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, Vector* Position, Matrix* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
     int Slot = -1;
@@ -417,23 +415,23 @@ GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, float* Position, f
     FAimSlot& Aim = Aims[Slot];
     if (Aim.bStarted == 0)
         return GR_GENERIC;
-    Aim.Target.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
-    Aim.Target.Orient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orientation));
+    Aim.Target.Pos = Frame.trans_from_frame(*Position);
+    Aim.Target.Orient = Frame.trans_from_frame(*Orientation);
     return GR_OK;
 }
 
 // LAB_00452ab0.
 GENRESULT DACOM_API FThornDeformable::SetPosition(const Vector* Position)
 {
-    Vector WorldPos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
-    DALib::Deform->SetPosePos(Character->Lod.Instance, &WorldPos.x);
+    Vector WorldPos = Frame.trans_from_frame(*Position);
+    DALib::Deform->SetPosePos(Character->Lod.Instance, &WorldPos);
     return GR_OK;
 }
 
 // LAB_00452b00.
 GENRESULT DACOM_API FThornDeformable::SetOrientation(const Matrix* Orient9)
 {
-    Matrix WorldOrient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orient9));
+    Matrix WorldOrient = Frame.trans_from_frame(*Orient9);
     DALib::Deform->SetPoseOri(Character->Lod.Instance, &WorldOrient);
     return GR_OK;
 }
@@ -442,7 +440,7 @@ GENRESULT DACOM_API FThornDeformable::SetOrientation(const Matrix* Orient9)
 GENRESULT DACOM_API FThornDeformable::GetPosition(Vector* OutPosition)
 {
     const InstanceIndex Instance = Character->GetEngineInstance();
-    *reinterpret_cast<Vector*>(OutPosition) = Frame.trans_to_frame(InstancePosition(Instance));
+    *OutPosition = Frame.trans_to_frame(InstancePosition(Instance));
     return GR_OK;
 }
 
@@ -450,7 +448,7 @@ GENRESULT DACOM_API FThornDeformable::GetPosition(Vector* OutPosition)
 GENRESULT DACOM_API FThornDeformable::GetOrientation(Matrix* OutOrient9)
 {
     const InstanceIndex Instance = Character->GetEngineInstance();
-    *reinterpret_cast<Matrix*>(OutOrient9) = Frame.trans_to_frame(InstanceOrientation(Instance));
+    *OutOrient9 = Frame.trans_to_frame(InstanceOrientation(Instance));
     return GR_OK;
 }
 

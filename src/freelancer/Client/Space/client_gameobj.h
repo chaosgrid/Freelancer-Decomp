@@ -233,10 +233,10 @@ public:
     // 98 +0x188 FUN_00539980: draw submit -- PreSubmitDraw, PickLod, the LOD gate (a failed gate
     // writes the LOD to *OutLod and returns), the effect-list sweep, UpdateDrawLighting, the
     // player flags, get_index, the envmap arm, IRenderer2::Slot7(Camera, Inst, 1.0f, Flags,
-    // Matrix, Extra). A non-null Matrix ors 0x120 into the flags; Extra is the IFLAppearance
+    // Xform, Extra). A non-null Xform ors 0x120 into the flags; Extra is the IFLAppearance
     // Slot8 out-param when it was null. Body: GameobjSubmitDrawRetail in
     // space_scene_obj_draw.cpp; the draw drain calls this slot through the node LAB_0051f7a0.
-    virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
                               void* Extra);
     // 99 +0x18c LAB_00524e50: *OutB = NebulaFogFactor (as bits); return CurrentNebula.
     virtual unsigned GetNebula(unsigned* OutB);
@@ -458,7 +458,7 @@ public:
     // 96 +0x180 LAB_0051b480.
     void PreSubmitDraw() override;
     // 98 +0x188 FUN_00533780.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 102 +0x198 FUN_005339e0.
     void ApplyDamageList(DamageList const& Damage) override;
@@ -560,7 +560,7 @@ public:
     // 94 +0x178 FUN_00548110.
     float GetPhysicalRadius(Vector& Center) override;
     // 98 +0x188 FUN_00548220.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 104 +0x1a0 FUN_00548520.
     void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
@@ -616,7 +616,7 @@ public:
     // 97 +0x184 FUN_00546480.
     void UpdateDrawLighting(void* Camera) override;
     // 98 +0x188 FUN_00546050.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 102 +0x198 FUN_00545f50.
     void ApplyDamageList(DamageList const& Damage) override;

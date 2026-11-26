@@ -945,7 +945,7 @@ NnInventory::~NnInventory()
     NnMainButtonSetPanelOrigin(0x66, &PanelOrigin);
 }
 
-void NnInventory::SetPosition(float const* NewPosition)
+void NnInventory::SetPosition(Vector const* NewPosition)
 {
     // FUN_0047fbb0.
     WinControl::SetPosition(NewPosition);
@@ -1620,12 +1620,12 @@ void NnInventory::CreateControls()
     {
         // The half next to a dealer.
         SetMesh("Interface\\NeuroNet\\Inventory\\INV_biginforcard.cmp", 0); // slot 38
-        HalfExtents[0] = 0.66f;  // +0xb4
-        HalfExtents[1] = 0.397f;
-        HalfExtents[2] = 0.0f;
-        HitOffset[0] = 0.64f;    // +0xc0
-        HitOffset[1] = -0.398f;
-        HitOffset[2] = 0.0f;
+        HalfExtents.x = 0.66f;  // +0xb4
+        HalfExtents.y = 0.397f;
+        HalfExtents.z = 0.0f;
+        HitOffset.x = 0.64f;    // +0xc0
+        HitOffset.y = -0.398f;
+        HitOffset.z = 0.0f;
         if (Dealer->TradeMode == kTradeModeCommodity) // +0x978
         {
             bShowFilters = 0;
@@ -1641,13 +1641,13 @@ void NnInventory::CreateControls()
     {
         // The player's own inventory window.
         SetMesh("Interface\\NeuroNet\\Inventory\\CHAR_infowindow.cmp", 0); // slot 38
-        float const ClosePosition[3] = {0.401f, 0.237f, 0.0f};
-        float const CloseHalfExtents[3] = {0.02f, 0.02f, 0.0f};
+        Vector const ClosePosition = {0.401f, 0.237f, 0.0f};
+        Vector const CloseHalfExtents = {0.02f, 0.02f, 0.0f};
         CloseButton = CreateButtonControl("Inventory_Close", // FUN_005a0c90
                                           "Interface\\NeuroNet\\Inventory\\x.3db", nullptr,
-                                          "ui_select_item", nullptr, ClosePosition, nullptr,
-                                          CloseHalfExtents, 0, 1, 0, 0, 0x409, 0, 0);
-        WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder); // FUN_005a1340
+                                          "ui_select_item", nullptr, &ClosePosition, nullptr,
+                                          &CloseHalfExtents, 0, 1, 0, 0, 0x409, 0, 0);
+        WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder); // FUN_005a1340
         Base[0] = -0.43f;
         Base[1] = 0.258f;
         Base[2] = 0.0f;
@@ -1666,24 +1666,24 @@ void NnInventory::CreateControls()
     // FUN_005a0e30; the result is not kept here.
     if (bOwnWindow != 0)
     {
-        float const TitlePosition[3] = {-0.42f, 0.261f, 0.0f};
-        CreateTextControl("PlayerTitle", "PageHeader", TitlePosition, nullptr, 0.839f, 0.03f,
+        Vector const TitlePosition = {-0.42f, 0.261f, 0.0f};
+        CreateTextControl("PlayerTitle", "PageHeader", &TitlePosition, nullptr, 0.839f, 0.03f,
                           1.65f, 0x213f, 1, 0, 1);
     }
     else
     {
         float const Delta[3] = {0.219f, -0.039f, 0.0f};
-        float const TitlePosition[3] = {Base[0] + Delta[0], Base[1] + Delta[1],
-                                        Base[2] + Delta[2]}; // FUN_00423b30
-        CreateTextControl("PlayerTitle", "PageHeader", TitlePosition, nullptr, 0.394f, 0.03f,
+        Vector const TitlePosition = {Base[0] + Delta[0], Base[1] + Delta[1],
+                                      Base[2] + Delta[2]}; // FUN_00423b30
+        CreateTextControl("PlayerTitle", "PageHeader", &TitlePosition, nullptr, 0.394f, 0.03f,
                           1.65f, 0x213f, 1, 0, 0);
     }
 
     {
         float const Delta[3] = {0.219f, -0.072f, 0.0f};
-        float const CashPosition[3] = {Base[0] + Delta[0], Base[1] + Delta[1],
-                                       Base[2] + Delta[2]}; // FUN_00423b30
-        CreateTextControl("PlayerCash", "SubHeader", CashPosition, nullptr, 0.394f, 0.03f, 1.4f,
+        Vector const CashPosition = {Base[0] + Delta[0], Base[1] + Delta[1],
+                                     Base[2] + Delta[2]}; // FUN_00423b30
+        CreateTextControl("PlayerCash", "SubHeader", &CashPosition, nullptr, 0.394f, 0.03f, 1.4f,
                           0, 1, 0, 0);
     }
 
@@ -1702,19 +1702,19 @@ void NnInventory::CreateControls()
         float const RowY = static_cast<float>(RowOffset);
         float const ButtonY = static_cast<float>(RowOffset - 0.131);
         {
-            float const ButtonPosition[3] = {Base[0] + 0.067f, Base[1] + ButtonY,
-                                             Base[2] + 0.0f}; // FUN_00423b30
-            float const ButtonHalfExtents[3] = {0.035f, 0.0335f, 0.0f};
-            CreateWireButtonControl(Name, "ui_item_select", ButtonPosition, ButtonHalfExtents,
+            Vector const ButtonPosition = {Base[0] + 0.067f, Base[1] + ButtonY,
+                                           Base[2] + 0.0f}; // FUN_00423b30
+            Vector const ButtonHalfExtents = {0.035f, 0.0335f, 0.0f};
+            CreateWireButtonControl(Name, "ui_item_select", &ButtonPosition, &ButtonHalfExtents,
                                     0, 0, 0, 0, 0); // FUN_005a0d00
         }
 
         sprintf(Name, "ItemView0%d", Number);
         {
-            float const ViewPosition[3] = {Base[0] + 0.248f, Base[1] + ButtonY,
-                                           Base[2] + 0.0f}; // FUN_00423b30
-            float const ViewHalfExtents[3] = {0.138f, 0.034f, 0.0f};
-            CreateWireButtonControl(Name, "ui_item_select", ViewPosition, ViewHalfExtents, 0, 0,
+            Vector const ViewPosition = {Base[0] + 0.248f, Base[1] + ButtonY,
+                                         Base[2] + 0.0f}; // FUN_00423b30
+            Vector const ViewHalfExtents = {0.138f, 0.034f, 0.0f};
+            CreateWireButtonControl(Name, "ui_item_select", &ViewPosition, &ViewHalfExtents, 0, 0,
                                     0, 0, 0); // FUN_005a0d00
         }
 
@@ -1723,25 +1723,25 @@ void NnInventory::CreateControls()
         double const MeshOffset = static_cast<double>(RowY) - static_cast<double>(0.131f); // DAT_005d150c
         float const MeshRowY = static_cast<float>(MeshOffset);
         {
-            float const MeshPosition[3] = {Base[0] + 0.066999994f, // DAT_005d1508
-                                           static_cast<float>(static_cast<double>(Base[1]) +
+            Vector const MeshPosition = {Base[0] + 0.066999994f,                
+                                         static_cast<float>(static_cast<double>(Base[1]) +
                                                               MeshOffset),
-                                           Base[2]};
-            float const MeshHalfExtents[3] = {0.036f, 0.041f, 0.0f};
-            float const MeshVector338[3] = {0.0f, 0.0f, 0.0f};
+                                         Base[2]};
+            Vector const MeshHalfExtents = {0.036f, 0.041f, 0.0f};
+            Vector const MeshVector338 = {0.0f, 0.0f, 0.0f};
             CreateStaticControl(Name, "equipment\\models\\weapons\\li_rad_launcher.cmp",
-                                MeshPosition, nullptr, MeshHalfExtents, 0, 0, 0, 1, 1, 1, 1, 0x50,
-                                0, 0, MeshVector338); // FUN_005a0db0
+                                &MeshPosition, nullptr, &MeshHalfExtents, 0, 0, 0, 1, 1, 1, 1, 0x50,
+                                0, 0, &MeshVector338); // FUN_005a0db0
         }
 
         sprintf(Name, "ItemName0%d", Number);
         {
-            float const NamePosition[3] = {
-                Base[0] + 0.256f, // DAT_005d14c4
+            Vector const NamePosition = {
+                Base[0] + 0.256f,                
                 static_cast<float>(static_cast<double>(RowY) - static_cast<double>(0.118f) +
-                                   static_cast<double>(Base[1])), // DAT_005d14c8
+                                   static_cast<double>(Base[1])),                
                 Base[2]};
-            CreateTextControl(Name, "ItemName", NamePosition, nullptr, 0.27f, 0.04f, 1.5f, 0, 0,
+            CreateTextControl(Name, "ItemName", &NamePosition, nullptr, 0.27f, 0.04f, 1.5f, 0, 0,
                               0, 0); // FUN_005a0e30
         }
 
@@ -1750,25 +1750,25 @@ void NnInventory::CreateControls()
         double const QuantityOffset = static_cast<double>(RowY) - static_cast<double>(0.148f); // DAT_005d14b0
         float const QuantityRowY = static_cast<float>(QuantityOffset);
         {
-            float const QuantityPosition[3] = {
-                Base[0] + 0.171f, // DAT_005d14ac
+            Vector const QuantityPosition = {
+                Base[0] + 0.171f,                
                 static_cast<float>(QuantityOffset + static_cast<double>(Base[1])), Base[2]};
-            CreateTextControl(Name, "ItemName", QuantityPosition, nullptr, 0.1f, 0.04f, 1.5f, 0,
+            CreateTextControl(Name, "ItemName", &QuantityPosition, nullptr, 0.1f, 0.04f, 1.5f, 0,
                               0, 0xbcf, 0); // FUN_005a0e30
         }
 
         // Mount / unmount toggle (FUN_005a0fb0).
         sprintf(Name, "EquipToggle%d", Number);
         {
-            float const TogglePosition[3] = {
-                Base[0] + 0.047000002f, // DAT_005d1490
+            Vector const TogglePosition = {
+                Base[0] + 0.047000002f,                
                 static_cast<float>(static_cast<double>(RowY) - static_cast<double>(0.11f) +
-                                   static_cast<double>(Base[1])), // DAT_005d1498
+                                   static_cast<double>(Base[1])),                
                 Base[2] + 0.001f};                               // DAT_005d1494
-            float const ToggleHalfExtents[3] = {0.012f, 0.012f, 0.0f};
+            Vector const ToggleHalfExtents = {0.012f, 0.012f, 0.0f};
             CreateToggleButtonControl(Name, "Interface\\neuronet\\inventory\\unmount.3db",
                                       "Interface\\neuronet\\inventory\\mount.3db", nullptr,
-                                      nullptr, TogglePosition, nullptr, ToggleHalfExtents, 0, 0,
+                                      nullptr, &TogglePosition, nullptr, &ToggleHalfExtents, 0, 0,
                                       0, 0, 0x426, 0x425);
         }
 
@@ -1776,44 +1776,44 @@ void NnInventory::CreateControls()
         // colour DAT_00679bac for both states.
         sprintf(Name, "ItemDamage%d", Number);
         {
-            float const DamagePosition[3] = {
-                Base[0] + 0.066999994f, // DAT_005d1508
+            Vector const DamagePosition = {
+                Base[0] + 0.066999994f,                
                 static_cast<float>(static_cast<double>(RowY) - static_cast<double>(0.158f) +
-                                   static_cast<double>(Base[1])), // DAT_005d1428
+                                   static_cast<double>(Base[1])),                
                 Base[2] + 0.001f};                               // DAT_005d1494
-            float const DamageHalfExtents[3] = {0.03f, 0.003f, 0.0f};
-            CreateCargoBarControl(Name, "", DamagePosition, nullptr, DamageHalfExtents, 1, 0x43c,
+            Vector const DamageHalfExtents = {0.03f, 0.003f, 0.0f};
+            CreateCargoBarControl(Name, "", &DamagePosition, nullptr, &DamageHalfExtents, 1, 0x43c,
                                   G_NnPaletteGreen, G_NnPaletteGreen);
         }
 
         sprintf(Name, "ItemPrice0%d", Number);
         {
-            float const PricePosition[3] = {
+            Vector const PricePosition = {
                 PriceX + Base[0],
                 static_cast<float>(static_cast<double>(RowY) - static_cast<double>(0.152f) +
-                                   static_cast<double>(Base[1])), // DAT_005d1414
+                                   static_cast<double>(Base[1])),                
                 Base[2]};
-            CreateTextControl(Name, "ItemName", PricePosition, nullptr, 0.12f, 0.04f, 1.5f, 0xbd4,
+            CreateTextControl(Name, "ItemName", &PricePosition, nullptr, 0.12f, 0.04f, 1.5f, 0xbd4,
                               2, 0xbd4, 0); // FUN_005a0e30
         }
 
         if (Dealer != nullptr && Dealer->TradeMode == kTradeModeCommodity)
         {
             sprintf(Name, "ItemGoodDeal0%d", Number);
-            float const DealPosition[3] = {Base[0] + 0.365f, QuantityRowY + Base[1], // DAT_005d1400
-                                           Base[2] + 0.001f};                        // DAT_005d1494
-            float const DealHalfExtents[3] = {0.012f, 0.012f, 0.0f};
-            float const DealVector338[3] = {0.0f, 0.0f, 0.0f};
+            Vector const DealPosition = {Base[0] + 0.365f, QuantityRowY + Base[1],                
+                                         Base[2] + 0.001f};                        // DAT_005d1494
+            Vector const DealHalfExtents = {0.012f, 0.012f, 0.0f};
+            Vector const DealVector338 = {0.0f, 0.0f, 0.0f};
             CreateStaticControl(Name, "Interface\\NeuroNet\\Inventory\\INV_green_square.3db",
-                                DealPosition, nullptr, DealHalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                0, DealVector338); // FUN_005a0db0
+                                &DealPosition, nullptr, &DealHalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                                0, &DealVector338); // FUN_005a0db0
         }
 
         sprintf(Name, "CargoMissionText%d", Number);
         {
-            float const MissionPosition[3] = {Base[0] + 0.183f, // DAT_005d13e8
-                                              MeshRowY + Base[1], Base[2]};
-            CargoMissionText[Row] = CreateTextControl(Name, "ItemName", MissionPosition, nullptr,
+            Vector const MissionPosition = {Base[0] + 0.183f,                
+                                            MeshRowY + Base[1], Base[2]};
+            CargoMissionText[Row] = CreateTextControl(Name, "ItemName", &MissionPosition, nullptr,
                                                       0.17f, 0.04f, 1.5f, 0, 2, 0, 1);
         }
     }
@@ -1821,99 +1821,99 @@ void NnInventory::CreateControls()
     // FUN_005a10e0.
     if (bOwnWindow != 0)
     {
-        float const InfoOffset[3] = {0.027f, 0.151f, 0.0f};
-        CreateRichTextWin("InfoCard_Info", 0.36f, 0.31f, InfoOffset, true);
+        Vector const InfoOffset = {0.027f, 0.151f, 0.0f};
+        CreateRichTextWin("InfoCard_Info", 0.36f, 0.31f, &InfoOffset, true);
     }
 
     // FUN_005a17e0.
     {
-        float const ScrollPosition[3] = {Base[0] + 0.3989f, Base[1] - 0.099f, // DAT_005d13d0 / 13d4
-                                         Base[2]};
-        CreateUIScroll("Inventory_Scroll", ScrollPosition, 0.019f, 0.335f, 0, 5, 5, 0);
+        Vector const ScrollPosition = {Base[0] + 0.3989f, Base[1] - 0.099f,                       
+                                       Base[2]};
+        CreateUIScroll("Inventory_Scroll", &ScrollPosition, 0.019f, 0.335f, 0, 5, 5, 0);
     }
 
     // FUN_005a0c90.
-    float const FilterHalfExtents[3] = {0.017f, 0.017f, 0.0f};
+    Vector const FilterHalfExtents = {0.017f, 0.017f, 0.0f};
     if (bShowFilters != 0)
     {
         float const FilterY = FilterBase[1] - 0.463f; // DAT_005d13b8
-        float const WeaponsPosition[3] = {FilterBase[0] + 0.226f, FilterY, FilterBase[2]};
+        Vector const WeaponsPosition = {FilterBase[0] + 0.226f, FilterY, FilterBase[2]};
         CreateButtonControl("Filter_Weapons", "Interface\\NeuroNet\\Inventory\\weaponsicon.3db",
-                            nullptr, "ui_filter_select", nullptr, WeaponsPosition, nullptr,
-                            FilterHalfExtents, 0, 1, 0, 0, 0x2135, 0, 0);
-        float const AmmoPosition[3] = {FilterBase[0] + 0.26f, FilterY, FilterBase[2]};
+                            nullptr, "ui_filter_select", nullptr, &WeaponsPosition, nullptr,
+                            &FilterHalfExtents, 0, 1, 0, 0, 0x2135, 0, 0);
+        Vector const AmmoPosition = {FilterBase[0] + 0.26f, FilterY, FilterBase[2]};
         CreateButtonControl("Filter_Ammo", "Interface\\NeuroNet\\Inventory\\ammo.3db", nullptr,
-                            "ui_filter_select", nullptr, AmmoPosition, nullptr, FilterHalfExtents,
+                            "ui_filter_select", nullptr, &AmmoPosition, nullptr, &FilterHalfExtents,
                             0, 1, 0, 0, 0x214a, 0, 0);
-        float const EquipmentPosition[3] = {FilterBase[0] + 0.294f, FilterY, FilterBase[2]};
+        Vector const EquipmentPosition = {FilterBase[0] + 0.294f, FilterY, FilterBase[2]};
         CreateButtonControl("Filter_Equipment",
                             "Interface\\NeuroNet\\Inventory\\equipmenticon.3db", nullptr,
-                            "ui_filter_select", nullptr, EquipmentPosition, nullptr,
-                            FilterHalfExtents, 0, 1, 0, 0, 0x2142, 0, 0);
-        float const CargoBayPosition[3] = {FilterBase[0] + 0.33f, FilterY, FilterBase[2]};
+                            "ui_filter_select", nullptr, &EquipmentPosition, nullptr,
+                            &FilterHalfExtents, 0, 1, 0, 0, 0x2142, 0, 0);
+        Vector const CargoBayPosition = {FilterBase[0] + 0.33f, FilterY, FilterBase[2]};
         CreateButtonControl("Filter_CargoBay", "Interface\\NeuroNet\\Inventory\\cargobay.3db",
-                            nullptr, "ui_filter_select", nullptr, CargoBayPosition, nullptr,
-                            FilterHalfExtents, 0, 1, 0, 0, 0x2141, 0, 0);
+                            nullptr, "ui_filter_select", nullptr, &CargoBayPosition, nullptr,
+                            &FilterHalfExtents, 0, 1, 0, 0, 0x2141, 0, 0);
     }
 
     if (bShowCommodity != 0)
     {
-        float const CommodityPosition[3] = {FilterBase[0] + 0.364f, FilterBase[1] - 0.463f,
-                                            FilterBase[2]};
+        Vector const CommodityPosition = {FilterBase[0] + 0.364f, FilterBase[1] - 0.463f,
+                                          FilterBase[2]};
         CreateButtonControl("Filter_Commodity", "Interface\\NeuroNet\\Inventory\\commodities.3db",
-                            nullptr, "ui_filter_select", nullptr, CommodityPosition, nullptr,
-                            FilterHalfExtents, 0, 1, 0, 0, 0x2138, 0, 0);
+                            nullptr, "ui_filter_select", nullptr, &CommodityPosition, nullptr,
+                            &FilterHalfExtents, 0, 1, 0, 0, 0x2138, 0, 0);
     }
 
     if (bOwnWindow != 0)
     {
-        float const RoutePosition[3] = {Base[0] + 0.641f, Base[1] - 0.455f, Base[2]};
-        float const RouteHalfExtents[3] = {0.146f, 0.026f, 0.0f};
+        Vector const RoutePosition = {Base[0] + 0.641f, Base[1] - 0.455f, Base[2]};
+        Vector const RouteHalfExtents = {0.146f, 0.026f, 0.0f};
         TradeRouteButton = CreateWireButtonControl("TradeRouteButton", "ui_item_select",
-                                                   RoutePosition, RouteHalfExtents, 0, 0, 0x3d4,
+                                                   &RoutePosition, &RouteHalfExtents, 0, 0, 0x3d4,
                                                    0, 0); // +0x970
-        float const RouteTextPosition[3] = {Base[0] + 0.54f, Base[1] - 0.433f, Base[2]};
-        TradeRouteText = CreateTextControl("TradeRouteText", "ButtonText", RouteTextPosition,
+        Vector const RouteTextPosition = {Base[0] + 0.54f, Base[1] - 0.433f, Base[2]};
+        TradeRouteText = CreateTextControl("TradeRouteText", "ButtonText", &RouteTextPosition,
                                            nullptr, 0.201f, 0.06f, 1.6f, 0x3dc, 1, 0,
                                            1); // +0x96c
     }
 
     if (GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
     {
-        float const BarPosition[3] = {FilterBase[0] + 0.0984f, FilterBase[1] - 0.453f,
-                                      FilterBase[2]};
-        float const FullHalfExtents[3] = {0.06f, 0.014f, 0.0f};
-        float const ZeroVector[3] = {0.0f, 0.0f, 0.0f};
+        Vector const BarPosition = {FilterBase[0] + 0.0984f, FilterBase[1] - 0.453f,
+                                    FilterBase[2]};
+        Vector const FullHalfExtents = {0.06f, 0.014f, 0.0f};
+        Vector const ZeroVector = {0.0f, 0.0f, 0.0f};
         FullCargoBar = CreateStaticControl("Full_Cargobar",
                                        "Interface\\NeuroNet\\Inventory\\cargofull.3db",
-                                       BarPosition, nullptr, FullHalfExtents, 0, 0, 0, 1, 0, 0, 1,
-                                       0, 0, 0, ZeroVector); // +0x4d0
+                                       &BarPosition, nullptr, &FullHalfExtents, 0, 0, 0, 1, 0, 0, 1,
+                                       0, 0, 0, &ZeroVector); // +0x4d0
         FullCargoBar->ToolTipIds = 0x43b;                        // +0xcc, no null test
         EmptyCargoBar = CreateStaticControl("Empty_Cargobar",
                                        "Interface\\NeuroNet\\Inventory\\cargoempty.3db",
-                                       BarPosition, nullptr, ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                       0, ZeroVector); // +0x4cc
+                                       &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                                       0, &ZeroVector); // +0x4cc
         EmptyCargoBar->SetProperty(kWinPropHide, 1, 0);
         SelectedCargoBar = CreateStaticControl("SelectedCargobar",
                                        "Interface\\NeuroNet\\Inventory\\cargoselected.3db",
-                                       BarPosition, nullptr, ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                       0, ZeroVector); // +0x4d4
+                                       &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                                       0, &ZeroVector); // +0x4d4
         SelectedCargoBar->SetProperty(kWinPropHide, 1, 0);
-        float const LabelPosition[3] = {FilterBase[0] + 0.166f, FilterBase[1] - 0.489f,
-                                        FilterBase[2]};
-        CargoLabel = CreateTextControl("CargoLabel", "Normal", LabelPosition, nullptr, 0.26f,
+        Vector const LabelPosition = {FilterBase[0] + 0.166f, FilterBase[1] - 0.489f,
+                                      FilterBase[2]};
+        CargoLabel = CreateTextControl("CargoLabel", "Normal", &LabelPosition, nullptr, 0.26f,
                                        0.06f, 1.5f, 0x43b, 0, 0, 0); // +0x4dc
     }
 
     // FUN_005a1020, created hidden.
     {
-        float const ViewPosition[3] = {Base[0] + 0.25f, Base[1] - 0.245f, Base[2]}; // DAT_005c94f8
-        float const RotSpeed[3] = {0.0f, 0.0f, 0.0f};
-        float const Ypr[3] = {0.0f, 0.0f, 0.0f};
-        float const ViewSize[3] = {0.13f, -0.147f, 0.0f};
+        Vector const ViewPosition = {Base[0] + 0.25f, Base[1] - 0.245f, Base[2]}; // DAT_005c94f8
+        Vector const RotSpeed = {0.0f, 0.0f, 0.0f};
+        Vector const Ypr = {0.0f, 0.0f, 0.0f};
+        Vector const ViewSize = {0.13f, -0.147f, 0.0f};
         unsigned const WireColor = 0xffffffffu;
         WinControl* const View = CreateShipViewControl(
-            "ShipView_Control", RotSpeed, ViewPosition, Ypr, ViewSize, nullptr, false, false,
+            "ShipView_Control", &RotSpeed, &ViewPosition, &Ypr, &ViewSize, nullptr, false, false,
             reinterpret_cast<unsigned const*>(G_HudChromeColorRgba), &WireColor);
         View->Flags = static_cast<unsigned char>(View->Flags & 0xfc);
     }
@@ -1922,17 +1922,17 @@ void NnInventory::CreateControls()
     {
         if (bOwnWindow != 0)
         {
-            float const TitlePosition[3] = {0.027f, 0.202f, 0.0f};
-            InfoCardTitle = CreateTextControl("Infocard_Title", "SubHeader", TitlePosition, nullptr,
+            Vector const TitlePosition = {0.027f, 0.202f, 0.0f};
+            InfoCardTitle = CreateTextControl("Infocard_Title", "SubHeader", &TitlePosition, nullptr,
                                          0.364f, 0.016f, 1.4f, 0x387, 1, 0, 1); // +0x944
         }
         else if (Dealer != nullptr && Dealer->TradeMode != kTradeModeCommodity)
         {
-            float const InfoPosition[3] = {0.478f, -0.424f, 0.388f};
-            float const InfoHalfExtents[3] = {0.012f, 0.012f, 0.0f};
+            Vector const InfoPosition = {0.478f, -0.424f, 0.388f};
+            Vector const InfoHalfExtents = {0.012f, 0.012f, 0.0f};
             CreateButtonControl("ShipView_Info", "Interface\\NeuroNet\\Inventory\\question.3db",
-                                nullptr, "ui_open_infocard", nullptr, InfoPosition, nullptr,
-                                InfoHalfExtents, 0, 1, 0, 0, 0xbc4, 0, 0);
+                                nullptr, "ui_open_infocard", nullptr, &InfoPosition, nullptr,
+                                &InfoHalfExtents, 0, 1, 0, 0, 0xbc4, 0, 0);
         }
     }
 
@@ -1942,61 +1942,61 @@ void NnInventory::CreateControls()
 
     // The result is not kept here.
     {
-        float const JettisonPosition[3] = {Base[0] + 0.42f, Base[1] - 0.076f, Base[2]};
-        float const JettisonHalfExtents[3] = {0.014f, 0.014f, 0.0f};
+        Vector const JettisonPosition = {Base[0] + 0.42f, Base[1] - 0.076f, Base[2]};
+        Vector const JettisonHalfExtents = {0.014f, 0.014f, 0.0f};
         CreateButtonControl("JettisonButton", "Interface\\NeuroNet\\Inventory\\INV_dump.3db",
-                            nullptr, "ui_item_select", nullptr, JettisonPosition, nullptr,
-                            JettisonHalfExtents, 0, 1, 0, 0, 0xbc6, 0, 0);
+                            nullptr, "ui_item_select", nullptr, &JettisonPosition, nullptr,
+                            &JettisonHalfExtents, 0, 1, 0, 0, 0xbc6, 0, 0);
     }
 
     // The jettison quantity panel, +0x91c..+0x938.
     {
-        float const TitlePosition[3] = {Base[0] + 0.62f, Base[1] - 0.121f, Base[2]};
-        QuantityControl[0] = CreateTextControl("Inv_Jettison_Title", "SubHeader", TitlePosition,
+        Vector const TitlePosition = {Base[0] + 0.62f, Base[1] - 0.121f, Base[2]};
+        QuantityControl[0] = CreateTextControl("Inv_Jettison_Title", "SubHeader", &TitlePosition,
                                                nullptr, 0.26f, 0.016f, 1.4f, 0x638, 1, 0,
                                                0); // +0x91c
     }
     {
-        float const SliderPosition[3] = {Base[0] + 0.494f, Base[1] - 0.182f, Base[2]};
-        UiScroll* const Slider = CreateUIScroll("JettisonQuantitySlider", SliderPosition, 0.253f,
+        Vector const SliderPosition = {Base[0] + 0.494f, Base[1] - 0.182f, Base[2]};
+        UiScroll* const Slider = CreateUIScroll("JettisonQuantitySlider", &SliderPosition, 0.253f,
                                                 0.019f, 0, 5, 1, 1);
         QuantityControl[1] = Slider; // +0x920
         Slider->SetStepMode(true);   // +0x3b4 = 1, no null test
         Slider->SetPageField(1.0f);  // +0x3cc = 1.0f
     }
     {
-        float const TextPosition[3] = {Base[0] + 0.706f, Base[1] - 0.258f, Base[2]};
-        QuantityControl[2] = CreateTextControl("JettisonQuantityText", "Normal", TextPosition,
+        Vector const TextPosition = {Base[0] + 0.706f, Base[1] - 0.258f, Base[2]};
+        QuantityControl[2] = CreateTextControl("JettisonQuantityText", "Normal", &TextPosition,
                                                nullptr, 0.384f, 0.06f, 1.6f, 0x47a, 0, 0,
                                                0); // +0x924
     }
     {
-        float const EditPosition[3] = {Base[0] + 0.864f, Base[1] - 0.258f, Base[2]};
-        QuantityControl[3] = CreateEditControl("JettisonQuantityEdit", "Normal", EditPosition,
+        Vector const EditPosition = {Base[0] + 0.864f, Base[1] - 0.258f, Base[2]};
+        QuantityControl[3] = CreateEditControl("JettisonQuantityEdit", "Normal", &EditPosition,
                                                nullptr, 0.384f, 0.06f, 1.6f, 0, 0,
                                                0); // FUN_005a0e90, +0x928
         QuantityControl[3]->SetProperty(0x43, 1, 8);
         QuantityControl[3]->SetProperty(0x44, 1, 0);
     }
-    float const JettisonButtonHalfExtents[3] = {0.104f, 0.026f, 0.0f};
+    Vector const JettisonButtonHalfExtents = {0.104f, 0.026f, 0.0f};
     {
-        float const CancelPosition[3] = {Base[0] + 0.621f, Base[1] - 0.319f, Base[2]};
+        Vector const CancelPosition = {Base[0] + 0.621f, Base[1] - 0.319f, Base[2]};
         QuantityControl[4] = CreateWireButtonControl("JettisonCancelButton", "ui_item_select",
-                                                     CancelPosition, JettisonButtonHalfExtents, 0,
+                                                     &CancelPosition, &JettisonButtonHalfExtents, 0,
                                                      0, 0x639, 0, 0); // +0x92c
-        float const CancelTextPosition[3] = {Base[0] + 0.52f, Base[1] - 0.297f, Base[2]};
+        Vector const CancelTextPosition = {Base[0] + 0.52f, Base[1] - 0.297f, Base[2]};
         QuantityControl[5] = CreateTextControl("JettisonCancelText", "ButtonText",
-                                               CancelTextPosition, nullptr, 0.201f, 0.06f, 1.6f,
+                                               &CancelTextPosition, nullptr, 0.201f, 0.06f, 1.6f,
                                                0x2148, 1, 0, 1); // +0x930
     }
     {
-        float const AcceptPosition[3] = {Base[0] + 0.621f, Base[1] - 0.391f, Base[2]};
+        Vector const AcceptPosition = {Base[0] + 0.621f, Base[1] - 0.391f, Base[2]};
         QuantityControl[6] = CreateWireButtonControl("JettisonAcceptButton", "ui_item_select",
-                                                     AcceptPosition, JettisonButtonHalfExtents, 0,
+                                                     &AcceptPosition, &JettisonButtonHalfExtents, 0,
                                                      0, 0x63a, 0, 0); // +0x934
-        float const AcceptTextPosition[3] = {Base[0] + 0.52f, Base[1] - 0.369f, Base[2]};
+        Vector const AcceptTextPosition = {Base[0] + 0.52f, Base[1] - 0.369f, Base[2]};
         QuantityControl[7] = CreateTextControl("JettisonAcceptText", "ButtonText",
-                                               AcceptTextPosition, nullptr, 0.201f, 0.06f, 1.6f,
+                                               &AcceptTextPosition, nullptr, 0.201f, 0.06f, 1.6f,
                                                0x2146, 1, 0, 1); // +0x938
     }
     JettisonQuantity = 1;
@@ -2012,9 +2012,9 @@ static void NnInventoryDrawBarQuad(WinControl const* Bar, float X, float HalfX, 
     float const* const BarOrientation = &Bar->Orientation.E[0][0];
     for (int Index = 0; Index < 9; ++Index)
         Frame[Index] = BarOrientation[Index];
-    Frame[9] = Bar->Offset[0] + Bar->Position.x;
-    Frame[10] = Bar->Offset[1] + Bar->Position.y;
-    Frame[11] = Bar->Offset[2] + Bar->Position.z;
+    Frame[9] = Bar->Offset.x + Bar->Position.x;
+    Frame[10] = Bar->Offset.y + Bar->Position.y;
+    Frame[11] = Bar->Offset.z + Bar->Position.z;
     Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Frame)); // FUN_00422690(0, &Transform)
     Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
     Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
@@ -2136,8 +2136,8 @@ void NnInventory::Draw()
     }
 
     WinControl* Bar = FullCargoBar;
-    float const HalfX = Bar->HalfExtents[0];
-    float const HalfY = Bar->HalfExtents[1];
+    float const HalfX = Bar->HalfExtents.x;
+    float const HalfY = Bar->HalfExtents.y;
     float const Width = HalfX + HalfX;
     float Right = static_cast<float>(static_cast<double>(HalfX) -
                                      static_cast<double>(Width) * Free);
@@ -2225,9 +2225,9 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Info.WorldPos[0] = Transform->Translation.x;
             Info.WorldPos[1] = Transform->Translation.y;
             Info.WorldPos[2] = Transform->Translation.z;
-            Info.HalfExtents[0] = FullCargoBar->HalfExtents[0];
-            Info.HalfExtents[1] = FullCargoBar->HalfExtents[1];
-            Info.HalfExtents[2] = FullCargoBar->HalfExtents[2];
+            Info.HalfExtents[0] = FullCargoBar->HalfExtents.x;
+            Info.HalfExtents[1] = FullCargoBar->HalfExtents.y;
+            Info.HalfExtents[2] = FullCargoBar->HalfExtents.z;
             Info.bLive = 1;
             NnToolTipFeedHover(&Info); // FUN_004be370
             return 1; // ~FToolTipHoverInfo
@@ -2267,9 +2267,9 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Info.WorldPos[0] = Wire->WireCenter[0];
         Info.WorldPos[1] = Wire->WireCenter[1];
         Info.WorldPos[2] = Wire->WireCenter[2];
-        Info.HalfExtents[0] = ItemButton[Row]->HalfExtents[0];
-        Info.HalfExtents[1] = ItemButton[Row]->HalfExtents[1];
-        Info.HalfExtents[2] = ItemButton[Row]->HalfExtents[2];
+        Info.HalfExtents[0] = ItemButton[Row]->HalfExtents.x;
+        Info.HalfExtents[1] = ItemButton[Row]->HalfExtents.y;
+        Info.HalfExtents[2] = ItemButton[Row]->HalfExtents.z;
         Info.bLive = 1;
         NnToolTipFeedHover(&Info); // FUN_004be370
         return 1; // ~FToolTipHoverInfo

@@ -60,7 +60,7 @@ struct FNavBarButton
     WinControl* Control;             // +0x18 the RoomControlN / ButtonControlN child
     RoomButtonInfo const* Hotspot;   // +0x1c the RoomData hotspot, null for the launch tab
     unsigned char bOpen;             // +0x20 its service window is open (slid out)
-    float Position[3];               // +0x24 the laid-out offset (FUN_0043e210)
+    Vector Position;               // +0x24 the laid-out offset (FUN_0043e210)
     unsigned Type;                   // +0x30 a location id (room buttons) or hotspot behaviour
 };
 
@@ -141,7 +141,7 @@ public:
     // FUN_00441c70 (RET 8) -- a room character was clicked; true when the bar took the click.
     bool CharacterClicked(FCharacterObject* Character, int Role);
     // FUN_00441ea0 (RET 0xc) -- replace the "ScaledBackground" child and scale its instance.
-    void MakeScaledBackground(float Scale, char const* Mesh, float const* Position);
+    void MakeScaledBackground(float Scale, char const* Mesh, Vector const* Position);
 
     bool IsAnimating() const { return ButtonMover::IsActive() || ButtonScaler::IsActive(); }
 

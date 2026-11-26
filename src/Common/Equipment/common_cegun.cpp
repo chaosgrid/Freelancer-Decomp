@@ -152,7 +152,7 @@ void CEGun::JointChannel::Bind(CEGun* NewOwner, long Instance)
     Owner = NewOwner;
     EngineIndex = (int)(Instance);
     // A full-rotation joint (range >= 2pi, DAT_0639c9e0) is unlimited.
-    FJointRelative const* const Rel = InstanceRelative(Instance);
+    FEngineJointBlock const* const Rel = InstanceRelative(Instance);
     if (Rel != nullptr)
     {
         if (fabs((double)Rel->Min - Rel->Max) >= 6.2831854820251465)
@@ -547,7 +547,7 @@ static void BindTurretJoints(CEGun& Gun, long Root)
     long Child = DALib::Engine->GetRelatedInstance(RootInst, 1, InvalidInstanceIndex);
     while (Child != kInvalidEngineInstance)
     {
-        FJointRelative const* const ChildRel = InstanceRelative(Child);
+        FEngineJointBlock const* const ChildRel = InstanceRelative(Child);
         if (ChildRel != nullptr && ChildRel->Type == kJointTypeRev)
             Gun.Pitch.Bind(&Gun, Child);
         Child = DALib::Engine->GetRelatedInstance(RootInst, 1, Child);
@@ -591,7 +591,7 @@ void CEGun::ComputeTurretFrame()
     }
     else
     {
-        FJointRelative const* const Rel = InstanceRelative(Root);
+        FEngineJointBlock const* const Rel = InstanceRelative(Root);
         Vector Up;
         Up.x = 0.0f;
         Up.y = 1.0f;
@@ -608,7 +608,7 @@ void CEGun::ComputeTurretFrame()
     {
         const InstanceIndex Parent = DALib::Engine->GetInstanceParent((long)Pitch.EngineIndex);
         Matrix const ParentOri = *DALib::Engine->GetInstanceOrientation(Parent);
-        FJointRelative const* const Rel = InstanceRelative(Pitch.EngineIndex);
+        FEngineJointBlock const* const Rel = InstanceRelative(Pitch.EngineIndex);
         Acquire3DMathEngine()->TransformMatrix(PitchAxisWS, ParentOri, Rel->Axis);
     }
     else
@@ -684,7 +684,7 @@ Vector CEGun::GetTurretOrigin() const
         const InstanceIndex PitchInst = (long)Pitch.EngineIndex;
         Matrix const PitchOri = *DALib::Engine->GetInstanceOrientation(PitchInst);
         Vector const PitchPos = *DALib::Engine->GetInstancePosition(PitchInst);
-        FJointRelative const* const Rel = InstanceRelative(Pitch.EngineIndex);
+        FEngineJointBlock const* const Rel = InstanceRelative(Pitch.EngineIndex);
         Vector Offset;
         Acquire3DMathEngine()->TransformMatrix(Offset, PitchOri, Rel->ChildPos);
         Vector Origin;
@@ -790,7 +790,7 @@ namespace
         double Hi = (double)(Angle);
         if (EngineIndex != kInvalidEngineInstance)
         {
-            FJointRelative const* const Rel = InstanceRelative(EngineIndex);
+            FEngineJointBlock const* const Rel = InstanceRelative(EngineIndex);
             Lo = (float)((double)NegAngle + Rel->Min);
             Hi = (double)Angle + Rel->Max;
         }

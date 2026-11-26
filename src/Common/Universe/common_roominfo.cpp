@@ -451,9 +451,9 @@ RoomLightInfo::RoomLightInfo()
     // RVA 0x13410. Direction (+0x30) is the ThornLightProperties +0xC triple read_set_script
     // rotates and normalises.
     Frame.set_identity();
-    Direction[0] = 0.0f;
-    Direction[1] = 0.0f;
-    Direction[2] = -1.0f;
+    Direction.x = 0.0f;
+    Direction.y = 0.0f;
+    Direction.z = -1.0f;
     // Retail leaves +0x3C..+0xA3 (Mode, Color, Opaque4C) uninitialized; not zero-filled on
     // purpose. add_set_script_light overwrites the whole range before use.
 }
@@ -467,9 +467,9 @@ void RoomLightInfo::clear()
 {
     // RVA 0x13490: as the constructor, leaving Mode/Color/Opaque4C untouched.
     Frame.set_identity();
-    Direction[0] = 0.0f;
-    Direction[1] = 0.0f;
-    Direction[2] = -1.0f;
+    Direction.x = 0.0f;
+    Direction.y = 0.0f;
+    Direction.z = -1.0f;
     Type = 0;
 }
 
@@ -477,9 +477,9 @@ RoomLightInfo& RoomLightInfo::operator=(RoomLightInfo const& Other)
 {
     // RVA 0x1290: a plain 0xA8-byte copy, no self-assignment check.
     Frame = Other.Frame;
-    Direction[0] = Other.Direction[0];
-    Direction[1] = Other.Direction[1];
-    Direction[2] = Other.Direction[2];
+    Direction.x = Other.Direction.x;
+    Direction.y = Other.Direction.y;
+    Direction.z = Other.Direction.z;
     Mode = Other.Mode;
     Color[0] = Other.Color[0];
     Color[1] = Other.Color[1];

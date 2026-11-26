@@ -112,7 +112,7 @@ GENRESULT DACOM_API FThornComponent::SetFloorHeight(float) { return GR_OK; }
 GENRESULT DACOM_API FThornComponent::AdvanceTime(int) { return GR_OK; }
 GENRESULT DACOM_API FThornComponent::ConnectHardpoints(void*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::DisconnectHardpoints(void*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetHardpointXform(int, char const*, float*)
+GENRESULT DACOM_API FThornComponent::GetHardpointXform(int, char const*, Transform*)
 {
     return kThornSlotNotImplemented;
 }
@@ -136,9 +136,9 @@ GENRESULT DACOM_API FThornComponent::GetPan(float*) { return kThornSlotNotImplem
 GENRESULT DACOM_API FThornComponent::SetAudioProps(float const*, int) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::GetAudioProps(float*, int) { return kThornSlotNotImplemented; }
 
-GENRESULT DACOM_API FThornComponent::StartIk(void*, float*, float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::StartIk(void*, Vector*, Matrix*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::StopIk(void*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::UpdateIk(void*, float*, float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::UpdateIk(void*, Vector*, Matrix*) { return kThornSlotNotImplemented; }
 
 GENRESULT DACOM_API FThornComponent::SetPosition(const Vector*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::SetOrientation(const Matrix*) { return kThornSlotNotImplemented; }
@@ -158,10 +158,10 @@ GENRESULT DACOM_API FThornComponent::GetFar(float*) { return kThornSlotNotImplem
 
 GENRESULT DACOM_API FThornComponent::SetOn(int) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::SetLight(void const*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::SetDirection(float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::SetDirection(Vector*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::GetOn(int*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::GetLight(void*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetDirection(float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::GetDirection(Vector*) { return kThornSlotNotImplemented; }
 
 GENRESULT DACOM_API FThornComponent::Start() { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::StopEffect() { return kThornSlotNotImplemented; }

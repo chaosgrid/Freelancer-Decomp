@@ -25,7 +25,7 @@ public:
     ~UiTextMsgButton() override;
 
     // slot 5 LAB_00599eb0 (RET 4) -- places the style mesh, then the base SetPosition.
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_00599e00 (RET 4) -- keeps the style mesh upright.
     void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_00599f60 (RET 8); Data is an FUiPayloadTextMsgButton*.
@@ -33,7 +33,7 @@ public:
     // slot 13 LAB_0059a260
     void Draw() override;
     // slot 15 LAB_0059a240 (RET 4) -- an interactive button plays the rollover sound.
-    void MouseEnter(float const* Ray) override;
+    void MouseEnter(Vector const* Ray) override;
     // slot 19 LAB_0059a3d0 (RET 4) -- a click sends 0x3004 (MessageArg) to the parent.
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
 

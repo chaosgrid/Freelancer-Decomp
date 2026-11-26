@@ -114,7 +114,7 @@ void NnToolTipControl::InitToolTipDefaults()
     }
 }
 
-bool NnToolTipControl::HitTest(float const* /*Ray*/)
+bool NnToolTipControl::HitTest(Vector const* /*Ray*/)
 {
     // slot 4 FUN_0053f330.
     return false;
@@ -164,14 +164,14 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     Vector BottomRight;
     Win3DTransformByMatrix(BottomRight, Orientation, BottomRightLocal);
 
-    float Ray[3];
-    Win3DGetMouseRay(Ray); // FUN_0059da70
+    Vector Ray;
+    Win3DGetMouseRay(&Ray); // FUN_0059da70
 
     // The ray scaled onto z = -1; the reciprocal stays unrounded for all three products.
-    double const RayScale = -1.0 / static_cast<double>(Ray[2]);
-    float PosX = static_cast<float>(static_cast<double>(Ray[0]) * RayScale);
-    float PosY = static_cast<float>(static_cast<double>(Ray[1]) * RayScale);
-    float PosZ = static_cast<float>(RayScale * static_cast<double>(Ray[2]));
+    double const RayScale = -1.0 / static_cast<double>(Ray.z);
+    float PosX = static_cast<float>(static_cast<double>(Ray.x) * RayScale);
+    float PosY = static_cast<float>(static_cast<double>(Ray.y) * RayScale);
+    float PosZ = static_cast<float>(RayScale * static_cast<double>(Ray.z));
 
     // Only the left edge of the top-left corner and the right / bottom of the bottom-right
     // corner are projected.
@@ -212,8 +212,8 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     if (PosY + VertBias < BoundVert)
         PosY = static_cast<float>(PosY - VertBias * 1.5f);
 
-    float const NewPosition[3] = {PosX, PosY, PosZ};
-    SetPosition(NewPosition);
+    Vector const NewPosition = {PosX, PosY, PosZ};
+    SetPosition(&NewPosition);
 }
 
 void NnToolTipControl::Draw()

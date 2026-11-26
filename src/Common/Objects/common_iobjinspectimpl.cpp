@@ -139,7 +139,7 @@ Transform const& IObjInspectImpl::get_transform() const
 {
     // FUN_062bf1f0, ICF-folded with get_orientation: Orientation (+0x08) followed by
     // WorldPosition (+0x2c) is one Transform.
-    return *(Transform const*)&Object->Orientation;
+    return Object->get_transform();
 }
 
 Matrix const& IObjInspectImpl::get_orientation() const

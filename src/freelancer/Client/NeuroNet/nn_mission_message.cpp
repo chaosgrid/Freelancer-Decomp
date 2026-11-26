@@ -175,7 +175,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
 
     Kind = G_NnMissionMessageKind;
     SetMesh(kFrameMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
 
     // The pop-up needs the cursor. In space the game also pauses (undone by the dtor).
     if (Kind == kKindPopUp)
@@ -194,12 +194,12 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
     DrawLayer = 1;
 
     // Every kind but the pop-up has the close box.
-    float const ClosePosition[3] = {NnFloatBits(0x3ecd4fdf), NnFloatBits(0x3e72b021), 0.0f};
-    float const CloseExtents[3] = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
+    Vector const ClosePosition = {NnFloatBits(0x3ecd4fdf), NnFloatBits(0x3e72b021), 0.0f};
+    Vector const CloseExtents = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
     if (Kind != kKindPopUp)
     {
         CloseButton = CreateButtonControl("MissionCloseButton", kCloseMesh, nullptr, kSelectSound,
-                                          nullptr, ClosePosition, nullptr, CloseExtents, 0, 0, 0,
+                                          nullptr, &ClosePosition, nullptr, &CloseExtents, 0, 0, 0,
                                           0, 0x409, 0, 0);
     }
 
@@ -208,13 +208,13 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         TitleIds = 0x4cf;
     if (Kind == kKindScanNotice)
         TitleIds = 0;
-    float const TitlePosition[3] = {NnFloatBits(0xbed58106), NnFloatBits(0x3e841893), 0.0f};
-    Title = CreateTextControl("MissionMessageTitle", "PageHeader", TitlePosition, nullptr,
+    Vector const TitlePosition = {NnFloatBits(0xbed58106), NnFloatBits(0x3e841893), 0.0f};
+    Title = CreateTextControl("MissionMessageTitle", "PageHeader", &TitlePosition, nullptr,
                               NnFloatBits(0x3f5645a2), NnFloatBits(0x3d75c28f), 1.5f, TitleIds,
                               1, 0, 1);
 
     // The answer buttons share one size; each caption sits below its button.
-    float const AnswerExtents[3] = {NnFloatBits(0x3dcccccd), NnFloatBits(0x3cd4fdf4), 0.0f};
+    Vector const AnswerExtents = {NnFloatBits(0x3dcccccd), NnFloatBits(0x3cd4fdf4), 0.0f};
     float const CaptionHeight = NnFloatBits(0x3cf5c28f);
     float const CaptionArg6 = NnFloatBits(0x3ff33333);
 
@@ -227,29 +227,29 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
 
         if ((G_NnMissionMessageButtons & 1) != 0)
         {
-            float const YesPosition[3] = {NnFloatBits(0xbe6b851f), NnFloatBits(0xbe560419), 0.0f};
-            YesButton = CreateWireButtonControl("MMYesButton", kSelectSound, YesPosition,
-                                                AnswerExtents, 0, 0, 0x335, 0, 0);
-            float const CaptionPosition[3] = {NnFloatBits(0xbea8f5c3), NnFloatBits(0xbe3f7cee), 0.0f};
-            CreateTextControl("MMYesText", kButtonTextStyle, CaptionPosition, nullptr,
+            Vector const YesPosition = {NnFloatBits(0xbe6b851f), NnFloatBits(0xbe560419), 0.0f};
+            YesButton = CreateWireButtonControl("MMYesButton", kSelectSound, &YesPosition,
+                                                &AnswerExtents, 0, 0, 0x335, 0, 0);
+            Vector const CaptionPosition = {NnFloatBits(0xbea8f5c3), NnFloatBits(0xbe3f7cee), 0.0f};
+            CreateTextControl("MMYesText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e4ac083), CaptionHeight, CaptionArg6, 0x4dc, 1, 0, 1);
         }
         if ((G_NnMissionMessageButtons & 2) != 0)
         {
-            float const NoPosition[3] = {0.0f, NnFloatBits(0xbe560419), 0.0f};
-            NoButton = CreateWireButtonControl("MMNoButton", kSelectSound, NoPosition, AnswerExtents,
+            Vector const NoPosition = {0.0f, NnFloatBits(0xbe560419), 0.0f};
+            NoButton = CreateWireButtonControl("MMNoButton", kSelectSound, &NoPosition, &AnswerExtents,
                                                0, 0, 0x336, 0, 0);
-            float const CaptionPosition[3] = {NnFloatBits(0xbdc8b439), NnFloatBits(0xbe3f7cee), 0.0f};
-            CreateTextControl("MMNoText", kButtonTextStyle, CaptionPosition, nullptr,
+            Vector const CaptionPosition = {NnFloatBits(0xbdc8b439), NnFloatBits(0xbe3f7cee), 0.0f};
+            CreateTextControl("MMNoText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e4ac083), CaptionHeight, CaptionArg6, 0x4dd, 1, 0, 1);
         }
         if ((G_NnMissionMessageButtons & 4) != 0)
         {
-            float const LaterPosition[3] = {NnFloatBits(0x3e6b851f), NnFloatBits(0xbe560419), 0.0f};
-            LaterButton = CreateWireButtonControl("MMLaterButton", kSelectSound, LaterPosition,
-                                                  AnswerExtents, 0, 0, 0x337, 0, 0);
-            float const CaptionPosition[3] = {NnFloatBits(0x3e072b02), NnFloatBits(0xbe3f7cee), 0.0f};
-            CreateTextControl("MMLaterText", kButtonTextStyle, CaptionPosition, nullptr,
+            Vector const LaterPosition = {NnFloatBits(0x3e6b851f), NnFloatBits(0xbe560419), 0.0f};
+            LaterButton = CreateWireButtonControl("MMLaterButton", kSelectSound, &LaterPosition,
+                                                  &AnswerExtents, 0, 0, 0x337, 0, 0);
+            Vector const CaptionPosition = {NnFloatBits(0x3e072b02), NnFloatBits(0xbe3f7cee), 0.0f};
+            CreateTextControl("MMLaterText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e4ac083), CaptionHeight, CaptionArg6, 0x622, 1, 0,
                               1);
         }
@@ -257,32 +257,32 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         if ((G_NnMissionMessageButtons & 8) != 0)
         {
             CloseButton = CreateButtonControl("MissionCloseButton", kCloseMesh, nullptr,
-                                              kSelectSound, nullptr, ClosePosition, nullptr,
-                                              CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
-            float const OkPosition[3] = {NnFloatBits(0xbc449ba6), NnFloatBits(0xbe560419), 0.0f};
-            OkButton = CreateWireButtonControl("MMOkButton", kSelectSound, OkPosition, AnswerExtents,
+                                              kSelectSound, nullptr, &ClosePosition, nullptr,
+                                              &CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
+            Vector const OkPosition = {NnFloatBits(0xbc449ba6), NnFloatBits(0xbe560419), 0.0f};
+            OkButton = CreateWireButtonControl("MMOkButton", kSelectSound, &OkPosition, &AnswerExtents,
                                                0, 0, 0, 0, 0);
-            float const CaptionPosition[3] = {NnFloatBits(0xbddf3b64), NnFloatBits(0xbe3f7cee), 0.0f};
-            CreateTextControl("MMOkText", kButtonTextStyle, CaptionPosition, nullptr,
+            Vector const CaptionPosition = {NnFloatBits(0xbddf3b64), NnFloatBits(0xbe3f7cee), 0.0f};
+            CreateTextControl("MMOkText", kButtonTextStyle, &CaptionPosition, nullptr,
                               NnFloatBits(0x3e47ae14), CaptionHeight, CaptionArg6, 0x411, 1, 0, 1);
         }
     }
 
     if (Kind == kKindScanNotice)
     {
-        float const Extents[3] = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
-        float const DropPosition[3] = {NnFloatBits(0xbe3c6a7f), NnFloatBits(0xbe560419), 0.0f};
-        DropCargoButton = CreateWireButtonControl("DropCargoButton", kSelectSound, DropPosition,
-                                                  Extents, 0, 0, 0x338, 0, 0);
-        float const DropTextPosition[3] = {NnFloatBits(0xbea04189), NnFloatBits(0xbe3f7cee), 0.0f};
-        DropCargoText = CreateTextControl("DropCargoText", kButtonTextStyle, DropTextPosition,
+        Vector const Extents = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
+        Vector const DropPosition = {NnFloatBits(0xbe3c6a7f), NnFloatBits(0xbe560419), 0.0f};
+        DropCargoButton = CreateWireButtonControl("DropCargoButton", kSelectSound, &DropPosition,
+                                                  &Extents, 0, 0, 0x338, 0, 0);
+        Vector const DropTextPosition = {NnFloatBits(0xbea04189), NnFloatBits(0xbe3f7cee), 0.0f};
+        DropCargoText = CreateTextControl("DropCargoText", kButtonTextStyle, &DropTextPosition,
                                           nullptr, NnFloatBits(0x3e851eb8), CaptionHeight,
                                           CaptionArg6, 0x51f, 1, 0, 1);
-        float const CancelPosition[3] = {NnFloatBits(0x3e3851ec), NnFloatBits(0xbe560419), 0.0f};
-        CancelButton = CreateWireButtonControl("DCCancelButton", kSelectSound, CancelPosition,
-                                               Extents, 0, 0, 0x63e, 0, 0);
-        float const CancelTextPosition[3] = {NnFloatBits(0x3d4ccccd), NnFloatBits(0xbe3f7cee), 0.0f};
-        CancelText = CreateTextControl("DCCancelText", kButtonTextStyle, CancelTextPosition,
+        Vector const CancelPosition = {NnFloatBits(0x3e3851ec), NnFloatBits(0xbe560419), 0.0f};
+        CancelButton = CreateWireButtonControl("DCCancelButton", kSelectSound, &CancelPosition,
+                                               &Extents, 0, 0, 0x63e, 0, 0);
+        Vector const CancelTextPosition = {NnFloatBits(0x3d4ccccd), NnFloatBits(0xbe3f7cee), 0.0f};
+        CancelText = CreateTextControl("DCCancelText", kButtonTextStyle, &CancelTextPosition,
                                        nullptr, NnFloatBits(0x3e851eb8), CaptionHeight,
                                        CaptionArg6, 0x63d, 1, 0, 1);
 
@@ -317,10 +317,10 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         }
     }
 
-    float const TextOffset[3] = {NnFloatBits(0xbec7ae14), NnFloatBits(0x3e8d4fdf),
-                                 NnFloatBits(0xbfa4dd2f)};
+    Vector const TextOffset = {NnFloatBits(0xbec7ae14), NnFloatBits(0x3e8d4fdf),
+                               NnFloatBits(0xbfa4dd2f)};
     Text = CreateRichTextWin("MissionMessageText", NnFloatBits(0x3f451eb8),
-                             NnFloatBits(0x3ebd70a4), TextOffset, true);
+                             NnFloatBits(0x3ebd70a4), &TextOffset, true);
 
     // Retail's clone-into-list idiom: the list takes a clone of a clone, the first is deleted.
     FmtStrSprintf(&G_NnMissionMessageText, G_NnTextScratchB, G_NnTextScratchCapacity);
@@ -340,7 +340,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
 
     // (0, 0.076, -1.288)
     SetOffset(0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f));
-    SetPosition(&Position.x);
+    SetPosition(&Position);
 
     NnMainButtonOnModalOpen();
     NavBarCloseService(true);

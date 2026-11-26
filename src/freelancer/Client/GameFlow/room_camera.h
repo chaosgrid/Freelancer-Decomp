@@ -67,7 +67,7 @@ public:
     virtual void DACOM_API Slot21();
 
     // Retail slot 19 (FUN_00556b70): copy three floats to +0x80.
-    void SetPosition(float const* Pos3);
+    void SetPosition(Vector const* Pos3);
     // Retail slot 20 (FUN_00556b90): copy nine floats to +0x5c.
     void SetOrientation(float const* Orient9);
     // Retail slot 21 (LAB_00556bb0): copy twelve floats -- orientation then position -- to +0x5c.
@@ -113,7 +113,7 @@ FRoomCamera* RoomCameraCreate();
 void RoomCameraDestroy(FRoomCamera* Camera);
 
 // FUN_00556cb0 / 556cc0 / 556cd0 -- slots 19 / 20 / 21.
-void RoomCameraSetPosition(FRoomCamera* Camera, float const* Pos3);
+void RoomCameraSetPosition(FRoomCamera* Camera, Vector const* Pos3);
 void RoomCameraSetOrientation(FRoomCamera* Camera, float const* Orient9);
 void RoomCameraSetTransform(FRoomCamera* Camera, float const* Transform12);
 

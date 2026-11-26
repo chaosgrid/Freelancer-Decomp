@@ -755,7 +755,7 @@ unsigned char FDeformMesh::Skin(FLodHolder* /*Holder*/, FDeformVbDesc* /*Vb*/,
 }
 
 // LAB_065f8cd0.
-unsigned char FDeformMesh::GetBoundSphere(float* /*OutRadius*/, float* /*OutCenter*/)
+unsigned char FDeformMesh::GetBoundSphere(float* /*OutRadius*/, Vector* /*OutCenter*/)
 {
     return 0;
 }
@@ -767,15 +767,15 @@ FDeformMesh::~FDeformMesh()
 
 // Slot 4 (LAB_065f8d00).
 // LAB_065f8d00, the DFM mesh's slot 4.
-unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
+unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, Vector* OutCenter)
 {
     if (SphereReady == 0)
     {
         const unsigned int Count = (unsigned int)VertexCount;
         const float* const Points = (const float*)Vertices;
-        SphereCenter[2] = 0.0f;
-        SphereCenter[1] = 0.0f;
-        SphereCenter[0] = 0.0f;
+        SphereCenter.z = 0.0f;
+        SphereCenter.y = 0.0f;
+        SphereCenter.x = 0.0f;
         SphereRadius = 0.0f;
         const unsigned char bNonEmpty = (Count != 0) ? 1 : 0;
         if (bNonEmpty != 0)
@@ -813,9 +813,9 @@ unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
             Sum[2] = Points[MaxZ * 3 + 2] + Points[MinZ * 3 + 2];
             float Center[3];
             ScaleVec3(Center, Sum, 0.5f);
-            SphereCenter[0] = Center[0];
-            SphereCenter[1] = Center[1];
-            SphereCenter[2] = Center[2];
+            SphereCenter.x = Center[0];
+            SphereCenter.y = Center[1];
+            SphereCenter.z = Center[2];
             float Extent = (Dx > Dy) ? Dx : Dy;
             if (!(Extent > Dz))
                 Extent = Dz;
@@ -828,7 +828,7 @@ unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
             {
                 const float* const P = Points + Index * 3;
                 float D[3];
-                SubVec3(D, P, SphereCenter);
+                SubVec3(D, P, &SphereCenter.x);
                 const double DistSq = ((double)D[1] * D[1] + (double)D[2] * D[2]) +
                                       (double)D[0] * D[0];
                 if (DistSq > (double)RadiusSq)
@@ -843,7 +843,7 @@ unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
                     float Toward[3];
                     ScaleVec3(Toward, P, Shift);
                     float Kept[3];
-                    ScaleVec3(Kept, SphereCenter, SphereRadius);
+                    ScaleVec3(Kept, &SphereCenter.x, SphereRadius);
                     float Blend[3];
                     WriteVec3(Blend, Toward[0] + Kept[0], Toward[1] + Kept[1], Toward[2] + Kept[2]);
                     const double Inv = 1.0 / (double)DistF;
@@ -851,18 +851,18 @@ unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
                     WriteVec3(NewCenter, (float)((double)Blend[0] * Inv),
                               (float)((double)Blend[1] * Inv),
                               (float)((double)Blend[2] * Inv));
-                    SphereCenter[0] = NewCenter[0];
-                    SphereCenter[1] = NewCenter[1];
-                    SphereCenter[2] = NewCenter[2];
+                    SphereCenter.x = NewCenter[0];
+                    SphereCenter.y = NewCenter[1];
+                    SphereCenter.z = NewCenter[2];
                 }
                 Index += 1;
             }
         }
         SphereReady = bNonEmpty;
     }
-    OutCenter[0] = SphereCenter[0];
-    OutCenter[1] = SphereCenter[1];
-    OutCenter[2] = SphereCenter[2];
+    OutCenter->x = SphereCenter.x;
+    OutCenter->y = SphereCenter.y;
+    OutCenter->z = SphereCenter.z;
     *OutRadius = SphereRadius;
     return 1;
 }

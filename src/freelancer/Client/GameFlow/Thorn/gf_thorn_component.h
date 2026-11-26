@@ -75,7 +75,7 @@ struct FThornComponent : ICompoundControl,
     GENRESULT DACOM_API ConnectHardpoints(void* Desc) override;           // 7  LAB_00454190
     GENRESULT DACOM_API DisconnectHardpoints(void* Desc) override;        // 8  LAB_00454190
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
-                                          float* OutXform12) override;    // 9  LAB_0044fcd0
+                                          Transform* OutXform) override;  // 9  LAB_0044fcd0
     GENRESULT DACOM_API GetFloorHeight(float* OutHeight) override;        // 10 LAB_0044fcb0
     GENRESULT DACOM_API SetTransform(const Transform* Transform12) override;  // 11 LAB_00454190
     GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;     // 12 LAB_00454190
@@ -91,9 +91,9 @@ struct FThornComponent : ICompoundControl,
     GENRESULT DACOM_API GetAudioProps(float* Props8, int Mask) override;       // 10 LAB_0044fce0
 
     // --- IIKControl defaults (0x005cc690..0x005cc698) ----------------------------------------
-    GENRESULT DACOM_API StartIk(void* Desc, float* Position, float* Orientation) override;  // LAB_0044fcd0
-    GENRESULT DACOM_API StopIk(void* Desc) override;                                        // LAB_00454190
-    GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) override; // LAB_0044fcd0
+    GENRESULT DACOM_API StartIk(void* Desc, Vector* Position, Matrix* Orientation) override;  // LAB_0044fcd0
+    GENRESULT DACOM_API StopIk(void* Desc) override;                                          // LAB_00454190
+    GENRESULT DACOM_API UpdateIk(void* Desc, Vector* Position, Matrix* Orientation) override; // LAB_0044fcd0
 
     // --- IGeoTransformControl defaults (all LAB_00454190) ------------------------------------
     GENRESULT DACOM_API SetPosition(const Vector* Position) override;
@@ -116,10 +116,10 @@ struct FThornComponent : ICompoundControl,
     // --- ID3DLightControl defaults (0x005cc610..0x005cc624, all LAB_00454190) -----------------
     GENRESULT DACOM_API SetOn(int On) override;
     GENRESULT DACOM_API SetLight(void const* D3dLight8) override;
-    GENRESULT DACOM_API SetDirection(float* Dir3) override;
+    GENRESULT DACOM_API SetDirection(Vector* Dir) override;
     GENRESULT DACOM_API GetOn(int* OutOn) override;
     GENRESULT DACOM_API GetLight(void* OutD3dLight8) override;
-    GENRESULT DACOM_API GetDirection(float* OutDir3) override;
+    GENRESULT DACOM_API GetDirection(Vector* OutDir) override;
 
     // --- IPSysControl defaults (0x005cc5ec..0x005cc5fc) --------------------------------------
     GENRESULT DACOM_API Start() override;                                 // 3  LAB_0044fcc0

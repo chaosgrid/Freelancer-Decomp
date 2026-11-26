@@ -76,16 +76,16 @@ LoadingProgressBar::~LoadingProgressBar()
 bool LoadingProgressBar::Create(Win3D* NewParent, void* Data)
 {
     // FUN_00578b70 (RET 8).
-    float TextPosition[3] = {-0.095f, 0.0192f, 0.0f};
-    Text = CreateTextControl("LoadingProgressText", "PageHeader", TextPosition, nullptr, 0.2f,
+    Vector TextPosition = {-0.095f, 0.0192f, 0.0f};
+    Text = CreateTextControl("LoadingProgressText", "PageHeader", &TextPosition, nullptr, 0.2f,
                              0.04f, 2.0f, 0, 1, 0, 1);
 
-    float BarPosition[3] = {0.0f, 0.0f, -1.0f};
-    float BarHalfExtents[3] = {0.0f, 0.0f, 0.0f};
-    float BarVector338[3] = {0.0f, 0.0f, 0.0f};
+    Vector BarPosition = {0.0f, 0.0f, -1.0f};
+    Vector BarHalfExtents = {0.0f, 0.0f, 0.0f};
+    Vector BarVector338 = {0.0f, 0.0f, 0.0f};
     Bar = CreateStaticControl("LoadingProgressBar", "Interface\\Intro\\objects\\FRONT_loadingbar.cmp",
-                              BarPosition, nullptr, BarHalfExtents, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-                              BarVector338);
+                              &BarPosition, nullptr, &BarHalfExtents, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                              &BarVector338);
 
     SetOffset(0.0f, 0.0f, -1.0f);
 

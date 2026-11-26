@@ -59,26 +59,26 @@ public:
     // FUN_00582120 (RET 0x6c) -- the argument list of CreateScrollControl after the name. A null
     // mesh leaves that holder alone; a null hardpoint name leaves that transform alone. A null
     // PrevMesh skips the whole prev block (offset, hardpoint, mouse, no-mesh-render), as retail.
-    void Init(char const* BackMesh, float const* BackOffset, char const* BackHp,
-              float const* BackMouse, bool bBackNoMeshRender, char const* NextMesh,
-              float const* NextOffset, char const* NextHp, float const* NextMouse,
-              bool bNextNoMeshRender, char const* PrevMesh, float const* PrevOffset,
-              char const* PrevHp, float const* PrevMouse, bool bPrevNoMeshRender,
-              char const* ThumbMesh, float const* NewThumbOffset0, float const* NewThumbOffset1,
-              char const* NewThumbHp0, char const* NewThumbHp1, float const* NewThumbMouse,
+    void Init(char const* BackMesh, Vector const* BackOffset, char const* BackHp,
+              Vector const* BackMouse, bool bBackNoMeshRender, char const* NextMesh,
+              Vector const* NextOffset, char const* NextHp, Vector const* NextMouse,
+              bool bNextNoMeshRender, char const* PrevMesh, Vector const* PrevOffset,
+              char const* PrevHp, Vector const* PrevMouse, bool bPrevNoMeshRender,
+              char const* ThumbMesh, Vector const* NewThumbOffset0, Vector const* NewThumbOffset1,
+              char const* NewThumbHp0, char const* NewThumbHp1, Vector const* NewThumbMouse,
               bool bNewThumbNoMeshRender, int NewMinRange, int NewMaxRange, int NewPageSize,
               bool bNewSliderBehavior, bool bNewNoZEnable);
 
     // --- Win3D / WinControl overrides ---
-    bool HitTest(float const* Ray) override;                          // slot 4  LAB_00583130
-    void SetPosition(float const* NewPosition) override;              // slot 5  LAB_00582aa0
+    bool HitTest(Vector const* Ray) override;                          // slot 4  LAB_00583130
+    void SetPosition(Vector const* NewPosition) override;              // slot 5  LAB_00582aa0
     void SetOrientation(Matrix const* NewOrientation) override;        // slot 7  FUN_00582ac0
     bool Create(Win3D* NewParent, void* Data) override;               // slot 9  LAB_005815a0
     void Update() override;                                           // slot 11 FUN_00582ae0
     void Draw() override;                                             // slot 13 LAB_005826e0
-    void MouseOver(float const* Ray) override;                        // slot 14 LAB_00583120
-    void MouseEnter(float const* Ray) override;                       // slot 15 LAB_005830a0
-    void MouseLeave(float const* Ray) override;                       // slot 16 LAB_00583120
+    void MouseOver(Vector const* Ray) override;                        // slot 14 LAB_00583120
+    void MouseEnter(Vector const* Ray) override;                       // slot 15 LAB_005830a0
+    void MouseLeave(Vector const* Ray) override;                       // slot 16 LAB_00583120
     bool MouseEvent(FWin3DMouseEvent const* Event) override;          // slot 19 LAB_00582c50
     void RefreshAttachment() override;                                // slot 35 FUN_00401e90
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override; // slot 42 FUN_005831b0

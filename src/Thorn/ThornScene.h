@@ -66,12 +66,12 @@ static const int kThornLightBitSpecular = 0x200;
 static const int kThornLightBitAmbient = 0x400;
 static const int kThornLightBitDiffuse = 0x800;
 
-// Retail Csys: orient 3x3 at +0, pos at +0x24 (FUN_06f3b970; event +0x4).
-struct FThornCsys
+// Retail Csys: orient 3x3 at +0, pos at +0x24 (FUN_06f3b970; event +0x4); a Transform.
+struct FThornCsys : Transform
 {
-    float Orient[9];
-    float Pos[3];
 };
+
+static_assert(sizeof(FThornCsys) == 0x30, "Csys is the orientation then the position");
 
 struct FThornUserPropLess
 {
@@ -143,10 +143,10 @@ public:
     char* AssignEntityTemplate(const char* Source);
     virtual void InnerUnused1();
     virtual void InnerApplyDesc(const FThornEntitySnap* SnapIn);
-    float* InnerGetPos();
-    float* InnerGetOrient();
-    virtual void InnerSetPos(const float* Pos);
-    virtual void InnerSetOrient(const float* Mat9);
+    Vector* InnerGetPos();
+    Matrix* InnerGetOrient();
+    virtual void InnerSetPos(const Vector* Pos);
+    virtual void InnerSetOrient(const Matrix* Orient);
 
     // FUN_06f423d0: refresh the live audio payload, then copy all eight words out.
     void CaptureAudioProps(float* Out8);
@@ -189,8 +189,8 @@ public:
     // the last ApplyDesc, in the parent Csys when there is one. SetPos/
     // SetOrient and the slot-5 refresh update Snap only; IScriptEngine slots
     // 10/11 (LAB_06f38950 / LAB_06f38a80), and so the serializer, read these.
-    float LoadPos[3];
-    float LoadOrient[9];
+    Vector LoadPos;
+    Matrix LoadOrient;
     FThornCsys* ParentCsys;
     int BindState;
     unsigned char bBound;
@@ -238,7 +238,7 @@ public:
     float LightDiffuse[3];
     float LightSpecular[3];
     float LightAmbient[3];
-    float LightDirection[3];
+    Vector LightDirection;
     float LightRange;
     float LightCutoff;
     float LightTheta;
@@ -444,10 +444,10 @@ public:
     IParamCurve*& ParamCurve;
     FThornEventDesc& Desc;
     int& PcurvePeriod;
-    float TargetPos[3];
-    float TargetOrient[9];
-    float CapturePos[3];
-    float CaptureOrient[9];
+    Vector TargetPos;
+    Matrix TargetOrient;
+    Vector CapturePos;
+    Matrix CaptureOrient;
     Quaternion TargetQuat;
     Quaternion CaptureQuat;
     int SpatialMask;
@@ -472,7 +472,7 @@ public:
     float& StartPercent;
     float& StopPercent;
     float& PercentDelta;
-    float (&PathOffset)[3];
+    Vector& PathOffset;
     char* Animation;
     char* LockedBone;
     float TransTime;
@@ -518,9 +518,9 @@ public:
     float PointAt[3];
     unsigned char bPointAt;
     unsigned char bMoveTo;
-    float AttachXform[12];
+    Transform AttachXform;
     // Written by the primary hardpoint callback; kept between IK ticks.
-    float IkEffectorXform[12];
+    Transform IkEffectorXform;
     int IkId;
     int CountToRoot;
     float Damping;
@@ -590,7 +590,7 @@ public:
     void RegisterFrameEntity(FThornEntity* Entity);
     void BindEventSceneAxes(FThornEvent* Event);
     FThornCsys& ForwardCsys() { return SceneForwardCsys_; }
-    void BuildInverseCsys(float* Out12) const;
+    void BuildInverseCsys(Transform* Out) const;
     void MarkLoaded() { PlaybackState_ = kThornPlaybackLoaded; }
     void FinalizeLoad(int DurationMs);
 
@@ -606,8 +606,8 @@ public:
     FThornEntitySnap* EntitySnapInorder(int Index);
     unsigned long UserPropCount(int Index) const;
     const char* UserPropKey(int Index, int N) const;
-    GENRESULT GetEntityPos(int Index, float* OutVec3);
-    GENRESULT GetEntityOrient(int Index, float* OutMat9);
+    GENRESULT GetEntityPos(int Index, Vector* OutVec3);
+    GENRESULT GetEntityOrient(int Index, Matrix* OutMat9);
     GENRESULT Attach(int Index, void* EngineObj);
     GENRESULT Detach(int Index);
     void PushBoundGeoFromScene(const Transform& OldInverse, bool bOrient);

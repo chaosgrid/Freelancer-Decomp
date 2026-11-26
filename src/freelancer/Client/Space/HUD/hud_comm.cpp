@@ -870,14 +870,14 @@ void FCommWindow::Layout(ICamera* Cam)
     CornerXform[3].Translation.z = Centre.z;
 
     // Corners 0 and 3 projected, truncated.
-    float Projected0[3];
-    float Projected3[3];
-    Cam->ProjectVec((Vector*)Projected0, &CornerXform[0].Translation);
-    Cam->ProjectVec((Vector*)Projected3, &CornerXform[3].Translation);
-    Rect[0] = static_cast<int>(Projected0[0]);
-    Rect[1] = static_cast<int>(Projected0[1]);
-    Rect[2] = static_cast<int>(Projected3[0]);
-    Rect[3] = static_cast<int>(Projected3[1]);
+    Vector Projected0;
+    Vector Projected3;
+    Cam->ProjectVec(&Projected0, &CornerXform[0].Translation);
+    Cam->ProjectVec(&Projected3, &CornerXform[3].Translation);
+    Rect[0] = static_cast<int>(Projected0.x);
+    Rect[1] = static_cast<int>(Projected0.y);
+    Rect[2] = static_cast<int>(Projected3.x);
+    Rect[3] = static_cast<int>(Projected3.y);
 }
 
 void FCommWindow::DrawCorners()
@@ -1045,7 +1045,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             {
                 DALib::Deform->SetHeight(Body->Deformable, Pose.Translation.y);
             }
-            DALib::Deform->SetPosePos(Body->Deformable, &Pose.Translation.x);
+            DALib::Deform->SetPosePos(Body->Deformable, &Pose.Translation);
             DALib::Deform->SetPoseOri(Body->Deformable, &Pose.Rotation);
 
             // One pass over the voice's scripts.
@@ -1153,8 +1153,8 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         return;
     }
     CommText->Flags = static_cast<unsigned char>(CommText->Flags | 3);
-    float const TextPos[3] = {-0.51f, 0.229f, -1.0f};
-    CommText->Init("Normal", TextPos, nullptr, 0.129f, 0.06f, 1.0f, 0, 1, 0, 1); // FUN_0058a110
+    Vector const TextPos = {-0.51f, 0.229f, -1.0f};
+    CommText->Init("Normal", &TextPos, nullptr, 0.129f, 0.06f, 1.0f, 0, 1, 0, 1); // FUN_0058a110
     FFontString* const Font = CommText->GetFontString();
     if (Font->bMultiLine != 1)
     {
@@ -1254,22 +1254,22 @@ bool FCommChannel::TickVoice(float Dt)
             {
                 // The speaker in the listener's frame (nine rotation floats, then the position).
                 Vector const SpeakerPos = SpeakerSimple->WorldPosition;
-                float View[12];
-                memcpy(View, Listener->GetOrientation(), sizeof(View));
-                float const DeltaX = SpeakerPos.x - View[9];
-                float const DeltaY = SpeakerPos.y - View[10];
-                float const DeltaZ = SpeakerPos.z - View[11];
+                Transform View;
+                memcpy(&View, Listener->GetOrientation(), sizeof(View));
+                float const DeltaX = SpeakerPos.x - View.Translation.x;
+                float const DeltaY = SpeakerPos.y - View.Translation.y;
+                float const DeltaZ = SpeakerPos.z - View.Translation.z;
                 // FUN_004cbf60 / FUN_004cbf80 / FUN_004cbfa0 take the columns, FUN_004cbf40 is
                 // z*z' + y*y' + x*x'.
-                float const X = static_cast<float>(static_cast<double>(DeltaZ) * View[6] +
-                                                   static_cast<double>(DeltaY) * View[3] +
-                                                   static_cast<double>(DeltaX) * View[0]);
-                float const Y = static_cast<float>(-(static_cast<double>(DeltaZ) * View[7] +
-                                                     static_cast<double>(DeltaY) * View[4] +
-                                                     static_cast<double>(DeltaX) * View[1]));
-                float const Z = static_cast<float>(static_cast<double>(DeltaZ) * View[8] +
-                                                   static_cast<double>(DeltaY) * View[5] +
-                                                   static_cast<double>(DeltaX) * View[2]);
+                float const X = static_cast<float>(static_cast<double>(DeltaZ) * View.Rotation.E[2][0] +
+                                                   static_cast<double>(DeltaY) * View.Rotation.E[1][0] +
+                                                   static_cast<double>(DeltaX) * View.Rotation.E[0][0]);
+                float const Y = static_cast<float>(-(static_cast<double>(DeltaZ) * View.Rotation.E[2][1] +
+                                                     static_cast<double>(DeltaY) * View.Rotation.E[1][1] +
+                                                     static_cast<double>(DeltaX) * View.Rotation.E[0][1]));
+                float const Z = static_cast<float>(static_cast<double>(DeltaZ) * View.Rotation.E[2][2] +
+                                                   static_cast<double>(DeltaY) * View.Rotation.E[1][2] +
+                                                   static_cast<double>(DeltaX) * View.Rotation.E[0][2]);
                 PanValue = Pan(X, Y, Z);
             }
         }
@@ -1649,8 +1649,8 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     FEngineLight* const NewLight = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
     EngineLightInit(NewLight, kLightNone);          // FUN_00410ca0
     EngineLightSetType(NewLight, kLightPoint, false); // FUN_004110c0
-    float const LightPos[3] = {0.23f, 0.31f, -0.92f};
-    EngineLightSetPosition(NewLight, LightPos); // FUN_00410ef0
+    Vector const LightPos = {0.23f, 0.31f, -0.92f};
+    EngineLightSetPosition(NewLight, &LightPos); // FUN_00410ef0
     unsigned char const LightColour[3] = {0x80, 0x80, 0x80};
     EngineLightSetColorBytesAlt(NewLight, LightColour); // FUN_004115b0
     EngineLightSetRadius(NewLight, 1.0e9f);             // FUN_00411300
@@ -1687,11 +1687,11 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     if (LowEndCommButton != nullptr)
     {
         // ButtonControl::Init FUN_0055ac30.
-        float const CommButtonOffset[3] = {-0.1617f, 0.0986f, -0.362f};
-        float const CommButtonHalfExtents[3] = {0.0f, 0.0f, 0.0f};
+        Vector const CommButtonOffset = {-0.1617f, 0.0986f, -0.362f};
+        Vector const CommButtonHalfExtents = {0.0f, 0.0f, 0.0f};
         static_cast<NnButtonControl*>(LowEndCommButton)
             ->Init("interface\\HUD\\HUD_genericcomm.3db", nullptr, nullptr, nullptr,
-                   CommButtonOffset, nullptr, CommButtonHalfExtents, 0, 0, 0, 0, 0, 0, 0);
+                   &CommButtonOffset, nullptr, &CommButtonHalfExtents, 0, 0, 0, 0, 0, 0, 0);
         LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & 0xfc);
     }
 }

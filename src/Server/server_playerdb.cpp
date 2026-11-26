@@ -1860,11 +1860,11 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
         Record.WeaponGroups = weapon_group_name;
         Record.BaseId = current_base;
         Record.LastBaseId = last_base_id;
-        Record.Position[0] = SavedPos.x;
-        Record.Position[1] = SavedPos.y;
-        Record.Position[2] = SavedPos.z;
+        Record.Position.x = SavedPos.x;
+        Record.Position.y = SavedPos.y;
+        Record.Position.z = SavedPos.z;
         for (int I = 0; I < 9; ++I)
-            Record.Orientation[I / 3][I % 3] = SavedOrient.E[I / 3][I % 3];
+            Record.Orientation.E[I / 3][I % 3] = SavedOrient.E[I / 3][I % 3];
         Record.ShipArchetype = ship_archetype;
         Record.LocationId = current_location;
         Record.SystemId = system_id;

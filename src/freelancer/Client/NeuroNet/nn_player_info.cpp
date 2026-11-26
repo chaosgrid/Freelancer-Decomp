@@ -109,9 +109,9 @@ namespace
         float const* const BarOrientation = &Bar->Orientation.E[0][0];
         for (int Index = 0; Index < 9; ++Index)
             Frame[Index] = BarOrientation[Index];
-        Frame[9] = Bar->Offset[0] + Bar->Position.x;
-        Frame[10] = Bar->Offset[1] + Bar->Position.y;
-        Frame[11] = Bar->Offset[2] + Bar->Position.z;
+        Frame[9] = Bar->Offset.x + Bar->Position.x;
+        Frame[10] = Bar->Offset.y + Bar->Position.y;
+        Frame[11] = Bar->Offset.z + Bar->Position.z;
         Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Frame)); // FUN_00422690(0, &Transform)
         Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
         Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
@@ -180,51 +180,51 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004a78c0 (RET 8).
     SetMesh(kInfoWindowMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder); // FUN_005a1340
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder); // FUN_005a1340
 
     {
-        float const Position[3] = {0.405f, 0.239f, 0.0f}; // 0x3ecf5c29, 0x3e74bc6a
-        float const Half[3] = {0.018f, 0.018f, 0.0f};     // 0x3c9374bc
+        Vector const Position = {0.405f, 0.239f, 0.0f}; // 0x3ecf5c29, 0x3e74bc6a
+        Vector const Half = {0.018f, 0.018f, 0.0f};     // 0x3c9374bc
         CloseButton = CreateButtonControl("PlayerInfoCloseButton", kCloseButtonMesh, nullptr,
-                                          "ui_select_item", nullptr, Position, nullptr, Half, 0, 0,
+                                          "ui_select_item", nullptr, &Position, nullptr, &Half, 0, 0,
                                           0, 0, 0x409, 0, 0);
     }
     // ids 0x3a3 "PLAYER STATUS"
     {
-        float const Position[3] = {-0.418f, 0.257f, 0.0f}; // 0xbed60419, 0x3e839581
-        CreateTextControl("PlayerInfoMainTitle", "PageHeader", Position, nullptr, 0.839f, 0.03f,
+        Vector const Position = {-0.418f, 0.257f, 0.0f}; // 0xbed60419, 0x3e839581
+        CreateTextControl("PlayerInfoMainTitle", "PageHeader", &Position, nullptr, 0.839f, 0.03f,
                           1.65f, 0x3a3, 1, 0, 1);
     }
     // ids 0x632 "REPUTATION"
     {
-        float const Position[3] = {-0.405f, 0.21f, 0.0f}; // 0xbecf5c29, 0x3e570a3d
-        CreateTextControl("PlayerInfoTitle", "SubHeader", Position, nullptr, 0.35f, 0.03f, 1.65f,
+        Vector const Position = {-0.405f, 0.21f, 0.0f}; // 0xbecf5c29, 0x3e570a3d
+        CreateTextControl("PlayerInfoTitle", "SubHeader", &Position, nullptr, 0.35f, 0.03f, 1.65f,
                           0x632, 1, 0, 1);
     }
     // ids 0x640 "STATS"
     {
-        float const Position[3] = {0.009f, 0.21f, 0.0f}; // 0x3c1374bc
-        PlayerStatsTitle = CreateTextControl("PlayerStatsTitle", "SubHeader", Position, nullptr,
+        Vector const Position = {0.009f, 0.21f, 0.0f}; // 0x3c1374bc
+        PlayerStatsTitle = CreateTextControl("PlayerStatsTitle", "SubHeader", &Position, nullptr,
                                              0.355f, 0.03f, 1.65f, 0x640, 1, 0, 1);
     }
     // The infocard, created invisible.
     {
-        float const Position[3] = {0.01f, 0.172f, 0.0f}; // 0x3c23d70a, 0x3e3020c5
-        FactionInfoCard = CreateRichTextWin("FactionInfoCard", 0.384f, 0.34f, Position, true);
+        Vector const Position = {0.01f, 0.172f, 0.0f}; // 0x3c23d70a, 0x3e3020c5
+        FactionInfoCard = CreateRichTextWin("FactionInfoCard", 0.384f, 0.34f, &Position, true);
         FactionInfoCard->Flags = static_cast<unsigned char>(FactionInfoCard->Flags & 0xfd);
     }
     // ids 0x32b "Close the Infocard."
     {
-        float const Position[3] = {0.2f, -0.21f, 0.0f};   // 0x3e4ccccd, 0xbe570a3d
-        float const Half[3] = {0.133f, 0.026f, 0.0f};     // 0x3e083127, 0x3cd4fdf4
+        Vector const Position = {0.2f, -0.21f, 0.0f};   // 0x3e4ccccd, 0xbe570a3d
+        Vector const Half = {0.133f, 0.026f, 0.0f};     // 0x3e083127, 0x3cd4fdf4
         CloseInfocardButton = CreateWireButtonControl("NavMapCloseInfocardButton",
-                                                      "ui_select_item", Position, Half, 0, 0,
+                                                      "ui_select_item", &Position, &Half, 0, 0,
                                                       0x32b, 0, 0);
     }
     // ids 0x3a1 "CLOSE"; both hidden.
     {
-        float const Position[3] = {0.07f, -0.19f, 0.0f}; // 0x3d8f5c29, 0xbe428f5c
-        CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", Position,
+        Vector const Position = {0.07f, -0.19f, 0.0f}; // 0x3d8f5c29, 0xbe428f5c
+        CloseInfocardText = CreateTextControl("NavMapCloseInfocardText", "ButtonText", &Position,
                                               nullptr, 0.262f, 0.03f, 1.9f, 0x3a1, 1, 0, 1);
     }
     CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
@@ -242,35 +242,35 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
 
         sprintf(ControlName,"PlayerInfoFactionFrame%d", Row);
         {
-            float const Position[3] = {-0.231f, // 0xbe6c8b44
-                                       static_cast<float>(RowY + static_cast<double>(0.149f)),
-                                       0.0f}; // DAT_005d2c10
-            float const Half[3] = {0.173f, 0.034f, 0.0f}; // 0x3e3126e9, 0x3d0b4396
-            FactionFrames[Row] = CreateWireButtonControl(ControlName,"ui_item_select", Position, Half,
+            Vector const Position = {-0.231f,               
+                                     static_cast<float>(RowY + static_cast<double>(0.149f)),
+                                     0.0f}; // DAT_005d2c10
+            Vector const Half = {0.173f, 0.034f, 0.0f}; // 0x3e3126e9, 0x3d0b4396
+            FactionFrames[Row] = CreateWireButtonControl(ControlName,"ui_item_select", &Position, &Half,
                                                          0, 0, 0, 0, 0);
         }
 
         sprintf(ControlName,"PlayerInfoFactionName%d", Row);
         {
-            float const Position[3] = {
-                NnFloatBits(0xbe666667), // -0.225 plus one ulp
+            Vector const Position = {
+                NnFloatBits(0xbe666667),                        
                 static_cast<float>(static_cast<double>(RowYf) + static_cast<double>(0.16f)),
                 0.0f}; // DAT_005d4938
-            FactionNames[Row] = CreateTextControl(ControlName,"ItemName", Position, nullptr, 0.358f,
+            FactionNames[Row] = CreateTextControl(ControlName,"ItemName", &Position, nullptr, 0.358f,
                                                   0.04f, 1.5f, 0, 1, 0, 0);
         }
 
         // Shared by both bars (0.134f is 0x005d4918).
         float const BarY =
             static_cast<float>(static_cast<double>(RowYf) + static_cast<double>(0.134f));
-        float const Half[3] = {0.061f, 0.014f, 0.0f}; // 0x3d79db23, 0x3c656042
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
+        Vector const Half = {0.061f, 0.014f, 0.0f}; // 0x3d79db23, 0x3c656042
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
 
         sprintf(ControlName,"PlayerInfoUnfriendlyBar%d", Row);
         {
-            float const Position[3] = {-0.292f, BarY, 0.0f}; // 0xbe958106
-            UnfriendlyBars[Row] = CreateStaticControl(ControlName,kUnfriendlyBarMesh, Position, nullptr,
-                                                      Half, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, Zero);
+            Vector const Position = {-0.292f, BarY, 0.0f}; // 0xbe958106
+            UnfriendlyBars[Row] = CreateStaticControl(ControlName,kUnfriendlyBarMesh, &Position, nullptr,
+                                                      &Half, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, &Zero);
         }
         // The HUD chrome colour with a third of its alpha, as both of property 0x18's arguments.
         unsigned char Colour[4];
@@ -281,17 +281,17 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
 
         sprintf(ControlName,"PlayerInfofriendlyBar%d", Row);
         {
-            float const Position[3] = {NnFloatBits(0xbe2e7d57), BarY, 0.0f}; // -0.1704 + 1 ulp
-            FriendlyBars[Row] = CreateStaticControl(ControlName,kFriendlyBarMesh, Position, nullptr,
-                                                    Half, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, Zero);
+            Vector const Position = {NnFloatBits(0xbe2e7d57), BarY, 0.0f}; // -0.1704 + 1 ulp
+            FriendlyBars[Row] = CreateStaticControl(ControlName,kFriendlyBarMesh, &Position, nullptr,
+                                                    &Half, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, &Zero);
         }
         FriendlyBars[Row]->SetProperty(0x18, reinterpret_cast<uintptr_t>(Colour),
                                        reinterpret_cast<uintptr_t>(Colour));
     }
 
     {
-        float const Position[3] = {-0.045f, 0.176f, 0.0f}; // 0xbd3851ec, 0x3e343958
-        Scroll = CreateUIScroll("PlayerInfoScroll", Position, 0.019f, 0.412f, 0, 5, 6, 0);
+        Vector const Position = {-0.045f, 0.176f, 0.0f}; // 0xbd3851ec, 0x3e343958
+        Scroll = CreateUIScroll("PlayerInfoScroll", &Position, 0.019f, 0.412f, 0, 5, 6, 0);
     }
 
     // The heading / value pairs, top down from 0.19. Outside single player the worth and
@@ -313,15 +313,15 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
                 static_cast<double>(0.19f) - static_cast<double>(Y) - static_cast<double>(0.03f));
 
             sprintf(ControlName,"PlayerInfoHeading%d", Pair);
-            float const HeadingPosition[3] = {0.19f, PairY, 0.0f}; // 0x3e428f5c
-            WinControl* const Heading = CreateTextControl(ControlName,"ItemName", HeadingPosition,
+            Vector const HeadingPosition = {0.19f, PairY, 0.0f}; // 0x3e428f5c
+            WinControl* const Heading = CreateTextControl(ControlName,"ItemName", &HeadingPosition,
                                                           nullptr, 0.358f, 0.04f, 1.5f, Ids, 0,
                                                           0, 0);
             StatHeadings[Pair] = Heading;
 
             sprintf(ControlName,"PlayerInfoStat%d", Pair);
-            float const StatPosition[3] = {0.38f, PairY, 0.0f}; // 0x3ec28f5c
-            StatValues[Pair] = CreateTextControl(ControlName,"ItemName", StatPosition, nullptr, 0.188f,
+            Vector const StatPosition = {0.38f, PairY, 0.0f}; // 0x3ec28f5c
+            StatValues[Pair] = CreateTextControl(ControlName,"ItemName", &StatPosition, nullptr, 0.188f,
                                                  0.04f, 1.5f, 0, 0, 0, 0);
 
             if (!SinglePlayer() && (TableIndex == 1 || TableIndex == 2))
@@ -342,7 +342,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
     Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(-1));
     FactionCount = 0;
     SetOffset(0.0f, 0.0f, 0.0f); // slot 31
-    SetPosition(&Position.x);       // slot 5
+    SetPosition(&Position);       // slot 5
     StatsRequestTimer = 1.0f;
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -479,8 +479,8 @@ void NnPlayerInfo::Draw()
         {
             // The quad from X to the left end.
             Bar = UnfriendlyBars[Row];
-            float const HalfX = Bar->HalfExtents[0];
-            float const HalfY = Bar->HalfExtents[1];
+            float const HalfX = Bar->HalfExtents.x;
+            float const HalfY = Bar->HalfExtents.y;
             float const X = static_cast<float>(
                 static_cast<double>(HalfX) +
                 static_cast<double>(HalfX + HalfX) * static_cast<double>(Faction.Attitude));
@@ -498,8 +498,8 @@ void NnPlayerInfo::Draw()
         {
             // The quad from -X to the right end.
             Bar = FriendlyBars[Row];
-            float const HalfX = Bar->HalfExtents[0];
-            float const HalfY = Bar->HalfExtents[1];
+            float const HalfX = Bar->HalfExtents.x;
+            float const HalfY = Bar->HalfExtents.y;
             float const X = static_cast<float>(
                 static_cast<double>(HalfX) -
                 static_cast<double>(HalfX + HalfX) * static_cast<double>(Faction.Attitude));

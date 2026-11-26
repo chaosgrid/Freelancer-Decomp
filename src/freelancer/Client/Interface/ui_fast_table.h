@@ -235,9 +235,9 @@ public:
     ~UiFastTable() override;
 
     // slot 4 LAB_0058f3e0 (RET 4)
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 LAB_0058e510 (RET 4)
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 8 LAB_0058e470 (RET 4)
     void SetTransform(Transform const* NewXform) override;
     // slot 9 FUN_0058e000 (RET 8); Data = FUiPayloadTable {Width, Height, rows, columns}.
@@ -247,7 +247,7 @@ public:
     // slot 13 LAB_0058eb30
     void Draw() override;
     // slot 16 LAB_0058f210 (RET 4)
-    void MouseLeave(float const* Ray) override;
+    void MouseLeave(Vector const* Ray) override;
     // slot 19 LAB_0058f230 (RET 4)
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 45 FUN_0058d9d0
@@ -348,7 +348,7 @@ public:
 protected:
     // The mouse ray scaled onto the table's z plane, then into table space through +0x504
     // (inlined three times in retail).
-    Vector RayToLocal(float const* Ray) const;
+    Vector RayToLocal(Vector const* Ray) const;
     // Draw's row highlight quad (inlined twice in retail).
     void DrawRowQuad(unsigned long const* Rgba, unsigned Row) const;
 

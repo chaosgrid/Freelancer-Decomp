@@ -959,7 +959,7 @@ void FGfScriptSequence::StopPlayback(unsigned char bArg)
     if (bRestorePlayer != 0 && !bMoved && bPlayerSaved != 0)
     {
         // Results unused; the character is not null-tested.
-        DALib::Deform->SetPosePos(PlayerDeformInstance, &PlayerCsys.Pos.x);
+        DALib::Deform->SetPosePos(PlayerDeformInstance, &PlayerCsys.Pos);
         DALib::Deform->SetPoseOri(PlayerDeformInstance, &PlayerCsys.Orient);
         PlayerCharacter->SetFloorHeight(PlayerFloorHeight);
     }

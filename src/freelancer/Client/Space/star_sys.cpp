@@ -605,10 +605,10 @@ namespace
             if (ClientMeshHolderLoad(&Layer->Holder, Layer->Name.Value, nullptr)) // FUN_00420dd0
             {
                 float Extent = 0.0f;
-                float Center[3] = {0.0f, 0.0f, 0.0f};
+                Vector Center = {0.0f, 0.0f, 0.0f};
                 DALib::Engine->GetInstanceExtent(Layer->Holder.EngineInstance, 0, &Extent,
-                                                 (Vector*)Center);
-                ClientMeshHolderSetPosition(&Layer->Holder, Center); // FUN_00420fd0
+                                                 (Vector*)&Center);
+                ClientMeshHolderSetPosition(&Layer->Holder, &Center); // FUN_00420fd0
                 ClientMeshHolderUpdate(&Layer->Holder);              // FUN_00421070
             }
             if (!ClientMeshHolderHasInstance(&Layer->Holder))

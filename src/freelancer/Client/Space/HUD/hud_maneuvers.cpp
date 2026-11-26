@@ -120,35 +120,35 @@ namespace
     // The box transform the three hover tests share: identity with a zero position; a bound instance supplies its whole transform (Engine
     // +0xa0), otherwise the position is +0x60 + +0xa8; then +0xc0 is added. Unlike
     // WinControl::HitTest there is no +0x2d3 orientation reset.
-    void ControlBoxTransform(WinControl* Control, float* Out12)
+    void ControlBoxTransform(WinControl* Control, Transform* OutXform)
     {
-        Out12[0] = 1.0f;
-        Out12[1] = 0.0f;
-        Out12[2] = 0.0f;
-        Out12[3] = 0.0f;
-        Out12[4] = 1.0f;
-        Out12[5] = 0.0f;
-        Out12[6] = 0.0f;
-        Out12[7] = 0.0f;
-        Out12[8] = 1.0f;
-        Out12[9] = 0.0f;
-        Out12[10] = 0.0f;
-        Out12[11] = 0.0f;
+        OutXform->Rotation.E[0][0] = 1.0f;
+        OutXform->Rotation.E[0][1] = 0.0f;
+        OutXform->Rotation.E[0][2] = 0.0f;
+        OutXform->Rotation.E[1][0] = 0.0f;
+        OutXform->Rotation.E[1][1] = 1.0f;
+        OutXform->Rotation.E[1][2] = 0.0f;
+        OutXform->Rotation.E[2][0] = 0.0f;
+        OutXform->Rotation.E[2][1] = 0.0f;
+        OutXform->Rotation.E[2][2] = 1.0f;
+        OutXform->Translation.x = 0.0f;
+        OutXform->Translation.y = 0.0f;
+        OutXform->Translation.z = 0.0f;
         if (ClientMeshHolderHasInstance(&Control->MeshHolder))
         {
             const Transform* const Source =
                 DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance);
-            memcpy(Out12, Source, 12 * sizeof(float));
+            memcpy(OutXform, Source, 12 * sizeof(float));
         }
         else
         {
-            Out12[9] = Control->Position.x + Control->Offset[0];
-            Out12[10] = Control->Position.y + Control->Offset[1];
-            Out12[11] = Control->Position.z + Control->Offset[2];
+            OutXform->Translation.x = Control->Position.x + Control->Offset.x;
+            OutXform->Translation.y = Control->Position.y + Control->Offset.y;
+            OutXform->Translation.z = Control->Position.z + Control->Offset.z;
         }
-        Out12[9] = Out12[9] + Control->HitOffset[0];
-        Out12[10] = Out12[10] + Control->HitOffset[1];
-        Out12[11] = Out12[11] + Control->HitOffset[2];
+        OutXform->Translation.x = OutXform->Translation.x + Control->HitOffset.x;
+        OutXform->Translation.y = OutXform->Translation.y + Control->HitOffset.y;
+        OutXform->Translation.z = OutXform->Translation.z + Control->HitOffset.z;
     }
 
     // The player IObjRW's ship (FUN_0054baf0, +0xc, CBase::Object, class & 0x503), or null.
@@ -247,44 +247,44 @@ HUD_Maneuvers::~HUD_Maneuvers()
 bool HUD_Maneuvers::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004d7b50 (this = the WinControl face).
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float const FramePos[3] = {0.0f, 0.176f, -0.5f};          // 0x3e343958, 0xbf000000
-    Frame = CreateStaticControl("ManeuverFrame", "Interface\\HUD\\HUD_maneuverbox9.cmp", FramePos,
-                                nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    Vector const FramePos = {0.0f, 0.176f, -0.5f};          // 0x3e343958, 0xbf000000
+    Frame = CreateStaticControl("ManeuverFrame", "Interface\\HUD\\HUD_maneuverbox9.cmp", &FramePos,
+                                nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     FrameButtonCount = 9;
-    WinControlHalfExtentsFromMesh(FrameHalfExtents, &Frame->MeshHolder);
+    WinControlHalfExtentsFromMesh(&FrameHalfExtents, &Frame->MeshHolder);
 
     // The first four elements, whatever the vector holds (no size check, as in retail).
-    float const ButtonHalf[3] = {0.014f, 0.014f, 0.0f};        // 0x3c656042
+    Vector const ButtonHalf = {0.014f, 0.014f, 0.0f};        // 0x3c656042
     for (int i = 0; i < 4; ++i)
     {
         char ButtonName[0x64];
         sprintf(ButtonName, "ManeuverButton%d", i);
-        float const Pos[3] = {kButtonHomeOffsets[i][0], kButtonHomeOffsets[i][1],
-                              kButtonHomeOffsets[i][2]};
+        Vector const Pos = {kButtonHomeOffsets[i][0], kButtonHomeOffsets[i][1],
+                            kButtonHomeOffsets[i][2]};
         FHudManeuver const& Maneuver = Maneuvers.data()[i];
         WinControl* const Button =
             CreateButtonControl(ButtonName, Maneuver.Mesh.Data, nullptr, "ui_select_item", nullptr,
-                                Pos, nullptr, ButtonHalf, 0, 1, 0, 0, Maneuver.ToolTipIds, 0,
+                                &Pos, nullptr, &ButtonHalf, 0, 1, 0, 0, Maneuver.ToolTipIds, 0,
                                 Maneuver.CommandId);
         Buttons[i] = Button;
-        Button->HomeOffset[0] = Pos[0];
-        Button->HomeOffset[1] = Pos[1];
-        Button->HomeOffset[2] = Pos[2];
+        Button->HomeOffset.x = Pos.x;
+        Button->HomeOffset.y = Pos.y;
+        Button->HomeOffset.z = Pos.z;
         Button->SetProperty(kWinPropHide, 1, 0);
     }
 
-    float const TabPos[3] = {0.0f, 0.292f, -1.0f};             // 0x3e958106, 0xbf800000
-    Tab = CreateStaticControl("ManeuverTab", "Interface\\Baseside\\CITY_maneuvertab1.cmp", TabPos,
-                              nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    Vector const TabPos = {0.0f, 0.292f, -1.0f};             // 0x3e958106, 0xbf800000
+    Tab = CreateStaticControl("ManeuverTab", "Interface\\Baseside\\CITY_maneuvertab1.cmp", &TabPos,
+                              nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     Tab->SetProperty(kWinPropHide, 1, 0);
-    WinControlHalfExtentsFromMesh(TabHalfExtents, &Tab->MeshHolder);
+    WinControlHalfExtentsFromMesh(&TabHalfExtents, &Tab->MeshHolder);
 
-    float const CruisePos[3] = {0.0f, 0.297f, 0.0f};           // 0x3e981062
+    Vector const CruisePos = {0.0f, 0.297f, 0.0f};           // 0x3e981062
     CruiseButton = CreateButtonControl("ManeuverCruiseButton", "interface\\HUD\\hud_mnvrwarp.3db",
-                                       nullptr, "ui_select_item", nullptr, CruisePos, nullptr,
-                                       ButtonHalf, 0, 1, 0, 0, 0xbf9, 0, 0x45);
+                                       nullptr, "ui_select_item", nullptr, &CruisePos, nullptr,
+                                       &ButtonHalf, 0, 1, 0, 0, 0xbf9, 0, 0x45);
     CruiseButton->SetProperty(kWinPropHide, 1, 0);
 
     // Registered in this order.
@@ -296,7 +296,7 @@ bool HUD_Maneuvers::Create(Win3D* NewParent, void* Data)
         RegisterEvent(Commands[i]);
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -589,27 +589,27 @@ void HUD_Maneuvers::Draw()
     }
 
     // Otherwise only while the mouse ray is over the frame or the tab.
-    float Transform[12];
-    float Ray[3];
-    ControlBoxTransform(Frame, Transform);
-    if (Win3DRayHitsAabbHalfExtents(FrameHalfExtents, Transform, Win3DGetMouseRay(Ray)))
+    Transform Xform;
+    Vector Ray;
+    ControlBoxTransform(Frame, &Xform);
+    if (Win3DRayHitsAabbHalfExtents(&FrameHalfExtents, &Xform, Win3DGetMouseRay(&Ray)))
     {
         WinControl::Draw();
         return;
     }
-    ControlBoxTransform(Tab, Transform);
-    if (Win3DRayHitsAabbHalfExtents(TabHalfExtents, Transform, Win3DGetMouseRay(Ray)))
+    ControlBoxTransform(Tab, &Xform);
+    if (Win3DRayHitsAabbHalfExtents(&TabHalfExtents, &Xform, Win3DGetMouseRay(&Ray)))
         WinControl::Draw();
 }
 
-bool HUD_Maneuvers::HitTest(float const* Ray)
+bool HUD_Maneuvers::HitTest(Vector const* Ray)
 {
     // LAB_004d9820 (this = the WinControl face).
     if (WinControl::HitTest(Ray))               // FUN_005a0340
         return true;
-    float Transform[12];
-    ControlBoxTransform(Tab, Transform);
-    return Win3DRayHitsAabbHalfExtents(TabHalfExtents, Transform, Ray);
+    Transform Xform;
+    ControlBoxTransform(Tab, &Xform);
+    return Win3DRayHitsAabbHalfExtents(&TabHalfExtents, &Xform, Ray);
 }
 
 intptr_t HUD_Maneuvers::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -687,8 +687,8 @@ void HUD_Maneuvers::UpdateButtons()
             bool bGray = bCurrent;
             if (!bGray && !HudIsMousePickBlocked())
             {
-                float Ray[3];
-                bGray = Button->HitTest(Win3DGetMouseRay(Ray));
+                Vector Ray;
+                bGray = Button->HitTest(Win3DGetMouseRay(&Ray));
             }
             // The montage tile goes straight into the ButtonControl's +0x338.
             if (bGray && Maneuver->GrayMesh.Length != 0)
@@ -728,8 +728,8 @@ void HUD_Maneuvers::UpdateButtons()
         WinControl* const Button = Buttons[i];
         if ((Button->Flags & kWin3DVisible) == 0)
             continue;
-        float const Pos[3] = {X, 0.1777f, 0.5f};    // 0x3e35f6fd, 0x3f000000
-        Button->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
+        Vector const Pos = {X, 0.1777f, 0.5f};    // 0x3e35f6fd, 0x3f000000
+        Button->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Pos), 0);
         X = X + 0.04f;
     }
 
@@ -751,35 +751,35 @@ void HUD_Maneuvers::UpdateTabAndCruise(int BehaviorId)
 
     // The offset of the button the tab sits under (Goto: button 1, Dock: button 2, anything
     // else: button 0), read through property 7.
-    float Offset[3] = {0.0f, 0.0f, 0.0f};
+    Vector Offset = {0.0f, 0.0f, 0.0f};
     WinControl* Anchor = Buttons[0];
     if (BehaviorId == BEHAVIOR_GOTO)
         Anchor = Buttons[1];
     else if (BehaviorId == BEHAVIOR_DOCK)
         Anchor = Buttons[2];
-    Anchor->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+    Anchor->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
 
     if (bTabMeshReset != 1)
     {
         bTabMeshReset = 1;
         Tab->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kTabMesh), 0);
-        WinControlHalfExtentsFromMesh(TabHalfExtents, &Tab->MeshHolder);
+        WinControlHalfExtentsFromMesh(&TabHalfExtents, &Tab->MeshHolder);
     }
 
-    Offset[0] = Offset[0] + Offset[0];
-    Offset[1] = 0.294f;                          // 0x3e966cf5
-    Offset[2] = -1.0f;
-    Tab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+    Offset.x = Offset.x + Offset.x;
+    Offset.y = 0.294f;                          // 0x3e966cf5
+    Offset.z = -1.0f;
+    Tab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
 
     // The cruise button is shown either way; away from Goto, FreeFlight and Dock it moves left
     // by 0.032 (DAT_005d69c0).
     CruiseButton->SetProperty(kWinPropHide, 0, 0);
     if (BehaviorId != BEHAVIOR_GOTO && BehaviorId != BEHAVIOR_FREE_FLIGHT && BehaviorId != BEHAVIOR_DOCK)
-        Offset[0] = Offset[0] - 0.032f;
+        Offset.x = Offset.x - 0.032f;
 
-    Offset[1] = 0.297f;                          // 0x3e981062
-    Offset[2] = 0.0f;
-    CruiseButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+    Offset.y = 0.297f;                          // 0x3e981062
+    Offset.z = 0.0f;
+    CruiseButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
     CruiseButton->SetProperty(0xc, GetPlayerEngineCruiseActive() ? 1u : 0u, 0);
 }
 
@@ -1060,17 +1060,17 @@ void HUD_Maneuvers::SetFrameButtonCount(int Count)
     if (Count > 9)
         FrameButtonCount = 9;
     Frame->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kFrameMeshes[FrameButtonCount]), 0);
-    WinControlHalfExtentsFromMesh(FrameHalfExtents, &Frame->MeshHolder);
+    WinControlHalfExtentsFromMesh(&FrameHalfExtents, &Frame->MeshHolder);
 
     // The frame box grows (x1.1, y2.5); this window's own box and hit offset are fixed.
-    FrameHalfExtents[1] = FrameHalfExtents[1] * 2.5f;     // DAT_005d74c8
-    HalfExtents[0] = 0.174f;                               // 0x3e322d0e
-    FrameHalfExtents[0] = FrameHalfExtents[0] * 1.1f;     // DAT_005d8468
-    HalfExtents[1] = 0.036f;                               // 0x3d1374bc
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.002f;                                 // 0x3b03126f
-    HitOffset[1] = 0.351f;                                 // 0x3eb3b646
-    HitOffset[2] = 0.0f;
+    FrameHalfExtents.y = FrameHalfExtents.y * 2.5f;     // DAT_005d74c8
+    HalfExtents.x = 0.174f;                               // 0x3e322d0e
+    FrameHalfExtents.x = FrameHalfExtents.x * 1.1f;     // DAT_005d8468
+    HalfExtents.y = 0.036f;                               // 0x3d1374bc
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.002f;                                 // 0x3b03126f
+    HitOffset.y = 0.351f;                                 // 0x3eb3b646
+    HitOffset.z = 0.0f;
 }
 
 bool HUD_Maneuvers::IsTargetTradeLaneDisrupted()

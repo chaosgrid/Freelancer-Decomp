@@ -236,11 +236,11 @@ namespace AlchemyImpl
                 Stage, reinterpret_cast<void*>(static_cast<ptrdiff_t>(Handle)));
         }
 
-        void CallRenderPipelineSetTransform(IRenderPipeline* Pipeline, const float* Xform12)
+        void CallRenderPipelineSetTransform(IRenderPipeline* Pipeline, const Transform* Xform)
         {
-            if (Pipeline == nullptr || Xform12 == nullptr)
+            if (Pipeline == nullptr || Xform == nullptr)
                 return;
-            Pipeline->SetModelview((const Transform*)Xform12);
+            Pipeline->SetModelview(Xform);
         }
 
         // {Pipeline, State, Saved} render-state saver of FUN_06206850 (stack +0x8/+0xc/+0x10):
@@ -291,17 +291,17 @@ namespace AlchemyImpl
 
         // Math engine vt+0x28 TransformXform / vt+0x2c TransformMatrix, the calls both fills
         // make through the lazily cached engine DAT_06257a28.
-        void CameraSpacePoint(const float* ViewWorld12, const float* Point, float* Out)
+        void CameraSpacePoint(const Transform* ViewWorld, const float* Point, float* Out)
         {
             Acquire3DMath()->TransformXform(*reinterpret_cast<Vector*>(Out),
-                                            *reinterpret_cast<const Transform*>(ViewWorld12),
+                                            *ViewWorld,
                                             *reinterpret_cast<const Vector*>(Point));
         }
 
-        void CameraSpaceVector(const float* ViewWorld12, const float* Vec, float* Out)
+        void CameraSpaceVector(const Transform* ViewWorld, const float* Vec, float* Out)
         {
             Acquire3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(Out),
-                                             *reinterpret_cast<const Matrix*>(ViewWorld12),
+                                             ViewWorld->Rotation,
                                              *reinterpret_cast<const Vector*>(Vec));
         }
 
@@ -1047,13 +1047,13 @@ namespace AlchemyImpl
         std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
 
-        const float IdentityXform12[12] = {
-            1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 0.0f,
+        const Transform IdentityXform = {
+            Matrix(1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f,
+                   0.0f, 0.0f, 1.0f),
+            {0.0f, 0.0f, 0.0f},
         };
-        G_RenderPipeline->SetModelview((const Transform*)IdentityXform12);
+        G_RenderPipeline->SetModelview(&IdentityXform);
 
         AlDrawContextDraw(G_BasicDrawContext);
         return GR_OK;
@@ -1090,19 +1090,19 @@ namespace AlchemyImpl
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         const bool bStreak = (Descriptor_->Flags & 4u) != 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        float ViewWorld[12];
-        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
+        Transform ViewWorld;
+        ComposeTransform(&ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
         FlipBasicAppearanceFrame(Descriptor_->Flags, FrameBlock);
         std::int32_t LastFrame = -1;
         for (; Particle != nullptr; Particle = Particle->Next)
         {
-            float C[3];
-            Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
-                *reinterpret_cast<const Transform*>(ViewWorld),
+            Vector C;
+            Shared3DMath()->TransformXform(C,
+                ViewWorld,
                 *reinterpret_cast<const Vector*>(&Particle->PosX));
-            if (C[2] > 0.0f)
+            if (C.z > 0.0f)
                 continue;
             float OuterTime;
             std::memcpy(&OuterTime, &AppearanceOuterTime_, sizeof(float));
@@ -1147,16 +1147,16 @@ namespace AlchemyImpl
             float Py;
             if (bStreak)
             {
-                float V[3];
-                Shared3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(V),
-                    *reinterpret_cast<const Matrix*>(ViewWorld),
+                Vector V;
+                Shared3DMath()->TransformMatrix(V,
+                    ViewWorld.Rotation,
                     *reinterpret_cast<const Vector*>(&Particle->VelX));
-                const double N0 = static_cast<double>(C[1]) * V[2] - static_cast<double>(V[1]) * C[2];
-                const double N1 = static_cast<double>(V[0]) * C[2] - static_cast<double>(C[0]) * V[2];
-                const double N2 = static_cast<double>(C[0]) * V[1] - static_cast<double>(V[0]) * C[1];
-                const float Ua = static_cast<float>(static_cast<double>(C[2]) * N1 - static_cast<double>(C[1]) * N2);
-                const float Ub = static_cast<float>(static_cast<double>(C[0]) * N2 - static_cast<double>(C[2]) * N0);
-                const double Uc = N0 * C[1] - static_cast<double>(C[0]) * N1;
+                const double N0 = static_cast<double>(C.y) * V.z - static_cast<double>(V.y) * C.z;
+                const double N1 = static_cast<double>(V.x) * C.z - static_cast<double>(C.x) * V.z;
+                const double N2 = static_cast<double>(C.x) * V.y - static_cast<double>(V.x) * C.y;
+                const float Ua = static_cast<float>(static_cast<double>(C.z) * N1 - static_cast<double>(C.y) * N2);
+                const float Ub = static_cast<float>(static_cast<double>(C.x) * N2 - static_cast<double>(C.z) * N0);
+                const double Uc = N0 * C.y - static_cast<double>(C.x) * N1;
                 const double SquareB = static_cast<double>(Ub) * Ub;
                 const double SquareA = static_cast<double>(Ua) * Ua;
                 const double SumBa = SquareB + SquareA;
@@ -1170,14 +1170,14 @@ namespace AlchemyImpl
                 const float NormalX = static_cast<float>(static_cast<double>(Ua) * InverseLength);
                 const float NormalY = static_cast<float>(static_cast<double>(Ub) * InverseLength);
                 const double NormalZ = Uc * InverseLength;
-                const double DotY = static_cast<double>(V[1]) * NormalY;
-                const double DotX = static_cast<double>(V[0]) * NormalX;
+                const double DotY = static_cast<double>(V.y) * NormalY;
+                const double DotX = static_cast<double>(V.x) * NormalX;
                 const double SumYx = DotY + DotX;
-                const double Shift = (SumYx + static_cast<double>(V[2]) * NormalZ) * StreakShiftScale();
+                const double Shift = (SumYx + static_cast<double>(V.z) * NormalZ) * StreakShiftScale();
                 const double ShiftX = static_cast<double>(NormalX) * Shift;
                 const float ShiftY = static_cast<float>(Shift * NormalY);
-                Bx = static_cast<float>(static_cast<double>(C[0]) - ShiftX);
-                By = static_cast<float>(static_cast<double>(C[1]) - ShiftY);
+                Bx = static_cast<float>(static_cast<double>(C.x) - ShiftX);
+                By = static_cast<float>(static_cast<double>(C.y) - ShiftY);
                 Ux = static_cast<float>(static_cast<double>(NormalX) * Size);
                 const double UnroundedUy = static_cast<double>(NormalY) * Size;
                 Uy = static_cast<float>(UnroundedUy);
@@ -1211,14 +1211,14 @@ namespace AlchemyImpl
                 double X;
                 if (bStreak)
                     X = Corner == 0 ? (static_cast<double>(Bx) - Ux) - Px :
-                        Corner == 1 ? (static_cast<double>(C[0]) + Ux) - Px :
+                        Corner == 1 ? (static_cast<double>(C.x) + Ux) - Px :
                         Corner == 2 ? (static_cast<double>(Bx) - Ux) + Px :
-                                      (static_cast<double>(C[0]) + Px) + Ux;
+                                      (static_cast<double>(C.x) + Px) + Ux;
                 else
-                    X = Corner == 0 ? (static_cast<double>(C[0]) + Uy) + Px :
-                        Corner == 1 ? (static_cast<double>(C[0]) - Px) + Uy :
-                        Corner == 2 ? (static_cast<double>(C[0]) + Px) - Uy :
-                                      (static_cast<double>(C[0]) - Px) - Uy;
+                    X = Corner == 0 ? (static_cast<double>(C.x) + Uy) + Px :
+                        Corner == 1 ? (static_cast<double>(C.x) - Px) + Uy :
+                        Corner == 2 ? (static_cast<double>(C.x) + Px) - Uy :
+                                      (static_cast<double>(C.x) - Px) - Uy;
                 Vertex->Diffuse = Diffuse;
                 if (Corner != 0)
                     std::memcpy(&Vertex->V, &FrameBlock[VIndex], sizeof(float));
@@ -1226,16 +1226,16 @@ namespace AlchemyImpl
                 double Y;
                 if (bStreak)
                     Y = Corner == 0 ? (static_cast<double>(By) - Uy) - Py :
-                        Corner == 1 ? (static_cast<double>(C[1]) + Uy) - Py :
+                        Corner == 1 ? (static_cast<double>(C.y) + Uy) - Py :
                         Corner == 2 ? (static_cast<double>(By) - Uy) + Py :
-                                      (static_cast<double>(C[1]) + Py) + Uy;
+                                      (static_cast<double>(C.y) + Py) + Uy;
                 else
-                    Y = Corner == 0 ? (static_cast<double>(C[1]) - Py) + Ux :
-                        Corner == 1 ? (static_cast<double>(C[1]) + Ux) + Py :
-                        Corner == 2 ? (static_cast<double>(C[1]) - Py) - Ux :
-                                      (static_cast<double>(C[1]) + Py) - Ux;
+                    Y = Corner == 0 ? (static_cast<double>(C.y) - Py) + Ux :
+                        Corner == 1 ? (static_cast<double>(C.y) + Ux) + Py :
+                        Corner == 2 ? (static_cast<double>(C.y) - Py) - Ux :
+                                      (static_cast<double>(C.y) + Py) - Ux;
                 Vertex->Y = static_cast<float>(Y);
-                Vertex->Z = static_cast<float>(LoadAppearanceScalar(C[2]));
+                Vertex->Z = static_cast<float>(LoadAppearanceScalar(C.z));
                 Vertex->U = static_cast<float>(U);
                 if (Corner == 0)
                     Vertex->V = static_cast<float>(V);
@@ -1256,13 +1256,13 @@ namespace AlchemyImpl
         const FPooledParticle* Particle = InstanceListHead_;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* const View = (const float*)Camera->GetViewTransform();
+        const Transform* const View = Camera->GetViewTransform();
         Transform ViewTemporary;
         Shared3DMath()->MulTransform(ViewTemporary,
-            *reinterpret_cast<const Transform*>(View),
+            *View,
             NodeWorldXform_);
-        float ViewWorld[12];
-        std::memcpy(ViewWorld, &ViewTemporary, sizeof(ViewTemporary));
+        Transform ViewWorld;
+        std::memcpy(&ViewWorld, &ViewTemporary, sizeof(ViewTemporary));
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
         const FAppearanceRampDescriptor* const InitialDescriptor = Descriptor_;
@@ -1283,9 +1283,9 @@ namespace AlchemyImpl
                 Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, InnerTime) * Scale);
             if (Alpha < FloatFromBits(0x3c23d70au))
                 continue;
-            float C[3];
-            Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
-                *reinterpret_cast<const Transform*>(ViewWorld),
+            Vector C;
+            Shared3DMath()->TransformXform(C,
+                ViewWorld,
                 *reinterpret_cast<const Vector*>(&Particle->PosX));
             const unsigned long Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
@@ -1327,15 +1327,15 @@ namespace AlchemyImpl
             {
                 double ThirdY = 0.0;
                 if (Corner == 2)
-                    ThirdY = static_cast<double>(Trig[0]) * Alpha + C[1];
+                    ThirdY = static_cast<double>(Trig[0]) * Alpha + C.y;
                 const long Count = G_BasicDrawContext.VertCount;
                 Indices[Corner] = static_cast<unsigned short>(G_BasicDrawContext.RequestedVerts);
                 if (Count > static_cast<long>(G_BasicDrawContext.RequestedVerts))
                     continue;
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BasicDrawContext.LockedVerts);
-                const double X = Corner == 0 ? (static_cast<double>(C[0]) + Xa) - Yb :
-                    Corner == 1 ? (static_cast<double>(C[0]) - Xa) - Yb :
-                                  static_cast<double>(Trig[1]) * Alpha + C[0];
+                const double X = Corner == 0 ? (static_cast<double>(C.x) + Xa) - Yb :
+                    Corner == 1 ? (static_cast<double>(C.x) - Xa) - Yb :
+                                  static_cast<double>(Trig[1]) * Alpha + C.x;
                 const unsigned long UvIndex = 2 - Corner;
                 Vertex->Diffuse = Diffuse;
                 std::memcpy(&Vertex->U, &TriU[UvIndex], sizeof(float));
@@ -1345,9 +1345,9 @@ namespace AlchemyImpl
                     Vertex->Y = static_cast<float>(ThirdY);
                 else
                     Vertex->Y = static_cast<float>(Corner == 0 ?
-                        (static_cast<double>(C[1]) - Ya) - Xb :
-                        (static_cast<double>(C[1]) + Ya) - Xb);
-                Vertex->Z = static_cast<float>(LoadAppearanceScalar(C[2]));
+                        (static_cast<double>(C.y) - Ya) - Xb :
+                        (static_cast<double>(C.y) + Ya) - Xb);
+                Vertex->Z = static_cast<float>(LoadAppearanceScalar(C.z));
                 Indices[Corner] = static_cast<unsigned short>(Count);
                 G_BasicDrawContext.LockedVerts = Vertex + 1;
                 ++G_BasicDrawContext.VertCount;
@@ -1622,9 +1622,9 @@ namespace AlchemyImpl
         std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
         CallRenderPipelineSetTexture(G_RenderPipeline, 0, static_cast<int>(FrameTexture));
 
-        float ViewWorld[12];
-        ComposeTransform(ViewWorld, GetDrawCameraTransform(), NodeWorldXform_);
-        CallRenderPipelineSetTransform(G_RenderPipeline, ViewWorld);
+        Transform ViewWorld;
+        ComposeTransform(&ViewWorld, GetDrawCameraTransform(), NodeWorldXform_);
+        CallRenderPipelineSetTransform(G_RenderPipeline, &ViewWorld);
 
         AlDrawContextDraw(G_RectDrawContext);
         return GR_OK;
@@ -2654,33 +2654,33 @@ namespace AlchemyImpl
                 continue;
             float Position[3];
             std::memcpy(Position, &Particle->PosX, sizeof(Position));
-            float M[12];
+            Transform M;
             if (static_cast<unsigned char>(Descriptor_->LocalTransform->IsIdentity()) == 0)
             {
                 unsigned long OuterBits;
                 unsigned long InnerBits;
                 std::memcpy(&OuterBits, &AppearanceOuterTime_, sizeof(OuterBits));
                 std::memcpy(&InnerBits, &InnerTime, sizeof(InnerBits));
-                Descriptor_->LocalTransform->Evaluate(OuterBits, InnerBits, reinterpret_cast<Transform*>(M));
-                Position[0] = static_cast<float>(static_cast<double>(M[9]) + Position[0]);
-                Position[1] = static_cast<float>(static_cast<double>(Position[1]) + M[10]);
-                Position[2] = static_cast<float>(static_cast<double>(Position[2]) + M[11]);
+                Descriptor_->LocalTransform->Evaluate(OuterBits, InnerBits, &M);
+                Position[0] = static_cast<float>(static_cast<double>(M.Translation.x) + Position[0]);
+                Position[1] = static_cast<float>(static_cast<double>(Position[1]) + M.Translation.y);
+                Position[2] = static_cast<float>(static_cast<double>(Position[2]) + M.Translation.z);
             }
             else
             {
-                FillIdentity3x3(M);
-                M[11] = 0.0f;
-                M[10] = 0.0f;
-                M[9] = 0.0f;
+                FillIdentity3x3(&M.Rotation);
+                M.Translation.z = 0.0f;
+                M.Translation.y = 0.0f;
+                M.Translation.x = 0.0f;
             }
             if (bCameraFade)
             {
-                const double B1 = LoadAppearanceScalar(M[1]);
-                const double B4 = LoadAppearanceScalar(M[4]);
-                const double B7 = LoadAppearanceScalar(M[7]);
-                const float A0 = static_cast<float>(LoadAppearanceScalar(M[0]));
-                const float A3 = static_cast<float>(LoadAppearanceScalar(M[3]));
-                const double A6 = LoadAppearanceScalar(M[6]);
+                const double B1 = LoadAppearanceScalar(M.Rotation.E[0][1]);
+                const double B4 = LoadAppearanceScalar(M.Rotation.E[1][1]);
+                const double B7 = LoadAppearanceScalar(M.Rotation.E[2][1]);
+                const float A0 = static_cast<float>(LoadAppearanceScalar(M.Rotation.E[0][0]));
+                const float A3 = static_cast<float>(LoadAppearanceScalar(M.Rotation.E[1][0]));
+                const double A6 = LoadAppearanceScalar(M.Rotation.E[2][0]);
                 const float NormalX = static_cast<float>(static_cast<double>(A3) * B7 - A6 * B4);
                 const float NormalY = static_cast<float>(A6 * B1 - B7 * A0);
                 const float NormalZ = static_cast<float>(B4 * A0 - static_cast<double>(A3) * B1);
@@ -2768,12 +2768,12 @@ namespace AlchemyImpl
             }
             float A[3];
             float B[3];
-            A[2] = static_cast<float>(static_cast<double>(M[6]) * Width);
-            A[1] = static_cast<float>(static_cast<double>(M[3]) * Width);
-            A[0] = static_cast<float>(static_cast<double>(M[0]) * Width);
-            B[2] = static_cast<float>(static_cast<double>(M[7]) * Height);
-            B[1] = static_cast<float>(static_cast<double>(M[4]) * Height);
-            B[0] = static_cast<float>(static_cast<double>(M[1]) * Height);
+            A[2] = static_cast<float>(static_cast<double>(M.Rotation.E[2][0]) * Width);
+            A[1] = static_cast<float>(static_cast<double>(M.Rotation.E[1][0]) * Width);
+            A[0] = static_cast<float>(static_cast<double>(M.Rotation.E[0][0]) * Width);
+            B[2] = static_cast<float>(static_cast<double>(M.Rotation.E[2][1]) * Height);
+            B[1] = static_cast<float>(static_cast<double>(M.Rotation.E[1][1]) * Height);
+            B[0] = static_cast<float>(static_cast<double>(M.Rotation.E[0][1]) * Height);
             float MinusA[3];
             float PlusA[3];
             float Corners[4][3];
@@ -2862,9 +2862,9 @@ namespace AlchemyImpl
         std::memcpy(&FrameTexture, Texture_.Frame, sizeof(FrameTexture));
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        float ViewWorld[12];
-        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
-        G_RenderPipeline->SetModelview((const Transform*)ViewWorld);
+        Transform ViewWorld;
+        ComposeTransform(&ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
+        G_RenderPipeline->SetModelview(&ViewWorld);
         AlDrawContextDraw(G_OrientedDrawContext);
         return GR_OK;
     }
@@ -2875,13 +2875,13 @@ namespace AlchemyImpl
         : FFxBillboardAppearance(PrimaryIid, FactoryName, &kDustClass),
           LastDt_(FloatFromBits(0x3d4ccccdu)), LastCameraStep_(0.0f)
     {
-        FillIdentity3x3(ViewXform_);
-        ViewXform_[9] = 0.0f;
-        ViewXform_[10] = 0.0f;
-        ViewXform_[11] = 0.0f;
-        LastCameraPos_[0] = 0.0f;
-        LastCameraPos_[1] = 0.0f;
-        LastCameraPos_[2] = 0.0f;
+        FillIdentity3x3(&ViewXform_.Rotation);
+        ViewXform_.Translation.x = 0.0f;
+        ViewXform_.Translation.y = 0.0f;
+        ViewXform_.Translation.z = 0.0f;
+        LastCameraPos_.x = 0.0f;
+        LastCameraPos_.y = 0.0f;
+        LastCameraPos_.z = 0.0f;
     }
 
     // FUN_0620f6b0: the set FUN_0620ef80 (perp's builder, cached at node+0xe8).
@@ -3052,7 +3052,7 @@ namespace AlchemyImpl
 
         float* LastViewPos =
             reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
-        CameraSpacePoint(ViewXform_, Six, LastViewPos);
+        CameraSpacePoint(&ViewXform_, Six, LastViewPos);
         return GR_OK;
     }
 
@@ -3090,29 +3090,29 @@ namespace AlchemyImpl
             return GR_OK;
 
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* CameraView = (const float*)Camera->GetViewTransform();
-        ComposeTransform(ViewXform_, CameraView, NodeWorldXform_);
+        const Transform* CameraView = Camera->GetViewTransform();
+        ComposeTransform(&ViewXform_, CameraView, NodeWorldXform_);
 
         unsigned long VertCount = 0;
         unsigned long IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
 
-        float CameraPos[3];
+        Vector CameraPos;
         ICamera* const PositionCamera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        std::memcpy(CameraPos, PositionCamera->GetPosition(), sizeof(CameraPos));
-        float CameraDelta[3];
-        StoreAlchemyFpuFloat(CameraDelta[0], static_cast<double>(CameraPos[0]) - LastCameraPos_[0]);
-        StoreAlchemyFpuFloat(CameraDelta[1], static_cast<double>(CameraPos[1]) - LastCameraPos_[1]);
-        StoreAlchemyFpuFloat(CameraDelta[2], static_cast<double>(CameraPos[2]) - LastCameraPos_[2]);
-        float Step[3];
-        Shared3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(Step),
-            *reinterpret_cast<const Matrix*>(CameraView),
-            *reinterpret_cast<const Vector*>(CameraDelta));
-        const double SquareX = static_cast<double>(Step[0]) * Step[0];
-        const double SquareY = static_cast<double>(Step[1]) * Step[1];
+        std::memcpy(&CameraPos, PositionCamera->GetPosition(), sizeof(CameraPos));
+        Vector CameraDelta;
+        StoreAlchemyFpuFloat(CameraDelta.x, static_cast<double>(CameraPos.x) - LastCameraPos_.x);
+        StoreAlchemyFpuFloat(CameraDelta.y, static_cast<double>(CameraPos.y) - LastCameraPos_.y);
+        StoreAlchemyFpuFloat(CameraDelta.z, static_cast<double>(CameraPos.z) - LastCameraPos_.z);
+        Vector Step;
+        Shared3DMath()->TransformMatrix(Step,
+            CameraView->Rotation,
+            CameraDelta);
+        const double SquareX = static_cast<double>(Step.x) * Step.x;
+        const double SquareY = static_cast<double>(Step.y) * Step.y;
         const double SumXy = SquareX + SquareY;
-        const double SquareZ = static_cast<double>(Step[2]) * Step[2];
+        const double SquareZ = static_cast<double>(Step.z) * Step.z;
         const double LengthSquared = SumXy + SquareZ;
         const double Length = ComputeAlchemyFpuSquareRoot(LengthSquared);
         float StepLen;
@@ -3174,7 +3174,7 @@ namespace AlchemyImpl
                     reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
                 float C[3];
                 Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
-                    *reinterpret_cast<const Transform*>(ViewXform_),
+                    ViewXform_,
                     *reinterpret_cast<const Vector*>(&Particle->PosX));
 
                 if (!(C[2] > -1.0f) && !(LastView[2] > -1.0f))
@@ -3350,17 +3350,17 @@ namespace AlchemyImpl
                 unsigned long FrameTexture = 0;
                 std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
                 CallRenderPipelineSetTexture(G_RenderPipeline, 0, static_cast<int>(FrameTexture));
-                float Identity[12];
-                FillIdentity3x3(Identity);
-                Identity[9] = 0.0f;
-                Identity[10] = 0.0f;
-                Identity[11] = 0.0f;
-                CallRenderPipelineSetTransform(G_RenderPipeline, Identity);
+                Transform Identity;
+                FillIdentity3x3(&Identity.Rotation);
+                Identity.Translation.x = 0.0f;
+                Identity.Translation.y = 0.0f;
+                Identity.Translation.z = 0.0f;
+                CallRenderPipelineSetTransform(G_RenderPipeline, &Identity);
                 AlDrawContextDraw(G_DustDrawContext);
             }
         }
 
-        std::memcpy(LastCameraPos_, CameraPos, sizeof(CameraPos));
+        std::memcpy(&LastCameraPos_, &CameraPos, sizeof(CameraPos));
         std::memcpy(&LastCameraStep_, &StepLen, sizeof(StepLen));
         return GR_OK;
     }
@@ -3720,10 +3720,10 @@ namespace AlchemyImpl
             }
         } SavedFillMode(G_RenderPipeline, FillMode);
 
-        float ViewWorld[12];
+        Transform ViewWorld;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
-        G_RenderPipeline->SetModelview((const Transform*)ViewWorld);
+        ComposeTransform(&ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
+        G_RenderPipeline->SetModelview(&ViewWorld);
     }
 
     // FUN_06205720, __thiscall on the node: the beam ribbon.
@@ -3925,17 +3925,17 @@ namespace AlchemyImpl
         State.Idx[3] = 0;
         State.Counter = 0;
         State.Node = this;
-        FillIdentity3x3(&State.Xform.Rotation.E[0][0]);
+        FillIdentity3x3(&State.Xform.Rotation);
         State.Xform.Translation.x = 0.0f;
         State.Xform.Translation.y = 0.0f;
         State.Xform.Translation.z = 0.0f;
         State.PrevPos[0] = 0.0f;
         State.PrevPos[1] = 0.0f;
         State.PrevPos[2] = 0.0f;
-        float Basis[12];
+        Transform Basis;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        ComposeTransform(Basis, (const float*)Camera->GetOrientation(), NodeWorldXform_);
-        std::memcpy(&State.Xform, Basis, sizeof(Basis));
+        ComposeTransform(&Basis, (const Transform*)Camera->GetOrientation(), NodeWorldXform_);
+        std::memcpy(&State.Xform, &Basis, sizeof(Basis));
 
         const float* LeadPos = &Head->PosX;
         bool bTipNoCap = false;
@@ -4365,27 +4365,27 @@ namespace AlchemyImpl
         // tests only the byte.
         if (Set->bUseParticleTransform != 0)
         {
-            float Anim[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                               0.0f, 0.0f, 0.0f };
+            Transform Anim = { Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                               { 0.0f, 0.0f, 0.0f } };
             {
                 const float Phase = Age / Duration;
                 unsigned long TimeA = 0;
                 unsigned long TimeB = 0;
                 std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                 std::memcpy(&TimeB, &Phase, sizeof(TimeB));
-                Set->ParticleTransform->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Anim));
+                Set->ParticleTransform->Evaluate(TimeA, TimeB, &Anim);
             }
-            const float T[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                                  Six[0], Six[1], Six[2] };
-            float A[12];
-            Math->MulTransform(*reinterpret_cast<Transform*>(A),
+            const Transform T = { Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                  { Six[0], Six[1], Six[2] } };
+            Transform A;
+            Math->MulTransform(A,
                                *World12,
-                               *reinterpret_cast<const Transform*>(T)); // +0x1C
-            float B[12];
-            Math->MulTransform(*reinterpret_cast<Transform*>(B),
-                               *reinterpret_cast<const Transform*>(A),
-                               *reinterpret_cast<const Transform*>(Anim)); // +0x1C
-            Mesh->SetTransform((const Transform*)B);
+                               T); // +0x1C
+            Transform B;
+            Math->MulTransform(B,
+                               A,
+                               Anim); // +0x1C
+            Mesh->SetTransform(&B);
         }
 
         // A counted local copy, released by FUN_06225940.
@@ -4515,40 +4515,40 @@ namespace AlchemyImpl
                 FFxMeshAppearancePropertySet* const Set = MeshProps();
                 if (Set->bUseParticleTransform != 0)
                 {
-                    float Anim[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 0.0f };
+                    Transform Anim = { Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                       { 0.0f, 0.0f, 0.0f } };
                     {
                         const float Phase = Item->Age / Item->Duration;
                         unsigned long TimeA = 0;
                         unsigned long TimeB = 0;
                         std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                         std::memcpy(&TimeB, &Phase, sizeof(TimeB));
-                        Set->ParticleTransform->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Anim));
+                        Set->ParticleTransform->Evaluate(TimeA, TimeB, &Anim);
                     }
-                    const float T[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                                          Item->PosX, Item->PosY, Item->PosZ };
-                    float X[12];
-                    Math->MulTransform(*reinterpret_cast<Transform*>(X),
+                    const Transform T = { Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                          { Item->PosX, Item->PosY, Item->PosZ } };
+                    Transform X;
+                    Math->MulTransform(X,
                                        *World,
-                                       *reinterpret_cast<const Transform*>(T)); // +0x1C
-                    float Y[12];
-                    Math->MulTransform(*reinterpret_cast<Transform*>(Y),
-                                       *reinterpret_cast<const Transform*>(X),
-                                       *reinterpret_cast<const Transform*>(Anim)); // +0x1C
-                    Mesh->SetTransform((const Transform*)Y);
+                                       T); // +0x1C
+                    Transform Y;
+                    Math->MulTransform(Y,
+                                       X,
+                                       Anim); // +0x1C
+                    Mesh->SetTransform(&Y);
                 }
                 else
                 {
-                    float M[12];
-                    std::memcpy(M, Mesh->GetTransform(), sizeof(M));
-                    float WorldPos[3];
-                    Math->TransformXform(*reinterpret_cast<Vector*>(WorldPos),
+                    Transform M;
+                    std::memcpy(&M, Mesh->GetTransform(), sizeof(M));
+                    Vector WorldPos;
+                    Math->TransformXform(WorldPos,
                                          *World,
                                          *reinterpret_cast<const Vector*>(&Item->PosX)); // +0x28
-                    M[9] = WorldPos[0];
-                    M[10] = WorldPos[1];
-                    M[11] = WorldPos[2];
-                    Mesh->SetTransform((const Transform*)M);
+                    M.Translation.x = WorldPos.x;
+                    M.Translation.y = WorldPos.y;
+                    M.Translation.z = WorldPos.z;
+                    Mesh->SetTransform(&M);
                 }
             }
             Item = Item->Next;
@@ -4896,9 +4896,9 @@ namespace AlchemyImpl
         Record->PosY = static_cast<float>(static_cast<double>(StepY) + Record->PosY);
         Record->PosZ = static_cast<float>(static_cast<double>(StepZ) + Record->PosZ);
 
-        float M[12];
-        FillIdentity3x3(M);
-        std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
+        Transform M;
+        FillIdentity3x3(&M.Rotation);
+        std::memcpy(&M.Translation, &Record->PosX, 3 * sizeof(float));
 
         const unsigned long Flags = ParticleProps()->Flags; // [[node+0xc0]+0xa0]
         if ((Flags & 1) != 0)
@@ -4999,10 +4999,10 @@ namespace AlchemyImpl
                 ParticleMath()->QuaternionToMatrix(Rotation,
                     R->VelQuat); // +0x54
             }
-            std::memcpy(M, &Rotation, sizeof(float) * 9);
+            std::memcpy(&M, &Rotation, sizeof(float) * 9);
         }
 
-        R->LifeEffect->SetTransform(1, (const Transform*)M);
+        R->LifeEffect->SetTransform(1, &M);
     }
 #pragma float_control(pop)
 
@@ -5162,11 +5162,11 @@ namespace AlchemyImpl
                             reinterpret_cast<void*>(static_cast<std::uintptr_t>(Key)),
                             &R->DeathEffect) == GR_OK)
                     {
-                        float M[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 0.0f};
+                        Transform M = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                       {0.0f, 0.0f, 0.0f}};
                         // Position dwords copied without conversion.
-                        std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
-                        R->DeathEffect->SetTransform(1, (const Transform*)M);
+                        std::memcpy(&M.Translation, &Record->PosX, 3 * sizeof(float));
+                        R->DeathEffect->SetTransform(1, &M);
                         if (IsNonzeroParticleField(AppearanceOuterTime_))
                             ForwardEffectFloat(R->DeathEffect, &IFxEffect::SetOuterTime,
                                                AppearanceOuterTime_);

@@ -54,12 +54,12 @@ UiWinDeform::~UiWinDeform()
         Body.Reset();
 }
 
-void UiWinDeform::SetPosition(float const* NewPosition)
+void UiWinDeform::SetPosition(Vector const* NewPosition)
 {
     // LAB_0059bb40 (RET 4).
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
 
     if (Body.Deformable == nullptr)
         return;
@@ -69,8 +69,8 @@ void UiWinDeform::SetPosition(float const* NewPosition)
 void UiWinDeform::SetTransform(Transform const* NewXform)
 {
     // LAB_0059b8f0 (RET 4).
-    float Local[12];
-    memcpy(Local, NewXform, sizeof(Local));
+    Transform Local;
+    memcpy(&Local, NewXform, sizeof(Local));
 
     // The widget's centre offset, turned by the incoming rotation.
     Vector HalfExtent;
@@ -80,16 +80,16 @@ void UiWinDeform::SetTransform(Transform const* NewXform)
 
     Vector Rotated;
     UiWidgetMathEngine()->TransformMatrix(Rotated,
-                                          *reinterpret_cast<Matrix const*>(NewXform),
+                                          NewXform->Rotation,
                                           HalfExtent);
 
-    Local[9] = Rotated.x + NewXform->Translation.x;
-    Local[10] = Rotated.y + NewXform->Translation.y;
-    Local[11] = Rotated.z + NewXform->Translation.z;
+    Local.Translation.x = Rotated.x + NewXform->Translation.x;
+    Local.Translation.y = Rotated.y + NewXform->Translation.y;
+    Local.Translation.z = Rotated.z + NewXform->Translation.z;
 
     // Virtual calls, so this class's SetPosition poses the body.
-    SetOrientation(reinterpret_cast<Matrix const*>(Local));
-    SetPosition(Local + 9);
+    SetOrientation(&Local.Rotation);
+    SetPosition(&Local.Translation);
 
     // The top-left and bottom-right corners through the new orientation + position (+0x3c).
     Transform const& Xform = Placement;
@@ -235,18 +235,18 @@ void UiWinDeform::SetCostume(char const* Name)
 
 void UiWinDeform::PoseBody()
 {
-    float Rotation[9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-    HudMatrixRotationY(Rotation, 3.14159274f);
-    HudMatrixRotateRows12(Rotation, 0.0f);
-    HudMatrixRotateRows01(Rotation, 0.0f);
+    Matrix Rotation(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    HudMatrixRotationY(&Rotation, 3.14159274f);
+    HudMatrixRotateRows12(&Rotation, 0.0f);
+    HudMatrixRotateRows01(&Rotation, 0.0f);
 
     if (Body.Deformable != nullptr)
         DALib::Deform->SetHeight(Body.Deformable, PoseHeight);
 
-    float Pose[3] = {0.0f, 0.0f, PoseZ};
-    DALib::Deform->SetPosePos(Body.Deformable, Pose);
+    Vector Pose = {0.0f, 0.0f, PoseZ};
+    DALib::Deform->SetPosePos(Body.Deformable, &Pose);
 
-    DALib::Deform->SetPoseOri(Body.Deformable, Rotation);
+    DALib::Deform->SetPoseOri(Body.Deformable, &Rotation);
 }
 
 // DAT_0067da94.

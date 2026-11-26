@@ -1875,7 +1875,7 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
 
     Object->flags = (Object->flags & ~0xffu) | (Host->flags & 0xffu);
 
-    PhySys::BeamBodyToWorldPose(nullptr, Object, &Quat.x, Position);
+    PhySys::BeamBodyToWorldPose(nullptr, Object, &Quat, Position);
     NewCore->refresh_contact_points();
 }
 

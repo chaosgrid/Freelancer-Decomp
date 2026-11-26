@@ -348,36 +348,36 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
             const unsigned long TypeB = *(unsigned long*)DataB;
             Payload[0] = TypeB;
             float* PayloadF = (float*)Payload;
-            const float* PosA = (const float*)(DataA + 4);
-            const float* PosB = (const float*)(DataB + 4);
-            const float* OrientA = (const float*)(DataA + 0x10);
-            const float* OrientB = (const float*)(DataB + 0x10);
-            const float* AxisB = (const float*)(DataB + 0x34);
+            const Vector* PosA = (const Vector*)(DataA + 4);
+            const Vector* PosB = (const Vector*)(DataB + 4);
+            const Matrix* OrientA = (const Matrix*)(DataA + 0x10);
+            const Matrix* OrientB = (const Matrix*)(DataB + 0x10);
+            const Vector* AxisB = (const Vector*)(DataB + 0x34);
 
             if (TypeB == 0)
             {
-                const float Transposed[9] = {OrientB[0], OrientB[3], OrientB[6],
-                                             OrientB[1], OrientB[4], OrientB[7],
-                                             OrientB[2], OrientB[5], OrientB[8]};
-                float OutMat[9];
-                float OutVec[3];
-                MathMulMatrix3(Acquire3DMathEngine(), OutMat, OrientA, Transposed);
-                MathTransformVec(Acquire3DMathEngine(), OutVec, OutMat, PosB);
-                PayloadF[4] = PosA[0] - OutVec[0];
-                PayloadF[5] = PosA[1] - OutVec[1];
-                PayloadF[6] = PosA[2] - OutVec[2];
-                std::memcpy(PayloadF + 7, OutMat, sizeof(OutMat));
+                const Matrix Transposed(OrientB->E[0][0], OrientB->E[1][0], OrientB->E[2][0],
+                                        OrientB->E[0][1], OrientB->E[1][1], OrientB->E[2][1],
+                                        OrientB->E[0][2], OrientB->E[1][2], OrientB->E[2][2]);
+                Matrix OutMat;
+                Vector OutVec;
+                MathMulMatrix3(Acquire3DMathEngine(), &OutMat, OrientA, &Transposed);
+                MathTransformVec(Acquire3DMathEngine(), &OutVec, &OutMat, PosB);
+                PayloadF[4] = PosA->x - OutVec.x;
+                PayloadF[5] = PosA->y - OutVec.y;
+                PayloadF[6] = PosA->z - OutVec.z;
+                std::memcpy(PayloadF + 7, &OutMat, sizeof(OutMat));
             }
             else if (TypeB == 1 || TypeB == 2)
             {
                 std::memcpy(PayloadF + 1, PosA, 3 * sizeof(float));
                 std::memcpy(PayloadF + 4, PosB, 3 * sizeof(float));
-                float OutMat[9];
-                float AxisXformed[3];
-                MathMulMatrix3(Acquire3DMathEngine(), OutMat, OrientA, OrientB);
-                MathTransformVec(Acquire3DMathEngine(), AxisXformed, OutMat, AxisB);
-                std::memcpy(PayloadF + 7, OutMat, sizeof(OutMat));
-                std::memcpy(PayloadF + 16, AxisXformed, sizeof(AxisXformed));
+                Matrix OutMat;
+                Vector AxisXformed;
+                MathMulMatrix3(Acquire3DMathEngine(), &OutMat, OrientA, OrientB);
+                MathTransformVec(Acquire3DMathEngine(), &AxisXformed, &OutMat, AxisB);
+                std::memcpy(PayloadF + 7, &OutMat, sizeof(OutMat));
+                std::memcpy(PayloadF + 16, &AxisXformed, sizeof(AxisXformed));
                 std::memcpy(PayloadF + 19, DataB + 0x40, 2 * sizeof(float));
             }
 

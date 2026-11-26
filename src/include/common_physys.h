@@ -468,11 +468,11 @@ namespace PhySys
 
     // FUN_06343670 (.text:06343670-063436f1, __thiscall, RET 0x10).
     // set_target_quaternion(TargetQuat, Time, TargetRotQuatOrNull, DeltaTime). Both quaternion
-    // arguments are 4 floats in IVP's (X,Y,Z,W) order, NOT Quaternion's (W,X,Y,Z).
+    // arguments are IVP_U_Quat, IVP's (X,Y,Z,W) order, NOT Quaternion's (W,X,Y,Z).
     void __cdecl GolemSetTargetQuaternion(::FLControllerGolem* Golem,
-                                                    float const TargetQuat[4],
+                                                    IVP_U_Quat const* TargetQuat,
                                                     IVP_Time const& Time,
-                                                    float const* TargetRotQuatOrNull,
+                                                    IVP_U_Quat const* TargetRotQuatOrNull,
                                                     float DeltaTime);
 
     // FUN_06343cc0 (.text:06343cc0-06343f63, __cdecl, 191 instructions). "Beam this body onto an absolute world pose by re-seating its
@@ -489,11 +489,11 @@ namespace PhySys
     // world transform pre-multiplies the requested pose. It is the literal constant 0 at both
     // call sites (verified instruction-by-instruction, not inferred) -- see the definition.
     //
-    // Quat is 4 floats in IVP's (X,Y,Z,W) order, same convention as GolemSetTargetQuaternion.
+    // WorldQuat is an IVP_U_Quat, IVP's (X,Y,Z,W) order, same convention as GolemSetTargetQuaternion.
     // Retail always returns 1 and neither call site inspects the result.
     bool __cdecl BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull,
                                      IVP_Real_Object* Body,
-                                     float const WorldQuat[4],
+                                     IVP_U_Quat const* WorldQuat,
                                      Vector const& WorldPosition);
 
     // FUN_06288e60 (.text:06288e60-062890cd, __cdecl). The per-child-part physics finalize:

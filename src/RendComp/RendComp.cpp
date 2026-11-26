@@ -32,13 +32,14 @@ I3DMathEngine* G_MathRenderMgr = nullptr;   // DAT_06c37d48
 
 struct FRendCompXform
 {
-    float Rotation[3][3];
-    float Translation[3];
+    Matrix Rotation;
+    Vector Translation;
 };
 
 // IRenderPipeline's matrix slots take the bare 12 floats. FRendCompXform is exactly that
 // layout and nothing else, so this is a view of the same storage, not a conversion.
 static_assert(sizeof(FRendCompXform) == 12 * sizeof(float), "FRendCompXform is 12 floats");
+static_assert(offsetof(FRendCompXform, Translation) == 9 * sizeof(float), "translation follows the 3x3");
 
 inline const float* AsFloat12(const FRendCompXform* Xform)
 {
@@ -229,38 +230,37 @@ void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraX
 }
 
 // FUN_06c33090 (thiscall on Src). Only caller: IRenderer slot 7.
-void VectorNegate3(const float* Src, float* Dest)
+void VectorNegate3(const Vector* Src, Vector* Dest)
 {
-    Dest[0] = -Src[0];
-    Dest[1] = -Src[1];
-    Dest[2] = -Src[2];
+    Dest->x = -Src->x;
+    Dest->y = -Src->y;
+    Dest->z = -Src->z;
 }
 
 // FUN_06c330b0 (thiscall on Src).
-float* TransposeXform3x3(const float* Src12, float* Dest9)
+Matrix* TransposeXform3x3(const Transform* Src, Matrix* Dest)
 {
-    Dest9[0] = Src12[0];
-    Dest9[1] = Src12[3];
-    Dest9[2] = Src12[6];
-    Dest9[3] = Src12[1];
-    Dest9[4] = Src12[4];
-    Dest9[5] = Src12[7];
-    Dest9[6] = Src12[2];
-    Dest9[7] = Src12[5];
-    Dest9[8] = Src12[8];
-    return Dest9;
+    Dest->E[0][0] = Src->Rotation.E[0][0];
+    Dest->E[0][1] = Src->Rotation.E[1][0];
+    Dest->E[0][2] = Src->Rotation.E[2][0];
+    Dest->E[1][0] = Src->Rotation.E[0][1];
+    Dest->E[1][1] = Src->Rotation.E[1][1];
+    Dest->E[1][2] = Src->Rotation.E[2][1];
+    Dest->E[2][0] = Src->Rotation.E[0][2];
+    Dest->E[2][1] = Src->Rotation.E[1][2];
+    Dest->E[2][2] = Src->Rotation.E[2][2];
+    return Dest;
 }
 
 // FUN_06c33100: math engine DAT_06c37d48, TransposeTransform into a local. No fallback.
-float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3)
+Vector* TransformPoint3(Vector* Dest, const Transform* Xform, const Vector* Point)
 {
     Vector Local;
-    MathEngineCached(G_MathRenderMgr)->TransposeTransform(Local, *(const Matrix*)Matrix12,
-                                            *(const Vector*)Vec3);
-    Dest3[0] = Local.x;
-    Dest3[1] = Local.y;
-    Dest3[2] = Local.z;
-    return Dest3;
+    MathEngineCached(G_MathRenderMgr)->TransposeTransform(Local, Xform->Rotation, *Point);
+    Dest->x = Local.x;
+    Dest->y = Local.y;
+    Dest->z = Local.z;
+    return Dest;
 }
 
 GENRESULT DACOM_API PluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)

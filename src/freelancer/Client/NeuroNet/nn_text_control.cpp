@@ -53,7 +53,7 @@ namespace
     // The second argument every Font::String scale call (FUN_004145d0) of this class gets.
     float TextDepth(NnTextControl const* Self)
     {
-        return Self->Offset[2] + Self->Position.z;
+        return Self->Offset.z + Self->Position.z;
     }
 }
 
@@ -146,7 +146,7 @@ NnTextControl::~NnTextControl()
     }
 }
 
-void NnTextControl::Init(char const* StyleName, float const* InPosition, char const* Hardpoint,
+void NnTextControl::Init(char const* StyleName, Vector const* InPosition, char const* Hardpoint,
                          float InWidth, float InHeight, float FontScale, unsigned Ids, int InJustification,
                          int InTextToolTipIds, unsigned char bInTopLeftAnchor)
 {
@@ -162,9 +162,9 @@ void NnTextControl::Init(char const* StyleName, float const* InPosition, char co
             SetFont(Font);
     }
 
-    Offset[0] = InPosition[0];
-    Offset[1] = InPosition[1];
-    Offset[2] = InPosition[2];
+    Offset.x = InPosition->x;
+    Offset.y = InPosition->y;
+    Offset.z = InPosition->z;
 
     if (Hardpoint != nullptr)
     {
@@ -221,9 +221,9 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
                 float const Y = static_cast<float>(Ini->get_value_float(1));
                 float const X = Ini->get_value_float(0);
                 float const Z = Ini->get_value_float(2);
-                Offset[0] = X;
-                Offset[1] = Y;
-                Offset[2] = Z;
+                Offset.x = X;
+                Offset.y = Y;
+                Offset.z = Z;
             }
             else if (Ini->is_value("hardpoint"))
             {
@@ -280,11 +280,11 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
     // The parent is re-placed at its own position, which positions this control with it.
     Win3D* const ParentWin = GetParent();
     if (ParentWin != nullptr)
-        ParentWin->SetPosition(&ParentWin->Position.x);
+        ParentWin->SetPosition(&ParentWin->Position);
     return true;
 }
 
-bool NnTextControl::HitTest(float const* Ray)
+bool NnTextControl::HitTest(Vector const* Ray)
 {
     // LAB_0058a230 (RET 4).
     if (TextToolTipIds == 0 && bClickable == 0)
@@ -292,19 +292,19 @@ bool NnTextControl::HitTest(float const* Ray)
 
     // The sums Position + Offset stay at full precision; each half extent is rounded to a float
     // first.
-    double const SumX = static_cast<double>(Position.x) + static_cast<double>(Offset[0]);
-    double const SumY = static_cast<double>(Position.y) + static_cast<double>(Offset[1]);
+    double const SumX = static_cast<double>(Position.x) + static_cast<double>(Offset.x);
+    double const SumY = static_cast<double>(Position.y) + static_cast<double>(Offset.y);
     float const CentreZ =
-        static_cast<float>(static_cast<double>(Position.z) + static_cast<double>(Offset[2]));
+        static_cast<float>(static_cast<double>(Position.z) + static_cast<double>(Offset.z));
     float const HalfWidth = Width * 0.5f;   // DAT_005c75e0
     float const HalfHeight = Height * 0.5f;
     float const CentreX = static_cast<float>(SumX + static_cast<double>(HalfWidth));
     float const CentreY = static_cast<float>(SumY - static_cast<double>(HalfHeight));
 
-    float const HalfExtents[3] = {HalfWidth, HalfHeight, 0.0f};
-    float Matrix[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                        CentreX, CentreY, CentreZ};
-    if (!Win3DRayHitsAabbHalfExtents(HalfExtents, Matrix, Ray)) // FUN_005a1130
+    Vector const HalfExtents = {HalfWidth, HalfHeight, 0.0f};
+    Transform Xform = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                       {CentreX, CentreY, CentreZ}};
+    if (!Win3DRayHitsAabbHalfExtents(&HalfExtents, &Xform, Ray)) // FUN_005a1130
         return false;
 
     if (TextToolTipIds != 0)
@@ -595,11 +595,11 @@ void NnTextControl::SetCachedDraw(unsigned char bCached, unsigned char bInvalida
         bCachedPlacementValid = 0;
 }
 
-void NnTextControl::SetPosition(float const* NewPosition)
+void NnTextControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_0058ae70. Keep the requested anchor separately; the base WinControl position is
     // the rectangle's upper-left corner when bTopLeftAnchor is clear.
-    memcpy(RequestedPosition, NewPosition, sizeof(RequestedPosition));
+    memcpy(&RequestedPosition, NewPosition, sizeof(RequestedPosition));
     bAttached = 1;
     Vector Attach;
     GetAttachPosition(&Attach);
@@ -609,14 +609,14 @@ void NnTextControl::SetPosition(float const* NewPosition)
         Attach.y += Height * 0.5f;
     }
 
-    Vector Placed = {NewPosition[0], NewPosition[1], NewPosition[2]};
+    Vector Placed = {NewPosition->x, NewPosition->y, NewPosition->z};
     if ((PositionFlags & 1) != 0)
     {
         Placed.x += Attach.x;
         Placed.y += Attach.y;
         Placed.z += Attach.z;
     }
-    WinControl::SetPosition(&Placed.x); // a direct base call
+    WinControl::SetPosition(&Placed); // a direct base call
     if (Width > 0.0f)
         FontStringSetScale(FontString, Width, TextDepth(this));
 }
@@ -664,9 +664,9 @@ void NnTextControl::Draw()
                     if (G_TextControlTypingCount <= 0)
                         StopUiSoundSlot(0xb);
                     wchar_t* const Whole = PendingText;
-                    float Sum[3];
-                    Win3DVec3Add(Sum, &Position.x, Offset); // FUN_00423b30
-                    FontStringSetScale(FontString, Width, Sum[2]);
+                    Vector Sum;
+                    Win3DVec3Add(&Sum, &Position, &Offset); // FUN_00423b30
+                    FontStringSetScale(FontString, Width, Sum.z);
                     FontStringSetText(FontString, Whole);
                 }
             }
@@ -674,16 +674,16 @@ void NnTextControl::Draw()
             wchar_t Typed[0x400];
             wcsncpy(Typed, PendingText, static_cast<size_t>(TypedCount));
             Typed[TypedCount] = L'\0';
-            float const TypedDepth = Position.z + Offset[2]; // FUN_00422b80
+            float const TypedDepth = Position.z + Offset.z; // FUN_00422b80
             FontStringSetScale(FontString, Width, TypedDepth);
             FontStringSetText(FontString, Typed);
         }
     }
 
     // Each sum rounded to a float (FUN_00422b80).
-    float const World[3] = {Position.x + Offset[0], Position.y + Offset[1],
-                            Position.z + Offset[2]};
-    FontStringSetScale(FontString, Width, World[2]);
+    Vector const World = {Position.x + Offset.x, Position.y + Offset.y,
+                          Position.z + Offset.z};
+    FontStringSetScale(FontString, Width, World.z);
     // No line: nothing more, and no depth-test call.
     if (FontStringChildCount(FontString) == 0) // FUN_004145a0
         return;
@@ -697,7 +697,7 @@ void NnTextControl::Draw()
     }
     // -z against 0.001 (DAT_005c75f8, a double): below returns without the depth-test call;
     // equal or unordered go on.
-    if (-static_cast<double>(World[2]) < 0.001)
+    if (-static_cast<double>(World.z) < 0.001)
         return;
 
     // The colour (FUN_00417780).
@@ -743,12 +743,12 @@ void NnTextControl::Draw()
             double const Inv = 1.0 / sqrt(static_cast<double>(Dir.x) * Dir.x +
                                           static_cast<double>(Dir.y) * Dir.y +
                                           static_cast<double>(Dir.z) * Dir.z);
-            float Ray[3];
-            Ray[0] = static_cast<float>(Dir.x * Inv);
-            Ray[1] = static_cast<float>(Dir.y * Inv);
-            Ray[2] = static_cast<float>(Dir.z * Inv);
+            Vector Ray;
+            Ray.x = static_cast<float>(Dir.x * Inv);
+            Ray.y = static_cast<float>(Dir.y * Inv);
+            Ray.z = static_cast<float>(Dir.z * Inv);
             // A hit with bHoverPulse set draws in the pulse colour (FUN_00561da0).
-            if (HitTest(Ray) && bHoverPulse != 0)
+            if (HitTest(&Ray) && bHoverPulse != 0)
             {
                 unsigned long Pulse = 0;
                 NnUiPulseBlendArgb(&Pulse);
@@ -766,7 +766,7 @@ void NnTextControl::Draw()
     Origin.VAlign = 0;
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
-    TextWinProjectExtent(Width, Height, World[2], &ScreenWidth, &ScreenHeight);
+    TextWinProjectExtent(Width, Height, World.z, &ScreenWidth, &ScreenHeight);
     Origin.Scale = ScreenWidth;
     Origin.Height = ScreenHeight;
     if (bUseCachedPlacement != 0)
@@ -779,7 +779,7 @@ void NnTextControl::Draw()
             // x moves right by half of (box width - text width); the text width (FUN_00414570)
             // is widened as unsigned.
             bCachedPlacementValid = 1;
-            TextWinProjectPoint(World, &CachedX, &CachedY);
+            TextWinProjectPoint(&World, &CachedX, &CachedY);
             int Extent[2] = {0, 0};
             int const* const TextExtent = FontStringGetExtent(FontString, Extent);
             double const TextWidth =
@@ -798,7 +798,7 @@ void NnTextControl::Draw()
     {
         // Aligned by Justification at FUN_00417730(World).
         Origin.HAlign = static_cast<unsigned>(Justification);
-        TextWinProjectPoint(World, &Origin.X, &Origin.Y);
+        TextWinProjectPoint(&World, &Origin.X, &Origin.Y);
     }
     FontStringDrawChildren(&Origin, FontString,
                            reinterpret_cast<void*>(static_cast<intptr_t>(Field34c)),
@@ -814,9 +814,9 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case kWinPropOffset:
     {
         float const* const NewOffset = reinterpret_cast<float const*>(A);
-        Offset[0] = NewOffset[0];
-        Offset[1] = NewOffset[1];
-        Offset[2] = NewOffset[2];
+        Offset.x = NewOffset[0];
+        Offset.y = NewOffset[1];
+        Offset.z = NewOffset[2];
         if (MeshHolder.EngineInstance == InvalidInstanceIndex)
             return 0;
         Vector Local;
@@ -827,17 +827,17 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Local.y = Height * 0.5f + Local.y;
         }
         // Without +0x2f4 bit 0 retail copies the Offset itself, not Local (as here).
-        float Sum[3];
-        float const* Source = Offset;
+        Vector Sum;
+        Vector const* Source = &Offset;
         if ((PositionFlags & 1) != 0)
         {
-            Sum[0] = Local.x + Offset[0];
-            Sum[1] = Local.y + Offset[1];
-            Sum[2] = Local.z + Offset[2];
-            Source = Sum;
+            Sum.x = Local.x + Offset.x;
+            Sum.y = Local.y + Offset.y;
+            Sum.z = Local.z + Offset.z;
+            Source = &Sum;
         }
-        Vector Copy = {Source[0], Source[1], Source[2]};
-        WinControl::SetPosition(&Copy.x); // FUN_005a0880, a direct call
+        Vector Copy = {Source->x, Source->y, Source->z};
+        WinControl::SetPosition(&Copy); // FUN_005a0880, a direct call
         return 0;
     }
     case 0xc:
@@ -884,7 +884,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 StopUiSoundSlot(0xb);
             // The pending text goes in whole; the depth is the z of FUN_00423b30.
             wchar_t* const Text = PendingText;
-            float const Depth = Position.z + Offset[2];
+            float const Depth = Position.z + Offset.z;
             FontStringSetScale(FontString, Width, Depth);
             FontStringSetText(FontString, Text);
         }

@@ -560,7 +560,7 @@ namespace
         GameLightTick(Self, Dt);
         Transform World;
         EffectGetWorldTransform(Self->Owner, &World);
-        EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.E[0][0], &World.Translation.x);
+        EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.E[0][0], &World.Translation);
     }
 
     FCliLightEquipFx::FCliLightEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)

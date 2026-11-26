@@ -134,7 +134,7 @@ public:
 
     // --- Win3D / WinControl overrides ---
     // slot 5 FUN_0047fbb0
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 9 FUN_0047b3e0
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 FUN_0047b310

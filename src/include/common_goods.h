@@ -292,7 +292,7 @@ struct COMMON_API RoomLightInfo
     // "LtShadowSource"/"LtGlareSource" branch (06274ec9) rotates it by the entity's orientation
     // and normalizes it into RoomData's Shadow/GlareLightDirection; the ctor/clear default is
     // (0, 0, -1.0f).
-    float Direction[3];
+    Vector Direction;
     // +0x3C -- ThornLightProperties+0x28. Retail's named-light branch compares exactly this
     // dword against 3 (06274eb1 `CMP [ESP+0xd4],EBX` with EBX=3, set at 06274dd3) and takes
     // the rotate-the-direction path when it matches, versus copying the entity's own position

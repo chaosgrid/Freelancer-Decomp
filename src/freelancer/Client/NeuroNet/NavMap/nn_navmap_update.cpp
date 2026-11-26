@@ -141,12 +141,12 @@ namespace
     // keeps its position when it shows the same ids; then FUN_004be370.
     void NavMapPlaceHoverAtCursor(FToolTipHoverInfo* Record)
     {
-        float Ray[3];
-        Win3DGetMouseRay(Ray); // FUN_0059da70
-        Record->WorldPos[0] = Ray[0];
-        Record->WorldPos[1] = static_cast<float>(static_cast<double>(Ray[1]) -
+        Vector Ray;
+        Win3DGetMouseRay(&Ray); // FUN_0059da70
+        Record->WorldPos[0] = Ray.x;
+        Record->WorldPos[1] = static_cast<float>(static_cast<double>(Ray.y) -
                                                  static_cast<double>(kNavMapHoverDrop));
-        Record->WorldPos[2] = Ray[2];
+        Record->WorldPos[2] = Ray.z;
         Record->HalfExtents[0] = 0.0f;
         Record->HalfExtents[1] = 0.0f;
         Record->HalfExtents[2] = 0.0f;
@@ -303,16 +303,16 @@ float* NeuroNetNavMap::CachedBasePosition(float* Out, unsigned BaseId,
     return Out;
 }
 
-void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
+void NeuroNetNavMap::PlayerMapPosition(Vector* OutPos, float* OutHeading)
 {
     // FUN_00491be0.
     if (ViewMode == kNavMapViewUniverse)
     {
         // The universe view -- the player's system's map position, not
         // scaled by SystemScale.
-        OutPos[0] = 0.0f;
-        OutPos[1] = 0.0f;
-        OutPos[2] = 0.0f;
+        OutPos->x = 0.0f;
+        OutPos->y = 0.0f;
+        OutPos->z = 0.0f;
         *OutHeading = 0.0f;
         for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
              System = Universe::GetNextSystem())
@@ -320,17 +320,17 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
             if (System->GetId() != GetPlayerStarSystemIdRetail())
                 continue;
             Vector const* const Pos = System->GetPos();
-            OutPos[0] = Pos->x;
-            OutPos[1] = Pos->y;
-            OutPos[2] = Pos->z;
-            OutPos[2] = static_cast<float>(static_cast<double>(OutPos[1]) *
+            OutPos->x = Pos->x;
+            OutPos->y = Pos->y;
+            OutPos->z = Pos->z;
+            OutPos->z = static_cast<float>(static_cast<double>(OutPos->y) *
                                                static_cast<double>(kNavMapUniverseScale) -
                                            static_cast<double>(kNavMapUniverseOffset));
-            OutPos[1] = 0.0f;
-            OutPos[0] = static_cast<float>(static_cast<double>(OutPos[0]) *
+            OutPos->y = 0.0f;
+            OutPos->x = static_cast<float>(static_cast<double>(OutPos->x) *
                                                static_cast<double>(kNavMapUniverseScale) -
                                            static_cast<double>(kNavMapUniverseOffset));
-            OutPos[2] = static_cast<float>(static_cast<double>(OutPos[2]) +
+            OutPos->z = static_cast<float>(static_cast<double>(OutPos->z) +
                                            static_cast<double>(kNavMapUniverseLift));
             return;
         }
@@ -339,9 +339,9 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
 
     // The system view -- the player's last position.
     float const* const LastPos = GetPlayerLastPositionRetail();
-    OutPos[0] = LastPos[0];
-    OutPos[1] = LastPos[1];
-    OutPos[2] = LastPos[2];
+    OutPos->x = LastPos[0];
+    OutPos->y = LastPos[1];
+    OutPos->z = LastPos[2];
     *OutHeading = 0.0f;
 
     if (IsPlayerDockedRetail())
@@ -355,9 +355,9 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
                 Universe::get_system(GetPlayerStarSystemIdRetail());
             float Pos[3];
             float const* const Result = CachedBasePosition(Pos, Base->NicknameId, System);
-            OutPos[0] = Result[0];
-            OutPos[1] = Result[1];
-            OutPos[2] = Result[2];
+            OutPos->x = Result[0];
+            OutPos->y = Result[1];
+            OutPos->z = Result[2];
         }
     }
     else
@@ -397,9 +397,9 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
 
     // Scaled by the system's NavMapScale.
     double const Scale = static_cast<double>(SystemScale);
-    OutPos[0] = static_cast<float>(Scale * static_cast<double>(OutPos[0]));
-    OutPos[1] = static_cast<float>(Scale * static_cast<double>(OutPos[1]));
-    OutPos[2] = static_cast<float>(Scale * static_cast<double>(OutPos[2]));
+    OutPos->x = static_cast<float>(Scale * static_cast<double>(OutPos->x));
+    OutPos->y = static_cast<float>(Scale * static_cast<double>(OutPos->y));
+    OutPos->z = static_cast<float>(Scale * static_cast<double>(OutPos->z));
 }
 
 // ----------------------------------------------------------------------------------------
@@ -593,7 +593,7 @@ void NavMapSetGroupPositions(void const* Data)
     }
 }
 
-int NeuroNetNavMap::GroupMemberAt(float const* MapPos)
+int NeuroNetNavMap::GroupMemberAt(Vector const* MapPos)
 {
     // FUN_004a21f0.
     if (SinglePlayer())
@@ -613,9 +613,9 @@ int NeuroNetNavMap::GroupMemberAt(float const* MapPos)
         FNavMapGroupMember const& Member = G_NavMapGroupPositions[static_cast<size_t>(Index)];
         if (Member.SystemId != CurrentSystem->GetId())
             continue;
-        double const Dx = static_cast<double>(MapPos[0]) - static_cast<double>(Member.Pos[0]);
-        double const Dy = static_cast<double>(MapPos[1]) - static_cast<double>(Member.Pos[1]);
-        double const Dz = static_cast<double>(MapPos[2]) - static_cast<double>(Member.Pos[2]);
+        double const Dx = static_cast<double>(MapPos->x) - static_cast<double>(Member.Pos[0]);
+        double const Dy = static_cast<double>(MapPos->y) - static_cast<double>(Member.Pos[1]);
+        double const Dz = static_cast<double>(MapPos->z) - static_cast<double>(Member.Pos[2]);
         if (Dx * Dx + Dz * Dz + Dy * Dy <= static_cast<double>(Radius2))
             return Member.RepId;
     }
@@ -686,7 +686,7 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
     return Best;
 }
 
-bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
+bool NeuroNetNavMap::MapPointUnderCursor(Vector* OutMapPos)
 {
     // FUN_00492410. The cursor inside ScreenRect (x kept in double, y rounded to float). x87:
     // a negative (or unordered) offset is rejected, as is one at or past the size: the rect is
@@ -708,16 +708,16 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
     {
         // The camera ray to the map plane, then the map-frame fractions to
         // map units.
-        float Ray[3];
-        AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
-        double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
-        double const A = static_cast<double>(Ray[0]) * K;
-        double const B = static_cast<double>(Ray[1]) * K;
+        Vector Ray;
+        AsCamera(&Camera)->Unproject(&Ray, ScreenX, ScreenY);
+        double const K = kNavMapPlaneDepth / static_cast<double>(Ray.z);
+        double const A = static_cast<double>(Ray.x) * K;
+        double const B = static_cast<double>(Ray.y) * K;
         float const V = static_cast<float>(-(B / (static_cast<double>(MapSize[1]) * 0.5)));
-        OutMapPos[0] = static_cast<float>(A / (static_cast<double>(MapSize[0]) * 0.5) *
+        OutMapPos->x = static_cast<float>(A / (static_cast<double>(MapSize[0]) * 0.5) *
                                           static_cast<double>(MapExtentX));
-        OutMapPos[1] = 0.0f;
-        OutMapPos[2] = static_cast<float>(static_cast<double>(V) *
+        OutMapPos->y = 0.0f;
+        OutMapPos->z = static_cast<float>(static_cast<double>(V) *
                                           static_cast<double>(MapExtentZ));
         return true;
     }
@@ -726,11 +726,11 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
 
     // Zoomed in -- the ray's point as fractions of the zoomed frame, less
     // the pan, back to map units.
-    float Ray[3];
-    AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
-    double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
-    double const A = static_cast<double>(Ray[0]) * K;
-    float const B = static_cast<float>(static_cast<double>(Ray[1]) * K);
+    Vector Ray;
+    AsCamera(&Camera)->Unproject(&Ray, ScreenX, ScreenY);
+    double const K = kNavMapPlaneDepth / static_cast<double>(Ray.z);
+    double const A = static_cast<double>(Ray.x) * K;
+    float const B = static_cast<float>(static_cast<double>(Ray.y) * K);
     double const U = A / (static_cast<double>(MapSize[0]) * 0.5) * 0.5 + 0.5;
     double const V = -1.0 / (static_cast<double>(MapSize[1]) * 0.5) * static_cast<double>(B) *
                          0.5 +
@@ -750,15 +750,15 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
     float const SumX = static_cast<float>(static_cast<double>(MapSize[0]) * 0.5 + PannedX);
     double const SumY = static_cast<double>(HalfY) + PannedY;
     double const FracY = SumY / static_cast<double>(MapSize[1]);
-    OutMapPos[0] = static_cast<float>(
+    OutMapPos->x = static_cast<float>(
         ((static_cast<double>(SumX) / static_cast<double>(MapSize[0])) * 2.0 - 1.0) *
         static_cast<double>(MapExtentX));
-    OutMapPos[1] = 0.0f;
-    OutMapPos[2] = static_cast<float>((FracY * 2.0 - 1.0) * static_cast<double>(MapExtentZ));
+    OutMapPos->y = 0.0f;
+    OutMapPos->z = static_cast<float>((FracY * 2.0 - 1.0) * static_cast<double>(MapExtentZ));
     return true;
 }
 
-bool NeuroNetNavMap::CursorRayPoint(float* OutPoint)
+bool NeuroNetNavMap::CursorRayPoint(Vector* OutPoint)
 {
     // FUN_0049e890 -- the same ScreenRect test as FUN_00492410.
     int MouseX = 0;
@@ -795,27 +795,27 @@ bool NeuroNetNavMap::CursorRayPoint(float* OutPoint)
     // Scaled onto this control's depth (Offset z + Position z), moved by
     // (0.0025, -0.001) and made relative to Offset + Position in x / y; z is the scaled ray's
     // own and then 0.
-    double const K = (static_cast<double>(Offset[2]) + static_cast<double>(Position.z)) /
+    double const K = (static_cast<double>(Offset.z) + static_cast<double>(Position.z)) /
                      static_cast<double>(Turned.z);
     float const X = static_cast<float>(static_cast<double>(Turned.x) * K);
     float const Y = static_cast<float>(static_cast<double>(Turned.y) * K);
     double const Z = K * static_cast<double>(Turned.z);
-    double const OriginX = static_cast<double>(Position.x) + static_cast<double>(Offset[0]);
-    float const OriginY = static_cast<float>(static_cast<double>(Offset[1]) +
+    double const OriginX = static_cast<double>(Position.x) + static_cast<double>(Offset.x);
+    float const OriginY = static_cast<float>(static_cast<double>(Offset.y) +
                                              static_cast<double>(Position.y));
-    OutPoint[0] = static_cast<float>(static_cast<double>(X) +
+    OutPoint->x = static_cast<float>(static_cast<double>(X) +
                                      static_cast<double>(kNavMapRayOffsetX));
-    OutPoint[1] = static_cast<float>(static_cast<double>(Y) -
+    OutPoint->y = static_cast<float>(static_cast<double>(Y) -
                                      static_cast<double>(kNavMapRayOffsetY));
-    OutPoint[2] = static_cast<float>(Z);
-    OutPoint[0] = static_cast<float>(static_cast<double>(OutPoint[0]) - OriginX);
-    OutPoint[1] = static_cast<float>(static_cast<double>(OutPoint[1]) -
+    OutPoint->z = static_cast<float>(Z);
+    OutPoint->x = static_cast<float>(static_cast<double>(OutPoint->x) - OriginX);
+    OutPoint->y = static_cast<float>(static_cast<double>(OutPoint->y) -
                                      static_cast<double>(OriginY));
-    OutPoint[2] = 0.0f;
+    OutPoint->z = 0.0f;
     return true;
 }
 
-FNavMapItem* NeuroNetNavMap::ItemAt(float const* MapPos, unsigned char bSkipWaypoints)
+FNavMapItem* NeuroNetNavMap::ItemAt(Vector const* MapPos, unsigned char bSkipWaypoints)
 {
     // FUN_00496d40.
     for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
@@ -827,8 +827,8 @@ FNavMapItem* NeuroNetNavMap::ItemAt(float const* MapPos, unsigned char bSkipWayp
             continue;
 
         // The distance in the XZ plane, squared.
-        double const Dx = static_cast<double>(MapPos[0]) - static_cast<double>(Item->Position[0]);
-        double const Dz = static_cast<double>(MapPos[2]) - static_cast<double>(Item->Position[2]);
+        double const Dx = static_cast<double>(MapPos->x) - static_cast<double>(Item->Position.x);
+        double const Dz = static_cast<double>(MapPos->z) - static_cast<double>(Item->Position.z);
         double const Dist2 = Dz * Dz + Dx * Dx;
 
         // The pick radius -- a universe-view system's is 1.5 x; the markers
@@ -988,16 +988,16 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         Item->bShown = 1;
         Item->Ordinal = Record->AutoId;
         double const Scale = static_cast<double>(SystemScale);
-        float const Pos[3] = {static_cast<float>(Scale * static_cast<double>(Record->Pos.x)),
-                              static_cast<float>(Scale * static_cast<double>(Record->Pos.y)),
-                              static_cast<float>(Scale * static_cast<double>(Record->Pos.z))};
+        Vector const Pos = {static_cast<float>(Scale * static_cast<double>(Record->Pos.x)),
+                            static_cast<float>(Scale * static_cast<double>(Record->Pos.y)),
+                            static_cast<float>(Scale * static_cast<double>(Record->Pos.z))};
         // x87: any component not equal (or unordered) moves the marker.
-        if (!(Item->Position[0] == Pos[0]) || !(Item->Position[1] == Pos[1]) ||
-            !(Item->Position[2] == Pos[2]) || Item->Variant != Number)
+        if (!(Item->Position.x == Pos.x) || !(Item->Position.y == Pos.y) ||
+            !(Item->Position.z == Pos.z) || Item->Variant != Number)
         {
-            Item->Position[0] = Pos[0];
-            Item->Position[1] = Pos[1];
-            Item->Position[2] = Pos[2];
+            Item->Position.x = Pos.x;
+            Item->Position.y = Pos.y;
+            Item->Position.z = Pos.z;
             Item->Variant = Number;
             bMoved = 1;
         }
@@ -1067,12 +1067,12 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         float const Scaled[3] = {static_cast<float>(static_cast<double>(Pos.x) * Scale),
                                  static_cast<float>(static_cast<double>(Pos.y) * Scale),
                                  static_cast<float>(static_cast<double>(Pos.z) * Scale)};
-        if (!(Item->Position[0] == Scaled[0]) || !(Item->Position[1] == Scaled[1]) ||
-            !(Item->Position[2] == Scaled[2]))
+        if (!(Item->Position.x == Scaled[0]) || !(Item->Position.y == Scaled[1]) ||
+            !(Item->Position.z == Scaled[2]))
         {
-            Item->Position[0] = Scaled[0];
-            Item->Position[1] = Scaled[1];
-            Item->Position[2] = Scaled[2];
+            Item->Position.x = Scaled[0];
+            Item->Position.y = Scaled[1];
+            Item->Position.z = Scaled[2];
             bMoved = 1;
             bPathChanged = 1;
         }
@@ -1170,27 +1170,27 @@ void NeuroNetNavMap::PlaceItems()
             // The player marker pinned to the map's edge, pointing out.
             unsigned char const bWasClamped = bItemClamped;
             bItemClamped = 0;
-            if (Item->Position[0] > kNavMapEdge)
+            if (Item->Position.x > kNavMapEdge)
             {
-                Item->Position[0] = kNavMapEdge;
+                Item->Position.x = kNavMapEdge;
                 bItemClamped = 1;
                 Item->Heading = 0.0f;
             }
-            if (Item->Position[0] < -kNavMapEdge)
+            if (Item->Position.x < -kNavMapEdge)
             {
-                Item->Position[0] = -kNavMapEdge;
+                Item->Position.x = -kNavMapEdge;
                 bItemClamped = 1;
                 Item->Heading = 180.0f;
             }
-            if (Item->Position[2] > kNavMapEdge)
+            if (Item->Position.z > kNavMapEdge)
             {
-                Item->Position[2] = kNavMapEdge;
+                Item->Position.z = kNavMapEdge;
                 bItemClamped = 1;
                 Item->Heading = 270.0f;
             }
-            if (Item->Position[2] < -kNavMapEdge)
+            if (Item->Position.z < -kNavMapEdge)
             {
-                Item->Position[2] = -kNavMapEdge;
+                Item->Position.z = -kNavMapEdge;
                 bItemClamped = 1;
                 Item->Heading = 90.0f;
             }
@@ -1207,28 +1207,28 @@ void NeuroNetNavMap::PlaceItems()
         else
         {
             // The rest clamped to the extents.
-            if (Item->Position[0] > MapExtentX)
-                Item->Position[0] = MapExtentX;
-            if (-MapExtentX > Item->Position[0])
-                Item->Position[0] = -MapExtentX;
-            if (Item->Position[2] > MapExtentZ)
-                Item->Position[2] = MapExtentZ;
-            if (-MapExtentZ > Item->Position[2])
-                Item->Position[2] = -MapExtentZ;
+            if (Item->Position.x > MapExtentX)
+                Item->Position.x = MapExtentX;
+            if (-MapExtentX > Item->Position.x)
+                Item->Position.x = -MapExtentX;
+            if (Item->Position.z > MapExtentZ)
+                Item->Position.z = MapExtentZ;
+            if (-MapExtentZ > Item->Position.z)
+                Item->Position.z = -MapExtentZ;
         }
 
         // The item's place in the zoomed frame (z at the map plane).
         float const TwiceExtZ = static_cast<float>(static_cast<double>(MapExtentZ) +
                                                    static_cast<double>(MapExtentZ));
-        double const U = (static_cast<double>(Item->Position[0]) + static_cast<double>(MapExtentX)) /
+        double const U = (static_cast<double>(Item->Position.x) + static_cast<double>(MapExtentX)) /
                          (static_cast<double>(MapExtentX) + static_cast<double>(MapExtentX));
-        double const V = (static_cast<double>(MapExtentZ) + static_cast<double>(Item->Position[2])) /
+        double const V = (static_cast<double>(MapExtentZ) + static_cast<double>(Item->Position.z)) /
                          static_cast<double>(TwiceExtZ);
-        float Place[3];
-        Place[0] = static_cast<float>(static_cast<double>(OriginX) + U * static_cast<double>(FrameX));
-        Place[1] = static_cast<float>(static_cast<double>(OriginY) +
+        Vector Place;
+        Place.x = static_cast<float>(static_cast<double>(OriginX) + U * static_cast<double>(FrameX));
+        Place.y = static_cast<float>(static_cast<double>(OriginY) +
                                       (1.0 - V) * static_cast<double>(FrameY));
-        Place[2] = static_cast<float>(static_cast<double>(OriginZ) + static_cast<double>(FrameZ));
+        Place.z = static_cast<float>(static_cast<double>(OriginZ) + static_cast<double>(FrameZ));
 
         // The size -- the markers (Kind 2 / 3 / 4) shrink with the zoom
         // (during a zoom from the start distance to the end one), the rest follow SystemScale.
@@ -1266,7 +1266,7 @@ void NeuroNetNavMap::PlaceItems()
         if ((Type & 4) != 0)
             Size *= static_cast<double>(kNavMapSystemMeshScale);
         float const MeshScale = static_cast<float>(Size * static_cast<double>(kNavMapMeshScale));
-        Place[2] = kNavMapItemDepth; // overwrites the frame z computed above, as retail does
+        Place.z = kNavMapItemDepth; // overwrites the frame z computed above, as retail does
 
         // The rotation about z by Heading (cos of the unrounded angle, sin
         // of the float one), scaled through I3DMathEngine::Scale, written back; then the
@@ -1292,7 +1292,7 @@ void NeuroNetNavMap::PlaceItems()
             G_NavMapMath = Acquire3DMathEngine(); // FUN_005b73e0
         G_NavMapMath->Scale(Xform.Rotation, Xform.Rotation, MeshScale);
         Engine->SetInstanceMatrix(Item->Mesh.EngineInstance, &Xform);
-        Engine->SetInstancePosition(Item->Mesh.EngineInstance, (const Vector*)Place);
+        Engine->SetInstancePosition(Item->Mesh.EngineInstance, &Place);
         Engine->UpdateInstance(Item->Mesh.EngineInstance, 0, nullptr);
 
         // An object with an id takes the visit map's flags; bit 0 shows it
@@ -1375,15 +1375,15 @@ void NeuroNetNavMap::Update()
     // distance strictly over 0.005; unordered does not close).
     if (bObjectToolsShown != 0)
     {
-        float Ray[3];
-        if (CursorRayPoint(Ray))
+        Vector Ray;
+        if (CursorRayPoint(&Ray))
         {
-            float const Dx = static_cast<float>(static_cast<double>(Ray[0]) -
-                                                static_cast<double>(ClickRayPos[0]));
-            float const Dy = static_cast<float>(static_cast<double>(Ray[1]) -
-                                                static_cast<double>(ClickRayPos[1]));
-            Ray[2] = static_cast<float>(static_cast<double>(Ray[2]) -
-                                        static_cast<double>(ClickRayPos[2]));
+            float const Dx = static_cast<float>(static_cast<double>(Ray.x) -
+                                                static_cast<double>(ClickRayPos.x));
+            float const Dy = static_cast<float>(static_cast<double>(Ray.y) -
+                                                static_cast<double>(ClickRayPos.y));
+            Ray.z = static_cast<float>(static_cast<double>(Ray.z) -
+                                        static_cast<double>(ClickRayPos.z));
             if (static_cast<double>(Dy) * static_cast<double>(Dy) +
                     static_cast<double>(Dx) * static_cast<double>(Dx) >
                 static_cast<double>(kNavMapToolsCloseDist2))
@@ -1503,10 +1503,10 @@ void NeuroNetNavMap::Update()
     if (!NnToolTipWasFedThisFrame() && G_NavMapFilterMode != 4 && G_NavMapFilterMode != 6 &&
         G_NavMapFilterMode != 7)
     {
-        float MapPos[3];
-        if (MapPointUnderCursor(MapPos))
+        Vector MapPos;
+        if (MapPointUnderCursor(&MapPos))
         {
-            FNavMapItem* const Item = ItemAt(MapPos, 0);
+            FNavMapItem* const Item = ItemAt(&MapPos, 0);
             if (Item != nullptr)
             {
                 FToolTipHoverInfo Record;
@@ -1533,7 +1533,7 @@ void NeuroNetNavMap::Update()
             }
             else if (ViewMode != kNavMapViewUniverse)
             {
-                int Rep = GroupMemberAt(MapPos); // FUN_004a21f0
+                int Rep = GroupMemberAt(&MapPos); // FUN_004a21f0
                 if (Rep != -1)
                 {
                     // A group member -- named (Reputation::Vibe::GetName's
@@ -1572,12 +1572,12 @@ void NeuroNetNavMap::Update()
                     float const InvScale =
                         static_cast<float>(1.0 / static_cast<double>(SystemScale));
                     float Pos[3];
-                    Pos[0] = static_cast<float>(static_cast<double>(MapPos[0]) *
+                    Pos[0] = static_cast<float>(static_cast<double>(MapPos.x) *
                                                 static_cast<double>(InvScale));
                     Pos[1] = static_cast<float>(static_cast<double>(InvScale) *
-                                                static_cast<double>(MapPos[1]));
+                                                static_cast<double>(MapPos.y));
                     Pos[2] = static_cast<float>(static_cast<double>(InvScale) *
-                                                static_cast<double>(MapPos[2]));
+                                                static_cast<double>(MapPos.z));
                     Universe::IZone const* const Zone =
                         NavMapZoneAt(CurrentSystem, Pos, 1, 0, bDebugShowAll); // FUN_004a1b50
                     if (Zone != nullptr)
@@ -1655,22 +1655,22 @@ void NeuroNetNavMap::Update()
     // offset, at z -1.25) through the Win3D camera, floored; then this map's own camera takes
     // the Win3D camera's near / far / half fov and ScreenRect as its viewport.
     FSpaceCamera* const SceneCamera = Win3DGetCamera(); // DAT_0067dbf8
-    float Corner[3];
-    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
+    Vector Corner;
+    Corner.x = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
                                    static_cast<double>(MapCorner0[0]));
-    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
+    Corner.y = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
                                    static_cast<double>(MapCorner2[1]));
-    Corner[2] = -1.25f;
+    Corner.z = -1.25f;
     AsCamera(SceneCamera)->Project(&ScreenRectMin[0], &ScreenRectMin[1], &ScreenRectMin[2],
-                                   (const Vector*)Corner);
+                                   &Corner);
     ScreenRectMin[0] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[0])));
     ScreenRectMin[1] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[1])));
-    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
+    Corner.x = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
                                    static_cast<double>(MapCorner2[0]));
-    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
+    Corner.y = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
                                    static_cast<double>(MapCorner0[1]));
     float Far[3];
-    AsCamera(SceneCamera)->Project(&Far[0], &Far[1], &Far[2], (const Vector*)Corner);
+    AsCamera(SceneCamera)->Project(&Far[0], &Far[1], &Far[2], &Corner);
     Far[0] = static_cast<float>(floor(static_cast<double>(Far[0])));
     Far[1] = static_cast<float>(floor(static_cast<double>(Far[1])));
     ScreenRectSize[0] = static_cast<float>(static_cast<double>(Far[0]) -
@@ -1697,16 +1697,16 @@ void NeuroNetNavMap::Update()
     {
         if (PlayerItem != nullptr)
         {
-            float Pos[3];
+            Vector Pos;
             float Heading = 0.0f;
-            PlayerMapPosition(Pos, &Heading); // FUN_00491be0
+            PlayerMapPosition(&Pos, &Heading); // FUN_00491be0
             // x87: any difference (or unordered) moves the marker.
-            if (!(Pos[0] == PlayerItem->Position[0]) || !(Pos[1] == PlayerItem->Position[1]) ||
-                !(Pos[2] == PlayerItem->Position[2]) || !(PlayerItem->Heading == Heading))
+            if (!(Pos.x == PlayerItem->Position.x) || !(Pos.y == PlayerItem->Position.y) ||
+                !(Pos.z == PlayerItem->Position.z) || !(PlayerItem->Heading == Heading))
             {
-                PlayerItem->Position[0] = Pos[0];
-                PlayerItem->Position[1] = Pos[1];
-                PlayerItem->Position[2] = Pos[2];
+                PlayerItem->Position.x = Pos.x;
+                PlayerItem->Position.y = Pos.y;
+                PlayerItem->Position.z = Pos.z;
                 PlayerItem->Heading = Heading;
                 bRebuild = 1;
             }

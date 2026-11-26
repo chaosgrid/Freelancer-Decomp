@@ -223,8 +223,8 @@ struct FRp9TextureBinding
 struct FRp9TransformCache
 {
     void Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE Type);
-    void StoreAffine(const float* Matrix);
-    void LoadAffine(float* Matrix) const;
+    void StoreAffine(const Transform* Xform);
+    void LoadAffine(Transform* Xform) const;
     void StoreTransposed(const float* Matrix);
     void LoadTransposed(float* Matrix) const;
 
@@ -615,7 +615,7 @@ public:
     UINT AdapterModeCount(UINT Adapter);
     HRESULT EnumAdapterMode(UINT Adapter, UINT Index, D3DDISPLAYMODE* Out);
     // FUN_06d0b607 / FUN_06d0bb58: MulTransform(diag(1,1,-1), M12).
-    void MulZFlip12(float* Out12, const float* In12);
+    void MulZFlip12(Transform* Out12, const Transform* In12);
     void ApplyIdentityTransforms();
     void ApplyDeviceViewport();
     void ApplyDefaultRenderStates();

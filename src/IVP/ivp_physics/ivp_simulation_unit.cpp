@@ -586,8 +586,8 @@ void IVP_Simulation_Unit::rebalance_and_clear_topology_flag()
 static uint32_t IVP_Simulation_Unit_Psi_Core_Step(IVP_Core* Core, float TimeBase, float TimeOffset)
 {
     const float Alpha = (float)((((double)(TimeBase)
-        - *reinterpret_cast<const float*>(&Core->TimeOfLastPsi.time_base)) + TimeOffset)
-        - *reinterpret_cast<const float*>(&Core->TimeOfLastPsi.time_offset));
+        - Core->TimeOfLastPsi.time_base) + TimeOffset)
+        - Core->TimeOfLastPsi.time_offset);
 
     Core->QWorldFCoreNext.set_matrix(&Core->MWorldFCore); // FUN_06350bc0 (+0xe4 -> +0xf4)
 

@@ -33,19 +33,19 @@ public:
     CargoBarControl();
 
     // FUN_0055ee80 (RET 0x20) -- the argument list of FUN_005a1080 after the name.
-    void Init(char const* MeshPath, float const* NewOffset, char const* Hardpoint,
-              float const* NewHalfExtents, unsigned char bNewHorizontal, int NewToolTip2Ids,
+    void Init(char const* MeshPath, Vector const* NewOffset, char const* Hardpoint,
+              Vector const* NewHalfExtents, unsigned char bNewHorizontal, int NewToolTip2Ids,
               unsigned NewColor, unsigned NewHighlightColor);
 
     // --- Win3D / WinControl overrides ---
-    bool HitTest(float const* Ray) override;                       // slot 4  LAB_0055fa80
-    void SetPosition(float const* NewPosition) override;           // slot 5  LAB_0055f5a0
+    bool HitTest(Vector const* Ray) override;                       // slot 4  LAB_0055fa80
+    void SetPosition(Vector const* NewPosition) override;           // slot 5  LAB_0055f5a0
     void SetOrientation(Matrix const* NewOrientation) override;     // slot 7  LAB_0055f5f0
     bool Create(Win3D* NewParent, void* Data) override;            // slot 9  LAB_0055eb40
     void Update() override;                                        // slot 11 LAB_0055f660
     void Draw() override;                                          // slot 13 LAB_0055ef60
-    void MouseEnter(float const* Ray) override;                    // slot 15 FUN_0055fa00
-    void MouseLeave(float const* Ray) override;                    // slot 16 FUN_0055fa40
+    void MouseEnter(Vector const* Ray) override;                    // slot 15 FUN_0055fa00
+    void MouseLeave(Vector const* Ray) override;                    // slot 16 FUN_0055fa40
     int GetHitPriority() override;                                 // slot 27 LAB_0055e9e0
     void RefreshAttachment() override;                             // slot 35 FUN_00401e90
     void GetAttachOrientation(Matrix* OutOrientation) override;    // slot 40 LAB_0055ea20

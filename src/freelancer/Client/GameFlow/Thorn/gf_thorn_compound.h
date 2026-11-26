@@ -34,7 +34,7 @@ struct FThornCompound : FThornComponent
     GENRESULT DACOM_API ConnectHardpoints(void* Desc) override;          // 7  FUN_00451e50
     GENRESULT DACOM_API DisconnectHardpoints(void* Desc) override;       // 8  FUN_00451e90
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
-                                          float* OutXform12) override;   // 9  LAB_00451b90
+                                          Transform* OutXform) override; // 9  LAB_00451b90
     GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00451660
     GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00451a00
 

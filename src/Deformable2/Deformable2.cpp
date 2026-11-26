@@ -120,7 +120,7 @@ static unsigned long G_VmeshPaletteSkinning = 1;
 unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)
 {
     FLodHolder* const Holder = Part->Lod;
-    const float* const View = (const float*)Camera->GetViewTransform();
+    const Transform* const View = Camera->GetViewTransform();
     int bHaveView = 1;
     G_Pipeline->GetPipelineState(7, &bHaveView);
     if (VMeshPart == nullptr)
@@ -133,17 +133,16 @@ unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)
             FBoneRuntime* const Bone = &Holder->BoneSlots[WorldIndex - 1];
             if (bHaveView != 0)
             {
-                float Composed[12];
-                AcquireMathEngine()->MulTransform(*(Transform*)Composed,
-                                                  *(const Transform*)View,
-                                                  *(const Transform*)
-                                                      Bone->WorldMatrix); // +0x1C
-                float Copy[12];
-                VmeshCopy12(Copy, Composed);
-                G_Pipeline->SetWorldN(WorldIndex, (const Transform*)Copy);
+                Transform Composed;
+                AcquireMathEngine()->MulTransform(Composed,
+                                                  *View,
+                                                  Bone->WorldMatrix); // +0x1C
+                Transform Copy;
+                VmeshCopy12(&Copy, &Composed);
+                G_Pipeline->SetWorldN(WorldIndex, &Copy);
             }
             else
-                G_Pipeline->SetWorldN(WorldIndex, (const Transform*)Bone->WorldMatrix);
+                G_Pipeline->SetWorldN(WorldIndex, &Bone->WorldMatrix);
             WorldIndex += 1;
         } while (WorldIndex - 1 < Holder->BindCursor);
     }

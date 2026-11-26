@@ -125,7 +125,7 @@ void CSimple::cache_physical_props()
                                      &CachedCenterOfMass);
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
-    Acquire3DMathEngine()->TransformXform(World, *(Transform const*)&Orientation, CachedCenterOfMass);
+    Acquire3DMathEngine()->TransformXform(World, get_transform(), CachedCenterOfMass);
     CachedCenterOfMass = World;
 }
 

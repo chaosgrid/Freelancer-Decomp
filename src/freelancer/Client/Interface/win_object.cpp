@@ -34,13 +34,13 @@ WinObject::~WinObject()
     // script, releases a bound instance); the Win3D dtor runs as the base.
 }
 
-void WinObject::SetPosition(float const* NewPosition)
+void WinObject::SetPosition(Vector const* NewPosition)
 {
     // FUN_004c91a0: tail-jumps into FUN_00420fd0 (SetInstancePosition only, no UpdateInstance).
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
-    ClientMeshHolderSetPosition(&MeshHolder, &NewPosition[0]);
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
+    ClientMeshHolderSetPosition(&MeshHolder, NewPosition);
 }
 
 void WinObject::Destroy()

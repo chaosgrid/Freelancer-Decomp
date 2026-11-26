@@ -178,18 +178,18 @@ UiScroll::~UiScroll()
     // FUN_00595800.
 }
 
-void UiScroll::SetPosition(float const* NewPosition)
+void UiScroll::SetPosition(Vector const* NewPosition)
 {
     // LAB_00595f90 (RET 4): NewPosition + (offset + scroll offset), then the inverse into
     // +0x3dc. x87: the X and Y sums stay double; Z's sum is rounded to float first.
-    double const SumX = static_cast<double>(Offset[0]) + ScrollOffset_[0];
-    double const SumY = static_cast<double>(Offset[1]) + ScrollOffset_[1];
-    float const SumZ = static_cast<float>(static_cast<double>(Offset[2]) + ScrollOffset_[2]);
+    double const SumX = static_cast<double>(Offset.x) + ScrollOffset_[0];
+    double const SumY = static_cast<double>(Offset.y) + ScrollOffset_[1];
+    float const SumZ = static_cast<float>(static_cast<double>(Offset.z) + ScrollOffset_[2]);
     Vector Local;
-    Local.x = static_cast<float>(SumX + NewPosition[0]);
-    Local.y = static_cast<float>(static_cast<double>(NewPosition[1]) + SumY);
-    Local.z = static_cast<float>(static_cast<double>(NewPosition[2]) + SumZ);
-    WinControl::SetPosition(&Local.x);
+    Local.x = static_cast<float>(SumX + NewPosition->x);
+    Local.y = static_cast<float>(static_cast<double>(NewPosition->y) + SumY);
+    Local.z = static_cast<float>(static_cast<double>(NewPosition->z) + SumZ);
+    WinControl::SetPosition(&Local);
 
     Transform Inverse;
     float Scratch = 0.0f;
@@ -433,7 +433,7 @@ void UiScroll::SetBarColors(unsigned long const* Idle, unsigned long const* Hot)
     BarHotColor_ = *Hot;
 }
 
-void UiScroll::SetScrollOffset(float const Offset[3])
+void UiScroll::SetScrollOffset(Vector const* Offset)
 {
     // FUN_005972d0: old position - old offset + new offset, handed to WinControl::SetPosition
     // directly (not through the vftable). x87: Z's difference is rounded to float first; X and
@@ -441,40 +441,40 @@ void UiScroll::SetScrollOffset(float const Offset[3])
     float const OldX = ScrollOffset_[0];
     float const OldY = ScrollOffset_[1];
     float const OldZ = ScrollOffset_[2];
-    ScrollOffset_[0] = Offset[0];
-    ScrollOffset_[1] = Offset[1];
-    ScrollOffset_[2] = Offset[2];
+    ScrollOffset_[0] = Offset->x;
+    ScrollOffset_[1] = Offset->y;
+    ScrollOffset_[2] = Offset->z;
     float const DeltaZ = static_cast<float>(static_cast<double>(Position.z) - OldZ);
     Vector Moved;
     Moved.x = static_cast<float>(static_cast<double>(Position.x) - OldX + ScrollOffset_[0]);
     Moved.y = static_cast<float>(static_cast<double>(Position.y) - OldY + ScrollOffset_[1]);
     Moved.z = static_cast<float>(static_cast<double>(DeltaZ) + ScrollOffset_[2]);
-    WinControl::SetPosition(&Moved.x);
+    WinControl::SetPosition(&Moved);
 }
 
-Vector UiScroll::RayToLocal(float const* Ray) const
+Vector UiScroll::RayToLocal(Vector const* Ray) const
 {
     // The ray scaled onto the z = Position.z plane (the quotient stays double), then through the
     // +0x3dc inverse.
-    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    double const Scale = static_cast<double>(Position.z) / Ray->z;
     Vector Scaled;
-    Scaled.x = static_cast<float>(Ray[0] * Scale);
-    Scaled.y = static_cast<float>(Ray[1] * Scale);
-    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Scaled.x = static_cast<float>(Ray->x * Scale);
+    Scaled.y = static_cast<float>(Ray->y * Scale);
+    Scaled.z = static_cast<float>(Ray->z * Scale);
     Vector Local;
     UiScrollMath()->TransformXform(Local, InverseLayout_, Scaled);
     return Local;
 }
 
-Vector UiScroll::RayToLocalViaHud(float const* Ray) const
+Vector UiScroll::RayToLocalViaHud(Vector const* Ray) const
 {
     // As RayToLocal, but the transform goes through HUD_Target_Base's math engine
     // (DAT_00674b1c), not DAT_0067d9fc.
-    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    double const Scale = static_cast<double>(Position.z) / Ray->z;
     Vector Scaled;
-    Scaled.x = static_cast<float>(Ray[0] * Scale);
-    Scaled.y = static_cast<float>(Ray[1] * Scale);
-    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Scaled.x = static_cast<float>(Ray->x * Scale);
+    Scaled.y = static_cast<float>(Ray->y * Scale);
+    Scaled.z = static_cast<float>(Ray->z * Scale);
     Vector Local;
     HudTransformPoint(&InverseLayout_, &Local, &Scaled);
     return Local;
@@ -493,7 +493,7 @@ void UiScroll::NotifyParent()
                        static_cast<uintptr_t>(static_cast<int>(Value_)));
 }
 
-bool UiScroll::HitTest(float const* Ray)
+bool UiScroll::HitTest(Vector const* Ray)
 {
     // LAB_005971e0 (RET 4).
     Vector const Local = RayToLocal(Ray);
@@ -512,9 +512,9 @@ void UiScroll::Update()
 {
     // LAB_00596050. A dragged thumb stays hot.
     Win3D::Update();
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    Vector const Local = RayToLocal(Ray);
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector const Local = RayToLocal(&Ray);
     for (size_t Index = 0; Index < HitRects_.size(); ++Index)
     {
         FScrollHitRect* const Rect = HitRects_[Index];
@@ -797,7 +797,7 @@ void UiScroll::Draw()
                                       GetClientFrameTimeCapped());
 }
 
-void UiScroll::MouseOver(float const* Ray)
+void UiScroll::MouseOver(Vector const* Ray)
 {
     // LAB_00596b90 (RET 4): while the thumb is dragged, map the mouse along the track to a
     // value (step mode: no grab offset and a truncated value), and on a change apply and notify.
@@ -832,7 +832,7 @@ void UiScroll::MouseOver(float const* Ray)
     NotifyParent();
 }
 
-void UiScroll::MouseLeave(float const* Ray)
+void UiScroll::MouseLeave(Vector const* Ray)
 {
     // LAB_00596d20 (RET 4).
     (void)Ray;
@@ -848,9 +848,9 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
 
     bool bHandled = false;
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    Vector const Local = RayToLocalViaHud(Ray);
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector const Local = RayToLocalViaHud(&Ray);
     DragPart_ = -1;
     int const Kind = Event->Action;
     bool const bPress = Kind == kWin3DMousePress || Kind == kWin3DMouseDoubleClick;
@@ -978,7 +978,7 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Moved.x = static_cast<float>(static_cast<double>(Base[0]) + ScrollOffset_[0]);
         Moved.y = static_cast<float>(static_cast<double>(Base[1]) + ScrollOffset_[1]);
         Moved.z = static_cast<float>(static_cast<double>(Base[2]) + ScrollOffset_[2]);
-        WinControl::SetPosition(&Moved.x);
+        WinControl::SetPosition(&Moved);
         Transform Inverse;
         float Scratch = 0.0f;
         UiScrollMath()->GeneralInverse(Inverse, Scratch,
@@ -1074,9 +1074,9 @@ bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
     if (Event->Button != kWin3DMouseLeft)
         return false;
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    Vector const Local = RayToLocal(Ray);
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector const Local = RayToLocal(&Ray);
     DragPart_ = -1;
     if (!ScrollInsideBox(Local.x, Local.y, Width_, Height_))
         return WinControl::MouseEvent(Event);

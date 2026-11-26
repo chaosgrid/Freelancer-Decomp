@@ -74,8 +74,8 @@ namespace
             Position.x = static_cast<float>(SlideX);
             StaticOffset.x = static_cast<float>(Offset + Self->AnimTime);
         }
-        Self->Buttons[Index].SetPosition(&Position.x);
-        Self->Statics[Index]->SetPosition(&StaticOffset.x);
+        Self->Buttons[Index].SetPosition(&Position);
+        Self->Statics[Index]->SetPosition(&StaticOffset);
     }
 
     TypeSelect G_TypeSelect; // DAT_0067b780
@@ -96,7 +96,7 @@ TextMsgButton::~TextMsgButton()
 {
 }
 
-void TextMsgButton::MouseEnter(float const* /*Ray*/)
+void TextMsgButton::MouseEnter(Vector const* /*Ray*/)
 {
     // FUN_005664e0.
     if (bEnabled != 0)

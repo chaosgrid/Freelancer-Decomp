@@ -198,49 +198,49 @@ bool HUD_Core::Create(Win3D* NewParent, void* Data)
     // FUN_004d4fa0 (this = the WinControl face).
     SetMesh("Interface\\hud\\HUD_guagewindow.cmp", 0);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float const BackgroundPos[3] = {0.005f, -0.365f, -1.0f};
+    Vector const BackgroundPos = {0.005f, -0.365f, -1.0f};
     Background2 = CreateStaticControl("Background2", "Interface\\hud\\HUD_numberboxes.cmp",
-                                      BackgroundPos, nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                      Zero);
+                                      &BackgroundPos, nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                      &Zero);
 
-    float const BarHalf[3] = {0.085f, 0.0055f, 0.0f};
+    Vector const BarHalf = {0.085f, 0.0055f, 0.0f};
 
-    float const HealthPos[3] = {0.005f, -0.376f, -1.0f};
-    HealthBar = CreateStaticControl("HealthBar", "Interface\\hud\\HUD_hullgauge.3db", HealthPos,
-                                    nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    Vector const HealthPos = {0.005f, -0.376f, -1.0f};
+    HealthBar = CreateStaticControl("HealthBar", "Interface\\hud\\HUD_hullgauge.3db", &HealthPos,
+                                    nullptr, &BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     HealthBar->SetProperty(kWinPropToolTip, 0x470, 0);
 
-    float const ShieldPos[3] = {0.005f, -0.366f, -1.0f};
-    ShieldBar = CreateStaticControl("ShieldBar", "Interface\\hud\\HUD_shieldgauge.3db", ShieldPos,
-                                    nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    Vector const ShieldPos = {0.005f, -0.366f, -1.0f};
+    ShieldBar = CreateStaticControl("ShieldBar", "Interface\\hud\\HUD_shieldgauge.3db", &ShieldPos,
+                                    nullptr, &BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     ShieldBar->SetProperty(kWinPropToolTip, 0x471, 0);
 
-    float const PowerPos[3] = {0.005f, -0.355f, -1.0f};
-    PowerBar = CreateStaticControl("PowerBar", "Interface\\hud\\HUD_energygauge.3db", PowerPos,
-                                   nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    Vector const PowerPos = {0.005f, -0.355f, -1.0f};
+    PowerBar = CreateStaticControl("PowerBar", "Interface\\hud\\HUD_energygauge.3db", &PowerPos,
+                                   nullptr, &BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     PowerBar->SetProperty(kWinPropToolTip, 0x3f2, 0);
 
-    float const VelocityPos[3] = {0.108f, 0.008f, 0.0f};
-    VelocityText = CreateTextControl("VelocityText", "Normal", VelocityPos, nullptr, 0.056f, 0.03f,
+    Vector const VelocityPos = {0.108f, 0.008f, 0.0f};
+    VelocityText = CreateTextControl("VelocityText", "Normal", &VelocityPos, nullptr, 0.056f, 0.03f,
                                      1.0f, 0, 1, 0, 1);
 
-    float const ThrustPos[3] = {-0.16f, 0.008f, 0.0f};
-    ThrustText = CreateTextControl("ThrustText", "Normal", ThrustPos, nullptr, 0.056f, 0.03f, 1.0f,
+    Vector const ThrustPos = {-0.16f, 0.008f, 0.0f};
+    ThrustText = CreateTextControl("ThrustText", "Normal", &ThrustPos, nullptr, 0.056f, 0.03f, 1.0f,
                                    0, 1, 0, 1);
 
-    HalfExtents[0] = 0.1f;
-    HalfExtents[1] = 0.02f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.005f;
-    HitOffset[1] = 0.0f;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.1f;
+    HalfExtents.y = 0.02f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.005f;
+    HitOffset.y = 0.0f;
+    HitOffset.z = 0.0f;
 
     RegisterEvent(USER_MINIMIZE_HUD);
 
     SetOffset(0.005f, -0.365f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -655,30 +655,30 @@ void HUD_Status::HideExpandedControls(bool bHide)
 bool HUD_Status::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004da930 (this = the WinControl face). No result is tested for null.
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float const BackgroundPos[3] = {0.3387f, -0.243f, -0.91f};
+    Vector const BackgroundPos = {0.3387f, -0.243f, -0.91f};
     ViewPanel = CreateStaticControl("StatusBackground", "Interface\\hud\\HUD_shipinfo.cmp",
-                                    BackgroundPos, nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                    Zero);
+                                    &BackgroundPos, nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                    &Zero);
 
-    float const MinimizedPos[3] = {0.4101f, -0.37f, -1.0f};
+    Vector const MinimizedPos = {0.4101f, -0.37f, -1.0f};
     MinimizedFrame = CreateStaticControl("StatusMinimizedFrame",
-                                         "Interface\\hud\\HUD_shipinfo_min.cmp", MinimizedPos,
-                                         nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+                                         "Interface\\hud\\HUD_shipinfo_min.cmp", &MinimizedPos,
+                                         nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
 
-    HalfExtents[0] = 0.105f;
-    HalfExtents[1] = 0.02f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.4f;
-    HitOffset[1] = -0.371f;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.105f;
+    HalfExtents.y = 0.02f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.4f;
+    HitOffset.y = -0.371f;
+    HitOffset.z = 0.0f;
 
     // The open button sits at HomePosition.
-    float const OpenHalf[3] = {0.02f, 0.02f, 0.0f};
+    Vector const OpenHalf = {0.02f, 0.02f, 0.0f};
     ToggleButton = CreateButtonControl("HudStatusOpen", "interface\\hud\\hud_ShipInfo_button.3db",
-                                       nullptr, "ui_window_open", nullptr, &HomePosition.x,
-                                       nullptr, OpenHalf, 0, 1, 0, 0, 0x3ff, 0, 0);
+                                       nullptr, "ui_window_open", nullptr, &HomePosition,
+                                       nullptr, &OpenHalf, 0, 1, 0, 0, 0x3ff, 0, 0);
     ToggleButton->SetProperty(0x36, 1, 0);
 
     // Ten rows. Step = float(Index * 0.018f) (DAT_005d3ee8). The number column is -0.199f
@@ -691,22 +691,22 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     {
         sprintf(ControlName, "WeaponNumberText%d", Index);
         float const Step = static_cast<float>(Index) * 0.018f;
-        float const NumberPos[3] = {0.27f, -0.199f - Step, 0.0f};
-        WeaponNumberText[Index] = CreateTextControl(ControlName, "HudSmall", NumberPos, nullptr,
+        Vector const NumberPos = {0.27f, -0.199f - Step, 0.0f};
+        WeaponNumberText[Index] = CreateTextControl(ControlName, "HudSmall", &NumberPos, nullptr,
                                                     0.02f, 0.016999999f, 1.0f,
                                                     static_cast<unsigned>(0x515 + Index), 1, 0, 1);
         WeaponNumberText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(ControlName, "WeaponText%d", Index);
         float const RowY = static_cast<float>(-0.199 - static_cast<double>(Step));
-        float const TextPos[3] = {0.288f, RowY, 0.0f};
-        WeaponText[Index] = CreateTextControl(ControlName, "HudSmall", TextPos, nullptr, 0.165f,
+        Vector const TextPos = {0.288f, RowY, 0.0f};
+        WeaponText[Index] = CreateTextControl(ControlName, "HudSmall", &TextPos, nullptr, 0.165f,
                                               0.016999999f, 1.0f, 0, 0, 0, 1);
         WeaponText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(ControlName, "AmmoText%d", Index);
-        float const AmmoPos[3] = {0.458f, RowY, 0.0f};
-        AmmoText[Index] = CreateTextControl(ControlName, "HudSmall", AmmoPos, nullptr, 0.04f, 0.017f,
+        Vector const AmmoPos = {0.458f, RowY, 0.0f};
+        AmmoText[Index] = CreateTextControl(ControlName, "HudSmall", &AmmoPos, nullptr, 0.04f, 0.017f,
                                             1.0f, 0x514, 0, 0, 1);
         AmmoText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
@@ -715,59 +715,59 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
         AmmoText[Index]->SetProperty(kWinPropHide, 1, 0);
     }
 
-    float const SmallHalf[3] = {0.014f, 0.014f, 0.0f};
+    Vector const SmallHalf = {0.014f, 0.014f, 0.0f};
 
-    float const ClosePos[3] = {0.383f, -0.307f, -0.5f};
+    Vector const ClosePos = {0.383f, -0.307f, -0.5f};
     CloseButton = CreateButtonControl("StatusCloseButton", "interface\\NeuroNet\\Inventory\\x.3db",
-                                      nullptr, "ui_select_item", nullptr, ClosePos, nullptr,
-                                      SmallHalf, 0, 1, 0, 0, 0x409, 0, 0);
+                                      nullptr, "ui_select_item", nullptr, &ClosePos, nullptr,
+                                      &SmallHalf, 0, 1, 0, 0, 0x409, 0, 0);
 
-    float const RepairPos[3] = {0.341f, -0.371f, 0.0f};
+    Vector const RepairPos = {0.341f, -0.371f, 0.0f};
     RepairButton = CreateButtonControl("HudRepairButton", "interface\\hud\\HUD_repairactivate.3db",
-                                       nullptr, "ui_item_select", nullptr, RepairPos, nullptr,
-                                       SmallHalf, 0, 1, 0, 0, 0x43e, 0, 0x8f);
-    float const RepairCountPos[3] = {0.347f, -0.359f, 0.0f};
-    RepairCountText = CreateTextControl("RepairCountText", "HudSmall", RepairCountPos, nullptr,
+                                       nullptr, "ui_item_select", nullptr, &RepairPos, nullptr,
+                                       &SmallHalf, 0, 1, 0, 0, 0x43e, 0, 0x8f);
+    Vector const RepairCountPos = {0.347f, -0.359f, 0.0f};
+    RepairCountText = CreateTextControl("RepairCountText", "HudSmall", &RepairCountPos, nullptr,
                                         0.034f, 0.03f, 0.8f, 0, 1, 0x4b2, 1);
     RepairCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
                                  0x10);
 
-    float const BatteryPos[3] = {0.397f, -0.371f, 0.0f};
+    Vector const BatteryPos = {0.397f, -0.371f, 0.0f};
     UseBatteryButton = CreateButtonControl("UseBatteryButton",
                                            "interface\\hud\\HUD_shieldgaugeicon.3db", nullptr,
-                                           "ui_item_select", nullptr, BatteryPos, nullptr,
-                                           SmallHalf, 0, 1, 0, 0, 0x4b5, 0, 0x90);
-    float const BatteryCountPos[3] = {0.404f, -0.359f, 0.0f};
-    BatteryCountText = CreateTextControl("BatteryCountText", "HudSmall", BatteryCountPos, nullptr,
+                                           "ui_item_select", nullptr, &BatteryPos, nullptr,
+                                           &SmallHalf, 0, 1, 0, 0, 0x4b5, 0, 0x90);
+    Vector const BatteryCountPos = {0.404f, -0.359f, 0.0f};
+    BatteryCountText = CreateTextControl("BatteryCountText", "HudSmall", &BatteryCountPos, nullptr,
                                          0.034f, 0.03f, 0.8f, 0, 1, 0x4b3, 1);
     BatteryCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
                                   0x10);
 
     // The scroll bar, then HUDItem slot 13 (virtual) with 1.
-    float const ScrollPos[3] = {0.49f, -0.234f, -1.0f};
-    WeaponListScroll = CreateUIScroll("WeaponListScroll", ScrollPos, 0.016f, 0.118f, 0, 5, 10, 0);
+    Vector const ScrollPos = {0.49f, -0.234f, -1.0f};
+    WeaponListScroll = CreateUIScroll("WeaponListScroll", &ScrollPos, 0.016f, 0.118f, 0, 5, 10, 0);
     HideExpandedControls(true);
 
     // The special-mode captions, both hidden.
-    float const SpecialPos[3] = {-0.513f, -0.29f, 0.0f};
-    SpecialModeText = CreateTextControl("SpecialModeText", "PageHeader", SpecialPos, nullptr,
+    Vector const SpecialPos = {-0.513f, -0.29f, 0.0f};
+    SpecialModeText = CreateTextControl("SpecialModeText", "PageHeader", &SpecialPos, nullptr,
                                         1.022f, 0.03f, 1.5f, 0, 1, 0, 1);
-    float const CancelPos[3] = {-0.513f, -0.321f, 0.0f};
-    SpecialModeTextCancel = CreateTextControl("SpecialModeTextCancel", "Normal", CancelPos,
+    Vector const CancelPos = {-0.513f, -0.321f, 0.0f};
+    SpecialModeTextCancel = CreateTextControl("SpecialModeTextCancel", "Normal", &CancelPos,
                                               nullptr, 1.028f, 0.03f, 1.3f, 0, 1, 0, 1);
     SpecialModeText->Flags &= 0xfc;
     SpecialModeTextCancel->Flags &= 0xfc;
 
     RebuildWeaponList();
 
-    float const LootPos[3] = {0.21f, -0.37f, 0.0f};
+    Vector const LootPos = {0.21f, -0.37f, 0.0f};
     LootButton = CreateButtonControl("LootButton", "interface\\HUD\\HUD_loot_bw.3db", nullptr,
-                                     "ui_select_item", nullptr, LootPos, nullptr, SmallHalf, 0, 1,
+                                     "ui_select_item", nullptr, &LootPos, nullptr, &SmallHalf, 0, 1,
                                      0, 0, 0x3a2, 0, 0x6f);
     LootButton->Flags &= 0xfc;
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -990,10 +990,10 @@ void HUD_Status::RefreshWeaponRows()
     double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
                                   static_cast<double>(World.y) * World.y +
                                   static_cast<double>(World.z) * World.z);
-    float Ray[3];
-    Ray[0] = static_cast<float>(World.x * Inv);
-    Ray[1] = static_cast<float>(World.y * Inv);
-    Ray[2] = static_cast<float>(World.z * Inv);
+    Vector Ray;
+    Ray.x = static_cast<float>(World.x * Inv);
+    Ray.y = static_cast<float>(World.y * Inv);
+    Ray.z = static_cast<float>(World.z * Inv);
 
     // Up to ten rows from WeaponTopRow (signed compares against Count). The active launcher's
     // row is DAT_00679bac, the rest DAT_00679bb0; a hovered row is pulsed unless the mouse pick
@@ -1010,8 +1010,8 @@ void HUD_Status::RefreshWeaponRows()
         {
             Color = G_NnPaletteGreen;
         }
-        if (WeaponNumberText[Slot]->HitTest(Ray) || WeaponText[Slot]->HitTest(Ray) ||
-            AmmoText[Slot]->HitTest(Ray))
+        if (WeaponNumberText[Slot]->HitTest(&Ray) || WeaponText[Slot]->HitTest(&Ray) ||
+            AmmoText[Slot]->HitTest(&Ray))
         {
             if (!HudIsMousePickBlocked())
             {
@@ -1095,23 +1095,23 @@ void HUD_Status::ToggleExpanded()
         // Opening, stage 1 -- the minimized controls slide down to -0.4 over 0.3 s
         // (DAT_005d8488); OnMoveFinished continues.
         ButtonMover::Start(0.3f);
-        float const ToggleEnd[3] = {0.371f, -0.27f, 0.0f};
-        ButtonMover::AddButton(ToggleButton, &HomePosition.x, ToggleEnd);
-        float const FrameStart[3] = {0.4101f, -0.37f, -1.0f};
-        float const FrameEnd[3] = {0.4101f, -0.4f, -1.0f};
-        ButtonMover::AddButton(MinimizedFrame, FrameStart, FrameEnd);
-        float const RepairStart[3] = {0.341f, -0.371f, 0.0f};
-        float const RepairEnd[3] = {0.341f, -0.4f, 0.0f};
-        ButtonMover::AddButton(RepairButton, RepairStart, RepairEnd);
-        float const RepairCountStart[3] = {0.347f, -0.359f, 0.0f};
-        float const RepairCountEnd[3] = {0.347f, -0.4f, 0.0f};
-        ButtonMover::AddButton(RepairCountText, RepairCountStart, RepairCountEnd);
-        float const BatteryStart[3] = {0.397f, -0.371f, 0.0f};
-        float const BatteryEnd[3] = {0.397f, -0.4f, 0.0f};
-        ButtonMover::AddButton(UseBatteryButton, BatteryStart, BatteryEnd);
-        float const BatteryCountStart[3] = {0.404f, -0.359f, 0.0f};
-        float const BatteryCountEnd[3] = {0.404f, -0.4f, 0.0f};
-        ButtonMover::AddButton(BatteryCountText, BatteryCountStart, BatteryCountEnd);
+        Vector const ToggleEnd = {0.371f, -0.27f, 0.0f};
+        ButtonMover::AddButton(ToggleButton, &HomePosition, &ToggleEnd);
+        Vector const FrameStart = {0.4101f, -0.37f, -1.0f};
+        Vector const FrameEnd = {0.4101f, -0.4f, -1.0f};
+        ButtonMover::AddButton(MinimizedFrame, &FrameStart, &FrameEnd);
+        Vector const RepairStart = {0.341f, -0.371f, 0.0f};
+        Vector const RepairEnd = {0.341f, -0.4f, 0.0f};
+        ButtonMover::AddButton(RepairButton, &RepairStart, &RepairEnd);
+        Vector const RepairCountStart = {0.347f, -0.359f, 0.0f};
+        Vector const RepairCountEnd = {0.347f, -0.4f, 0.0f};
+        ButtonMover::AddButton(RepairCountText, &RepairCountStart, &RepairCountEnd);
+        Vector const BatteryStart = {0.397f, -0.371f, 0.0f};
+        Vector const BatteryEnd = {0.397f, -0.4f, 0.0f};
+        ButtonMover::AddButton(UseBatteryButton, &BatteryStart, &BatteryEnd);
+        Vector const BatteryCountStart = {0.404f, -0.359f, 0.0f};
+        Vector const BatteryCountEnd = {0.404f, -0.4f, 0.0f};
+        ButtonMover::AddButton(BatteryCountText, &BatteryCountStart, &BatteryCountEnd);
         RefreshTimer = 1.0f; // DAT_005d8484
         return;
     }
@@ -1151,12 +1151,12 @@ void HUD_Status::OnMoveFinished()
     // Closing, done -- collapsed, session flag 2 cleared, and the minimized hit box back.
     bExpanded = 0;
     SetGameSessionFlags(2, false);
-    HalfExtents[0] = 0.105f;
-    HalfExtents[1] = 0.02f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.4f;
-    HitOffset[1] = -0.371f;
-    HitOffset[2] = 0.0f;
+    HalfExtents.x = 0.105f;
+    HalfExtents.y = 0.02f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.4f;
+    HitOffset.y = -0.371f;
+    HitOffset.z = 0.0f;
 }
 
 void HUD_Status::OnScaleFinished()
@@ -1170,14 +1170,14 @@ void HUD_Status::OnScaleFinished()
         bExpanded = 1;
         SetGameSessionFlags(2, true);
         HideExpandedControls(false);
-        float const RepairPos[3] = {0.3f, -0.171f, 0.0f};
-        RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairPos), 0);
-        float const RepairCountPos[3] = {0.306f, -0.16f, 0.0f};
-        RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairCountPos), 0);
-        float const BatteryPos[3] = {0.357f, -0.171f, 0.0f};
-        UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryPos), 0);
-        float const BatteryCountPos[3] = {0.365f, -0.16f, 0.0f};
-        BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryCountPos), 0);
+        Vector const RepairPos = {0.3f, -0.171f, 0.0f};
+        RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RepairPos), 0);
+        Vector const RepairCountPos = {0.306f, -0.16f, 0.0f};
+        RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RepairCountPos), 0);
+        Vector const BatteryPos = {0.357f, -0.171f, 0.0f};
+        UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BatteryPos), 0);
+        Vector const BatteryCountPos = {0.365f, -0.16f, 0.0f};
+        BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BatteryCountPos), 0);
         if (bShowWeaponList != 0)
         {
             for (int Index = 0; Index < 10; ++Index)
@@ -1189,12 +1189,12 @@ void HUD_Status::OnScaleFinished()
             WeaponListScroll->SetProperty(kWinPropHide, 0, 0);
         }
         MinimizedFrame->SetProperty(kWinPropHide, 1, 0);
-        HalfExtents[0] = 0.131f;
-        HalfExtents[1] = 0.117f;
-        HalfExtents[2] = 0.0f;
-        HitOffset[0] = 0.376f;
-        HitOffset[1] = -0.267f;
-        HitOffset[2] = 0.0f;
+        HalfExtents.x = 0.131f;
+        HalfExtents.y = 0.117f;
+        HalfExtents.z = 0.0f;
+        HitOffset.x = 0.376f;
+        HitOffset.y = -0.267f;
+        HitOffset.z = 0.0f;
         return;
     }
 
@@ -1203,27 +1203,27 @@ void HUD_Status::OnScaleFinished()
     // finishes.
     MinimizedFrame->SetProperty(kWinPropHide, 0, 0);
     ButtonMover::Start(0.3f);
-    float const ToggleStart[3] = {0.371f, -0.27f, 0.0f};
-    ButtonMover::AddButton(ToggleButton, ToggleStart, &HomePosition.x);
-    float const RepairLow[3] = {0.341f, -0.4f, 0.0f};
-    RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairLow), 0);
-    float const RepairCountLow[3] = {0.347f, -0.4f, 0.0f};
-    RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairCountLow), 0);
-    float const BatteryLow[3] = {0.397f, -0.4f, 0.0f};
-    UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryLow), 0);
-    float const BatteryCountLow[3] = {0.404f, -0.4f, 0.0f};
-    BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryCountLow), 0);
-    float const RepairHome[3] = {0.341f, -0.371f, 0.0f};
-    ButtonMover::AddButton(RepairButton, RepairLow, RepairHome);
-    float const RepairCountHome[3] = {0.347f, -0.359f, 0.0f};
-    ButtonMover::AddButton(RepairCountText, RepairCountLow, RepairCountHome);
-    float const BatteryHome[3] = {0.397f, -0.371f, 0.0f};
-    ButtonMover::AddButton(UseBatteryButton, BatteryLow, BatteryHome);
-    float const BatteryCountHome[3] = {0.404f, -0.359f, 0.0f};
-    ButtonMover::AddButton(BatteryCountText, BatteryCountLow, BatteryCountHome);
-    float const FrameLow[3] = {0.4101f, -0.4f, -1.0f};
-    float const FrameHome[3] = {0.4101f, -0.37f, -1.0f};
-    ButtonMover::AddButton(MinimizedFrame, FrameLow, FrameHome);
+    Vector const ToggleStart = {0.371f, -0.27f, 0.0f};
+    ButtonMover::AddButton(ToggleButton, &ToggleStart, &HomePosition);
+    Vector const RepairLow = {0.341f, -0.4f, 0.0f};
+    RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RepairLow), 0);
+    Vector const RepairCountLow = {0.347f, -0.4f, 0.0f};
+    RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&RepairCountLow), 0);
+    Vector const BatteryLow = {0.397f, -0.4f, 0.0f};
+    UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BatteryLow), 0);
+    Vector const BatteryCountLow = {0.404f, -0.4f, 0.0f};
+    BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BatteryCountLow), 0);
+    Vector const RepairHome = {0.341f, -0.371f, 0.0f};
+    ButtonMover::AddButton(RepairButton, &RepairLow, &RepairHome);
+    Vector const RepairCountHome = {0.347f, -0.359f, 0.0f};
+    ButtonMover::AddButton(RepairCountText, &RepairCountLow, &RepairCountHome);
+    Vector const BatteryHome = {0.397f, -0.371f, 0.0f};
+    ButtonMover::AddButton(UseBatteryButton, &BatteryLow, &BatteryHome);
+    Vector const BatteryCountHome = {0.404f, -0.359f, 0.0f};
+    ButtonMover::AddButton(BatteryCountText, &BatteryCountLow, &BatteryCountHome);
+    Vector const FrameLow = {0.4101f, -0.4f, -1.0f};
+    Vector const FrameHome = {0.4101f, -0.37f, -1.0f};
+    ButtonMover::AddButton(MinimizedFrame, &FrameLow, &FrameHome);
     RefreshTimer = 1.0f;
 }
 

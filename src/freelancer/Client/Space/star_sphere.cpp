@@ -372,18 +372,18 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         return 0.0f;
     }
 
-    void AddVec3Local(float* Out, float const* A, float const* B)
+    void AddVec3Local(Vector* Out, Vector const* A, Vector const* B)
     {
-        Out[0] = A[0] + B[0];
-        Out[1] = A[1] + B[1];
-        Out[2] = A[2] + B[2];
+        Out->x = A->x + B->x;
+        Out->y = A->y + B->y;
+        Out->z = A->z + B->z;
     }
 
-    void SubVec3Local(float* Out, float const* A, float const* B)
+    void SubVec3Local(Vector* Out, Vector const* A, Vector const* B)
     {
-        Out[0] = A[0] - B[0];
-        Out[1] = A[1] - B[1];
-        Out[2] = A[2] - B[2];
+        Out->x = A->x - B->x;
+        Out->y = A->y - B->y;
+        Out->z = A->z - B->z;
     }
 
     float const* OwnerGetWorldPos(IObjInspect* Owner)
@@ -504,19 +504,19 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     unsigned char SunSampleRayBlocked(FStarSphere* Sphere, ICamera* Camera, Vector const& CamPos,
                                       float Dist, float Sx, float Sy)
     {
-        float Dir[3];
-        Camera->Unproject((Vector*)Dir, Sx, Sy);
+        Vector Dir;
+        Camera->Unproject(&Dir, Sx, Sy);
         double const Inv =
-            1.0 / std::sqrt(static_cast<double>(Dir[0]) * Dir[0] +
-                            static_cast<double>(Dir[1]) * Dir[1] +
-                            static_cast<double>(Dir[2]) * Dir[2]);
-        Dir[0] = static_cast<float>(Dir[0] * Inv);
-        Dir[1] = static_cast<float>(Dir[1] * Inv);
-        Dir[2] = static_cast<float>(Dir[2] * Inv);
-        float const ZReach = static_cast<float>(static_cast<double>(Dir[2]) * Dist);
+            1.0 / std::sqrt(static_cast<double>(Dir.x) * Dir.x +
+                            static_cast<double>(Dir.y) * Dir.y +
+                            static_cast<double>(Dir.z) * Dir.z);
+        Dir.x = static_cast<float>(Dir.x * Inv);
+        Dir.y = static_cast<float>(Dir.y * Inv);
+        Dir.z = static_cast<float>(Dir.z * Inv);
+        float const ZReach = static_cast<float>(static_cast<double>(Dir.z) * Dist);
         Vector To{};
-        To.x = static_cast<float>(static_cast<double>(Dir[0]) * Dist + CamPos.x);
-        To.y = static_cast<float>(static_cast<double>(Dir[1]) * Dist + CamPos.y);
+        To.x = static_cast<float>(static_cast<double>(Dir.x) * Dist + CamPos.x);
+        To.y = static_cast<float>(static_cast<double>(Dir.y) * Dist + CamPos.y);
         To.z = static_cast<float>(static_cast<double>(ZReach) + CamPos.z);
         return SunRayIsOccluded(Sphere, &CamPos, &To, Camera);
     }
@@ -1356,7 +1356,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     }
 
     // FUN_0050cd50 — Cam-basis oriented star_glow / star_center triangle fan (world verts).
-    void StarGlowDrawBillboard(FStarGlowDesc* Desc, float const Pos[3], float Scale,
+    void StarGlowDrawBillboard(FStarGlowDesc* Desc, Vector const* Pos, float Scale,
                                float const Right[3], float const Up[3], float Alpha)
     {
         // The only test is the shape (+0x48); no null tests on the
@@ -1373,28 +1373,28 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         void* const Tex = ResolveShapeTextureHandle(Shape);
         Win3DBindTexture(Tex);
 
-        float RightHalf[3];
-        float UpHalf[3];
-        float Tmp[3];
-        ScaleVec3(Tmp, Right, Scale);
-        ScaleVec3(RightHalf, Tmp, Desc->Scale);
-        ScaleVec3(Tmp, Up, Scale);
-        ScaleVec3(UpHalf, Tmp, Desc->Scale);
+        Vector RightHalf;
+        Vector UpHalf;
+        Vector Tmp;
+        ScaleVec3(&Tmp.x, Right, Scale);
+        ScaleVec3(&RightHalf.x, &Tmp.x, Desc->Scale);
+        ScaleVec3(&Tmp.x, Up, Scale);
+        ScaleVec3(&UpHalf.x, &Tmp.x, Desc->Scale);
 
         // Corners (FUN_00423b30 = add, FUN_00423b60 = subtract):
         // C0 = (Pos - R) + U, C1 = (Pos + R) + U, C2 = (Pos + R) - U, C3 = (Pos - R) - U.
-        float C0[3];
-        float C1[3];
-        float C2[3];
-        float C3[3];
-        SubVec3Local(Tmp, Pos, RightHalf);
-        AddVec3Local(C0, Tmp, UpHalf);
-        AddVec3Local(Tmp, Pos, RightHalf);
-        AddVec3Local(C1, Tmp, UpHalf);
-        AddVec3Local(Tmp, Pos, RightHalf);
-        SubVec3Local(C2, Tmp, UpHalf);
-        SubVec3Local(Tmp, Pos, RightHalf);
-        SubVec3Local(C3, Tmp, UpHalf);
+        Vector C0;
+        Vector C1;
+        Vector C2;
+        Vector C3;
+        SubVec3Local(&Tmp, Pos, &RightHalf);
+        AddVec3Local(&C0, &Tmp, &UpHalf);
+        AddVec3Local(&Tmp, Pos, &RightHalf);
+        AddVec3Local(&C1, &Tmp, &UpHalf);
+        AddVec3Local(&Tmp, Pos, &RightHalf);
+        SubVec3Local(&C2, &Tmp, &UpHalf);
+        SubVec3Local(&Tmp, Pos, &RightHalf);
+        SubVec3Local(&C3, &Tmp, &UpHalf);
 
         // Centre = (((C0 + C1) + C2) + C3) * 0.25; the edge midpoints
         // are (C1 + C0), (C2 + C1), (C3 + C2), (C3 + C0), each * 0.5.
@@ -1403,28 +1403,28 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         float Edge12[3];
         float Edge23[3];
         float Edge30[3];
-        AddVec3Local(Tmp, C0, C1);
-        AddVec3Local(Tmp, Tmp, C2);
-        AddVec3Local(Tmp, Tmp, C3);
-        Center[0] = Tmp[0] * 0.25f;
-        Center[1] = Tmp[1] * 0.25f;
-        Center[2] = Tmp[2] * 0.25f;
-        AddVec3Local(Tmp, C1, C0);
-        Edge01[0] = Tmp[0] * 0.5f;
-        Edge01[1] = Tmp[1] * 0.5f;
-        Edge01[2] = Tmp[2] * 0.5f;
-        AddVec3Local(Tmp, C2, C1);
-        Edge12[0] = Tmp[0] * 0.5f;
-        Edge12[1] = Tmp[1] * 0.5f;
-        Edge12[2] = Tmp[2] * 0.5f;
-        AddVec3Local(Tmp, C3, C2);
-        Edge23[0] = Tmp[0] * 0.5f;
-        Edge23[1] = Tmp[1] * 0.5f;
-        Edge23[2] = Tmp[2] * 0.5f;
-        AddVec3Local(Tmp, C3, C0);
-        Edge30[0] = Tmp[0] * 0.5f;
-        Edge30[1] = Tmp[1] * 0.5f;
-        Edge30[2] = Tmp[2] * 0.5f;
+        AddVec3Local(&Tmp, &C0, &C1);
+        AddVec3Local(&Tmp, &Tmp, &C2);
+        AddVec3Local(&Tmp, &Tmp, &C3);
+        Center[0] = Tmp.x * 0.25f;
+        Center[1] = Tmp.y * 0.25f;
+        Center[2] = Tmp.z * 0.25f;
+        AddVec3Local(&Tmp, &C1, &C0);
+        Edge01[0] = Tmp.x * 0.5f;
+        Edge01[1] = Tmp.y * 0.5f;
+        Edge01[2] = Tmp.z * 0.5f;
+        AddVec3Local(&Tmp, &C2, &C1);
+        Edge12[0] = Tmp.x * 0.5f;
+        Edge12[1] = Tmp.y * 0.5f;
+        Edge12[2] = Tmp.z * 0.5f;
+        AddVec3Local(&Tmp, &C3, &C2);
+        Edge23[0] = Tmp.x * 0.5f;
+        Edge23[1] = Tmp.y * 0.5f;
+        Edge23[2] = Tmp.z * 0.5f;
+        AddVec3Local(&Tmp, &C3, &C0);
+        Edge30[0] = Tmp.x * 0.5f;
+        Edge30[1] = Tmp.y * 0.5f;
+        Edge30[2] = Tmp.z * 0.5f;
 
         float const U0 = Shape->U0;
         float const V0 = Shape->V0;
@@ -1440,23 +1440,23 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         Win3DColor4f(Desc->OuterColor[0], Desc->OuterColor[1], Desc->OuterColor[2], Alpha);
         Win3DTexCoord2f(U0, V0);
-        Win3DVertex3f(C0[0], C0[1], C0[2]);
+        Win3DVertex3f(C0.x, C0.y, C0.z);
         Win3DTexCoord2f(Um, V0);
         Win3DVertex3f(Edge01[0], Edge01[1], Edge01[2]);
         Win3DTexCoord2f(U1, V0);
-        Win3DVertex3f(C1[0], C1[1], C1[2]);
+        Win3DVertex3f(C1.x, C1.y, C1.z);
         Win3DTexCoord2f(U1, Vm);
         Win3DVertex3f(Edge12[0], Edge12[1], Edge12[2]);
         Win3DTexCoord2f(U1, V1);
-        Win3DVertex3f(C2[0], C2[1], C2[2]);
+        Win3DVertex3f(C2.x, C2.y, C2.z);
         Win3DTexCoord2f(Um, V1);
         Win3DVertex3f(Edge23[0], Edge23[1], Edge23[2]);
         Win3DTexCoord2f(U0, V1);
-        Win3DVertex3f(C3[0], C3[1], C3[2]);
+        Win3DVertex3f(C3.x, C3.y, C3.z);
         Win3DTexCoord2f(U0, Vm);
         Win3DVertex3f(Edge30[0], Edge30[1], Edge30[2]);
         Win3DTexCoord2f(U0, V0);
-        Win3DVertex3f(C0[0], C0[1], C0[2]);
+        Win3DVertex3f(C0.x, C0.y, C0.z);
         Win3DEnd();
     }
 
@@ -1622,15 +1622,15 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // The owner's position.
         float const* const OwnerPos = (float const*)&this->Owner->get_position();
-        float Pos[3] = {OwnerPos[0], OwnerPos[1], OwnerPos[2]};
+        Vector Pos = {OwnerPos[0], OwnerPos[1], OwnerPos[2]};
 
         // The unit direction from the camera. The z difference is stored as a float and squared
         // against its stored copy; the others
         // stay on the FPU.
         const Vector* const CamPos = Camera->GetPosition();
-        double const Dx = static_cast<double>(Pos[0]) - CamPos->x;
-        double const Dy = static_cast<double>(Pos[1]) - CamPos->y;
-        double const DzExt = static_cast<double>(Pos[2]) - CamPos->z;
+        double const Dx = static_cast<double>(Pos.x) - CamPos->x;
+        double const Dy = static_cast<double>(Pos.y) - CamPos->y;
+        double const DzExt = static_cast<double>(Pos.z) - CamPos->z;
         float const DzF = static_cast<float>(DzExt);
         double const SumSq = DzExt * DzF + Dy * Dy + Dx * Dx;
         float const InvLen = static_cast<float>(1.0 / sqrt(SumSq));
@@ -1669,12 +1669,12 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // FUN_0050cd50 on the star_glow -- U is its 2nd vector argument, R its 3rd, which is the
         // port's (Right = R, Up = U) naming. No null test on the star_glow.
-        StarGlowDrawBillboard(this->StarGlow, Pos, Scale, Right, Up, A);
+        StarGlowDrawBillboard(this->StarGlow, &Pos, Scale, Right, Up, A);
         // The star_center when present, with A * A.
         if (this->StarCenter != nullptr)
         {
             float const AlphaSq = static_cast<float>(static_cast<double>(A) * A);
-            StarGlowDrawBillboard(this->StarCenter, Pos, Scale, Right, Up, AlphaSq);
+            StarGlowDrawBillboard(this->StarCenter, &Pos, Scale, Right, Up, AlphaSq);
         }
 
 #ifdef FREELANCER_RP9
@@ -1685,7 +1685,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             float GlowScale = this->StarGlow->Scale;
             if (this->StarCenter != nullptr && this->StarCenter->Scale > GlowScale)
                 GlowScale = this->StarCenter->Scale;
-            NebulaVolume::NoteStarGlow(Pos, Scale * GlowScale, A);
+            NebulaVolume::NoteStarGlow(&Pos, Scale * GlowScale, A);
         }
 #endif
 
@@ -1990,16 +1990,16 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only: without a camera the matrix is the modelview as it stands (the Win3D camera
     // is the identity), so a shifted HUD window's shear goes onto it here.
-    float Sheared[12];
+    Transform Sheared;
     if (ObjectOrNull == nullptr &&
-        WidescreenHudShearModelview(reinterpret_cast<float const*>(Xform), Sheared))
-        Src = reinterpret_cast<Transform const*>(Sheared);
+        WidescreenHudShearModelview(Xform, &Sheared))
+        Src = &Sheared;
 #endif
     if (ObjectOrNull != nullptr)
     {
         // Local = MulTransform(view, Xform).
         Transform const* const View =
-            (Transform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
+            ((ICamera*)ObjectOrNull)->GetViewTransform();
         if (G_Win3DModelviewMath == nullptr)
             G_Win3DModelviewMath = Acquire3DMathEngine();
         G_Win3DModelviewMath->MulTransform(Local, *View, *Xform);
@@ -2023,18 +2023,18 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
     {
         // SetView with a second view-transform call.
         Transform const* const View =
-            (Transform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
+            ((ICamera*)ObjectOrNull)->GetViewTransform();
         Pipe->SetView(View);
     }
     else
     {
         // Identity rotation, zero translation.
-        float Ident[12];
-        Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(Ident));
-        Ident[9] = 0.0f;
-        Ident[10] = 0.0f;
-        Ident[11] = 0.0f;
-        Pipe->SetView((const Transform*)Ident);
+        Transform Ident;
+        Win3DIdentityRotation3x3(&Ident.Rotation);
+        Ident.Translation.x = 0.0f;
+        Ident.Translation.y = 0.0f;
+        Ident.Translation.z = 0.0f;
+        Pipe->SetView(&Ident);
     }
     // SetWorld with the caller's Xform, not the product.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT

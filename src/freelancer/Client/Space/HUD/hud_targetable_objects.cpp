@@ -102,12 +102,12 @@ namespace
     // The ctor's alert block: FUN_005a0db0 with a 0.018 square mouse box; the lag alert has no
     // IDS (Ids 0).
     WinControl* CreateAlert(WinControl* Parent, char const* Name, char const* MeshPath,
-                            float const* Position, unsigned Ids)
+                            Vector const* Position, unsigned Ids)
     {
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        float const HalfExtents[3] = {0.018f, 0.018f, 0.0f};
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        Vector const HalfExtents = {0.018f, 0.018f, 0.0f};
         WinControl* const Alert = Parent->CreateStaticControl(
-            Name, MeshPath, Position, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+            Name, MeshPath, Position, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
         uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
         Alert->SetProperty(0x18, Red, Red);
         if (Ids != 0)
@@ -151,7 +151,7 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     // Create's body inlined; Win3D::Create(0, 0) is a direct (non-virtual) call.
     G_HudTargetableObjects = this;
     HUDItem::Name = "Targetable_Objects";
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     if (Win3D::Create(nullptr, nullptr))
         RegisterEvent(USER_BUTTON0);
     Win3D::SetName("Targetable_Objects");
@@ -178,8 +178,8 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     PickId = 0;
 
     // The range read-out under the reticle.
-    float const RangePos[3] = {0.003f, 0.0f, 0.0f};
-    ReticleRangeText = CreateTextControl("ReticleRangeText", "HudSmall", RangePos, nullptr,
+    Vector const RangePos = {0.003f, 0.0f, 0.0f};
+    ReticleRangeText = CreateTextControl("ReticleRangeText", "HudSmall", &RangePos, nullptr,
                                          0.171f /* DAT_005d8f0c */, 0.03f,
                                          1.0f, 0x453, 1, 0, 0);
     ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
@@ -187,17 +187,17 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     ReticleRangeText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(White), 1);
 
     // The four alert icons.
-    float const MissilePos[3] = {0.126f, 0.213f, -0.6f};
+    Vector const MissilePos = {0.126f, 0.213f, -0.6f};
     MissileAlert = CreateAlert(this, "MissileAlert", "Interface\\hud\\HUD_missilealert.3db",
-                               MissilePos, 0x4d0);
-    float const TrailPos[3] = {-0.126f, 0.213f, -0.6f};
-    TrailAlert = CreateAlert(this, "TrailAlert", "Interface\\hud\\HUD_trailalert.3db", TrailPos,
+                               &MissilePos, 0x4d0);
+    Vector const TrailPos = {-0.126f, 0.213f, -0.6f};
+    TrailAlert = CreateAlert(this, "TrailAlert", "Interface\\hud\\HUD_trailalert.3db", &TrailPos,
                              0x616);
-    float const RadiationPos[3] = {0.126f, 0.177f, -0.6f};
+    Vector const RadiationPos = {0.126f, 0.177f, -0.6f};
     RadiationAlert = CreateAlert(this, "RadiationAlert", "Interface\\hud\\HUD_radiationalert.3db",
-                                 RadiationPos, 0x617);
-    float const LagPos[3] = {-0.126f, 0.177f, -0.6f};
-    LagAlert = CreateAlert(this, "LagAlert", "Interface\\multiplayer\\MULTI_lag.3db", LagPos, 0);
+                                 &RadiationPos, 0x617);
+    Vector const LagPos = {-0.126f, 0.177f, -0.6f};
+    LagAlert = CreateAlert(this, "LagAlert", "Interface\\multiplayer\\MULTI_lag.3db", &LagPos, 0);
 
     // FUN_0059ec80, in retail's order.
     ClientMeshLoadFromPath(&TargetArrow, "interface\\hud\\hud_targetarrow.3db", 0, true);
@@ -394,7 +394,7 @@ void HudTargetableObjects::SetTarget(IObjRW* Target)
 bool HudTargetableObjects::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004f17c0 (this = the WinControl face).
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     if (!Win3D::Create(NewParent, Data))   // FUN_004b5060
         return false;
     RegisterEvent(USER_BUTTON0);        // FUN_005760d0
@@ -861,7 +861,7 @@ FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const
     Result.Point.z = 0.0f;
     Result.Distance = 0.0f;
 
-    Vector const* const From = reinterpret_cast<Vector const*>(Camera->GetPosition());
+    Vector const* const From = Camera->GetPosition();
     unsigned const SystemId = StarSysGetActiveSystemId();
     PhySys::RayHit Hits[8];
     int const HitCount = PhySys::FindRayCollisions(SystemId, *From, *To, Hits, 8);
@@ -894,7 +894,7 @@ FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const
         // The camera position is fetched again; the distance is summed z, y, x.
         Result.Object = GetRoot(Hit.Object);
         Result.Instance = Instance;
-        Vector const* const CameraPos = reinterpret_cast<Vector const*>(Camera->GetPosition());
+        Vector const* const CameraPos = Camera->GetPosition();
         Result.Point = Hit.Point;
         double const Dx = static_cast<double>(Hit.Point.x) - static_cast<double>(CameraPos->x);
         double const Dy = static_cast<double>(Hit.Point.y) - static_cast<double>(CameraPos->y);
@@ -1066,7 +1066,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
         {
             IObjRW* const NearObject = Near;
             PickId = NearObject->get_id();
-            Vector const* const CameraPos = reinterpret_cast<Vector const*>(Camera->GetPosition());
+            Vector const* const CameraPos = Camera->GetPosition();
             Vector const& NearPos = NearObject->get_position();
             double const Dx = static_cast<double>(NearPos.x) - static_cast<double>(CameraPos->x);
             double const Dy = static_cast<double>(NearPos.y) - static_cast<double>(CameraPos->y);
@@ -1080,7 +1080,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
     IObjRW* const Hostile = FindHostileContactNearCursor();   // FUN_004f1c20
     if (Hostile != nullptr)
     {
-        Vector const* const CameraPos = reinterpret_cast<Vector const*>(Camera->GetPosition());
+        Vector const* const CameraPos = Camera->GetPosition();
         Vector const& HostilePos = Hostile->get_position();
         double const Dx = static_cast<double>(HostilePos.x) - static_cast<double>(CameraPos->x);
         double const Dy = static_cast<double>(HostilePos.y) - static_cast<double>(CameraPos->y);
@@ -1741,7 +1741,7 @@ namespace
     void DrawBracketLine(Vector const& A, Vector const& B, unsigned long Color,
                          unsigned long EdgeColor)
     {
-        Win3DImmedDrawLine(&A.x, &B.x, Color, EdgeColor, 2.0f);
+        Win3DImmedDrawLine(&A, &B, Color, EdgeColor, 2.0f);
     }
 }
 
@@ -3631,12 +3631,12 @@ void HudTargetableObjects::DrawLeadMarkers()
 
         float const X = Marker.LeadScreen.x;
         float const Y = Marker.LeadScreen.y;
-        float const LeftEnd[3] = {X - Size, Y, 0.0f};
-        float const RightEnd[3] = {Size + X, Y, 0.0f};
-        Win3DImmedDrawLine(LeftEnd, RightEnd, Color, EdgeColor, 2.0f);   // FUN_005a2940
-        float const TopEnd[3] = {X, Y - Size, 0.0f};
-        float const BottomEnd[3] = {X, Size + Y, 0.0f};
-        Win3DImmedDrawLine(TopEnd, BottomEnd, Color, EdgeColor, 2.0f);
+        Vector const LeftEnd = {X - Size, Y, 0.0f};
+        Vector const RightEnd = {Size + X, Y, 0.0f};
+        Win3DImmedDrawLine(&LeftEnd, &RightEnd, Color, EdgeColor, 2.0f);   // FUN_005a2940
+        Vector const TopEnd = {X, Y - Size, 0.0f};
+        Vector const BottomEnd = {X, Size + Y, 0.0f};
+        Win3DImmedDrawLine(&TopEnd, &BottomEnd, Color, EdgeColor, 2.0f);
     }
 }
 
@@ -3714,7 +3714,7 @@ void HudTargetableObjects::UpdateAimPoint()
         double const ScreenDistSq = Dy * Dy + Dx * Dx;
         if (!(ScreenDistSq < static_cast<double>(Radius)))
             continue;
-        Vector const* const CameraPos = reinterpret_cast<Vector const*>(Camera->GetPosition());
+        Vector const* const CameraPos = Camera->GetPosition();
         Vector Offset;   // rounded to float, as retail's FUN_00422b80
         Offset.x = Marker.LeadWorld.x - CameraPos->x;
         Offset.y = Marker.LeadWorld.y - CameraPos->y;
@@ -3756,7 +3756,7 @@ void HudTargetableObjects::UpdateAimPoint()
         Direction.x = static_cast<float>(Direction.x * InvLength);
         Direction.y = static_cast<float>(Direction.y * InvLength);
         Direction.z = static_cast<float>(Direction.z * InvLength);
-        Vector const* const CameraPos = reinterpret_cast<Vector const*>(Camera->GetPosition());
+        Vector const* const CameraPos = Camera->GetPosition();
         double const Dx = static_cast<double>(Best->LeadWorld.x) - static_cast<double>(CameraPos->x);
         double const Dy = static_cast<double>(Best->LeadWorld.y) - static_cast<double>(CameraPos->y);
         double const Dz = static_cast<double>(Best->LeadWorld.z) - static_cast<double>(CameraPos->z);
@@ -3765,7 +3765,7 @@ void HudTargetableObjects::UpdateAimPoint()
         Reach.x = static_cast<float>(Direction.x * Distance);
         Reach.y = static_cast<float>(Direction.y * Distance);
         Reach.z = static_cast<float>(Direction.z * Distance);
-        Vector const* const Origin = reinterpret_cast<Vector const*>(Camera->GetPosition());
+        Vector const* const Origin = Camera->GetPosition();
         AimPoint.x = Reach.x + Origin->x;
         AimPoint.y = Reach.y + Origin->y;
         AimPoint.z = Reach.z + Origin->z;
@@ -3796,7 +3796,7 @@ void HudTargetableObjects::UpdateAimPoint()
     Scaled.x = static_cast<float>(static_cast<double>(Direction.x) * Reach);
     Scaled.y = static_cast<float>(static_cast<double>(Direction.y) * Reach);
     Scaled.z = static_cast<float>(static_cast<double>(Direction.z) * Reach);
-    Vector const* const Origin = reinterpret_cast<Vector const*>(Camera->GetPosition());
+    Vector const* const Origin = Camera->GetPosition();
     AimPoint.x = Scaled.x + Origin->x;
     AimPoint.y = Scaled.y + Origin->y;
     AimPoint.z = Scaled.z + Origin->z;

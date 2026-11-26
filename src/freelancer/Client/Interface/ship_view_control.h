@@ -79,13 +79,13 @@ public:
 
     // FUN_005842a0 (RET 0x24) -- the argument list of FUN_005a1020 after the name. RectColor /
     // WireColor point at RGBA byte quads.
-    void Init(float const* NewRotSpeed, float const* NewOffset, float const* NewYpr,
-              float const* NewViewSize, char const* Hardpoint, bool bShowRect, bool bShowWire,
+    void Init(Vector const* NewRotSpeed, Vector const* NewOffset, Vector const* NewYpr,
+              Vector const* NewViewSize, char const* Hardpoint, bool bShowRect, bool bShowWire,
               unsigned const* RectColor, unsigned const* WireColor);
 
     // --- Win3D / WinControl overrides ---
-    bool HitTest(float const* Ray) override;                       // slot 4  LAB_00584bd0
-    void SetPosition(float const* NewPosition) override;           // slot 5  LAB_004b5020
+    bool HitTest(Vector const* Ray) override;                       // slot 4  LAB_00584bd0
+    void SetPosition(Vector const* NewPosition) override;           // slot 5  LAB_004b5020
     bool IsPositionInViewport(unsigned A) override;                               // slot 6  LAB_005846b0
     bool Create(Win3D* NewParent, void* Data) override;            // slot 9  FUN_00583e30
     void Update() override;                                        // slot 11 LAB_00584740
@@ -98,7 +98,7 @@ public:
     // two angles; bStart records them, otherwise the difference turns +0x520.
     void DragRotate(bool bStart);
     // FUN_00585070 (RET 4) -- +0x520 = Ypr.
-    void SetDragYpr(float const* Ypr);
+    void SetDragYpr(Vector const* Ypr);
     // FUN_005850f0 (RET 4) -- replace the shown equipment (null: none) and the marker meshes.
     void LoadEquipment(EquipDescList const* List);
     // FUN_00585380 (RET 8) -- frame Instance: bounds, camera distance, camera placement.
@@ -139,9 +139,9 @@ public:
     bool HasHpTypeGroup(int Group) const;
     // FUN_005868c0 / 005868e0 / 00586900 / 00586a10 (RET 4) -- the Init fields one at a time.
     void SetViewSize(float const* NewViewSize);
-    void SetRotSpeed(float const* NewRotSpeed);
-    void SetObjectYpr(float const* NewYpr);
-    void SetAttachPosition(float const* NewPosition);
+    void SetRotSpeed(Vector const* NewRotSpeed);
+    void SetObjectYpr(Vector const* NewYpr);
+    void SetAttachPosition(Vector const* NewPosition);
     // FUN_00586a30 / 00586a50 (RET 4) -- flag bits 2 / 3.
     void SetShowRect(bool bShow);
     void SetShowWireframe(bool bShow);
@@ -157,7 +157,7 @@ public:
 
     ID_String ShipId;                          // +0x32c
     FClientMeshHolder ShipHolder;              // +0x330
-    float ObjectOrientation[9];                // +0x358
+    Matrix ObjectOrientation;                  // +0x358
     float ObjectYpr[3];                        // +0x37c -- degrees
     FSpaceCamera Camera;                       // +0x388 (0xc0)
     unsigned char Ambient[4];                  // +0x448 -- RGBA {0,0,0,0xff}

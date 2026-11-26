@@ -6,6 +6,10 @@
 
 #pragma once
 
+class Vector;
+
+class Vector;
+
 // Port-only (no retail counterpart): the ray-marched volumetric nebula, on the Direct3D 9 render
 // extensions (render/IRenderPipelineEx.h, RP9.dll). Retail draws the inside of a nebula as a
 // fullscreen fog quad, per-object linear D3D fog and interior puff billboards, and its outside
@@ -114,7 +118,7 @@ namespace NebulaVolume
     // alpha argument. Where the glow is most of the scene the volume attenuates the pixel by the
     // transmittance up to the star, not by the whole ray's (a star in front of a nebula stays
     // visible; behind it, it is hidden as before).
-    void NoteStarGlow(float const* WorldPos, float Radius, float Alpha);
+    void NoteStarGlow(Vector const* WorldPos, float Radius, float Alpha);
     // FClientSolarGameobj::SubmitDraw (planets and moons; the far bucket draws them without a depth
     // test): their bounding sphere ends the volume's rays like the scene depth would.
     void NoteOpaqueSphere(float const* WorldCentre, float Radius);

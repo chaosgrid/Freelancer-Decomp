@@ -151,7 +151,7 @@ struct FDeformMesh
     // 3 +0x0C -- (part+0 holder, &part+0x14, a flag byte). FUN_065f69d0 pushes the flag as a
     // whole dword but LAB_065f6bf0 reads only its low byte.
     virtual unsigned char Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsigned char bForce);
-    virtual unsigned char GetBoundSphere(float* OutRadius, float* OutCenter); // 4 +0x10
+    virtual unsigned char GetBoundSphere(float* OutRadius, Vector* OutCenter); // 4 +0x10
     virtual unsigned char Draw(ICamera* Camera, FDeformPart* Part) = 0;       // 5 +0x14
     virtual ~FDeformMesh();                                                   // 6 +0x18
 
@@ -171,7 +171,7 @@ struct FMeshArchetype : FDeformMesh
     int GetVertexCapacity() override;
     unsigned char FillIndexBuffer(FDeformIbDesc* Ib) override;
     unsigned char Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsigned char bForce) override;
-    unsigned char GetBoundSphere(float* OutRadius, float* OutCenter) override;
+    unsigned char GetBoundSphere(float* OutRadius, Vector* OutCenter) override;
     unsigned char Draw(ICamera* Camera, FDeformPart* Part) override;
 
     unsigned long ParseTag;     // +0x0C FVF (0x112 after UTF)
@@ -208,7 +208,7 @@ struct FMeshArchetype : FDeformMesh
     unsigned char bSkinned;
     unsigned char SphereReady;  // +0x71 LAB_065f8d00 cache
     unsigned char Pad72[2];
-    float SphereCenter[3];      // +0x74
+    Vector SphereCenter;        // +0x74
     float SphereRadius;         // +0x80
 
     // FUN_065f90c0. Defined in DeformablePartArchetype.cpp.
@@ -260,7 +260,7 @@ static_assert(sizeof(FVmeshWrapper) == 0x14, "VMesh wrapper must be 0x14");
 // Shared between the Deformable2 source files and EyeMaterial.cpp (module-internal, not exported).
 extern IEngine* G_Engine;                                        // DAT_06603134
 char* FormatDeformMessage(char* Buffer, const char* Format, ...); // FUN_065f28b0
-void MathTransformVec3(float* Dest, const float* A, const float* B); // FUN_065f7120
+void MathTransformVec3(Vector* Dest, const Matrix* Rotation, const Vector* In); // FUN_065f7120
 void FillFileDesc(FFileSystemDesc* Desc, const char* Path);      // FUN_065f3e80
 
 // Aggregate descriptor used to create the Deformable component.
@@ -316,8 +316,8 @@ struct FDeformable : IDeformable, IEngineComponent
                               int* OutLod, unsigned int Flags) override;
     GENRESULT DACOM_API Unused17(void* A, void* B, void* C, void* D) override;
     GENRESULT DACOM_API GetFirstBone(void* Instance, int* Out) override;
-    GENRESULT DACOM_API SetPosePos(void* Instance, float* Pos3) override;
-    GENRESULT DACOM_API SetPoseOri(void* Instance, void* Ori) override;
+    GENRESULT DACOM_API SetPosePos(void* Instance, const Vector* Pos) override;
+    GENRESULT DACOM_API SetPoseOri(void* Instance, const Matrix* Ori) override;
     GENRESULT DACOM_API Unused21(void* A, void* B) override;
     GENRESULT DACOM_API Unused22(void* A, void* B) override;
     GENRESULT DACOM_API Unused23(void* A, void* B) override;
@@ -336,7 +336,7 @@ struct FDeformable : IDeformable, IEngineComponent
     GENRESULT DACOM_API GetOffset(void* Instance, float* Out) override;
     GENRESULT DACOM_API WalkHardpoints(void* Instance, void* UserFn, void* UserData) override;
     GENRESULT DACOM_API GetMeshStats(void* Instance, unsigned int* Out) override;
-    GENRESULT DACOM_API GetBoundSphere(void* Instance, float* OutRadius, float* OutCenter) override;
+    GENRESULT DACOM_API GetBoundSphere(void* Instance, float* OutRadius, Vector* OutCenter) override;
     int DACOM_API Initialize() override;
     int DACOM_API CreateArchetype(ArchetypeIndex Arg1, IFileSystem* Arg2) override;
     int DACOM_API DuplicateArchetype(ArchetypeIndex Arg1, ArchetypeIndex Arg2) override;
@@ -377,7 +377,7 @@ struct FDeformableObject : FDeformable
 struct FBoneSlot
 {
     int Parent;
-    float BoneToRoot[12];
+    Transform BoneToRoot;
 };
 
 static_assert(sizeof(FBoneSlot) == 0x34, "bone slot must be 0x34");
@@ -405,10 +405,10 @@ struct FBoneRuntime : IEngineInstance
 {
     InstanceIndex Instance;   // +0x04 engine instance (slot 0), -1 until bound
     FBoneSlot* Source;        // +0x08 &Skeleton->Bones[i]
-    float LocalTransform[12]; // +0x0C rotation followed by position
+    Transform LocalTransform; // +0x0C rotation followed by position
     unsigned char Flags;
     unsigned char FlagPadding[3];
-    float WorldMatrix[12];    // +0x40
+    Transform WorldMatrix;    // +0x40
 
     // The per-slot body of the FUN_065f1550 construct loop.
     FBoneRuntime();
@@ -431,7 +431,7 @@ struct FBoneRuntime : IEngineInstance
     bool DACOM_API joint_changed(long Inst) override;                                 // LAB_065f17b0
 
     // FUN_065f1030. Defined in Deformable.cpp.
-    void ComposeWorldMatrix(const float* InverseRoot);
+    void ComposeWorldMatrix(const Transform* InverseRoot);
 };
 
 static_assert(sizeof(FBoneRuntime) == 0x70, "bone runtime must be 0x70");
@@ -512,11 +512,11 @@ struct FIkEvent : IChannelOwner
 
     FIkListNode* Owner;      // +0x04
     int* JointIds;           // +0x08
-    float* BindMats;         // +0x0C count * 0x24
+    Matrix* BindMats;        // +0x0C count * 0x24
     int StartJoint;          // +0x10
     int EndJoint;            // +0x14
     void** Channels;         // +0x18
-    float* Quats;            // +0x1C count * 0x10
+    Quaternion* Quats;       // +0x1C count * 0x10
     void* TargetA;           // +0x20 desc+0x10
     void* TargetB;           // +0x24 desc+0x14
     // +0x28 desc+0x0C: bit 0 TargetA is a point (else a direction), 0x20 / 0x40 position /
@@ -609,7 +609,7 @@ struct FDeformPart
     void Construct();
 
     // FUN_065f68c0. Defined in DeformablePart.cpp.
-    unsigned char BoundSphere(float* OutRadius, float* OutCenter);
+    unsigned char BoundSphere(float* OutRadius, Vector* OutCenter);
 
     // FUN_065f69d0. Defined in DeformablePart.cpp.
     unsigned char DrawLive(ICamera* Camera, void* /*Unused*/);
@@ -638,7 +638,7 @@ struct FDeformInstance : IChannelSink
     void DACOM_API OnKeys(unsigned long ChannelKey, void* Context,
                           FChannelKeyBatch* Batch) override;                 // FUN_065f5210
     void DACOM_API OnOpaqueNotification(void* A, void* B) override; // LAB_065f5290
-    void DACOM_API OnLoop(unsigned long ChannelKey, float* Transform,
+    void DACOM_API OnLoop(unsigned long ChannelKey, Transform* Xform,
                           void* Context) override;                           // LAB_065f52b0
 
     // FUN_065f4c80. Defined in DeformableObject.cpp.
@@ -721,7 +721,7 @@ extern float G_DeformRate;
 int ReleaseSkeleton(FSkeleton* Skel);
 void AddRefLodHolder(FLodHolder* Holder);
 int ReleaseLodHolder(FLodHolder* Holder);
-void WriteIdentity3x3(float* Matrix);
+void WriteIdentity3x3(Matrix* Dest);
 
 // DeformablePartArchetype.cpp
 extern const char* const G_ParentNode;
@@ -741,10 +741,10 @@ FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, const char*
                             unsigned char bSkinned);
 
 // DeformableObject.cpp
-void IkMathQuatToMatrix(float* Out9, const float* Quat4);
+void IkMathQuatToMatrix(Matrix* Out, const Quaternion* Quat);
 InstanceIndex FirstBoneInstance(FDeformInstance* Instance);
 void StopAimNode(FIkListNode* Node);
-void IkEulerRebuild(float* Out9, float Yaw, float Pitch, float Roll);
+void IkEulerRebuild(Matrix* Out, float Yaw, float Pitch, float Roll);
 void WriteVec3(float* Dest, float X, float Y, float Z);
 void ScaleVec3(float* Out, const float* In, float Scale);
 void SubVec3(float* Out, const float* A, const float* B);

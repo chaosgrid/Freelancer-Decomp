@@ -348,23 +348,23 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
 
     // The window mesh (slot 38) and the hit box from it.
     SetMesh(kInfoWindowMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder); // FUN_005a1340
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder); // FUN_005a1340
 
     {
-        float const Position[3] = {0.397f, 0.238f, 0.0f};
-        float const Half[3] = {0.018f, 0.018f, 0.0f};
+        Vector const Position = {0.397f, 0.238f, 0.0f};
+        Vector const Half = {0.018f, 0.018f, 0.0f};
         CloseButton = CreateButtonControl("PlayerInfoCloseButton", kCloseButtonMesh, nullptr,
-                                          "ui_select_item", nullptr, Position, nullptr, Half, 0, 0,
+                                          "ui_select_item", nullptr, &Position, nullptr, &Half, 0, 0,
                                           0, 0, 0x409, 0, 0);
     }
     {
-        float const Position[3] = {-0.418f, 0.256f, 0.0f};
-        Title = CreateTextControl("PlayerInfoTitle", "PageHeader", Position, nullptr, 0.836f, 0.03f,
+        Vector const Position = {-0.418f, 0.256f, 0.0f};
+        Title = CreateTextControl("PlayerInfoTitle", "PageHeader", &Position, nullptr, 0.836f, 0.03f,
                                   1.65f, 0x389, 1, 0, 1);
     }
     {
-        float const Position[3] = {-0.409f, 0.208f, 0.0f};
-        Text = CreateRichTextWin("PlayerInfoText", 0.795f, 0.455f, Position, true);
+        Vector const Position = {-0.409f, 0.208f, 0.0f};
+        Text = CreateRichTextWin("PlayerInfoText", 0.795f, 0.455f, &Position, true);
     }
 
     if (G_bNnHelpPendingTarget != 0)
@@ -541,7 +541,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
     }
 
     SetOffset(0.0f, 0.0f, 0.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 

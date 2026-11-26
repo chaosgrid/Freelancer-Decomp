@@ -91,22 +91,22 @@ namespace
         return DALib::Pipeline;
     }
 
-    void SetIdentity9(float* M)
+    void SetIdentity9(Matrix* M)
     {
-        M[0] = 1.0f;
-        M[1] = 0.0f;
-        M[2] = 0.0f;
-        M[3] = 0.0f;
-        M[4] = 1.0f;
-        M[5] = 0.0f;
-        M[6] = 0.0f;
-        M[7] = 0.0f;
-        M[8] = 1.0f;
+        M->E[0][0] = 1.0f;
+        M->E[0][1] = 0.0f;
+        M->E[0][2] = 0.0f;
+        M->E[1][0] = 0.0f;
+        M->E[1][1] = 1.0f;
+        M->E[1][2] = 0.0f;
+        M->E[2][0] = 0.0f;
+        M->E[2][1] = 0.0f;
+        M->E[2][2] = 1.0f;
     }
 
     // The orientation every ypr writer builds (Create, and inlined in Init, DragRotate and
     // SetObjectYpr).
-    void BuildYprOrientation(float* M, float const* Ypr)
+    void BuildYprOrientation(Matrix* M, float const* Ypr)
     {
         HudMatrixRotationY(M, Ypr[0] * kDegToRad);
         HudMatrixRotateRows12(M, Ypr[1] * kDegToRad);
@@ -252,7 +252,7 @@ ShipViewControl::ShipViewControl()
     AttachPos[0] = 0.0f;
     AttachPos[1] = 0.0f;
     AttachPos[2] = 0.0f;
-    SetIdentity9(ObjectOrientation);
+    SetIdentity9(&ObjectOrientation);
 
     memcpy(WireColor, G_HudChromeColorRgba, sizeof(WireColor));
     memcpy(RectColor, G_HudChromeColorRgba, sizeof(RectColor));
@@ -291,11 +291,11 @@ ShipViewControl::ShipViewControl()
         float const Y = Directions[Index][1];
         float const Z = Directions[Index][2];
         float const Inverse = 1.0f / sqrtf(Y * Y + Z * Z + X * X);
-        float Direction[3];
-        Direction[0] = -(X * Inverse);
-        Direction[1] = -(Y * Inverse);
-        Direction[2] = -(Z * Inverse);
-        EngineLightSetDirection(Light, Direction);
+        Vector Direction;
+        Direction.x = -(X * Inverse);
+        Direction.y = -(Y * Inverse);
+        Direction.z = -(Z * Inverse);
+        EngineLightSetDirection(Light, &Direction);
         EngineLightSetColorBytes(Light, Colors[Index]);
         EngineLightRegister(Light);
     }
@@ -381,7 +381,7 @@ bool ShipViewControl::Create(Win3D* NewParent, void* Data)
             ObjectYpr[0] = X;
             ObjectYpr[1] = Y;
             ObjectYpr[2] = Z;
-            BuildYprOrientation(ObjectOrientation, ObjectYpr);
+            BuildYprOrientation(&ObjectOrientation, ObjectYpr);
         }
         if (Ini->is_value("viewSize"))
         {
@@ -395,7 +395,7 @@ bool ShipViewControl::Create(Win3D* NewParent, void* Data)
         else if (Ini->is_value("hardpoint"))
         {
             // The NEW parent's hardpoint, then copied into AttachPos.
-            SetIdentity9(&AttachOrientation.E[0][0]);
+            SetIdentity9(&AttachOrientation);
             AttachPosition.z = 0.0f;
             AttachPosition.y = 0.0f;
             AttachPosition.x = 0.0f;
@@ -449,28 +449,28 @@ bool ShipViewControl::Create(Win3D* NewParent, void* Data)
     return true;
 }
 
-void ShipViewControl::Init(float const* NewRotSpeed, float const* NewOffset, float const* NewYpr,
-                           float const* NewViewSize, char const* Hardpoint, bool bShowRect,
+void ShipViewControl::Init(Vector const* NewRotSpeed, Vector const* NewOffset, Vector const* NewYpr,
+                           Vector const* NewViewSize, char const* Hardpoint, bool bShowRect,
                            bool bShowWire, unsigned const* NewRectColor,
                            unsigned const* NewWireColor)
 {
     // FUN_005842a0 (RET 0x24).
-    RotSpeed[0] = NewRotSpeed[0];
-    RotSpeed[1] = NewRotSpeed[1];
-    RotSpeed[2] = NewRotSpeed[2];
-    ViewOffset[0] = NewOffset[0];
-    ViewOffset[1] = NewOffset[1];
-    ViewOffset[2] = NewOffset[2];
-    ObjectYpr[0] = NewYpr[0];
-    ObjectYpr[1] = NewYpr[1];
-    ObjectYpr[2] = NewYpr[2];
-    BuildYprOrientation(ObjectOrientation, ObjectYpr);
-    ViewSize[0] = NewViewSize[0];
-    ViewSize[1] = NewViewSize[1];
-    ViewSize[2] = NewViewSize[2];
+    RotSpeed[0] = NewRotSpeed->x;
+    RotSpeed[1] = NewRotSpeed->y;
+    RotSpeed[2] = NewRotSpeed->z;
+    ViewOffset[0] = NewOffset->x;
+    ViewOffset[1] = NewOffset->y;
+    ViewOffset[2] = NewOffset->z;
+    ObjectYpr[0] = NewYpr->x;
+    ObjectYpr[1] = NewYpr->y;
+    ObjectYpr[2] = NewYpr->z;
+    BuildYprOrientation(&ObjectOrientation, ObjectYpr);
+    ViewSize[0] = NewViewSize->x;
+    ViewSize[1] = NewViewSize->y;
+    ViewSize[2] = NewViewSize->z;
     if (Hardpoint != nullptr)
     {
-        SetIdentity9(&AttachOrientation.E[0][0]);
+        SetIdentity9(&AttachOrientation);
         AttachPosition.z = 0.0f;
         AttachPosition.y = 0.0f;
         AttachPosition.x = 0.0f;
@@ -551,7 +551,7 @@ void ShipViewControl::Draw()
     EngineLightSetAmbientRgbBytes(White);
 }
 
-void ShipViewControl::SetPosition(float const* NewPosition)
+void ShipViewControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_004b5020: Win3D's, not WinControl's.
     Win3D::SetPosition(NewPosition);
@@ -589,11 +589,11 @@ void ShipViewControl::Update()
             RotAccum[2] = Step2 + RotAccum[2];
 
             Transform Turned;
-            float* const M = &Turned.Rotation.E[0][0];
+            Matrix* const M = &Turned.Rotation;
             HudMatrixRotationY(M, (ObjectYpr[0] + RotAccum[0]) * kDegToRad);
             HudMatrixRotateRows12(M, (RotAccum[1] + ObjectYpr[1]) * kDegToRad);
             HudMatrixRotateRows01(M, (RotAccum[2] + ObjectYpr[2]) * kDegToRad);
-            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, (const Matrix*)M);
+            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, M);
             ClientMeshHolderUpdate(&ShipHolder);
 
             // With no equipment shown, re-centre the hull on its longest axis.
@@ -667,25 +667,25 @@ void ShipViewControl::Update()
         }
         else
         {
-            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, (const Matrix*)ObjectOrientation);
+            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, &ObjectOrientation);
             ClientMeshHolderUpdate(&ShipHolder);
         }
     }
     ComputeScreenRect(&Position.x, true);
 }
 
-bool ShipViewControl::HitTest(float const* Ray)
+bool ShipViewControl::HitTest(Vector const* Ray)
 {
     // LAB_00584bd0 (RET 4): the ray's point at 1000 projected by the Win3D camera, strictly
     // inside the screen rect.
-    float World[3];
-    World[0] = Ray[0] * 1000.0f; // DAT_005e4d14
-    World[1] = Ray[1] * 1000.0f;
-    World[2] = Ray[2] * 1000.0f;
+    Vector World;
+    World.x = Ray->x * 1000.0f; // DAT_005e4d14
+    World.y = Ray->y * 1000.0f;
+    World.z = Ray->z * 1000.0f;
     float X;
     float Y;
     float Z;
-    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, (const Vector*)World);
+    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, &World);
     return static_cast<double>(ScreenRect[0]) < X && static_cast<double>(ScreenRect[2]) > X &&
            static_cast<double>(ScreenRect[1]) < Y && static_cast<double>(ScreenRect[3]) > Y;
 }
@@ -693,16 +693,16 @@ bool ShipViewControl::HitTest(float const* Ray)
 void ShipViewControl::DragRotate(bool bStart)
 {
     // FUN_00584c80 (RET 4).
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    float World[3];
-    World[0] = Ray[0] * 1000.0f;
-    World[1] = Ray[1] * 1000.0f;
-    World[2] = Ray[2] * 1000.0f;
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector World;
+    World.x = Ray.x * 1000.0f;
+    World.y = Ray.y * 1000.0f;
+    World.z = Ray.z * 1000.0f;
     float X;
     float Y;
     float Z;
-    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, (const Vector*)World);
+    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, &World);
 
     // Strictly inside the rect; left / top are rounded to float first.
     float const Left = static_cast<float>(ScreenRect[0]);
@@ -781,15 +781,15 @@ void ShipViewControl::DragRotate(bool bStart)
     ObjectYpr[0] = DragYpr[0];
     ObjectYpr[1] = DragYpr[1];
     ObjectYpr[2] = DragYpr[2];
-    BuildYprOrientation(ObjectOrientation, ObjectYpr);
+    BuildYprOrientation(&ObjectOrientation, ObjectYpr);
 }
 
-void ShipViewControl::SetDragYpr(float const* Ypr)
+void ShipViewControl::SetDragYpr(Vector const* Ypr)
 {
     // FUN_00585070 (RET 4).
-    DragYpr[0] = Ypr[0];
-    DragYpr[1] = Ypr[1];
-    DragYpr[2] = Ypr[2];
+    DragYpr[0] = Ypr->x;
+    DragYpr[1] = Ypr->y;
+    DragYpr[2] = Ypr->z;
 }
 
 void ShipViewControl::LoadEquipment(EquipDescList const* List)
@@ -1011,7 +1011,7 @@ bool ShipViewControl::LoadMesh(char const* Path, char const* MaterialPath, bool 
         Vector Local;
         GetShipViewMath()->TransposeTransform(Local, Framed.Rotation, Delta);
         Transform Placed;
-        SetIdentity9(&Placed.Rotation.E[0][0]);
+        SetIdentity9(&Placed.Rotation);
         Placed.Translation = Local;
         DALib::Engine->SetInstanceMatrix(ShipHolder.EngineInstance, &Placed);
         DALib::Engine->UpdateInstance(ShipHolder.EngineInstance, 0, nullptr);
@@ -1045,8 +1045,8 @@ void ShipViewControl::SelectInstance(long NewSelection, bool bFlag, int Unused)
     ViewFlags = static_cast<unsigned char>((ViewFlags & ~0x10) | (bFlag ? 0x10 : 0));
     SelInstance = NewSelection;
     float Radius;
-    float Centre[3];
-    DALib::Engine->GetInstanceExtent(NewSelection, 0, &Radius, (Vector*)Centre);
+    Vector Centre;
+    DALib::Engine->GetInstanceExtent(NewSelection, 0, &Radius, &Centre);
     SelRadius = Radius;
     SelExtent = Radius;
     const ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(NewSelection);
@@ -1274,17 +1274,17 @@ void ShipViewControl::ComputeScreenRect(float const* Where, bool bSetCamera)
     float X = 0.0f;
     float Y = 0.0f;
     float Z = 0.0f;
-    float Corner[3];
-    Corner[0] = PointX - ViewSize[0];
-    Corner[1] = PointY - ViewSize[1];
-    Corner[2] = PointZ - ViewSize[2];
-    WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner);
+    Vector Corner;
+    Corner.x = PointX - ViewSize[0];
+    Corner.y = PointY - ViewSize[1];
+    Corner.z = PointZ - ViewSize[2];
+    WinCamera->Project(&X, &Y, &Z, &Corner);
     ScreenRect[0] = static_cast<int>(X);
     ScreenRect[1] = static_cast<int>(Y);
-    Corner[0] = PointX + ViewSize[0];
-    Corner[1] = PointY + ViewSize[1];
-    Corner[2] = PointZ + ViewSize[2];
-    WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner);
+    Corner.x = PointX + ViewSize[0];
+    Corner.y = PointY + ViewSize[1];
+    Corner.z = PointZ + ViewSize[2];
+    WinCamera->Project(&X, &Y, &Z, &Corner);
     ScreenRect[2] = static_cast<int>(X);
     ScreenRect[3] = static_cast<int>(Y);
 
@@ -1373,29 +1373,29 @@ void ShipViewControl::SetViewSize(float const* NewViewSize)
     ViewSize[2] = NewViewSize[2];
 }
 
-void ShipViewControl::SetRotSpeed(float const* NewRotSpeed)
+void ShipViewControl::SetRotSpeed(Vector const* NewRotSpeed)
 {
     // FUN_005868e0 (RET 4).
-    RotSpeed[0] = NewRotSpeed[0];
-    RotSpeed[1] = NewRotSpeed[1];
-    RotSpeed[2] = NewRotSpeed[2];
+    RotSpeed[0] = NewRotSpeed->x;
+    RotSpeed[1] = NewRotSpeed->y;
+    RotSpeed[2] = NewRotSpeed->z;
 }
 
-void ShipViewControl::SetObjectYpr(float const* NewYpr)
+void ShipViewControl::SetObjectYpr(Vector const* NewYpr)
 {
     // FUN_00586900 (RET 4).
-    ObjectYpr[0] = NewYpr[0];
-    ObjectYpr[1] = NewYpr[1];
-    ObjectYpr[2] = NewYpr[2];
-    BuildYprOrientation(ObjectOrientation, ObjectYpr);
+    ObjectYpr[0] = NewYpr->x;
+    ObjectYpr[1] = NewYpr->y;
+    ObjectYpr[2] = NewYpr->z;
+    BuildYprOrientation(&ObjectOrientation, ObjectYpr);
 }
 
-void ShipViewControl::SetAttachPosition(float const* NewPosition)
+void ShipViewControl::SetAttachPosition(Vector const* NewPosition)
 {
     // FUN_00586a10 (RET 4).
-    AttachPos[0] = NewPosition[0];
-    AttachPos[1] = NewPosition[1];
-    AttachPos[2] = NewPosition[2];
+    AttachPos[0] = NewPosition->x;
+    AttachPos[1] = NewPosition->y;
+    AttachPos[2] = NewPosition->z;
 }
 
 void ShipViewControl::SetShowRect(bool bShow)
@@ -1542,9 +1542,9 @@ FShipViewHpEntry const* ShipViewControl::GetHardpointListEntry(int Index) const
     return &HpList[static_cast<size_t>(Index)];
 }
 
-WinControl* WinControl::CreateShipViewControl(char const* Name, float const* RotSpeed,
-                                              float const* NewOffset, float const* Ypr,
-                                              float const* NewViewSize, char const* Hardpoint,
+WinControl* WinControl::CreateShipViewControl(char const* Name, Vector const* RotSpeed,
+                                              Vector const* NewOffset, Vector const* Ypr,
+                                              Vector const* NewViewSize, char const* Hardpoint,
                                               bool bShowRect, bool bShowWire,
                                               unsigned const* RectColor,
                                               unsigned const* WireColor)

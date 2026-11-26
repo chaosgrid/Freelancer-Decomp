@@ -59,19 +59,19 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
     // FUN_00423b30: the frame position, component-wise sum.
     float const Base[3] = {NnFloatBits(0xbc9374bc), 0.0f, -1.0f};
     float const Delta[3] = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3c75c28f), 0.0f};
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float const FramePosition[3] = {Base[0] + Delta[0], Base[1] + Delta[1], Base[2] + Delta[2]};
-    Frame = CreateStaticControl("Confirm_deleteBox", kConfirmFrameMesh, FramePosition, nullptr,
-                                Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+    Vector const FramePosition = {Base[0] + Delta[0], Base[1] + Delta[1], Base[2] + Delta[2]};
+    Frame = CreateStaticControl("Confirm_deleteBox", kConfirmFrameMesh, &FramePosition, nullptr,
+                                &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
 
     float const kRowOffsetY = NnFloatBits(0x3d4ccccd);  // DAT_005cb88c 0.05
     float const kTextOffsetX = NnFloatBits(0x3ccccccd); // DAT_005d15b4 0.025
     float const kYesOffsetX = NnFloatBits(0x3dae147b);  // DAT_005d1f84 0.085
     float const kNoOffsetX = NnFloatBits(0x3e051eb8);   // DAT_005d0434 0.13
 
-    float const TextPosition[3] = {Base[0] + kTextOffsetX, Base[1] + kRowOffsetY, Base[2]};
-    Text = CreateTextControl("Confirm_delTxt", Payload->Style, TextPosition, nullptr,
+    Vector const TextPosition = {Base[0] + kTextOffsetX, Base[1] + kRowOffsetY, Base[2]};
+    Text = CreateTextControl("Confirm_delTxt", Payload->Style, &TextPosition, nullptr,
                              NnFloatBits(0x3ecccccd), NnFloatBits(0x3df5c28f), 1.0f, 0x4ad, 1, 0,
                              0);
 
@@ -85,20 +85,20 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
     }
     Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Question), 0);
 
-    float const ButtonExtents[3] = {NnFloatBits(0x3db851ec), NnFloatBits(0x3cac0831), 0.0f};
-    float const YesPosition[3] = {Base[0] - kYesOffsetX, Base[1] - kRowOffsetY, Base[2]};
-    YesBox = CreateWireButtonControl("Confirm_delBtnYes", nullptr, YesPosition, ButtonExtents, 0,
+    Vector const ButtonExtents = {NnFloatBits(0x3db851ec), NnFloatBits(0x3cac0831), 0.0f};
+    Vector const YesPosition = {Base[0] - kYesOffsetX, Base[1] - kRowOffsetY, Base[2]};
+    YesBox = CreateWireButtonControl("Confirm_delBtnYes", nullptr, &YesPosition, &ButtonExtents, 0,
                                      0, 0, 0, 0);
 
-    float const NoPosition[3] = {Base[0] + kNoOffsetX, Base[1] - kRowOffsetY, Base[2]};
-    NoBox = CreateWireButtonControl("Confirm_delBtnNo", nullptr, NoPosition, ButtonExtents, 0, 0,
+    Vector const NoPosition = {Base[0] + kNoOffsetX, Base[1] - kRowOffsetY, Base[2]};
+    NoBox = CreateWireButtonControl("Confirm_delBtnNo", nullptr, &NoPosition, &ButtonExtents, 0, 0,
                                     0, 0, 0);
 
     // The captions on the boxes' positions.
-    YesText = CreateTextControl("Confirm_delBtnYesText", "ButtonText", YesPosition, nullptr,
+    YesText = CreateTextControl("Confirm_delBtnYesText", "ButtonText", &YesPosition, nullptr,
                                 NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x4dc, 1,
                                 0, 0);
-    NoText = CreateTextControl("Confirm_delBtnNoText", "ButtonText", NoPosition, nullptr,
+    NoText = CreateTextControl("Confirm_delBtnNoText", "ButtonText", &NoPosition, nullptr,
                                NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x4dd, 1, 0,
                                0);
 
@@ -169,7 +169,7 @@ intptr_t NnConfirm::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         return 0;
     }
     if (Msg == kWinMsgEscape)
@@ -210,8 +210,8 @@ namespace
         if (Created == nullptr)
             return nullptr;
         NnConfirm* const Dialog = static_cast<NnConfirm*>(Created);
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
         Dialog->CaptureMouse(); // slot 32
         return Created;
     }

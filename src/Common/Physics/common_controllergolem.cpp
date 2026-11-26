@@ -223,24 +223,24 @@ void IVP_Controller_Golem::set_target_position(Vector const& InTargetPosition,
 
 // FUN_06343670 (__thiscall). The call sites pass the IVP-ordered quaternion, the same IVP_Time
 // as the position call, and 0, 0.
-void IVP_Controller_Golem::set_target_quaternion(float const InTargetQuat[4],
+void IVP_Controller_Golem::set_target_quaternion(IVP_U_Quat const* InTargetQuat,
                                                  IVP_Time const& Time,
-                                                 float const* InTargetRotQuatOrNull,
+                                                 IVP_U_Quat const* InTargetRotQuatOrNull,
                                                  float DeltaTime)
 {
     // (X,Y,Z,W) order, straight onto IVP_U_Quat's x/y/z/w (+0x7c).
-    TargetQuat.x = InTargetQuat[0];
-    TargetQuat.y = InTargetQuat[1];
-    TargetQuat.z = InTargetQuat[2];
-    TargetQuat.w = InTargetQuat[3];
+    TargetQuat.x = InTargetQuat->x;
+    TargetQuat.y = InTargetQuat->y;
+    TargetQuat.z = InTargetQuat->z;
+    TargetQuat.w = InTargetQuat->w;
 
     // The 1.0f numerator is DAT_063a53d0.
     if (InTargetRotQuatOrNull != nullptr)
     {
-        TargetRotQuat.x = InTargetRotQuatOrNull[0];
-        TargetRotQuat.y = InTargetRotQuatOrNull[1];
-        TargetRotQuat.z = InTargetRotQuatOrNull[2];
-        TargetRotQuat.w = InTargetRotQuatOrNull[3];
+        TargetRotQuat.x = InTargetRotQuatOrNull->x;
+        TargetRotQuat.y = InTargetRotQuatOrNull->y;
+        TargetRotQuat.z = InTargetRotQuatOrNull->z;
+        TargetRotQuat.w = InTargetRotQuatOrNull->w;
         bHasTargetRotQuat = 1;
         InvRotDeltaTime = 1.0f / DeltaTime;
     }
@@ -509,9 +509,9 @@ void __cdecl PhySys::GolemSetTargetPosition(::FLControllerGolem* Golem,
 }
 
 void __cdecl PhySys::GolemSetTargetQuaternion(::FLControllerGolem* Golem,
-                                              float const TargetQuat[4],
+                                              IVP_U_Quat const* TargetQuat,
                                               IVP_Time const& Time,
-                                              float const* TargetRotQuatOrNull,
+                                              IVP_U_Quat const* TargetRotQuatOrNull,
                                               float DeltaTime)
 {
     Golem->set_target_quaternion(TargetQuat, Time, TargetRotQuatOrNull, DeltaTime);
@@ -532,7 +532,7 @@ void __cdecl PhySys::GolemSetTargetQuaternion(::FLControllerGolem* Golem,
 // IVP_Ball) overrides.
 // ============================================================================
 bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, IVP_Real_Object* Object,
-                                         float const WorldQuat[4], Vector const& WorldPosition)
+                                         IVP_U_Quat const* WorldQuat, Vector const& WorldPosition)
 {
 
     // ---- The reference/base transform ----
@@ -553,7 +553,7 @@ bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, I
 
     // ---- The requested world pose ----
     IVP_U_Matrix WorldFromObject;
-    ((IVP_U_Quat const*)WorldQuat)->set_matrix(&WorldFromObject);   // 4 floats, IVP (x,y,z,w) order
+    WorldQuat->set_matrix(&WorldFromObject);   // IVP (x,y,z,w) order
     WorldFromObject.vv.set(WorldPosition.x, WorldPosition.y, WorldPosition.z);
 
     IVP_U_Matrix Combined;
@@ -680,12 +680,12 @@ void __cdecl PhySys::AttachGolemController(CObject* Object, CreateParms const& P
         Math->MatrixToQuaternion(MathQuat, Object->Orientation);
 
         // Quaternion is (W,X,Y,Z); retail rotates it into IVP's (X,Y,Z,W).
-        float const IvpQuat[4] = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
+        IVP_U_Quat const IvpQuat = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
 
         Vector const ZeroSpeed = {0.0f, 0.0f, 0.0f};
 
         Golem->set_target_position(Object->WorldPosition, ZeroSpeed, Now);
-        Golem->set_target_quaternion(IvpQuat, Now, nullptr, 0.0f);
+        Golem->set_target_quaternion(&IvpQuat, Now, nullptr, 0.0f);
         return;
     }
 

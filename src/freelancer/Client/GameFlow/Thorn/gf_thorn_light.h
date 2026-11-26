@@ -40,10 +40,10 @@ struct FThornLight : FThornComponent
     // ID3DLightControl (0x005cd464..0x005cd478)
     GENRESULT DACOM_API SetOn(int On) override;                          // 3  LAB_00453310
     GENRESULT DACOM_API SetLight(void const* D3dLight8) override;        // 4  LAB_004533d0
-    GENRESULT DACOM_API SetDirection(float* Dir3) override;              // 5  LAB_00453330
+    GENRESULT DACOM_API SetDirection(Vector* Dir) override;              // 5  LAB_00453330
     GENRESULT DACOM_API GetOn(int* OutOn) override;                      // 6  LAB_004533f0
     GENRESULT DACOM_API GetLight(void* OutD3dLight8) override;           // 7  LAB_00453450
-    GENRESULT DACOM_API GetDirection(float* OutDir3) override;           // 8  LAB_00453420
+    GENRESULT DACOM_API GetDirection(Vector* OutDir) override;           // 8  LAB_00453420
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00453100
@@ -74,10 +74,10 @@ struct FThornLightReference : FThornComponent
     // ID3DLightControl
     GENRESULT DACOM_API SetOn(int On) override;                          // 3  LAB_004535a0
     GENRESULT DACOM_API SetLight(void const* D3dLight8) override;        // 4  LAB_004535e0
-    GENRESULT DACOM_API SetDirection(float* Dir3) override;              // 5  LAB_004535c0
+    GENRESULT DACOM_API SetDirection(Vector* Dir) override;              // 5  LAB_004535c0
     GENRESULT DACOM_API GetOn(int* OutOn) override;                      // 6  LAB_00453600
     GENRESULT DACOM_API GetLight(void* OutD3dLight8) override;           // 7  LAB_00453640
-    GENRESULT DACOM_API GetDirection(float* OutDir3) override;           // 8  LAB_00453620
+    GENRESULT DACOM_API GetDirection(Vector* OutDir) override;           // 8  LAB_00453620
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00450cd0

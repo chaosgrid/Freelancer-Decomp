@@ -910,8 +910,7 @@ namespace
         FRoomCamera* const Camera = Runtime->Camera;
         Quaternion FromQuat;
         RoomCameraMath()->MatrixToQuaternion(FromQuat,
-                                             *reinterpret_cast<Matrix const*>(
-                                                 Camera->GetOrientation()));
+                                             *Camera->GetOrientation());
         float FromPos[3];
         memcpy(FromPos, Camera->GetPosition(), sizeof(FromPos));
         float const FromHalfFovX = Camera->GetHalfFovXDeg();
@@ -1820,7 +1819,7 @@ static void RoomControlStartAnimations(FRoomRuntime* Runtime)
         Runtime->Handles64[Index] = Playback;
         unsigned long const Flags = Room->AnimationLoop[Index] ? 2u : 0u;
         DALib::Anim->EvalPlayback(Playback, Flags, -2.0f, 1.0f, AsOpaqueDword(0),
-                                  AsOpaqueDword(1.0f), AsOpaqueDword(1.0f), AsOpaqueDword(0));
+                                  AsOpaqueDword(1.0f), AsOpaqueDword(1.0f), nullptr);
     }
 }
 
@@ -1971,7 +1970,7 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
         RoomLightInfo* Light = Room->Lights[LightIndex];
         Runtime->RoomLights[LightIndex] = GfLightWrapperCreate(
             &Light->Frame.Pos.x, reinterpret_cast<FD3dLight8 const*>(&Light->Mode),
-            Light->Direction, Light->Type);
+            &Light->Direction, Light->Type);
     }
     Runtime->RoomLightCount = static_cast<int>(Room->Lights.size());
 

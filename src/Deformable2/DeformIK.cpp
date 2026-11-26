@@ -21,22 +21,22 @@
 #include <new>
 #include <vector>
 
-static double IkLen3(const float* Vec);
-static void IkCross3(float* Dest, const float* Left, const float* Right);
-static void IkColsToMat(float* Out9, const float* Col0, const float* Col1, const float* Col2);
-static float* IkEulerClamp(float* Out9, const float* Bone, const float* Mat9);
+static double IkLen3(const Vector* Vec);
+static void IkCross3(Vector* Dest, const Vector* Left, const Vector* Right);
+static void IkColsToMat(Matrix* Out, const Vector* Col0, const Vector* Col1, const Vector* Col2);
+static Matrix* IkEulerClamp(Matrix* Out, const float* Bone, const Matrix* Mat);
 
-static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const float* Mat9,
+static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const Matrix* Mat,
                            bool bAlt);
 
-static void IkMathMulMatrix(float* Out9, const float* Left9, const float* Right9);
+static void IkMathMulMatrix(Matrix* Out, const Matrix* Left, const Matrix* Right);
 
 
 // IK current and trial poses; row zero holds the start joint.
-static float G_IkCurRot[G_IkMaxJoints + 1][9];
-static float G_IkCurPos[G_IkMaxJoints + 1][3];
-static float G_IkNewPos[G_IkMaxJoints + 1][3];
-static float G_IkNewRot[G_IkMaxJoints + 1][9];
+static Matrix G_IkCurRot[G_IkMaxJoints + 1];
+static Vector G_IkCurPos[G_IkMaxJoints + 1];
+static Vector G_IkNewPos[G_IkMaxJoints + 1];
+static Matrix G_IkNewRot[G_IkMaxJoints + 1];
 
 // FUN_065f9d70 transpose; FUN_065faef0 A*B; FUN_065fafc0 A*x.
 void FSvdMatrix::Transpose(FSvdMatrix* Out) const
@@ -66,7 +66,7 @@ static_assert(sizeof(FIkVec) == 0x34, "IK vector is 13 dwords");
 // Keep Rest9 adjacent: a locked first joint writes into the preceding cells.
 struct FIkDlsJacobian
 {
-    float Rest9[9];
+    Matrix Rest9;
     FSvdMatrix J;
 };
 
@@ -88,10 +88,10 @@ struct FIkDlsFrame
     int CounterFloor;        // [0xa8] / [0x9c]
     float Alpha;             // [0x20] / [0x28]
     float Accum;             // [0x1c] / [0x24]
-    float TargetPos[3];      // [0x68] / [0x5c]  TargetA, copied when bPos
-    float TargetMat[9];      // [0x2d0] / [0x2c4] TargetB, copied when bOri
-    float TargetQ[4];        // [0x124] / [0x118]
-    float Held3[3];          // [0xac] / [0xac]
+    Vector TargetPos;        // [0x68] / [0x5c]  TargetA, copied when bPos
+    Matrix TargetMat;        // [0x2d0] / [0x2c4] TargetB, copied when bOri
+    Quaternion TargetQ;      // [0x124] / [0x118]
+    Vector Held3;            // [0xac] / [0xac]
     FIkDlsJacobian Block;    // [0x2f4] / [0x2e8]
     FSvdMatrix JtJ;          // [0x560] / [0x554]
     FSvdMatrix Jt;           // [0x7a8] / [0x79c]
@@ -674,115 +674,117 @@ static int IkEulerOutOfRange(const float* Bone, float Yaw, float Pitch, float Ro
     return Count;
 }
 
-static void IkCopy3(float* Dest, const float* Src)
+static void IkCopy3(Vector* Dest, const Vector* Src)
 {
-    Dest[0] = Src[0];
-    Dest[1] = Src[1];
-    Dest[2] = Src[2];
+    Dest->x = Src->x;
+    Dest->y = Src->y;
+    Dest->z = Src->z;
 }
 
 // FUN_065fb100 (Out, Dir, Parent 3x3, flags byte).
-static void IkLookAt(float* Out9, const float* Dir, const float* Parent9, unsigned char Flags)
+static void IkLookAt(Matrix* Out, const Vector* Dir, const Matrix* Parent, unsigned char Flags)
 {
-    float Col0[3] = {0.0f, 0.0f, 0.0f};
-    float Col1[3] = {0.0f, 0.0f, 0.0f};
-    float Col2[3] = {0.0f, 0.0f, 0.0f};
+    Vector Col0 = {0.0f, 0.0f, 0.0f};
+    Vector Col1 = {0.0f, 0.0f, 0.0f};
+    Vector Col2 = {0.0f, 0.0f, 0.0f};
     if ((Flags & 4) != 0)
     {
-        IkCopy3(Col0, Dir);
-        const double P2 = (double)Parent9[2];
-        const double P5 = (double)Parent9[5];
-        const double P8 = (double)Parent9[8];
-        Col2[0] = (float)((double)Col0[2] * P5 - (double)Col0[1] * P8);
-        Col2[1] = (float)(P8 * (double)Col0[0] - (double)Col0[2] * P2);
-        Col2[2] = (float)((double)Col0[1] * P2 - P5 * (double)Col0[0]);
-        const double Y0 = (double)Col2[0];
-        const double Y1 = (double)Col2[1];
-        const double Y2 = (double)Col2[2];
+        IkCopy3(&Col0, Dir);
+        const double P2 = (double)Parent->E[0][2];
+        const double P5 = (double)Parent->E[1][2];
+        const double P8 = (double)Parent->E[2][2];
+        Col2.x = (float)((double)Col0.z * P5 - (double)Col0.y * P8);
+        Col2.y = (float)(P8 * (double)Col0.x - (double)Col0.z * P2);
+        Col2.z = (float)((double)Col0.y * P2 - P5 * (double)Col0.x);
+        const double Y0 = (double)Col2.x;
+        const double Y1 = (double)Col2.y;
+        const double Y2 = (double)Col2.z;
         const double Inv = 1.0 / std::sqrt(Y2 * Y2 + Y1 * Y1 + Y0 * Y0);
-        Col1[0] = (float)(Y0 * Inv);
-        Col1[1] = (float)(Y1 * Inv);
-        Col1[2] = (float)(Y2 * Inv);
-        IkCross3(Col2, Col0, Col1);
+        Col1.x = (float)(Y0 * Inv);
+        Col1.y = (float)(Y1 * Inv);
+        Col1.z = (float)(Y2 * Inv);
+        IkCross3(&Col2, &Col0, &Col1);
     }
     else if ((Flags & 8) != 0)
     {
-        IkCopy3(Col1, Dir);
-        float Temp[3];
-        Temp[0] = Parent9[0];
-        Temp[1] = Parent9[3];
-        Temp[2] = Parent9[6];
-        IkCross3(Col2, Temp, Col1);
-        const double Inv = 1.0 / IkLen3(Col2);
-        Col2[0] = (float)((double)Col2[0] * Inv);
-        Col2[1] = (float)((double)Col2[1] * Inv);
-        Col2[2] = (float)((double)Col2[2] * Inv);
-        IkCross3(Col0, Col1, Col2);
+        IkCopy3(&Col1, Dir);
+        Vector Temp;
+        Temp.x = Parent->E[0][0];
+        Temp.y = Parent->E[1][0];
+        Temp.z = Parent->E[2][0];
+        IkCross3(&Col2, &Temp, &Col1);
+        const double Inv = 1.0 / IkLen3(&Col2);
+        Col2.x = (float)((double)Col2.x * Inv);
+        Col2.y = (float)((double)Col2.y * Inv);
+        Col2.z = (float)((double)Col2.z * Inv);
+        IkCross3(&Col0, &Col1, &Col2);
     }
     else if ((Flags & 0x10) != 0)
     {
-        IkCopy3(Col2, Dir);
-        Col1[0] = Parent9[1];
-        Col1[1] = Parent9[4];
-        Col1[2] = Parent9[7];
-        IkCross3(Col0, Col1, Col2);
-        const double Inv = 1.0 / IkLen3(Col0);
-        Col0[0] = (float)((double)Col0[0] * Inv);
-        Col0[1] = (float)((double)Col0[1] * Inv);
-        Col0[2] = (float)((double)Col0[2] * Inv);
-        IkCross3(Col1, Col2, Col0);
+        IkCopy3(&Col2, Dir);
+        Col1.x = Parent->E[0][1];
+        Col1.y = Parent->E[1][1];
+        Col1.z = Parent->E[2][1];
+        IkCross3(&Col0, &Col1, &Col2);
+        const double Inv = 1.0 / IkLen3(&Col0);
+        Col0.x = (float)((double)Col0.x * Inv);
+        Col0.y = (float)((double)Col0.y * Inv);
+        Col0.z = (float)((double)Col0.z * Inv);
+        IkCross3(&Col1, &Col2, &Col0);
     }
-    IkColsToMat(Out9, Col0, Col1, Col2);
+    IkColsToMat(Out, &Col0, &Col1, &Col2);
 }
 
 // FUN_065fb480 (ECX = vec): returned in ST0 as a double, never rounded to float.
-static double IkLen3(const float* Vec)
+static double IkLen3(const Vector* Vec)
 {
-    const double X = (double)Vec[0];
-    const double Y = (double)Vec[1];
-    const double Z = (double)Vec[2];
+    const double X = (double)Vec->x;
+    const double Y = (double)Vec->y;
+    const double Z = (double)Vec->z;
     return std::sqrt(X * X + Y * Y + Z * Z);
 }
 
 // FUN_065fb4b0: each component is a difference of two double products, stored once as float.
-static void IkCross3(float* Dest, const float* Left, const float* Right)
+static void IkCross3(Vector* Dest, const Vector* Left, const Vector* Right)
 {
-    const double Z = (double)Left[0] * Right[1] - (double)Left[1] * Right[0];
-    const double Y = (double)Left[2] * Right[0] - (double)Right[2] * Left[0];
-    const double X = (double)Left[1] * Right[2] - (double)Left[2] * Right[1];
-    Dest[0] = (float)X;
-    Dest[1] = (float)Y;
-    Dest[2] = (float)Z;
+    const double Z = (double)Left->x * Right->y - (double)Left->y * Right->x;
+    const double Y = (double)Left->z * Right->x - (double)Right->z * Left->x;
+    const double X = (double)Left->y * Right->z - (double)Left->z * Right->y;
+    Dest->x = (float)X;
+    Dest->y = (float)Y;
+    Dest->z = (float)Z;
 }
 
 // FUN_065fb4f0: columns → 3×3.
-static void IkColsToMat(float* Out9, const float* Col0, const float* Col1, const float* Col2)
+static void IkColsToMat(Matrix* Out, const Vector* Col0, const Vector* Col1, const Vector* Col2)
 {
-    Out9[0] = Col0[0];
-    Out9[3] = Col0[1];
-    Out9[6] = Col0[2];
-    Out9[1] = Col1[0];
-    Out9[4] = Col1[1];
-    Out9[7] = Col1[2];
-    Out9[2] = Col2[0];
-    Out9[5] = Col2[1];
-    Out9[8] = Col2[2];
+    Out->E[0][0] = Col0->x;
+    Out->E[1][0] = Col0->y;
+    Out->E[2][0] = Col0->z;
+    Out->E[0][1] = Col1->x;
+    Out->E[1][1] = Col1->y;
+    Out->E[2][1] = Col1->z;
+    Out->E[0][2] = Col2->x;
+    Out->E[1][2] = Col2->y;
+    Out->E[2][2] = Col2->z;
 }
 
-static void IkCopy4(float* Dest, const float* Src)
+static void IkCopy4(Quaternion* Dest, const Quaternion* Src)
 {
-    Dest[0] = Src[0];
-    Dest[1] = Src[1];
-    Dest[2] = Src[2];
-    Dest[3] = Src[3];
+    Dest->w = Src->w;
+    Dest->x = Src->x;
+    Dest->y = Src->y;
+    Dest->z = Src->z;
 }
 
-static void IkCopy9(float* Dest, const float* Src)
+static void IkCopy9(Matrix* Dest, const Matrix* Src)
 {
+    float* const DestFloats = &Dest->E[0][0];
+    const float* const SrcFloats = &Src->E[0][0];
     int Index = 0;
     while (Index < 9)
     {
-        Dest[Index] = Src[Index];
+        DestFloats[Index] = SrcFloats[Index];
         Index += 1;
     }
 }
@@ -791,76 +793,76 @@ static void IkCopy9(float* Dest, const float* Src)
 static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float* Bone)
 {
     const InstanceIndex Joint = Gate->Joint;
-    const float* ParentRot = (const float*)G_Engine->GetInstanceOrientation(G_Engine->GetInstanceParent(Joint));
-    float Local[9];
-    IkCopy9(Local, ParentRot);
-    float Trans[9];
+    const Matrix* ParentRot = G_Engine->GetInstanceOrientation(G_Engine->GetInstanceParent(Joint));
+    Matrix Local;
+    IkCopy9(&Local, ParentRot);
+    Matrix Trans;
     if ((Event->AimFlags & 0x40) != 0)
     {
-        Trans[0] = Local[0];
-        Trans[1] = Local[3];
-        Trans[2] = Local[6];
-        Trans[3] = Local[1];
-        Trans[4] = Local[4];
-        Trans[5] = Local[7];
-        Trans[6] = Local[2];
-        Trans[7] = Local[5];
-        Trans[8] = Local[8];
-        AcquireMathEngine()->MulMatrix(*(Matrix*)Local,
-                                       *(const Matrix*)Trans,
+        Trans.E[0][0] = Local.E[0][0];
+        Trans.E[0][1] = Local.E[1][0];
+        Trans.E[0][2] = Local.E[2][0];
+        Trans.E[1][0] = Local.E[0][1];
+        Trans.E[1][1] = Local.E[1][1];
+        Trans.E[1][2] = Local.E[2][1];
+        Trans.E[2][0] = Local.E[0][2];
+        Trans.E[2][1] = Local.E[1][2];
+        Trans.E[2][2] = Local.E[2][2];
+        AcquireMathEngine()->MulMatrix(Local,
+                                       Trans,
                                        *(const Matrix*)Event->TargetB);
     }
     else
     {
-        const float* Pos = (const float*)G_Engine->GetInstancePosition(Joint);
-        float P[3];
-        IkCopy3(P, Pos);
-        const float* Target = (const float*)Event->TargetA;
-        float Diff[3];
-        const float* Src = Target;
+        const Vector* Pos = G_Engine->GetInstancePosition(Joint);
+        Vector P;
+        IkCopy3(&P, Pos);
+        const Vector* Target = (const Vector*)Event->TargetA;
+        Vector Diff;
+        const Vector* Src = Target;
         if ((Event->AimFlags & 1) != 0)
         {
-            Diff[0] = (float)((double)Target[0] - (double)P[0]);
-            Diff[1] = (float)((double)Target[1] - (double)P[1]);
-            Diff[2] = (float)((double)Target[2] - (double)P[2]);
-            Src = Diff;
+            Diff.x = (float)((double)Target->x - (double)P.x);
+            Diff.y = (float)((double)Target->y - (double)P.y);
+            Diff.z = (float)((double)Target->z - (double)P.z);
+            Src = &Diff;
         }
-        float Dir[3];
-        IkCopy3(Dir, Src);
-        const double X = (double)Dir[0];
-        const double Y = (double)Dir[1];
-        const double Z = (double)Dir[2];
+        Vector Dir;
+        IkCopy3(&Dir, Src);
+        const double X = (double)Dir.x;
+        const double Y = (double)Dir.y;
+        const double Z = (double)Dir.z;
         const double Inv = 1.0 / std::sqrt(Y * Y + Z * Z + X * X);
-        Dir[0] = (float)(X * Inv);
-        Dir[1] = (float)(Y * Inv);
-        Dir[2] = (float)(Z * Inv);
-        float Look[9];
-        IkLookAt(Look, Dir, Local, (unsigned char)Event->AimFlags);
-        Trans[0] = Local[0];
-        Trans[1] = Local[3];
-        Trans[2] = Local[6];
-        Trans[3] = Local[1];
-        Trans[4] = Local[4];
-        Trans[5] = Local[7];
-        Trans[6] = Local[2];
-        Trans[7] = Local[5];
-        Trans[8] = Local[8];
-        AcquireMathEngine()->MulMatrix(*(Matrix*)Local,
-                                       *(const Matrix*)Trans,
-                                       *(const Matrix*)Look);
+        Dir.x = (float)(X * Inv);
+        Dir.y = (float)(Y * Inv);
+        Dir.z = (float)(Z * Inv);
+        Matrix Look;
+        IkLookAt(&Look, &Dir, &Local, (unsigned char)Event->AimFlags);
+        Trans.E[0][0] = Local.E[0][0];
+        Trans.E[0][1] = Local.E[1][0];
+        Trans.E[0][2] = Local.E[2][0];
+        Trans.E[1][0] = Local.E[0][1];
+        Trans.E[1][1] = Local.E[1][1];
+        Trans.E[1][2] = Local.E[2][1];
+        Trans.E[2][0] = Local.E[0][2];
+        Trans.E[2][1] = Local.E[1][2];
+        Trans.E[2][2] = Local.E[2][2];
+        AcquireMathEngine()->MulMatrix(Local,
+                                       Trans,
+                                       Look);
     }
-    float Result[9];
-    IkCopy9(Result, Local);
+    Matrix Result;
+    IkCopy9(&Result, &Local);
     if ((Event->AimFlags & 0x80) == 0)
     {
-        float Clamp[9];
-        const float* Clamped = IkEulerClamp(Clamp, Bone, Result);
-        IkCopy9(Result, Clamped);
+        Matrix Clamp;
+        const Matrix* Clamped = IkEulerClamp(&Clamp, Bone, &Result);
+        IkCopy9(&Result, Clamped);
     }
-    float Q[4];
-    AcquireMathEngine()->MatrixToQuaternion(*(Quaternion*)Q,
-                                            *(const Matrix*)Result); // +0x50
-    IkCopy4(Event->Quats, Q);
+    Quaternion Q;
+    AcquireMathEngine()->MatrixToQuaternion(Q,
+                                            Result); // +0x50
+    IkCopy4(Event->Quats, &Q);
 }
 
 // LAB_065fb540, the IK event's only table slot (06601340): EngBase's FUN_0661b420 calls it on
@@ -907,7 +909,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
     {
         if ((int)Channels[Index] == MatchId)
         {
-            IkCopy4(OutQuat, Quats + Index * 4);
+            IkCopy4((Quaternion*)OutQuat, &Quats[Index]);
             return 0;
         }
     }
@@ -915,19 +917,19 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
 }
 
 // FUN_065fb900 (Out9, Bone, Mat9). Returns Out9.
-static float* IkEulerClamp(float* Out9, const float* Bone, const float* Mat9)
+static Matrix* IkEulerClamp(Matrix* Out, const float* Bone, const Matrix* Mat)
 {
     float Yaw = 0.0f;
     float Pitch = 0.0f;
     float Roll = 0.0f;
-    IkEulerExtract(&Yaw, &Pitch, &Roll, Mat9, false);
+    IkEulerExtract(&Yaw, &Pitch, &Roll, Mat, false);
     const int Score = IkEulerOutOfRange(Bone, Yaw, Pitch, Roll);
     if (Score != 0)
     {
         float AltYaw = 0.0f;
         float AltPitch = 0.0f;
         float AltRoll = 0.0f;
-        IkEulerExtract(&AltYaw, &AltPitch, &AltRoll, Mat9, true);
+        IkEulerExtract(&AltYaw, &AltPitch, &AltRoll, Mat, true);
         if (!(IkEulerOutOfRange(Bone, AltYaw, AltPitch, AltRoll) > Score))
         {
             Yaw = AltYaw;
@@ -968,36 +970,36 @@ static float* IkEulerClamp(float* Out9, const float* Bone, const float* Mat9)
         bChanged = true;
     }
 
-    float Local[9];
+    Matrix Local;
     if (!bChanged)
-        IkCopy9(Local, Mat9);
+        IkCopy9(&Local, Mat);
     else
-        IkEulerRebuild(Local, Yaw, Pitch, Roll);
-    IkCopy9(Out9, Local);
-    return Out9;
+        IkEulerRebuild(&Local, Yaw, Pitch, Roll);
+    IkCopy9(Out, &Local);
+    return Out;
 }
 
 // DAT_066013a8: the float 0x36000000 = 2^-19, written out exactly.
 static const float G_IkGimbalEps = 1.9073486328125e-06f;
 
 // FUN_065fbb90 (OutYaw, OutPitch, OutRoll, Mat9, bAlt byte).
-static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const float* Mat9,
+static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const Matrix* Mat,
                            bool bAlt)
 {
-    const double M0 = (double)Mat9[0];
-    const double M3 = (double)Mat9[3];
-    const double M6 = (double)Mat9[6];
+    const double M0 = (double)Mat->E[0][0];
+    const double M3 = (double)Mat->E[1][0];
+    const double M6 = (double)Mat->E[2][0];
     const double Hyp = std::sqrt(M0 * M0 + M3 * M3);
     if (!(Hyp > (double)G_IkGimbalEps))
     {
         if (bAlt)
         {
-            *OutYaw = (float)(std::atan2((double)Mat9[5], -(double)Mat9[4]));
+            *OutYaw = (float)(std::atan2((double)Mat->E[1][2], -(double)Mat->E[1][1]));
             *OutPitch = (float)(std::atan2(M6, -Hyp));
         }
         else
         {
-            *OutYaw = (float)(std::atan2(-(double)Mat9[5], (double)Mat9[4]));
+            *OutYaw = (float)(std::atan2(-(double)Mat->E[1][2], (double)Mat->E[1][1]));
             *OutPitch = (float)(std::atan2(-M6, Hyp));
         }
         *OutRoll = 0.0f;
@@ -1005,12 +1007,12 @@ static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const
     }
     if (bAlt)
     {
-        *OutYaw = (float)(std::atan2((double)Mat9[7], -(double)Mat9[8]));
+        *OutYaw = (float)(std::atan2((double)Mat->E[2][1], -(double)Mat->E[2][2]));
         *OutPitch = (float)(std::atan2(-M6, -Hyp));
         *OutRoll = (float)(std::atan2(M3, -M0));
         return;
     }
-    *OutYaw = (float)(std::atan2((double)Mat9[7], (double)Mat9[8]));
+    *OutYaw = (float)(std::atan2((double)Mat->E[2][1], (double)Mat->E[2][2]));
     *OutPitch = (float)(std::atan2(-M6, Hyp));
     *OutRoll = (float)(std::atan2(M3, M0));
 }
@@ -1019,78 +1021,78 @@ static void IkEulerExtract(float* OutYaw, float* OutPitch, float* OutRoll, const
 static const double G_IkLogEps = (double)1.0e-5f;
 
 // FUN_065fbc90 (Out3, Quat wxyz): quat -> log axis (acos / sin).
-static void IkQuatLogVec(float* Out3, const float* Quat)
+static void IkQuatLogVec(Vector* Out, const Quaternion* Quat)
 {
-    const double W = (double)Quat[0];
+    const double W = (double)Quat->w;
     if (std::fabs(1.0 - W) < G_IkLogEps)
     {
-        Out3[0] = 0.0f;
-        Out3[1] = 0.0f;
-        Out3[2] = 0.0f;
+        Out->x = 0.0f;
+        Out->y = 0.0f;
+        Out->z = 0.0f;
         return;
     }
     const double Scale = std::acos(W) / std::sqrt(1.0 - W * W);
-    Out3[0] = (float)(Scale * (double)Quat[1]);
-    Out3[1] = (float)(Scale * (double)Quat[2]);
-    Out3[2] = (float)(Scale * (double)Quat[3]);
+    Out->x = (float)(Scale * (double)Quat->x);
+    Out->y = (float)(Scale * (double)Quat->y);
+    Out->z = (float)(Scale * (double)Quat->z);
 }
 
 // DAT_06601348: the double 1e-5 (bytes f168e388b5f8e43e).
 static const double G_IkExpEps = 1.0e-5;
 
 // FUN_065fbd30 (Out4 wxyz, Axis).
-static void IkQuatExp(float* Out4, const float* Axis)
+static void IkQuatExp(Quaternion* Out, const Vector* Axis)
 {
     const double Len = IkLen3(Axis);
     if (!(Len > G_IkExpEps))
     {
-        Out4[0] = 1.0f;
-        Out4[1] = 0.0f;
-        Out4[2] = 0.0f;
-        Out4[3] = 0.0f;
+        Out->w = 1.0f;
+        Out->x = 0.0f;
+        Out->y = 0.0f;
+        Out->z = 0.0f;
         return;
     }
     const float W = (float)(std::cos(Len));
     const double Scale = std::sin(Len) / Len;
-    Out4[0] = W;
-    Out4[1] = (float)(Scale * (double)Axis[0]);
-    Out4[2] = (float)(Scale * (double)Axis[1]);
-    Out4[3] = (float)(Scale * (double)Axis[2]);
+    Out->w = W;
+    Out->x = (float)(Scale * (double)Axis->x);
+    Out->y = (float)(Scale * (double)Axis->y);
+    Out->z = (float)(Scale * (double)Axis->z);
 }
 
 // FUN_065fbdf0 (Out3, A, B -- wxyz).
-static void IkQuatLog(float* Out3, const float* QuatA, const float* QuatB)
+static void IkQuatLog(Vector* Out, const Quaternion* QuatA, const Quaternion* QuatB)
 {
-    const double Dot = (double)QuatA[3] * QuatB[3] +
-                       (double)QuatA[2] * QuatB[2] +
-                       (double)QuatA[1] * QuatB[1] +
-                       (double)QuatA[0] * QuatB[0];
-    float UseB[4];
+    const double Dot = (double)QuatA->z * QuatB->z +
+                       (double)QuatA->y * QuatB->y +
+                       (double)QuatA->x * QuatB->x +
+                       (double)QuatA->w * QuatB->w;
+    Quaternion UseB;
     if (!(Dot >= 0.0))
     {
-        UseB[0] = -QuatB[0];
-        UseB[1] = -QuatB[1];
-        UseB[2] = -QuatB[2];
-        UseB[3] = -QuatB[3];
+        UseB.w = -QuatB->w;
+        UseB.x = -QuatB->x;
+        UseB.y = -QuatB->y;
+        UseB.z = -QuatB->z;
     }
     else
     {
-        IkCopy4(UseB, QuatB);
+        IkCopy4(&UseB, QuatB);
     }
-    float ConjA[4];
-    ConjA[0] = QuatA[0];
-    ConjA[1] = -QuatA[1];
-    ConjA[2] = -QuatA[2];
-    ConjA[3] = -QuatA[3];
-    float Prod[4];
-    AcquireMathEngine()->MulQuat(*(Quaternion*)Prod,
-                                 *(const Quaternion*)UseB,
-                                 *(const Quaternion*)ConjA); // +0x18
-    float Log3[3];
-    IkQuatLogVec(Log3, Prod);
-    Out3[0] = Log3[0] + Log3[0];
-    Out3[1] = Log3[1] + Log3[1];
-    Out3[2] = Log3[2] + Log3[2];
+    Quaternion ConjA;
+    ConjA.w = QuatA->w;
+    ConjA.x = -QuatA->x;
+    ConjA.y = -QuatA->y;
+    ConjA.z = -QuatA->z;
+    Quaternion Prod;
+    AcquireMathEngine()->MulQuat(Prod,
+                                 UseB,
+                                 ConjA); // +0x18
+    Vector Log3;
+    IkQuatLogVec(&Log3, &Prod);
+    Out->x = Log3.x + Log3.x;
+    Out->y = Log3.y + Log3.y;
+    Out->z = Log3.z + Log3.z;
 }
 
 
@@ -1164,10 +1166,10 @@ static void IkDlsWriteIdentity(float* Cells, int First)
     Cells[First + 26] = 1.0f;
 }
 
-static void IkMathMatrixToQuat(float* Out4, const float* Mat9)
+static void IkMathMatrixToQuat(Quaternion* Out, const Matrix* Mat)
 {
-    AcquireMathEngine()->MatrixToQuaternion(*(Quaternion*)Out4,
-                                            *(const Matrix*)Mat9); // +0x50
+    AcquireMathEngine()->MatrixToQuaternion(*Out,
+                                            *Mat); // +0x50
 }
 
 // The write-back: for each unlocked joint among the first JointIters, the local rotation
@@ -1179,24 +1181,24 @@ static void IkDlsWriteQuats(FIkEvent* Event, int JointIters)
     {
         if (Event->LockBytes[Joint] == 0)
         {
-            const float* Parent = G_IkNewRot[Joint];
-            float ParentT[9];
-            ParentT[0] = Parent[0];
-            ParentT[1] = Parent[3];
-            ParentT[2] = Parent[6];
-            ParentT[3] = Parent[1];
-            ParentT[4] = Parent[4];
-            ParentT[5] = Parent[7];
-            ParentT[6] = Parent[2];
-            ParentT[7] = Parent[5];
-            ParentT[8] = Parent[8];
-            float Product[9];
-            IkMathMulMatrix(Product, ParentT, G_IkNewRot[Joint + 1]);
-            float Local[9];
-            IkCopy9(Local, Product);
-            float Q[4];
-            IkMathMatrixToQuat(Q, Local);
-            IkCopy4(Event->Quats + Joint * 4, Q);
+            const Matrix* Parent = &G_IkNewRot[Joint];
+            Matrix ParentT;
+            ParentT.E[0][0] = Parent->E[0][0];
+            ParentT.E[0][1] = Parent->E[1][0];
+            ParentT.E[0][2] = Parent->E[2][0];
+            ParentT.E[1][0] = Parent->E[0][1];
+            ParentT.E[1][1] = Parent->E[1][1];
+            ParentT.E[1][2] = Parent->E[2][1];
+            ParentT.E[2][0] = Parent->E[0][2];
+            ParentT.E[2][1] = Parent->E[1][2];
+            ParentT.E[2][2] = Parent->E[2][2];
+            Matrix Product;
+            IkMathMulMatrix(&Product, &ParentT, &G_IkNewRot[Joint + 1]);
+            Matrix Local;
+            IkCopy9(&Local, &Product);
+            Quaternion Q;
+            IkMathMatrixToQuat(&Q, &Local);
+            IkCopy4(&Event->Quats[Joint], &Q);
         }
         Joint += 1;
     }
@@ -1205,23 +1207,23 @@ static void IkDlsWriteQuats(FIkEvent* Event, int JointIters)
 // The entry reads of the chain's start: IEngine +0x90 (position) and +0x98 (orientation).
 static void IkDlsReadStart(FIkEvent* Event)
 {
-    const float* StartPos = (const float*)G_Engine->GetInstancePosition(Event->StartJoint);
-    IkCopy3(G_IkNewPos[0], StartPos);
-    IkCopy3(G_IkCurPos[0], StartPos);
-    IkCopy9(G_IkNewRot[0], (const float*)G_Engine->GetInstanceOrientation(Event->StartJoint));
-    IkCopy9(G_IkCurRot[0], G_IkNewRot[0]);
+    const Vector* StartPos = G_Engine->GetInstancePosition(Event->StartJoint);
+    IkCopy3(&G_IkNewPos[0], StartPos);
+    IkCopy3(&G_IkCurPos[0], StartPos);
+    IkCopy9(&G_IkNewRot[0], G_Engine->GetInstanceOrientation(Event->StartJoint));
+    IkCopy9(&G_IkCurRot[0], &G_IkNewRot[0]);
 }
 
 // Whether the chain end's orientation is off target.
 static bool IkDlsOriOff(const FIkDlsFrame* Frame)
 {
-    float CurQ[4];
-    IkMathMatrixToQuat(CurQ, G_IkCurRot[Frame->EndIndex]);
-    float Log3[3];
-    IkQuatLog(Log3, CurQ, Frame->TargetQ);
-    const double X = (double)Log3[0];
-    const double Y = (double)Log3[1];
-    const double Z = (double)Log3[2];
+    Quaternion CurQ;
+    IkMathMatrixToQuat(&CurQ, &G_IkCurRot[Frame->EndIndex]);
+    Vector Log3;
+    IkQuatLog(&Log3, &CurQ, &Frame->TargetQ);
+    const double X = (double)Log3.x;
+    const double Y = (double)Log3.y;
+    const double Z = (double)Log3.z;
     return std::sqrt((Y * Y + Z * Z) + X * X) > 0.01;
 }
 
@@ -1286,7 +1288,7 @@ static void IkDlsDamp(FSvdMatrix* JtJ, float Damp)
 }
 
 // The rest pull, run when AimFlags bit 7 is clear.
-static void IkDlsFillRestPull(FIkEvent* Event, int JointIters, float* Rest9, float* Pull)
+static void IkDlsFillRestPull(FIkEvent* Event, int JointIters, Matrix* Rest9, float* Pull)
 {
     float* Cursor = Pull + 1;
     int Joint = 0;
@@ -1294,33 +1296,33 @@ static void IkDlsFillRestPull(FIkEvent* Event, int JointIters, float* Rest9, flo
     {
         if (Event->LockBytes[Joint] == 0)
         {
-            float Product[9];
-            IkMathMulMatrix(Product, G_IkCurRot[Joint], Event->BindMats + Joint * 9);
-            IkCopy9(Rest9, Product);
-            float CurQ[4];
-            IkMathMatrixToQuat(CurQ, G_IkCurRot[Joint + 1]);
-            float RestQ[4];
-            IkMathMatrixToQuat(RestQ, Rest9);
-            float Log3[3];
-            IkQuatLog(Log3, CurQ, RestQ);
-            Cursor[-1] = Log3[0];
-            Cursor[0] = Log3[1];
-            Cursor[1] = Log3[2];
+            Matrix Product;
+            IkMathMulMatrix(&Product, &G_IkCurRot[Joint], &Event->BindMats[Joint]);
+            IkCopy9(Rest9, &Product);
+            Quaternion CurQ;
+            IkMathMatrixToQuat(&CurQ, &G_IkCurRot[Joint + 1]);
+            Quaternion RestQ;
+            IkMathMatrixToQuat(&RestQ, Rest9);
+            Vector Log3;
+            IkQuatLog(&Log3, &CurQ, &RestQ);
+            Cursor[-1] = Log3.x;
+            Cursor[0] = Log3.y;
+            Cursor[1] = Log3.z;
             Cursor += 3;
         }
         Joint += 1;
     }
 }
 
-static void IkMathTransform(float* Out3, const float* Mat9, const float* Vec3)
+static void IkMathTransform(Vector* Out, const Matrix* Mat, const Vector* Vec)
 {
-    AcquireMathEngine()->TransformMatrix(*(Vector*)Out3,
-                                         *(const Matrix*)Mat9,
-                                         *(const Vector*)Vec3); // +0x2C
+    AcquireMathEngine()->TransformMatrix(*Out,
+                                         *Mat,
+                                         *Vec); // +0x2C
 }
 
 // The trial step over the first JointIters joints.
-static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta, float* Held3)
+static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta, Vector* Held3)
 {
     const float* Cursor = Delta + 2;
     int Joint = 0;
@@ -1330,30 +1332,30 @@ static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta,
             G_Engine->GetInstanceRelative(Event->JointIds[Joint]));
         if (Event->LockBytes[Joint] == 0)
         {
-            Held3[0] = Cursor[-2];
-            Held3[1] = Cursor[-1];
-            Held3[2] = Cursor[0];
+            Held3->x = Cursor[-2];
+            Held3->y = Cursor[-1];
+            Held3->z = Cursor[0];
             Cursor += 3;
         }
-        float Axis[3];
-        Axis[0] = (float)((double)Held3[0] * 0.5);
-        Axis[1] = (float)((double)Held3[1] * 0.5);
-        Axis[2] = (float)((double)Held3[2] * 0.5);
-        float StepQ[4];
-        IkQuatExp(StepQ, Axis);
-        float StepM[9];
-        IkMathQuatToMatrix(StepM, StepQ);
-        float Rotated[9];
-        IkMathMulMatrix(Rotated, StepM, G_IkCurRot[Joint + 1]);
-        IkCopy9(G_IkNewRot[Joint + 1], Rotated);
-        float Arm[3];
-        IkMathTransform(Arm, G_IkNewRot[Joint], Bone + 1);
-        G_IkNewPos[Joint + 1][0] = (float)((double)Arm[0] +
-                                                      (double)G_IkNewPos[Joint][0]);
-        G_IkNewPos[Joint + 1][1] = (float)((double)Arm[1] +
-                                                      (double)G_IkNewPos[Joint][1]);
-        G_IkNewPos[Joint + 1][2] = (float)((double)Arm[2] +
-                                                      (double)G_IkNewPos[Joint][2]);
+        Vector Axis;
+        Axis.x = (float)((double)Held3->x * 0.5);
+        Axis.y = (float)((double)Held3->y * 0.5);
+        Axis.z = (float)((double)Held3->z * 0.5);
+        Quaternion StepQ;
+        IkQuatExp(&StepQ, &Axis);
+        Matrix StepM;
+        IkMathQuatToMatrix(&StepM, &StepQ);
+        Matrix Rotated;
+        IkMathMulMatrix(&Rotated, &StepM, &G_IkCurRot[Joint + 1]);
+        IkCopy9(&G_IkNewRot[Joint + 1], &Rotated);
+        Vector Arm;
+        IkMathTransform(&Arm, &G_IkNewRot[Joint], (const Vector*)(Bone + 1));
+        G_IkNewPos[Joint + 1].x = (float)((double)Arm.x +
+                                                      (double)G_IkNewPos[Joint].x);
+        G_IkNewPos[Joint + 1].y = (float)((double)Arm.y +
+                                                      (double)G_IkNewPos[Joint].y);
+        G_IkNewPos[Joint + 1].z = (float)((double)Arm.z +
+                                                      (double)G_IkNewPos[Joint].z);
         Joint += 1;
     }
 }
@@ -1386,7 +1388,7 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
     const bool bPull = ((Event->AimFlags >> 7) & 1u) == 0;
     Frame->Pull.Count = Frame->Dof;
     if (bPull)
-        IkDlsFillRestPull(Event, Frame->JointIters, Frame->Block.Rest9, Frame->Pull.Cell);
+        IkDlsFillRestPull(Event, Frame->JointIters, &Frame->Block.Rest9, Frame->Pull.Cell);
 
     float Step = 2.0f;
     float PrevErr = FLT_MAX;
@@ -1394,18 +1396,18 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
     for (;;)
     {
         Step = (float)((double)Step * 0.5);
-        const float* const End = G_IkCurPos[Frame->EndIndex];
-        float Diff[3];
-        Diff[0] = (float)((double)Frame->TargetPos[0] - (double)End[0]);
-        Diff[1] = (float)((double)Frame->TargetPos[1] - (double)End[1]);
-        Diff[2] = (float)((double)Frame->TargetPos[2] - (double)End[2]);
+        const Vector* const End = &G_IkCurPos[Frame->EndIndex];
+        Vector Diff;
+        Diff.x = (float)((double)Frame->TargetPos.x - (double)End->x);
+        Diff.y = (float)((double)Frame->TargetPos.y - (double)End->y);
+        Diff.z = (float)((double)Frame->TargetPos.z - (double)End->z);
         const int Divisor = Frame->Counter >= 1 ? Frame->Counter : Frame->CounterFloor;
         const double Scale = 1.0 / (double)Divisor;
         Frame->Counter -= 1;
         Frame->Error.Count = Frame->TaskDim;
-        const float ScaledX = (float)((double)Diff[0] * Scale);
-        const float ScaledY = (float)((double)Diff[1] * Scale);
-        const double ScaledZ = Scale * (double)Diff[2];
+        const float ScaledX = (float)((double)Diff.x * Scale);
+        const float ScaledY = (float)((double)Diff.y * Scale);
+        const double ScaledZ = Scale * (double)Diff.z;
         if (Frame->bPos)
         {
             Frame->Error.Cell[0] = ScaledX;
@@ -1414,13 +1416,13 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
         }
         if (Frame->bOri)
         {
-            float CurQ[4];
-            IkMathMatrixToQuat(CurQ, G_IkCurRot[Frame->EndIndex]);
-            float Log3[3];
-            IkQuatLog(Log3, CurQ, Frame->TargetQ);
-            Frame->Error.Cell[Frame->PosDim] = Log3[0];
-            Frame->Error.Cell[Frame->PosDim + 1] = Log3[1];
-            Frame->Error.Cell[Frame->PosDim + 2] = Log3[2];
+            Quaternion CurQ;
+            IkMathMatrixToQuat(&CurQ, &G_IkCurRot[Frame->EndIndex]);
+            Vector Log3;
+            IkQuatLog(&Log3, &CurQ, &Frame->TargetQ);
+            Frame->Error.Cell[Frame->PosDim] = Log3.x;
+            Frame->Error.Cell[Frame->PosDim + 1] = Log3.y;
+            Frame->Error.Cell[Frame->PosDim + 2] = Log3.z;
         }
 
         Frame->JtE.Count = Frame->Error.Count;
@@ -1439,25 +1441,25 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
         }
         SvdMulVec(&Frame->Pinv, Frame->JtE.Cell, Frame->Delta.Cell);
 
-        float OldEnd[3];
-        IkCopy3(OldEnd, End);
-        IkDlsStepJoints(Event, Frame->JointIters, Frame->Delta.Cell, Frame->Held3);
+        Vector OldEnd;
+        IkCopy3(&OldEnd, End);
+        IkDlsStepJoints(Event, Frame->JointIters, Frame->Delta.Cell, &Frame->Held3);
         if (Frame->bPos)
         {
-            const float* const NewEnd = G_IkNewPos[Frame->EndIndex];
-            Frame->Achieved.Cell[0] = (float)((double)NewEnd[0] - (double)OldEnd[0]);
-            Frame->Achieved.Cell[1] = (float)((double)NewEnd[1] - (double)OldEnd[1]);
-            Frame->Achieved.Cell[2] = (float)((double)NewEnd[2] - (double)OldEnd[2]);
+            const Vector* const NewEnd = &G_IkNewPos[Frame->EndIndex];
+            Frame->Achieved.Cell[0] = (float)((double)NewEnd->x - (double)OldEnd.x);
+            Frame->Achieved.Cell[1] = (float)((double)NewEnd->y - (double)OldEnd.y);
+            Frame->Achieved.Cell[2] = (float)((double)NewEnd->z - (double)OldEnd.z);
         }
         if (Frame->bOri)
         {
-            float NewQ[4];
-            IkMathMatrixToQuat(NewQ, G_IkNewRot[Frame->EndIndex]);
-            float Log3[3];
-            IkQuatLog(Log3, NewQ, Frame->TargetQ);
-            Frame->Achieved.Cell[Frame->PosDim] = Log3[0];
-            Frame->Achieved.Cell[Frame->PosDim + 1] = Log3[1];
-            Frame->Achieved.Cell[Frame->PosDim + 2] = Log3[2];
+            Quaternion NewQ;
+            IkMathMatrixToQuat(&NewQ, &G_IkNewRot[Frame->EndIndex]);
+            Vector Log3;
+            IkQuatLog(&Log3, &NewQ, &Frame->TargetQ);
+            Frame->Achieved.Cell[Frame->PosDim] = Log3.x;
+            Frame->Achieved.Cell[Frame->PosDim + 1] = Log3.y;
+            Frame->Achieved.Cell[Frame->PosDim + 2] = Log3.z;
         }
 
         const double Sum = IkDlsResidual(&Frame->Error, &Frame->Achieved, Frame->TaskDim);
@@ -1506,30 +1508,30 @@ void FIkEvent::SolveDls()
     int Joint = 0;
     while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(JointIds[Joint], 0, Quats + Joint * 4);
+        G_Engine->GetJointParams(JointIds[Joint], 0, &Quats[Joint].w);
         G_Engine->GetInstanceRelative(JointIds[Joint]);
-        IkCopy3(G_IkCurPos[Joint + 1],
-                (const float*)G_Engine->GetInstancePosition(JointIds[Joint]));
-        IkCopy9(G_IkCurRot[Joint + 1],
-                (const float*)G_Engine->GetInstanceOrientation(JointIds[Joint]));
+        IkCopy3(&G_IkCurPos[Joint + 1],
+                G_Engine->GetInstancePosition(JointIds[Joint]));
+        IkCopy9(&G_IkCurRot[Joint + 1],
+                G_Engine->GetInstanceOrientation(JointIds[Joint]));
         Joint += 1;
     }
 
     Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(Frame.TargetPos, (const float*)TargetA);
+        IkCopy3(&Frame.TargetPos, (const Vector*)TargetA);
     if (Frame.bOri)
-        IkCopy9(Frame.TargetMat, (const float*)TargetB);
+        IkCopy9(&Frame.TargetMat, (const Matrix*)TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
-        const float* const End = G_IkCurPos[Frame.EndIndex];
-        const double Dx = (double)Frame.TargetPos[0] - (double)End[0];
-        const double Dy = (double)Frame.TargetPos[1] - (double)End[1];
-        const double Dz = (double)Frame.TargetPos[2] - (double)End[2];
+        const Vector* const End = &G_IkCurPos[Frame.EndIndex];
+        const double Dx = (double)Frame.TargetPos.x - (double)End->x;
+        const double Dy = (double)Frame.TargetPos.y - (double)End->y;
+        const double Dz = (double)Frame.TargetPos.z - (double)End->z;
         bNeed = std::sqrt((Dz * Dz + Dy * Dy) + Dx * Dx) > 0.001;
     }
-    IkMathMatrixToQuat(Frame.TargetQ, Frame.TargetMat);
+    IkMathMatrixToQuat(&Frame.TargetQ, &Frame.TargetMat);
     if (!bNeed)
     {
         if (!Frame.bOri)
@@ -1552,23 +1554,23 @@ void FIkEvent::SolveDls()
         {
             if (Frame.bPos)
             {
-                float Arm[3];
+                Vector Arm;
                 if (Link == JointCount)
                 {
-                    Arm[0] = 0.0f;
-                    Arm[1] = 0.0f;
-                    Arm[2] = 0.0f;
+                    Arm.x = 0.0f;
+                    Arm.y = 0.0f;
+                    Arm.z = 0.0f;
                 }
                 else
                 {
                     const float* Bone = (const float*)(
                         G_Engine->GetInstanceRelative(JointIds[Link]));
-                    IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
+                    IkMathTransform(&Arm, &G_IkCurRot[Link], (const Vector*)(Bone + 1));
                 }
                 if (LockBytes[Link - 1] != 0)
-                    IkDlsAddSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
+                    IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
                 else
-                    IkDlsWriteSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
+                    IkDlsWriteSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
             }
             if (Frame.bOri && LockBytes[Link - 1] == 0)
                 IkDlsWriteIdentity(Cells, Col + 12 * Frame.PosDim);
@@ -1600,32 +1602,32 @@ void FIkEvent::SolveDlsAlt()
     int Joint = 0;
     while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(JointIds[Joint], 0, Quats + Joint * 4);
-        IkCopy3(G_IkCurPos[Joint + 1],
-                (const float*)G_Engine->GetInstancePosition(JointIds[Joint]));
-        IkCopy9(G_IkCurRot[Joint + 1],
-                (const float*)G_Engine->GetInstanceOrientation(JointIds[Joint]));
+        G_Engine->GetJointParams(JointIds[Joint], 0, &Quats[Joint].w);
+        IkCopy3(&G_IkCurPos[Joint + 1],
+                G_Engine->GetInstancePosition(JointIds[Joint]));
+        IkCopy9(&G_IkCurRot[Joint + 1],
+                G_Engine->GetInstanceOrientation(JointIds[Joint]));
         Joint += 1;
     }
 
     Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(Frame.TargetPos, (const float*)TargetA);
+        IkCopy3(&Frame.TargetPos, (const Vector*)TargetA);
     if (Frame.bOri)
-        IkCopy9(Frame.TargetMat, (const float*)TargetB);
+        IkCopy9(&Frame.TargetMat, (const Matrix*)TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
-        const float* const End = G_IkCurPos[Frame.EndIndex];
-        const float Fx = (float)((double)Frame.TargetPos[0] - (double)End[0]);
-        const float Fy = (float)((double)Frame.TargetPos[1] - (double)End[1]);
-        const float Fz = (float)((double)Frame.TargetPos[2] - (double)End[2]);
+        const Vector* const End = &G_IkCurPos[Frame.EndIndex];
+        const float Fx = (float)((double)Frame.TargetPos.x - (double)End->x);
+        const float Fy = (float)((double)Frame.TargetPos.y - (double)End->y);
+        const float Fz = (float)((double)Frame.TargetPos.z - (double)End->z);
         const double X = (double)Fx;
         const double Y = (double)Fy;
         const double Z = (double)Fz;
         bNeed = std::sqrt((Y * Y + Z * Z) + X * X) > 0.001;
     }
-    IkMathMatrixToQuat(Frame.TargetQ, Frame.TargetMat);
+    IkMathMatrixToQuat(&Frame.TargetQ, &Frame.TargetMat);
     if (!bNeed)
     {
         if (!Frame.bOri)
@@ -1648,12 +1650,12 @@ void FIkEvent::SolveDlsAlt()
             {
                 const float* Bone = (const float*)(
                     G_Engine->GetInstanceRelative(JointIds[Link]));
-                float Arm[3];
-                IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
+                Vector Arm;
+                IkMathTransform(&Arm, &G_IkCurRot[Link], (const Vector*)(Bone + 1));
                 if (LockBytes[Link - 1] != 0)
-                    IkDlsAddSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
+                    IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
                 else
-                    IkDlsWriteSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
+                    IkDlsWriteSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
             }
             if (Frame.bOri && LockBytes[Link - 1] == 0)
                 IkDlsWriteIdentity(Cells, Col + 12 * Frame.PosDim);
@@ -1667,9 +1669,9 @@ void FIkEvent::SolveDlsAlt()
 
 // Float-array views of the math engine slots the IK solvers call (retail: DAT_066033a8, filled
 // by FUN_06600de0 on first use). They add no checks.
-static void IkMathMulMatrix(float* Out9, const float* Left9, const float* Right9)
+static void IkMathMulMatrix(Matrix* Out, const Matrix* Left, const Matrix* Right)
 {
-    AcquireMathEngine()->MulMatrix(*(Matrix*)Out9,
-                                   *(const Matrix*)Left9,
-                                   *(const Matrix*)Right9); // +0x20
+    AcquireMathEngine()->MulMatrix(*Out,
+                                   *Left,
+                                   *Right); // +0x20
 }

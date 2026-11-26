@@ -194,9 +194,9 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
             float const Y = static_cast<float>(Ini->get_value_float(1));
             float const X = static_cast<float>(Ini->get_value_float(0));
             float const Z = static_cast<float>(Ini->get_value_float(2));
-            Offset[0] = X;
-            Offset[1] = Y;
-            Offset[2] = Z;
+            Offset.x = X;
+            Offset.y = Y;
+            Offset.z = Z;
             continue;
         }
         if (Ini->is_value("hardpoint"))
@@ -219,9 +219,9 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
             float const Y = static_cast<float>(Ini->get_value_float(1));
             float const X = static_cast<float>(Ini->get_value_float(0));
             float const Z = static_cast<float>(Ini->get_value_float(2));
-            HalfExtents[0] = X;
-            HalfExtents[1] = Y;
-            HalfExtents[2] = Z;
+            HalfExtents.x = X;
+            HalfExtents.y = Y;
+            HalfExtents.z = Z;
             continue;
         }
         if (Ini->is_value("horizontal"))
@@ -270,15 +270,15 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
     return bResult;
 }
 
-void CargoBarControl::Init(char const* MeshPath, float const* NewOffset, char const* Hardpoint,
-                           float const* NewHalfExtents, unsigned char bNewHorizontal,
+void CargoBarControl::Init(char const* MeshPath, Vector const* NewOffset, char const* Hardpoint,
+                           Vector const* NewHalfExtents, unsigned char bNewHorizontal,
                            int NewToolTip2Ids, unsigned NewColor, unsigned NewHighlightColor)
 {
     // FUN_0055ee80 (RET 0x20).
     SetMesh(MeshPath, 0);
-    Offset[0] = NewOffset[0];
-    Offset[1] = NewOffset[1];
-    Offset[2] = NewOffset[2];
+    Offset.x = NewOffset->x;
+    Offset.y = NewOffset->y;
+    Offset.z = NewOffset->z;
     if (Hardpoint != nullptr)
     {
         SetIdentity9(&AttachOrientation);
@@ -292,9 +292,9 @@ void CargoBarControl::Init(char const* MeshPath, float const* NewOffset, char co
                 ParentControl->GetHardpointTransform(Hardpoint, &AttachXform);
         }
     }
-    HalfExtents[0] = NewHalfExtents[0];
-    HalfExtents[1] = NewHalfExtents[1];
-    HalfExtents[2] = NewHalfExtents[2];
+    HalfExtents.x = NewHalfExtents->x;
+    HalfExtents.y = NewHalfExtents->y;
+    HalfExtents.z = NewHalfExtents->z;
     bHorizontal = bNewHorizontal;
     ToolTip2Ids = NewToolTip2Ids;
     bToolTip = (NewToolTip2Ids != 0) ? 1 : 0;
@@ -312,9 +312,9 @@ void CargoBarControl::Draw()
 
     Transform Matrix;
     memcpy(&Matrix, &Orientation, 9 * sizeof(float));
-    Matrix.Translation.x = Position.x + Offset[0];
-    Matrix.Translation.y = Position.y + Offset[1];
-    Matrix.Translation.z = Position.z + Offset[2];
+    Matrix.Translation.x = Position.x + Offset.x;
+    Matrix.Translation.y = Position.y + Offset.y;
+    Matrix.Translation.z = Position.z + Offset.z;
     Win3DBindModelview(nullptr, &Matrix);
     Win3DDisable(kWin3DTexture2D);
     Win3DDisable(kWin3DDepthTest);
@@ -327,8 +327,8 @@ void CargoBarControl::Draw()
     // Nothing but the border when Capacity == 0.
     if (Capacity != 0.0f)
     {
-        float const Width2 = HalfExtents[0] + HalfExtents[0];
-        float const Height2 = HalfExtents[1] + HalfExtents[1];
+        float const Width2 = HalfExtents.x + HalfExtents.x;
+        float const Height2 = HalfExtents.y + HalfExtents.y;
 
         if (bHorizontal != 0)
         {
@@ -340,7 +340,7 @@ void CargoBarControl::Draw()
                 {
                     HeadLength = HeadSegment / Capacity * Width2;
                     Win3DColor4ub(Segment[0], Segment[1], Segment[2], 0xff);
-                    DrawBarQuad(-HalfExtents[0], -HalfExtents[1], HeadLength, Height2);
+                    DrawBarQuad(-HalfExtents.x, -HalfExtents.y, HeadLength, Height2);
                 }
 
                 // The tail segment ends at Used. Unlike the head, it scales through a double
@@ -352,13 +352,13 @@ void CargoBarControl::Draw()
                 {
                     TailLength = static_cast<float>(Inverse * TailSegment * Width2);
                     Win3DColor4ub(Segment[0], Segment[1], Segment[2], 0xff);
-                    float const TailStart = UsedLength - HalfExtents[0] - TailLength;
-                    DrawBarQuad(TailStart, -HalfExtents[1], TailLength, Height2);
+                    float const TailStart = UsedLength - HalfExtents.x - TailLength;
+                    DrawBarQuad(TailStart, -HalfExtents.y, TailLength, Height2);
                 }
 
                 float const FillLength = UsedLength - HeadLength - TailLength;
                 Win3DColor4ub(Color[0], Color[1], Color[2], Color[3]);
-                DrawBarQuad(HeadLength - HalfExtents[0], -HalfExtents[1], FillLength, Height2);
+                DrawBarQuad(HeadLength - HalfExtents.x, -HalfExtents.y, FillLength, Height2);
             }
         }
         else if (Height2 != 0.0f)
@@ -369,7 +369,7 @@ void CargoBarControl::Draw()
             {
                 HeadLength = HeadSegment / Capacity * Height2;
                 Win3DColor4ub(Segment[0], Segment[1], Segment[2], 0xff);
-                DrawBarQuad(-HalfExtents[0], -HalfExtents[1], Width2, HeadLength);
+                DrawBarQuad(-HalfExtents.x, -HalfExtents.y, Width2, HeadLength);
             }
 
             double const Inverse = 1.0 / Capacity;
@@ -379,13 +379,13 @@ void CargoBarControl::Draw()
             {
                 TailLength = static_cast<float>(Inverse * TailSegment * Height2);
                 Win3DColor4ub(Segment[0], Segment[1], Segment[2], 0xff);
-                float const TailStart = UsedLength - HalfExtents[1] - TailLength;
-                DrawBarQuad(-HalfExtents[0], TailStart, Width2, TailLength);
+                float const TailStart = UsedLength - HalfExtents.y - TailLength;
+                DrawBarQuad(-HalfExtents.x, TailStart, Width2, TailLength);
             }
 
             float const FillLength = UsedLength - HeadLength - TailLength;
             Win3DColor4ub(Color[0], Color[1], Color[2], Color[3]);
-            DrawBarQuad(-HalfExtents[0], HeadLength - HalfExtents[1], Width2, FillLength);
+            DrawBarQuad(-HalfExtents.x, HeadLength - HalfExtents.y, Width2, FillLength);
         }
     }
 
@@ -393,41 +393,40 @@ void CargoBarControl::Draw()
     {
         Win3DColor4ub(Chrome[0], Chrome[1], Chrome[2], Chrome[3]);
         Win3DBegin(kWin3DLineLoop);
-        Win3DVertex3f(-HalfExtents[0], -HalfExtents[1], 0.0f);
-        Win3DVertex3f(HalfExtents[0], -HalfExtents[1], 0.0f);
-        Win3DVertex3f(HalfExtents[0], HalfExtents[1], 0.0f);
-        Win3DVertex3f(-HalfExtents[0], HalfExtents[1], 0.0f);
+        Win3DVertex3f(-HalfExtents.x, -HalfExtents.y, 0.0f);
+        Win3DVertex3f(HalfExtents.x, -HalfExtents.y, 0.0f);
+        Win3DVertex3f(HalfExtents.x, HalfExtents.y, 0.0f);
+        Win3DVertex3f(-HalfExtents.x, HalfExtents.y, 0.0f);
         Win3DEnd();
     }
 
     PostDraw();
 }
 
-void CargoBarControl::SetPosition(float const* NewPosition)
+void CargoBarControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_0055f5a0 (RET 4): WinControl's with the attach position added.
-    float Attach[3];
-    GetAttachPosition(reinterpret_cast<Vector*>(Attach));
-    float Placed[3];
-    Placed[0] = Attach[0] + NewPosition[0];
-    Placed[1] = Attach[1] + NewPosition[1];
-    Placed[2] = Attach[2] + NewPosition[2];
-    WinControl::SetPosition(Placed);
+    Vector Attach;
+    GetAttachPosition(&Attach);
+    Vector Placed;
+    Placed.x = Attach.x + NewPosition->x;
+    Placed.y = Attach.y + NewPosition->y;
+    Placed.z = Attach.z + NewPosition->z;
+    WinControl::SetPosition(&Placed);
 }
 
 void CargoBarControl::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_0055f5f0 (RET 4): WinControl's on NewOrientation * the attach orientation.
-    float Attach[9];
-    GetAttachOrientation(reinterpret_cast<Matrix*>(Attach));
+    Matrix Attach;
+    GetAttachOrientation(&Attach);
     if (G_CargoBarMath == nullptr)
         G_CargoBarMath = Acquire3DMathEngine();
     Matrix Product;
-    G_CargoBarMath->MulMatrix(Product, *reinterpret_cast<Matrix const*>(NewOrientation),
-                              *reinterpret_cast<Matrix const*>(Attach));
-    float Copy[9];
-    memcpy(Copy, &Product, sizeof(Copy));
-    WinControl::SetOrientation(reinterpret_cast<Matrix const*>(Copy));
+    G_CargoBarMath->MulMatrix(Product, *NewOrientation, Attach);
+    Matrix Copy;
+    memcpy(&Copy, &Product, sizeof(Copy));
+    WinControl::SetOrientation(&Copy);
 }
 
 void CargoBarControl::Update()
@@ -479,7 +478,7 @@ void CargoBarControl::Update()
     Win3D::Update();
 }
 
-void CargoBarControl::MouseEnter(float const* Ray)
+void CargoBarControl::MouseEnter(Vector const* Ray)
 {
     // FUN_0055fa00 (RET 4): the parent WinControl hears 0x2c with this.
     (void)Ray;
@@ -492,7 +491,7 @@ void CargoBarControl::MouseEnter(float const* Ray)
     ParentControl->SetProperty(kWinNotifyHighlight, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
 }
 
-void CargoBarControl::MouseLeave(float const* Ray)
+void CargoBarControl::MouseLeave(Vector const* Ray)
 {
     // FUN_0055fa40 (RET 4).
     (void)Ray;
@@ -505,16 +504,16 @@ void CargoBarControl::MouseLeave(float const* Ray)
     ParentControl->SetProperty(kWinNotifyUnhighlight, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
 }
 
-bool CargoBarControl::HitTest(float const* Ray)
+bool CargoBarControl::HitTest(Vector const* Ray)
 {
     // LAB_0055fa80 (RET 4). Unlike WinControl's there is no instance transform, no hit offset
     // and no parent notification.
-    float Matrix[12];
-    memcpy(Matrix, &Orientation, 9 * sizeof(float));
-    Matrix[9] = Position.x + Offset[0];
-    Matrix[10] = Position.y + Offset[1];
-    Matrix[11] = Position.z + Offset[2];
-    return Win3DRayHitsAabbHalfExtents(HalfExtents, Matrix, Ray);
+    Transform Xform;
+    memcpy(&Xform, &Orientation, 9 * sizeof(float));
+    Xform.Translation.x = Position.x + Offset.x;
+    Xform.Translation.y = Position.y + Offset.y;
+    Xform.Translation.z = Position.z + Offset.z;
+    return Win3DRayHitsAabbHalfExtents(&HalfExtents, &Xform, Ray);
 }
 
 intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -563,8 +562,8 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 }
 
 WinControl* WinControl::CreateCargoBarControl(char const* Name, char const* MeshPath,
-                                              float const* NewOffset, char const* Hardpoint,
-                                              float const* NewHalfExtents,
+                                              Vector const* NewOffset, char const* Hardpoint,
+                                              Vector const* NewHalfExtents,
                                               unsigned char bHorizontal, int ToolTip2Ids,
                                               unsigned Color, unsigned HighlightColor)
 {

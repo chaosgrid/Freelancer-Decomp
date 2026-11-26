@@ -484,9 +484,9 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
 
     for (int Axis = 0; Axis < 3; ++Axis)
     {
-        CharacterBoxHome[Axis] = (&CharacterBox->Position.x)[Axis];
-        MotdBoxHome[Axis] = (&MotdBox->Position.x)[Axis];
-        DetailsBoxHome[Axis] = (&ServerDetailsBox->Position.x)[Axis];
+        (&CharacterBoxHome.x)[Axis] = (&CharacterBox->Position.x)[Axis];
+        (&MotdBoxHome.x)[Axis] = (&MotdBox->Position.x)[Axis];
+        (&DetailsBoxHome.x)[Axis] = (&ServerDetailsBox->Position.x)[Axis];
     }
     return true;
 }
@@ -966,37 +966,37 @@ void PageCharacterSelect::Update()
 
         if (SlideT < 0.0)
         {
-            float const Along[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
+            Vector const Along = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float const Against[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-            float const Up[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
-            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            float Scaled[3];
-            float Position[3];
-            ScaleVec3(Scaled, Against, 1.20000005f);
-            Win3DVec3Add(Position, CharacterBoxHome, Scaled);
-            CharacterBox->SetPosition(Position);
-            Win3DVec3Add(Position, MotdBoxHome, Up);
-            MotdBox->SetPosition(Position);
-            ScaleVec3(Scaled, Along, 1.20000005f);
-            Win3DVec3Add(Position, DetailsBoxHome, Scaled);
-            ServerDetailsBox->SetPosition(Position);
+            Vector const Up = {0.0f, static_cast<float>(SlideT), 0.0f};
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            Vector Scaled;
+            Vector Position;
+            ScaleVec3(&Scaled.x, Against, 1.20000005f);
+            Win3DVec3Add(&Position, &CharacterBoxHome, &Scaled);
+            CharacterBox->SetPosition(&Position);
+            Win3DVec3Add(&Position, &MotdBoxHome, &Up);
+            MotdBox->SetPosition(&Position);
+            ScaleVec3(&Scaled.x, &Along.x, 1.20000005f);
+            Win3DVec3Add(&Position, &DetailsBoxHome, &Scaled);
+            ServerDetailsBox->SetPosition(&Position);
         }
         else if (SlideT > 0.0)
         {
             // Arrived (strictly past 0): everything in place, shown and live; SlideT parked at 2.0.
-            float const ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            CharacterBox->SetPosition(CharacterBoxHome);
-            MotdBox->SetPosition(MotdBoxHome);
-            ServerDetailsBox->SetPosition(DetailsBoxHome);
+            Vector const ZeroOffset = {0.0f, 0.0f, 0.0f};
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            CharacterBox->SetPosition(&CharacterBoxHome);
+            MotdBox->SetPosition(&MotdBoxHome);
+            ServerDetailsBox->SetPosition(&DetailsBoxHome);
             LoadCharacter->SetSkipUpload(false);
             NewCharacter->SetSkipUpload(false);
             DeleteCharacter->SetSkipUpload(false);
@@ -1038,28 +1038,28 @@ void PageCharacterSelect::Update()
         // At or below -0.9, or unordered, the leave ends.
         if (SlideT > -0.9)
         {
-            float const Along[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
+            Vector const Along = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float const Negated = static_cast<float>(-SlideT);
-            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
-            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Along), 0);
             // The same three positions as the slide-in, but built with FUN_00422b80's float sums.
             float const Out[3] = {Negated * 1.20000005f, 0.0f, 0.0f};
-            float Position[3] = {Out[0] + CharacterBoxHome[0], Out[1] + CharacterBoxHome[1],
-                                 Out[2] + CharacterBoxHome[2]};
-            CharacterBox->SetPosition(Position);
-            Position[0] = MotdBoxHome[0];
-            Position[1] = Along[0] + MotdBoxHome[1];
-            Position[2] = MotdBoxHome[2];
-            MotdBox->SetPosition(Position);
-            float const Right[3] = {Along[0] * 1.20000005f, Along[1] * 1.20000005f,
-                                    Along[2] * 1.20000005f};
-            Position[0] = Right[0] + DetailsBoxHome[0];
-            Position[1] = Right[1] + DetailsBoxHome[1];
-            Position[2] = Right[2] + DetailsBoxHome[2];
-            ServerDetailsBox->SetPosition(Position);
+            Vector Position = {Out[0] + CharacterBoxHome.x, Out[1] + CharacterBoxHome.y,
+                               Out[2] + CharacterBoxHome.z};
+            CharacterBox->SetPosition(&Position);
+            Position.x = MotdBoxHome.x;
+            Position.y = Along.x + MotdBoxHome.y;
+            Position.z = MotdBoxHome.z;
+            MotdBox->SetPosition(&Position);
+            float const Right[3] = {Along.x * 1.20000005f, Along.y * 1.20000005f,
+                                    Along.z * 1.20000005f};
+            Position.x = Right[0] + DetailsBoxHome.x;
+            Position.y = Right[1] + DetailsBoxHome.y;
+            Position.z = Right[2] + DetailsBoxHome.z;
+            ServerDetailsBox->SetPosition(&Position);
         }
         else
         {

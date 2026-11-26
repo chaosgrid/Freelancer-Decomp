@@ -908,7 +908,7 @@ bool CEqObj::get_explosion_dmg_bounding_sphere(float& OutRadius, Vector& OutCent
 
     // Math engine slot +0x28, never null-tested.
     Vector World;
-    Acquire3DMathEngine()->TransformXform(World, (Transform const&)Orientation, ExplosionDmgCenter);
+    Acquire3DMathEngine()->TransformXform(World, get_transform(), ExplosionDmgCenter);
     OutCenter = World;
     return true;
 }
@@ -925,7 +925,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     };
 
     I3DMathEngine* const Math = Acquire3DMathEngine();     // DAT_063fc2e4 cache
-    Transform const& Xform = (Transform const&)Orientation;   // this+0x08
+    Transform const& Xform = get_transform();   // this+0x08
     const InstanceIndex Instance = EngineInstanceId;
 
     // IEngine +0x88 extent; the AABB starts as the root sphere.

@@ -232,16 +232,16 @@ FTextureRef* GetHudStaticTexture();
 int GetHudStaticBlend();
 
 // FUN_004c8b10 (cdecl Out, In, Length) -- Out = In * (1 / Length).
-void HudVec3ScaleByInverse(float* Out, float const* In, float Length);
+void HudVec3ScaleByInverse(Vector* Out, Vector const* In, float Length);
 
 // The three rotation helpers on a row-major 3x3 matrix (retail thiscall on the matrix).
 // FUN_004c8b40 -- rotation about Y: [ cos 0 sin ; 0 1 0 ; -sin 0 cos ].
-void HudMatrixRotationY(float* M, float Angle);
+void HudMatrixRotationY(Matrix* M, float Angle);
 // FUN_004c8b80 -- rows 1 and 2 turned column by column:
 //   row1 = row1 * cos - sin * row2;  row2 = row1 * sin + cos * row2.
-void HudMatrixRotateRows12(float* M, float Angle);
+void HudMatrixRotateRows12(Matrix* M, float Angle);
 // FUN_004c8bc0 -- rows 0 and 1 turned the same way.
-void HudMatrixRotateRows01(float* M, float Angle);
+void HudMatrixRotateRows01(Matrix* M, float Angle);
 
 // FUN_0053eb10 (cdecl X, Y) -- the angle of (X, Y) measured from the +Y axis: 0 for (0, 0);
 // with |X| > |Y| it is atan(Y / |X|) -/+ pi/2, otherwise atan(-X / |Y|), shifted by +/- pi

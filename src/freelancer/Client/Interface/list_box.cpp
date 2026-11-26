@@ -60,13 +60,13 @@ ListBox::~ListBox()
     }
 }
 
-bool ListBox::HitTest(float const* Ray)
+bool ListBox::HitTest(Vector const* Ray)
 {
     // FUN_005a26a0: the ray's point at this object's depth inside [x, x + width] and
     // [y - height, y]. The y product is rounded to float; the x difference stays double.
-    double const T = static_cast<double>(Position.z) / Ray[2];
-    float const PointY = static_cast<float>(T * Ray[1]);
-    double const DeltaX = T * Ray[0] - Position.x;
+    double const T = static_cast<double>(Position.z) / Ray->z;
+    float const PointY = static_cast<float>(T * Ray->y);
+    double const DeltaX = T * Ray->x - Position.x;
     if (!(DeltaX >= 0.0))
         return false;
     if (!(DeltaX <= Width))
@@ -108,7 +108,7 @@ void ListBox::Update()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY);
+    TextWinProjectPoint(&Position, &ScreenX, &ScreenY);
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
     TextWinProjectExtent(Width, Height, Position.z, &ScreenWidth, &ScreenHeight);
@@ -149,7 +149,7 @@ void ListBox::Draw()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY);
+    TextWinProjectPoint(&Position, &ScreenX, &ScreenY);
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
     TextWinProjectExtent(Width, Height, Position.z, &ScreenWidth, &ScreenHeight);
@@ -265,7 +265,7 @@ void ListBox::Draw()
     Win3DDrawChildren(this);
 }
 
-void ListBox::MouseOver(float const* /*Ray*/)
+void ListBox::MouseOver(Vector const* /*Ray*/)
 {
     // LAB_0059c8b0 (RET 4).
     Timer894 = 10.0f;

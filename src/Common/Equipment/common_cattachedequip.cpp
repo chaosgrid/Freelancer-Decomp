@@ -245,8 +245,8 @@ bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
         ComputeBoundingSphere(BoundRadius, BoundCenter);
     }
     long Root = Attachment->GetRootIndex();
-    const float* Xform = (const float*)DALib::Engine->GetInstanceTransform(Root);
-    Acquire3DMathEngine()->TransformXform(World, *(Transform const*)Xform, BoundCenter);
+    Transform const* Xform = DALib::Engine->GetInstanceTransform(Root);
+    Acquire3DMathEngine()->TransformXform(World, *Xform, BoundCenter);
     Out = World;
     return true;
 }

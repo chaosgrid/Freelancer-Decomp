@@ -1094,13 +1094,13 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
     if (CoreA != nullptr)
     {
         const Vector& C0 = F->CoordOSCrossNormal[0];
-        const float V[3] = { (float)((double)(C0.x) * CoreA->InvRotInertia.x),
-                             (float)((double)(C0.y) * CoreA->InvRotInertia.y),
-                             (float)((double)(C0.z) * CoreA->InvRotInertia.z) };
+        const Vector V = { (float)((double)(C0.x) * CoreA->InvRotInertia.x),
+                           (float)((double)(C0.y) * CoreA->InvRotInertia.y),
+                           (float)((double)(C0.z) * CoreA->InvRotInertia.z) };
         const double S = (double)(-Impulse);
-        CoreA->RotSpeed.y = (float)(S * V[1] + CoreA->RotSpeed.y);
-        CoreA->RotSpeed.z = (float)(S * V[2] + CoreA->RotSpeed.z);
-        CoreA->RotSpeed.x = (float)(S * V[0] + CoreA->RotSpeed.x);
+        CoreA->RotSpeed.y = (float)(S * V.y + CoreA->RotSpeed.y);
+        CoreA->RotSpeed.z = (float)(S * V.z + CoreA->RotSpeed.z);
+        CoreA->RotSpeed.x = (float)(S * V.x + CoreA->RotSpeed.x);
 
         const double S2 = (double)((float)(-((double)(CoreA->InvMass) * Impulse)));
         CoreA->Speed.y = (float)(S2 * N.y + CoreA->Speed.y);
@@ -1111,13 +1111,13 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
     if (CoreB != nullptr)
     {
         const Vector& C1 = F->CoordOSCrossNormal[1];
-        const float V[3] = { (float)((double)(C1.x) * CoreB->InvRotInertia.x),
-                             (float)((double)(C1.y) * CoreB->InvRotInertia.y),
-                             (float)((double)(C1.z) * CoreB->InvRotInertia.z) };
+        const Vector V = { (float)((double)(C1.x) * CoreB->InvRotInertia.x),
+                           (float)((double)(C1.y) * CoreB->InvRotInertia.y),
+                           (float)((double)(C1.z) * CoreB->InvRotInertia.z) };
         const double S = (double)(Impulse);
-        CoreB->RotSpeed.y = (float)(S * V[1] + CoreB->RotSpeed.y);
-        CoreB->RotSpeed.z = (float)(S * V[2] + CoreB->RotSpeed.z);
-        CoreB->RotSpeed.x = (float)(S * V[0] + CoreB->RotSpeed.x);
+        CoreB->RotSpeed.y = (float)(S * V.y + CoreB->RotSpeed.y);
+        CoreB->RotSpeed.z = (float)(S * V.z + CoreB->RotSpeed.z);
+        CoreB->RotSpeed.x = (float)(S * V.x + CoreB->RotSpeed.x);
 
         const double S2 = (double)(CoreB->InvMass) * (double)(Impulse);
         CoreB->Speed.y = (float)(S2 * N.y + CoreB->Speed.y);

@@ -84,7 +84,8 @@ namespace
     Win3D* G_Hover = nullptr;
 
     // DAT_0067dbcc -- the mouse ray, seeded (0, 0, -1); written by the Win3D input handler
-    // FUN_0059d140 case 2.
+    // FUN_0059d140 case 2. A plain array: every caller of Win3DPick / Win3DPickWithin passes it,
+    // and the compiled code only folds it into them (and into HitTestWidescreen) as an array.
     float G_MouseRay[3] = {0.0f, 0.0f, -1.0f};
 
     // DAT_0067dcd0 -- how many registry nodes the last Win3DUpdateAll walked.
@@ -233,14 +234,14 @@ namespace
 
     // Ray is the frame's mouse ray; a shifted object is tested against the cursor's ray through
     // the shifted camera instead.
-    bool HitTestWidescreen(Win3D* Object, float const* Ray)
+    bool HitTestWidescreen(Win3D* Object, Vector const* Ray)
     {
         float const Shift = WidescreenHudShiftPixelsFor(Object);
         if (Shift == WidescreenHudCurrentShift())
             return Object->HitTest(Ray);
         FWidescreenHudShiftScope const Scope(Shift, false);
-        float Shifted[3];
-        return Object->HitTest(Win3DGetMouseRay(Shifted));
+        Vector Shifted;
+        return Object->HitTest(Win3DGetMouseRay(&Shifted));
     }
 
     enum class EMouseCall
@@ -253,14 +254,14 @@ namespace
     void MouseCallWidescreen(Win3D* Object, EMouseCall Call)
     {
         FWidescreenHudShiftScope const Scope(WidescreenHudShiftPixelsFor(Object), false);
-        float Ray[3];
-        Win3DGetMouseRay(Ray);
+        Vector Ray;
+        Win3DGetMouseRay(&Ray);
         if (Call == EMouseCall::Enter)
-            Object->MouseEnter(Ray);
+            Object->MouseEnter(&Ray);
         else if (Call == EMouseCall::Over)
-            Object->MouseOver(Ray);
+            Object->MouseOver(&Ray);
         else
-            Object->MouseLeave(Ray);
+            Object->MouseLeave(&Ray);
     }
 
     bool MouseEventWidescreen(Win3D* Object, FWin3DMouseEvent const* Event)
@@ -378,18 +379,18 @@ bool Win3D::IsDescendantOf(Win3D* Ancestor)
     return false;
 }
 
-bool Win3D::HitTest(float const* /*Ray*/)
+bool Win3D::HitTest(Vector const* /*Ray*/)
 {
     // FUN_0053f330.
     return false;
 }
 
-void Win3D::SetPosition(float const* NewPosition)
+void Win3D::SetPosition(Vector const* NewPosition)
 {
     // LAB_004b5020.
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
 }
 
 bool Win3D::IsPositionInViewport(unsigned /*A*/)
@@ -408,7 +409,7 @@ void Win3D::SetTransform(Transform const* NewXform)
 {
     // LAB_00595f70: both virtual calls.
     SetOrientation(&NewXform->Rotation);
-    SetPosition(&NewXform->Translation.x);
+    SetPosition(&NewXform->Translation);
 }
 
 bool Win3D::Create(Win3D* NewParent, void* /*Data*/)
@@ -470,17 +471,17 @@ void Win3D::Draw()
     Win3DDrawChildren(this);
 }
 
-void Win3D::MouseOver(float const* /*Ray*/)
+void Win3D::MouseOver(Vector const* /*Ray*/)
 {
     // FUN_0053e4a0.
 }
 
-void Win3D::MouseEnter(float const* /*Ray*/)
+void Win3D::MouseEnter(Vector const* /*Ray*/)
 {
     // FUN_0053e4a0.
 }
 
-void Win3D::MouseLeave(float const* /*Ray*/)
+void Win3D::MouseLeave(Vector const* /*Ray*/)
 {
     // FUN_0053e4a0.
 }
@@ -689,7 +690,7 @@ Win3D* Win3DGetFirstRegistered()
     return nullptr;
 }
 
-float* Win3DGetMouseRay(float* Out)
+Vector* Win3DGetMouseRay(Vector* Out)
 {
     // FUN_0059da70.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -700,15 +701,15 @@ float* Win3DGetMouseRay(float* Out)
         return Out;
     }
 #endif
-    Out[0] = G_MouseRay[0];
-    Out[1] = G_MouseRay[1];
-    Out[2] = G_MouseRay[2];
+    Out->x = G_MouseRay[0];
+    Out->y = G_MouseRay[1];
+    Out->z = G_MouseRay[2];
     return Out;
 }
 
-float* Win3DMouseRayStorage()
+Vector* Win3DMouseRayStorage()
 {
-    return G_MouseRay;
+    return reinterpret_cast<Vector*>(G_MouseRay);
 }
 
 FSpaceCamera* Win3DGetCamera()
@@ -835,7 +836,7 @@ bool Win3DDispatchKey(FHudCmdRecord const* Record)
     return bHandled;
 }
 
-Win3D* Win3DPick(float const* Ray)
+Win3D* Win3DPick(Vector const* Ray)
 {
     // FUN_0059dd80.
     Win3D* Best = nullptr;
@@ -900,7 +901,7 @@ Win3D* Win3DPick(float const* Ray)
     return Best;
 }
 
-Win3D* Win3DPickWithin(Win3D* Capture, float const* Ray)
+Win3D* Win3DPickWithin(Win3D* Capture, Vector const* Ray)
 {
     // FUN_0059de50 (cdecl). Unlike Win3DPick the ancestor-visibility walk runs only after the
     // depth comparison, and only on the "deeper" branch.
@@ -1023,11 +1024,11 @@ void Win3DUpdateAll(double DeltaSeconds)
     {
         if (G_CaptureHead == nullptr)
         {
-            Picked = Win3DPick(G_MouseRay);
+            Picked = Win3DPick(reinterpret_cast<Vector const*>(G_MouseRay));
         }
         else
         {
-            Picked = Win3DPickWithin(G_CaptureHead, G_MouseRay);
+            Picked = Win3DPickWithin(G_CaptureHead, reinterpret_cast<Vector const*>(G_MouseRay));
             if (Picked == nullptr)
                 Picked = G_CaptureHead;
         }
@@ -1478,7 +1479,7 @@ namespace
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
             if (G_CaptureHead != nullptr)
                 return WheelWidescreen(G_CaptureHead, GetClientMouseWheel());
-            Win3D* const Picked = Win3DPick(G_MouseRay);
+            Win3D* const Picked = Win3DPick(reinterpret_cast<Vector const*>(G_MouseRay));
             if (Picked == nullptr)
                 return false;
             return WheelWidescreen(Picked, GetClientMouseWheel());
@@ -1518,11 +1519,11 @@ namespace
             Win3D* Picked = nullptr;
             if (G_CaptureHead == nullptr)
             {
-                Picked = Win3DPick(G_MouseRay);
+                Picked = Win3DPick(reinterpret_cast<Vector const*>(G_MouseRay));
             }
             else
             {
-                Picked = Win3DPickWithin(G_CaptureHead, G_MouseRay);
+                Picked = Win3DPickWithin(G_CaptureHead, reinterpret_cast<Vector const*>(G_MouseRay));
                 if (Picked == nullptr)
                     Picked = G_CaptureHead;
             }
@@ -1555,7 +1556,7 @@ namespace
                 if (bHandled)
                     return bHandled;
                 Win3D* const Next = Capture->CaptureNext;
-                Win3D* const Hit = Win3DPickWithin(Capture, G_MouseRay);
+                Win3D* const Hit = Win3DPickWithin(Capture, reinterpret_cast<Vector const*>(G_MouseRay));
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
                 if (Hit != nullptr)
                     bHandled = MouseEventWidescreen(Hit, &Event);
@@ -1574,7 +1575,7 @@ namespace
         }
 
         // Nothing in the capture chain took it; the global pick gets it.
-        Win3D* const Picked = Win3DPick(G_MouseRay);
+        Win3D* const Picked = Win3DPick(reinterpret_cast<Vector const*>(G_MouseRay));
         if (Picked == nullptr)
             return bHandled;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT

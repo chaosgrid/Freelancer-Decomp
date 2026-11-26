@@ -1023,9 +1023,9 @@ float __cdecl GetSphereIntersectVol(float Dist, float RadiusA, float RadiusB)
 long __cdecl get_projected_bounding_sphere(ICamera* Camera, Vector const& Center, float Radius, float& Out1, float& Out2, float& Out3, float& Out4)
 {
     // The centre in view space (the math engine cached in DAT_063fce08).
-    const float* const CameraXform = (const float*)Camera->GetOrientation();
+    Transform const* const CameraXform = reinterpret_cast<Transform const*>(Camera->GetOrientation());
     Vector View;
-    Acquire3DMathEngine()->InverseTransform(View, *reinterpret_cast<Transform const*>(CameraXform), Center);
+    Acquire3DMathEngine()->InverseTransform(View, *CameraXform, Center);
 
     // Behind the near plane (or unordered) -> 0.
     if (!(-(double)(Camera->GetZNear()) >= (double)(View.z)))
@@ -1108,7 +1108,8 @@ long __cdecl get_projected_bounding_box(ICamera* Camera, Vector const& Center, f
 }
 
 // RVA 0x4a680, ?ComputeExplosiveImpulses@@YAXJAAVVector@@00@Z (Ghidra's decompile of it is
-// garbled by x87 / stack-slot reuse). GetInstanceRelative returns {Count, Vector Items[]}.
+// garbled by x87 / stack-slot reuse). GetInstanceRelative returns the joint block, whose Type
+// the first branch tests and whose two vectors it rotates.
 // The math engine is cached in DAT_063fc2e4. Neither engine pointer is tested.
 namespace
 {
@@ -1133,12 +1134,13 @@ void __cdecl ComputeExplosiveImpulses(long EngineHandle, Vector& OutLinear, Vect
 {
     const InstanceIndex Instance = EngineHandle;
     const InstanceIndex Parent = DALib::Engine->GetInstanceParent(Instance);
-    unsigned long* const Relative = DALib::Engine->GetInstanceRelative(Instance);
-    int const Count = (int)Relative[0];
-    Vector const* const Items = (Vector const*)(Relative + 1);
+    FEngineJointBlock const* const Relative = DALib::Engine->GetInstanceRelative(Instance);
+    int const Type = (int)Relative->Type;
+    // The parent and the child position, the two vectors that follow the type.
+    Vector const* const Items = &Relative->ParentPos;
 
     // Signed; 1..4 takes the first branch.
-    if (Count > 0 && Count <= 4)
+    if (Type > 0 && Type <= 4)
     {
         // Items[1] by the instance's orientation, plus its position.
         Matrix const* const Orient = DALib::Engine->GetInstanceOrientation(Instance);

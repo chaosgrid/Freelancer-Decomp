@@ -682,36 +682,36 @@ namespace AlchemyImpl
             std::memcpy(&TimeB, &Age_, sizeof(TimeB));
             std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
             Anim->Evaluate(TimeA, TimeB, &NodeLocalXform_);
-            float Composed[12];
-            NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+            Transform Composed;
+            NodeTransformMath()->MulTransform(Composed, *Parent,
                                               NodeLocalXform_);
-            std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+            std::memcpy(&NodeWorldXform_, &Composed, sizeof(NodeWorldXform_));
             return GR_OK;
         }
 
         if (bSkipAnim)
         {
-            float Composed[12];
-            NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+            Transform Composed;
+            NodeTransformMath()->MulTransform(Composed, *Parent,
                                               NodeLocalXform_);
-            std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+            std::memcpy(&NodeWorldXform_, &Composed, sizeof(NodeWorldXform_));
             return GR_OK;
         }
 
-        float Local[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f };
+        Transform Local = { Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f), { 0.0f, 0.0f, 0.0f } };
         IAnimatedTransform* const Anim = FindNodeAnimatedTransform();
         unsigned long TimeA = 0;
         unsigned long TimeB = 0;
         std::memcpy(&TimeB, &Age_, sizeof(TimeB));
         std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
-        Anim->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Local));
-        float Composed[12];
-        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+        Anim->Evaluate(TimeA, TimeB, &Local);
+        Transform Composed;
+        NodeTransformMath()->MulTransform(Composed, *Parent,
                                           NodeLocalXform_);
-        std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
-        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), NodeWorldXform_,
-                                          *reinterpret_cast<const Transform*>(Local));
-        std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+        std::memcpy(&NodeWorldXform_, &Composed, sizeof(NodeWorldXform_));
+        NodeTransformMath()->MulTransform(Composed, NodeWorldXform_,
+                                          Local);
+        std::memcpy(&NodeWorldXform_, &Composed, sizeof(NodeWorldXform_));
         return GR_OK;
     }
 
@@ -720,15 +720,15 @@ namespace AlchemyImpl
     {
         Transform* OtherWorld = nullptr;
         AsFxNode(Other)->GetNodeTransform(0, &OtherWorld);
-        float Inverse[12];
+        Transform Inverse;
         float W;
-        NodeTransformMath()->GeneralInverse(*reinterpret_cast<Transform*>(Inverse), W,
+        NodeTransformMath()->GeneralInverse(Inverse, W,
                                             *OtherWorld); // +0x5C
-        float Rel[12];
-        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Rel),
-                                          *reinterpret_cast<const Transform*>(Inverse),
+        Transform Rel;
+        NodeTransformMath()->MulTransform(Rel,
+                                          Inverse,
                                           NodeWorldXform_); // +0x1C
-        std::memcpy(Out, Rel, sizeof(Rel));
+        std::memcpy(Out, &Rel, sizeof(Rel));
         return GR_OK;
     }
 

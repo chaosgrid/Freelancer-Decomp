@@ -39,7 +39,7 @@ public:
     ~NnRolloverControl() override;
 
     // slot 4 FUN_0053f330 -- always false.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 9 FUN_004b54d0.
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 13 LAB_004b5720.

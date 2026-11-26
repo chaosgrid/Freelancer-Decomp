@@ -19,30 +19,30 @@
 
 #pragma comment(lib, "dacom.lib")
 
-// Typed math calls preserve the caller's float buffers and their spill boundaries.
-static GENRESULT MathMulMatrix(I3DMathEngine* Math, float* Dst, const float* A, const float* B)
+// Thin wrappers over the 3DMathEngine calls the channel and joint code makes.
+static GENRESULT MathMulMatrix(I3DMathEngine* Math, Matrix* Dst, const Matrix* A, const Matrix* B)
 {
-    return Math->MulMatrix(*(Matrix*)Dst, *(const Matrix*)A, *(const Matrix*)B);
+    return Math->MulMatrix(*Dst, *A, *B);
 }
 
-static GENRESULT MathTransformMatrix(I3DMathEngine* Math, float* Dst, const float* A, const float* B)
+static GENRESULT MathTransformMatrix(I3DMathEngine* Math, Vector* Dst, const Matrix* A, const Vector* B)
 {
-    return Math->TransformMatrix(*(Vector*)Dst, *(const Matrix*)A, *(const Vector*)B);
+    return Math->TransformMatrix(*Dst, *A, *B);
 }
 
-static GENRESULT MathMatrixToQuat(I3DMathEngine* Math, float* Dst, const float* A)
+static GENRESULT MathMatrixToQuat(I3DMathEngine* Math, Quaternion* Dst, const Matrix* A)
 {
-    return Math->MatrixToQuaternion(*(Quaternion*)Dst, *(const Matrix*)A);
+    return Math->MatrixToQuaternion(*Dst, *A);
 }
 
-GENRESULT MathQuatToMatrix(I3DMathEngine* Math, float* Dst, const float* A)
+GENRESULT MathQuatToMatrix(I3DMathEngine* Math, Matrix* Dst, const Quaternion* A)
 {
-    return Math->QuaternionToMatrix(*(Matrix*)Dst, *(const Quaternion*)A);
+    return Math->QuaternionToMatrix(*Dst, *A);
 }
 
-static GENRESULT MathQuatSlerp(I3DMathEngine* Math, float* Dst, const float* A, const float* B, float C)
+static GENRESULT MathQuatSlerp(I3DMathEngine* Math, Quaternion* Dst, const Quaternion* A, const Quaternion* B, float C)
 {
-    return Math->QuatSlerp(*(Quaternion*)Dst, *(const Quaternion*)A, *(const Quaternion*)B, C);
+    return Math->QuatSlerp(*Dst, *A, *B, C);
 }
 static const char* const G_FdumpFmtNotice = "%s(%d) : NOTICE:General:%s";
 static const char* const G_FdumpFmtError = "%s(%d) : ERROR:General:%s";
@@ -180,17 +180,17 @@ static void TypedCopyVec3(float* Dest, const float* Source)
     Dest[2] = Source[2];
 }
 
-static void TypedStoreIdentityMatrix(float* Matrix)
+static void TypedStoreIdentityMatrix(Matrix* Dest)
 {
-    Matrix[0] = 1.0f;
-    Matrix[1] = 0.0f;
-    Matrix[2] = 0.0f;
-    Matrix[3] = 0.0f;
-    Matrix[4] = 1.0f;
-    Matrix[5] = 0.0f;
-    Matrix[6] = 0.0f;
-    Matrix[7] = 0.0f;
-    Matrix[8] = 1.0f;
+    Dest->E[0][0] = 1.0f;
+    Dest->E[0][1] = 0.0f;
+    Dest->E[0][2] = 0.0f;
+    Dest->E[1][0] = 0.0f;
+    Dest->E[1][1] = 1.0f;
+    Dest->E[1][2] = 0.0f;
+    Dest->E[2][0] = 0.0f;
+    Dest->E[2][1] = 0.0f;
+    Dest->E[2][2] = 1.0f;
 }
 
 unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
@@ -198,28 +198,28 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
     TypedBind(this, Header);
     if (Kind != 1)
     {
-        TypedStoreIdentityMatrix(Matrix);
-        Delta[0] = 0.0f;
-        Delta[1] = 0.0f;
-        Delta[2] = 0.0f;
+        TypedStoreIdentityMatrix(&Orientation);
+        Delta.x = 0.0f;
+        Delta.y = 0.0f;
+        Delta.z = 0.0f;
         return 0;
     }
-    const float* Block = Header->Transform;
+    const Transform* Block = Header->Transform;
     FEngineInstance* Instance = (FEngineInstance*)((size_t)(this->Instance));
     if (Header->StartTime == 0.0f || (Header->LoopFlags & 0x40) != 0)
     {
         if (Block != nullptr)
         {
-            std::memcpy(Matrix, Block, sizeof(Matrix));
-            TypedCopyVec3(Delta, Block + 9);
+            std::memcpy(&Orientation, &Block->Rotation, sizeof(Orientation));
+            TypedCopyVec3(&Delta.x, &Block->Translation.x);
             unsigned long Bits = 0;
-            std::memcpy(&Bits, &Block[9], sizeof(Bits));
+            std::memcpy(&Bits, &Block->Translation.x, sizeof(Bits));
             return Bits;
         }
-        const float* Orient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
-        std::memcpy(Matrix, Orient, sizeof(Matrix));
-        const float* Position = (const float*)G_AnimEngine->GetInstancePosition((InstanceIndex)Instance);
-        TypedCopyVec3(Delta, Position);
+        const Matrix* Orient = G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
+        std::memcpy(&Orientation, Orient, sizeof(Orientation));
+        const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Instance);
+        TypedCopyVec3(&Delta.x, &Position->x);
         return (unsigned long)((size_t)Position);
     }
     const unsigned char* KeyA = nullptr;
@@ -231,46 +231,46 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
                                            (const float*)KeyB,
                                            (double)Alpha);
     const double Factor = (double)(TranslationScale) * (double)(Scale);
-    float Pos[3];
-    Pos[0] = (float)((double)(Pose[0]) * Factor);
-    Pos[1] = (float)((double)(Pose[1]) * Factor);
-    Pos[2] = (float)((double)(Pose[2]) * Factor);
+    Vector Pos;
+    Pos.x = (float)((double)(Pose[0]) * Factor);
+    Pos.y = (float)((double)(Pose[1]) * Factor);
+    Pos.z = (float)((double)(Pose[2]) * Factor);
     I3DMathEngine* Math = Acquire3DMathEngine();
-    float Xformed[3];
+    Vector Xformed;
     if (Block != nullptr)
     {
-        std::memcpy(Matrix, Block, sizeof(Matrix));
-        MathTransformMatrix(Math, Xformed, Matrix, Pos);
-        Delta[0] = Block[9] - Xformed[0];
-        Delta[1] = Block[10] - Xformed[1];
-        Delta[2] = Block[11] - Xformed[2];
+        std::memcpy(&Orientation, &Block->Rotation, sizeof(Orientation));
+        MathTransformMatrix(Math, &Xformed, &Orientation, &Pos);
+        Delta.x = Block->Translation.x - Xformed.x;
+        Delta.y = Block->Translation.y - Xformed.y;
+        Delta.z = Block->Translation.z - Xformed.z;
     }
     else
     {
-        float QuatMatrix[9];
-        MathQuatToMatrix(Math, QuatMatrix, Pose + 3);
-        float Transposed[9];
-        Transposed[0] = QuatMatrix[0];
-        Transposed[1] = QuatMatrix[3];
-        Transposed[2] = QuatMatrix[6];
-        Transposed[3] = QuatMatrix[1];
-        Transposed[4] = QuatMatrix[4];
-        Transposed[5] = QuatMatrix[7];
-        Transposed[6] = QuatMatrix[2];
-        Transposed[7] = QuatMatrix[5];
-        Transposed[8] = QuatMatrix[8];
-        const float* Orient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
-        float Composed[9];
-        MathMulMatrix(Math, Composed, Orient, Transposed);
-        std::memcpy(Matrix, Composed, sizeof(Matrix));
-        MathTransformMatrix(Math, Xformed, Matrix, Pos);
+        Matrix QuatMatrix;
+        MathQuatToMatrix(Math, &QuatMatrix, (const Quaternion*)(Pose + 3));
+        Matrix Transposed;
+        Transposed.E[0][0] = QuatMatrix.E[0][0];
+        Transposed.E[0][1] = QuatMatrix.E[1][0];
+        Transposed.E[0][2] = QuatMatrix.E[2][0];
+        Transposed.E[1][0] = QuatMatrix.E[0][1];
+        Transposed.E[1][1] = QuatMatrix.E[1][1];
+        Transposed.E[1][2] = QuatMatrix.E[2][1];
+        Transposed.E[2][0] = QuatMatrix.E[0][2];
+        Transposed.E[2][1] = QuatMatrix.E[1][2];
+        Transposed.E[2][2] = QuatMatrix.E[2][2];
+        const Matrix* Orient = G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
+        Matrix Composed;
+        MathMulMatrix(Math, &Composed, Orient, &Transposed);
+        std::memcpy(&Orientation, &Composed, sizeof(Orientation));
+        MathTransformMatrix(Math, &Xformed, &Orientation, &Pos);
         const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Instance);
-        Delta[0] = Position->x - Xformed[0];
-        Delta[1] = Position->y - Xformed[1];
-        Delta[2] = Position->z - Xformed[2];
+        Delta.x = Position->x - Xformed.x;
+        Delta.y = Position->y - Xformed.y;
+        Delta.z = Position->z - Xformed.z;
     }
     unsigned long Bits = 0;
-    std::memcpy(&Bits, &Delta[1], sizeof(Bits));
+    std::memcpy(&Bits, &Delta.y, sizeof(Bits));
     return Bits;
 }
 
@@ -315,12 +315,12 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     const unsigned long Bytes = ChannelPayloadBytesFromFlags(Flags);
     if (This->Kind == 0 && G_AnimEngine != nullptr)
     {
-        unsigned long* Relative = G_AnimEngine->GetInstanceRelative(
+        FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative(
             This->Instance);
         unsigned long MixKind = 0;
         if (Relative != nullptr)
         {
-            const unsigned long Case = Relative[0] - 1;
+            const unsigned long Case = Relative->Type - 1;
             if (Case == 0 || Case == 1)
                 MixKind = 1;
             else if (Case == 2)
@@ -346,10 +346,9 @@ unsigned long FScalarTypedChannel::BindMap(unsigned long* Map, void* Bind)
     const unsigned long bBound = TypedBindMap(this, Map, Bind);
     if (bBound != 0)
     {
-        unsigned long* Relative = (unsigned long*)(
-            G_AnimEngine->GetInstanceRelative(Map[3]));
+        FEngineJointBlock* Relative = G_AnimEngine->GetInstanceRelative(Map[3]);
         if (Relative != nullptr)
-            JointType = Relative[0];
+            JointType = Relative->Type;
     }
     return bBound;
 }
@@ -422,36 +421,36 @@ unsigned long FScalarTypedChannel::InterpolatePose(float* Out, const float* A, c
 
 unsigned long FQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha)
 {
-    float RightCopy[4];
-    RightCopy[0] = Right[0];
-    RightCopy[1] = Right[1];
-    RightCopy[2] = Right[2];
-    RightCopy[3] = Right[3];
-    float LeftCopy[4];
-    LeftCopy[0] = Left[0];
-    LeftCopy[1] = Left[1];
-    LeftCopy[2] = Left[2];
-    LeftCopy[3] = Left[3];
+    Quaternion RightCopy;
+    RightCopy.w = Right[0];
+    RightCopy.x = Right[1];
+    RightCopy.y = Right[2];
+    RightCopy.z = Right[3];
+    Quaternion LeftCopy;
+    LeftCopy.w = Left[0];
+    LeftCopy.x = Left[1];
+    LeftCopy.y = Left[2];
+    LeftCopy.z = Left[3];
     I3DMathEngine* Math = Acquire3DMathEngine();
-    float Result[4];
-    MathQuatSlerp(Math, Result, LeftCopy, RightCopy, (float)Alpha);
-    Out[0] = Result[0];
-    Out[1] = Result[1];
-    Out[2] = Result[2];
-    Out[3] = Result[3];
+    Quaternion Result;
+    MathQuatSlerp(Math, &Result, &LeftCopy, &RightCopy, (float)Alpha);
+    Out[0] = Result.w;
+    Out[1] = Result.x;
+    Out[2] = Result.y;
+    Out[3] = Result.z;
     unsigned long ScaleBits = 0;
     std::memcpy(&ScaleBits, &Scale, sizeof(ScaleBits));
     if (ScaleBits == 0x3F800000)
         return (unsigned long)((size_t)Out);
-    Result[0] = 1.0f;
-    Result[1] = 0.0f;
-    Result[2] = 0.0f;
-    Result[3] = 0.0f;
-    MathQuatSlerp(Math, LeftCopy, Result, Out, Scale);
-    Out[0] = LeftCopy[0];
-    Out[1] = LeftCopy[1];
-    Out[2] = LeftCopy[2];
-    Out[3] = LeftCopy[3];
+    Result.w = 1.0f;
+    Result.x = 0.0f;
+    Result.y = 0.0f;
+    Result.z = 0.0f;
+    MathQuatSlerp(Math, &LeftCopy, &Result, (const Quaternion*)Out, Scale);
+    Out[0] = LeftCopy.w;
+    Out[1] = LeftCopy.x;
+    Out[2] = LeftCopy.y;
+    Out[3] = LeftCopy.z;
     return (unsigned long)((size_t)Out);
 }
 
@@ -517,7 +516,7 @@ unsigned long FTypedChannel::CopySampled(float* Out)
     return 0;
 }
 
-unsigned long FTypedChannel::TouchMapped(void* A, void* B)
+unsigned long FTypedChannel::TouchMapped(Vector* A, Vector* B)
 {
     (void)A;
     (void)B;
@@ -526,14 +525,14 @@ unsigned long FTypedChannel::TouchMapped(void* A, void* B)
 
 // LAB_06612170: slot 0x38 of every table except type-6's. Type-6's LAB_0661bd30 shows the
 // second argument is a float, so the slot uses that one signature.
-unsigned long FTypedChannel::Step(float* Out, float Dt)
+unsigned long FTypedChannel::Step(Vector* Out, float Dt)
 {
     (void)Dt;
     if (Out == nullptr)
         return 0;
-    Out[0] = 0.0f;
-    Out[1] = 0.0f;
-    Out[2] = 0.0f;
+    Out->x = 0.0f;
+    Out->y = 0.0f;
+    Out->z = 0.0f;
     return 0;
 }
 
@@ -764,9 +763,10 @@ unsigned long FTypedChannel::Tick(float Dt)
         FPlayHeader Header;
         if ((Loop & 2) != 0)
         {
-            // A 3x3 orientation (0..8), the applied position (9..11) and the matrix
-            // QuaternionToMatrix writes (12..20), which is copied over 0..8.
-            float Frame[21];
+            // The applied pose (orientation, then position) and the matrix QuaternionToMatrix
+            // writes, which is copied over the orientation.
+            Transform Frame;
+            Matrix Rebuilt;
             if (Kind == 1)
             {
                 const unsigned char bLast = Rate < 0.0f ? 0 : 1;
@@ -778,19 +778,18 @@ unsigned long FTypedChannel::Tick(float Dt)
                     (double)Dt);
                 // Retail reads +0x78 / +0x84 straight off the object, whatever its class.
                 FPosQuatTypedChannel* Pose = (FPosQuatTypedChannel*)this;
-                Frame[9] = Pose->AppliedPos[0];
-                Frame[10] = Pose->AppliedPos[1];
-                Frame[11] = Pose->AppliedPos[2];
+                Frame.Translation.x = Pose->AppliedPos.x;
+                Frame.Translation.y = Pose->AppliedPos.y;
+                Frame.Translation.z = Pose->AppliedPos.z;
                 I3DMathEngine* Math = Acquire3DMathEngine();
-                Math->QuaternionToMatrix(*(Matrix*)(&Frame[12]),
-                                         *(const Quaternion*)(Pose->AppliedQuat));
-                std::memcpy(Frame, &Frame[12], 9 * sizeof(float));
+                Math->QuaternionToMatrix(Rebuilt, Pose->AppliedQuat);
+                std::memcpy(&Frame.Rotation, &Rebuilt, sizeof(Matrix));
                 void* Sink = (void*)((size_t)(this->Sink));
                 if (Sink != nullptr)
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
                     LoopSink->OnLoop((unsigned long)((size_t)this),
-                                     Frame,
+                                     &Frame,
                                      (void*)((size_t)(SinkContext)));
                 }
             }
@@ -804,7 +803,7 @@ unsigned long FTypedChannel::Tick(float Dt)
             std::memset(&Header.BlendDuration, 0, sizeof(float));
             std::memcpy(&Header.Scale, &Scale, sizeof(float));
             std::memcpy(&Header.TranslationScale, &TranslationScale, sizeof(float));
-            Header.Transform = Kind == 1 ? Frame : nullptr;
+            Header.Transform = Kind == 1 ? &Frame : nullptr;
             BindHeader(&Header);
             // Rate >= 0 or unordered takes Frac.
             if (Duration != 0.0f)
@@ -853,7 +852,7 @@ unsigned long FTypedChannel::Tick(float Dt)
 }
 
 // LAB_0661caf0, the type-6 table's slot 8 (+0x20, .rdata:06629110).
-unsigned long FPosQuatTypedChannel::SetOverlayPos(const float* Target)
+unsigned long FPosQuatTypedChannel::SetOverlayPos(const Vector* Target)
 {
     if (Kind != 1)
         return 0;
@@ -872,20 +871,20 @@ unsigned long FPosQuatTypedChannel::SetOverlayPos(const float* Target)
     const float P0Scaled = P0 * Scale;
     const float P1Scaled = P1 * Scale;
     const double P2Scaled = P2 * (double)(Scale);
-    float Pos[3];
-    Pos[0] = P0Scaled * TranslationScale;
-    Pos[1] = P1Scaled * TranslationScale;
-    Pos[2] = (float)(P2Scaled * (double)(TranslationScale));
-    float Xformed[3];
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, Matrix, Pos);
-    Delta[0] = Target[0] - Xformed[0];
-    Delta[1] = Target[1] - Xformed[1];
-    Delta[2] = Target[2] - Xformed[2];
-    AppliedPos[0] = Target[0];
-    AppliedPos[1] = Target[1];
-    AppliedPos[2] = Target[2];
+    Vector Pos;
+    Pos.x = P0Scaled * TranslationScale;
+    Pos.y = P1Scaled * TranslationScale;
+    Pos.z = (float)(P2Scaled * (double)(TranslationScale));
+    Vector Xformed;
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &Orientation, &Pos);
+    Delta.x = Target->x - Xformed.x;
+    Delta.y = Target->y - Xformed.y;
+    Delta.z = Target->z - Xformed.z;
+    AppliedPos.x = Target->x;
+    AppliedPos.y = Target->y;
+    AppliedPos.z = Target->z;
     unsigned long Bits = 0;
-    std::memcpy(&Bits, &Target[2], sizeof(Bits));
+    std::memcpy(&Bits, &Target->z, sizeof(Bits));
     return Bits;
 }
 
@@ -897,14 +896,14 @@ unsigned long FPosQuatTypedChannel::InterpolatePose(float* Out, const float* Lef
     Out[2] = (float)(((double)(Right[2]) - Left[2]) * Alpha + Left[2]);
     const float Blend = (float)Alpha;
     I3DMathEngine* Math = Acquire3DMathEngine();
-    float Quat[4];
-    MathQuatSlerp(Math, Quat, Left + 3, Right + 3, Blend);
-    Out[3] = Quat[0];
-    Out[4] = Quat[1];
-    Out[5] = Quat[2];
-    Out[6] = Quat[3];
+    Quaternion Quat;
+    MathQuatSlerp(Math, &Quat, (const Quaternion*)(Left + 3), (const Quaternion*)(Right + 3), Blend);
+    Out[3] = Quat.w;
+    Out[4] = Quat.x;
+    Out[5] = Quat.y;
+    Out[6] = Quat.z;
     unsigned long Bits = 0;
-    std::memcpy(&Bits, &Quat[1], sizeof(Bits));
+    std::memcpy(&Bits, &Quat.x, sizeof(Bits));
     return Bits;
 }
 
@@ -917,15 +916,15 @@ unsigned long FPosQuatTypedChannel::Interpolate(float* Out, const float* Left, c
     if (ScaleBits == 0x3F800000)
         return ScaleBits;
     I3DMathEngine* Math = Acquire3DMathEngine();
-    float const Identity[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
-    float Slerped[4];
-    MathQuatSlerp(Math, Slerped, Identity, Out + 3, Scale);
-    Out[3] = Slerped[0];
-    Out[4] = Slerped[1];
-    Out[5] = Slerped[2];
-    Out[6] = Slerped[3];
+    const Quaternion Identity = { 1.0f, 0.0f, 0.0f, 0.0f };
+    Quaternion Slerped;
+    MathQuatSlerp(Math, &Slerped, &Identity, (const Quaternion*)(Out + 3), Scale);
+    Out[3] = Slerped.w;
+    Out[4] = Slerped.x;
+    Out[5] = Slerped.y;
+    Out[6] = Slerped.z;
     unsigned long LastBits = 0;
-    std::memcpy(&LastBits, &Slerped[3], sizeof(LastBits));
+    std::memcpy(&LastBits, &Slerped.z, sizeof(LastBits));
     return LastBits;
 }
 
@@ -945,37 +944,37 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
     if (Kind == 1)
     {
         const double Factor = (double)(TranslationScale) * (double)(Scale);
-        float Pos[3];
-        Pos[0] = (float)((double)(Local[0]) * Factor);
-        Pos[1] = (float)((double)(Local[1]) * Factor);
-        Pos[2] = (float)((double)(Local[2]) * Factor);
+        Vector Pos;
+        Pos.x = (float)((double)(Local[0]) * Factor);
+        Pos.y = (float)((double)(Local[1]) * Factor);
+        Pos.z = (float)((double)(Local[2]) * Factor);
         I3DMathEngine* Math = Acquire3DMathEngine();
-        float Xformed[3];
-        MathTransformMatrix(Math, Xformed, Matrix, Pos);
-        AppliedPos[0] = Xformed[0] + Delta[0];
-        AppliedPos[1] = Xformed[1] + Delta[1];
-        AppliedPos[2] = Xformed[2] + Delta[2];
-        float MatrixQuat[4];
-        MathMatrixToQuat(Math, MatrixQuat, Matrix);
-        float Composed[4];
-        Math->MulQuat(*(Quaternion*)Composed,
-                              *(const Quaternion*)MatrixQuat,
+        Vector Xformed;
+        MathTransformMatrix(Math, &Xformed, &Orientation, &Pos);
+        AppliedPos.x = Xformed.x + Delta.x;
+        AppliedPos.y = Xformed.y + Delta.y;
+        AppliedPos.z = Xformed.z + Delta.z;
+        Quaternion MatrixQuat;
+        MathMatrixToQuat(Math, &MatrixQuat, &Orientation);
+        Quaternion Composed;
+        Math->MulQuat(Composed,
+                              MatrixQuat,
                               *(const Quaternion*)(Local + 3));   // +0x18
-        AppliedQuat[0] = Composed[0];
-        AppliedQuat[1] = Composed[1];
-        AppliedQuat[2] = Composed[2];
-        AppliedQuat[3] = Composed[3];
+        AppliedQuat.w = Composed.w;
+        AppliedQuat.x = Composed.x;
+        AppliedQuat.y = Composed.y;
+        AppliedQuat.z = Composed.z;
         unsigned long Bits = 0;
-        std::memcpy(&Bits, &Composed[3], sizeof(Bits));
+        std::memcpy(&Bits, &Composed.z, sizeof(Bits));
         return Bits;
     }
     if (Kind == 0)
     {
-        TypedCopyVec3(AppliedPos, Local);
-        AppliedQuat[0] = Local[3];
-        AppliedQuat[1] = Local[4];
-        AppliedQuat[2] = Local[5];
-        AppliedQuat[3] = Local[6];
+        TypedCopyVec3(&AppliedPos.x, Local);
+        AppliedQuat.w = Local[3];
+        AppliedQuat.x = Local[4];
+        AppliedQuat.y = Local[5];
+        AppliedQuat.z = Local[6];
         unsigned long Bits = 0;
         std::memcpy(&Bits, &Local[6], sizeof(Bits));
         return Bits;
@@ -1026,37 +1025,37 @@ unsigned long FScalarTypedChannel::CopySampled(float* Out)
 // LAB_066121b0, type-4 slot 6: 16 bytes from +0x3C. No null checks.
 unsigned long FQuatTypedChannel::CopySampled(float* Out)
 {
-    Out[0] = Sampled[0];
-    Out[1] = Sampled[1];
-    Out[2] = Sampled[2];
-    Out[3] = Sampled[3];
+    Out[0] = Sampled.w;
+    Out[1] = Sampled.x;
+    Out[2] = Sampled.y;
+    Out[3] = Sampled.z;
     return (unsigned long)((size_t)Out);
 }
 
 // LAB_066121d0, type-2 slot 6: 12 bytes from +0x3C. No null checks.
 unsigned long FVectorTypedChannel::CopySampled(float* Out)
 {
-    TypedCopyVec3(Out, Sampled);
+    TypedCopyVec3(Out, &Sampled.x);
     return (unsigned long)((size_t)Out);
 }
 
 // LAB_066121f0: 12 bytes from +0x78 and 16 from +0x84; returns Out+0xC. No null checks.
 unsigned long FPosQuatTypedChannel::CopySampled(float* Out)
 {
-    TypedCopyVec3(Out, AppliedPos);
-    Out[3] = AppliedQuat[0];
-    Out[4] = AppliedQuat[1];
-    Out[5] = AppliedQuat[2];
-    Out[6] = AppliedQuat[3];
+    TypedCopyVec3(Out, &AppliedPos.x);
+    Out[3] = AppliedQuat.w;
+    Out[4] = AppliedQuat.x;
+    Out[5] = AppliedQuat.y;
+    Out[6] = AppliedQuat.z;
     return (unsigned long)((size_t)(Out + 3));
 }
 
 // LAB_0661c6d0: Delta is at +0x60.
-unsigned long FPosQuatTypedChannel::AddOverlayPos(const float* Add)
+unsigned long FPosQuatTypedChannel::AddOverlayPos(const Vector* Add)
 {
-    Delta[0] += Add[0];
-    Delta[1] += Add[1];
-    Delta[2] += Add[2];
+    Delta.x += Add->x;
+    Delta.y += Add->y;
+    Delta.z += Add->z;
     if ((PlayFlags & G_ChannelPlayFlag) != 0)
         ApplyFromArchetype();
     return (unsigned long)((size_t)Add);
@@ -1065,14 +1064,12 @@ unsigned long FPosQuatTypedChannel::AddOverlayPos(const float* Add)
 // LAB_06612240: +0x78. No null check.
 float* FPosQuatTypedChannel::GetSampled()
 {
-    return AppliedPos;
+    return &AppliedPos.x;
 }
 
 // LAB_0661c5c0, the type-6 table's slot 0x30.
-unsigned long FPosQuatTypedChannel::TouchMapped(void* OutPos, void* OutSampledPos)
+unsigned long FPosQuatTypedChannel::TouchMapped(Vector* OutPos, Vector* OutSampledPos)
 {
-    float* Out = (float*)OutPos;
-    float* OutSampled = (float*)OutSampledPos;
     const unsigned char* KeyA = nullptr;
     const unsigned char* KeyB = nullptr;
     float Alpha = 0.0f;
@@ -1089,37 +1086,37 @@ unsigned long FPosQuatTypedChannel::TouchMapped(void* OutPos, void* OutSampledPo
     Interpolate(Pose, (const float*)KeyA,
                                            (const float*)KeyB,
                                            (double)Alpha);
-    OutSampled[0] = Pose[0];
-    OutSampled[1] = Pose[1];
-    OutSampled[2] = Pose[2];
-    float Xformed[3];
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, Matrix, OutSampled);
-    Out[0] = Xformed[0] + Delta[0];
-    Out[1] = Xformed[1] + Delta[1];
-    Out[2] = Xformed[2] + Delta[2];
-    return (unsigned long)((size_t)Out);
+    OutSampledPos->x = Pose[0];
+    OutSampledPos->y = Pose[1];
+    OutSampledPos->z = Pose[2];
+    Vector Xformed;
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &Orientation, OutSampledPos);
+    OutPos->x = Xformed.x + Delta.x;
+    OutPos->y = Xformed.y + Delta.y;
+    OutPos->z = Xformed.z + Delta.z;
+    return (unsigned long)((size_t)OutPos);
 }
 
 // One pass of LAB_0661c320 (retail inlines it twice).
 static void TypedType6SampleXform(FPosQuatTypedChannel* This, float Time, const float** KeyA,
-                                  const float** KeyB, float* Alpha, float* Xformed)
+                                  const float** KeyB, float* Alpha, Vector* Xformed)
 {
     This->Archetype->Sample(Time, (const unsigned char**)KeyA,
                             (const unsigned char**)KeyB, Alpha);
     const float* A = *KeyA;
     const float* B = *KeyB;
-    float V[3];
-    V[0] = (B[0] - A[0]) * *Alpha;
-    V[1] = (B[1] - A[1]) * *Alpha;
-    V[2] = (B[2] - A[2]) * *Alpha;
-    V[0] = V[0] + A[0];
-    V[1] = V[1] + A[1];
-    V[2] = V[2] + A[2];
+    Vector V;
+    V.x = (B[0] - A[0]) * *Alpha;
+    V.y = (B[1] - A[1]) * *Alpha;
+    V.z = (B[2] - A[2]) * *Alpha;
+    V.x = V.x + A[0];
+    V.y = V.y + A[1];
+    V.z = V.z + A[2];
     const double Factor = (double)(This->Scale) * (double)(This->TranslationScale);
-    V[0] = (float)((double)(V[0]) * Factor);
-    V[1] = (float)((double)(V[1]) * Factor);
-    V[2] = (float)((double)(V[2]) * Factor);
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, This->Matrix, V);
+    V.x = (float)((double)(V.x) * Factor);
+    V.y = (float)((double)(V.y) * Factor);
+    V.z = (float)((double)(V.z) * Factor);
+    MathTransformMatrix(Acquire3DMathEngine(), Xformed, &This->Orientation, &V);
 }
 
 // LAB_0661c320, the type-6 table's slot 0x34.
@@ -1131,52 +1128,52 @@ unsigned long FPosQuatTypedChannel::UpdateDeltaRate(float Dt)
     const float* KeyA = nullptr;
     const float* KeyB = nullptr;
     float Alpha = 0.0f;
-    float Xformed[3];
-    TypedType6SampleXform(this, Time, &KeyA, &KeyB, &Alpha, Xformed);
-    float Now[3];
-    Now[0] = Xformed[0] + Delta[0];
-    Now[1] = Xformed[1] + Delta[1];
-    Now[2] = Xformed[2] + Delta[2];
-    TypedType6SampleXform(this, Shifted, &KeyA, &KeyB, &Alpha, Xformed);
-    const double S0 = (double)(Xformed[0]) + (double)(Delta[0]);
-    const double S1 = (double)(Xformed[1]) + (double)(Delta[1]);
-    const float S2 = (float)((double)(Xformed[2]) + (double)(Delta[2]));
-    const float Dx = (float)(S0 - (double)(Now[0]));
-    const double Dy = S1 - (double)(Now[1]);
-    const double Dz = (double)S2 - (double)(Now[2]);
+    Vector Xformed;
+    TypedType6SampleXform(this, Time, &KeyA, &KeyB, &Alpha, &Xformed);
+    Vector Now;
+    Now.x = Xformed.x + Delta.x;
+    Now.y = Xformed.y + Delta.y;
+    Now.z = Xformed.z + Delta.z;
+    TypedType6SampleXform(this, Shifted, &KeyA, &KeyB, &Alpha, &Xformed);
+    const double S0 = (double)(Xformed.x) + (double)(Delta.x);
+    const double S1 = (double)(Xformed.y) + (double)(Delta.y);
+    const float S2 = (float)((double)(Xformed.z) + (double)(Delta.z));
+    const float Dx = (float)(S0 - (double)(Now.x));
+    const double Dy = S1 - (double)(Now.y);
+    const double Dz = (double)S2 - (double)(Now.z);
     const double Inv = 1.0 / (double)Dt;
-    StepDelta[0] = (float)((double)Dx * Inv);
-    StepDelta[1] = (float)(Dy * Inv);
-    StepDelta[2] = (float)(Dz * Inv);
+    StepDelta.x = (float)((double)Dx * Inv);
+    StepDelta.y = (float)(Dy * Inv);
+    StepDelta.z = (float)(Dz * Inv);
     unsigned long Bits = 0;
-    std::memcpy(&Bits, &StepDelta[1], sizeof(Bits));
+    std::memcpy(&Bits, &StepDelta.y, sizeof(Bits));
     return Bits;
 }
 
 // Round each position scaling step to float.
-static void TypedType6ScaledFrame(FPosQuatTypedChannel* This, unsigned char bLast, float* Out)
+static void TypedType6ScaledFrame(FPosQuatTypedChannel* This, unsigned char bLast, Vector* Out)
 {
     const float* Frame = nullptr;
     This->Archetype->GetFrame(bLast, (const unsigned char**)(&Frame));
-    float Scaled[3];
-    Scaled[0] = This->Scale * Frame[0];
-    Scaled[1] = This->Scale * Frame[1];
-    Scaled[2] = This->Scale * Frame[2];
-    Out[0] = Scaled[0] * This->TranslationScale;
-    Out[1] = Scaled[1] * This->TranslationScale;
-    Out[2] = Scaled[2] * This->TranslationScale;
+    Vector Scaled;
+    Scaled.x = This->Scale * Frame[0];
+    Scaled.y = This->Scale * Frame[1];
+    Scaled.z = This->Scale * Frame[2];
+    Out->x = Scaled.x * This->TranslationScale;
+    Out->y = Scaled.y * This->TranslationScale;
+    Out->z = Scaled.z * This->TranslationScale;
 }
 
 // LAB_0661bd30, the type-6 table's slot 0x38.
-unsigned long FPosQuatTypedChannel::Step(float* Out, float Dt)
+unsigned long FPosQuatTypedChannel::Step(Vector* Out, float Dt)
 {
     const float RatedDt = Dt * Rate;
     float Duration = 0.0f;
     Archetype->GetDuration(&Duration);
-    float Step[3];
-    Step[0] = 0.0f;
-    Step[1] = 0.0f;
-    Step[2] = 0.0f;
+    Vector Step;
+    Step.x = 0.0f;
+    Step.y = 0.0f;
+    Step.z = 0.0f;
     const unsigned char bReverse = (double)(Rate) < 0.0 ? 1 : 0;
     const double SampleTimeWide = bReverse != 0
                                       ? (double)(Time) - (double)RatedDt
@@ -1193,82 +1190,82 @@ unsigned long FPosQuatTypedChannel::Step(float* Out, float Dt)
     float Alpha = 0.0f;
     Archetype->Sample(Time, (const unsigned char**)(&KeyA),
                             (const unsigned char**)(&KeyB), &Alpha);
-    float Lerp[3];
-    Lerp[0] = KeyB[0] - KeyA[0];
-    Lerp[1] = KeyB[1] - KeyA[1];
-    Lerp[2] = KeyB[2] - KeyA[2];
-    Lerp[0] = Lerp[0] * Alpha;
-    Lerp[1] = Lerp[1] * Alpha;
-    Lerp[2] = Lerp[2] * Alpha;
-    Lerp[0] = KeyA[0] + Lerp[0];
-    Lerp[1] = KeyA[1] + Lerp[1];
-    Lerp[2] = KeyA[2] + Lerp[2];
+    Vector Lerp;
+    Lerp.x = KeyB[0] - KeyA[0];
+    Lerp.y = KeyB[1] - KeyA[1];
+    Lerp.z = KeyB[2] - KeyA[2];
+    Lerp.x = Lerp.x * Alpha;
+    Lerp.y = Lerp.y * Alpha;
+    Lerp.z = Lerp.z * Alpha;
+    Lerp.x = KeyA[0] + Lerp.x;
+    Lerp.y = KeyA[1] + Lerp.y;
+    Lerp.z = KeyA[2] + Lerp.z;
     const double Factor = (double)(Scale) * (double)(TranslationScale);
-    float Now[3];
-    Now[0] = (float)((double)(Lerp[0]) * Factor);
-    Now[1] = (float)((double)(Lerp[1]) * Factor);
-    Now[2] = (float)((double)(Lerp[2]) * Factor);
+    Vector Now;
+    Now.x = (float)((double)(Lerp.x) * Factor);
+    Now.y = (float)((double)(Lerp.y) * Factor);
+    Now.z = (float)((double)(Lerp.z) * Factor);
 
     if (bCrossed != 0 && (LoopFlags & 2) != 0)
     {
-        float EndA[3];
-        TypedType6ScaledFrame(this, bReverse != 0 ? 0 : 1, EndA);
-        Step[0] = EndA[0] - Now[0];
-        Step[1] = EndA[1] - Now[1];
-        Step[2] = EndA[2] - Now[2];
-        float EndB[3];
-        TypedType6ScaledFrame(this, bReverse, EndB);
+        Vector EndA;
+        TypedType6ScaledFrame(this, bReverse != 0 ? 0 : 1, &EndA);
+        Step.x = EndA.x - Now.x;
+        Step.y = EndA.y - Now.y;
+        Step.z = EndA.z - Now.z;
+        Vector EndB;
+        TypedType6ScaledFrame(this, bReverse, &EndB);
         const float Leftover = bReverse != 0 ? Duration - SampleTime : SampleTime - Duration;
         Archetype->Sample(Leftover, (const unsigned char**)(&KeyA),
                                 (const unsigned char**)(&KeyB), &Alpha);
-        Lerp[0] = KeyB[0] - KeyA[0];
-        Lerp[1] = KeyB[1] - KeyA[1];
-        Lerp[2] = KeyB[2] - KeyA[2];
-        Lerp[0] = Lerp[0] * Alpha;
-        Lerp[1] = Lerp[1] * Alpha;
-        Lerp[2] = Lerp[2] * Alpha;
-        Lerp[0] = Lerp[0] + KeyA[0];
-        Lerp[1] = Lerp[1] + KeyA[1];
-        Lerp[2] = Lerp[2] + KeyA[2];
-        float Wrapped[3];
-        Wrapped[0] = (float)((double)(Lerp[0]) * Factor - (double)(EndB[0]));
-        Wrapped[1] = (float)((double)(Lerp[1]) * Factor - (double)(EndB[1]));
-        Wrapped[2] = (float)((double)(Lerp[2]) * Factor - (double)(EndB[2]));
-        Step[0] = Wrapped[0] + Step[0];
-        Step[1] = Step[1] + Wrapped[1];
-        Step[2] = Step[2] + Wrapped[2];
+        Lerp.x = KeyB[0] - KeyA[0];
+        Lerp.y = KeyB[1] - KeyA[1];
+        Lerp.z = KeyB[2] - KeyA[2];
+        Lerp.x = Lerp.x * Alpha;
+        Lerp.y = Lerp.y * Alpha;
+        Lerp.z = Lerp.z * Alpha;
+        Lerp.x = Lerp.x + KeyA[0];
+        Lerp.y = Lerp.y + KeyA[1];
+        Lerp.z = Lerp.z + KeyA[2];
+        Vector Wrapped;
+        Wrapped.x = (float)((double)(Lerp.x) * Factor - (double)(EndB.x));
+        Wrapped.y = (float)((double)(Lerp.y) * Factor - (double)(EndB.y));
+        Wrapped.z = (float)((double)(Lerp.z) * Factor - (double)(EndB.z));
+        Step.x = Wrapped.x + Step.x;
+        Step.y = Step.y + Wrapped.y;
+        Step.z = Step.z + Wrapped.z;
     }
     else if (Archetype->Sample(SampleTime, (const unsigned char**)(&KeyA),
                                      (const unsigned char**)(&KeyB), &Alpha) == 0)
     {
-        float Diff[3];
-        Diff[0] = KeyB[0] - KeyA[0];
-        Diff[1] = KeyB[1] - KeyA[1];
-        Diff[2] = KeyB[2] - KeyA[2];
-        const float Shifted0 = (float)((double)(Diff[0]) * (double)Alpha +
+        Vector Diff;
+        Diff.x = KeyB[0] - KeyA[0];
+        Diff.y = KeyB[1] - KeyA[1];
+        Diff.z = KeyB[2] - KeyA[2];
+        const float Shifted0 = (float)((double)(Diff.x) * (double)Alpha +
                                                   (double)(KeyA[0]));
-        const float Shifted1 = (float)((double)(Diff[1]) * (double)Alpha +
+        const float Shifted1 = (float)((double)(Diff.y) * (double)Alpha +
                                                   (double)(KeyA[1]));
-        const float Diff2Alpha = Diff[2] * Alpha;
+        const float Diff2Alpha = Diff.z * Alpha;
         const float Shifted2 = Diff2Alpha + KeyA[2];
         const float Scaled1 = (float)((double)Shifted1 * Factor);
         const float Scaled2 = (float)((double)Shifted2 * Factor);
-        Step[0] = (float)((double)Shifted0 * Factor - (double)(Now[0]));
-        Step[1] = Scaled1 - Now[1];
-        Step[2] = Scaled2 - Now[2];
+        Step.x = (float)((double)Shifted0 * Factor - (double)(Now.x));
+        Step.y = Scaled1 - Now.y;
+        Step.z = Scaled2 - Now.z;
     }
     // A failed Sample leaves Step zero.
 
-    float Xformed[3];
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, Matrix, Step);
-    Out[0] = Xformed[0];
-    Out[1] = Xformed[1];
-    Out[2] = Xformed[2];
+    Vector Xformed;
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &Orientation, &Step);
+    Out->x = Xformed.x;
+    Out->y = Xformed.y;
+    Out->z = Xformed.z;
     return (unsigned long)((size_t)Out);
 }
 
 // LAB_0661cc40, the type-6 table's slot 9 (+0x24, .rdata:06629114).
-unsigned long FPosQuatTypedChannel::SetOverlayExtra(const float* Orient)
+unsigned long FPosQuatTypedChannel::SetOverlayExtra(const Matrix* Orient)
 {
     if (Kind != 1)
         return 0;
@@ -1280,53 +1277,53 @@ unsigned long FPosQuatTypedChannel::SetOverlayExtra(const float* Orient)
     Interpolate(Pose, (const float*)KeyA,
                                            (const float*)KeyB,
                                            (double)Alpha);
-    float Pos[3];
-    Pos[0] = Pose[0];
-    Pos[1] = Pose[1];
-    Pos[2] = Pose[2];
-    float Quat[4];
-    Quat[0] = Pose[3];
-    Quat[1] = Pose[4];
-    Quat[2] = Pose[5];
-    Quat[3] = Pose[6];
+    Vector Pos;
+    Pos.x = Pose[0];
+    Pos.y = Pose[1];
+    Pos.z = Pose[2];
+    Quaternion Quat;
+    Quat.w = Pose[3];
+    Quat.x = Pose[4];
+    Quat.y = Pose[5];
+    Quat.z = Pose[6];
     FEngineInstance* Instance = (FEngineInstance*)((size_t)(this->Instance));
-    const float* InstanceOrient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
-    float Transposed[9];                                         // FUN_0661caa0
-    Transposed[0] = InstanceOrient[0];
-    Transposed[1] = InstanceOrient[3];
-    Transposed[2] = InstanceOrient[6];
-    Transposed[3] = InstanceOrient[1];
-    Transposed[4] = InstanceOrient[4];
-    Transposed[5] = InstanceOrient[7];
-    Transposed[6] = InstanceOrient[2];
-    Transposed[7] = InstanceOrient[5];
-    Transposed[8] = InstanceOrient[8];
-    float R1[9];
-    MathMulMatrix(Acquire3DMathEngine(), R1, Orient, Transposed);
-    float R2[9];
-    MathMulMatrix(Acquire3DMathEngine(), R2, R1, Matrix);
-    float Xformed[3];
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, Matrix, Pos);
-    float World[3];
-    World[0] = Xformed[0] + Delta[0];
-    World[1] = Xformed[1] + Delta[1];
-    World[2] = Xformed[2] + Delta[2];
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, R2, Pos);
-    Delta[0] = World[0] - Xformed[0];
-    Delta[1] = World[1] - Xformed[1];
-    Delta[2] = World[2] - Xformed[2];
-    std::memcpy(Matrix, R2, sizeof(Matrix));
-    MathTransformMatrix(Acquire3DMathEngine(), Xformed, Matrix, Pos);
-    AppliedPos[0] = Xformed[0] + Delta[0];
-    AppliedPos[1] = Xformed[1] + Delta[1];
-    AppliedPos[2] = Xformed[2] + Delta[2];
-    float QuatMatrix[9];
-    MathQuatToMatrix(Acquire3DMathEngine(), QuatMatrix, Quat);
-    float R3[9];
-    MathMulMatrix(Acquire3DMathEngine(), R3, R2, QuatMatrix);
-    MathMatrixToQuat(Acquire3DMathEngine(), AppliedQuat, R3);
+    const Matrix* InstanceOrient = G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
+    Matrix Transposed;                                         // FUN_0661caa0
+    Transposed.E[0][0] = InstanceOrient->E[0][0];
+    Transposed.E[0][1] = InstanceOrient->E[1][0];
+    Transposed.E[0][2] = InstanceOrient->E[2][0];
+    Transposed.E[1][0] = InstanceOrient->E[0][1];
+    Transposed.E[1][1] = InstanceOrient->E[1][1];
+    Transposed.E[1][2] = InstanceOrient->E[2][1];
+    Transposed.E[2][0] = InstanceOrient->E[0][2];
+    Transposed.E[2][1] = InstanceOrient->E[1][2];
+    Transposed.E[2][2] = InstanceOrient->E[2][2];
+    Matrix R1;
+    MathMulMatrix(Acquire3DMathEngine(), &R1, Orient, &Transposed);
+    Matrix R2;
+    MathMulMatrix(Acquire3DMathEngine(), &R2, &R1, &Orientation);
+    Vector Xformed;
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &Orientation, &Pos);
+    Vector World;
+    World.x = Xformed.x + Delta.x;
+    World.y = Xformed.y + Delta.y;
+    World.z = Xformed.z + Delta.z;
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &R2, &Pos);
+    Delta.x = World.x - Xformed.x;
+    Delta.y = World.y - Xformed.y;
+    Delta.z = World.z - Xformed.z;
+    std::memcpy(&Orientation, &R2, sizeof(Orientation));
+    MathTransformMatrix(Acquire3DMathEngine(), &Xformed, &Orientation, &Pos);
+    AppliedPos.x = Xformed.x + Delta.x;
+    AppliedPos.y = Xformed.y + Delta.y;
+    AppliedPos.z = Xformed.z + Delta.z;
+    Matrix QuatMatrix;
+    MathQuatToMatrix(Acquire3DMathEngine(), &QuatMatrix, &Quat);
+    Matrix R3;
+    MathMulMatrix(Acquire3DMathEngine(), &R3, &R2, &QuatMatrix);
+    MathMatrixToQuat(Acquire3DMathEngine(), &AppliedQuat, &R3);
     unsigned long Bits = 0;
-    std::memcpy(&Bits, &AppliedQuat[3], sizeof(Bits));
+    std::memcpy(&Bits, &AppliedQuat.z, sizeof(Bits));
     return Bits;
 }
 
@@ -1336,9 +1333,9 @@ unsigned long FTypedChannel::Interpolate(float* Out, const float* Left, const fl
 unsigned long FTypedChannel::BindHeader(const FPlayHeader* Header) { return TypedBind(this, Header); }
 unsigned long FTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
 unsigned long FTypedChannel::BindMap(unsigned long* Map, void* Bind) { return TypedBindMap(this, Map, Bind); }
-unsigned long FTypedChannel::SetOverlayPos(const float* Pos) { (void)Pos; return 0; }
-unsigned long FTypedChannel::SetOverlayExtra(const float* Extra) { (void)Extra; return 0; }
-unsigned long FTypedChannel::AddOverlayPos(const float* Delta) { (void)Delta; return 0; }
+unsigned long FTypedChannel::SetOverlayPos(const Vector* Pos) { (void)Pos; return 0; }
+unsigned long FTypedChannel::SetOverlayExtra(const Matrix* Extra) { (void)Extra; return 0; }
+unsigned long FTypedChannel::AddOverlayPos(const Vector* Delta) { (void)Delta; return 0; }
 float* FTypedChannel::GetSampled() { return nullptr; }
 unsigned long FTypedChannel::UpdateDeltaRate(float Dt) { (void)Dt; return 0; }
 // Type 1 (066291a4): slots 0/1/4/8..10/12..14 inherited (the shared bodies), 2 LAB_0661b880,
@@ -1348,13 +1345,13 @@ float* FScalarTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0 (+0
 
 // Type 2 (06629168): 2 LAB_0661b880, 3 LAB_0661cfa0, 5 LAB_0661d040, 6 LAB_066121d0,
 // 7 FUN_0661adc0 (the base's), 11 LAB_066121a0; the rest as the base.
-unsigned long FVectorTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
-float* FVectorTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0
+unsigned long FVectorTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, &Sampled.x, Left, Right, Alpha); }
+float* FVectorTypedChannel::GetSampled() { return &Sampled.x; } // LAB_066121a0
 
 // Type 4 (0662912c): 2 LAB_0661b880, 3 LAB_0661b950, 5 LAB_0661b940, 6 LAB_066121b0,
 // 7 FUN_0661adc0 (the base's), 11 LAB_066121a0; the rest as the base.
-unsigned long FQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
-float* FQuatTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0
+unsigned long FQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, &Sampled.w, Left, Right, Alpha); }
+float* FQuatTypedChannel::GetSampled() { return &Sampled.w; } // LAB_066121a0
 
 // ---- Typed-channel construction (retail operator new + ctor chain) ----------------------------
 static void TypedResetPlayState(FTypedChannel* This)
@@ -1461,14 +1458,14 @@ void FileSystemFindClose(void* FileSystem, int FindHandle)
     AsFileSystem(FileSystem)->FindClose((unsigned long)FindHandle); // +0x50
 }
 
-void MathMulMatrix3(I3DMathEngine* Math, float* Out9, const float* Left, const float* Right)
+void MathMulMatrix3(I3DMathEngine* Math, Matrix* Out, const Matrix* Left, const Matrix* Right)
 {
-    MathMulMatrix(Math, Out9, Left, Right);
+    MathMulMatrix(Math, Out, Left, Right);
 }
 
-void MathTransformVec(I3DMathEngine* Math, float* Out3, const float* Matrix, const float* In3)
+void MathTransformVec(I3DMathEngine* Math, Vector* Out, const Matrix* Rotation, const Vector* In)
 {
-    MathTransformMatrix(Math, Out3, Matrix, In3);
+    MathTransformMatrix(Math, Out, Rotation, In);
 }
 
 static I3DMathEngine* G_MathEngine = nullptr;

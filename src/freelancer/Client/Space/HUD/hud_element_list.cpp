@@ -87,60 +87,60 @@ namespace
     }
 }
 
-void HudVec3ScaleByInverse(float* Out, float const* In, float Length)
+void HudVec3ScaleByInverse(Vector* Out, Vector const* In, float Length)
 {
     // FUN_004c8b10: Z uses the unrounded reciprocal, Y and X the reciprocal rounded to float.
     double const InvExact = 1.0 / static_cast<double>(Length);
     float const Inv = static_cast<float>(InvExact);
-    float const Z = static_cast<float>(InvExact * In[2]);
-    float const Y = static_cast<float>(static_cast<double>(Inv) * In[1]);
-    float const X = static_cast<float>(static_cast<double>(Inv) * In[0]);
-    Out[0] = X;
-    Out[1] = Y;
-    Out[2] = Z;
+    float const Z = static_cast<float>(InvExact * In->z);
+    float const Y = static_cast<float>(static_cast<double>(Inv) * In->y);
+    float const X = static_cast<float>(static_cast<double>(Inv) * In->x);
+    Out->x = X;
+    Out->y = Y;
+    Out->z = Z;
 }
 
-void HudMatrixRotationY(float* M, float Angle)
+void HudMatrixRotationY(Matrix* M, float Angle)
 {
     // FUN_004c8b40.
     double const C = cos(static_cast<double>(Angle));
     double const S = sin(static_cast<double>(Angle));
-    M[1] = 0.0f;
-    M[3] = 0.0f;
-    M[4] = 1.0f;
-    M[5] = 0.0f;
-    M[7] = 0.0f;
-    M[0] = static_cast<float>(C);
-    M[2] = static_cast<float>(S);
-    M[6] = static_cast<float>(-S);
-    M[8] = static_cast<float>(C);
+    M->E[0][1] = 0.0f;
+    M->E[1][0] = 0.0f;
+    M->E[1][1] = 1.0f;
+    M->E[1][2] = 0.0f;
+    M->E[2][1] = 0.0f;
+    M->E[0][0] = static_cast<float>(C);
+    M->E[0][2] = static_cast<float>(S);
+    M->E[2][0] = static_cast<float>(-S);
+    M->E[2][2] = static_cast<float>(C);
 }
 
-void HudMatrixRotateRows12(float* M, float Angle)
+void HudMatrixRotateRows12(Matrix* M, float Angle)
 {
     // FUN_004c8b80.
     double const C = cos(static_cast<double>(Angle));
     double const S = sin(static_cast<double>(Angle));
     for (int Col = 0; Col < 3; ++Col)
     {
-        double const A = M[3 + Col];
-        double const B = M[6 + Col];
-        M[3 + Col] = static_cast<float>(A * C - S * B);
-        M[6 + Col] = static_cast<float>(A * S + C * B);
+        double const A = M->E[1][Col];
+        double const B = M->E[2][Col];
+        M->E[1][Col] = static_cast<float>(A * C - S * B);
+        M->E[2][Col] = static_cast<float>(A * S + C * B);
     }
 }
 
-void HudMatrixRotateRows01(float* M, float Angle)
+void HudMatrixRotateRows01(Matrix* M, float Angle)
 {
     // FUN_004c8bc0.
     double const C = cos(static_cast<double>(Angle));
     double const S = sin(static_cast<double>(Angle));
     for (int Col = 0; Col < 3; ++Col)
     {
-        double const A = M[Col];
-        double const B = M[3 + Col];
-        M[Col] = static_cast<float>(A * C - S * B);
-        M[3 + Col] = static_cast<float>(C * B + A * S);
+        double const A = M->E[0][Col];
+        double const B = M->E[1][Col];
+        M->E[0][Col] = static_cast<float>(A * C - S * B);
+        M->E[1][Col] = static_cast<float>(C * B + A * S);
     }
 }
 
@@ -641,15 +641,15 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
 #endif
     int const CursorYi = static_cast<int>(CursorYf);
     float const Cursor[3] = {static_cast<float>(CursorX), static_cast<float>(CursorYi), 0.0f};
-    float const Offset[3] = {Cursor[0] - HalfW, Cursor[1] - HalfH, 0.0f}; // FUN_00423b60
-    float Dir[3];
-    HudVec3ScaleByInverse(Dir, Offset, -RangePixels);
+    Vector const Offset = {Cursor[0] - HalfW, Cursor[1] - HalfH, 0.0f}; // FUN_00423b60
+    Vector Dir;
+    HudVec3ScaleByInverse(&Dir, &Offset, -RangePixels);
     float const DeadZone = static_cast<float>(static_cast<double>(Radius) / Range);
 
     // The length (FUN_00410190) clamped to 1, and zero inside the dead zone.
-    double const LengthExact = sqrt(static_cast<double>(Dir[0]) * Dir[0] +
-                                    static_cast<double>(Dir[1]) * Dir[1] +
-                                    static_cast<double>(Dir[2]) * Dir[2]);
+    double const LengthExact = sqrt(static_cast<double>(Dir.x) * Dir.x +
+                                    static_cast<double>(Dir.y) * Dir.y +
+                                    static_cast<double>(Dir.z) * Dir.z);
     float Length = static_cast<float>(LengthExact);
     if (LengthExact > 1.0)
         Length = 1.0f;
@@ -674,9 +674,9 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
 
     // The roll is multiplied by -0.99999994f (DAT_005d6ee0), not negated.
     Matrix Rotation;
-    HudMatrixRotationY(&Rotation.E[0][0], 0.0f);
-    HudMatrixRotateRows12(&Rotation.E[0][0], 0.0f);
-    HudMatrixRotateRows01(&Rotation.E[0][0],
+    HudMatrixRotationY(&Rotation, 0.0f);
+    HudMatrixRotateRows12(&Rotation, 0.0f);
+    HudMatrixRotateRows01(&Rotation,
                           static_cast<float>(static_cast<double>(Angle) * -0.9999999403953552));
 
     // One arrow segment every 0.15 (DAT_005d6edc) while below the length: placed at

@@ -169,9 +169,9 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     if (!Win3D::Create(NewParent, nullptr))
         return false;
 
-    Offset[0] = 0.0f;
-    Offset[1] = 0.052f;     // 0x3d54fdf4
-    Offset[2] = 0.0f;
+    Offset.x = 0.0f;
+    Offset.y = 0.052f;     // 0x3d54fdf4
+    Offset.z = 0.0f;
     SetMesh("Interface\\intro\\objects\\MULTI_attentionreq'd.cmp", 0);
     Field2d2 = 1;
 
@@ -224,8 +224,8 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
         WinFactoryCreate("RequestDisplay", "RichTextWin", this, nullptr));
     if (RequestDisplay != nullptr)
     {
-        float const AttachOffset[3] = {-0.23f, 0.2f, 0.0f};    // DAT_005cef30 / DAT_005cef34
-        RequestDisplay->SetAttachOffset(AttachOffset);
+        Vector const AttachOffset = {-0.23f, 0.2f, 0.0f};    // DAT_005cef30 / DAT_005cef34
+        RequestDisplay->SetAttachOffset(&AttachOffset);
         RequestDisplay->SetNormSize(0.46f, 0.15f);             // DAT_005cef28 / DAT_005cef2c
         RequestDisplay->SetAutoScrollbar(true);
         RequestDisplay->SetFrameColor(
@@ -237,44 +237,44 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
 
     // BtnAccept, DAT_0061157c.. = {0.089, 0.021} / {-0.11, -0.03}.
     {
-        float const Position[3] = {-0.11f, -0.03f, 0.0f};
-        float const Half[3] = {0.089f, 0.021f, 0.0f};
+        Vector const Position = {-0.11f, -0.03f, 0.0f};
+        Vector const Half = {0.089f, 0.021f, 0.0f};
         BtnAccept = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "BtnAccept", "ui_select_item", Position, Half, 0, 0, 0x1b80, 0, 0, 0));
+            "BtnAccept", "ui_select_item", &Position, &Half, 0, 0, 0x1b80, 0, 0, 0));
         RDLRefNode Ref(Texts[kNnGroupTextAccept]);
         (*BtnAccept->TextWinRef)->AppendNode(Ref);
     }
     // BtnDecline, DAT_0061158c.. = {0.089, 0.021} / {0.12, -0.03}.
     {
-        float const Position[3] = {0.12f, -0.03f, 0.0f};
-        float const Half[3] = {0.089f, 0.021f, 0.0f};
+        Vector const Position = {0.12f, -0.03f, 0.0f};
+        Vector const Half = {0.089f, 0.021f, 0.0f};
         BtnDecline = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "BtnDecline", "ui_select_item", Position, Half, 0, 0, 0x1b81, 0, 0, 0));
+            "BtnDecline", "ui_select_item", &Position, &Half, 0, 0, 0x1b81, 0, 0, 0));
         RDLRefNode Ref(Texts[kNnGroupTextDecline]);
         (*BtnDecline->TextWinRef)->AppendNode(Ref);
     }
     // BtnLeave, DAT_0061159c.. = {0.089, 0.021} / {DAT_0066da5c, -0.1}.
     {
-        float const Position[3] = {G_GroupBtnLeaveX, -0.1f, 0.0f};
-        float const Half[3] = {0.089f, 0.021f, 0.0f};
+        Vector const Position = {G_GroupBtnLeaveX, -0.1f, 0.0f};
+        Vector const Half = {0.089f, 0.021f, 0.0f};
         RichTextWireButtonControl* const Leave =
             static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-                "BtnLeave", "ui_select_item", Position, Half, 0, 0, 0x1b82, 0, 0, 0));
+                "BtnLeave", "ui_select_item", &Position, &Half, 0, 0, 0x1b82, 0, 0, 0));
         BtnLeave = Leave;
         RDLRefNode Ref(Texts[kNnGroupTextLeaveGroup]);
         (*Leave->TextWinRef)->AppendNode(Ref);
     }
     {
-        float const Position[3] = {0.23f, 0.23f, 0.0f};    // 0x3e6b851f
-        float const Half[3] = {0.02f, 0.02f, 0.0f};        // 0x3ca3d70a
+        Vector const Position = {0.23f, 0.23f, 0.0f};    // 0x3e6b851f
+        Vector const Half = {0.02f, 0.02f, 0.0f};        // 0x3ca3d70a
         BtnClose = CreateButtonControl("BtnClose", "Interface\\NeuroNet\\Inventory\\X.3db",
-                                       nullptr, "ui_select_item", nullptr, Position, nullptr,
-                                       Half, 0, 0, 0, 0, 0x409, 0, 0);
+                                       nullptr, "ui_select_item", nullptr, &Position, nullptr,
+                                       &Half, 0, 0, 0, 0, 0x409, 0, 0);
     }
     // AttentionTitle, 0.46 x 0.035 at {-0.23, 0.035 + 0.2, 0}.
     {
-        float const AttachOffset[3] = {-0.23f, 0.035f + 0.2f, 0.0f};
-        AttentionTitle = CreateRichTextWin("AttentionTitle", 0.46f, 0.035f, AttachOffset, false);
+        Vector const AttachOffset = {-0.23f, 0.035f + 0.2f, 0.0f};
+        AttentionTitle = CreateRichTextWin("AttentionTitle", 0.46f, 0.035f, &AttachOffset, false);
         StyleNode Style1(kTextStyleBody);
         AttentionTitle->AppendNode(Style1);
         StyleNode Style2(kTextStyleScreenTitle);
@@ -293,7 +293,7 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     RefreshRequestDisplay();
     ShownFrom = G_ChatIdNone;
     ShownShipId = 0;
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
     return true;
 }
 
@@ -303,7 +303,7 @@ bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(&Parent->Position.x);
+            SetPosition(&Parent->Position);
         RefreshRequestDisplay();
         return true;
     }

@@ -621,19 +621,19 @@ namespace AlchemyImpl
     // FUN_06206c70: identity 3x3 at [0,4,8]=1. FUN_0622ff00 then copies pos
     // to translation and, if extra+0x6c != 0, calls extra+0x0C. flags&1 quat
     // from vel is leftover (long acos/sincos). Mesh 0x34 has no extra+0x6c.
-    void FillIdentity3x3(float* Nine)
+    void FillIdentity3x3(Matrix* Out)
     {
-        if (Nine == nullptr)
+        if (Out == nullptr)
             return;
-        Nine[0] = 1.0f;
-        Nine[1] = 0.0f;
-        Nine[2] = 0.0f;
-        Nine[3] = 0.0f;
-        Nine[4] = 1.0f;
-        Nine[5] = 0.0f;
-        Nine[6] = 0.0f;
-        Nine[7] = 0.0f;
-        Nine[8] = 1.0f;
+        Out->E[0][0] = 1.0f;
+        Out->E[0][1] = 0.0f;
+        Out->E[0][2] = 0.0f;
+        Out->E[1][0] = 0.0f;
+        Out->E[1][1] = 1.0f;
+        Out->E[1][2] = 0.0f;
+        Out->E[2][0] = 0.0f;
+        Out->E[2][1] = 0.0f;
+        Out->E[2][2] = 1.0f;
     }
 
     // The math engine's Rotate (+0x30) on the 12-float Transform layout (3x3 row-major,
@@ -807,20 +807,20 @@ namespace AlchemyImpl
         return true;
     }
 
-    const float* GetDrawCameraTransform()
+    const Transform* GetDrawCameraTransform()
     {
         ICamera* Camera = DrawCameraFromCookie();
         if (Camera == nullptr)
             return nullptr;
-        return (const float*)Camera->GetViewTransform();
+        return Camera->GetViewTransform();
     }
 
-    const float* GetDrawCameraOrientation()
+    const Matrix* GetDrawCameraOrientation()
     {
         ICamera* Camera = DrawCameraFromCookie();
         if (Camera == nullptr)
             return nullptr;
-        return (const float*)Camera->GetOrientation();
+        return Camera->GetOrientation();
     }
 
     Vector* TransformPerpBoundsCenter(const Transform& Xform, Vector& Out,
@@ -1171,11 +1171,11 @@ namespace AlchemyImpl
     // vt+0x1c, lazily cached in DAT_06257978 -- the same engine Acquire3DMath hands out)
     // into a stack local, then a 12-dword copy to Out. Callers: beam 0x0620592d, dust
     // 0x0620fd3f, basic 0x06216629, mesh 0x062253a9, oriented 0x0622d079.
-    void ComposeTransform(float* Out12, const float* A12, const Transform& B)
+    void ComposeTransform(Transform* Out, const Transform* A, const Transform& B)
     {
         Transform Result;
-        Shared3DMath()->MulTransform(Result, *reinterpret_cast<const Transform*>(A12), B);
-        std::memcpy(Out12, &Result, sizeof(Result));
+        Shared3DMath()->MulTransform(Result, *A, B);
+        std::memcpy(Out, &Result, sizeof(Result));
     }
 
     // FUN_06244f30 (the frame lookup the draws make) is FFxTextureWrapper::LookupFrame

@@ -95,9 +95,9 @@ public:
     ~BaseRichTextWin() override;
 
     // slot 4 LAB_0057aa80
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 FUN_0057b0a0
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 9 FUN_0057a810
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 FUN_0057b0e0
@@ -147,7 +147,7 @@ public:
     // FUN_00579c30
     float GetScrollBarGap();
     // FUN_00579c40 (RET 4)
-    void SetAttachOffset(float const* NewOffset);
+    void SetAttachOffset(Vector const* NewOffset);
     // FUN_00579cc0 (RET 8)
     void SetNormSize(float Width, float Height);
     // FUN_00579e90 -- project the control, then (re)build the DC, bitmap and image.

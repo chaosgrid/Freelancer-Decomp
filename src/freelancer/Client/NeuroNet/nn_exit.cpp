@@ -63,18 +63,18 @@ bool NnExit::Create(Win3D* NewParent, void* Data)
     // Lower-case in retail; the lookup is stricmp.
     MouseSetCursor("arrow", false);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float FramePosition[3] = {0.0f, 0.0f, -1.0f};
-    CreateStaticControl("ExitFrame", kExitFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
-                        0, 1, 0, 0, 0, Zero);
+    Vector FramePosition = {0.0f, 0.0f, -1.0f};
+    CreateStaticControl("ExitFrame", kExitFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1, 1,
+                        0, 1, 0, 0, 0, &Zero);
 
-    float TextFramePosition[3] = {0.0f, NnFloatBits(0x3cf5c288), -1.0f};
-    CreateStaticControl("ExitTextFrame", kExitTextFrameMesh, TextFramePosition, nullptr, Zero, 0,
-                        0, 1, 0, 1, 0, 1, 0, 0, 0, Zero);
+    Vector TextFramePosition = {0.0f, NnFloatBits(0x3cf5c288), -1.0f};
+    CreateStaticControl("ExitTextFrame", kExitTextFrameMesh, &TextFramePosition, nullptr, &Zero, 0,
+                        0, 1, 0, 1, 0, 1, 0, 0, 0, &Zero);
 
-    float TextPosition[3] = {0.0f, NnFloatBits(0x3d0b4394), -1.0f};
-    ExitText = CreateTextControl("ExitText", "PageHeader", TextPosition, nullptr,
+    Vector TextPosition = {0.0f, NnFloatBits(0x3d0b4394), -1.0f};
+    ExitText = CreateTextControl("ExitText", "PageHeader", &TextPosition, nullptr,
                                  NnFloatBits(0x3eb851ec), NnFloatBits(0x3cf5c28f),
                                  NnFloatBits(0x3fc00000), 0, 1, 0, 0);
 
@@ -90,14 +90,14 @@ bool NnExit::Create(Win3D* NewParent, void* Data)
         char Name[0x100];
 
         sprintf(Name, "ExitButtonBox%d", Index);
-        float BoxPosition[3] = {Row + kBoxOffset, NnFloatBits(0xbd99999a), -1.0f};
-        float BoxExtents[3] = {NnFloatBits(0x3db645a2), NnFloatBits(0x3cac0831), 0.0f};
-        ButtonBox[Index] = CreateWireButtonControl(Name, "ui_select_item", BoxPosition,
-                                                   BoxExtents, 0, 0, 0, 0, 0);
+        Vector BoxPosition = {Row + kBoxOffset, NnFloatBits(0xbd99999a), -1.0f};
+        Vector BoxExtents = {NnFloatBits(0x3db645a2), NnFloatBits(0x3cac0831), 0.0f};
+        ButtonBox[Index] = CreateWireButtonControl(Name, "ui_select_item", &BoxPosition,
+                                                   &BoxExtents, 0, 0, 0, 0, 0);
 
         sprintf(Name, "ExitButtonText%d", Index);
-        float CaptionPosition[3] = {Row + kCaptionOffset, NnFloatBits(0xbd916873), -1.0f};
-        ButtonText[Index] = CreateTextControl(Name, "ButtonText", CaptionPosition, nullptr,
+        Vector CaptionPosition = {Row + kCaptionOffset, NnFloatBits(0xbd916873), -1.0f};
+        ButtonText[Index] = CreateTextControl(Name, "ButtonText", &CaptionPosition, nullptr,
                                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                               NnFloatBits(0x3fc00000), 0, 1, 0, 0);
     }
@@ -184,7 +184,7 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         return 0;
     }
     return 0;
@@ -227,8 +227,8 @@ void NnExitOpen(bool bImmediate)
     if (Created == nullptr)
         return;
     NnExit* const Exit = static_cast<NnExit*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Exit->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Exit->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     Exit->bImmediate = bImmediate ? 1 : 0;
     Exit->CaptureMouse();
 }

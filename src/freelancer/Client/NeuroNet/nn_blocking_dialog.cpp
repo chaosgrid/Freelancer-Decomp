@@ -42,9 +42,9 @@ bool BlockingDialog::Create(Win3D* NewParent, void* Data)
     DrawSubLayer = 6;
     bCursorDrawFlag = NnModalPauseGame();
     Win3DSetKeyFocus(this);
-    HalfExtents[0] = 2.0f;
-    HalfExtents[1] = 2.0f;
-    HalfExtents[2] = 0.0f;
+    HalfExtents.x = 2.0f;
+    HalfExtents.y = 2.0f;
+    HalfExtents.z = 0.0f;
 
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -66,8 +66,8 @@ void BlockingDialogOpen()
     if (Created == nullptr)
         return;
     BlockingDialog* const Dialog = static_cast<BlockingDialog*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     Dialog->CaptureMouse();
 }
 

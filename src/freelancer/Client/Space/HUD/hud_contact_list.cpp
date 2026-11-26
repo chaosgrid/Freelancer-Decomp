@@ -302,7 +302,7 @@ namespace
     // the near plane of the Win3D camera DAT_0067dbf8, turned by a copy of its orientation
     // DAT_0067dbfc -- through FUN_00423b90 in the refresh pass, through this TU's lazy
     // 3DMathEngine in the layout pass -- then normalised.
-    void ContactCursorRay(float* OutRay, bool bThroughEngine)
+    void ContactCursorRay(Vector* OutRay, bool bThroughEngine)
     {
         FSpaceCamera* const Cam = Win3DGetCamera();
         int CursorX = 0;
@@ -332,9 +332,9 @@ namespace
         double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
                                       static_cast<double>(World.y) * World.y +
                                       static_cast<double>(World.z) * World.z);
-        OutRay[0] = static_cast<float>(World.x * Inv);
-        OutRay[1] = static_cast<float>(World.y * Inv);
-        OutRay[2] = static_cast<float>(World.z * Inv);
+        OutRay->x = static_cast<float>(World.x * Inv);
+        OutRay->y = static_cast<float>(World.y * Inv);
+        OutRay->z = static_cast<float>(World.z * Inv);
     }
 
     // The label both name paths of the layout pass build: the client object's Font::String
@@ -590,8 +590,8 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         Win3DModelCachePreload(kContactIconPaths[Index], nullptr);
 
     // The formation-list title, hidden.
-    float const TitlePos[3] = {-0.189f, 0.043f, 0.0f};   // 0xbe418937, 0x3d3020c5
-    FormationTitle = CreateTextControl("FormationTitle", "PageHeader", TitlePos, nullptr, 0.269f,
+    Vector const TitlePos = {-0.189f, 0.043f, 0.0f};   // 0xbe418937, 0x3d3020c5
+    FormationTitle = CreateTextControl("FormationTitle", "PageHeader", &TitlePos, nullptr, 0.269f,
                                        0.015f, 1.7f, 0x60d, 1, 0, 1);
     FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & 0xfc);
 
@@ -604,72 +604,72 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         double const RowTop = static_cast<double>(kRowTop) -
                               static_cast<double>(Index) * static_cast<double>(kRowStep);
         float const RowTopF = static_cast<float>(RowTop);
-        float const RangePos[3] = {-0.126f, static_cast<float>(RowTop + kRangeRowOffset), 0.0f};
-        RangeTexts[Index] = CreateTextControl(ControlName, "HudSmall", RangePos, nullptr, 0.043f,
+        Vector const RangePos = {-0.126f, static_cast<float>(RowTop + kRangeRowOffset), 0.0f};
+        RangeTexts[Index] = CreateTextControl(ControlName, "HudSmall", &RangePos, nullptr, 0.043f,
                                               0.015f, 0.9f, 0, 1, 0, 0);
         RangeTexts[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         _snprintf(ControlName, 0x100, "ContactListNameText%d", Index);
-        float const NamePos[3] = {-0.107f,
-                                  static_cast<float>(static_cast<double>(RowTopF) + kNameRowOffset),
-                                  0.0f};
-        NameTexts[Index] = CreateTextControl(ControlName, "HudSmall", NamePos, nullptr, kLabelScale,
+        Vector const NamePos = {-0.107f,
+                                static_cast<float>(static_cast<double>(RowTopF) + kNameRowOffset),
+                                0.0f};
+        NameTexts[Index] = CreateTextControl(ControlName, "HudSmall", &NamePos, nullptr, kLabelScale,
                                              kRowStep, 0.9f, 0, 0, 0, 1);
-        NameTexts[Index]->HomeOffset[0] = NamePos[0];
-        NameTexts[Index]->HomeOffset[1] = NamePos[1];
-        NameTexts[Index]->HomeOffset[2] = NamePos[2];
+        NameTexts[Index]->HomeOffset.x = NamePos.x;
+        NameTexts[Index]->HomeOffset.y = NamePos.y;
+        NameTexts[Index]->HomeOffset.z = NamePos.z;
         NameTexts[Index]->SetProperty(kTextPropClickable, 1, 0);
         static_cast<NnTextControl*>(NameTexts[Index])->SetMaxLines(1); // FUN_0058b770
     }
 
-    float const IconHalf[3] = {0.006f, 0.006f, 0.0f};    // 0x3bc49ba6
+    Vector const IconHalf = {0.006f, 0.006f, 0.0f};    // 0x3bc49ba6
     for (int Index = 0; Index < 8; ++Index)
     {
         char ControlName[0x100];
         _snprintf(ControlName, 0x100, "ContactListIcon%d", Index);
-        float const IconPos[3] = {
+        Vector const IconPos = {
             -0.17f,
             static_cast<float>(static_cast<double>(kIconRowTop) -
                                static_cast<double>(Index) * static_cast<double>(kRowStep)),
             0.0f};
         Icons[Index] = CreateButtonControl(ControlName, "Interface\\hud\\HUD_contactwaypoint.3db",
-                                           nullptr, "ui_select_item", nullptr, IconPos, nullptr,
-                                           IconHalf, 0, 1, 0, 0, 1, 0, 0);
+                                           nullptr, "ui_select_item", nullptr, &IconPos, nullptr,
+                                           &IconHalf, 0, 1, 0, 0, 1, 0, 0);
     }
 
-    float const FilterHalf[3] = {0.014f, 0.014f, 0.0f};  // 0x3c656042
-    float const ImportantPos[3] = {-0.128f, 0.024f, 0.0f};
+    Vector const FilterHalf = {0.014f, 0.014f, 0.0f};  // 0x3c656042
+    Vector const ImportantPos = {-0.128f, 0.024f, 0.0f};
     ImportantButton = CreateButtonControl("ImportantFilterButton",
                                           "interface\\HUD\\HUD_contactimportant.3db", nullptr,
-                                          "ui_filter_select", nullptr, ImportantPos, nullptr,
-                                          FilterHalf, 0, 1, 0, 0, 0x623, 0, 0);
-    float const ShipsPos[3] = {-0.094f, 0.024f, 0.0f};
+                                          "ui_filter_select", nullptr, &ImportantPos, nullptr,
+                                          &FilterHalf, 0, 1, 0, 0, 0x623, 0, 0);
+    Vector const ShipsPos = {-0.094f, 0.024f, 0.0f};
     ShipsButton = CreateButtonControl("ShipsFilterButton", "interface\\HUD\\HUD_contactship.3db",
-                                      nullptr, "ui_filter_select", nullptr, ShipsPos, nullptr,
-                                      FilterHalf, 0, 1, 0, 0, 0x4fc, 0, 0);
-    float const SolarPos[3] = {-0.06f, 0.024f, 0.0f};
+                                      nullptr, "ui_filter_select", nullptr, &ShipsPos, nullptr,
+                                      &FilterHalf, 0, 1, 0, 0, 0x4fc, 0, 0);
+    Vector const SolarPos = {-0.06f, 0.024f, 0.0f};
     SolarButton = CreateButtonControl("SolarFilterButton",
                                       "interface\\HUD\\HUD_contactstation.3db", nullptr,
-                                      "ui_filter_select", nullptr, SolarPos, nullptr, FilterHalf,
+                                      "ui_filter_select", nullptr, &SolarPos, nullptr, &FilterHalf,
                                       0, 1, 0, 0, 0x4fd, 0, 0);
-    float const LootPos[3] = {-0.026f, 0.024f, 0.0f};
+    Vector const LootPos = {-0.026f, 0.024f, 0.0f};
     LootButton = CreateButtonControl("LootFilterButton", "interface\\HUD\\HUD_contactloot.3db",
-                                     nullptr, "ui_filter_select", nullptr, LootPos, nullptr,
-                                     FilterHalf, 0, 1, 0, 0, 0x520, 0, 0);
-    float const AllPos[3] = {0.008f, 0.024f, 0.0f};
+                                     nullptr, "ui_filter_select", nullptr, &LootPos, nullptr,
+                                     &FilterHalf, 0, 1, 0, 0, 0x520, 0, 0);
+    Vector const AllPos = {0.008f, 0.024f, 0.0f};
     AllButton = CreateButtonControl("AllFilterButton", "interface\\HUD\\HUD_contactall.3db",
-                                    nullptr, "ui_filter_select", nullptr, AllPos, nullptr,
-                                    FilterHalf, 0, 1, 0, 0, 0x624, 0, 0);
+                                    nullptr, "ui_filter_select", nullptr, &AllPos, nullptr,
+                                    &FilterHalf, 0, 1, 0, 0, 0x624, 0, 0);
 
     // The "all" button is hidden in single player.
     AllButton->SetProperty(kWinPropHide, SinglePlayer() ? 1u : 0u, 0);
 
     // The scroll bar (range 0..5, page 8, vertical).
-    float const ScrollPos3[3] = {-0.267f, -0.234f, -1.0f};
-    Scroll = CreateUIScroll("ContactListScroll", ScrollPos3, 0.016f, 0.118f, 0, 5, 8, 0);
+    Vector const ScrollPos3 = {-0.267f, -0.234f, -1.0f};
+    Scroll = CreateUIScroll("ContactListScroll", &ScrollPos3, 0.016f, 0.118f, 0, 5, 8, 0);
 
     SetOffset(-0.323f, -0.241f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     SetHiddenWithChildren(true);
 
     // Previous / next contact.
@@ -1886,10 +1886,10 @@ void HUD_ContactList::Draw()
             }
             else
             {
-                float Ray[3];
-                ContactCursorRay(Ray, false);
-                if ((Icons[Row]->HitTest(Ray) || RangeTexts[Row]->HitTest(Ray) ||
-                     NameTexts[Row]->HitTest(Ray)) &&
+                Vector Ray;
+                ContactCursorRay(&Ray, false);
+                if ((Icons[Row]->HitTest(&Ray) || RangeTexts[Row]->HitTest(&Ray) ||
+                     NameTexts[Row]->HitTest(&Ray)) &&
                     !HudIsMousePickBlocked())
                 {
                     unsigned long Pulsed = 0;
@@ -2212,11 +2212,11 @@ void HUD_ContactList::Draw()
             {
                 NameText->SetFont(PlayerNameFont);        // FUN_0058a740
             }
-            NameText->Offset[0] = NameText->HomeOffset[0];
-            NameText->Offset[1] = NameText->HomeOffset[1];
-            NameText->Offset[2] = NameText->HomeOffset[2];
-            NameText->Offset[1] =
-                static_cast<float>(static_cast<double>(NameText->Offset[1]) - kGroupNameDrop);
+            NameText->Offset.x = NameText->HomeOffset.x;
+            NameText->Offset.y = NameText->HomeOffset.y;
+            NameText->Offset.z = NameText->HomeOffset.z;
+            NameText->Offset.y =
+                static_cast<float>(static_cast<double>(NameText->Offset.y) - kGroupNameDrop);
         }
         else
         {
@@ -2224,11 +2224,11 @@ void HUD_ContactList::Draw()
             {
                 NameText->SetFont(HudSmallFont);
             }
-            NameText->Offset[0] = NameText->HomeOffset[0];
-            NameText->Offset[1] = NameText->HomeOffset[1];
-            NameText->Offset[2] = NameText->HomeOffset[2];
+            NameText->Offset.x = NameText->HomeOffset.x;
+            NameText->Offset.y = NameText->HomeOffset.y;
+            NameText->Offset.z = NameText->HomeOffset.z;
         }
-        NameText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(NameText->Offset), 0);
+        NameText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&NameText->Offset), 0);
         if (RowLabels[Row] == nullptr)
         {
             NameTexts[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Name), 0);
@@ -2268,10 +2268,10 @@ void HUD_ContactList::Draw()
         }
         else
         {
-            float Ray[3];
-            ContactCursorRay(Ray, true);
-            if ((Icons[Row]->HitTest(Ray) || RangeTexts[Row]->HitTest(Ray) ||
-                 NameTexts[Row]->HitTest(Ray)) &&
+            Vector Ray;
+            ContactCursorRay(&Ray, true);
+            if ((Icons[Row]->HitTest(&Ray) || RangeTexts[Row]->HitTest(&Ray) ||
+                 NameTexts[Row]->HitTest(&Ray)) &&
                 !HudIsMousePickBlocked())
             {
                 unsigned long Pulsed = 0;

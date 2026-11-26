@@ -59,20 +59,20 @@ namespace
 static GENRESULT DACOM_API StubRet8(void* /*This*/, void* /*A*/);
 
 // FUN_065f1030 (thiscall: InverseRoot).
-void FBoneRuntime::ComposeWorldMatrix(const float* InverseRoot)
+void FBoneRuntime::ComposeWorldMatrix(const Transform* InverseRoot)
 {
-    float Local[12];
+    Transform Local;
     AcquireMathEngine()->MulTransform(
-        *(Transform*)Local,
-        *(const Transform*)LocalTransform,
-        *(const Transform*)Source->BoneToRoot); // +0x1C
-    float LocalCopy[12];
-    std::memcpy(LocalCopy, Local, sizeof(LocalCopy));
-    float World[12];
-    AcquireMathEngine()->MulTransform(*(Transform*)World,
-                                      *(const Transform*)InverseRoot,
-                                      *(const Transform*)LocalCopy); // +0x1C
-    std::memcpy(WorldMatrix, World, sizeof(World));
+        Local,
+        LocalTransform,
+        Source->BoneToRoot); // +0x1C
+    Transform LocalCopy;
+    std::memcpy(&LocalCopy, &Local, sizeof(LocalCopy));
+    Transform World;
+    AcquireMathEngine()->MulTransform(World,
+                                      *InverseRoot,
+                                      LocalCopy); // +0x1C
+    std::memcpy(&WorldMatrix, &World, sizeof(World));
 }
 
 // EngBase's IEngine, acquired by QI. Every slot this module calls (+0x20, +0x24,
@@ -126,7 +126,7 @@ bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
                     if (Child->Read((unsigned long)Handle, Buffer, 0x30, &Got, 0) != 0 &&
                         Got == 0x30)
                     {
-                        std::memcpy(Bone->BoneToRoot, Buffer, 0x30);
+                        std::memcpy(&Bone->BoneToRoot, Buffer, 0x30);
                         bRead = true;
                     }
                     Child->CloseFile((unsigned long)Handle);
@@ -258,10 +258,10 @@ FBoneRuntime::FBoneRuntime()
     Source = nullptr;
     Flags = 0;
     std::memset(FlagPadding, 0, sizeof(FlagPadding));
-    WriteIdentity3x3(WorldMatrix);
-    WorldMatrix[9] = 0.0f;
-    WorldMatrix[10] = 0.0f;
-    WorldMatrix[11] = 0.0f;
+    WriteIdentity3x3(&WorldMatrix.Rotation);
+    WorldMatrix.Translation.x = 0.0f;
+    WorldMatrix.Translation.y = 0.0f;
+    WorldMatrix.Translation.z = 0.0f;
 }
 
 // The FUN_065f1550 construct loop body for one slot. The memset stands in for the operator
@@ -328,12 +328,12 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel)
 }
 
 // FUN_065f1660 (thiscall). Retail does not test for null.
-void WriteIdentity3x3(float* Matrix)
+void WriteIdentity3x3(Matrix* Dest)
 {
-    std::memset(Matrix, 0, 9 * sizeof(float));
-    Matrix[0] = 1.0f;
-    Matrix[4] = 1.0f;
-    Matrix[8] = 1.0f;
+    std::memset(Dest, 0, 9 * sizeof(float));
+    Dest->E[0][0] = 1.0f;
+    Dest->E[1][1] = 1.0f;
+    Dest->E[2][2] = 1.0f;
 }
 
 // LAB_065f1690 (RET 8), slot 0: [this+4] = the instance. Retail leaves `this` in EAX; the
@@ -369,10 +369,10 @@ void DACOM_API FBoneRuntime::destroy_instance(long Inst)
 // LAB_065f16b0, slot 3. Retail leaves the flag byte in AL; the slot returns nothing.
 void DACOM_API FBoneRuntime::set_position(long /*Inst*/, Vector const& Pos)
 {
-    float* const Dest = LocalTransform + 9;
-    Dest[0] = Pos.x;
-    Dest[1] = Pos.y;
-    Dest[2] = Pos.z;
+    Vector* const Dest = &LocalTransform.Translation;
+    Dest->x = Pos.x;
+    Dest->y = Pos.y;
+    Dest->z = Pos.z;
     if ((this->Flags & 1u) != 0)
         this->Flags = (unsigned char)(this->Flags | 2u);
 }
@@ -380,7 +380,7 @@ void DACOM_API FBoneRuntime::set_position(long /*Inst*/, Vector const& Pos)
 // LAB_065f16e0, slot 4.
 Vector const& DACOM_API FBoneRuntime::get_position(long /*Inst*/) const
 {
-    return *(const Vector*)(LocalTransform + 9);
+    return LocalTransform.Translation;
 }
 
 // LAB_065f16f0, slot 5. The copy is unconditional; the bit 0 test made before it only decides
@@ -388,7 +388,7 @@ Vector const& DACOM_API FBoneRuntime::get_position(long /*Inst*/) const
 void DACOM_API FBoneRuntime::set_orientation(long /*Inst*/, Matrix const& Orient)
 {
     const unsigned char Flags = this->Flags;
-    std::memcpy(LocalTransform, &Orient, 9 * sizeof(float));
+    std::memcpy(&LocalTransform.Rotation, &Orient, 9 * sizeof(float));
     if ((Flags & 1u) != 0)
         this->Flags = (unsigned char)(Flags | 2u);
 }
@@ -396,20 +396,20 @@ void DACOM_API FBoneRuntime::set_orientation(long /*Inst*/, Matrix const& Orient
 // LAB_065f1720, slots 6 and 8.
 Matrix const& DACOM_API FBoneRuntime::get_orientation(long /*Inst*/) const
 {
-    return *(const Matrix*)LocalTransform;
+    return LocalTransform.Rotation;
 }
 
 // LAB_065f1720, slot 8 (the same body as slot 6).
 Transform const& DACOM_API FBoneRuntime::get_transform(long /*Inst*/) const
 {
-    return *(const Transform*)LocalTransform;
+    return LocalTransform;
 }
 
 // LAB_065f1730, slot 7: as slot 5, with rotation + position.
 void DACOM_API FBoneRuntime::set_transform(long /*Inst*/, Transform const& Xform)
 {
     const unsigned char Flags = this->Flags;
-    std::memcpy(LocalTransform, &Xform, 12 * sizeof(float));
+    std::memcpy(&LocalTransform, &Xform, 12 * sizeof(float));
     if ((Flags & 1u) != 0)
         this->Flags = (unsigned char)(Flags | 2u);
 }
@@ -990,17 +990,17 @@ GENRESULT DACOM_API FDeformable::GetFirstBone(void* Instance, int* Out)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3)
+GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, const Vector* Pos)
 {
     FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
-    // LAB_065f20f0 -> FUN_065f4f00(Pos3).
+    // LAB_065f20f0 -> FUN_065f4f00(Pos).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
     DeformInstance->SweepExpiredList();
-    float Vec[3];
-    Vec[0] = Pos3[0];
-    Vec[1] = Pos3[1];
-    Vec[2] = Pos3[2];
+    Vector Vec;
+    Vec.x = Pos->x;
+    Vec.y = Pos->y;
+    Vec.z = Pos->z;
     unsigned char bHit = 0;
     FIkListNode* Node = DeformInstance->ListHead;
     while (Node != nullptr)
@@ -1010,41 +1010,41 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3)
             const unsigned long Handle =
                 (unsigned long)((ptrdiff_t)Node->Event);
             float Duration;
-            float MappedA[3];
-            float MappedB[3];
-            MappedA[0] = 0.0f;
-            MappedA[1] = 0.0f;
-            MappedA[2] = 0.0f;
-            MappedB[0] = 0.0f;
-            MappedB[1] = 0.0f;
-            MappedB[2] = 0.0f;
+            Vector MappedA;
+            Vector MappedB;
+            MappedA.x = 0.0f;
+            MappedA.y = 0.0f;
+            MappedA.z = 0.0f;
+            MappedB.x = 0.0f;
+            MappedB.y = 0.0f;
+            MappedB.z = 0.0f;
             double Sum = 0.0;
             if (G_Animation->GetDurationIfNamed(Handle, &Duration) != 0)
             {
-                G_Animation->TouchMapped(Handle, MappedB, MappedA);
-                Sum = (double)Duration + (double)MappedA[1];
+                G_Animation->TouchMapped(Handle, &MappedB, &MappedA);
+                Sum = (double)Duration + (double)MappedA.y;
             }
             else
                 Sum = (double)DeformInstance->RootHeightOffset + 0.0;
             const float Y = (float)(Sum + (double)DeformInstance->BaseHeight);
-            Vec[1] = Y;
-            float OverlayPos[3];
-            OverlayPos[0] = Pos3[0];
-            OverlayPos[1] = Y;
-            OverlayPos[2] = Pos3[2];
-            G_Animation->SetOverlayPos(Handle, OverlayPos);
+            Vec.y = Y;
+            Vector OverlayPos;
+            OverlayPos.x = Pos->x;
+            OverlayPos.y = Y;
+            OverlayPos.z = Pos->z;
+            G_Animation->SetOverlayPos(Handle, &OverlayPos);
             bHit = 1;
         }
         Node = Node->Next;
     }
     if (bHit == 0)
-        Vec[1] = DeformInstance->RootHeightOffset + DeformInstance->BaseHeight;
+        Vec.y = DeformInstance->RootHeightOffset + DeformInstance->BaseHeight;
     G_Engine->SetInstancePosition(FirstBoneInstance(DeformInstance),
-                                  (const Vector*)Vec);
+                                  &Vec);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, void* Ori)
+GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, const Matrix* Ori)
 {
     FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
     // LAB_065f2110 -> FUN_065f5050(Ori).
@@ -1056,10 +1056,10 @@ GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, void* Ori)
         if (Node->Active == 0)
             G_Animation->SetOverlayExtra(
                 (unsigned long)((ptrdiff_t)Node->Event),
-                (float*)Ori);
+                Ori);
         Node = Node->Next;
     }
-    G_Engine->SetInstanceOrientation(FirstBoneInstance(DeformInstance), (const Matrix*)Ori);
+    G_Engine->SetInstanceOrientation(FirstBoneInstance(DeformInstance), Ori);
     return GR_OK;
 }
 
@@ -1094,35 +1094,35 @@ GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height)
             float Ref = 0.0f;
             if (G_Animation->GetDurationIfNamed(Handle, &Duration) != 0)
             {
-                float MappedA[3];
-                float MappedB[3];
-                MappedA[0] = 0.0f;
-                MappedA[1] = 0.0f;
-                MappedA[2] = 0.0f;
-                MappedB[0] = 0.0f;
-                MappedB[1] = 0.0f;
-                MappedB[2] = 0.0f;
-                G_Animation->TouchMapped(Handle, MappedA, MappedB);
+                Vector MappedA;
+                Vector MappedB;
+                MappedA.x = 0.0f;
+                MappedA.y = 0.0f;
+                MappedA.z = 0.0f;
+                MappedB.x = 0.0f;
+                MappedB.y = 0.0f;
+                MappedB.z = 0.0f;
+                G_Animation->TouchMapped(Handle, &MappedA, &MappedB);
                 Base = Duration;
-                Add = MappedB[1];
-                Ref = MappedA[1];
+                Add = MappedB.y;
+                Ref = MappedA.y;
             }
             else
             {
                 Base = DeformInstance->RootHeightOffset;
                 Add = 0.0f;
-                Ref = DeformInstance->PartArray[0].Lod->BoneSlots[0].LocalTransform[10];
+                Ref = DeformInstance->PartArray[0].Lod->BoneSlots[0].LocalTransform.Translation.y;
             }
             const double Delta = (((double)Base + (double)Add) +
                                   (double)DeformInstance->BaseHeight) -
                                  (double)Ref;
             if (std::fabs(Delta) > 1.1920928955078125e-07)
             {
-                float Vec[3];
-                Vec[0] = 0.0f;
-                Vec[1] = (float)Delta;
-                Vec[2] = 0.0f;
-                G_Animation->AddOverlayPos(Handle, Vec);
+                Vector Vec;
+                Vec.x = 0.0f;
+                Vec.y = (float)Delta;
+                Vec.z = 0.0f;
+                G_Animation->AddOverlayPos(Handle, &Vec);
             }
         }
         Node = Node->Next;
@@ -1215,7 +1215,7 @@ GENRESULT DACOM_API FDeformable::GetMeshStats(void* Instance, unsigned int* Out)
 }
 
 GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius,
-                                                      float* OutCenter)
+                                                      Vector* OutCenter)
 {
     FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
     // LAB_065f2220 -> FUN_065f5bc0.
@@ -1223,24 +1223,24 @@ GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius
         return GR_GENERIC;
 
     float BestRadius = 0.0f;
-    float FirstCenter[3];
-    FirstCenter[0] = 0.0f;
-    FirstCenter[1] = 0.0f;
-    FirstCenter[2] = 0.0f;
-    DeformInstance->PartArray[0].BoundSphere(&BestRadius, FirstCenter);
+    Vector FirstCenter;
+    FirstCenter.x = 0.0f;
+    FirstCenter.y = 0.0f;
+    FirstCenter.z = 0.0f;
+    DeformInstance->PartArray[0].BoundSphere(&BestRadius, &FirstCenter);
 
     int Index = 0;
     while (Index < DeformInstance->PartCount)
     {
         float Radius = 0.0f;
-        float Center[3];
-        Center[0] = 0.0f;
-        Center[1] = 0.0f;
-        Center[2] = 0.0f;
-        DeformInstance->PartArray[Index].BoundSphere(&Radius, Center);
-        const double Dx = (double)Center[0] - (double)FirstCenter[0];
-        const double Dy = (double)Center[1] - (double)FirstCenter[1];
-        const double Dz = (double)Center[2] - (double)FirstCenter[2];
+        Vector Center;
+        Center.x = 0.0f;
+        Center.y = 0.0f;
+        Center.z = 0.0f;
+        DeformInstance->PartArray[Index].BoundSphere(&Radius, &Center);
+        const double Dx = (double)Center.x - (double)FirstCenter.x;
+        const double Dy = (double)Center.y - (double)FirstCenter.y;
+        const double Dz = (double)Center.z - (double)FirstCenter.z;
         const double Reach = std::sqrt(Dz * Dz + Dy * Dy + Dx * Dx) + (double)Radius;
         Radius = (float)Reach;
         if (Reach > (double)BestRadius)
@@ -1249,9 +1249,9 @@ GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius
     }
     if (!(BestRadius > 0.0f))
         return GR_GENERIC;
-    OutCenter[0] = FirstCenter[0];
-    OutCenter[1] = FirstCenter[1];
-    OutCenter[2] = FirstCenter[2];
+    OutCenter->x = FirstCenter.x;
+    OutCenter->y = FirstCenter.y;
+    OutCenter->z = FirstCenter.z;
     *OutRadius = BestRadius;
     return GR_OK;
 }

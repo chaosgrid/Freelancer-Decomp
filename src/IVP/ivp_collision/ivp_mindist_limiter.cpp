@@ -909,7 +909,7 @@ void IVP_Contact_Point::UpdateContactFrame()
         NewOwner->CoordOSCrossNormal[0].y = (float)(NormalOSx * Coord.z - (double)(NormalOSz) * Coord.x);
         NewOwner->CoordOSCrossNormal[0].z = (float)((double)(CrossZa) - CrossZb);
 
-        Core0->calc_point_speed_ws(static_cast<const Vector*>(&NewOwner->CoordOS[0]), &Core0->Speed, &Core0->RotSpeed,
+        Core0->calc_point_speed_ws(&NewOwner->CoordOS[0], &Core0->Speed, &Core0->RotSpeed,
                                    &RelativeSpeed); // FUN_063461a0
 
         const Vector& Cross = NewOwner->CoordOSCrossNormal[0];
@@ -958,7 +958,7 @@ void IVP_Contact_Point::UpdateContactFrame()
         NewOwner->CoordOSCrossNormal[1].z = (float)((double)(CrossZa) - CrossZb);
 
         Vector PointSpeed1; // local_38
-        Core1->calc_point_speed_ws(static_cast<const Vector*>(&NewOwner->CoordOS[1]), &Core1->Speed, &Core1->RotSpeed,
+        Core1->calc_point_speed_ws(&NewOwner->CoordOS[1], &Core1->Speed, &Core1->RotSpeed,
                                    &PointSpeed1); // FUN_063461a0
         // FUN_0628bea0: RelativeSpeed -= PointSpeed1.
         RelativeSpeed.y = (float)((double)(RelativeSpeed.y) - PointSpeed1.y);

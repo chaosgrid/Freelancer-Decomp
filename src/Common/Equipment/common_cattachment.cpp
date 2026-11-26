@@ -81,10 +81,10 @@ namespace
     // that frame) through IEngine::CreateJoint; otherwise IHardpoint::ConnectHardpoints. Returns
     // the child's IEngine::GetInstanceRelative block, or null when either archetype or
     // hardpoint lookup fails. Both archetype handles are released, also when they are -1.
-    unsigned long* ConnectAttachedHardpoints(long ParentInst, char const* ParentHp, long ChildInst,
-                                             char const* ChildHp)
+    FEngineJointBlock* ConnectAttachedHardpoints(long ParentInst, char const* ParentHp, long ChildInst,
+                                                 char const* ChildHp)
     {
-        unsigned long* Result = nullptr;
+        FEngineJointBlock* Result = nullptr;
         ArchetypeIndex ParentHandle = DALib::Engine->GetInstanceArchetype(ParentInst);
         if (ParentHandle != InvalidArchetypeIndex)
         {
@@ -106,9 +106,9 @@ namespace
                     {
                         if (ChildData.Type == 2 && ParentData.Type == 2)
                         {
-                            FJointRelative Joint;
+                            FEngineJointBlock Joint;
                             Joint.Type = 2;
-                            Joint.Field_0x54 = 0;  // retail: unwritten stack (see FJointRelative)
+                            Joint.Field_0x54 = 0;  // retail: unwritten stack (see FEngineJointBlock)
                             Joint.Field_0x58 = 0;
                             Joint.ParentPos = ParentData.Position;
                             Joint.ChildPos = ChildData.Position;

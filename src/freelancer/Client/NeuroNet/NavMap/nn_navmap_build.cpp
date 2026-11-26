@@ -161,10 +161,10 @@ void NeuroNetNavMap::BuildSystemItems()
 void NeuroNetNavMap::AddPlayerMarker()
 {
     // FUN_00491410.
-    float Pos[3];
+    Vector Pos;
     float Heading;
-    PlayerMapPosition(Pos, &Heading); // FUN_00491be0
-    PlayerItem = AddItem(2, 0, Pos[0], Pos[1], Pos[2], ShipMarkerSize, "NNM_SM_INFO_POSITION",
+    PlayerMapPosition(&Pos, &Heading); // FUN_00491be0
+    PlayerItem = AddItem(2, 0, Pos.x, Pos.y, Pos.z, ShipMarkerSize, "NNM_SM_INFO_POSITION",
                          0x219a, 0, Heading, 0, 0);
     // No null test, as in retail.
     PlayerItem->PulsePhase = -1.0f;

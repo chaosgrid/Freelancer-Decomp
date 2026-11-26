@@ -532,14 +532,14 @@ FTriMeshArch::~FTriMeshArch()
 int FTriMeshArch::Reset()
 {
     CloseFaceGroup();
-    Center[0] = 0.0f;
-    Center[1] = 0.0f;
-    Center[2] = 0.0f;
+    Center.x = 0.0f;
+    Center.y = 0.0f;
+    Center.z = 0.0f;
     for (int Index = 0; Index < 6; ++Index)
         Box[Index] = 0.0f;
-    SphereCenter[0] = 0.0f;
-    SphereCenter[1] = 0.0f;
-    SphereCenter[2] = 0.0f;
+    SphereCenter.x = 0.0f;
+    SphereCenter.y = 0.0f;
+    SphereCenter.z = 0.0f;
     SphereRadius = -1.0f;
     for (size_t Index = 0; Index < Groups.size(); ++Index)
     {
@@ -1664,14 +1664,14 @@ int FTriMeshArch::Clone(FTriMeshArch** Out)
         Copy->Groups.insert(Copy->Groups.end(), 1, Group);
     }
     Copy->Flags = Flags;
-    Copy->Center[0] = Center[0];
-    Copy->Center[1] = Center[1];
-    Copy->Center[2] = Center[2];
+    Copy->Center.x = Center.x;
+    Copy->Center.y = Center.y;
+    Copy->Center.z = Center.z;
     for (int Index = 0; Index < 6; ++Index)
         Copy->Box[Index] = Box[Index];
-    Copy->SphereCenter[0] = SphereCenter[0];
-    Copy->SphereCenter[1] = SphereCenter[1];
-    Copy->SphereCenter[2] = SphereCenter[2];
+    Copy->SphereCenter.x = SphereCenter.x;
+    Copy->SphereCenter.y = SphereCenter.y;
+    Copy->SphereCenter.z = SphereCenter.z;
     Copy->SphereRadius = SphereRadius;
     std::strncpy(Copy->Name, Name, 0x104);
     Copy->Cursor = Copy->Groups.size();
@@ -1873,59 +1873,59 @@ int FTriMeshArch::GetBox(float* Out)
 
 // FUN_06c25d40. Retail: the summing loop never advances Point (the result is the first vertex),
 // and the cache is tested with bit 0x2 (the sphere bit) but recorded in bit 0x8.
-int FTriMeshArch::GetCenter(float* Out)
+int FTriMeshArch::GetCenter(Vector* Out)
 {
     if ((Flags & 0x1) == 0)
         return -1;
     if ((Flags & 0x2) != 0)
     {
-        Out[0] = Center[0];
-        Out[1] = Center[1];
-        Out[2] = Center[2];
+        Out->x = Center.x;
+        Out->y = Center.y;
+        Out->z = Center.z;
         return 0;
     }
-    Center[2] = 0.0f;
-    Center[1] = 0.0f;
-    Center[0] = 0.0f;
+    Center.z = 0.0f;
+    Center.y = 0.0f;
+    Center.x = 0.0f;
     const unsigned long Count = Vertices.Position.Count;
     if (Count != 0)
     {
         const float* Point = (const float*)Vertices.Position.Base;
         for (unsigned long Index = 0; Index < Count; ++Index)
         {
-            Center[0] = Center[0] + Point[0];
-            Center[1] = Point[1] + Center[1];
-            Center[2] = Point[2] + Center[2];
+            Center.x = Center.x + Point[0];
+            Center.y = Point[1] + Center.y;
+            Center.z = Point[2] + Center.z;
         }
         // The count converts unsigned; 1 / count (1.0f is DAT_06c361ec) stays on the x87 stack.
         const double Scale = 1.0 / (double)Count;
-        Center[0] = (float)(Scale * Center[0]);
-        Center[1] = (float)(Scale * Center[1]);
-        Center[2] = (float)(Scale * Center[2]);
+        Center.x = (float)(Scale * Center.x);
+        Center.y = (float)(Scale * Center.y);
+        Center.z = (float)(Scale * Center.z);
         Flags |= 0x8;
     }
-    Out[0] = Center[0];
-    Out[1] = Center[1];
-    Out[2] = Center[2];
+    Out->x = Center.x;
+    Out->y = Center.y;
+    Out->z = Center.z;
     return 0;
 }
 
 // FUN_06c258c0.
-int FTriMeshArch::GetSphere(float* OutCenter, float* OutRadius)
+int FTriMeshArch::GetSphere(Vector* OutCenter, float* OutRadius)
 {
     if ((Flags & 0x1) == 0)
         return -1;
     if ((Flags & 0x2) != 0)
     {
-        OutCenter[0] = SphereCenter[0];
-        OutCenter[1] = SphereCenter[1];
-        OutCenter[2] = SphereCenter[2];
+        OutCenter->x = SphereCenter.x;
+        OutCenter->y = SphereCenter.y;
+        OutCenter->z = SphereCenter.z;
         *OutRadius = SphereRadius;
         return 0;
     }
-    SphereCenter[2] = 0.0f;
-    SphereCenter[1] = 0.0f;
-    SphereCenter[0] = 0.0f;
+    SphereCenter.z = 0.0f;
+    SphereCenter.y = 0.0f;
+    SphereCenter.x = 0.0f;
     SphereRadius = 0.0f;
     const unsigned long Count = Vertices.Position.Count;
     if (Count != 0)
@@ -1961,9 +1961,9 @@ int FTriMeshArch::GetSphere(float* OutCenter, float* OutRadius)
         const float SumY = Points[MaxY * 3 + 1] + Points[MinY * 3 + 1];
         const float SumZ = Points[MaxZ * 3 + 2] + Points[MinZ * 3 + 2];
         // FUN_06c25d10 (Out = In * 0.5f), each product stored as float.
-        SphereCenter[0] = 0.5f * SumX;
-        SphereCenter[1] = 0.5f * SumY;
-        SphereCenter[2] = 0.5f * SumZ;
+        SphereCenter.x = 0.5f * SumX;
+        SphereCenter.y = 0.5f * SumY;
+        SphereCenter.z = 0.5f * SumZ;
         // The largest extent, ties going to the later operand.
         float Largest = 0.0f;
         const float LargerXY = (ExtentX > ExtentY) ? ExtentX : ExtentY;
@@ -1978,9 +1978,9 @@ int FTriMeshArch::GetSphere(float* OutCenter, float* OutRadius)
         {
             const float* Point = Points + Index * 3;
             // FUN_06c25ce0: Delta = Point - Centre, stored as float.
-            const float DeltaX = Point[0] - SphereCenter[0];
-            const float DeltaY = Point[1] - SphereCenter[1];
-            const float DeltaZ = Point[2] - SphereCenter[2];
+            const float DeltaX = Point[0] - SphereCenter.x;
+            const float DeltaY = Point[1] - SphereCenter.y;
+            const float DeltaZ = Point[2] - SphereCenter.z;
             const double DistanceSquared = (double)DeltaY * DeltaY +
                                            (double)DeltaZ * DeltaZ +
                                            (double)DeltaX * DeltaX;
@@ -1998,22 +1998,22 @@ int FTriMeshArch::GetSphere(float* OutCenter, float* OutRadius)
             const float PartX = Toward * Point[0];
             const float PartY = Toward * Point[1];
             const float PartZ = Toward * Point[2];
-            const float KeepX = SphereRadius * SphereCenter[0];
-            const float KeepY = SphereRadius * SphereCenter[1];
-            const float KeepZ = SphereRadius * SphereCenter[2];
+            const float KeepX = SphereRadius * SphereCenter.x;
+            const float KeepY = SphereRadius * SphereCenter.y;
+            const float KeepZ = SphereRadius * SphereCenter.z;
             const float SumCenterX = PartX + KeepX;
             const float SumCenterY = PartY + KeepY;
             const float SumCenterZ = PartZ + KeepZ;
             const double Inverse = 1.0 / (double)DistanceFloat;
-            SphereCenter[0] = (float)((double)SumCenterX * Inverse);
-            SphereCenter[1] = (float)((double)SumCenterY * Inverse);
-            SphereCenter[2] = (float)((double)SumCenterZ * Inverse);
+            SphereCenter.x = (float)((double)SumCenterX * Inverse);
+            SphereCenter.y = (float)((double)SumCenterY * Inverse);
+            SphereCenter.z = (float)((double)SumCenterZ * Inverse);
         }
         Flags |= 0x2;
     }
-    OutCenter[0] = SphereCenter[0];
-    OutCenter[1] = SphereCenter[1];
-    OutCenter[2] = SphereCenter[2];
+    OutCenter->x = SphereCenter.x;
+    OutCenter->y = SphereCenter.y;
+    OutCenter->z = SphereCenter.z;
     *OutRadius = SphereRadius;
     return 0;
 }

@@ -114,7 +114,7 @@ void ClientMeshHolderSetMatrix(FMeshHolder* Holder, const Transform* Xform);
 void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags);
 
 // FUN_00420fd0 (thiscall on the holder, RET 4) - IEngine SetInstancePosition.
-void ClientMeshHolderSetPosition(FMeshHolder* Holder, float const Position[3]);
+void ClientMeshHolderSetPosition(FMeshHolder* Holder, Vector const* Position);
 
 // FUN_00420fb0 (thiscall on the holder) - IEngine GetInstancePosition.
 const Vector* ClientMeshHolderGetPosition(FMeshHolder const* Holder);

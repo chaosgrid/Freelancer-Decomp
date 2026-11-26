@@ -416,25 +416,25 @@ void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, 
     static_assert(sizeof(ICamera*) == sizeof(float), "the radius shares the camera's slot");
     float Radius = 0.0f;
     std::memcpy(&Radius, &Camera, sizeof(Radius));
-    float Center[3];
-    Center[0] = 0.0f;
-    Center[1] = 0.0f;
-    Center[2] = 0.0f;
+    Vector Center;
+    Center.x = 0.0f;
+    Center.y = 0.0f;
+    Center.z = 0.0f;
     int Index = 0;
     do
     {
         FDeformPart* const Part = &PartArray[Index];
-        Part->BoundSphere(&Radius, Center);
-        const float* const View = (const float*)Camera->GetViewTransform();
-        float ViewCenter[3];
-        AcquireMathEngine()->TransformXform(*(Vector*)ViewCenter,
+        Part->BoundSphere(&Radius, &Center);
+        const Transform* const View = Camera->GetViewTransform();
+        Vector ViewCenter;
+        AcquireMathEngine()->TransformXform(ViewCenter,
                                             *(const Transform*)View,
-                                            *(const Vector*)Center); // +0x28
-        float Probe[3];
-        Probe[0] = ViewCenter[0];
-        Probe[1] = ViewCenter[1];
-        Probe[2] = ViewCenter[2];
-        const int Rank = Camera->ClassifySphere((const Vector*)Probe, Radius);
+                                            Center); // +0x28
+        Vector Probe;
+        Probe.x = ViewCenter.x;
+        Probe.y = ViewCenter.y;
+        Probe.z = ViewCenter.z;
+        const int Rank = Camera->ClassifySphere(&Probe, Radius);
         if (Rank > 2)
             Part->DrawLive(Camera, RenderArg);
         if (Index == 0)
@@ -497,12 +497,12 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
         return -1;
 
     FBoneRuntime* Bone = PartArray[0].Lod->BoneSlots;
-    const float* BonePos =
-        Bone->LocalTransform + 9;
-    float Vec[3];
-    Vec[0] = 0.0f;
-    Vec[1] = 0.0f;
-    Vec[2] = 0.0f;
+    const Vector* BonePos =
+        &Bone->LocalTransform.Translation;
+    Vector Vec;
+    Vec.x = 0.0f;
+    Vec.y = 0.0f;
+    Vec.z = 0.0f;
     const float ArgCFloat = FloatFromOpaqueDword(ArgC);
     if (ArgCFloat > 0.0f)
     {
@@ -511,13 +511,13 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
         {
             // Retail pushes, last first: 1.0f, ArgF, ArgD, ArgE, ArgC, ArgG, &Vec, Handle.
             const unsigned char bTouched = Root->Eval(
-                (unsigned long)Handle, Vec,
+                (unsigned long)Handle, &Vec,
                 (unsigned long)((ptrdiff_t)ArgG), ArgCFloat,
                 FloatFromOpaqueDword(ArgE), ArgD, ArgF, 1.0f);
             if (bTouched != 0)
             {
-                Vec[2] = 0.0f;
-                Vec[0] = 0.0f;
+                Vec.z = 0.0f;
+                Vec.x = 0.0f;
             }
         }
         if (Root != nullptr)
@@ -529,10 +529,10 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
         Y = DurationOut + BaseHeight;
     else
         Y = RootHeightOffset + BaseHeight;
-    float Pos[3];
-    Pos[0] = BonePos[0] + Vec[0];
-    Pos[1] = Vec[1] + Y;
-    Pos[2] = BonePos[2] + Vec[2];
+    Vector Pos;
+    Pos.x = BonePos->x + Vec.x;
+    Pos.y = Vec.y + Y;
+    Pos.z = BonePos->z + Vec.z;
 
     float Quat[4];
     float UpAxis[3];
@@ -540,7 +540,7 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
     if (Twist < 0.0f)
     {
         float Row[3];
-        WriteVec3(Row, Bone->LocalTransform[2], Bone->LocalTransform[5], Bone->LocalTransform[8]);
+        WriteVec3(Row, Bone->LocalTransform.Rotation.E[0][2], Bone->LocalTransform.Rotation.E[1][2], Bone->LocalTransform.Rotation.E[2][2]);
         const float Angle = (float)(
             std::atan2((double)Row[0], (double)Row[2]));
         WriteVec3(UpAxis, 0.0f, 1.0f, 0.0f);
@@ -555,17 +555,17 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
         ScaleVec3(&Quat[1], UpAxis, Scale);
     }
 
-    float Xform[12];
+    Transform Xform;
     I3DMathEngine* Math = AcquireMathEngine();
-    Math->QuaternionToMatrix(*(Matrix*)Xform,
+    Math->QuaternionToMatrix(Xform.Rotation,
                              *(const Quaternion*)Quat); // +0x54
-    Xform[9] = Pos[0];
-    Xform[10] = Pos[1];
-    Xform[11] = Pos[2];
+    Xform.Translation.x = Pos.x;
+    Xform.Translation.y = Pos.y;
+    Xform.Translation.z = Pos.z;
     const long Applied = (long)(G_Animation->EvalPlayback(
         (unsigned long)Handle,
         (unsigned long)((ptrdiff_t)ArgG), ArgCFloat,
-        FloatFromOpaqueDword(ArgE), ArgD, ArgF, AsOpaqueDword(1.0f), (void*)Xform));
+        FloatFromOpaqueDword(ArgE), ArgD, ArgF, AsOpaqueDword(1.0f), &Xform));
     if (Applied < 0)
     {
         G_Animation->DestroyScript((void*)((ptrdiff_t)Handle));
@@ -723,15 +723,15 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
         Index -= 1;
     }
 
-    const float* const BonePos = PartArray[0].Lod->BoneSlots[0].LocalTransform + 9;
+    const float* const BonePos = &PartArray[0].Lod->BoneSlots[0].LocalTransform.Translation.x;
     const float DiffZ = (float)((double)StartPos[2] - BonePos[2]);
-    float Delta[3];
-    Delta[0] = (float)((double)StartPos[0] - BonePos[0] -
+    Vector Delta;
+    Delta.x = (float)((double)StartPos[0] - BonePos[0] -
                                   (double)Tail[0]);
-    Delta[1] = (float)((double)StartPos[1] - BonePos[1] -
+    Delta.y = (float)((double)StartPos[1] - BonePos[1] -
                                   (double)Tail[1]);
-    Delta[2] = (float)((double)DiffZ - (double)Tail[2]);
-    G_Animation->AddOverlayPos(Play, Delta);
+    Delta.z = (float)((double)DiffZ - (double)Tail[2]);
+    G_Animation->AddOverlayPos(Play, &Delta);
     return PlayHandle;
 }
 
@@ -820,7 +820,7 @@ void FDeformInstance::SweepExpiredList()
     }
     if (ListCount == 0)
     {
-        RootHeightOffset = PartArray[0].Lod->BoneSlots[0].LocalTransform[10] - BaseHeight;
+        RootHeightOffset = PartArray[0].Lod->BoneSlots[0].LocalTransform.Translation.y - BaseHeight;
     }
 }
 
@@ -858,9 +858,8 @@ void DACOM_API FDeformInstance::OnOpaqueNotification(void* A, void* B)
 }
 
 // IChannelSink slot 2 (called by EngBase FUN_0661b420), LAB_065f52b0.
-void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transform, void* Context)
+void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, Transform* Xform, void* Context)
 {
-    float* const Xform = Transform;
     int Handle = -1;
     FIkListNode* Node = ListHead;
     while (Node != nullptr)
@@ -886,27 +885,27 @@ void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transfor
         Height = Duration + BaseHeight;
     else
         Height = RootHeightOffset + BaseHeight;
-    Xform[0x28 / 4] = Height;
+    Xform->Translation.y = Height;
     const double Half =
-        std::atan2((double)Xform[0x8 / 4], (double)Xform[0x20 / 4]) *
+        std::atan2((double)Xform->Rotation.E[0][2], (double)Xform->Rotation.E[2][2]) *
         0.5;
     const float SinScaled = (float)(std::sin(Half) / std::sqrt(1.0));
-    float Quat[4];
-    Quat[0] = (float)(std::cos(Half));
+    Quaternion Quat;
+    Quat.w = (float)(std::cos(Half));
     const float Side = SinScaled * 0.0f;
-    WriteVec3(&Quat[1], Side, SinScaled, Side);
-    float Mat[9];
+    WriteVec3(&Quat.x, Side, SinScaled, Side);
+    Matrix Mat;
     I3DMathEngine* Math = AcquireMathEngine();
-    Math->QuaternionToMatrix(*(Matrix*)Mat,
-                             *(const Quaternion*)Quat); // +0x54
-    std::memcpy(Xform, Mat, sizeof(Mat));
+    Math->QuaternionToMatrix(Mat,
+                             Quat); // +0x54
+    std::memcpy(&Xform->Rotation, &Mat, sizeof(Mat));
     if (ForwardSink == nullptr)
         return;
     ForwardSink->OnLoop(ChannelKey, Xform, Context);
 }
 
 // The Euler rebuild FUN_065f5400 and FUN_065fb900 inline.
-void IkEulerRebuild(float* Out9, float Yaw, float Pitch, float Roll)
+void IkEulerRebuild(Matrix* Out, float Yaw, float Pitch, float Roll)
 {
     const double SinY = std::sin((double)Yaw);
     const double CosY = std::cos((double)Yaw);
@@ -917,23 +916,23 @@ void IkEulerRebuild(float* Out9, float Yaw, float Pitch, float Roll)
     const double SinPSinY = SinP * SinY;
     const float SinRCosY = (float)(SinR * CosY);
     const float CosRCosY = (float)(CosR * CosY);
-    Out9[0] = (float)(CosR * CosP);
-    Out9[1] = (float)(SinPSinY * CosR - (double)SinRCosY);
-    Out9[2] = (float)((double)CosRCosY * SinP + SinR * SinY);
-    Out9[3] = (float)(SinR * CosP);
-    Out9[4] = (float)(SinPSinY * SinR + (double)CosRCosY);
-    Out9[5] = (float)((double)SinRCosY * SinP - CosR * SinY);
-    Out9[6] = (float)-SinP;
-    Out9[7] = (float)(CosP * SinY);
-    Out9[8] = (float)(CosP * CosY);
+    Out->E[0][0] = (float)(CosR * CosP);
+    Out->E[0][1] = (float)(SinPSinY * CosR - (double)SinRCosY);
+    Out->E[0][2] = (float)((double)CosRCosY * SinP + SinR * SinY);
+    Out->E[1][0] = (float)(SinR * CosP);
+    Out->E[1][1] = (float)(SinPSinY * SinR + (double)CosRCosY);
+    Out->E[1][2] = (float)((double)SinRCosY * SinP - CosR * SinY);
+    Out->E[2][0] = (float)-SinP;
+    Out->E[2][1] = (float)(CosP * SinY);
+    Out->E[2][2] = (float)(CosP * CosY);
 }
 
 static const char* const G_StartAimBlocked = "deform::start_aim(): instance blocked -- exiting";
 
-void IkMathQuatToMatrix(float* Out9, const float* Quat4)
+void IkMathQuatToMatrix(Matrix* Out, const Quaternion* Quat)
 {
-    AcquireMathEngine()->QuaternionToMatrix(*(Matrix*)Out9,
-                                            *(const Quaternion*)Quat4); // +0x54
+    AcquireMathEngine()->QuaternionToMatrix(*Out,
+                                            *Quat); // +0x54
 }
 
 // The StartAim descriptor FUN_065f5400 reads (+0x00 is not read).
@@ -990,14 +989,14 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
             Chain.push_back(Cursor);
             const InstanceIndex CursorInstance = Cursor;
             Parent = (int)((ptrdiff_t)(G_Engine->GetInstanceParent(CursorInstance)));
-            const unsigned long* Relative = G_Engine->GetInstanceRelative(CursorInstance);
-            if (Relative[0] == 4)
+            const FEngineJointBlock* Relative = G_Engine->GetInstanceRelative(CursorInstance);
+            if (Relative->Type == 4)
             {
-                const float* Axis = (const float*)(Relative + 4);
+                const Vector* Axis = &Relative->ChildPos;
                 bSphereAxis = 1;
-                const double X = (double)Axis[0];
-                const double Y = (double)Axis[1];
-                const double Z = (double)Axis[2];
+                const double X = (double)Axis->x;
+                const double Y = (double)Axis->y;
+                const double Z = (double)Axis->z;
                 const double Length = std::sqrt(X * X + Y * Y + Z * Z);
                 if (!(Length > 1.0e-5))
                     bSphereAxis = 0;
@@ -1031,11 +1030,11 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     if (Count > 0)
         std::memcpy(Event->JointIds, &JointIds[0], Count4);
     Event->Channels = (void**)new unsigned char[Count4];
-    Event->Quats = (float*)new unsigned char[(size_t)Count * 0x10];
+    Event->Quats = (Quaternion*)new unsigned char[(size_t)Count * 0x10];
     Event->AimFlags = Aim->Flags;
     Event->StartJoint = Aim->StartJoint;
     Event->EndJoint = Aim->EndJoint;
-    Event->BindMats = (float*)new unsigned char[(size_t)Count * 0x24];
+    Event->BindMats = (Matrix*)new unsigned char[(size_t)Count * 0x24];
     Event->LockBytes = new unsigned char[(size_t)Count];
     std::memset(Event->LockBytes, 0, (size_t)Count);
     Event->Damping = Aim->Damping;
@@ -1081,16 +1080,16 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
             ((double)Relative[0x44 / 4] + (double)Relative[0x40 / 4]) * 0.5);
         // Written into BindMats[i], then overwritten whole below before anything reads it;
         // retail does both.
-        IkEulerRebuild(Event->BindMats + Index * 9, Yaw, Pitch, Roll);
+        IkEulerRebuild(&Event->BindMats[Index], Yaw, Pitch, Roll);
 
         // Retail's target is [E+0x78] with the matrix at [E+0x88]: a loose joint (seven
         // floats from EngBase's GetJointParams) runs into the matrix slot before
         // QuaternionToMatrix rewrites it, so the buffer here holds seven.
         float JointQuat[7];
         G_Engine->GetJointParams(JointInstance, 0, JointQuat);
-        float LiveMat[9];
-        IkMathQuatToMatrix(LiveMat, JointQuat);
-        std::memcpy(Event->BindMats + Index * 9, LiveMat, sizeof(LiveMat));
+        Matrix LiveMat;
+        IkMathQuatToMatrix(&LiveMat, (const Quaternion*)JointQuat);
+        std::memcpy(&Event->BindMats[Index], &LiveMat, sizeof(LiveMat));
 
         const int LockCount = Aim->LockCount;
         const int* LockIds = Aim->LockIds;

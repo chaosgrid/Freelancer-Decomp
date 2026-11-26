@@ -75,7 +75,7 @@ struct FThirdPersonCamera : FHudCamera
                                         //         seeded from the target on a reset
 
     float TargetOrientB[9];             // +0x17c  second copy of the target's orientation
-    float LevelAxis[3];                 // +0x1a0  reset to (0, 0, -1)
+    Vector LevelAxis;                 // +0x1a0  reset to (0, 0, -1)
     float PrevAngularRate;              // +0x1ac  the last frame's turn rate (rad/s)
     float TargetOrientA[9];             // +0x1b0  first copy of the target's orientation
 
@@ -94,7 +94,7 @@ struct FThirdPersonCamera : FHudCamera
     float SpeedSlack;                   // +0x1fc  integrated (speed - smoothed), never negative
     float TurnRateScale;                // +0x200  ctor 2.0f
 
-    float UpAxis[3];                    // +0x204  the up the camera levels towards
+    Vector UpAxis;                    // +0x204  the up the camera levels towards
     float Unused210;                    // +0x210  zeroed by the ctor, never read
     unsigned char bInitialised;         // +0x214  set on every exit from the attach; the next
                                         //         update skips its own solve and clears it

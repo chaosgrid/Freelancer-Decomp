@@ -221,7 +221,7 @@ namespace AlchemyImpl
         PrevNodePos_.y = 0.0f;
         PrevNodePos_.z = 0.0f;
         // FUN_06206c70 on +0xbc (identity rotation), then +0xe0..+0xe8 = 0.
-        FillIdentity3x3(&EmitterXform_.Rotation.E[0][0]);
+        FillIdentity3x3(&EmitterXform_.Rotation);
         EmitterXform_.Translation.x = 0.0f;
         EmitterXform_.Translation.y = 0.0f;
         EmitterXform_.Translation.z = 0.0f;
@@ -410,29 +410,29 @@ namespace AlchemyImpl
         // How far the emitter moved since the last emit, in this frame's local space;
         // 1.0f / EmitNowF stays in the FPU for the per-particle step and is rounded to float
         // for the time step.
-        float Delta[3] = { 0.0f, 0.0f, 0.0f };
-        Acquire3DMath()->InverseTransform(*reinterpret_cast<Vector*>(Delta),
+        Vector Delta = { 0.0f, 0.0f, 0.0f };
+        Acquire3DMath()->InverseTransform(Delta,
                                           NodeWorldXform_,
                                           PrevNodePos_); // +0x3C
         const double InvCountExt = 1.0 / static_cast<double>(EmitNowF);
-        float FullDelta[3] = { Delta[0], Delta[1], Delta[2] };
+        float FullDelta[3] = { Delta.x, Delta.y, Delta.z };
         float Velocity[3] = { 0.0f, 0.0f, 0.0f };
         PrevNodePos_.x = NodeWorldXform_.Translation.x;
         PrevNodePos_.y = NodeWorldXform_.Translation.y;
         PrevNodePos_.z = NodeWorldXform_.Translation.z;
         const float InvCount = static_cast<float>(InvCountExt);
-        float Step[3] = { static_cast<float>(Delta[0] * InvCountExt),
-                          static_cast<float>(Delta[1] * InvCountExt),
-                          static_cast<float>(Delta[2] * InvCountExt) };
+        float Step[3] = { static_cast<float>(Delta.x * InvCountExt),
+                          static_cast<float>(Delta.y * InvCountExt),
+                          static_cast<float>(Delta.z * InvCountExt) };
 
         // Elapsed <= 0 (or unordered) skips. 1 / -Elapsed and the VelocityApproach Eval stay
         // double; the scaled delta is rounded to float.
         if (Elapsed > 0.0f)
         {
             const double NegInvElapsed = 1.0 / -static_cast<double>(Elapsed);
-            const float Scaled[3] = { static_cast<float>(Delta[0] * NegInvElapsed),
-                                      static_cast<float>(Delta[1] * NegInvElapsed),
-                                      static_cast<float>(Delta[2] * NegInvElapsed) };
+            const float Scaled[3] = { static_cast<float>(Delta.x * NegInvElapsed),
+                                      static_cast<float>(Delta.y * NegInvElapsed),
+                                      static_cast<float>(Delta.z * NegInvElapsed) };
             const double Approach = Set->VelocityApproachRamp->Eval(AppearanceOuterTime_, Age_);
             Velocity[0] = static_cast<float>(Scaled[0] * Approach);
             Velocity[1] = static_cast<float>(Scaled[1] * Approach);
@@ -488,38 +488,38 @@ namespace AlchemyImpl
                                        const float* PosOffset3, const float* VelIn3)
     {
         // Q = W * AgeOffset (FUN_06206ab0, each stored as float).
-        float Q[3];
-        StoreAlchemyFpuFloat(Q[2], static_cast<double>(Vel3[2]) * AgeOffset);
-        StoreAlchemyFpuFloat(Q[1], static_cast<double>(Vel3[1]) * AgeOffset);
-        StoreAlchemyFpuFloat(Q[0], static_cast<double>(Vel3[0]) * AgeOffset);
+        Vector Q;
+        StoreAlchemyFpuFloat(Q.z, static_cast<double>(Vel3[2]) * AgeOffset);
+        StoreAlchemyFpuFloat(Q.y, static_cast<double>(Vel3[1]) * AgeOffset);
+        StoreAlchemyFpuFloat(Q.x, static_cast<double>(Vel3[0]) * AgeOffset);
         // The common sampler tail (cone 0621bb88, cube 0621d541, sphere 0623be5c): x and y
         // sums stay in the FPU until + PosOffset; the z sum is rounded to float first.
-        float Pos[3];
-        const double SumX = static_cast<double>(Q[0]) + Pos3[0];
-        const double SumY = static_cast<double>(Pos3[1]) + Q[1];
+        Vector Pos;
+        const double SumX = static_cast<double>(Q.x) + Pos3[0];
+        const double SumY = static_cast<double>(Pos3[1]) + Q.y;
         float SumZ;
-        StoreAlchemyFpuFloat(SumZ, static_cast<double>(Pos3[2]) + Q[2]);
-        StoreAlchemyFpuFloat(Pos[0], SumX + PosOffset3[0]);
-        StoreAlchemyFpuFloat(Pos[1], SumY + PosOffset3[1]);
-        StoreAlchemyFpuFloat(Pos[2], static_cast<double>(SumZ) + PosOffset3[2]);
-        float Vel[3];
-        StoreAlchemyFpuFloat(Vel[0], static_cast<double>(Vel3[0]) + VelIn3[0]);
-        StoreAlchemyFpuFloat(Vel[1], static_cast<double>(Vel3[1]) + VelIn3[1]);
-        StoreAlchemyFpuFloat(Vel[2], static_cast<double>(Vel3[2]) + VelIn3[2]);
+        StoreAlchemyFpuFloat(SumZ, static_cast<double>(Pos3[2]) + Q.z);
+        StoreAlchemyFpuFloat(Pos.x, SumX + PosOffset3[0]);
+        StoreAlchemyFpuFloat(Pos.y, SumY + PosOffset3[1]);
+        StoreAlchemyFpuFloat(Pos.z, static_cast<double>(SumZ) + PosOffset3[2]);
+        Vector Vel;
+        StoreAlchemyFpuFloat(Vel.x, static_cast<double>(Vel3[0]) + VelIn3[0]);
+        StoreAlchemyFpuFloat(Vel.y, static_cast<double>(Vel3[1]) + VelIn3[1]);
+        StoreAlchemyFpuFloat(Vel.z, static_cast<double>(Vel3[2]) + VelIn3[2]);
 
         I3DMathEngine* Math = Shared3DMath();
-        float Rotated[3] = { 0.0f, 0.0f, 0.0f };
-        Math->Rotate(*reinterpret_cast<Vector*>(Rotated),
+        Vector Rotated = { 0.0f, 0.0f, 0.0f };
+        Math->Rotate(Rotated,
                      EmitterXform_,
-                     *reinterpret_cast<const Vector*>(Vel)); // +0x30
+                     Vel); // +0x30
         float Six[6];
-        std::memcpy(Six + 3, Rotated, sizeof(Rotated));
-        float Placed[3] = { 0.0f, 0.0f, 0.0f };
-        Math->TransformXform(*reinterpret_cast<Vector*>(Placed),
+        std::memcpy(Six + 3, &Rotated, sizeof(Rotated));
+        Vector Placed = { 0.0f, 0.0f, 0.0f };
+        Math->TransformXform(Placed,
                              EmitterXform_,
-                             *reinterpret_cast<const Vector*>(Pos)); // +0x28
+                             Pos); // +0x28
 
-        std::memcpy(Six, Placed, sizeof(Placed));
+        std::memcpy(Six, &Placed, sizeof(Placed));
         IGenericFx* const Appearance = AsFxNode(AssociatedAppearance_);
         if (ForwardEmitterPad46(Appearance, Six, AgeOffset, InitLifeSpan_) >= 0)
             ForwardEmitterPad47(AsFxNode(AssociatedAppearance_), Six, AgeOffset, InitLifeSpan_);

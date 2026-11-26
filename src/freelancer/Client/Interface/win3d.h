@@ -98,9 +98,9 @@ struct Win3D : public LinkTree<Win3D>
     // slot 3 (+0x0c) LAB_0043d8b0 -- parent == Ancestor, else ask the parent
     virtual bool IsDescendantOf(Win3D* Ancestor);
     // slot 4 (+0x10) FUN_0053f330 -- ray pick; false
-    virtual bool HitTest(float const* Ray);
+    virtual bool HitTest(Vector const* Ray);
     // slot 5 (+0x14) LAB_004b5020 -- copy three dwords to +0x60
-    virtual void SetPosition(float const* NewPosition);
+    virtual void SetPosition(Vector const* NewPosition);
     // slot 6 (+0x18) LAB_0043d8e0 -- true
     virtual bool IsPositionInViewport(unsigned A);
     // slot 7 (+0x1c) FUN_004b5040 -- copy nine dwords to +0x3c
@@ -119,9 +119,9 @@ struct Win3D : public LinkTree<Win3D>
     virtual void Draw();
     // slots 14 / 15 / 16 (+0x38 / +0x3c / +0x40) FUN_0053e4a0 -- nothing. Win3DSetHover calls
     // 16 on the old hover object, 15 then 14 on the new one, each with the mouse ray.
-    virtual void MouseOver(float const* Ray);
-    virtual void MouseEnter(float const* Ray);
-    virtual void MouseLeave(float const* Ray);
+    virtual void MouseOver(Vector const* Ray);
+    virtual void MouseEnter(Vector const* Ray);
+    virtual void MouseLeave(Vector const* Ray);
     // slot 17 (+0x44) FUN_00401e90 -- nothing
     virtual void Slot17();
     // slot 18 (+0x48) FUN_0053f330 -- false. The input dispatch's case 4 passes DAT_0061684c.
@@ -223,9 +223,9 @@ Win3D* Win3DFindByName(char const* Name);
 // FUN_0059da50 -- first registered object, or 0.
 Win3D* Win3DGetFirstRegistered();
 // FUN_0059da70 -- copy the cached mouse ray DAT_0067dbcc/d0/d4 into Out; returns Out.
-float* Win3DGetMouseRay(float* Out);
+Vector* Win3DGetMouseRay(Vector* Out);
 // DAT_0067dbcc -- the ray itself (FUN_0059df80 / FUN_0059e080 push its address).
-float* Win3DMouseRayStorage();
+Vector* Win3DMouseRayStorage();
 // FUN_0059da60 -- &DAT_0067dbf8, the Win3D scene camera.
 FSpaceCamera* Win3DGetCamera();
 // FUN_0059dcc0 -- that camera's viewport = {0, 0, Width - 1, Height - 1} (FUN_0040fb80).
@@ -244,9 +244,9 @@ void Win3DReparent(Win3D* Child, Win3D* NewParent);
 struct FHudCmdRecord;
 bool Win3DDispatchKey(FHudCmdRecord const* Record);
 // FUN_0059dd80 -- the topmost pickable root-visible registered object Ray hits.
-Win3D* Win3DPick(float const* Ray);
+Win3D* Win3DPick(Vector const* Ray);
 // FUN_0059de50 -- the same pick restricted to Capture and its descendants.
-Win3D* Win3DPickWithin(Win3D* Capture, float const* Ray);
+Win3D* Win3DPickWithin(Win3D* Capture, Vector const* Ray);
 // FUN_0059df40 -- slot 23 on every registered object until one returns true.
 bool Win3DBroadcast(unsigned Msg, unsigned A, unsigned B);
 // FUN_0059df80 -- change the hover object (slot 16 on the old one, 15 and 14 on the new one).

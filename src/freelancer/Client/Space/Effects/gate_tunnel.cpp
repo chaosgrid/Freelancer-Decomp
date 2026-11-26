@@ -358,8 +358,8 @@ void FGateTunnel::EnterState1()
 
     // Directional, at the origin, white, range 500000.
     EngineLightSetType(Light, kLightDirectional, false);
-    float const Origin[3] = {0.0f, 0.0f, 0.0f};
-    EngineLightSetPosition(Light, Origin);
+    Vector const Origin = {0.0f, 0.0f, 0.0f};
+    EngineLightSetPosition(Light, &Origin);
     unsigned char const White[3] = {0xff, 0xff, 0xff};
     EngineLightSetColorBytesAlt(Light, White);
     EngineLightSetRangeRaw(Light, 500000.0f);
@@ -373,7 +373,7 @@ void FGateTunnel::EnterState1()
                      static_cast<double>(LightDirection.y) * LightDirection.y +
                          static_cast<double>(LightDirection.z) * LightDirection.z +
                          static_cast<double>(LightDirection.x) * LightDirection.x);
-    EngineLightSetDirection(Light, &LightDirection.x);
+    EngineLightSetDirection(Light, &LightDirection);
 
     // A refused enable releases it; an accepted light is switched off again until Draw needs it.
     if (!GameLightEnable(Light))
@@ -674,7 +674,7 @@ void FGateTunnel::Update(float Dt)
                          static_cast<double>(LightDirection.x) * LightDirection.x +
                              static_cast<double>(LightDirection.y) * LightDirection.y +
                              static_cast<double>(LightDirection.z) * LightDirection.z);
-        EngineLightSetDirection(Light, &LightDirection.x);
+        EngineLightSetDirection(Light, &LightDirection);
     }
 
     // Every layer's texture scrolls.

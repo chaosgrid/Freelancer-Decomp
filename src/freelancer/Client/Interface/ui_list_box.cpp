@@ -54,7 +54,7 @@ void UiListBox::SetTransform(Transform const* NewXform)
 {
     // LAB_0059a530 (RET 4): then the shared extent projection (DAT_0067dbc0) with the new Z.
     SetOrientation(&NewXform->Rotation);
-    SetPosition(&NewXform->Translation.x);
+    SetPosition(&NewXform->Translation);
     UiWidgetProjectExtent(&Orientation, NewXform->Translation.z, LocalWidth, LocalHeight, &Width,
                           &Height);
 }

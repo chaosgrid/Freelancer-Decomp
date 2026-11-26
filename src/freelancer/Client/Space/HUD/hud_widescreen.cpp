@@ -174,23 +174,24 @@ float WidescreenHudCurrentShift()
     return G_HudShift;
 }
 
-bool WidescreenHudShearModelview(float const* In12, float* Out12)
+bool WidescreenHudShearModelview(Transform const* In, Transform* Out)
 {
     if (G_HudShift == 0.0f)
         return false;
     FSpaceCamera const* const Cam = Win3DGetCamera();
     double const S = static_cast<double>(G_HudShift) / static_cast<double>(Cam->XScale);
-    memcpy(Out12, In12, sizeof(float) * 12);
+    memcpy(Out, In, sizeof(Transform));
     for (int Column = 0; Column < 3; ++Column)
     {
-        Out12[Column] = static_cast<float>(static_cast<double>(In12[Column]) -
-                                           S * static_cast<double>(In12[6 + Column]));
+        Out->Rotation.E[0][Column] = static_cast<float>(static_cast<double>(In->Rotation.E[0][Column]) -
+                                                        S * static_cast<double>(In->Rotation.E[2][Column]));
     }
-    Out12[9] = static_cast<float>(static_cast<double>(In12[9]) - S * static_cast<double>(In12[11]));
+    Out->Translation.x = static_cast<float>(static_cast<double>(In->Translation.x) -
+                                            S * static_cast<double>(In->Translation.z));
     return true;
 }
 
-void WidescreenHudCursorRay(float* OutRay3)
+void WidescreenHudCursorRay(Vector* OutRay)
 {
     // The mouse-move ray of the Win3D input handler (0x0059d22c): the cursor onto the near
     // plane, through the camera orientation, normalised.
@@ -208,9 +209,9 @@ void WidescreenHudCursorRay(float* OutRay3)
                                static_cast<double>(World.y) * World.y +
                                static_cast<double>(World.z) * World.z);
     double const Inverse = Length > 0.0 ? 1.0 / Length : 0.0;
-    OutRay3[0] = static_cast<float>(World.x * Inverse);
-    OutRay3[1] = static_cast<float>(World.y * Inverse);
-    OutRay3[2] = static_cast<float>(World.z * Inverse);
+    OutRay->x = static_cast<float>(World.x * Inverse);
+    OutRay->y = static_cast<float>(World.y * Inverse);
+    OutRay->z = static_cast<float>(World.z * Inverse);
 }
 
 FWidescreenHudShiftScope::FWidescreenHudShiftScope(float ShiftPx, bool bDrawIn)

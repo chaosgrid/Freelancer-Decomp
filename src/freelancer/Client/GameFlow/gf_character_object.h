@@ -200,7 +200,7 @@ struct FCharacterObject : FRoomObject
     int ActiveAims;                    // +0x374 aim handles Thorn_Deformable holds
     unsigned char bPoseDirty;          // +0x378 the pose moved: the next Update walks the mixer
     float LastPos[3];                  // +0x37c the engine instance's position last Update
-    float LastOrient[9];               // +0x388 and its orientation
+    Matrix LastOrient;                 // +0x388 and its orientation
     unsigned char bHasLastPose;        // +0x3ac
     unsigned char bSharedDeform;       // +0x3ad Props +0x1c == 1: the body is DAT_00668948's
 

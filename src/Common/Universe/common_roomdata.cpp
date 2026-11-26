@@ -254,7 +254,7 @@ Csys __cdecl ThornScriptGetCsys(IScriptEngine* Engine, char const* ActorName)
             continue;
 
         // y comes from the floor height, not the entity position.
-        float const Position[3] = {Entity->Pos[0], FloorHeight, Entity->Pos[2]};
+        Vector const Position = {Entity->Pos.x, FloorHeight, Entity->Pos.z};
         CsysFromPosOrient(Out, Position, Entity->Orient);
         return Out;
     }
@@ -451,9 +451,9 @@ void RoomData::read_set_script(char const* RelPath)
             // +0x28 a D3DLIGHT8 (its type at +0x28, the diffuse colour at +0x2c).
             FThornLightProps const& Blob = Entity->Light;
             Vector BlobDirection;
-            BlobDirection.x = Blob.Direction[0];
-            BlobDirection.y = Blob.Direction[1];
-            BlobDirection.z = Blob.Direction[2];
+            BlobDirection.x = Blob.Direction.x;
+            BlobDirection.y = Blob.Direction.y;
+            BlobDirection.z = Blob.Direction.z;
             int const LightType = Blob.Type;
             Vector BlobColor;
             BlobColor.x = Blob.Diffuse[0];
@@ -1356,7 +1356,7 @@ void RoomData::add_set_script_light(unsigned long Id, Csys const& Frame,
     (void)Id;
     RoomLightInfo* const Light = AppendRoomRecord(Lights);
     Light->Frame = Frame;
-    memcpy(Light->Direction, Props->Direction, sizeof(Light->Direction));
+    memcpy(&Light->Direction, &Props->Direction, sizeof(Light->Direction));
     // The blob from its +0x28 (Type) to its end: the 0x1a dwords of the D3DLIGHT8.
     static_assert(sizeof(FThornLightProps) - offsetof(FThornLightProps, Type) == 0x1a * sizeof(unsigned),
                   "the light blob's D3DLIGHT8 tail is 0x1a dwords");

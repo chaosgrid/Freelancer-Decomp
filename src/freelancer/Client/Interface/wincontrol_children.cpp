@@ -21,8 +21,8 @@
 
 WinControl* WinControl::CreateButtonControl(char const* Name, char const* MeshPath,
                                             char const* Mesh2, char const* SoundName,
-                                            char const* KeyCommandName, float const* Position,
-                                            char const* Hardpoint, float const* HalfExtents,
+                                            char const* KeyCommandName, Vector const* Position,
+                                            char const* Hardpoint, Vector const* HalfExtents,
                                             unsigned char bNoMeshRender, unsigned char bActionButton,
                                             unsigned char bNoColorChange, unsigned char bNoZEnable,
                                             int ToolTipIds, int ToolTip2Ids, int CommandId)
@@ -40,7 +40,7 @@ WinControl* WinControl::CreateButtonControl(char const* Name, char const* MeshPa
 }
 
 WinControl* WinControl::CreateWireButtonControl(char const* Name, char const* SoundName,
-                                                float const* Position, float const* HalfExtents,
+                                                Vector const* Position, Vector const* HalfExtents,
                                                 unsigned char bAlwaysWhite, unsigned char bNoZEnable,
                                                 int ToolTipIds, int CommandId, int EdgeMask)
 {
@@ -55,8 +55,8 @@ WinControl* WinControl::CreateWireButtonControl(char const* Name, char const* So
     return static_cast<WinControl*>(Created);
 }
 
-WinControl* WinControl::CreateWireStaticControl(char const* Name, float const* Position,
-                                                float const* HalfExtents, unsigned char bAlwaysWhite,
+WinControl* WinControl::CreateWireStaticControl(char const* Name, Vector const* Position,
+                                                Vector const* HalfExtents, unsigned char bAlwaysWhite,
                                                 unsigned char bNoZEnable, int ToolTipIds,
                                                 int EdgeMask)
 {
@@ -72,13 +72,13 @@ WinControl* WinControl::CreateWireStaticControl(char const* Name, float const* P
 }
 
 WinControl* WinControl::CreateStaticControl(char const* Name, char const* MeshPath,
-                                            float const* Position, char const* Hardpoint,
-                                            float const* HalfExtents, unsigned char bNoZEnable,
+                                            Vector const* Position, char const* Hardpoint,
+                                            Vector const* HalfExtents, unsigned char bNoZEnable,
                                             unsigned char bZClear, unsigned char bNoMeshRender,
                                             unsigned char bNoWireRender, unsigned char bNoColoring,
                                             unsigned char bRenderToWindow, unsigned char bNoClearRender,
                                             int ForceRadius, int RotationSpeed, unsigned char bEnableRotation,
-                                            float const* StartYpr)
+                                            Vector const* StartYpr)
 {
     // FUN_005a0db0 (StaticControl::Init FUN_00588540).
     Win3D* const Created = WinFactoryCreate(Name, "StaticControl", this, nullptr);
@@ -92,7 +92,7 @@ WinControl* WinControl::CreateStaticControl(char const* Name, char const* MeshPa
 }
 
 WinControl* WinControl::CreateTextControl(char const* Name, char const* StyleName,
-                                          float const* Position, char const* Hardpoint,
+                                          Vector const* Position, char const* Hardpoint,
                                           float Width, float Height, float FontScale, unsigned Ids,
                                           int Justification, int TextToolTipIds, unsigned char bTopLeftAnchor)
 {
@@ -107,7 +107,7 @@ WinControl* WinControl::CreateTextControl(char const* Name, char const* StyleNam
     return static_cast<WinControl*>(Created);
 }
 
-UiScroll* WinControl::CreateUIScroll(char const* Name, float const* Position, float Width,
+UiScroll* WinControl::CreateUIScroll(char const* Name, Vector const* Position, float Width,
                                      float Height, int Min, int Max, int Page,
                                      unsigned char bHorizontal)
 {
@@ -131,7 +131,7 @@ UiScroll* WinControl::CreateUIScroll(char const* Name, float const* Position, fl
     return Scroll;
 }
 
-UiScroll* WinControl::CreateUICycle(char const* Name, float const* Position, float Width,
+UiScroll* WinControl::CreateUICycle(char const* Name, Vector const* Position, float Width,
                                     float Height, int Min, int Max, int Page,
                                     unsigned char bHorizontal)
 {
@@ -156,7 +156,7 @@ UiScroll* WinControl::CreateUICycle(char const* Name, float const* Position, flo
 }
 
 RichTextWin* WinControl::CreateRichTextWin(char const* Name, float Width, float Height,
-                                           float const* AttachOffset, bool bAutoScrollbar)
+                                           Vector const* AttachOffset, bool bAutoScrollbar)
 {
     // FUN_005a10e0: retail does not test the factory's result for null.
     RichTextWin* const Text =
@@ -167,7 +167,7 @@ RichTextWin* WinControl::CreateRichTextWin(char const* Name, float Width, float 
     return Text;
 }
 
-RichTextEditWin* WinControl::CreateUiTextEdit(char const* Name, float const* AttachOffset,
+RichTextEditWin* WinControl::CreateUiTextEdit(char const* Name, Vector const* AttachOffset,
                                               float Width, float Height, wchar_t* Caption)
 {
     // FUN_005a1900.
@@ -183,8 +183,8 @@ RichTextEditWin* WinControl::CreateUiTextEdit(char const* Name, float const* Att
 }
 
 WinControl* WinControl::CreateRichTextWireButtonControl(char const* Name, char const* SoundName,
-                                                        float const* Position,
-                                                        float const* HalfExtents,
+                                                        Vector const* Position,
+                                                        Vector const* HalfExtents,
                                                         unsigned char bAlwaysWhite,
                                                         unsigned char bNoZEnable, int ToolTipIds,
                                                         unsigned CaptionIds, int CommandId,
@@ -202,7 +202,7 @@ WinControl* WinControl::CreateRichTextWireButtonControl(char const* Name, char c
 }
 
 WinControl* WinControl::CreateEditControl(char const* Name, char const* StyleName,
-                                          float const* Position, char const* Hardpoint,
+                                          Vector const* Position, char const* Hardpoint,
                                           float Width, float Height, float FontScale, unsigned Ids,
                                           int Justification, int TextToolTipIds)
 {
@@ -220,8 +220,8 @@ WinControl* WinControl::CreateEditControl(char const* Name, char const* StyleNam
 WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* MeshPath,
                                                   char const* AltMeshPath, char const* SoundName,
                                                   char const* KeyCommandName,
-                                                  float const* Position, char const* Hardpoint,
-                                                  float const* HalfExtents,
+                                                  Vector const* Position, char const* Hardpoint,
+                                                  Vector const* HalfExtents,
                                                   unsigned char bNoMeshRender,
                                                   unsigned char bActionButton,
                                                   unsigned char bNoColorChange,
@@ -239,14 +239,14 @@ WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* 
     return static_cast<WinControl*>(Created);
 }
 
-bool WinControlHalfExtentsFromMesh(float* HalfExtents, FClientMeshHolder* Holder)
+bool WinControlHalfExtentsFromMesh(Vector* HalfExtents, FClientMeshHolder* Holder)
 {
     // FUN_005a1340.
     FClientMeshAabb Box;
     if (!ClientMeshQueryAabb(Holder, &Box))
         return false;
-    HalfExtents[0] = Box.Values[0];
-    HalfExtents[1] = Box.Values[2];
-    HalfExtents[2] = 0.0f;
+    HalfExtents->x = Box.Values[0];
+    HalfExtents->y = Box.Values[2];
+    HalfExtents->z = 0.0f;
     return true;
 }

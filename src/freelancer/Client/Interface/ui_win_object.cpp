@@ -46,7 +46,7 @@ UiWinObject::~UiWinObject()
     // FUN_0059cf70.
 }
 
-void UiWinObject::SetPosition(float const* NewPosition)
+void UiWinObject::SetPosition(Vector const* NewPosition)
 {
     // LAB_0059ab10 (RET 4).
     WinObject::SetPosition(NewPosition);
@@ -77,10 +77,10 @@ void UiWinObject::SetTransform(Transform const* NewXform)
 
     // x87: the quotient stays double for both products.
     double const Scale = static_cast<double>(Depth_) / static_cast<double>(Translation.z);
-    float Position[3];
-    Position[0] = static_cast<float>(static_cast<double>(Center.x) * Scale);
-    Position[1] = static_cast<float>(static_cast<double>(Center.y) * Scale);
-    Position[2] = Depth_;
+    Vector Position;
+    Position.x = static_cast<float>(static_cast<double>(Center.x) * Scale);
+    Position.y = static_cast<float>(static_cast<double>(Center.y) * Scale);
+    Position.z = Depth_;
 
     Vector Zero;
     Zero.x = 0.0f;
@@ -103,18 +103,18 @@ void UiWinObject::SetTransform(Transform const* NewXform)
     Corner_[2] = CornerOut.z;
 
     // Both through the vftable, so SetPosition is this class's override.
-    float Identity[9];
-    Identity[0] = 1.0f;
-    Identity[1] = 0.0f;
-    Identity[2] = 0.0f;
-    Identity[3] = 0.0f;
-    Identity[4] = 1.0f;
-    Identity[5] = 0.0f;
-    Identity[6] = 0.0f;
-    Identity[7] = 0.0f;
-    Identity[8] = 1.0f;
-    SetOrientation(reinterpret_cast<Matrix const*>(Identity));
-    SetPosition(Position);
+    Matrix Identity;
+    Identity.E[0][0] = 1.0f;
+    Identity.E[0][1] = 0.0f;
+    Identity.E[0][2] = 0.0f;
+    Identity.E[1][0] = 0.0f;
+    Identity.E[1][1] = 1.0f;
+    Identity.E[1][2] = 0.0f;
+    Identity.E[2][0] = 0.0f;
+    Identity.E[2][1] = 0.0f;
+    Identity.E[2][2] = 1.0f;
+    SetOrientation(&Identity);
+    SetPosition(&Position);
 }
 
 bool UiWinObject::Create(Win3D* NewParent, void* Payload)

@@ -33,11 +33,11 @@ namespace
     {
         Vector const World = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Local3));
         FGfCameraSlot& Target = PoolSlotAt(Slot);
-        Target.Pos[0] = World.x;
-        Target.Pos[1] = World.y;
-        Target.Pos[2] = World.z;
+        Target.Pos.x = World.x;
+        Target.Pos.y = World.y;
+        Target.Pos.z = World.z;
         if (Slot == G_GfCameraPool.ActiveIndex)
-            RoomCameraSetPosition(Target.Camera, Target.Pos);
+            RoomCameraSetPosition(Target.Camera, &Target.Pos);
     }
 
     // LAB_004508e0 / the tail of LAB_00450940: the same for the orientation, FUN_00556cc0.
@@ -53,7 +53,7 @@ namespace
     void LoadPoolPosition(Csys const& Frame, int Slot, float* Out3)
     {
         FGfCameraSlot const& Source = PoolSlotAt(Slot);
-        Vector const Local = Frame.trans_to_frame(*reinterpret_cast<Vector const*>(Source.Pos));
+        Vector const Local = Frame.trans_to_frame(Source.Pos);
         Out3[0] = Local.x;
         Out3[1] = Local.y;
         Out3[2] = Local.z;

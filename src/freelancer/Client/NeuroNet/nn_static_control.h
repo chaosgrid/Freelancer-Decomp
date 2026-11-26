@@ -51,7 +51,7 @@ public:
     ~NnStaticControl() override;
 
     // slot 5 LAB_005896b0 (RET 4)
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_00588d00 (RET 4)
     void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 LAB_00587fc0 (RET 8) -- Data is the INI_Reader positioned on this control's section
@@ -70,12 +70,12 @@ public:
     // FUN_00588540 (RET 0x3c). Callers: WinControl::CreateStaticControl FUN_005a0db0
     // (0x005a0e19) and LAB_0043d170 (0x0043d222, the briefing window, mission_briefing.cpp).
     // ForceRadius / RotationSpeed arrive as ints and are stored as floats.
-    void Init(char const* NewMeshPath, float const* NewOffset, char const* Hardpoint,
-              float const* NewHalfExtents, unsigned char bNewNoZEnable, unsigned char bNewZClear,
+    void Init(char const* NewMeshPath, Vector const* NewOffset, char const* Hardpoint,
+              Vector const* NewHalfExtents, unsigned char bNewNoZEnable, unsigned char bNewZClear,
               unsigned char bNewNoMeshRender, unsigned char bNewNoWireRender,
               unsigned char bNewNoColoring, unsigned char bNewRenderToWindow,
               unsigned char bNewNoClearRender, int NewForceRadius, int NewRotationSpeed,
-              unsigned char bNewEnableRotation, float const* NewStartYpr);
+              unsigned char bNewEnableRotation, Vector const* NewStartYpr);
 
     float CurRoll;                 // +0x32c
     float CurPitch;                // +0x330

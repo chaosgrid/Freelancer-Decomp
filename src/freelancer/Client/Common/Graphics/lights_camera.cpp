@@ -83,7 +83,7 @@ void FLightsCameraParticles::Draw(ICamera* Camera)
     Effect->GetTransform(0, (Transform**)&Scratch[0]);
     if (Effect->GetBoundingSphere(&Scratch[1]) < 0)
         return;
-    if (!MiscUtilSphereInView(Camera, &Scratch[1], Scratch[4]))
+    if (!MiscUtilSphereInView(Camera, reinterpret_cast<Vector const*>(&Scratch[1]), Scratch[4]))
         return;
     Effect->Draw(Camera);
 }

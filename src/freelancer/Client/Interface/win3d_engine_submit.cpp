@@ -153,18 +153,18 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
     ApplyDepthStates(GetPipe(), bDepthTested);
 
     // Scale != 1 passes a scaled identity with Flags | 0x30; else no matrix.
-    void* Matrix = nullptr;
+    Transform const* Xform = nullptr;
     unsigned long SlotFlags = Flags;
     float ScaleMtx[12];
     if (Scale != kOne)
     {
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DObjectMath, ScaleMtx, Scale);
-        Matrix = ScaleMtx;
+        Xform = reinterpret_cast<Transform const*>(ScaleMtx);
         SlotFlags |= 0x30u;
     }
 
-    DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Matrix, nullptr);
+    DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Xform, nullptr);
 }
 
 void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInstance,
@@ -212,18 +212,18 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInsta
     Floats[3] = static_cast<float>(static_cast<double>(ColorRgba[3]) * ByteToUnit);
     Material->SetParameterValue(0, ValueBlob);
 
-    void* Matrix = nullptr;
+    Transform const* Xform = nullptr;
     unsigned long SlotFlags = Flags;
     float ScaleMtx[12];
     if (Scale != kOne)
     {
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DSubmitMath, ScaleMtx, Scale);
-        Matrix = ScaleMtx;
+        Xform = reinterpret_cast<Transform const*>(ScaleMtx);
         SlotFlags |= 0x30u;
     }
 
-    DALib::Renderer->RenderInstance(ArchAnchor, EngineInstance, 1.0f, SlotFlags, Matrix, Material);
+    DALib::Renderer->RenderInstance(ArchAnchor, EngineInstance, 1.0f, SlotFlags, Xform, Material);
     Pipe->SetRenderState(kRsDepthFunction, SavedDepthFunc);
     Pipe->SetRenderState(kRsZWriteEnable, SavedZWrite);
 }
@@ -293,17 +293,17 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, InstanceIndex EngineInstance
     unsigned long SlotFlags = Flags | 0x100u;
     if (bFrontCull == 0)
         SlotFlags |= 0x2000u;
-    void* Matrix = nullptr;
+    Transform const* Xform = nullptr;
     float ScaleMtx[12];
     if (Scale != 1.0f)
     {
         FillIdentity3x4(ScaleMtx);
         ScaleIdentityRotation(G_Win3DSubmitMath, ScaleMtx, Scale);
-        Matrix = ScaleMtx;
+        Xform = reinterpret_cast<Transform const*>(ScaleMtx);
         SlotFlags |= 0x30u;
     }
     int const Result =
-        DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, SlotFlags, Matrix, Material);
+        DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, SlotFlags, Xform, Material);
 
     Pipe->SetRenderState(kRsDepthFunction, SavedDepthFunc);
     Pipe->SetRenderState(kRsZWriteEnable, SavedZWrite);
@@ -324,36 +324,35 @@ void SubmitWin3DOutlinedEngineInstance(void* Camera, InstanceIndex EngineInstanc
     SubmitWin3DTintedEngineInstance(Camera, EngineInstance, 1, OrFlags, ColorRgba, 1, Scale);
 }
 
-bool Win3DRayHitsAabbHalfExtents(float const HalfExtents[3], float const Matrix3x4[12],
-                                 float const RayDir[3])
+bool Win3DRayHitsAabbHalfExtents(Vector const* HalfExtents, Transform const* Xform,
+                                 Vector const* RayDir)
 {
     // FUN_005a1130 (thiscall on HalfExtents, RET 8). The ray direction is inverse-transformed
     // as a point: LocalDir = Out + Translation, LocalOrigin = -Translation. Then the plane
     // crossing on each axis whose direction is non-zero: t > 0 and both other coordinates
     // strictly inside their halves.
-    if (HalfExtents[0] == 0.0f && HalfExtents[1] == 0.0f && HalfExtents[2] == 0.0f)
+    if (HalfExtents->x == 0.0f && HalfExtents->y == 0.0f && HalfExtents->z == 0.0f)
         return false;
 
     if (G_RayBoxMathEngine == nullptr)
         G_RayBoxMathEngine = Acquire3DMathEngine();
 
-    static_assert(sizeof(Transform) == 12 * sizeof(float), "Transform is the 3x4 transform");
     Vector Out;
-    G_RayBoxMathEngine->InverseTransform(Out, *reinterpret_cast<Transform const*>(Matrix3x4),
-                                         *reinterpret_cast<Vector const*>(RayDir));
+    G_RayBoxMathEngine->InverseTransform(Out, *Xform, *RayDir);
 
-    float const LocalDir[3] = {Out.x + Matrix3x4[9], Out.y + Matrix3x4[10],
-                               Out.z + Matrix3x4[11]};
-    float const LocalOrigin[3] = {-Matrix3x4[9], -Matrix3x4[10], -Matrix3x4[11]};
+    float const LocalDir[3] = {Out.x + Xform->Translation.x, Out.y + Xform->Translation.y,
+                               Out.z + Xform->Translation.z};
+    float const LocalOrigin[3] = {-Xform->Translation.x, -Xform->Translation.y,
+                                  -Xform->Translation.z};
 
     if (SlabHitStrict(LocalOrigin[0], LocalOrigin[1], LocalOrigin[2], LocalDir[0], LocalDir[1],
-                      LocalDir[2], HalfExtents[1], HalfExtents[2]))
+                      LocalDir[2], HalfExtents->y, HalfExtents->z))
         return true;
     if (SlabHitStrict(LocalOrigin[1], LocalOrigin[0], LocalOrigin[2], LocalDir[1], LocalDir[0],
-                      LocalDir[2], HalfExtents[0], HalfExtents[2]))
+                      LocalDir[2], HalfExtents->x, HalfExtents->z))
         return true;
     if (SlabHitStrict(LocalOrigin[2], LocalOrigin[0], LocalOrigin[1], LocalDir[2], LocalDir[0],
-                      LocalDir[1], HalfExtents[0], HalfExtents[1]))
+                      LocalDir[1], HalfExtents->x, HalfExtents->y))
         return true;
     return false;
 }

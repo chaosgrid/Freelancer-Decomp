@@ -372,8 +372,8 @@ public:
                              IVP_Time const& Time);
 
     // FUN_06343670 (.text:06343670-063436f1).
-    void set_target_quaternion(float const InTargetQuat[4], IVP_Time const& Time,
-                               float const* InTargetRotQuatOrNull, float DeltaTime);
+    void set_target_quaternion(IVP_U_Quat const* InTargetQuat, IVP_Time const& Time,
+                               IVP_U_Quat const* InTargetRotQuatOrNull, float DeltaTime);
 
     // FUN_06343130 (.text:06343130-06343142, RET 0x4). One stack argument that the body
     // never reads; the body is FUN_06345f90(Body, &CurrentTargetQuat,

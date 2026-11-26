@@ -289,7 +289,7 @@ namespace
         const ArchetypeIndex Loaded = ArchHandle;
         ClientMeshHolderSetMaterials(Mesh, Path.Text, nullptr);
         ClientMeshHolderBindInstance(Mesh, Loaded);
-        ClientMeshHolderSetPosition(Mesh, Position);
+        ClientMeshHolderSetPosition(Mesh, reinterpret_cast<Vector const*>(Position));
         DALib::Engine->ReleaseHandle(Loaded);
         return GR_OK;
     }

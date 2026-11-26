@@ -61,13 +61,13 @@ bool WinButtonProjectedRect(FClientMeshHolder* Holder, float* OutRect4)
         return false;
 
     float Radius = 0.0f;
-    float Center[3];
-    DALib::Engine->GetInstanceExtent(Holder->EngineInstance, 0, &Radius, (Vector*)Center);
+    Vector Center;
+    DALib::Engine->GetInstanceExtent(Holder->EngineInstance, 0, &Radius, &Center);
     const Vector* const Pos = DALib::Engine->GetInstancePosition(Holder->EngineInstance);
     Vector World;
-    World.x = Center[0] + Pos->x;
-    World.y = Center[1] + Pos->y;
-    World.z = Center[2] + Pos->z;
+    World.x = Center.x + Pos->x;
+    World.y = Center.y + Pos->y;
+    World.z = Center.z + Pos->z;
 
     ViewRect Rect;
     float Depth = 0.0f;
@@ -81,7 +81,7 @@ bool WinButtonProjectedRect(FClientMeshHolder* Holder, float* OutRect4)
     return true;
 }
 
-bool WinButton::HitTest(float const* Ray)
+bool WinButton::HitTest(Vector const* Ray)
 {
     // FUN_0059f2e0.
     (void)Ray;
@@ -107,15 +107,15 @@ bool WinButton::HitTest(float const* Ray)
     return true;
 }
 
-void WinButton::SetPosition(float const* NewPosition)
+void WinButton::SetPosition(Vector const* NewPosition)
 {
     // LAB_004c9320.
-    Position.x = NewPosition[0];
-    Position.y = NewPosition[1];
-    Position.z = NewPosition[2];
-    RestPose.Translation.x = NewPosition[0];
-    RestPose.Translation.y = NewPosition[1];
-    RestPose.Translation.z = NewPosition[2];
+    Position.x = NewPosition->x;
+    Position.y = NewPosition->y;
+    Position.z = NewPosition->z;
+    RestPose.Translation.x = NewPosition->x;
+    RestPose.Translation.y = NewPosition->y;
+    RestPose.Translation.z = NewPosition->z;
     memcpy(&Orientation, &RestPose, 12 * sizeof(float));
     HolderSetMatrixAndUpdate(&MeshHolder, &Orientation.E[0][0]);
 }
@@ -229,13 +229,13 @@ void WinButton::Draw()
         Win3DDrawChildren(this);
 }
 
-void WinButton::MouseOver(float const* Ray)
+void WinButton::MouseOver(Vector const* Ray)
 {
     // FUN_004c9380.
     bHover = HitTest(Ray) ? 1 : 0;
 }
 
-void WinButton::MouseLeave(float const* Ray)
+void WinButton::MouseLeave(Vector const* Ray)
 {
     // LAB_004c93a0.
     (void)Ray;

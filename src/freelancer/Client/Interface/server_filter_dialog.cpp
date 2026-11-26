@@ -91,14 +91,14 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
 {
     // FUN_00562a60. The names go through a 0x2000-byte _vsnprintf buffer.
     char Name[0x2000];
-    float const* const DialogOffset = Dialog->Offset; // +0xa8
+    Vector const* const DialogOffset = &Dialog->Offset; // +0xa8
 
     // The row's tool tip twice, then property 0x35 = 1.
-    float const CheckOffset[3] = {Desc.X, Desc.Y, Desc.Z};
-    float const CheckHalfExtents[3] = {0.0120000001f, 0.0120000001f, 0.0f};
+    Vector const CheckOffset = {Desc.X, Desc.Y, Desc.Z};
+    Vector const CheckHalfExtents = {0.0120000001f, 0.0120000001f, 0.0f};
     _snprintf(Name, 0x2000, "FilterCheck%d", G_ServerFilterRowCounter);
     Check = Dialog->CreateToggleButtonControl(Name, kCheckMesh, kCheckAltMesh, kCheckSound,
-                                              nullptr, CheckOffset, nullptr, CheckHalfExtents,
+                                              nullptr, &CheckOffset, nullptr, &CheckHalfExtents,
                                               0, 0, 0, 0, Desc.ToolTipIds,
                                               Desc.ToolTipIds);
     Check->SetProperty(0x35, 1, 0);
@@ -117,13 +117,13 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
     }
 
     // Summed in double in this order and rounded to float.
-    float const LabelOffset[3] = {
+    Vector const LabelOffset = {
         static_cast<float>(static_cast<double>(Desc.LabelX) +
-                           static_cast<double>(DialogOffset[0])),
+                           static_cast<double>(DialogOffset->x)),
         static_cast<float>((0.0299999993f * 0.5 + static_cast<double>(Desc.Y)) +
-                           static_cast<double>(DialogOffset[1])),
-        static_cast<float>(static_cast<double>(Desc.Z) + static_cast<double>(DialogOffset[2]))};
-    Label->SetAttachOffset(LabelOffset);
+                           static_cast<double>(DialogOffset->y)),
+        static_cast<float>(static_cast<double>(Desc.Z) + static_cast<double>(DialogOffset->z))};
+    Label->SetAttachOffset(&LabelOffset);
 
     Label->SetNormSize(Desc.bHasData != 0 ? 0.280000001f : 0.379999995f, 0.0299999993f);
 
@@ -141,14 +141,14 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
         _snprintf(Name, 0x2000, "FilterData%d", G_ServerFilterRowCounter);
         Data = static_cast<RichTextEditWin*>(
             WinFactoryCreate(Name, "RichTextEditWin", Dialog, nullptr));
-        float const DataOffset[3] = {
+        Vector const DataOffset = {
             static_cast<float>(static_cast<double>(Desc.DataX) +
-                               static_cast<double>(DialogOffset[0])),
+                               static_cast<double>(DialogOffset->x)),
             static_cast<float>((0.0299999993f * 0.5 + static_cast<double>(Desc.Y)) +
-                               static_cast<double>(DialogOffset[1])),
+                               static_cast<double>(DialogOffset->y)),
             static_cast<float>(static_cast<double>(Desc.Z) +
-                               static_cast<double>(DialogOffset[2]))};
-        Data->SetAttachOffset(DataOffset);
+                               static_cast<double>(DialogOffset->z))};
+        Data->SetAttachOffset(&DataOffset);
         Data->SetNormSize(0.100000001f, 0.0299999993f);
         Data->SetFixedStyle(true);
         Data->SetImeEnabled(false);
@@ -236,22 +236,22 @@ bool ServerFilterDialog::Create(Win3D* NewParent, void* Data)
     if (!Win3D::Create(NewParent, nullptr))
         return false;
 
-    Offset[2] = -1.0f;
+    Offset.z = -1.0f;
     SetMesh(kBackPlaneMesh, nullptr);
 
     // "Filter_BG" 0.01 behind the plane; not kept.
-    float const BackgroundOffset[3] = {Offset[0], Offset[1], Offset[2] + 0.00999999978f};
-    float const ZeroHalfExtents[3] = {0.0f, 0.0f, 0.0f};
-    float const ZeroVector338[3] = {0.0f, 0.0f, 0.0f};
-    CreateStaticControl("Filter_BG", kBackgroundMesh, BackgroundOffset, nullptr, ZeroHalfExtents,
-                        0, 0, 0, 1, 1, 0, 1, 0, 0, 0, ZeroVector338);
+    Vector const BackgroundOffset = {Offset.x, Offset.y, Offset.z + 0.00999999978f};
+    Vector const ZeroHalfExtents = {0.0f, 0.0f, 0.0f};
+    Vector const ZeroVector338 = {0.0f, 0.0f, 0.0f};
+    CreateStaticControl("Filter_BG", kBackgroundMesh, &BackgroundOffset, nullptr, &ZeroHalfExtents,
+                        0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &ZeroVector338);
 
     Target = static_cast<ServerFilter*>(Data);
     Backup = *Target;
 
     Title = static_cast<RichTextWin*>(WinFactoryCreate("FilterTitle", "RichTextWin", this, nullptr));
-    float const TitleOffset[3] = {Offset[0] + -0.150000006f, Offset[1] + 0.189999998f, Offset[2]};
-    Title->SetAttachOffset(TitleOffset);
+    Vector const TitleOffset = {Offset.x + -0.150000006f, Offset.y + 0.189999998f, Offset.z};
+    Title->SetAttachOffset(&TitleOffset);
     Title->SetNormSize(0.300000012f, 0.0399999991f);
     {
         RenderDisplayList Text;
@@ -268,15 +268,15 @@ bool ServerFilterDialog::Create(Win3D* NewParent, void* Data)
         Title->AppendContent(Text);
     }
 
-    float const CancelOffset[3] = {0.224999994f, 0.174999997f, -1.0f};
-    float const CancelHalfExtents[3] = {0.0199999996f, 0.0199999996f, 0.0f};
+    Vector const CancelOffset = {0.224999994f, 0.174999997f, -1.0f};
+    Vector const CancelHalfExtents = {0.0199999996f, 0.0199999996f, 0.0f};
     CancelButton = CreateButtonControl("FilterCancel", kCancelMesh, nullptr, kSelectSound, nullptr,
-                                       CancelOffset, nullptr, CancelHalfExtents, 0, 0, 0, 0,
+                                       &CancelOffset, nullptr, &CancelHalfExtents, 0, 0, 0, 0,
                                        0x409, 0, 0);
 
-    float const OkOffset[3] = {0.0f, -0.170000002f, -1.0f};
-    float const OkHalfExtents[3] = {0.0500000007f, 0.0170000009f, 0.0f};
-    OkButton = CreateRichTextWireButtonControl("FilterOk", kSelectSound, OkOffset, OkHalfExtents,
+    Vector const OkOffset = {0.0f, -0.170000002f, -1.0f};
+    Vector const OkHalfExtents = {0.0500000007f, 0.0170000009f, 0.0f};
+    OkButton = CreateRichTextWireButtonControl("FilterOk", kSelectSound, &OkOffset, &OkHalfExtents,
                                                0, 0, 0xbdb, 0x411, 0, 0);
 
     for (int Index = 0; Index < 5; ++Index)
@@ -304,9 +304,9 @@ bool ServerFilterDialog::MouseEvent(FWin3DMouseEvent const* Event)
             if (Data == nullptr)
                 continue;
             Data->Deactivate(false);
-            float Ray[3];
-            if (Data->HitTest(Win3DGetMouseRay(Ray)) ||
-                Rows[Index].Label->HitTest(Win3DGetMouseRay(Ray)))
+            Vector Ray;
+            if (Data->HitTest(Win3DGetMouseRay(&Ray)) ||
+                Rows[Index].Label->HitTest(Win3DGetMouseRay(&Ray)))
             {
                 Data->Activate();
                 bFocused = true;
@@ -385,8 +385,8 @@ bool ServerFilterDialogRun(Win3D* Parent, ServerFilter* Filter)
     if (Created == nullptr)
         return true;
     ServerFilterDialog* const Dialog = static_cast<ServerFilterDialog*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     Dialog->CaptureMouse();
 
     int ExitCode = 0;

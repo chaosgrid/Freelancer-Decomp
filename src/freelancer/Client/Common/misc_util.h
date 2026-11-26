@@ -83,4 +83,4 @@ struct ICamera;
 // first use), then ICamera slot 15 ClassifySphere; true when it answers 3 or more (straddle or
 // inside). Callers: CharacterObject::DrawOpaque and the LightsCamera particle draw
 // FUN_005574d0.
-bool MiscUtilSphereInView(ICamera* Camera, float const* Center, float Radius);
+bool MiscUtilSphereInView(ICamera* Camera, Vector const* Center, float Radius);

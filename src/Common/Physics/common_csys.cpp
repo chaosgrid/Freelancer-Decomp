@@ -47,14 +47,14 @@ namespace
 
 }
 
-void CsysFromPosOrient(Csys& Out, float const* Pos3, float const* Orient9)
+void CsysFromPosOrient(Csys& Out, Vector const& Pos, Matrix const& Orient)
 {
-    Out.Pos.x = Pos3[0];
-    Out.Pos.y = Pos3[1];
-    Out.Pos.z = Pos3[2];
+    Out.Pos.x = Pos.x;
+    Out.Pos.y = Pos.y;
+    Out.Pos.z = Pos.z;
     unsigned Cell = 0;
     for (; Cell < 9; ++Cell)
-        Out.Orient.E[Cell / 3][Cell % 3] = Orient9[Cell];
+        Out.Orient.E[Cell / 3][Cell % 3] = Orient.E[Cell / 3][Cell % 3];
 }
 
 Csys::Csys()

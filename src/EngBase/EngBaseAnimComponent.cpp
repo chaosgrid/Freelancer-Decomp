@@ -233,7 +233,7 @@ static FAnimationObject* AnimationFromNested(void* Nested, unsigned long Offset)
 }
 
 // LAB_06614b30 (IRootData+0x0C).
-unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, void* OutSampledPos,
+unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, Vector* OutSampledPos,
                                                unsigned long Flags, float Time, float Speed,
                                                void* BlendDuration, void* Scale,
                                                float TranslationScale)
@@ -252,10 +252,10 @@ unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, void* O
         return 0;
     // The world position lands in a 12-byte local of this frame and is dropped; the sampled
     // (local) position goes to the caller.
-    unsigned char WorldPos[0xC];
-    std::memset(WorldPos, 0, sizeof(WorldPos));
+    Vector WorldPos;
+    std::memset(&WorldPos, 0, sizeof(WorldPos));
     unsigned char bTouch = 0;
-    if (Playback->TouchMappedTyped(WorldPos, OutSampledPos) != 0)
+    if (Playback->TouchMappedTyped(&WorldPos, OutSampledPos) != 0)
         bTouch = 1;
     Playback->StopTyped();
     return bTouch;
@@ -266,7 +266,7 @@ unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, void* O
 unsigned long DACOM_API FAnimationObject::EvalPlayback(unsigned long PlaybackId, unsigned long Flags,
                                                      float Time, float Speed, void* BlendDuration,
                                                      void* Scale, void* TranslationScale,
-                                                     void* Transform)
+                                                     const Transform* Xform)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(this, PlaybackId, &Playback) == 0)
@@ -274,7 +274,7 @@ unsigned long DACOM_API FAnimationObject::EvalPlayback(unsigned long PlaybackId,
     const unsigned long Result = Playback->EvalTyped(Flags, Time, Speed, (unsigned long)((size_t)BlendDuration),
         (unsigned long)((size_t)Scale),
         (unsigned long)((size_t)TranslationScale),
-        (const float*)Transform);
+        Xform);
     if (Result == 0xFFFFFFFF)
         return Result;
     const float BlendTime = FloatFromOpaqueDword(BlendDuration);
@@ -365,7 +365,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, 
 // LAB_06614de0 (IAnimation2+0x48): the playback's root entry in the mixer map
 // (FUN_06614f70 on playback +4); when there is one, FUN_06612a70 writes the position into the
 // channels and the object overlays.
-unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId, float* Pos)
+unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId, const Vector* Pos)
 {
     FAnimationObject* This = (FAnimationObject*)this;
     FAnimPlayback* Playback = nullptr;
@@ -379,7 +379,7 @@ unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId
 }
 
 // LAB_06614fd0 (IAnimation2+0x4C): as above with FUN_06612b80 (orientation matrix).
-unsigned long DACOM_API FAnimation2Facet::SetOverlayExtra(unsigned long PlaybackId, float* Extra)
+unsigned long DACOM_API FAnimation2Facet::SetOverlayExtra(unsigned long PlaybackId, const Matrix* Extra)
 {
     FAnimationObject* This = (FAnimationObject*)this;
     FAnimPlayback* Playback = nullptr;
@@ -415,16 +415,17 @@ unsigned long DACOM_API FAnimationObject::HasObject(unsigned long PlaybackId, vo
 }
 
 // LAB_066150e0 (IAnimation2+0x54): lookup FUN_06614580, then FUN_066122d0.
-unsigned long DACOM_API FAnimationObject::TouchMapped(unsigned long PlaybackId, float* Pos, float* Extra)
+unsigned long DACOM_API FAnimationObject::TouchMapped(unsigned long PlaybackId, Vector* OutPos,
+                                                      Vector* OutSampledPos)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(this, PlaybackId, &Playback) == 0)
         return 0;
-    return Playback->TouchMappedTyped(Pos, Extra);
+    return Playback->TouchMappedTyped(OutPos, OutSampledPos);
 }
 
 // LAB_06615120 (IAnimation2+0x58): as SetOverlayPos with FUN_06612c60 (add a delta).
-unsigned long DACOM_API FAnimation2Facet::AddOverlayPos(unsigned long PlaybackId, float* Delta)
+unsigned long DACOM_API FAnimation2Facet::AddOverlayPos(unsigned long PlaybackId, const Vector* Delta)
 {
     FAnimationObject* This = (FAnimationObject*)this;
     FAnimPlayback* Playback = nullptr;
@@ -702,7 +703,7 @@ float DACOM_API FAnimationChannelFacet::GetUser(unsigned long Key)
 }
 
 // FUN_06616720 (IChannel+0x34): typed slot 0x20 and nothing else -- unlike IAnimation2's playback setter (FUN_06612a70), no mixer overlay is touched here.
-GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayPos(unsigned long Key, float* Pos)
+GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayPos(unsigned long Key, const Vector* Pos)
 {
     void* ChannelThis = this;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -713,7 +714,7 @@ GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayPos(unsigned long Key, flo
 }
 
 // FUN_06616790 (IChannel+0x38): typed slot 0x24 only.
-GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayExtra(unsigned long Key, float* Extra)
+GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayExtra(unsigned long Key, const Matrix* Extra)
 {
     void* ChannelThis = this;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -760,7 +761,7 @@ unsigned long* DACOM_API FAnimationChannelFacet::GetHeader(unsigned long* Out, u
 }
 
 // FUN_06616a50 (IChannel+0x44): typed slot 0x28 only.
-GENRESULT DACOM_API FAnimationChannelFacet::AddOverlayPos(unsigned long Key, float* Delta)
+GENRESULT DACOM_API FAnimationChannelFacet::AddOverlayPos(unsigned long Key, const Vector* Delta)
 {
     void* ChannelThis = this;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);

@@ -337,12 +337,12 @@ bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter&
             continue;
 
         // ---- per-[Player] reset ----------------------------------------------
-        Record.Position[0] = 0.0f;
-        Record.Position[1] = 0.0f;
-        Record.Position[2] = 0.0f;
+        Record.Position.x = 0.0f;
+        Record.Position.y = 0.0f;
+        Record.Position.z = 0.0f;
         for (int Row = 0; Row < 3; ++Row)
             for (int Col = 0; Col < 3; ++Col)
-                Record.Orientation[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
+                Record.Orientation.E[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
         bSawPlayer = true;
         Record.SystemId = 0;
         Record.BaseId = 0;
@@ -510,16 +510,16 @@ bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter&
             } else if (Reader.is_value("num_misn_failures")) {
                 Record.NumMissionFailures = (int)(long long)Reader.get_value_float(0);
             } else if (Reader.is_value("pos")) {
-                Record.Position[0] = (float)Reader.get_value_float(0);
-                Record.Position[1] = (float)Reader.get_value_float(1);
-                Record.Position[2] = (float)Reader.get_value_float(2);
+                Record.Position.x = (float)Reader.get_value_float(0);
+                Record.Position.y = (float)Reader.get_value_float(1);
+                Record.Position.z = (float)Reader.get_value_float(2);
             } else if (Reader.is_value("rotate")) {
                 Vector Angles;
                 Angles.x = (float)Reader.get_value_float(0);
                 Angles.y = (float)Reader.get_value_float(1);
                 Angles.z = (float)Reader.get_value_float(2);
                 Matrix const Rotation = EulerMatrix(Angles);
-                memcpy(Record.Orientation, Rotation.E, sizeof(Record.Orientation));
+                memcpy(&Record.Orientation, Rotation.E, sizeof(Record.Orientation));
             } else if (Reader.is_value("starting_ring")) {
                 Record.StartingRing = CreateID(Reader.get_value_string());
             } else if (Reader.is_value("equip")) {
@@ -783,10 +783,10 @@ void PlayerData::apply_saved_character(PlayerData::FSavedCharacter const& Record
     for (int I = 0; I < static_cast<int>(costume.AccessoryCount); ++I)
         costume.AccessoryIds[I] = Record.BaseCostume.AccessoryIds[I];
 
-    initial_pos.x = Record.Position[0];
-    initial_pos.y = Record.Position[1];
-    initial_pos.z = Record.Position[2];
-    memcpy(&initial_ornt, Record.Orientation, sizeof(initial_ornt));
+    initial_pos.x = Record.Position.x;
+    initial_pos.y = Record.Position.y;
+    initial_pos.z = Record.Position.z;
+    memcpy(&initial_ornt, &Record.Orientation, sizeof(initial_ornt));
 
     ship_archetype = Record.ShipArchetype;                         // +0x264
     relative_health = Record.HullStatus;                           // +0x268

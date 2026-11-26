@@ -171,14 +171,14 @@ namespace
         if (State->ParentWindow == nullptr)
             return;
         // Init flags: only NoWireRender and NoClearRender set.
-        float const Offset[3] = {0.0f, 0.0f, 0.0f};
-        float const HalfExtents[3] = {0.0f, 0.0f, 0.0f};
-        float const StartYpr[3] = {0.0f, 0.0f, 0.0f};
+        Vector const Offset = {0.0f, 0.0f, 0.0f};
+        Vector const HalfExtents = {0.0f, 0.0f, 0.0f};
+        Vector const StartYpr = {0.0f, 0.0f, 0.0f};
         static_cast<NnStaticControl*>(State->ParentWindow)
-            ->Init(kBriefingWindowMesh, Offset, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                   StartYpr);
+            ->Init(kBriefingWindowMesh, &Offset, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                   &StartYpr);
         Vector const Position = {-0.62f, 0.3f, -1.25f};
-        State->ParentWindow->SetPosition(&Position.x);
+        State->ParentWindow->SetPosition(&Position);
         // Hidden until the first frame.
         State->ParentWindow->Flags = static_cast<unsigned char>(
             State->ParentWindow->Flags & ~(kWin3DActive | kWin3DVisible));

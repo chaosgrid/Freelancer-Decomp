@@ -80,10 +80,10 @@ namespace
 
     // Where an opened service tab slides to (LAB_0043d630 / LAB_0043d650 / LAB_0043d670 /
     // LAB_0043d690).
-    float const G_NavBarRepairTarget[3] = {0.0f, NnFloatBits(0xbeb33333), 0.0f};  // DAT_00668804 (0xc)
-    float const G_NavBarShipTarget[3] = {0.0f, NnFloatBits(0xbeb33333), 0.0f};    // DAT_006687f8 (7)
-    float const G_NavBarNewsTarget[3] = {0.0f, NnFloatBits(0xbecccccd), 0.0f};    // DAT_006687ec (2)
-    float const G_NavBarMissionTarget[3] = {0.0f, NnFloatBits(0xbecccccd), 0.0f}; // DAT_006687e0 (3)
+    Vector const G_NavBarRepairTarget = {0.0f, NnFloatBits(0xbeb33333), 0.0f};  // DAT_00668804 (0xc)
+    Vector const G_NavBarShipTarget = {0.0f, NnFloatBits(0xbeb33333), 0.0f};    // DAT_006687f8 (7)
+    Vector const G_NavBarNewsTarget = {0.0f, NnFloatBits(0xbecccccd), 0.0f};    // DAT_006687ec (2)
+    Vector const G_NavBarMissionTarget = {0.0f, NnFloatBits(0xbecccccd), 0.0f}; // DAT_006687e0 (3)
 
     // DAT_00610bf0 -- the maneuver tab mesh for 1..3 service tabs.
     char const* const kTabMeshes[3] = {"Interface\\Baseside\\CITY_maneuvertab1.cmp",
@@ -311,17 +311,17 @@ NavBar::~NavBar()
 bool NavBar::Create(Win3D* NewParent, void* Data)
 {
     // LAB_0043dc40. "ManeuverFrame" at (0, 0.176, -0.5).
-    float const HalfExtents[3] = {0.0f, 0.0f, 0.0f};
-    float const Zero338[3] = {0.0f, 0.0f, 0.0f};
-    float const FramePosition[3] = {0.0f, NnFloatBits(0x3e343958), NnFloatBits(0xbf000000)};
+    Vector const HalfExtents = {0.0f, 0.0f, 0.0f};
+    Vector const Zero338 = {0.0f, 0.0f, 0.0f};
+    Vector const FramePosition = {0.0f, NnFloatBits(0x3e343958), NnFloatBits(0xbf000000)};
     ManeuverFrame = CreateStaticControl("ManeuverFrame", "Interface\\HUD\\HUD_maneuverbox6.cmp",
-                                        FramePosition, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1,
-                                        0, 0, 0, Zero338);
+                                        &FramePosition, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1,
+                                        0, 0, 0, &Zero338);
     // "ManeuverTab" at (0, 0.283, -1.0), hidden (property 1).
-    float const TabPosition[3] = {0.0f, NnFloatBits(0x3e90624e), NnFloatBits(0xbf800000)};
+    Vector const TabPosition = {0.0f, NnFloatBits(0x3e90624e), NnFloatBits(0xbf800000)};
     ManeuverTab = CreateStaticControl("ManeuverTab", "Interface\\Baseside\\CITY_maneuvertab3.cmp",
-                                      TabPosition, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0,
-                                      0, 0, Zero338);
+                                      &TabPosition, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0,
+                                      0, 0, &Zero338);
     ManeuverTab->SetProperty(kWinPropHide, 1, 0);
 
     // Win3D::Create (FUN_004b5060); on failure both children deleted
@@ -491,8 +491,8 @@ void NavBar::LayoutTabs(bool bAnimate)
         return;
 
     // Its offset (property 7).
-    float Base[3] = {0.0f, 0.0f, 0.0f};
-    Selected->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Base), 0);
+    Vector Base = {0.0f, 0.0f, 0.0f};
+    Selected->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&Base), 0);
 
     // The enabled service tabs; 1..3 of them, else return.
     int Count = 0;
@@ -505,12 +505,12 @@ void NavBar::LayoutTabs(bool bAnimate)
         return;
     int const TabIndex = Count - 1;
     if (TabIndex > 0)
-        Base[0] = Base[0] + Step;
+        Base.x = Base.x + Step;
 
     // The tab mesh and its offset (x, 0.295, -1.0).
     ManeuverTab->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kTabMeshes[TabIndex]), 0);
-    float const TabPosition[3] = {Base[0], NnFloatBits(0x3e970a3d), NnFloatBits(0xbf800000)};
-    ManeuverTab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(TabPosition), 0);
+    Vector const TabPosition = {Base.x, NnFloatBits(0x3e970a3d), NnFloatBits(0xbf800000)};
+    ManeuverTab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&TabPosition), 0);
 
     float const* Offset = kTabOffsets[TabIndex];
     ButtonMover::Start(kAnimSeconds);
@@ -528,27 +528,27 @@ void NavBar::LayoutTabs(bool bAnimate)
             continue;
         if (Button.bDisabled == 0)
         {
-            float End[3];
+            Vector End;
             if (bAnimate)
             {
-                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Base), 0);
-                End[0] = *Offset + Base[0];
-                End[1] = Base[1] - NnFloatBits(0x3d851eb8);
-                End[2] = Base[2];
+                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Base), 0);
+                End.x = *Offset + Base.x;
+                End.y = Base.y - NnFloatBits(0x3d851eb8);
+                End.z = Base.z;
                 ++Offset;
-                ButtonMover::AddButton(Button.Control, Base, End);
+                ButtonMover::AddButton(Button.Control, &Base, &End);
             }
             else
             {
-                End[0] = *Offset + Base[0];
-                End[1] = Base[1] - NnFloatBits(0x3d851eb8);
-                End[2] = Base[2];
+                End.x = *Offset + Base.x;
+                End.y = Base.y - NnFloatBits(0x3d851eb8);
+                End.z = Base.z;
                 ++Offset;
-                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(End), 0);
+                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&End), 0);
             }
-            Button.Position[0] = End[0];
-            Button.Position[1] = End[1];
-            Button.Position[2] = End[2];
+            Button.Position.x = End.x;
+            Button.Position.y = End.y;
+            Button.Position.z = End.z;
         }
         if (Button.Type == kHotspotFrontDesk)
             DeskTab = &Button;
@@ -559,7 +559,7 @@ void NavBar::LayoutTabs(bool bAnimate)
 
     // While sliding, the desk tab starts where the dealer tab sits.
     if (bAnimate && DeskTab != nullptr && DealerTab != nullptr)
-        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
+        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&DealerTab->Position), 0);
 }
 
 void NavBar::LayoutRoomButtons()
@@ -581,8 +581,8 @@ void NavBar::LayoutRoomButtons()
     {
         if (It->bRoomSwitch == 0)
             continue;
-        float const Position[3] = {*Offset, NnFloatBits(0x3be56042), 0.0f};
-        It->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
+        Vector const Position = {*Offset, NnFloatBits(0x3be56042), 0.0f};
+        It->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Position), 0);
         ++Offset;
     }
 
@@ -1197,30 +1197,30 @@ void NavBar::OpenService(FNavBarButton* Button)
 
     // A service tab slides from where it is to its type's target
     // (the repair tab also asks for the desk afterwards).
-    float const* Target = nullptr;
+    Vector const* Target = nullptr;
     switch (Button->Type)
     {
     case kHotspotRepair:
-        Target = G_NavBarRepairTarget;
+        Target = &G_NavBarRepairTarget;
         break;
     case kHotspotStartShipDealer:
-        Target = G_NavBarShipTarget;
+        Target = &G_NavBarShipTarget;
         break;
     case kHotspotMissionVendor:
-        Target = G_NavBarMissionTarget;
+        Target = &G_NavBarMissionTarget;
         break;
     case kHotspotNewsVendor:
-        Target = G_NavBarNewsTarget;
+        Target = &G_NavBarNewsTarget;
         break;
     default:
         return;
     }
     Button->bOpen = 1;
-    Button->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Button->Position), 0);
+    Button->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&Button->Position), 0);
     if (Button->Type == kHotspotRepair)
         bReturnToDesk = 1;
     ButtonMover::Start(kAnimSeconds);
-    ButtonMover::AddButton(Button->Control, Button->Position, Target);
+    ButtonMover::AddButton(Button->Control, &Button->Position, Target);
 }
 
 void NavBar::CloseService(FNavBarButton* Button)
@@ -1264,24 +1264,24 @@ void NavBar::MakeServiceBackground(unsigned Type, float Scale)
     {
     case kHotspotRepair:
     {
-        float const Position[3] = {0.0f, 0.0f, NnFloatBits(0xbf8ccccd)};
+        Vector const Position = {0.0f, 0.0f, NnFloatBits(0xbf8ccccd)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\Inventory\\repair_bakgrnd.cmp",
-                             Position);
+                             &Position);
         return;
     }
     case kHotspotStartShipDealer:
     {
-        float const Position[3] = {0.0f, NnFloatBits(0xbdb020c5), NnFloatBits(0xbfa4dd2f)};
+        Vector const Position = {0.0f, NnFloatBits(0xbdb020c5), NnFloatBits(0xbfa4dd2f)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\Inventory\\INV_biginforcard_center.cmp",
-                             Position);
+                             &Position);
         return;
     }
     case kHotspotNewsVendor:
     case kHotspotMissionVendor:
     {
-        float const Position[3] = {0.0f, NnFloatBits(0xbdcccccd), NnFloatBits(0xbfbfbe77)};
+        Vector const Position = {0.0f, NnFloatBits(0xbdcccccd), NnFloatBits(0xbfbfbe77)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\NewsVendor\\NEWS_background.cmp",
-                             Position);
+                             &Position);
         return;
     }
     default:
@@ -1306,8 +1306,8 @@ void NavBar::OnScaleFinished()
         {
         case kHotspotRepair:
             ButtonMover::Start(kAnimSeconds);
-            ButtonMover::AddButton(ClosingButton->Control, G_NavBarRepairTarget,
-                                   ClosingButton->Position);
+            ButtonMover::AddButton(ClosingButton->Control, &G_NavBarRepairTarget,
+                                   &ClosingButton->Position);
             ClosingButton->bDisabled = 0;
             ClosingButton->Control->SetProperty(kWinPropDisable, 0, 0);
             ClosingButton->bOpen = 0;
@@ -1316,13 +1316,13 @@ void NavBar::OnScaleFinished()
         case kHotspotNewsVendor:
         case kHotspotMissionVendor:
         {
-            float const* const Target = ClosingButton->Type == kHotspotStartShipDealer
-                                            ? G_NavBarShipTarget
-                                            : (ClosingButton->Type == kHotspotNewsVendor ? G_NavBarNewsTarget
-                                                                        : G_NavBarMissionTarget);
+            Vector const* const Target = ClosingButton->Type == kHotspotStartShipDealer
+                                            ? &G_NavBarShipTarget
+                                            : (ClosingButton->Type == kHotspotNewsVendor ? &G_NavBarNewsTarget
+                                                                        : &G_NavBarMissionTarget);
             ButtonMover::Start(kAnimSeconds);
             ClosingButton->bOpen = 0;
-            ButtonMover::AddButton(ClosingButton->Control, Target, ClosingButton->Position);
+            ButtonMover::AddButton(ClosingButton->Control, Target, &ClosingButton->Position);
             ClosingButton->bDisabled = 0;
             ClosingButton->Control->SetProperty(kWinPropDisable, 0, 0);
             return;
@@ -1780,7 +1780,7 @@ void NavBar::ToggleDealerTabs(bool bShowDesk)
     if (DeskTab == nullptr || DealerTab == nullptr)
         return;
 
-    float Offset[3] = {0.0f, 0.0f, 0.0f};
+    Vector Offset = {0.0f, 0.0f, 0.0f};
     if (bShowDesk)
     {
         // An open dealer tab put back; the desk tab enabled and moved
@@ -1788,12 +1788,12 @@ void NavBar::ToggleDealerTabs(bool bShowDesk)
         if (DealerTab->bOpen != 0)
         {
             DealerTab->bOpen = 0;
-            DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
+            DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&DealerTab->Position), 0);
         }
         DeskTab->bDisabled = 0;
         DeskTab->Control->SetProperty(kWinPropDisable, 0, 0);
-        DealerTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
-        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+        DealerTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
+        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
         DealerTab->bDisabled = 1;
         DealerTab->Control->SetProperty(kWinPropDisable, 1, 0);
         return;
@@ -1801,8 +1801,8 @@ void NavBar::ToggleDealerTabs(bool bShowDesk)
     // The mirror image.
     DealerTab->bDisabled = 0;
     DealerTab->Control->SetProperty(kWinPropDisable, 0, 0);
-    DeskTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
-    DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+    DeskTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
+    DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&Offset), 0);
     DeskTab->bDisabled = 1;
     DeskTab->Control->SetProperty(kWinPropDisable, 1, 0);
 }
@@ -1891,7 +1891,7 @@ bool NavBar::CharacterClicked(FCharacterObject* Character, int Role)
     return true;
 }
 
-void NavBar::MakeScaledBackground(float Scale, char const* Mesh, float const* Position)
+void NavBar::MakeScaledBackground(float Scale, char const* Mesh, Vector const* Position)
 {
     // FUN_00441ea0. The old background deleted first.
     if (ScaledBackground != nullptr)
@@ -1902,10 +1902,10 @@ void NavBar::MakeScaledBackground(float Scale, char const* Mesh, float const* Po
 
     // "ScaledBackground" (arguments 0, {0,0,0}, 0,0,0,1,0,0,1,0,0,0,
     // {0,0,0}).
-    float const HalfExtents[3] = {0.0f, 0.0f, 0.0f};
-    float const Zero338[3] = {0.0f, 0.0f, 0.0f};
+    Vector const HalfExtents = {0.0f, 0.0f, 0.0f};
+    Vector const Zero338 = {0.0f, 0.0f, 0.0f};
     ScaledBackground = CreateStaticControl("ScaledBackground", Mesh, Position, nullptr,
-                                           HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero338);
+                                           &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero338);
 
     // The instance's rotation reset to identity scaled by Scale (its
     // translation kept), SetInstanceMatrix, UpdateInstance. No null or -1 test.

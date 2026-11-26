@@ -226,7 +226,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         GetIfacePositionOrZero(&TargetPos, ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target())));
         Vector const RelDir = Sub(TargetPos, CachedIfacePosition(Sys));
 
-        Matrix* const Reference = IfaceOrientation(Sys);
+        Matrix const* const Reference = IfaceOrientation(Sys);
         if (Gate)
         {
             Vector const Up = Manager->get_ship_up_direction();
@@ -302,7 +302,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         RefreshCachedIfacePosition(Sys);
         Vector const RelDir = Sub(Position1c, CachedIfacePosition(Sys));
 
-        Matrix* const Reference = IfaceOrientation(Sys);
+        Matrix const* const Reference = IfaceOrientation(Sys);
         if (UseRawUpHint)
         {
             // The up-hint triple is 0xc apart, not packed.
@@ -328,7 +328,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         // Direction28 is used as-is (no subtraction of the cached position, unlike
         // cases 1/2); the gate picks the builder as in the fallback.
         bool const Gate = Sys->Thrust.CheckSteeringGate();
-        Matrix* const Reference = IfaceOrientation(Sys);
+        Matrix const* const Reference = IfaceOrientation(Sys);
         if (Gate)
         {
             Vector const Up = Manager->get_ship_up_direction();
@@ -391,7 +391,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
         Vector const RecomputeDir = Sub(Pathfind->AvoidTargetPoint, CachedIfacePosition(Sys));
 
-        Matrix* const RecomputeReference = IfaceOrientation(Sys);
+        Matrix const* const RecomputeReference = IfaceOrientation(Sys);
         if (Gate)
         {
             Vector const Up = Manager->get_ship_up_direction();

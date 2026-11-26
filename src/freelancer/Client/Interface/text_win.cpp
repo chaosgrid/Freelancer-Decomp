@@ -36,13 +36,13 @@ TextWin::~TextWin()
     Win3DUnregister(this);
 }
 
-bool TextWin::HitTest(float const* Ray)
+bool TextWin::HitTest(Vector const* Ray)
 {
     // FUN_004b51d0: the ray's point at this object's depth must sit inside [x, x + width] and
     // [y - height, y]. The y product is rounded to float; the x difference stays double.
-    double const T = static_cast<double>(Position.z) / Ray[2];
-    float const PointY = static_cast<float>(T * Ray[1]);
-    double const DeltaX = T * Ray[0] - Position.x;
+    double const T = static_cast<double>(Position.z) / Ray->z;
+    float const PointY = static_cast<float>(T * Ray->y);
+    double const DeltaX = T * Ray->x - Position.x;
     if (DeltaX < 0.0)
         return false;
     if (!(DeltaX <= Width))
@@ -105,7 +105,7 @@ void TextWin::Draw()
     TextWinProjectExtent(Width, Height, Position.z, &ScreenWidth, &ScreenHeight);
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY);
+    TextWinProjectPoint(&Position, &ScreenX, &ScreenY);
 
     FFontStringDrawOrigin Origin;
     Origin.X = ScreenX;
@@ -175,7 +175,7 @@ void TextWinProjectExtent(float Width, float Height, float Z, float* OutWidth,
     *OutHeight = static_cast<float>(-(InvNear * Cam->YScale * NearOverDepth * Height));
 }
 
-void TextWinProjectPoint(float const* World, float* OutX, float* OutY)
+void TextWinProjectPoint(Vector const* World, float* OutX, float* OutY)
 {
     // FUN_00417730.
     float X = 0.0f;

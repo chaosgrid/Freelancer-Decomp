@@ -433,10 +433,10 @@ void FClientGameobj::UpdateDrawLighting(void* Camera)
 }
 
 unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                  void* Matrix, void* Extra)
+                                  Transform const* Xform, void* Extra)
 {
     // FUN_00539980 -- the body is GameobjSubmitDrawRetail (space_scene_obj_draw.cpp).
-    return GameobjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Matrix, Extra);
+    return GameobjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Xform, Extra);
 }
 
 unsigned FClientGameobj::GetNebula(unsigned* OutB)
@@ -1217,10 +1217,10 @@ void FClientEquippedObj::PreSubmitDraw()
 }
 
 unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                      void* Matrix, void* Extra)
+                                      Transform const* Xform, void* Extra)
 {
     // FUN_00533780 -- the body is EquippedObjSubmitDrawRetail (space_scene_obj_draw.cpp).
-    return EquippedObjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Matrix, Extra);
+    return EquippedObjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Xform, Extra);
 }
 
 void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
@@ -1772,7 +1772,7 @@ float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
 }
 
 unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                       void* Matrix, void* Extra)
+                                       Transform const* Xform, void* Extra)
 {
     // LAB_00548220 -- the solar draw. Every path that draws nothing returns LOD {0, 0xffff}.
     unsigned Lod = 0xffff0000u;
@@ -1830,7 +1830,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
         // EquippedObj's draw FUN_00533780 into a temporary.
         unsigned Temp = 0;
         unsigned* const Result =
-            EquippedObjSubmitDrawRetail(this, &Temp, Camera, CachedLod, Matrix, Extra);
+            EquippedObjSubmitDrawRetail(this, &Temp, Camera, CachedLod, Xform, Extra);
         *OutLod = *Result;
         return OutLod;
     }
@@ -2218,7 +2218,7 @@ namespace
     // caller's stack archetype, exactly as retail's does. The local companion is cleared
     // (FUN_00502d90) either way.
     void CreateEffectOnGameobj(FClientGameobj* Go, FEffectArch* Arch, long EngineIndex,
-                               float const* Pose)
+                               Transform const* Pose)
     {
         if (GetGameOption(kGameOptEffectsGroup) == 0)
             return;
@@ -2235,12 +2235,12 @@ namespace
 
         if (Companion[2] != nullptr)
             ParticleEffectAttach(static_cast<FParticleEffect*>(Companion[2]), Go, EngineIndex,
-                                 reinterpret_cast<Transform const*>(Pose));
+                                 Pose);
         if (Companion[1] != nullptr)
-            static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, (const Transform*)Pose);
+            static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, Pose);
         if (Companion[3] != nullptr)
             CliExplosionAttachLocalXform(Companion[3], EngineIndex,
-                                         reinterpret_cast<Transform const*>(Pose));
+                                         Pose);
 
         if (CreateEffectStart(Companion, Arch))
             CliEffectListInsert(&Go->EffectList, Companion);
@@ -2288,22 +2288,22 @@ namespace
         ID_String const* const SoundId = Archetype::CliShipBayDoorSound(ShipArch->Companion, bOpen);
         Arch.SndEffect = LookupClientSoundArch(SoundId);
 
-        float Pose[12];
-        Pose[0] = Hp.Orient.E[0][0];
-        Pose[1] = Hp.Orient.E[0][1];
-        Pose[2] = Hp.Orient.E[0][2];
-        Pose[3] = Hp.Orient.E[1][0];
-        Pose[4] = Hp.Orient.E[1][1];
-        Pose[5] = Hp.Orient.E[1][2];
-        Pose[6] = Hp.Orient.E[2][0];
-        Pose[7] = Hp.Orient.E[2][1];
-        Pose[8] = Hp.Orient.E[2][2];
-        Pose[9] = Hp.Position.x;
-        Pose[10] = Hp.Position.y;
-        Pose[11] = Hp.Position.z;
+        Transform Pose;
+        Pose.Rotation.E[0][0] = Hp.Orient.E[0][0];
+        Pose.Rotation.E[0][1] = Hp.Orient.E[0][1];
+        Pose.Rotation.E[0][2] = Hp.Orient.E[0][2];
+        Pose.Rotation.E[1][0] = Hp.Orient.E[1][0];
+        Pose.Rotation.E[1][1] = Hp.Orient.E[1][1];
+        Pose.Rotation.E[1][2] = Hp.Orient.E[1][2];
+        Pose.Rotation.E[2][0] = Hp.Orient.E[2][0];
+        Pose.Rotation.E[2][1] = Hp.Orient.E[2][1];
+        Pose.Rotation.E[2][2] = Hp.Orient.E[2][2];
+        Pose.Translation.x = Hp.Position.x;
+        Pose.Translation.y = Hp.Position.y;
+        Pose.Translation.z = Hp.Position.z;
         long const EngineIndex = Go->get_index();
 
-        CreateEffectOnGameobj(Go, &Arch, EngineIndex, Pose);
+        CreateEffectOnGameobj(Go, &Arch, EngineIndex, &Pose);
     }
 }
 
@@ -2336,22 +2336,22 @@ void FClientShipGameobj::PlayCargoJettisonSound()
     FEffectArch& Arch = Scoped.Arch;
     Arch.SndEffect = LookupClientSoundArch(&SND_CARGO_JETTISONED);
 
-    float Pose[12];
-    Pose[0] = Hp.Orient.E[0][0];
-    Pose[1] = Hp.Orient.E[0][1];
-    Pose[2] = Hp.Orient.E[0][2];
-    Pose[3] = Hp.Orient.E[1][0];
-    Pose[4] = Hp.Orient.E[1][1];
-    Pose[5] = Hp.Orient.E[1][2];
-    Pose[6] = Hp.Orient.E[2][0];
-    Pose[7] = Hp.Orient.E[2][1];
-    Pose[8] = Hp.Orient.E[2][2];
-    Pose[9] = Hp.Position.x;
-    Pose[10] = Hp.Position.y;
-    Pose[11] = Hp.Position.z;
+    Transform Pose;
+    Pose.Rotation.E[0][0] = Hp.Orient.E[0][0];
+    Pose.Rotation.E[0][1] = Hp.Orient.E[0][1];
+    Pose.Rotation.E[0][2] = Hp.Orient.E[0][2];
+    Pose.Rotation.E[1][0] = Hp.Orient.E[1][0];
+    Pose.Rotation.E[1][1] = Hp.Orient.E[1][1];
+    Pose.Rotation.E[1][2] = Hp.Orient.E[1][2];
+    Pose.Rotation.E[2][0] = Hp.Orient.E[2][0];
+    Pose.Rotation.E[2][1] = Hp.Orient.E[2][1];
+    Pose.Rotation.E[2][2] = Hp.Orient.E[2][2];
+    Pose.Translation.x = Hp.Position.x;
+    Pose.Translation.y = Hp.Position.y;
+    Pose.Translation.z = Hp.Position.z;
     long const EngineIndex = get_index();
 
-    CreateEffectOnGameobj(this, &Arch, EngineIndex, Pose);
+    CreateEffectOnGameobj(this, &Arch, EngineIndex, &Pose);
 }
 
 // The three NN voice lines the ship notify queues (static-init CreateID entries).
@@ -2429,9 +2429,9 @@ namespace
             Archetype::CliSolarDoorSound(Solar->Archetype->Companion, bOpen);
         Arch.SndEffect = LookupClientSoundArch(SoundId);
 
-        float Pose[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+        Transform Pose = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f), {0.0f, 0.0f, 0.0f}};
         long const EngineIndex = Go->get_index();
-        CreateEffectOnGameobj(Go, &Arch, EngineIndex, Pose);
+        CreateEffectOnGameobj(Go, &Arch, EngineIndex, &Pose);
     }
 }
 
@@ -2885,7 +2885,7 @@ void FClientShipGameobj::UpdateDrawLighting(void* Camera)
         FGameLight* const Light = Effect->Tunnel->Light;
         if (Light == nullptr)
             return;
-        EngineLightSetPosition((FEngineLight*)Light, &Pos.x);
+        EngineLightSetPosition((FEngineLight*)Light, &Pos);
         FEngineLight* const Lights[1] = {(FEngineLight*)Light};
         EngineLightApplyList(Lights, 1u, static_cast<ICamera*>(Camera), &Pos.x);
         return;
@@ -2934,7 +2934,7 @@ namespace
 }
 
 unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                      void* Matrix, void* Extra)
+                                      Transform const* Xform, void* Extra)
 {
     // LAB_00546050 -- the ship draw. From the cockpit camera the player's own ship is not
     // drawn.
@@ -2996,7 +2996,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
 
     unsigned Lod = 0;
     unsigned* const Result =
-        EquippedObjSubmitDrawRetail(this, &Lod, Camera, CachedLod, Matrix, Extra);
+        EquippedObjSubmitDrawRetail(this, &Lod, Camera, CachedLod, Xform, Extra);
     *OutLod = *Result;
     return OutLod;
 }

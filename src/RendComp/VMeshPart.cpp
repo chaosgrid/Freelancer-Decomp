@@ -105,7 +105,7 @@ public:
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    bool DACOM_API Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags, const void* Matrix,
+    bool DACOM_API Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags, const Transform* Xform,
                         IMaterial* Override) override;
     bool DACOM_API Prepare(void* Listing, void* Scratch) override;
     FVmeshRef* DACOM_API GetRef() override;
@@ -361,13 +361,12 @@ bool DACOM_API FVMeshPart::Prepare(void* ListingArg, void* ScratchArg)
 }
 
 bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags,
-                                const void* Matrix, IMaterial* Override)
+                                const Transform* Xform, IMaterial* Override)
 {
     if (Data == nullptr)
         return false;
     const Transform* View = (Camera->GetViewTransform());
     const Transform* World = (const Transform*)(G_Engine->GetInstanceTransform(Inst));
-    const Transform* MatrixXf = (const Transform*)Matrix;
     if ((Flags & 0x200) == 0)
     {
         int State = 1;
@@ -375,10 +374,10 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned lo
         if (State != 0)
         {
             Transform Product;
-            if (MatrixXf != nullptr)
+            if (Xform != nullptr)
             {
                 Transform Local;
-                MathEngineCached(G_MathVMesh)->MulTransform(Local, *MatrixXf, *World);
+                MathEngineCached(G_MathVMesh)->MulTransform(Local, *Xform, *World);
                 const Transform LocalCopy = Local;
                 MathEngineCached(G_MathVMesh)->MulTransform(Product, *View, LocalCopy);
             }
@@ -388,10 +387,10 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned lo
             const Transform Modelview = ProductCopy;
             G_Pipeline->SetModelview(&Modelview);
         }
-        else if (MatrixXf != nullptr)
+        else if (Xform != nullptr)
         {
             Transform Local;
-            MathEngineCached(G_MathVMesh)->MulTransform(Local, *MatrixXf, *World);
+            MathEngineCached(G_MathVMesh)->MulTransform(Local, *Xform, *World);
             const Transform Unused = Local;
             (void)Unused;
             G_Pipeline->SetWorld(World);
@@ -910,15 +909,15 @@ public:
         float Radius;
         const uint32_t HandleBits = (uint32_t)((uintptr_t)Handle);
         std::memcpy(&Radius, &HandleBits, sizeof(Radius));
-        float Center[3];
-        G_Engine->GetInstanceExtent(InstId, 1, &Radius, (Vector*)Center);
+        Vector Center;
+        G_Engine->GetInstanceExtent(InstId, 1, &Radius, &Center);
         if (Radius <= 0.0f)
         {
-            Center[0] = Part->Ref->Center[0];
-            Center[1] = Part->Ref->Center[1];
-            Center[2] = Part->Ref->Center[2];
+            Center.x = Part->Ref->Center.x;
+            Center.y = Part->Ref->Center.y;
+            Center.z = Part->Ref->Center.z;
             Radius = Part->Ref->Radius;
-            G_Engine->SetInstanceExtent(InstId, 1, Radius, (const Vector*)Center);
+            G_Engine->SetInstanceExtent(InstId, 1, Radius, &Center);
         }
         return 1;
     }
@@ -991,7 +990,7 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Center, 3 * sizeof(float));
+        std::memcpy(Out, &((FVMeshPart*)Handle)->Ref->Center, 3 * sizeof(float));
         return 1;
     }
 
@@ -1005,7 +1004,7 @@ public:
     // LAB_06c2da10 -> AL: draw the part bound by BindMeshInstance (the Handle argument is
     // not read) with the flag word translated: 0x4000 clear -> 0x40, 0x1000 -> 2, 0x8000 -> 0x80.
     int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long Flags,
-                         void* Matrix, void* Extra) override
+                         const Transform* Xform, void* Extra) override
     {
         unsigned long PartFlags = 0;
         if ((Flags & 0x4000) == 0)
@@ -1014,7 +1013,7 @@ public:
             PartFlags |= 2;
         if ((Flags & 0x8000) != 0)
             PartFlags |= 0x80;
-        return Bound->Draw(Camera, Inst, PartFlags, Matrix, (IMaterial*)Extra) ? 1 : 0;
+        return Bound->Draw(Camera, Inst, PartFlags, Xform, (IMaterial*)Extra) ? 1 : 0;
     }
 
     // LAB_06c2dac0: invalid handle -> -1, else bind it.

@@ -26,6 +26,7 @@
 #include "common_metalist.h"
 
 struct ICamera;
+struct FThornLightProps;
 
 // The light types: 1..3 are the D3DLIGHTTYPE values (FD3dLight8::Type as well); the names are
 // the [LightSource] type strings EngineLightParseType (FUN_00411cd0) maps.
@@ -45,7 +46,7 @@ struct FD3dLight8
     float Diffuse[4];     // +0x04
     float Specular[4];    // +0x14
     float Ambient[4];     // +0x24
-    float Position[3];    // +0x34 (light +0x40)
+    Vector Position;      // +0x34 (light +0x40)
     float Direction[3];   // +0x40 (light +0x4C)
     float Range;          // +0x4C (light +0x58)
     float Falloff;        // +0x50 (light +0x5C)
@@ -68,8 +69,8 @@ struct FEngineLight
                            // DAT_006164e8 = count). Linked (Flags bit 4) by EngineLightApplyNearby
                            // (FUN_004104e0), unlinked by the dtor / Unregister / ClearList.
     FD3dLight8 D3d;       // +0x0C
-    float Orient[9];      // +0x74 3x3, identity from the ctor
-    float Position[3];    // +0x98
+    Matrix Orient;        // +0x74 3x3, identity from the ctor
+    Vector Position;      // +0x98
     float Color[3];       // +0xA4 mirror of D3d.Diffuse rgb, 1.0 from the ctor
     int Type;             // +0xB0 1/2/3 kept, -2 kept, anything else becomes -1
     unsigned char Flags;  // +0xB4 bit 0 = dynamic light (EngineLightSetType; the nearby-light
@@ -105,7 +106,7 @@ void EngineLightInit(FEngineLight* Light, int LightType);
 void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source);
 // FUN_00410ef0 — world position. Also writes the D3DLIGHT8 Position with a negated Z for
 // every type but directional.
-void EngineLightSetPosition(FEngineLight* Light, float const* Pos3);
+void EngineLightSetPosition(FEngineLight* Light, Vector const* Pos3);
 // FUN_00410f60 — 3x3 orientation.
 void EngineLightSetOrientation(FEngineLight* Light, float const* Orient9);
 // FUN_00410dd0 — register with DALib::Pipeline (slot 73) and raise the enabled bit.
@@ -122,7 +123,7 @@ void EngineLightPushUpdate(FEngineLight* Light);
 // FUN_00410fe0 — combined "set orientation + position" from one {Orient[9], Pos[3]} block, in
 // that order (position first, then orientation) with the pipeline pushed after each half,
 // exactly like calling EngineLightSetPosition then EngineLightSetOrientation back to back.
-void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, float const* Pos3);
+void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, Vector const* Pos3);
 // FUN_004110c0 — set Flags bit 0 to bDynamic and the light type via the same switch as
 // EngineLightInit/EngineLightSetLight (StoreType, always touching D3d.Type). Retail callers pass
 // 1 for the lights of effects, explosions, equipment and projectile flashes, 0 for the
@@ -138,7 +139,7 @@ void EngineLightSetRadius(FEngineLight* Light, float Radius);
 // FUN_00411470 — set the light from a direction vector instead of a full orientation matrix:
 // derives D3d.Direction (non-point lights) and back-fills Orient's look column (Orient[2],
 // Orient[5], Orient[8]) from it, then pushes the update.
-void EngineLightSetDirection(FEngineLight* Light, float const* Dir3);
+void EngineLightSetDirection(FEngineLight* Light, Vector const* Dir3);
 // FUN_004114f0 and FUN_004115b0 — byte-triplet colour setters. Retail's two functions have
 // byte-identical bodies (Color + D3d.Diffuse.rgb from RGB/255, Diffuse.a=1, then push); kept as
 // two entry points since they're genuinely separate retail symbols/call sites.
@@ -150,10 +151,10 @@ void EngineLightSetConeAngle(FEngineLight* Light, float DegreesFullAngle);
 
 // FUN_00411350 — generic 3-float negate. Lives in EngineLight.cpp in retail (most callers are
 // outside this subsystem).
-void Vec3Negate(float* Out, float const* In);
+void Vec3Negate(Vector* Out, Vector const* In);
 // FUN_00410190 (thiscall on a 3-float vector) — sqrt((x*x + y*y) + z*z), left on the FPU
 // (so returned as double).
-double Vec3Length(float const* V);
+double Vec3Length(Vector const* V);
 // FUN_00411d60 — generic Out = Scalar * V.
 void ScaleVec3(float* Out, float const* V, float Scalar);
 // FUN_00411c50 — pack two nibbles into a byte-ish uint: *Out = (Lo & 0xF) | (Hi << 4). Purpose
@@ -169,7 +170,7 @@ float* EngineLightUnpackColorBytes(unsigned char const* Bytes3, float* OutRgb3);
 int EngineLightParseType(char const* Text);
 // FUN_00411f70 — write column 2 of a row-major 3x3 (elements 2, 5, 8). Also called from outside
 // the light code.
-void MatrixSetColumn2(float* Matrix9, float const* Vec3);
+void MatrixSetColumn2(Matrix* Matrix9, Vector const* Vec3);
 
 // The {length, text} buffer FUN_00411f00 fills from a C string (at most 0x7F characters).
 struct FLightCurveName
@@ -198,14 +199,14 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
 // forces theta/phi to pi for a point light, sets the position, then the orientation
 // LookMatrixYup(Orient * Direction3) through DAT_006799bc, then registers it (slot 1).
 FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
-                                float const* Direction3);
+                                Vector const* Direction);
 
 // The Thorn light-props block: 0x90 bytes at snap+0x44. Offsets recovered from the two
 // FUN_00556fd0 call sites: +0x0C is the light's local direction (turned
 // by the entity orientation in FUN_00556fd0) and +0x28 is the D3DLIGHT8 itself, which fills the
 // block exactly (0x28 + 0x68 = 0x90).
-FD3dLight8 const* ThornLightPropsD3d(float const* Props36);
-float const* ThornLightPropsTarget(float const* Props36);
+FD3dLight8 const* ThornLightPropsD3d(FThornLightProps const* Props);
+Vector const* ThornLightPropsTarget(FThornLightProps const* Props);
 // FUN_00557130 — release slot 0 and free.
 void EngineLightDestroy(FEngineLight* Light);
 // FUN_00410ba0 — vtable slot 0 itself, called with 1: the FUN_00410ab0 body (inlined in retail)
@@ -229,7 +230,7 @@ bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutCol
 
 // FUN_00411370 — unit direction toward Point (point/spot with flag bit1), else −Orient col2.
 // Optional OutDist receives |Point − Position| when Point != null.
-float* EngineLightComputeDirection(FEngineLight* Light, float* OutDir3, float const* Point,
+Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float const* Point,
                                    float* OutDist);
 
 // FUN_00410960 (__thiscall, RET 0x10) -- sample the light at Point. False, with nothing written,
@@ -400,7 +401,7 @@ extern I3DMathEngine* G_GameLightMath;
 FGameLight* GameLightConstruct(FGameLight* Light);
 
 // FUN_00537af0 — __cdecl
-FGameLight* GameLightCreatePoint(float const* Pos3, unsigned char const Rgb[3], float Range);
+FGameLight* GameLightCreatePoint(Vector const* Pos3, unsigned char const Rgb[3], float Range);
 
 // FUN_00538e80 — __cdecl; the first AnimationArch whose Name stricmps equal, else null.
 Light::AnimationArch* GameLightFindAnimByName(char const* Name);

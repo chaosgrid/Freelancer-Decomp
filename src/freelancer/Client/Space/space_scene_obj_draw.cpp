@@ -652,8 +652,8 @@ namespace
             int Record[5];
             Record[0] = 0;
             Record[1] = static_cast<int>(reinterpret_cast<uintptr_t>(Light));
-            Record[2] = static_cast<int>(Light->Position[0]);
-            Record[3] = static_cast<int>(Light->Position[2]);
+            Record[2] = static_cast<int>(Light->Position.x);
+            Record[3] = static_cast<int>(Light->Position.z);
             Record[4] = static_cast<int>(Light->D3d.Range);
             LightGridInsert(&G_LightGridRoot, Record);
         }
@@ -2119,7 +2119,7 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
 }
 
 unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
-                                  unsigned CachedLod, void* Matrix, void* Extra)
+                                  unsigned CachedLod, Transform const* Xform, void* Extra)
 {
     // FUN_00539980
     Self->PreSubmitDraw();
@@ -2168,10 +2168,10 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     if (Lo == 4 && Hi <= 0)
         Flags |= 0x100u;
 
-    void* SubmitMatrix = nullptr;
-    if (Matrix != nullptr)
+    Transform const* SubmitXform = nullptr;
+    if (Xform != nullptr)
     {
-        SubmitMatrix = Matrix;
+        SubmitXform = Xform;
         Flags |= 0x120u;
     }
 
@@ -2200,7 +2200,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
 
     // Renderer Slot7; no test of the renderer.
     int const Result = DALib::Renderer->RenderInstance(Camera, static_cast<intptr_t>(Inst),
-                                              1.0f, Flags, SubmitMatrix, Extra);
+                                              1.0f, Flags, SubmitXform, Extra);
 
     // Signed compare.
     if (Result >= 3)
@@ -2223,7 +2223,7 @@ namespace
 }
 
 unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod, void* Camera,
-                                      unsigned CachedLod, void* Matrix, void* Extra)
+                                      unsigned CachedLod, Transform const* Xform, void* Extra)
 {
     // FUN_00533780. Retail also tests `this` for null; a virtual call cannot arrive with a null
     // `this`. The CEqObj's +0x140 is read with no test; not above 0 (NaN included) takes the
@@ -2258,7 +2258,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
     }
 
     // FUN_00539980 called directly (not through the vtable), Extra as possibly rewritten above.
-    GameobjSubmitDrawRetail(Self, OutLod, Camera, CachedLod, Matrix, Extra);
+    GameobjSubmitDrawRetail(Self, OutLod, Camera, CachedLod, Xform, Extra);
     return OutLod;
 }
 

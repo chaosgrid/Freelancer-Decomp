@@ -239,9 +239,8 @@ GENRESULT DACOM_API FThornCompound::DisconnectHardpoints(void* DescArg)
 // LAB_00451b90. A world-space answer (no script-frame conversion). The Petal-bug WARNING branch
 // is unreachable: it needs an empty name, which the second stricmp has already taken.
 GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const* Name,
-                                                      float* OutXform12)
+                                                      Transform* Out)
 {
-    Transform* Out = reinterpret_cast<Transform*>(OutXform12);
     if (TargetType != 0)
     {
         if (TargetType == 2)
@@ -301,7 +300,7 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
 // LAB_00451660. Position first, then orientation, then Engine slot 27.
 GENRESULT DACOM_API FThornCompound::SetTransform(const Transform* Transform12)
 {
-    Transform const* In = reinterpret_cast<Transform const*>(Transform12);
+    Transform const* In = Transform12;
     Local.Pos = In->Translation;
     Local.Orient = In->Rotation;
     Vector const World = InstancePosFromLocal(*this);
@@ -319,7 +318,7 @@ GENRESULT DACOM_API FThornCompound::SetTransform(const Transform* Transform12)
 // LAB_00451a00.
 GENRESULT DACOM_API FThornCompound::GetTransform(Transform* OutTransform12)
 {
-    Transform* Out = reinterpret_cast<Transform*>(OutTransform12);
+    Transform* Out = OutTransform12;
     Vector Pos;
     Matrix Orient;
     LocalFromInstance(*this, Pos, Orient);
@@ -331,7 +330,7 @@ GENRESULT DACOM_API FThornCompound::GetTransform(Transform* OutTransform12)
 // LAB_004514f0.
 GENRESULT DACOM_API FThornCompound::SetPosition(const Vector* Position)
 {
-    Local.Pos = *reinterpret_cast<Vector const*>(Position);
+    Local.Pos = *Position;
     Vector const World = InstancePosFromLocal(*this);
     const InstanceIndex Inst = Instance;
     Vector EnginePos = Frame.trans_from_frame(World);
@@ -343,7 +342,7 @@ GENRESULT DACOM_API FThornCompound::SetPosition(const Vector* Position)
 // LAB_004515b0.
 GENRESULT DACOM_API FThornCompound::SetOrientation(const Matrix* Orient9)
 {
-    Local.Orient = *reinterpret_cast<Matrix const*>(Orient9);
+    Local.Orient = *Orient9;
     Matrix EngineOrient = Frame.trans_from_frame(InstanceOrientFromLocal(*this));
     const InstanceIndex Inst = Instance;
     DALib::Engine->SetInstanceOrientation(Inst, &EngineOrient);
@@ -357,7 +356,7 @@ GENRESULT DACOM_API FThornCompound::GetPosition(Vector* OutPosition)
     Vector Pos;
     Matrix Orient;
     LocalFromInstance(*this, Pos, Orient);
-    *reinterpret_cast<Vector*>(OutPosition) = Pos;
+    *OutPosition = Pos;
     return GR_OK;
 }
 
@@ -371,7 +370,7 @@ GENRESULT DACOM_API FThornCompound::GetOrientation(Matrix* OutOrient9)
     Matrix Product;
     ThornCompoundMath()->MulMatrix(Product, AsMathMatrix(LocalOrient),
                                    AsMathMatrix(OffsetTransposed));
-    *reinterpret_cast<Matrix*>(OutOrient9) = AsMatrix(Product);
+    *OutOrient9 = AsMatrix(Product);
     return GR_OK;
 }
 

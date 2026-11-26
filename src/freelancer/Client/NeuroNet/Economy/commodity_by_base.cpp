@@ -376,11 +376,11 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
     SortColumn = 0;
 
     SetMesh(kCommodityByBaseMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
 
-    float const TitlePosition[3] = {NnFloatBits(0xbed58106), NnFloatBits(0x3e841893), 0.0f};
+    Vector const TitlePosition = {NnFloatBits(0xbed58106), NnFloatBits(0x3e841893), 0.0f};
     WinControl* const Title = CreateTextControl(
-        "CommodityByBaseTitle", "PageHeader", TitlePosition, nullptr, NnFloatBits(0x3f5645a2),
+        "CommodityByBaseTitle", "PageHeader", &TitlePosition, nullptr, NnFloatBits(0x3f5645a2),
         NnFloatBits(0x3d75c28f), NnFloatBits(0x3fc00000), 0, 1, 0, 1);
 
     // ids 0x3d5, then " - " and the equipment's name when the archetype is equipment.
@@ -402,38 +402,38 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
     Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 
     {
-        float const Position[3] = {NnFloatBits(0x3ecd4fdf), NnFloatBits(0x3e72b021), 0.0f};
-        float const Extents[3] = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
+        Vector const Position = {NnFloatBits(0x3ecd4fdf), NnFloatBits(0x3e72b021), 0.0f};
+        Vector const Extents = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
         CloseButton = CreateButtonControl("CommodityByBaseCloseButton", kCommodityByBaseCloseMesh,
-                                          nullptr, "ui_select_item", nullptr, Position, nullptr,
-                                          Extents, 0, 0, 0, 0, 0x409, 0, 0);
+                                          nullptr, "ui_select_item", nullptr, &Position, nullptr,
+                                          &Extents, 0, 0, 0, 0, 0x409, 0, 0);
     }
 
     // The four column titles; SetProperty is called without a null test.
     {
-        float const Position[3] = {kCbbPriceX, kCbbTitleY, 0.0f};
-        PriceTitle = CreateTextControl("CommodityByBasePriceTitle", "SubHeader", Position, nullptr,
+        Vector const Position = {kCbbPriceX, kCbbTitleY, 0.0f};
+        PriceTitle = CreateTextControl("CommodityByBasePriceTitle", "SubHeader", &Position, nullptr,
                                        kCbbPriceWidth, kCbbTextHeight,
                                        kCbbFontScale, 0x3d6, 0, 0, 1);
         PriceTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
-        float const Position[3] = {kCbbBaseX, kCbbTitleY, 0.0f};
-        BaseTitle = CreateTextControl("CommodityByBaseBaseTitle", "SubHeader", Position, nullptr,
+        Vector const Position = {kCbbBaseX, kCbbTitleY, 0.0f};
+        BaseTitle = CreateTextControl("CommodityByBaseBaseTitle", "SubHeader", &Position, nullptr,
                                       kCbbBaseWidth, kCbbTextHeight,
                                       kCbbFontScale, 0x3cc, 0, 0, 1);
         BaseTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
-        float const Position[3] = {kCbbSystemX, kCbbTitleY, 0.0f};
-        SystemTitle = CreateTextControl("CommodityByBaseSystemTitle", "SubHeader", Position,
+        Vector const Position = {kCbbSystemX, kCbbTitleY, 0.0f};
+        SystemTitle = CreateTextControl("CommodityByBaseSystemTitle", "SubHeader", &Position,
                                         nullptr, kCbbSystemWidth, kCbbTextHeight,
                                         kCbbFontScale, 0x3cd, 0, 0, 1);
         SystemTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
-        float const Position[3] = {kCbbBuySellX, kCbbTitleY, 0.0f};
-        BuySellTitle = CreateTextControl("CommodityByBaseBuySellTitle", "SubHeader", Position,
+        Vector const Position = {kCbbBuySellX, kCbbTitleY, 0.0f};
+        BuySellTitle = CreateTextControl("CommodityByBaseBuySellTitle", "SubHeader", &Position,
                                          nullptr, kCbbPriceWidth, kCbbTextHeight,
                                          kCbbFontScale, 0x3d8, 0, 0, 1);
         BuySellTitle->SetProperty(kTextPropClickable, 1, 0);
@@ -452,38 +452,38 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
         FCommodityByBaseRowControls& Controls = Rows[Line];
 
         sprintf(Name, "CommodityByBasePrice%d", Line);
-        float const PricePosition[3] = {kCbbPriceX, Y, 0.0f};
-        Controls.Price = CreateTextControl(Name, "ItemName", PricePosition, nullptr,
+        Vector const PricePosition = {kCbbPriceX, Y, 0.0f};
+        Controls.Price = CreateTextControl(Name, "ItemName", &PricePosition, nullptr,
                                            kCbbPriceWidth, kCbbTextHeight,
                                            kCbbFontScale, 0, 0, 0, 1);
         Controls.Price->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBuySellPrice%d", Line);
-        float const BuySellPosition[3] = {kCbbBuySellX, Y, 0.0f};
-        Controls.BuySell = CreateTextControl(Name, "ItemName", BuySellPosition, nullptr,
+        Vector const BuySellPosition = {kCbbBuySellX, Y, 0.0f};
+        Controls.BuySell = CreateTextControl(Name, "ItemName", &BuySellPosition, nullptr,
                                              kCbbPriceWidth, kCbbTextHeight,
                                              kCbbFontScale, 0, 0, 0, 1);
         Controls.BuySell->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBaseBase%d", Line);
-        float const BasePosition[3] = {kCbbBaseX, Y, 0.0f};
-        Controls.Base = CreateTextControl(Name, "ItemName", BasePosition, nullptr,
+        Vector const BasePosition = {kCbbBaseX, Y, 0.0f};
+        Controls.Base = CreateTextControl(Name, "ItemName", &BasePosition, nullptr,
                                           kCbbBaseWidth, kCbbTextHeight,
                                           kCbbFontScale, 0, 0, 0, 1);
         Controls.Base->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBaseSystem%d", Line);
-        float const SystemPosition[3] = {kCbbSystemX, Y, 0.0f};
-        Controls.System = CreateTextControl(Name, "ItemName", SystemPosition, nullptr,
+        Vector const SystemPosition = {kCbbSystemX, Y, 0.0f};
+        Controls.System = CreateTextControl(Name, "ItemName", &SystemPosition, nullptr,
                                             kCbbSystemWidth, kCbbTextHeight,
                                             kCbbFontScale, 0, 0, 0, 1);
         Controls.System->SetProperty(kTextPropClickable, 1, 0);
     }
 
     {
-        float const Position[3] = {NnFloatBits(0x3ec83127), NnFloatBits(0x3e6d9168),
-                                   NnFloatBits(0xbfa4dd2f)};
-        Scroll = CreateUIScroll("CommodityByBaseScroll", Position, NnFloatBits(0x3c9ba5e3),
+        Vector const Position = {NnFloatBits(0x3ec83127), NnFloatBits(0x3e6d9168),
+                                 NnFloatBits(0xbfa4dd2f)};
+        Scroll = CreateUIScroll("CommodityByBaseScroll", &Position, NnFloatBits(0x3c9ba5e3),
                                 NnFloatBits(0x3ecfdf3b), 0, 5, 3, 0);
     }
 
@@ -497,7 +497,7 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
 
     RegisterEvent(USER_CANCEL);
     SetOffset(0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f));
-    SetPosition(&Position.x);
+    SetPosition(&Position);
 
     // FUN_004b5060 with the window's current parent and no data, not Create's arguments.
     return Win3D::Create(Parent, nullptr);
@@ -654,10 +654,10 @@ void NnCommodityByBase::Update()
     double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
                                   static_cast<double>(World.y) * World.y +
                                   static_cast<double>(World.z) * World.z);
-    float Ray[3];
-    Ray[0] = static_cast<float>(World.x * Inv);
-    Ray[1] = static_cast<float>(World.y * Inv);
-    Ray[2] = static_cast<float>(World.z * Inv);
+    Vector Ray;
+    Ray.x = static_cast<float>(World.x * Inv);
+    Ray.y = static_cast<float>(World.y * Inv);
+    Ray.z = static_cast<float>(World.z * Inv);
 
     // Column titles: the sorted column is amber (DAT_00679ba4), one under the mouse pulses.
     WinControl* const Titles[5] = {nullptr, PriceTitle, BaseTitle, SystemTitle, BuySellTitle};
@@ -671,7 +671,7 @@ void NnCommodityByBase::Update()
         {
             Color = G_NnPaletteAmber;
         }
-        else if (Title->HitTest(Ray))
+        else if (Title->HitTest(&Ray))
         {
             unsigned long Pulse = 0;
             NnUiPulseBlendArgb(&Pulse);
@@ -688,8 +688,8 @@ void NnCommodityByBase::Update()
         if (Controls.Base == nullptr || (Controls.Base->Flags & kWin3DVisible) == 0)
             continue;
         unsigned long Color = G_NnPaletteCyan;
-        if (Controls.Base->HitTest(Ray) || Controls.BuySell->HitTest(Ray) ||
-            Controls.Price->HitTest(Ray) || Controls.System->HitTest(Ray))
+        if (Controls.Base->HitTest(&Ray) || Controls.BuySell->HitTest(&Ray) ||
+            Controls.Price->HitTest(&Ray) || Controls.System->HitTest(&Ray))
         {
             unsigned long Pulse = 0;
             NnUiPulseBlendArgb(&Pulse);

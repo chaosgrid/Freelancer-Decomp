@@ -336,7 +336,7 @@ unsigned long FAnimPlayback::HasTyped(void* Object)
 }
 
 // FUN_066122d0.
-unsigned long FAnimPlayback::TouchMappedTyped(void* OutPos, void* OutSampledPos)
+unsigned long FAnimPlayback::TouchMappedTyped(Vector* OutPos, Vector* OutSampledPos)
 {
     std::vector<FTypedChannel*>::iterator Cursor = this->Typed.begin();
     while (Cursor != this->Typed.end())
@@ -547,7 +547,7 @@ static unsigned long PlaybackDurationsDiffer(FAnimPlayback* Playback)
 // after Rate arrive as raw dwords and are stored bit for bit.
 unsigned long FAnimPlayback::EvalTyped(unsigned long Flags, float Start, float Speed,
                                        unsigned long BlendDurationBits, unsigned long ScaleBits,
-                                       unsigned long TranslationScaleBits, const float* Transform)
+                                       unsigned long TranslationScaleBits, const ::Transform* Transform)
 {
     // Flags bit 0 means reverse.
     const long Sign = (Flags & 1) == 0 ? 1 : -1;

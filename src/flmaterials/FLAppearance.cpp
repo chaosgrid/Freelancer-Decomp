@@ -103,12 +103,12 @@ namespace
         {
             IdentityTransform(CameraTransform_);
             IdentityTransform(ViewTransform_);
-            SidePlaneX_[0] = 1.0f;
-            SidePlaneX_[1] = 0.0f;
-            SidePlaneX_[2] = 0.0f;
-            SidePlaneY_[0] = 0.0f;
-            SidePlaneY_[1] = 1.0f;
-            SidePlaneY_[2] = 0.0f;
+            SidePlaneX_.x = 1.0f;
+            SidePlaneX_.y = 0.0f;
+            SidePlaneX_.z = 0.0f;
+            SidePlaneY_.x = 0.0f;
+            SidePlaneY_.y = 1.0f;
+            SidePlaneY_.z = 0.0f;
         }
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
@@ -206,29 +206,29 @@ namespace
         }
 
         // +0x34 LAB_066fddc0 RET 0x14: tail-call inner Project.
-        virtual int DACOM_API Project(float* OutX, float* OutY, float* OutZ, float const* World)
+        virtual int DACOM_API Project(float* OutX, float* OutY, float* OutZ, const Vector* World)
         {
-            return Inner_->Project(OutX, OutY, OutZ, (const Vector*)World);
+            return Inner_->Project(OutX, OutY, OutZ, World);
         }
 
         // +0x38 LAB_066fddd0 RET 0x10: tail-call inner Unproject.
-        virtual void DACOM_API Unproject(float* OutWorld3, float ScreenX, float ScreenY)
+        virtual void DACOM_API Unproject(Vector* OutWorld3, float ScreenX, float ScreenY)
         {
-            Inner_->Unproject((Vector*)OutWorld3, ScreenX, ScreenY);
+            Inner_->Unproject(OutWorld3, ScreenX, ScreenY);
         }
 
         // +0x3C LAB_066fddf0 RET 0xC. Byte+8 clear forwards ClassifySphere. Byte+8 set
         // classifies against this object's near/far and the axes at +0x6C/+0x78.
-        virtual int DACOM_API ClassifySphere(float const* Center, float Radius)
+        virtual int DACOM_API ClassifySphere(const Vector* Center, float Radius)
         {
             if (bBackdropClip_ == 0)
-                return Inner_->ClassifySphere((const Vector*)Center, Radius);
+                return Inner_->ClassifySphere(Center, Radius);
 
             const float ZNear = GetZNear();
             const float ZFar = GetZFar();
-            const float Cx = Center[0];
-            const float Cy = Center[1];
-            const float Cz = Center[2];
+            const float Cx = Center->x;
+            const float Cy = Center->y;
+            const float Cz = Center->z;
 
             if (((double)Radius - ZNear) < Cz)
                 return 1;
@@ -241,15 +241,15 @@ namespace
             if (!(((double)Radius - ZFar) < Cz))
                 Rank = 3;
 
-            const double SumX = std::fabs((double)Cx) * SidePlaneX_[0]
-                + (double)Cz * SidePlaneX_[2];
+            const double SumX = std::fabs((double)Cx) * SidePlaneX_.x
+                + (double)Cz * SidePlaneX_.z;
             if (SumX > Radius)
                 return 1;
             if (!(SumX < -Radius))
                 Rank = 3;
 
-            const double SumY = std::fabs((double)Cy) * SidePlaneY_[1]
-                + (double)Cz * SidePlaneY_[2];
+            const double SumY = std::fabs((double)Cy) * SidePlaneY_.y
+                + (double)Cz * SidePlaneY_.z;
             if (SumY > Radius)
                 return 1;
             if (SumY < -Radius)
@@ -283,18 +283,18 @@ namespace
         unsigned char OwnTransform() const { return bOwnTransform_; }
         float* CameraTransform() { return CameraTransform_; }
         float* ViewTransform() { return ViewTransform_; }
-        float* SidePlaneX() { return SidePlaneX_; }
-        float* SidePlaneY() { return SidePlaneY_; }
+        Vector* SidePlaneX() { return &SidePlaneX_; }
+        Vector* SidePlaneY() { return &SidePlaneY_; }
         ICamera* Inner() const { return Inner_; }
 
         // FUN_066fe700: 9 floats from the orientation, then 3 from the second pointer, at +0x24.
-        void SetOrientationAndTranslation(const float* Matrix9, const float* Translation)
+        void SetOrientationAndTranslation(const float* Matrix9, const Vector* Translation)
         {
             for (int Index = 0; Index < 9; ++Index)
                 CameraTransform_[Index] = Matrix9[Index];
-            CameraTransform_[9] = Translation[0];
-            CameraTransform_[10] = Translation[1];
-            CameraTransform_[11] = Translation[2];
+            CameraTransform_[9] = Translation->x;
+            CameraTransform_[10] = Translation->y;
+            CameraTransform_[11] = Translation->z;
         }
 
         // FUN_066fe4b0: preserve source; write inverse to the separate output transform.
@@ -303,9 +303,9 @@ namespace
             if (G_MathEngine == nullptr)
                 G_MathEngine = FlmCreateMathEngine();
             I3DMathEngine* Math = G_MathEngine;
-            float Dest[3];
+            Vector Dest;
             // These references view float storage without a numeric conversion.
-            Math->TransposeTransform(reinterpret_cast<Vector&>(Dest[0]),
+            Math->TransposeTransform(Dest,
                                      reinterpret_cast<const Matrix&>(CameraTransform_[0]),
                                      reinterpret_cast<const Vector&>(CameraTransform_[9]));
             float Transposed[12];
@@ -318,9 +318,9 @@ namespace
             Transposed[6] = CameraTransform_[2];
             Transposed[7] = CameraTransform_[5];
             Transposed[8] = CameraTransform_[8];
-            Transposed[9] = -Dest[0];
-            Transposed[10] = -Dest[1];
-            Transposed[11] = -Dest[2];
+            Transposed[9] = -Dest.x;
+            Transposed[10] = -Dest.y;
+            Transposed[11] = -Dest.z;
             for (int Index = 0; Index < 12; ++Index)
                 OutTransform[Index] = Transposed[Index];
         }
@@ -335,8 +335,8 @@ namespace
         unsigned char Pad1_;
         float CameraTransform_[12]; // +0x0C: orientation 3x3, then position
         float ViewTransform_[12];   // +0x3C: inverse of CameraTransform_
-        float SidePlaneX_[3];       // +0x6C: unit normal of the left/right frustum planes
-        float SidePlaneY_[3];       // +0x78: unit normal of the top/bottom frustum planes
+        Vector SidePlaneX_;         // +0x6C: unit normal of the left/right frustum planes
+        Vector SidePlaneY_;         // +0x78: unit normal of the top/bottom frustum planes
         unsigned long RefCount_;
     };
 
@@ -750,11 +750,11 @@ namespace
         PipelineSetPerspective(Pipeline, Fov, Aspect, NearPlane, FarPlane);
     }
 
-    double CameraAxisLength(const float* Axis) // FUN_066fe480
+    double CameraAxisLength(const Vector* Axis) // FUN_066fe480
     {
-        const double X = Axis[0];
-        const double Y = Axis[1];
-        const double Z = Axis[2];
+        const double X = Axis->x;
+        const double Y = Axis->y;
+        const double Z = Axis->z;
         return std::sqrt((X * X + Y * Y) + Z * Z);
     }
 
@@ -765,22 +765,22 @@ namespace
         const float HalfWidth = (float)((double)Width * kHalf);
         const float Horizontal = (float)((double)HalfWidth / Camera->GetXScaleOverNear());
         const float Vertical = (float)((double)Horizontal / Camera->GetAspect());
-        float* Right = Camera->SidePlaneX();
-        Right[0] = 1.0f;
-        Right[1] = 0.0f;
-        Right[2] = Horizontal;
+        Vector* Right = Camera->SidePlaneX();
+        Right->x = 1.0f;
+        Right->y = 0.0f;
+        Right->z = Horizontal;
         const double RightScale = (double)kCameraNearConst / CameraAxisLength(Right);
-        Right[0] = (float)(RightScale * Right[0]);
-        Right[1] = (float)(RightScale * Right[1]);
-        Right[2] = (float)(RightScale * Right[2]);
-        float* Up = Camera->SidePlaneY();
-        Up[0] = 0.0f;
-        Up[1] = 1.0f;
-        Up[2] = Vertical;
+        Right->x = (float)(RightScale * Right->x);
+        Right->y = (float)(RightScale * Right->y);
+        Right->z = (float)(RightScale * Right->z);
+        Vector* Up = Camera->SidePlaneY();
+        Up->x = 0.0f;
+        Up->y = 1.0f;
+        Up->z = Vertical;
         const double UpScale = (double)kCameraNearConst / CameraAxisLength(Up);
-        Up[0] = (float)(UpScale * Up[0]);
-        Up[1] = (float)(UpScale * Up[1]);
-        Up[2] = (float)(UpScale * Up[2]);
+        Up->x = (float)(UpScale * Up->x);
+        Up->y = (float)(UpScale * Up->y);
+        Up->z = (float)(UpScale * Up->z);
     }
 
     class FAppearanceRenderStateScope
@@ -1112,8 +1112,8 @@ namespace
         FillLocalAxes(Camera);
         if (Camera->OwnTransform() != 0)
         {
-            const float Translation[3] = {};
-            Camera->SetOrientationAndTranslation((const float*)((ICamera*)A)->GetOrientation(), Translation);
+            const Vector Translation = {};
+            Camera->SetOrientationAndTranslation((const float*)((ICamera*)A)->GetOrientation(), &Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
             float* Dest = Camera->ViewTransform();
@@ -1145,11 +1145,11 @@ namespace
         Camera->BindArg(A, 0, 1);
         {
             const float* Orientation = (const float*)((ICamera*)A)->GetOrientation();
-            float Translation[3];
-            Translation[0] = 0.0f;
-            Translation[1] = 0.0f;
-            Translation[2] = 0.0f;
-            Camera->SetOrientationAndTranslation(Orientation, Translation);
+            Vector Translation;
+            Translation.x = 0.0f;
+            Translation.y = 0.0f;
+            Translation.z = 0.0f;
+            Camera->SetOrientationAndTranslation(Orientation, &Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
             float* Dest = Camera->ViewTransform();

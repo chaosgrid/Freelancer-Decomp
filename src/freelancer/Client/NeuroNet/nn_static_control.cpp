@@ -88,9 +88,9 @@ namespace
     {
         float Transform[12];
         SetIdentityTransform(Transform);
-        Transform[9] = Self->Offset[0] + Self->Position.x;
-        Transform[10] = Self->Offset[1] + Self->Position.y;
-        Transform[11] = Self->Offset[2] + Self->Position.z;
+        Transform[9] = Self->Offset.x + Self->Position.x;
+        Transform[10] = Self->Offset.y + Self->Position.y;
+        Transform[11] = Self->Offset.z + Self->Position.z;
         DALib::Engine->SetInstanceMatrix(Self->MeshHolder.EngineInstance, (const ::Transform*)Transform);
         DALib::Engine->UpdateInstance(Self->MeshHolder.EngineInstance, 0, nullptr);
     }
@@ -98,14 +98,14 @@ namespace
     // One plane rotation of the three rows of a 3x3, as SetOrientation and the angle
     // properties unroll it. SetOrientation and the first turn of each property round C to a
     // float first; the second turn of each property keeps both at full precision.
-    void RotateColumns(float* M, int ColA, int ColB, double C, double S)
+    void RotateColumns(Matrix* M, int ColA, int ColB, double C, double S)
     {
         for (int Row = 0; Row < 3; ++Row)
         {
-            double const A = M[Row * 3 + ColA];
-            double const B = M[Row * 3 + ColB];
-            M[Row * 3 + ColA] = static_cast<float>(C * A + S * B);
-            M[Row * 3 + ColB] = static_cast<float>(C * B - S * A);
+            double const A = M->E[Row][ColA];
+            double const B = M->E[Row][ColB];
+            M->E[Row][ColA] = static_cast<float>(C * A + S * B);
+            M->E[Row][ColB] = static_cast<float>(C * B - S * A);
         }
     }
 
@@ -123,14 +123,14 @@ namespace
     void TurnInstanceAngle(NnStaticControl* Self, int ColA, int ColB, float OldAngle,
                            float NewAngle)
     {
-        float Transform[12];
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(Self->MeshHolder.EngineInstance),
-               sizeof(Transform));
+        Transform Xform;
+        memcpy(&Xform, DALib::Engine->GetInstanceTransform(Self->MeshHolder.EngineInstance),
+               sizeof(Xform));
         double const Back = -static_cast<double>(OldAngle);
-        RotateColumns(Transform, ColA, ColB, static_cast<float>(cos(Back)), sin(Back));
+        RotateColumns(&Xform.Rotation, ColA, ColB, static_cast<float>(cos(Back)), sin(Back));
         double const Forward = static_cast<double>(NewAngle);
-        RotateColumns(Transform, ColA, ColB, cos(Forward), sin(Forward));
-        DALib::Engine->SetInstanceMatrix(Self->MeshHolder.EngineInstance, (const ::Transform*)Transform);
+        RotateColumns(&Xform.Rotation, ColA, ColB, cos(Forward), sin(Forward));
+        DALib::Engine->SetInstanceMatrix(Self->MeshHolder.EngineInstance, &Xform);
         DALib::Engine->UpdateInstance(Self->MeshHolder.EngineInstance, 0, nullptr);
     }
 
@@ -189,27 +189,27 @@ NnStaticControl::~NnStaticControl()
     // FUN_00587f60. Nothing to free.
 }
 
-void NnStaticControl::SetPosition(float const* NewPosition)
+void NnStaticControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_005896b0 (RET 4).
-    RequestedPosition[0] = NewPosition[0];
-    RequestedPosition[1] = NewPosition[1];
-    RequestedPosition[2] = NewPosition[2];
+    RequestedPosition.x = NewPosition->x;
+    RequestedPosition.y = NewPosition->y;
+    RequestedPosition.z = NewPosition->z;
 
     float Placed[3];
     if ((PositionFlags & 1) != 0)
     {
         Vector Attach;
         GetAttachPosition(&Attach); // slot 41
-        Placed[0] = Attach.x + NewPosition[0];
-        Placed[1] = Attach.y + NewPosition[1];
-        Placed[2] = Attach.z + NewPosition[2];
+        Placed[0] = Attach.x + NewPosition->x;
+        Placed[1] = Attach.y + NewPosition->y;
+        Placed[2] = Attach.z + NewPosition->z;
     }
     else
     {
-        Placed[0] = NewPosition[0];
-        Placed[1] = NewPosition[1];
-        Placed[2] = NewPosition[2];
+        Placed[0] = NewPosition->x;
+        Placed[1] = NewPosition->y;
+        Placed[2] = NewPosition->z;
     }
     Position.x = Placed[0];
     Position.y = Placed[1];
@@ -217,25 +217,25 @@ void NnStaticControl::SetPosition(float const* NewPosition)
 
     if (HasInstance(this))
     {
-        float Instance[3];
+        Vector Instance;
         if ((PositionFlags & 1) != 0)
         {
-            Instance[0] = Position.x + Offset[0];
-            Instance[1] = Position.y + Offset[1];
-            Instance[2] = Position.z + Offset[2];
+            Instance.x = Position.x + Offset.x;
+            Instance.y = Position.y + Offset.y;
+            Instance.z = Position.z + Offset.z;
         }
         else
         {
-            Instance[0] = Position.x;
-            Instance[1] = Position.y;
-            Instance[2] = Position.z;
+            Instance.x = Position.x;
+            Instance.y = Position.y;
+            Instance.z = Position.z;
         }
-        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Instance);
+        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, &Instance);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
 
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
-        Child->SetPosition(&Position.x);
+        Child->SetPosition(&Position);
 }
 
 void NnStaticControl::SetOrientation(Matrix const* NewOrientation)
@@ -250,15 +250,15 @@ void NnStaticControl::SetOrientation(Matrix const* NewOrientation)
     if (!HasInstance(this))
         return;
 
-    float Turned[9];
-    memcpy(Turned, &Result, sizeof(Turned));
+    Matrix Turned;
+    memcpy(&Turned, &Result, sizeof(Turned));
     double const Pitch = static_cast<double>(CurPitch);
-    RotateColumns(Turned, 1, 2, static_cast<float>(cos(Pitch)), sin(Pitch));
+    RotateColumns(&Turned, 1, 2, static_cast<float>(cos(Pitch)), sin(Pitch));
     double const Yaw = static_cast<double>(CurYaw);
-    RotateColumns(Turned, 2, 0, static_cast<float>(cos(Yaw)), sin(Yaw));
+    RotateColumns(&Turned, 2, 0, static_cast<float>(cos(Yaw)), sin(Yaw));
     double const Roll = static_cast<double>(CurRoll);
-    RotateColumns(Turned, 0, 1, static_cast<float>(cos(Roll)), sin(Roll));
-    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, (const Matrix*)Turned); // +0x94
+    RotateColumns(&Turned, 0, 1, static_cast<float>(cos(Roll)), sin(Roll));
+    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, &Turned); // +0x94
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 
@@ -284,9 +284,9 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
                 float const Y = static_cast<float>(Ini->get_value_float(1));
                 float const X = static_cast<float>(Ini->get_value_float(0));
                 float const Z = static_cast<float>(Ini->get_value_float(2));
-                HalfExtents[0] = X;
-                HalfExtents[1] = Y;
-                HalfExtents[2] = Z;
+                HalfExtents.x = X;
+                HalfExtents.y = Y;
+                HalfExtents.z = Z;
                 continue;
             }
             if (Ini->is_value("offset"))
@@ -294,9 +294,9 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
                 float const Y = static_cast<float>(Ini->get_value_float(1));
                 float const X = static_cast<float>(Ini->get_value_float(0));
                 float const Z = static_cast<float>(Ini->get_value_float(2));
-                Offset[0] = X;
-                Offset[1] = Y;
-                Offset[2] = Z;
+                Offset.x = X;
+                Offset.y = Y;
+                Offset.z = Z;
                 if (HasInstance(this))
                     PlaceInstanceAtOffset(this);
                 continue;
@@ -396,7 +396,7 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
 
     // The parent is re-placed at its own position, which positions this control with it.
     if (Parent != nullptr)
-        Parent->SetPosition(&Parent->Position.x);
+        Parent->SetPosition(&Parent->Position);
     return true;
 }
 
@@ -487,39 +487,39 @@ void NnStaticControl::Draw()
 
     // The draw scale: "force_radius" over the instance's radius (Engine +0x88); 0 keeps 1.0.
     float Radius = 0.0f;
-    float Centre[3];
-    DALib::Engine->GetInstanceExtent(MeshHolder.EngineInstance, 0, &Radius, (Vector*)Centre);
+    Vector Centre;
+    DALib::Engine->GetInstanceExtent(MeshHolder.EngineInstance, 0, &Radius, &Centre);
     float Scale = 1.0f;
     if (ForceRadius != 0.0f)
         Scale = ForceRadius / Radius;
 
     FSpaceCamera* ViewCamera = Win3DGetCamera(); // DAT_0067dbf8
     int SavedViewport[4];
-    float Placed[3];
+    Vector Placed;
     if (bRenderToWindow != 0)
     {
         // The instance's box projected by the Win3D camera, truncated, shrunk by two pixels and
         // flipped in y; off-screen or clipped boxes draw nothing.
         Win3DGetViewport(0xba2, SavedViewport); // FUN_00422390
         float const* const At = (const float*)ClientMeshHolderGetPosition(&MeshHolder); // FUN_00420fb0
-        Placed[0] = At[0];
-        Placed[1] = At[1];
-        Placed[2] = At[2];
+        Placed.x = At[0];
+        Placed.y = At[1];
+        Placed.z = At[2];
         ICamera* const WinCamera = AsCamera(Win3DGetCamera());
         float X = 0.0f;
         float Y = 0.0f;
         float Z = 0.0f;
-        float Corner[3];
-        Corner[0] = Placed[0] - HalfExtents[0];
-        Corner[1] = Placed[1] - HalfExtents[1];
-        Corner[2] = Placed[2] - HalfExtents[2];
-        WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner); // camera slot 13 (+0x34)
+        Vector Corner;
+        Corner.x = Placed.x - HalfExtents.x;
+        Corner.y = Placed.y - HalfExtents.y;
+        Corner.z = Placed.z - HalfExtents.z;
+        WinCamera->Project(&X, &Y, &Z, &Corner); // camera slot 13 (+0x34)
         int Left = static_cast<int>(X);
         int Bottom = static_cast<int>(Y);
-        Corner[0] = Placed[0] + HalfExtents[0];
-        Corner[1] = Placed[1] + HalfExtents[1];
-        Corner[2] = Placed[2] + HalfExtents[2];
-        WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner);
+        Corner.x = Placed.x + HalfExtents.x;
+        Corner.y = Placed.y + HalfExtents.y;
+        Corner.z = Placed.z + HalfExtents.z;
+        WinCamera->Project(&X, &Y, &Z, &Corner);
         int Right = static_cast<int>(X);
         int Top = static_cast<int>(Y);
         if (Left < 0 || Top < 0 || Right < 0 || Bottom < 0)
@@ -545,8 +545,8 @@ void NnStaticControl::Draw()
 
         // The instance moved in front of the window camera, fitted to the rect with the Win3D
         // camera's near / far (FUN_0040fb60).
-        float const Behind[3] = {0.0f, 0.0f, kWindowDepth};
-        ClientMeshHolderSetPosition(&MeshHolder, Behind); // FUN_00420fd0
+        Vector const Behind = {0.0f, 0.0f, kWindowDepth};
+        ClientMeshHolderSetPosition(&MeshHolder, &Behind); // FUN_00420fd0
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
         SpaceCameraSetViewportEx(&Camera, Rect, 1); // FUN_0040fb80
         FSpaceCamera const* const SceneCamera = Win3DGetCamera();
@@ -576,7 +576,7 @@ void NnStaticControl::Draw()
                 StaticMathEngine()->Scale(*reinterpret_cast<Matrix*>(Scaled),
                                           *reinterpret_cast<Matrix const*>(Scaled), Scale);
                 DALib::Renderer->RenderInstance(ViewCamera, MeshHolder.EngineInstance, 1.0f, 0x30u,
-                                       Scaled, nullptr);
+                                       reinterpret_cast<Transform const*>(Scaled), nullptr);
             }
             else
             {
@@ -612,7 +612,7 @@ void NnStaticControl::Draw()
         Win3DApplyCamera(AsCamera(Win3DGetCamera())); // FUN_00422950(&DAT_0067dbf8)
         Win3DSetViewportRect(SavedViewport[0], SavedViewport[1], SavedViewport[2],
                              SavedViewport[3], kStaticControlCpp, 0x185); // FUN_00421620
-        ClientMeshHolderSetPosition(&MeshHolder, Placed);
+        ClientMeshHolderSetPosition(&MeshHolder, &Placed);
     }
     Win3DDisable(0xb71);
     PostDraw();
@@ -646,22 +646,22 @@ void NnStaticControl::ShowToolTip()
     Info.IdsAlt = ToolTipIds;
     if (HasInstance(this))
     {
-        float Transform[12];
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-               sizeof(Transform));
-        Info.WorldPos[0] = Transform[9];
-        Info.WorldPos[1] = Transform[10];
-        Info.WorldPos[2] = Transform[11];
+        Transform Xform;
+        memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+               sizeof(Xform));
+        Info.WorldPos[0] = Xform.Translation.x;
+        Info.WorldPos[1] = Xform.Translation.y;
+        Info.WorldPos[2] = Xform.Translation.z;
     }
     else
     {
-        Info.WorldPos[0] = Position.x + Offset[0];
-        Info.WorldPos[1] = Offset[1] + Position.y;
-        Info.WorldPos[2] = Offset[2] + Position.z;
+        Info.WorldPos[0] = Position.x + Offset.x;
+        Info.WorldPos[1] = Offset.y + Position.y;
+        Info.WorldPos[2] = Offset.z + Position.z;
     }
-    Info.HalfExtents[0] = HalfExtents[0];
-    Info.HalfExtents[1] = HalfExtents[1];
-    Info.HalfExtents[2] = HalfExtents[2];
+    Info.HalfExtents[0] = HalfExtents.x;
+    Info.HalfExtents[1] = HalfExtents.y;
+    Info.HalfExtents[2] = HalfExtents.z;
     Info.bLive = 1;
     NnToolTipFeedHover(&Info);
 }
@@ -748,23 +748,23 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 }
 
-void NnStaticControl::Init(char const* NewMeshPath, float const* NewOffset, char const* Hardpoint,
-                           float const* NewHalfExtents, unsigned char bNewNoZEnable,
+void NnStaticControl::Init(char const* NewMeshPath, Vector const* NewOffset, char const* Hardpoint,
+                           Vector const* NewHalfExtents, unsigned char bNewNoZEnable,
                            unsigned char bNewZClear, unsigned char bNewNoMeshRender,
                            unsigned char bNewNoWireRender, unsigned char bNewNoColoring,
                            unsigned char bNewRenderToWindow, unsigned char bNewNoClearRender,
                            int NewForceRadius, int NewRotationSpeed,
-                           unsigned char bNewEnableRotation, float const* NewStartYpr)
+                           unsigned char bNewEnableRotation, Vector const* NewStartYpr)
 {
     // FUN_00588540 (RET 0x3c).
     if (NewMeshPath != nullptr)
         SetMesh(NewMeshPath, 0); // slot 38
-    HalfExtents[0] = NewHalfExtents[0];
-    HalfExtents[1] = NewHalfExtents[1];
-    HalfExtents[2] = NewHalfExtents[2];
-    Offset[0] = NewOffset[0];
-    Offset[1] = NewOffset[1];
-    Offset[2] = NewOffset[2];
+    HalfExtents.x = NewHalfExtents->x;
+    HalfExtents.y = NewHalfExtents->y;
+    HalfExtents.z = NewHalfExtents->z;
+    Offset.x = NewOffset->x;
+    Offset.y = NewOffset->y;
+    Offset.z = NewOffset->z;
     if (HasInstance(this))
         PlaceInstanceAtOffset(this);
 
@@ -803,9 +803,9 @@ void NnStaticControl::Init(char const* NewMeshPath, float const* NewOffset, char
     bRenderToWindow = bNewRenderToWindow;
     bNoClearRender = bNewNoClearRender;
     bEnableRotation = bNewEnableRotation;
-    StartYpr[0] = NewStartYpr[0];
-    StartYpr[1] = NewStartYpr[1];
-    StartYpr[2] = NewStartYpr[2];
+    StartYpr[0] = NewStartYpr->x;
+    StartYpr[1] = NewStartYpr->y;
+    StartYpr[2] = NewStartYpr->z;
     CurYaw = StartYpr[0];
     CurPitch = StartYpr[1];
     CurRoll = StartYpr[2];

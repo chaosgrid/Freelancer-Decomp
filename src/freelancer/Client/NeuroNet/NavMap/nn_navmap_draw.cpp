@@ -293,12 +293,12 @@ namespace
     void BindMapModelview(NeuroNetNavMap const* Map, float Depth)
     {
         Transform Offset;
-        memcpy(&Offset.Rotation, Map->MapRotation, sizeof(Offset.Rotation));
+        memcpy(&Offset.Rotation, &Map->MapRotation, sizeof(Offset.Rotation));
         Offset.Translation.x = 0.0f;
         Offset.Translation.y = 0.0f;
         Offset.Translation.z = Depth;
         Transform Model;
-        memcpy(&Model.Rotation, Map->MapRotation, sizeof(Model.Rotation));
+        memcpy(&Model.Rotation, &Map->MapRotation, sizeof(Model.Rotation));
         Vector Zero;
         Zero.x = 0.0f;
         Zero.y = 0.0f;
@@ -831,34 +831,34 @@ void NeuroNetNavMap::Draw()
                 // The marker, then its number from the digit meshes
                 // at the marker's position -- one digit, or two either side.
                 DrawHolder(&Item->Mesh, &Camera, 0x308);
-                float Pos[3];
-                memcpy(Pos, Engine->GetInstancePosition(Item->Mesh.EngineInstance), sizeof(Pos));
+                Vector Pos;
+                memcpy(&Pos, Engine->GetInstancePosition(Item->Mesh.EngineInstance), sizeof(Pos));
                 if (Number < 10)
                 {
                     FClientMeshHolder* const Digit = &DigitMeshes[Number];
-                    Engine->SetInstancePosition(Digit->EngineInstance, (const Vector*)Pos);       // slot 35
+                    Engine->SetInstancePosition(Digit->EngineInstance, &Pos);       // slot 35
                     Engine->UpdateInstance(Digit->EngineInstance, 0, nullptr);
                     DrawHolder(Digit, &Camera, 0x308);
                     continue;
                 }
                 int const Tens = Number / 10; // IDIV 10
                 int const Ones = Number % 10;
-                float Left3[3];
-                Left3[0] = static_cast<float>(static_cast<double>(Pos[0]) -
+                Vector Left3;
+                Left3.x = static_cast<float>(static_cast<double>(Pos.x) -
                                               static_cast<double>(kNavMapDigitHalfGap));
-                Left3[1] = Pos[1];
-                Left3[2] = Pos[2];
+                Left3.y = Pos.y;
+                Left3.z = Pos.z;
                 FClientMeshHolder* const TensDigit = &DigitMeshes[Tens];
-                Engine->SetInstancePosition(TensDigit->EngineInstance, (const Vector*)Left3);
+                Engine->SetInstancePosition(TensDigit->EngineInstance, &Left3);
                 Engine->UpdateInstance(TensDigit->EngineInstance, 0, nullptr);
                 DrawHolder(TensDigit, &Camera, 0x308);
-                float Right3[3];
-                Right3[0] = static_cast<float>(static_cast<double>(Pos[0]) +
+                Vector Right3;
+                Right3.x = static_cast<float>(static_cast<double>(Pos.x) +
                                                static_cast<double>(kNavMapDigitHalfGap));
-                Right3[1] = Pos[1];
-                Right3[2] = Pos[2];
+                Right3.y = Pos.y;
+                Right3.z = Pos.z;
                 FClientMeshHolder* const OnesDigit = &DigitMeshes[Ones];
-                Engine->SetInstancePosition(OnesDigit->EngineInstance, (const Vector*)Right3);
+                Engine->SetInstancePosition(OnesDigit->EngineInstance, &Right3);
                 Engine->UpdateInstance(OnesDigit->EngineInstance, 0, nullptr);
                 DrawHolder(OnesDigit, &Camera, 0x308);
             }
@@ -993,10 +993,10 @@ void NeuroNetNavMap::Draw()
                                    static_cast<double>(Rotated.y) * static_cast<double>(Rotated.y) +
                                    static_cast<double>(Rotated.z) * static_cast<double>(Rotated.z));
         double const InvLength = 1.0 / Length; // FDIVR DAT_005c75dc
-        float Ray[3];
-        Ray[0] = static_cast<float>(static_cast<double>(Rotated.x) * InvLength);
-        Ray[1] = static_cast<float>(static_cast<double>(Rotated.y) * InvLength);
-        Ray[2] = static_cast<float>(static_cast<double>(Rotated.z) * InvLength);
+        Vector Ray;
+        Ray.x = static_cast<float>(static_cast<double>(Rotated.x) * InvLength);
+        Ray.y = static_cast<float>(static_cast<double>(Rotated.y) * InvLength);
+        Ray.z = static_cast<float>(static_cast<double>(Rotated.z) * InvLength);
 
         // The fifteen base rows -- both halves shown, pulsed when the
         // ray hits either (slot 4), coloured through SetProperty(0x33, &colour, 1), drawn.
@@ -1009,7 +1009,7 @@ void NeuroNetNavMap::Draw()
             if (SystemText == nullptr || !IsShown(SystemText))
                 continue;
             unsigned long Colour = G_NnPaletteCyan;
-            if (BaseText->HitTest(Ray) || SystemText->HitTest(Ray))
+            if (BaseText->HitTest(&Ray) || SystemText->HitTest(&Ray))
             {
                 unsigned long Pulsed = 0;
                 NnUiPulseBlendArgb(&Pulsed); // FUN_00561da0
@@ -1035,7 +1035,7 @@ void NeuroNetNavMap::Draw()
             {
                 Colour = G_NnPaletteAmber;
             }
-            else if (BaseTitleText->HitTest(Ray))
+            else if (BaseTitleText->HitTest(&Ray))
             {
                 unsigned long Pulsed = 0;
                 NnUiPulseBlendArgb(&Pulsed);
@@ -1051,7 +1051,7 @@ void NeuroNetNavMap::Draw()
             {
                 Colour = G_NnPaletteAmber;
             }
-            else if (SystemTitleText->HitTest(Ray))
+            else if (SystemTitleText->HitTest(&Ray))
             {
                 unsigned long Pulsed = 0;
                 NnUiPulseBlendArgb(&Pulsed);
@@ -1387,10 +1387,10 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         float const SizeY = static_cast<float>(static_cast<double>(MapSize[1]) * Zoom);
         double const ExtentX = static_cast<double>(MapExtentX);
         double const ExtentZ = static_cast<double>(MapExtentZ);
-        double const FrameX = (static_cast<double>(Item->Position[0]) + ExtentX) / (ExtentX + ExtentX) *
+        double const FrameX = (static_cast<double>(Item->Position.x) + ExtentX) / (ExtentX + ExtentX) *
                               static_cast<double>(SizeX);
         double const FrameY =
-            (kNavMapOne - (static_cast<double>(Item->Position[2]) + ExtentZ) / (ExtentZ + ExtentZ)) *
+            (kNavMapOne - (static_cast<double>(Item->Position.z) + ExtentZ) / (ExtentZ + ExtentZ)) *
             static_cast<double>(SizeY);
         float const PointX = static_cast<float>(static_cast<double>(OriginX) + FrameX);
         double const PointY = static_cast<double>(OriginY) + FrameY;
@@ -1406,10 +1406,10 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     else
     {
         // The system view -- straight from the extents.
-        float const X0 = static_cast<float>(static_cast<double>(Item->Position[0]) /
+        float const X0 = static_cast<float>(static_cast<double>(Item->Position.x) /
                                             static_cast<double>(MapExtentX) *
                                             static_cast<double>(kNavMapLabelFrameX));
-        double const Y0 = static_cast<double>(Item->Position[2]) / static_cast<double>(MapExtentZ) *
+        double const Y0 = static_cast<double>(Item->Position.z) / static_cast<double>(MapExtentZ) *
                           static_cast<double>(kNavMapLabelFrameY);
         X = static_cast<float>(static_cast<double>(X0) - WidthExt * 0.5);
         Y = static_cast<float>(-Y0);
@@ -1451,32 +1451,32 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     float const LiftedY = static_cast<float>(static_cast<double>(Y) + static_cast<double>(kNavMapLabelLift));
     if (bZoomed)
     {
-        float Front[3];
-        Front[0] = X;
-        Front[1] = LiftedY;
-        Front[2] = static_cast<float>(static_cast<double>(Depth) - static_cast<double>(kNavMapLabelLift));
+        Vector Front;
+        Front.x = X;
+        Front.y = LiftedY;
+        Front.z = static_cast<float>(static_cast<double>(Depth) - static_cast<double>(kNavMapLabelLift));
         float FrontX = 0.0f;
         float FrontY = 0.0f;
-        TextWinProjectPoint(Front, &FrontX, &FrontY); // FUN_00417730
-        float Back[3];
-        Back[0] = X;
-        Back[1] = LiftedY;
-        Back[2] = static_cast<float>(static_cast<double>(Depth) + static_cast<double>(kNavMapLabelBack));
+        TextWinProjectPoint(&Front, &FrontX, &FrontY); // FUN_00417730
+        Vector Back;
+        Back.x = X;
+        Back.y = LiftedY;
+        Back.z = static_cast<float>(static_cast<double>(Depth) + static_cast<double>(kNavMapLabelBack));
         float BackX = 0.0f;
         float BackY = 0.0f;
-        TextWinProjectPoint(Back, &BackX, &BackY);
+        TextWinProjectPoint(&Back, &BackX, &BackY);
         Origin.X = FrontX;
         Origin.Y = BackY;
     }
     else
     {
-        float Point[3];
-        Point[0] = X;
-        Point[1] = LiftedY;
-        Point[2] = Depth;
+        Vector Point;
+        Point.x = X;
+        Point.y = LiftedY;
+        Point.z = Depth;
         float PointX = 0.0f;
         float PointY = 0.0f;
-        TextWinProjectPoint(Point, &PointX, &PointY);
+        TextWinProjectPoint(&Point, &PointX, &PointY);
         Origin.X = PointX;
         Origin.Y = PointY;
     }

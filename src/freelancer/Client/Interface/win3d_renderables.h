@@ -8,6 +8,8 @@
 
 // The helpers Win3DDrawAll (FUN_0059e300, win3d.cpp) calls around its draw loop.
 
+class Vector;
+class Vector;
 struct IRPVertexBuffer;
 struct IRPIndexBuffer;
 struct IRPDraw;
@@ -47,7 +49,7 @@ extern FImmedBatcher G_ImmedBatchB; // DAT_0067dd68
 // flushed and rewound first when 12 more indices or 8 more vertices would not fit, then eight
 // vertices (A and B in Color, each also pushed Width to either side along the perpendicular in
 // EdgeColor) and twelve indices.
-void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
+void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
                        unsigned long Color, unsigned long EdgeColor, float Width);
 
 // FUN_005a2970 -- create both batchers, then B's bOrtho = 1.
@@ -63,7 +65,7 @@ void Win3DImmedBatchFlushAll();
 
 // FUN_005a2940 (cdecl) -- ImmedBatchAddLine on B. Callers: HUD_Targetable_Objects' bracket
 // drawer and lead-marker cross.
-void Win3DImmedDrawLine(float const* A, float const* B, unsigned long Color,
+void Win3DImmedDrawLine(Vector const* A, Vector const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width);
 
 // FUN_00559c10 -- ButtonMontage.ini loaded once.

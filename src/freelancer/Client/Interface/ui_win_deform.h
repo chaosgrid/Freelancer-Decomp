@@ -34,7 +34,7 @@ public:
     ~UiWinDeform() override;
 
     // slot 5 (+0x14) -- LAB_0059bb40.
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 8 (+0x20) -- LAB_0059b8f0.
     void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) -- LAB_0059b8a0.

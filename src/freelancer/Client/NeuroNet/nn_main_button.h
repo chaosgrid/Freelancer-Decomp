@@ -130,7 +130,7 @@ public:
     WinControl* ClosingButton;       // +0x50c
     int ClosingPanelId;              // +0x510
     int ClosingToolTipIds;           // +0x514
-    float ClosingStart[3];           // +0x518
+    Vector ClosingStart;           // +0x518
     WinControl* QueuedButton;        // +0x524
     int QueuedPanelId;               // +0x528
     // +0x52c -- the panels open onto the inventory info-card layout (FUN_0045dcb0 sets it,

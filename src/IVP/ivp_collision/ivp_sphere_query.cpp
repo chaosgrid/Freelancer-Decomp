@@ -80,9 +80,9 @@ namespace
 // CurrentRoot (env+0x14 -> +0x178) with a cubic half-size of Radius.
 void IVP_Sphere_Object_Query::collect_objects(const FIVP_Sphere_Query_Record* Record, IVP_Environment* Environment)
 {
-    Center.k[0] = Record->Center[0];
-    Center.k[1] = Record->Center[1];
-    Center.k[2] = Record->Center[2];
+    Center.k[0] = Record->Center.x;
+    Center.k[1] = Record->Center.y;
+    Center.k[2] = Record->Center.z;
     Radius = Record->Radius;
     MaxLedgeTreeDepth = Record->MaxLedgeTreeDepth;
     TreeManager = Environment->ov_tree_manager;

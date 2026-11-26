@@ -29,6 +29,8 @@
 
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
 
+#include "math3d.h"
+
 struct Win3D;
 
 // The pixel shift for Object: that of its root window, 0 for anything else, for an excluded
@@ -41,10 +43,10 @@ float WidescreenHudCurrentShift();
 // While a shift is applied: Out12 = In12 with the shift's shear in front (row 0 minus s times
 // row 2, the same as the Win3D view gets), for modelviews bound without a camera; false (Out12
 // untouched) when no shift is applied. A flat matrix (z rows zero) comes out unchanged.
-bool WidescreenHudShearModelview(float const* In12, float* Out12);
+bool WidescreenHudShearModelview(Transform const* In, Transform* Out);
 
 // The mouse ray for the cursor through the Win3D camera as it is now (shifted or not).
-void WidescreenHudCursorRay(float* OutRay3);
+void WidescreenHudCursorRay(Vector* OutRay);
 
 // Applies ShiftPx to the Win3D camera for the scope's lifetime and puts the previous shift
 // back on exit. bDraw: also hand the camera to the pipeline on each change and flush the

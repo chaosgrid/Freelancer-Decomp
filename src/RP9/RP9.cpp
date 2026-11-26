@@ -2455,20 +2455,20 @@ unsigned long FDirectX9::StageCount()
 }
 
 // RP8: FRp8TransformCache::StoreAffine
-void FRp9TransformCache::StoreAffine(const float* M12)
+void FRp9TransformCache::StoreAffine(const Transform* Xform)
 {
-    Values[0] = M12[0];
-    Values[4] = M12[1];
-    Values[8] = M12[2];
-    Values[1] = M12[3];
-    Values[5] = M12[4];
-    Values[9] = M12[5];
-    Values[2] = M12[6];
-    Values[6] = M12[7];
-    Values[10] = M12[8];
-    Values[12] = M12[9];
-    Values[13] = M12[10];
-    Values[14] = M12[11];
+    Values[0] = Xform->Rotation.E[0][0];
+    Values[4] = Xform->Rotation.E[0][1];
+    Values[8] = Xform->Rotation.E[0][2];
+    Values[1] = Xform->Rotation.E[1][0];
+    Values[5] = Xform->Rotation.E[1][1];
+    Values[9] = Xform->Rotation.E[1][2];
+    Values[2] = Xform->Rotation.E[2][0];
+    Values[6] = Xform->Rotation.E[2][1];
+    Values[10] = Xform->Rotation.E[2][2];
+    Values[12] = Xform->Translation.x;
+    Values[13] = Xform->Translation.y;
+    Values[14] = Xform->Translation.z;
     Values[3] = 0.0f;
     Values[7] = 0.0f;
     Values[11] = 0.0f;
@@ -2477,20 +2477,20 @@ void FRp9TransformCache::StoreAffine(const float* M12)
 }
 
 // RP8: FRp8TransformCache::LoadAffine
-void FRp9TransformCache::LoadAffine(float* Out12) const
+void FRp9TransformCache::LoadAffine(Transform* Out) const
 {
-    Out12[0] = Values[0];
-    Out12[1] = Values[4];
-    Out12[2] = Values[8];
-    Out12[3] = Values[1];
-    Out12[4] = Values[5];
-    Out12[5] = Values[9];
-    Out12[6] = Values[2];
-    Out12[7] = Values[6];
-    Out12[8] = Values[10];
-    Out12[9] = Values[12];
-    Out12[10] = Values[13];
-    Out12[11] = Values[14];
+    Out->Rotation.E[0][0] = Values[0];
+    Out->Rotation.E[0][1] = Values[4];
+    Out->Rotation.E[0][2] = Values[8];
+    Out->Rotation.E[1][0] = Values[1];
+    Out->Rotation.E[1][1] = Values[5];
+    Out->Rotation.E[1][2] = Values[9];
+    Out->Rotation.E[2][0] = Values[2];
+    Out->Rotation.E[2][1] = Values[6];
+    Out->Rotation.E[2][2] = Values[10];
+    Out->Translation.x = Values[12];
+    Out->Translation.y = Values[13];
+    Out->Translation.z = Values[14];
 }
 
 // DAT_06d70540: rp8.dll's lazily created 3DMathEngine. Every user (FUN_06d15e60, FUN_06d15ec0,
@@ -2535,9 +2535,9 @@ static void Rp9NormalizeInPlace(Vector& Vec)
 static_assert(sizeof(Transform) == 12 * sizeof(float), "Transform is the 12-float DA transform");
 
 // RP8: FDirectX8::MulZFlip12
-void FDirectX9::MulZFlip12(float* Out12, const float* In12)
+void FDirectX9::MulZFlip12(Transform* Out, const Transform* In)
 {
-    // The engine product uses a temporary, so Out12 may alias In12.
+    // The engine product uses a temporary, so Out may alias In.
     Transform ZFlip;
     ZFlip.Rotation.E[0][0] = 1.0f;
     ZFlip.Rotation.E[0][1] = 0.0f;
@@ -2552,8 +2552,8 @@ void FDirectX9::MulZFlip12(float* Out12, const float* In12)
     ZFlip.Translation.y = 0.0f;
     ZFlip.Translation.z = 0.0f;
     Transform Product;
-    Rp9MathEngine()->MulTransform(Product, ZFlip, *(const Transform*)(In12));
-    std::memcpy(Out12, &Product, sizeof(Product));
+    Rp9MathEngine()->MulTransform(Product, ZFlip, *In);
+    std::memcpy(Out, &Product, sizeof(Product));
 }
 
 // RP8: FRp8TransformCache::StoreTransposed
@@ -2603,8 +2603,8 @@ void FRp9TransformCache::LoadTransposed(float* Out16) const
 // RP8: FDirectX8::ApplyIdentityTransforms
 void FDirectX9::ApplyIdentityTransforms()
 {
-    const float Identity12[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-                                  0.0f};
+    const float Identity12[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                                  0.0f, 0.0f, 0.0f};
     // RP8 kOffViewspaceLights 0x3A8 = pipeline-state 7 (VIEWSPACE_LIGHTS) value.
     const bool bViewspaceLightsOff =
         PipelineStates_[PipelineStateViewspaceLights].Value == 0;
@@ -2624,12 +2624,12 @@ void FDirectX9::ApplyIdentityTransforms()
         FRp9TransformCache& Block = *Steps[Index].Cache;
         if (Steps[Index].bFlip)
         {
-            float Flipped[12];
-            MulZFlip12(Flipped, Identity12);
-            Block.StoreAffine(Flipped);
+            Transform Flipped;
+            MulZFlip12(&Flipped, (const Transform*)Identity12);
+            Block.StoreAffine(&Flipped);
         }
         else
-            Block.StoreAffine(Identity12);
+            Block.StoreAffine((const Transform*)Identity12);
         Block.bCommitted = 0;
         Block.Commit(Device_, Steps[Index].Type);
         Block.bApplyMarker = 1;
@@ -2692,11 +2692,11 @@ void FDirectX9::ApplyDefaultTextureStages()
             Cache.bValid = 1;
         }
 
-        FRp9TransformCache& Transform = DeviceStates_.TextureTransforms[Stage];
-        Transform.StoreAffine(Identity12);
-        Transform.Commit(Device_,
+        FRp9TransformCache& TextureTransform = DeviceStates_.TextureTransforms[Stage];
+        TextureTransform.StoreAffine((const Transform*)Identity12);
+        TextureTransform.Commit(Device_,
                            (D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + Stage));
-        Transform.bApplyMarker = 1;
+        TextureTransform.bApplyMarker = 1;
 
         FRp9PropertyMap& States = StageStateMaps_[Stage];
         for (FRp9PropertyMap::iterator It = States.begin(); It != States.end(); ++It)
@@ -4034,7 +4034,7 @@ GENRESULT DACOM_API FDirectX9::SetWorld(const Transform* M12)
         NeedDeviceLifetime("set_world() called outside of device lifetime", 0xa9a);
     if (Ready != GR_OK)
         return Ready;
-    Transforms_.World.StoreAffine((const float*)M12);
+    Transforms_.World.StoreAffine(M12);
     return GR_OK;
 }
 // RP8: FDirectX8::GetWorld
@@ -4045,7 +4045,7 @@ GENRESULT DACOM_API FDirectX9::GetWorld(Transform* Out12)
         NeedDeviceLifetime("get_world() called outside of device lifetime", 0xaa5);
     if (Ready != GR_OK)
         return Ready;
-    Transforms_.World.LoadAffine((float*)Out12);
+    Transforms_.World.LoadAffine(Out12);
     return GR_OK;
 }
 // RP8: FDirectX8::SetView
@@ -4056,9 +4056,9 @@ GENRESULT DACOM_API FDirectX9::SetView(const Transform* M12)
         NeedDeviceLifetime("set_view() called outside of device lifetime", 0xaaf);
     if (Ready != GR_OK)
         return Ready;
-    float Flipped[12];
-    MulZFlip12(Flipped, (const float*)M12);
-    Transforms_.View.StoreAffine(Flipped);
+    Transform Flipped;
+    MulZFlip12(&Flipped, M12);
+    Transforms_.View.StoreAffine(&Flipped);
     return GR_OK;
 }
 // RP8: FDirectX8::GetView
@@ -4070,9 +4070,9 @@ GENRESULT DACOM_API FDirectX9::GetView(Transform* Out12)
         NeedDeviceLifetime("get_modelview() called outside of device lifetime", 0xaba);
     if (Ready != GR_OK)
         return Ready;
-    float Stored[12];
-    Transforms_.View.LoadAffine(Stored);
-    MulZFlip12((float*)Out12, Stored);
+    Transform Stored;
+    Transforms_.View.LoadAffine(&Stored);
+    MulZFlip12(Out12, &Stored);
     return GR_OK;
 }
 // RP8: FDirectX8::SetModelview
@@ -4089,13 +4089,13 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const Transform* M12)
     const bool bViewspaceLightsOff = PipelineStateValue(7) == 0;
     if (!bViewspaceLightsOff)
     {
-        float Flipped[12];
-        MulZFlip12(Flipped, (const float*)M12);
-        Transforms_.World.StoreAffine(Flipped);
+        Transform Flipped;
+        MulZFlip12(&Flipped, M12);
+        Transforms_.World.StoreAffine(&Flipped);
     }
     else
     {
-        Transforms_.World.StoreAffine((const float*)M12);
+        Transforms_.World.StoreAffine(M12);
     }
 
     if (Transforms_.View.bApplyMarker == 0)
@@ -4104,13 +4104,13 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const Transform* M12)
                                       0.0f, 0.0f, 0.0f};
         if (bViewspaceLightsOff)
         {
-            float Flipped[12];
-            MulZFlip12(Flipped, Identity12);
-            Transforms_.View.StoreAffine(Flipped);
+            Transform Flipped;
+            MulZFlip12(&Flipped, (const Transform*)Identity12);
+            Transforms_.View.StoreAffine(&Flipped);
         }
         else
         {
-            Transforms_.View.StoreAffine(Identity12);
+            Transforms_.View.StoreAffine((const Transform*)Identity12);
         }
         Transforms_.View.bApplyMarker = 1;
     }
@@ -4127,20 +4127,20 @@ GENRESULT DACOM_API FDirectX9::GetModelview(Transform* Out12)
     const bool bViewspaceLightsOff = PipelineStateValue(7) == 0;
 
     Transform World;
-    float* World12 = (float*)(&World);
+    Transform* World12 = &World;
     Transforms_.World.LoadAffine(World12);
     if (!bViewspaceLightsOff)
         MulZFlip12(World12, World12);
 
     Transform View;
-    float* View12 = (float*)(&View);
+    Transform* View12 = &View;
     Transforms_.View.LoadAffine(View12);
     if (bViewspaceLightsOff)
         MulZFlip12(View12, View12);
 
     Transform Modelview;
     Rp9MathEngine()->MulTransform(Modelview, View, World);
-    std::memcpy((float*)Out12, &Modelview, sizeof(Modelview));
+    std::memcpy(Out12, &Modelview, sizeof(Modelview));
     return GR_OK;
 }
 // RP8: FDirectX8::SetProjection
@@ -4232,32 +4232,32 @@ GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, flo
     Xform.Translation.x = -Rotated.x;
     Xform.Translation.y = -Rotated.y;
     Xform.Translation.z = -Rotated.z;
-    const float* Xform12 = (const float*)(&Xform);
+    const Transform* Xform12 = &Xform;
 
     // Every store goes through FUN_06d172f0 with its last argument 0: the matrix is written
     // and marked dirty (+0x40 = 0) but NOT sent to the device here -- FUN_06d04138 commits it
     // at draw time (FlushDrawState). The bFlip argument multiplies ZFlip in first.
-    float Flipped[12];
+    Transform Flipped;
     if (PipelineStateValue(7) != 0)
     {
         // FUN_06d172f0(+0x2240, device, bFlip=1, D3DTS_WORLD, &Xform, 0)
-        MulZFlip12(Flipped, Xform12);
-        Transforms_.World.StoreAffine(Flipped);
+        MulZFlip12(&Flipped, Xform12);
+        Transforms_.World.StoreAffine(&Flipped);
         // Only while the VIEWSPACE view is unset (+0x41 clear): FUN_06d172f0(+0x21FC, device,
         // bFlip=0, D3DTS_VIEW, &Identity, 0).
         if (Transforms_.View.bApplyMarker == 0)
         {
-            const float Identity12[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f};
-            Transforms_.View.StoreAffine(Identity12);
+            const Transform Identity12 = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f),
+                                          {0.0f, 0.0f, 0.0f}};
+            Transforms_.View.StoreAffine(&Identity12);
             Transforms_.View.bApplyMarker = 1;
         }
     }
     else
     {
         // FUN_06d172f0(+0x21FC, device, bFlip=1, D3DTS_VIEW, &Xform, 0)
-        MulZFlip12(Flipped, Xform12);
-        Transforms_.View.StoreAffine(Flipped);
+        MulZFlip12(&Flipped, Xform12);
+        Transforms_.View.StoreAffine(&Flipped);
     }
     return GR_OK;
 }

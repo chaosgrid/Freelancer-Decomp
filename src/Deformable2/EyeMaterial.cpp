@@ -1319,12 +1319,12 @@ namespace
     const FStateValue G_EyeOpaqueStates[] = {{D3DRS_LIGHTING, 1}, {D3DRS_SPECULARENABLE, 0}, {D3DRS_ALPHABLENDENABLE, 0}, {0, 0}};
 }
 
-static bool EyeUvClampPair(const FUvDeformRecord* Record, const float* In, float* OutU,
+static bool EyeUvClampPair(const FUvDeformRecord* Record, const Vector* In, float* OutU,
                            float* OutV)
 {
-    float U = (float)((double)(Record->BoneXToU) * In[0] *
+    float U = (float)((double)(Record->BoneXToU) * In->x *
                                  Record->PlaneDistance);
-    double V = (double)(In[1]) * Record->BoneYToV * Record->PlaneDistance;
+    double V = (double)(In->y) * Record->BoneYToV * Record->PlaneDistance;
     if (!(std::fabs((double)(U)) > G_EyeUvDeadZone) &&
         !(std::fabs(V) > G_EyeUvDeadZone))
         return false;
@@ -1396,25 +1396,25 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
     if (Binding == nullptr || Binding->Record == nullptr)
         return GR_OK;
     const FBoneRuntime* const Bone = Binding->Bone;
-    const float* const BoneLocal =
-        Bone->LocalTransform;
-    float Axis[3];
-    Axis[0] = BoneLocal[2];
-    Axis[1] = BoneLocal[5];
-    Axis[2] = BoneLocal[8];
+    const Transform* const BoneLocal =
+        &Bone->LocalTransform;
+    Vector Axis;
+    Axis.x = BoneLocal->Rotation.E[0][2];
+    Axis.y = BoneLocal->Rotation.E[1][2];
+    Axis.z = BoneLocal->Rotation.E[2][2];
     const InstanceIndex Parent = G_Engine->GetInstanceParent(Bone->Instance);
     if (Parent != InvalidInstanceIndex)
     {
-        const float* const Orientation = (const float*)G_Engine->GetInstanceOrientation(Parent);
-        float InParent[3];
-        MathTransformVec3(InParent, Orientation, Axis);
-        Axis[0] = InParent[0];
-        Axis[1] = InParent[1];
-        Axis[2] = InParent[2];
+        const Matrix* const Orientation = G_Engine->GetInstanceOrientation(Parent);
+        Vector InParent;
+        MathTransformVec3(&InParent, Orientation, &Axis);
+        Axis.x = InParent.x;
+        Axis.y = InParent.y;
+        Axis.z = InParent.z;
     }
     float U;
     float V;
-    if (!EyeUvClampPair(Binding->Record, Axis, &U, &V))
+    if (!EyeUvClampPair(Binding->Record, &Axis, &U, &V))
         return GR_OK;
     const float Transform[16] = {
         1.0f, 0.0f, U,    0.0f,

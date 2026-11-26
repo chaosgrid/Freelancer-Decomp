@@ -101,9 +101,9 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
     Line.Texture = Self->LineShape->Texture;
     Line.JitterScale = kLineJitterScale;
     const Vector* const Eye = AsCamera(Cam)->GetPosition();
-    Line.EyePos[0] = Eye->x;
-    Line.EyePos[1] = Eye->y;
-    Line.EyePos[2] = Eye->z;
+    Line.EyePos.x = Eye->x;
+    Line.EyePos.y = Eye->y;
+    Line.EyePos.z = Eye->z;
     Line.SideScale = 1.0f;
 
     Win3DSetDepthWrite(0);
@@ -186,12 +186,12 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
 
         // The straight beam, source -> end.
         Line.bCurved = 0;
-        Line.Start[0] = Source.x;
-        Line.Start[1] = Source.y;
-        Line.Start[2] = Source.z;
-        Line.End[0] = EndPoint[0];
-        Line.End[1] = EndPoint[1];
-        Line.End[2] = EndPoint[2];
+        Line.Start.x = Source.x;
+        Line.Start.y = Source.y;
+        Line.Start.z = Source.z;
+        Line.End.x = EndPoint[0];
+        Line.End.y = EndPoint[1];
+        Line.End.z = EndPoint[2];
         Line.Width = kBeamWidth;
         Win3DDrawFuzzyLine(&Line);
 
@@ -239,15 +239,15 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
                 G_TractorBeamMath->TransformMatrix(Local, LookMatrix, ConeDir);
 
                 // The arc from the beam end to Centre + Local, bent about Centre.
-                Line.End[0] = Local.x + Centre[0];
-                Line.End[1] = Local.y + Centre[1];
-                Line.End[2] = Local.z + Centre[2];
-                Line.Control[0] = Centre[0];
-                Line.Control[1] = Centre[1];
-                Line.Control[2] = Centre[2];
-                Line.Start[0] = EndPoint[0];
-                Line.Start[1] = EndPoint[1];
-                Line.Start[2] = EndPoint[2];
+                Line.End.x = Local.x + Centre[0];
+                Line.End.y = Local.y + Centre[1];
+                Line.End.z = Local.z + Centre[2];
+                Line.Control.x = Centre[0];
+                Line.Control.y = Centre[1];
+                Line.Control.z = Centre[2];
+                Line.Start.x = EndPoint[0];
+                Line.Start.y = EndPoint[1];
+                Line.Start.z = EndPoint[2];
                 Line.Width = 1.0f;
                 Line.bCurved = 1;
                 Win3DDrawFuzzyLine(&Line);

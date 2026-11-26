@@ -78,7 +78,7 @@ namespace
         return *reinterpret_cast<Matrix*>(M9);
     }
 
-    Vector const& AsVector(const float* V3)
+    Vector const& AsVector(const Vector* V3)
     {
         return *reinterpret_cast<Vector const*>(V3);
     }
@@ -95,54 +95,54 @@ namespace
     }
 
     // FUN_0051a0c0: Out = A x B, terms in double, rounded to float.
-    void Vec3CrossStored(float* Out, const float* A, const float* B)
+    void Vec3CrossStored(Vector* Out, const Vector* A, const Vector* B)
     {
-        const double Z = static_cast<double>(A[0]) * B[1] - static_cast<double>(A[1]) * B[0];
-        const double Y = static_cast<double>(A[2]) * B[0] - static_cast<double>(B[2]) * A[0];
-        const double X = static_cast<double>(A[1]) * B[2] - static_cast<double>(A[2]) * B[1];
-        Out[0] = static_cast<float>(X);
-        Out[1] = static_cast<float>(Y);
-        Out[2] = static_cast<float>(Z);
+        const double Z = static_cast<double>(A->x) * B->y - static_cast<double>(A->y) * B->x;
+        const double Y = static_cast<double>(A->z) * B->x - static_cast<double>(B->z) * A->x;
+        const double X = static_cast<double>(A->y) * B->z - static_cast<double>(A->z) * B->y;
+        Out->x = static_cast<float>(X);
+        Out->y = static_cast<float>(Y);
+        Out->z = static_cast<float>(Z);
     }
 
     // FUN_00410190: sqrt((x*x + y*y) + z*z), unrounded.
-    double Vec3Length(const float* V)
+    double Vec3Length(const Vector* V)
     {
-        double SumSq = static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1];
-        SumSq = SumSq + static_cast<double>(V[2]) * V[2];
+        double SumSq = static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y;
+        SumSq = SumSq + static_cast<double>(V->z) * V->z;
         return sqrt(SumSq);
     }
 
     // FUN_0041a390: scale by 1.0f / length (unrounded), each product rounded.
-    void Vec3NormaliseInPlace(float* V)
+    void Vec3NormaliseInPlace(Vector* V)
     {
         const double Inv = 1.0f / Vec3Length(V);
-        V[0] = static_cast<float>(Inv * V[0]);
-        V[1] = static_cast<float>(Inv * V[1]);
-        V[2] = static_cast<float>(Inv * V[2]);
+        V->x = static_cast<float>(Inv * V->x);
+        V->y = static_cast<float>(Inv * V->y);
+        V->z = static_cast<float>(Inv * V->z);
     }
 
     // FUN_004cbf40: (a.z*b.z + a.y*b.y) + a.x*b.x, unrounded.
-    double Vec3DotZyx(const float* A, const float* B)
+    double Vec3DotZyx(const Vector* A, const Vector* B)
     {
-        double Sum = static_cast<double>(A[2]) * B[2] + static_cast<double>(A[1]) * B[1];
-        return Sum + static_cast<double>(A[0]) * B[0];
+        double Sum = static_cast<double>(A->z) * B->z + static_cast<double>(A->y) * B->y;
+        return Sum + static_cast<double>(A->x) * B->x;
     }
 
     // Column C of a row-major 3x3 (elements C, C + 3, C + 6).
-    void GetColumn(float* Out, const float* M9, int Column)
+    void GetColumn(Vector* Out, const float* M9, int Column)
     {
-        Out[0] = M9[Column];
-        Out[1] = M9[Column + 3];
-        Out[2] = M9[Column + 6];
+        Out->x = M9[Column];
+        Out->y = M9[Column + 3];
+        Out->z = M9[Column + 6];
     }
 
     // FUN_0051a100 / FUN_0051a120 / FUN_00411f70: write column 0 / 1 / 2.
-    void SetColumn(float* M9, int Column, const float* V)
+    void SetColumn(float* M9, int Column, const Vector* V)
     {
-        M9[Column] = V[0];
-        M9[Column + 3] = V[1];
-        M9[Column + 6] = V[2];
+        M9[Column] = V->x;
+        M9[Column + 3] = V->y;
+        M9[Column + 6] = V->z;
     }
 
     // The two rotation loops FUN_00518f20 runs over a 3x3 in place: cos rounded to float, sin
@@ -293,15 +293,15 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
     Cam->HorizontalTurnAngle = 0.2f;          // 0x3e4ccccd
     Cam->VerticalTurnDownAngle = 0.2f;        // 0x3e4ccccd
 
-    Cam->UpAxis[1] = 1.0f;
-    Cam->UpAxis[0] = 0.0f;
-    Cam->UpAxis[2] = 0.0f;
+    Cam->UpAxis.y = 1.0f;
+    Cam->UpAxis.x = 0.0f;
+    Cam->UpAxis.z = 0.0f;
     Cam->Unused210 = 0.0f;
 
     Cam->TurnRateScale = 2.0f;                // 0x40000000
-    Cam->LevelAxis[0] = 0.0f;
-    Cam->LevelAxis[1] = 0.0f;
-    Cam->LevelAxis[2] = -1.0f;                // 0xbf800000
+    Cam->LevelAxis.x = 0.0f;
+    Cam->LevelAxis.y = 0.0f;
+    Cam->LevelAxis.z = -1.0f;                // 0xbf800000
     Cam->PrevAngularRate = 0.0f;
     Cam->bInitialised = 0;
 
@@ -362,9 +362,9 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         memcpy(Cam->TargetOrientA, &Target->get_transform().Rotation.E[0][0], 9 * sizeof(float));
         memcpy(Cam->TargetOrientB, &WatchedObject(Cam)->get_transform().Rotation.E[0][0],
                9 * sizeof(float));
-        Cam->UpAxis[0] = Cam->TargetOrientA[1];
-        Cam->UpAxis[1] = Cam->TargetOrientA[4];
-        Cam->UpAxis[2] = Cam->TargetOrientA[7];
+        Cam->UpAxis.x = Cam->TargetOrientA[1];
+        Cam->UpAxis.y = Cam->TargetOrientA[4];
+        Cam->UpAxis.z = Cam->TargetOrientA[7];
 
         // Slot 0x10's transform (twelve dwords) to the world transform, view dirty first.
         FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
@@ -477,8 +477,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
     // The speed, rounded to float.
     const Vector Velocity = WatchedObject(Cam)->get_velocity();
-    float Heading[3] = {Velocity.x, Velocity.y, Velocity.z};
-    const double SpeedExact = Vec3Length(Heading);
+    Vector Heading = {Velocity.x, Velocity.y, Velocity.z};
+    const double SpeedExact = Vec3Length(&Heading);
     const float Speed = static_cast<float>(SpeedExact);
 
     // Over 1.0f (not for a NaN): the velocity again, normalised, and the heading replaced by
@@ -487,18 +487,18 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     if (SpeedExact > 1.0f)
     {
         const Vector Again = WatchedObject(Cam)->get_velocity();
-        float VelocityDir[3];
-        VelocityDir[0] = Again.x;
-        VelocityDir[1] = Again.y;
-        VelocityDir[2] = Again.z;
-        const double Inv = 1.0f / Vec3Length(VelocityDir);
-        VelocityDir[0] = static_cast<float>(VelocityDir[0] * Inv);
-        VelocityDir[1] = static_cast<float>(VelocityDir[1] * Inv);
-        VelocityDir[2] = static_cast<float>(VelocityDir[2] * Inv);
+        Vector VelocityDir;
+        VelocityDir.x = Again.x;
+        VelocityDir.y = Again.y;
+        VelocityDir.z = Again.z;
+        const double Inv = 1.0f / Vec3Length(&VelocityDir);
+        VelocityDir.x = static_cast<float>(VelocityDir.x * Inv);
+        VelocityDir.y = static_cast<float>(VelocityDir.y * Inv);
+        VelocityDir.z = static_cast<float>(VelocityDir.z * Inv);
         const float* const Rot = &WatchedObject(Cam)->get_transform().Rotation.E[0][0];
-        Heading[0] = -Rot[2];
-        Heading[1] = -Rot[5];
-        Heading[2] = -Rot[8];
+        Heading.x = -Rot[2];
+        Heading.y = -Rot[5];
+        Heading.z = -Rot[8];
     }
 
     // Null allowed.
@@ -511,16 +511,16 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Cam->SmoothedSpeed = Speed;
         Cam->PrevSpeed = Speed;
         Cam->SpeedSlack = 0.0f;
-        Cam->LevelAxis[0] = 0.0f;
-        Cam->LevelAxis[1] = 0.0f;
-        Cam->LevelAxis[2] = -1.0f;
+        Cam->LevelAxis.x = 0.0f;
+        Cam->LevelAxis.y = 0.0f;
+        Cam->LevelAxis.z = -1.0f;
         memcpy(Cam->ResetOrient, &WatchedObject(Cam)->get_transform().Rotation.E[0][0],
                9 * sizeof(float));
-        float ResetUp[3];
-        GetColumn(ResetUp, Cam->ResetOrient, 1);
-        Cam->UpAxis[0] = ResetUp[0];
-        Cam->UpAxis[1] = ResetUp[1];
-        Cam->UpAxis[2] = ResetUp[2];
+        Vector ResetUp;
+        GetColumn(&ResetUp, Cam->ResetOrient, 1);
+        Cam->UpAxis.x = ResetUp.x;
+        Cam->UpAxis.y = ResetUp.y;
+        Cam->UpAxis.z = ResetUp.z;
         if (Manager != nullptr)
         {
             Manager->set_camera_mode(IBehaviorManager::CameraModeLevel);
@@ -573,7 +573,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
     // The camera offset = hardpoint + ((look offset + extra offset) + (0, 0, look-ahead)), each
     // sum rounded to float.
-    float CameraOffset[3] = {Cam->HardpointPos[0], Cam->HardpointPos[1], Cam->HardpointPos[2]};
+    Vector CameraOffset = {Cam->HardpointPos[0], Cam->HardpointPos[1], Cam->HardpointPos[2]};
     float LookAheadOffset[3];
     LookAheadOffset[0] = 0.0f;
     LookAheadOffset[1] = 0.0f;
@@ -582,9 +582,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     Vec3AddStored(LookOffsetSum, &Cam->LookOffsetX, &Cam->ExtraOffsetX);
     float OffsetPlusLookAhead[3];
     Vec3AddStored(OffsetPlusLookAhead, LookOffsetSum, LookAheadOffset);
-    CameraOffset[0] = static_cast<float>(static_cast<double>(OffsetPlusLookAhead[0]) + CameraOffset[0]);
-    CameraOffset[1] = static_cast<float>(static_cast<double>(CameraOffset[1]) + OffsetPlusLookAhead[1]);
-    CameraOffset[2] = static_cast<float>(static_cast<double>(CameraOffset[2]) + OffsetPlusLookAhead[2]);
+    CameraOffset.x = static_cast<float>(static_cast<double>(OffsetPlusLookAhead[0]) + CameraOffset.x);
+    CameraOffset.y = static_cast<float>(static_cast<double>(CameraOffset.y) + OffsetPlusLookAhead[1]);
+    CameraOffset.z = static_cast<float>(static_cast<double>(CameraOffset.z) + OffsetPlusLookAhead[2]);
 
     // Every slerp below writes QSlerp and converts back from the copy QSlerpCopy, as retail does.
     Quaternion QSlerp;
@@ -604,14 +604,14 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
             // q(M levelled to +0x204).
             float Levelled[9];
-            CameraOrientFromForwardAndUp(Levelled, M, Cam->UpAxis);
+            CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &Cam->UpAxis);
             Quaternion QFromUpAxis;
             CockpitMathEngine()->MatrixToQuaternion(QFromUpAxis, AsMatrix(Levelled));
 
             // q(M levelled to the reset up).
-            float HistoryUp[3];
-            GetColumn(HistoryUp, Cam->ResetOrient, 1);
-            CameraOrientFromForwardAndUp(Levelled, M, HistoryUp);
+            Vector HistoryUp;
+            GetColumn(&HistoryUp, Cam->ResetOrient, 1);
+            CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &HistoryUp);
             Quaternion QFromHistory;
             CockpitMathEngine()->MatrixToQuaternion(QFromHistory, AsMatrix(Levelled));
 
@@ -622,20 +622,20 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             QSlerpCopy = QSlerp;
             float Slerped[9];
             CockpitMathEngine()->QuaternionToMatrix(AsMatrix(Slerped), QSlerpCopy);
-            float SlerpedUp[3];
-            GetColumn(SlerpedUp, Slerped, 1);
+            Vector SlerpedUp;
+            GetColumn(&SlerpedUp, Slerped, 1);
             memcpy(M, Slerped, sizeof(M));
-            Cam->UpAxis[0] = SlerpedUp[0];
-            Cam->UpAxis[1] = SlerpedUp[1];
-            Cam->UpAxis[2] = SlerpedUp[2];
+            Cam->UpAxis.x = SlerpedUp.x;
+            Cam->UpAxis.y = SlerpedUp.y;
+            Cam->UpAxis.z = SlerpedUp.z;
         }
         else
         {
             const Vector ShipUp = Manager->get_ship_up_direction();
-            float LevelUp[3];
-            LevelUp[0] = ShipUp.x;
-            LevelUp[1] = ShipUp.y;
-            LevelUp[2] = ShipUp.z;
+            Vector LevelUp;
+            LevelUp.x = ShipUp.x;
+            LevelUp.y = ShipUp.y;
+            LevelUp.z = ShipUp.z;
 
             // In jump states 2 or 3 (+0x158; the object is tested but not its class), an up
             // other than exactly (0, 1, 0) -- NaN included -- is replaced by it and pushed to the
@@ -649,11 +649,11 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                         const_cast<unsigned char*>(Held - kWatchableOffset))));
                 const int State = ShipGo->JumpState;
                 if ((State == kJumpStateJumpOutTunnel || State == kJumpStateJumpInTunnel) &&
-                    (LevelUp[0] != 0.0f || LevelUp[1] != 1.0f || LevelUp[2] != 0.0f))
+                    (LevelUp.x != 0.0f || LevelUp.y != 1.0f || LevelUp.z != 0.0f))
                 {
-                    LevelUp[0] = 0.0f;
-                    LevelUp[1] = 1.0f;
-                    LevelUp[2] = 0.0f;
+                    LevelUp.x = 0.0f;
+                    LevelUp.y = 1.0f;
+                    LevelUp.z = 0.0f;
                     Vector Up;
                     Up.x = 0.0f;
                     Up.y = 1.0f;
@@ -665,11 +665,11 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             // M levelled to that up; how far it is from +0x204, and how far the levelled up is
             // from the ship's own (both rounded).
             float Levelled[9];
-            CameraOrientFromForwardAndUp(Levelled, M, LevelUp);
+            CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &LevelUp);
             float Dot = static_cast<float>(
-                (static_cast<double>(LevelUp[2]) * Cam->UpAxis[2] +
-                 static_cast<double>(LevelUp[1]) * Cam->UpAxis[1]) +
-                static_cast<double>(LevelUp[0]) * Cam->UpAxis[0]);
+                (static_cast<double>(LevelUp.z) * Cam->UpAxis.z +
+                 static_cast<double>(LevelUp.y) * Cam->UpAxis.y) +
+                static_cast<double>(LevelUp.x) * Cam->UpAxis.x);
             const float UpAgree = static_cast<float>(
                 (static_cast<double>(Levelled[7]) * ShipRot[7] +
                  static_cast<double>(Levelled[4]) * ShipRot[4]) +
@@ -682,7 +682,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                 if (fabs(static_cast<double>(Dot)) < kLevelTurnMaxDot)
                 {
                     float FromUpAxis[9];
-                    CameraOrientFromForwardAndUp(FromUpAxis, M, Cam->UpAxis);
+                    CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(FromUpAxis), reinterpret_cast<Matrix const*>(M), &Cam->UpAxis);
                     Quaternion QTowards;
                     CockpitMathEngine()->MatrixToQuaternion(QTowards, AsMatrix(Levelled));
                     Quaternion QFrom;
@@ -695,17 +695,17 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                     QSlerpCopy = QSlerp;
                     float Turned[9];
                     CockpitMathEngine()->QuaternionToMatrix(AsMatrix(Turned), QSlerpCopy);
-                    float TurnedUp[3];
-                    GetColumn(TurnedUp, Turned, 1);
+                    Vector TurnedUp;
+                    GetColumn(&TurnedUp, Turned, 1);
                     memcpy(Levelled, Turned, sizeof(Levelled));
-                    LevelUp[0] = TurnedUp[0];
-                    LevelUp[1] = TurnedUp[1];
-                    LevelUp[2] = TurnedUp[2];
+                    LevelUp.x = TurnedUp.x;
+                    LevelUp.y = TurnedUp.y;
+                    LevelUp.z = TurnedUp.z;
                 }
 
-                Cam->UpAxis[0] = LevelUp[0];
-                Cam->UpAxis[1] = LevelUp[1];
-                Cam->UpAxis[2] = LevelUp[2];
+                Cam->UpAxis.x = LevelUp.x;
+                Cam->UpAxis.y = LevelUp.y;
+                Cam->UpAxis.z = LevelUp.z;
                 Vector Up;
                 Up.x = Levelled[1];
                 Up.y = Levelled[4];
@@ -716,9 +716,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             else if (static_cast<double>(UpAgree) > kLevelUpAgreeDot)
             {
                 // Almost opposite, but the ship's own up agrees: adopt it without turning.
-                Cam->UpAxis[0] = LevelUp[0];
-                Cam->UpAxis[1] = LevelUp[1];
-                Cam->UpAxis[2] = LevelUp[2];
+                Cam->UpAxis.x = LevelUp.x;
+                Cam->UpAxis.y = LevelUp.y;
+                Cam->UpAxis.z = LevelUp.z;
             }
         }
     }
@@ -727,7 +727,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     {
         memcpy(Cam->ResetOrient, M, sizeof(M));
         Vector Offset;
-        CockpitMathEngine()->TransformMatrix(Offset, AsMatrix(M), AsVector(CameraOffset));
+        CockpitMathEngine()->TransformMatrix(Offset, AsMatrix(M), AsVector(&CameraOffset));
         Pos[0] = static_cast<float>(static_cast<double>(Offset.x) + Pos[0]);
         Pos[1] = static_cast<float>(static_cast<double>(Offset.y) + Pos[1]);
         Pos[2] = static_cast<float>(static_cast<double>(Offset.z) + Pos[2]);
@@ -784,30 +784,30 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
         // The level axis through the ship's live rotation, against M's column 1.
         Vector LevelWorld;
-        CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(Cam->LevelAxis));
-        float CamUp[3];
-        GetColumn(CamUp, M, 1);
-        float LevelDir[3];
-        LevelDir[0] = LevelWorld.x;
-        LevelDir[1] = LevelWorld.y;
-        LevelDir[2] = LevelWorld.z;
-        const double AxisDot = Vec3DotZyx(CamUp, LevelDir);
+        CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(&Cam->LevelAxis));
+        Vector CamUp;
+        GetColumn(&CamUp, M, 1);
+        Vector LevelDir;
+        LevelDir.x = LevelWorld.x;
+        LevelDir.y = LevelWorld.y;
+        LevelDir.z = LevelWorld.z;
+        const double AxisDot = Vec3DotZyx(&CamUp, &LevelDir);
 
         // Unless the two are (anti)parallel, the target frame is {normalise(LevelDir x CamUp),
         // normalise(that x LevelDir), -LevelDir} by columns; otherwise M itself.
         float TargetFrame[9];
         if (fabs(AxisDot) < kLevelAxisMaxDot)
         {
-            float Right[3];
-            Vec3CrossStored(Right, LevelDir, CamUp);
-            Vec3NormaliseInPlace(Right);
-            float Up[3];
-            Vec3CrossStored(Up, Right, LevelDir);
-            Vec3NormaliseInPlace(Up);
-            SetColumn(TargetFrame, 0, Right);
-            SetColumn(TargetFrame, 1, Up);
-            float Back[3] = {-LevelDir[0], -LevelDir[1], -LevelDir[2]};   // FUN_00411350
-            SetColumn(TargetFrame, 2, Back);
+            Vector Right;
+            Vec3CrossStored(&Right, &LevelDir, &CamUp);
+            Vec3NormaliseInPlace(&Right);
+            Vector Up;
+            Vec3CrossStored(&Up, &Right, &LevelDir);
+            Vec3NormaliseInPlace(&Up);
+            SetColumn(TargetFrame, 0, &Right);
+            SetColumn(TargetFrame, 1, &Up);
+            Vector Back = {-LevelDir.x, -LevelDir.y, -LevelDir.z};   // FUN_00411350
+            SetColumn(TargetFrame, 2, &Back);
         }
         else
         {
@@ -821,14 +821,14 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
         // The angle between their column 2s: the cosine clamped to [0, 1] (the low test on the
         // unrounded value, the high on the rounded one).
-        float CamBack[3];
-        GetColumn(CamBack, M, 2);
-        float TargetBack[3];
-        GetColumn(TargetBack, TargetFrame, 2);
+        Vector CamBack;
+        GetColumn(&CamBack, M, 2);
+        Vector TargetBack;
+        GetColumn(&TargetBack, TargetFrame, 2);
         const double CosSum =
-            (static_cast<double>(CamBack[2]) * TargetBack[2] +
-             static_cast<double>(CamBack[1]) * TargetBack[1]) +
-            static_cast<double>(TargetBack[0]) * CamBack[0];
+            (static_cast<double>(CamBack.z) * TargetBack.z +
+             static_cast<double>(CamBack.y) * TargetBack.y) +
+            static_cast<double>(TargetBack.x) * CamBack.x;
         float Cos = static_cast<float>(CosSum);
         if (CosSum < 0.0)
             Cos = 0.0f;
@@ -863,19 +863,19 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         // The offset through M onto the position -- via the Win3D engine cache DAT_006679d8,
         // not the cockpit one.
         Vector Offset;
-        Win3DTransformByMatrix(Offset, AsMatrix(M), AsVector(CameraOffset));
+        Win3DTransformByMatrix(Offset, AsMatrix(M), AsVector(&CameraOffset));
         Pos[0] = static_cast<float>(static_cast<double>(Offset.x) + Pos[0]);
         Pos[1] = static_cast<float>(static_cast<double>(Pos[1]) + Offset.y);
         Pos[2] = static_cast<float>(static_cast<double>(Pos[2]) + Offset.z);
 
         // The new level axis = -(ship rotation^T * M's column 2).
-        float NewBack[3];
-        GetColumn(NewBack, M, 2);
+        Vector NewBack;
+        GetColumn(&NewBack, M, 2);
         Vector BackLocal;
-        CockpitMathEngine()->TransposeTransform(BackLocal, AsMatrix(ShipRot), AsVector(NewBack));
-        Cam->LevelAxis[0] = -BackLocal.x;
-        Cam->LevelAxis[1] = -BackLocal.y;
-        Cam->LevelAxis[2] = -BackLocal.z;
+        CockpitMathEngine()->TransposeTransform(BackLocal, AsMatrix(ShipRot), AsVector(&NewBack));
+        Cam->LevelAxis.x = -BackLocal.x;
+        Cam->LevelAxis.y = -BackLocal.y;
+        Cam->LevelAxis.z = -BackLocal.z;
 
         // The history = M, then M = slerp(q(M), q(before), +0x1e8).
         memcpy(Cam->ResetOrient, M, sizeof(M));
@@ -892,7 +892,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     Cam->TranslationCache[1] = Pos[1];
     Cam->TranslationCache[2] = Pos[2];
     Cam->PrevSpeed = Speed;
-    HudCameraApplyShake((FHudCamera*)Cam, M);
+    HudCameraApplyShake((FHudCamera*)Cam, reinterpret_cast<Matrix*>(M));
     memcpy(Out12, M, 9 * sizeof(float));
     Out12[9] = Cam->TranslationCache[0];
     Out12[10] = Cam->TranslationCache[1];

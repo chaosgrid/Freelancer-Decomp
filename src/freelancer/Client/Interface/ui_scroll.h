@@ -46,9 +46,9 @@ public:
     ~UiScroll() override;
 
     // slot 4 (+0x10) — LAB_005971e0 (RET 4). Inside (0..W, 0..-H) tells the parent.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 (+0x14) — LAB_00595f90 (RET 4). Adds the offsets and rebuilds the inverse.
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
 
     // slot 9 (+0x24) — FUN_00595e90 (RET 8); args (Parent, FUiPayloadScrollCycle*).
     bool Create(Win3D* NewParent, void* Payload) override;
@@ -58,9 +58,9 @@ public:
     // slot 13 (+0x34) — LAB_00596450.
     void Draw() override;
     // slot 14 (+0x38) — LAB_00596b90 (RET 4): thumb drag.
-    void MouseOver(float const* Ray) override;
+    void MouseOver(Vector const* Ray) override;
     // slot 16 (+0x40) — LAB_00596d20 (RET 4).
-    void MouseLeave(float const* Ray) override;
+    void MouseLeave(Vector const* Ray) override;
     // slot 19 (+0x4c) — LAB_00596d30 (RET 4).
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 42 (+0xa8) — LAB_00597350 (RET 0xc): 6 scroll offset, 0x37 range, 0x38 value,
@@ -88,7 +88,7 @@ public:
     // FUN_00595f50 (RET 8) — +0x414 / +0x418.
     void SetBarColors(unsigned long const* Idle, unsigned long const* Hot);
     // FUN_005972d0 (RET 4) — move by the change of the scroll offset (+0x41c).
-    void SetScrollOffset(float const Offset[3]);
+    void SetScrollOffset(Vector const* Offset);
 
     // +0x3b4 — retail callers write the byte directly.
     void SetStepMode(bool bStepMode) { bStepMode_ = bStepMode; }
@@ -117,9 +117,9 @@ protected:
     void NotifyParent();
     // The mouse ray on the scrollbar plane in local coordinates (+0x3dc inverse), through the
     // TU's math engine DAT_0067d9fc.
-    Vector RayToLocal(float const* Ray) const;
+    Vector RayToLocal(Vector const* Ray) const;
     // The same, but MouseEvent transforms through FUN_004e7090 (DAT_00674b1c).
-    Vector RayToLocalViaHud(float const* Ray) const;
+    Vector RayToLocalViaHud(Vector const* Ray) const;
 
     bool bActive_;                     // +0x32c — ctor 1; gates the draw hover tint and the drag
     bool bCustomColor_;                // +0x32d — ctor 0; draw uses +0x32e for every part

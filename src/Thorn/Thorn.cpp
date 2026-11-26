@@ -188,18 +188,18 @@ namespace
               ComContext_(nullptr), ContextTailRelease_(ComContext_), LoadParser_(nullptr), SaveParser_(nullptr)
         {
             Outer_ = &Inner_;
-            Scene_.ForwardCsys().Pos[0] = 0.0f;
-            Scene_.ForwardCsys().Pos[1] = 0.0f;
-            Scene_.ForwardCsys().Pos[2] = 0.0f;
-            std::memset(Scene_.ForwardCsys().Orient, 0, sizeof(Scene_.ForwardCsys().Orient));
-            Scene_.ForwardCsys().Orient[0] = 1.0f;
-            Scene_.ForwardCsys().Orient[4] = 1.0f;
-            Scene_.ForwardCsys().Orient[8] = 1.0f;
+            Scene_.ForwardCsys().Translation.x = 0.0f;
+            Scene_.ForwardCsys().Translation.y = 0.0f;
+            Scene_.ForwardCsys().Translation.z = 0.0f;
+            std::memset(&Scene_.ForwardCsys().Rotation, 0, sizeof(Scene_.ForwardCsys().Rotation));
+            Scene_.ForwardCsys().Rotation.E[0][0] = 1.0f;
+            Scene_.ForwardCsys().Rotation.E[1][1] = 1.0f;
+            Scene_.ForwardCsys().Rotation.E[2][2] = 1.0f;
             // FUN_06f37b50 initializes the inverse to identity/+0 directly.
-            std::memset(SceneCsys_, 0, sizeof(SceneCsys_));
-            SceneCsys_[0] = 1.0f;
-            SceneCsys_[4] = 1.0f;
-            SceneCsys_[8] = 1.0f;
+            std::memset(&SceneCsys_, 0, sizeof(SceneCsys_));
+            SceneCsys_.Rotation.E[0][0] = 1.0f;
+            SceneCsys_.Rotation.E[1][1] = 1.0f;
+            SceneCsys_.Rotation.E[2][2] = 1.0f;
         }
 
         ~FScriptEngine() noexcept(false)
@@ -387,12 +387,12 @@ namespace
 
         GENRESULT DACOM_API GetEntityPosition(int Index, Vector* OutVec3) override
         {
-            return Scene_.GetEntityPos(Index, &OutVec3->x);
+            return Scene_.GetEntityPos(Index, OutVec3);
         }
 
         GENRESULT DACOM_API GetEntityOrientation(int Index, Matrix* OutMat9) override
         {
-            return Scene_.GetEntityOrient(Index, &OutMat9->E[0][0]);
+            return Scene_.GetEntityOrient(Index, OutMat9);
         }
 
         GENRESULT DACOM_API AttachEntity(int Index, void* EngineObj) override
@@ -638,13 +638,13 @@ namespace
         {
             Transform OldInverse;
             std::memcpy(&OldInverse, SceneCsys(), sizeof(OldInverse));
-            const float* Source = (const float*)Position;
+            const float* Source = &Position->x;
             // The three raw forward stores are sequential, matching overlapping input.
             for (int Index = 0; Index < 3; ++Index)
             {
                 unsigned int Word;
                 std::memcpy(&Word, Source + Index, sizeof(Word));
-                std::memcpy(ScenePos() + Index, &Word, sizeof(Word));
+                std::memcpy(&ScenePos()->x + Index, &Word, sizeof(Word));
             }
             RebuildSceneCsys();
             Scene_.PushBoundGeoFromScene(OldInverse, false);
@@ -662,7 +662,7 @@ namespace
             {
                 unsigned int Word;
                 std::memcpy(&Word, Source + Index, sizeof(Word));
-                std::memcpy(SceneOrient() + Index, &Word, sizeof(Word));
+                std::memcpy(&SceneOrient()->E[0][0] + Index, &Word, sizeof(Word));
             }
             RebuildSceneCsys();
             Scene_.PushBoundGeoFromScene(OldInverse, true);
@@ -694,17 +694,17 @@ namespace
         // Slot 6, LAB_06f3c0e0 -> +0x44, slot 17.
         int DACOM_API GetDuration() override { return GetScriptDuration(); }
 
-        float* ScenePos() { return Scene_.ForwardCsys().Pos; }
-        float* SceneOrient() { return Scene_.ForwardCsys().Orient; }
+        Vector* ScenePos() { return &Scene_.ForwardCsys().Translation; }
+        Matrix* SceneOrient() { return &Scene_.ForwardCsys().Rotation; }
         FThornScene& Scene() { return Scene_; }
 
         void RebuildSceneCsys()
         {
             // Retail (06f3b9a0) calls 3DMath +0x38, then packs the inverse.
-            Scene_.BuildInverseCsys(SceneCsys_);
+            Scene_.BuildInverseCsys(&SceneCsys_);
         }
 
-        const float* SceneCsys() const { return SceneCsys_; }
+        const Transform* SceneCsys() const { return &SceneCsys_; }
 
     private:
         // Retail +0x108 controlling unknown / +0x10c embedded inner unknown, which holds the
@@ -717,7 +717,7 @@ namespace
         // Reverse member destruction: scene teardown, late context Release, path string.
         FThornContextTailRelease ContextTailRelease_;
         FThornScene Scene_;
-        float SceneCsys_[12];
+        Transform SceneCsys_;
         IThornLoadParser* LoadParser_;
         IThornSaveParser* SaveParser_;
     };

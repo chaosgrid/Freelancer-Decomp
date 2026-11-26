@@ -145,9 +145,9 @@ public:
     unsigned long Flags;                   // +0xA8 bit0 loaded, bit1 sphere cached, bit2 box
                                            //       cached, bit3 centroid computed
     char Name[0x104];                      // +0xAC the node path (IFileSystem +0xA4)
-    float Center[3];                       // +0x1B0 FUN_06c25d40
+    Vector Center;                         // +0x1B0 FUN_06c25d40
     float Box[6];                          // +0x1BC max x, min x, max y, min y, max z, min z
-    float SphereCenter[3];                 // +0x1D4 FUN_06c258c0
+    Vector SphereCenter;                   // +0x1D4 FUN_06c258c0
     float SphereRadius;                    // +0x1E0 -1.0f after a reset
     void* PrebuiltVertexBuffer;            // +0x1E4 handed to Draw via GetPrebuiltListing as a
                                            //       ready vertex listing; only ever zeroed in retail.
@@ -175,8 +175,8 @@ public:
                      FTriMeshArch** OutFront, FTriMeshArch** OutBack); // FUN_06c24d00
     int CompactVertices();                                           // FUN_06c25140
     int GetBox(float* Out);                                          // FUN_06c25790
-    int GetSphere(float* OutCenter, float* OutRadius);               // FUN_06c258c0
-    int GetCenter(float* Out);                                       // FUN_06c25d40
+    int GetSphere(Vector* OutCenter, float* OutRadius);              // FUN_06c258c0
+    int GetCenter(Vector* Out);                                      // FUN_06c25d40
     int LockChannel(unsigned long Channel);                          // FUN_06c25e30
     int UnlockChannel(unsigned long Channel);                        // FUN_06c26000
     int LockEdgeAngles();                                            // FUN_06c261b0

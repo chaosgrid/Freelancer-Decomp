@@ -68,7 +68,7 @@ public:
     virtual ~CTradeEquipListLine();
 
     // FUN_004be7e0 (RET 8) -- build the row's widgets under Parent around Position.
-    void Init(WinControl* Parent, float const* Position);
+    void Init(WinControl* Parent, Vector const* Position);
     // FUN_004bed40 -- SetProperty(1, 1, 0) (hide) on every widget; the info card when it exists.
     void Hide();
     // FUN_004bedc0 -- show and enable the frame and icon, show the other widgets, hide the card.

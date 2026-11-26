@@ -1558,7 +1558,7 @@ bool CShip::check_formation_follower_status(float MaxDistance)
 
         // I3DMathEngine slot 0x28, this+8 read as one Transform.
         Vector Slot;
-        Acquire3DMathEngine()->TransformXform(Slot, (Transform const&)Orientation, Offset);
+        Acquire3DMathEngine()->TransformXform(Slot, get_transform(), Offset);
 
         Vector const& FollowerPos = Follower->get_position();
         double const Dx = (double)(FollowerPos.x) - Slot.x;

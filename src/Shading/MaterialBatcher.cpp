@@ -105,8 +105,8 @@ FRpVertexSrcDesc* FMaterialBatcher::CloneVertexSource(const FRpVertexSrcDesc& So
 FBatchRecord::FBatchRecord()
 {
     std::memset(this, 0, sizeof(*this));
-    Context.World = (const Transform*)MatrixDataA;
-    Context.View = (const Transform*)MatrixDataB;
+    Context.World = &MatrixDataA;
+    Context.View = &MatrixDataB;
 }
 
 FBatchBin::FBatchBin() : OrderKey(0), SortKind(0), RecordCount(0) {}
@@ -165,10 +165,10 @@ static int __cdecl CompareBatchTriangleDescending(const void* A, const void* B)
 static double ComputeBatchPositionDepth(const FBatchRecord& Record, const float* Position)
 {
     // Summed Z, Y, X, then translation, all in double.
-    double Depth = (double)Record.Combined[8] * Position[2];
-    Depth += (double)Record.Combined[5] * Position[1];
-    Depth += (double)Record.Combined[2] * Position[0];
-    Depth += Record.Combined[11];
+    double Depth = (double)Record.Combined.Rotation.E[2][2] * Position[2];
+    Depth += (double)Record.Combined.Rotation.E[1][2] * Position[1];
+    Depth += (double)Record.Combined.Rotation.E[0][2] * Position[0];
+    Depth += Record.Combined.Translation.z;
     return Depth;
 }
 
@@ -636,11 +636,11 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
         int StateValue = 1;
         Pipeline->GetPipelineState(7, &StateValue);
         if (StateValue != 0)
-            Pipeline->SetModelview((const Transform*)Record.Combined);
+            Pipeline->SetModelview(&Record.Combined);
         else
         {
-            Pipeline->SetWorld((const Transform*)Record.MatrixDataA);
-            Pipeline->SetView((const Transform*)Record.MatrixDataB);
+            Pipeline->SetWorld(&Record.MatrixDataA);
+            Pipeline->SetView(&Record.MatrixDataB);
         }
         if (Active != Item.Batched || (Item.MaterialFlags & 0x20) != 0)
         {
@@ -841,11 +841,11 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     Transform Combined;
     GBatchMathEngine->MulTransform(Combined, *MatrixB, *MatrixA);
     const unsigned long QueuedFlags = Record.Flags;
-    std::memcpy(Record.Combined, &Combined, sizeof(Record.Combined));
+    std::memcpy(&Record.Combined, &Combined, sizeof(Record.Combined));
     // Retail re-reads World/View after the math call.
-    std::memcpy(Record.MatrixDataA,
+    std::memcpy(&Record.MatrixDataA,
         Source->World, sizeof(Record.MatrixDataA));
-    std::memcpy(Record.MatrixDataB,
+    std::memcpy(&Record.MatrixDataB,
         Source->View, sizeof(Record.MatrixDataB));
     if ((QueuedFlags & 0x100) != 0)
     {

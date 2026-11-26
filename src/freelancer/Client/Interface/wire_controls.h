@@ -90,9 +90,9 @@ public:
     ~WireStaticControl() override;
 
     // slot 4 FUN_0053f330 -- Win3D's pick: false
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 5 LAB_005a3950
-    void SetPosition(float const* NewPosition) override;
+    void SetPosition(Vector const* NewPosition) override;
     // slot 7 LAB_005a3a30
     void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_005a3ea0 (RET 8)
@@ -107,10 +107,10 @@ public:
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     // FUN_005a3360 (RET 0x18)
-    void Init(float const* NewOffset, float const* NewHalfExtents, unsigned char bAlwaysWhite,
+    void Init(Vector const* NewOffset, Vector const* NewHalfExtents, unsigned char bAlwaysWhite,
               unsigned char bNewNoZEnable, int NewToolTipIds, unsigned NewEdgeMask);
 
-    float WireOrientation[9];      // +0x32c
+    Matrix WireOrientation;        // +0x32c
     float WireCenter[3];           // +0x350
     unsigned char WireState;       // +0x35c
     unsigned char WireState2;      // +0x35d
@@ -148,13 +148,13 @@ public:
     ~WireButtonControl() override;
 
     // slot 4 LAB_005a42c0 -- WinControl's HitTest FUN_005a0340
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
     // slot 11 LAB_005a4080
     void Update() override;
     // slot 15 FUN_005a42d0 (RET 4)
-    void MouseEnter(float const* Ray) override;
+    void MouseEnter(Vector const* Ray) override;
     // slot 16 FUN_005a4330 (RET 4)
-    void MouseLeave(float const* Ray) override;
+    void MouseLeave(Vector const* Ray) override;
     // slot 19 FUN_005a4380 (RET 4)
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 34 FUN_005a46c0
@@ -166,7 +166,7 @@ public:
     virtual void Activate();
 
     // FUN_005a3ee0 (RET 0x20)
-    void Init(char const* NewSoundName, float const* NewOffset, float const* NewHalfExtents,
+    void Init(char const* NewSoundName, Vector const* NewOffset, Vector const* NewHalfExtents,
               unsigned char bAlwaysWhite, unsigned char bNewNoZEnable, int NewToolTipIds,
               int NewCommandId, unsigned NewEdgeMask);
 
@@ -188,7 +188,7 @@ public:
     ~RichTextWireButtonControl() override;
 
     // FUN_005a4810 (RET 0x24)
-    void Init(char const* NewSoundName, float const* NewOffset, float const* NewHalfExtents,
+    void Init(char const* NewSoundName, Vector const* NewOffset, Vector const* NewHalfExtents,
               unsigned char bAlwaysWhite, unsigned char bNewNoZEnable, int NewToolTipIds,
               unsigned CaptionIds, int NewCommandId, unsigned NewEdgeMask);
 

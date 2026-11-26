@@ -164,32 +164,32 @@ CTradeEquipListLine::~CTradeEquipListLine()
     // LAB_004be7c0. The widgets are children of the parent control and are not touched.
 }
 
-void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
+void CTradeEquipListLine::Init(WinControl* Parent, Vector const* Position)
 {
     // FUN_004be7e0. Base = Position moved 0.029 right (DAT_005d6130).
-    float Base[3];
-    Base[0] = Position[0] + 0.029f;
-    Base[1] = Position[1];
-    Base[2] = Position[2];
-    float Zero[3];
-    float At[3];
+    Vector Base;
+    Base.x = Position->x + 0.029f;
+    Base.y = Position->y;
+    Base.z = Position->z;
+    Vector Zero;
+    Vector At;
 
     if (Owner != nullptr && Owner->bInfoCard != 0)
     {
         // The "?" button (offsets DAT_005d6128, DAT_005d612c), created hidden and above
         // everything else.
-        At[0] = Base[0] + 0.119f;
-        At[1] = Base[1] + 0.021f;
-        At[2] = Position[2];
-        Zero[0] = 0.0f;
-        Zero[1] = 0.0f;
-        Zero[2] = 0.0f;
+        At.x = Base.x + 0.119f;
+        At.y = Base.y + 0.021f;
+        At.z = Position->z;
+        Zero.x = 0.0f;
+        Zero.y = 0.0f;
+        Zero.z = 0.0f;
         FormatTradeWidgetName("InfoCard");
         InfoCard = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
-            G_TradeWidgetName, kQuestionMesh, kQuestionMesh, nullptr, nullptr, At, nullptr, Zero,
+            G_TradeWidgetName, kQuestionMesh, kQuestionMesh, nullptr, nullptr, &At, nullptr, &Zero,
             0, 0, 0, 1, 0, 0, 0));
         InfoCard->OwnerData = PointerField(this);
-        WinControlHalfExtentsFromMesh(InfoCard->HalfExtents, &InfoCard->MeshHolder);
+        WinControlHalfExtentsFromMesh(&InfoCard->HalfExtents, &InfoCard->MeshHolder);
         InfoCard->HitPriority = 1000;
         InfoCard->SetProperty(kWinPropHide, 1, 0);
     }
@@ -198,65 +198,65 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
         InfoCard = nullptr;
     }
 
-    Zero[0] = 0.0f;
-    Zero[1] = 0.0f;
-    Zero[2] = 0.0f;
+    Zero.x = 0.0f;
+    Zero.y = 0.0f;
+    Zero.z = 0.0f;
     FormatTradeWidgetName("InfoFrame");
     InfoFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
-        G_TradeWidgetName, kItemInfoMesh, kItemInfoMesh, nullptr, nullptr, Base, nullptr, Zero, 1,
+        G_TradeWidgetName, kItemInfoMesh, kItemInfoMesh, nullptr, nullptr, &Base, nullptr, &Zero, 1,
         0, 0, 1, 0, 0, 0));
     InfoFrame->OwnerData = PointerField(this);
-    WinControlHalfExtentsFromMesh(InfoFrame->HalfExtents, &InfoFrame->MeshHolder);
+    WinControlHalfExtentsFromMesh(&InfoFrame->HalfExtents, &InfoFrame->MeshHolder);
 
     // The item frame (0.175 is the string "333>" read as a float, 0x005d60a4), always drawn
     // tinted (+0x337).
-    At[0] = Base[0] - 0.175f;
-    At[1] = Base[1];
-    At[2] = Base[2];
-    Zero[0] = 0.0f;
-    Zero[1] = 0.0f;
-    Zero[2] = 0.0f;
+    At.x = Base.x - 0.175f;
+    At.y = Base.y;
+    At.z = Base.z;
+    Zero.x = 0.0f;
+    Zero.y = 0.0f;
+    Zero.z = 0.0f;
     FormatTradeWidgetName("IconFrame");
     IconFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
-        G_TradeWidgetName, kItemViewMesh, kItemViewMesh, nullptr, nullptr, At, nullptr, Zero, 1,
+        G_TradeWidgetName, kItemViewMesh, kItemViewMesh, nullptr, nullptr, &At, nullptr, &Zero, 1,
         0, 0, 1, 0, 0, 0));
     IconFrame->OwnerData = PointerField(this);
     IconFrame->SetGlow(1);
-    WinControlHalfExtentsFromMesh(IconFrame->HalfExtents, &IconFrame->MeshHolder);
+    WinControlHalfExtentsFromMesh(&IconFrame->HalfExtents, &IconFrame->MeshHolder);
 
     // The icon at the same place, a StaticControl.
-    float IconAt[3];
-    IconAt[0] = Base[0] - 0.175f;
-    IconAt[1] = Base[1];
-    IconAt[2] = Base[2];
-    Zero[0] = 0.0f;
-    Zero[1] = 0.0f;
-    Zero[2] = 0.0f;
-    At[0] = 0.0f;
-    At[1] = 0.0f;
-    At[2] = 0.0f;
+    Vector IconAt;
+    IconAt.x = Base.x - 0.175f;
+    IconAt.y = Base.y;
+    IconAt.z = Base.z;
+    Zero.x = 0.0f;
+    Zero.y = 0.0f;
+    Zero.z = 0.0f;
+    At.x = 0.0f;
+    At.y = 0.0f;
+    At.z = 0.0f;
     FormatTradeWidgetName("IconMesh");
-    IconMesh = Parent->CreateStaticControl(G_TradeWidgetName, kItemViewMesh, IconAt, nullptr, At, 0,
-                                           0, 0, 1, 0, 1, 1, 100, 0, 0, Zero);
+    IconMesh = Parent->CreateStaticControl(G_TradeWidgetName, kItemViewMesh, &IconAt, nullptr, &At, 0,
+                                           0, 0, 1, 0, 1, 1, 100, 0, 0, &Zero);
     IconMesh->UserData = PointerField(IconMesh);
     IconMesh->OwnerData = PointerField(this);
-    WinControlHalfExtentsFromMesh(IconMesh->HalfExtents, &IconMesh->MeshHolder);
+    WinControlHalfExtentsFromMesh(&IconMesh->HalfExtents, &IconMesh->MeshHolder);
     InfoFrame->UserData = PointerField(IconMesh);
 
     // DAT_005c99c8.
-    IconAt[0] = Base[0] - 0.01f;
-    IconAt[1] = Base[1];
-    IconAt[2] = Base[2];
+    IconAt.x = Base.x - 0.01f;
+    IconAt.y = Base.y;
+    IconAt.z = Base.z;
     FormatTradeWidgetName("ItemName");
-    ItemName = Parent->CreateTextControl(G_TradeWidgetName, "ItemName", IconAt, nullptr, 0.23f,
+    ItemName = Parent->CreateTextControl(G_TradeWidgetName, "ItemName", &IconAt, nullptr, 0.23f,
                                          0.066f, 1.5f, 0, 0, 0, 0);
 
     // DAT_005d011c, DAT_005c99c8.
-    IconAt[0] = Base[0] + 0.03f;
-    IconAt[1] = Base[1] - 0.01f;
-    IconAt[2] = Base[2];
+    IconAt.x = Base.x + 0.03f;
+    IconAt.y = Base.y - 0.01f;
+    IconAt.z = Base.z;
     FormatTradeWidgetName("ItemCount");
-    ItemCount = Parent->CreateTextControl(G_TradeWidgetName, "ItemName", IconAt, nullptr, 0.19f,
+    ItemCount = Parent->CreateTextControl(G_TradeWidgetName, "ItemName", &IconAt, nullptr, 0.19f,
                                           0.025f, 1.5f, 0, 2, 0, 0);
 
     // The health bar straight from the factory (no Init, no null test); 0.176 is the string
@@ -264,13 +264,13 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
     FormatTradeWidgetName("CargoBar");
     HealthBar = static_cast<CargoBarControl*>(
         WinFactoryCreate(G_TradeWidgetName, "CargoBarControl", Parent, nullptr));
-    HealthBar->HalfExtents[0] = 0.0264f;
-    HealthBar->HalfExtents[1] = 0.0032f;
-    HealthBar->HalfExtents[2] = 0.0f;
+    HealthBar->HalfExtents.x = 0.0264f;
+    HealthBar->HalfExtents.y = 0.0032f;
+    HealthBar->HalfExtents.z = 0.0f;
     HealthBar->bHorizontal = 1;
-    HealthBar->Offset[0] = Base[0] - 0.176f;
-    HealthBar->Offset[1] = Base[1] - 0.0272f;
-    HealthBar->Offset[2] = Base[2];
+    HealthBar->Offset.x = Base.x - 0.176f;
+    HealthBar->Offset.y = Base.y - 0.0272f;
+    HealthBar->Offset.z = Base.z;
     HealthBar->Capacity = 100.0f;
     HealthBar->Used = 100.0f;
     HealthBar->Color[0] = 0x00;
@@ -410,19 +410,19 @@ CTradeEquipList::CTradeEquipList(WinControl* NewParent, char const* RowsHp,
     Xform.Translation.y = 0.0f;
     Xform.Translation.z = 0.0f;
     Parent->GetHardpointTransform(RowsHp, &Xform);
-    float RowAt[3];
-    RowAt[0] = Xform.Translation.x;
-    RowAt[1] = Xform.Translation.y;
-    RowAt[2] = Xform.Translation.z;
+    Vector RowAt;
+    RowAt.x = Xform.Translation.x;
+    RowAt.y = Xform.Translation.y;
+    RowAt.z = Xform.Translation.z;
 
     CTradeEquipListLine* Line = new CTradeEquipListLine(this);
-    Line->Init(Parent, RowAt);
+    Line->Init(Parent, &RowAt);
     Lines.insert(Lines.end(), Line); // FUN_00537260
 
     // The row pitch is the first info frame's full height.
     float RowHeight;
     if (Line->InfoFrame != nullptr)
-        RowHeight = Line->InfoFrame->HalfExtents[1] + Line->InfoFrame->HalfExtents[1];
+        RowHeight = Line->InfoFrame->HalfExtents.y + Line->InfoFrame->HalfExtents.y;
     else
         RowHeight = 0.0f;
 
@@ -430,30 +430,30 @@ CTradeEquipList::CTradeEquipList(WinControl* NewParent, char const* RowsHp,
     {
         for (int Row = VisibleRows - 1; Row != 0; --Row)
         {
-            RowAt[1] = RowAt[1] - RowHeight;
+            RowAt.y = RowAt.y - RowHeight;
             Line = new CTradeEquipListLine(this);
-            Line->Init(Parent, RowAt);
+            Line->Init(Parent, &RowAt);
             Lines.insert(Lines.end(), Line);
         }
     }
 
     // Four rows is the transfer list's bar, anything else the inventory's.
     char const* const BackMesh = (VisibleRows == 4) ? kTransferScrollBarMesh : kInventoryScrollBarMesh;
-    float ThumbMouse[3] = {0.01f, 0.018f, 0.0f};
-    float ThumbOffset1[3] = {0.0f, 0.0f, 0.0f};
-    float ThumbOffset0[3] = {0.0f, 0.0f, 0.0f};
-    float PrevMouse[3] = {0.012f, 0.009f, 0.0f};
-    float PrevOffset[3] = {0.0f, 0.0f, 0.0f};
-    float NextMouse[3] = {0.012f, 0.009f, 0.0f};
-    float NextOffset[3] = {0.0f, 0.0f, 0.0f};
-    float BackMouse[3] = {0.01f, 0.14f, 0.0f};
-    float BackOffset[3] = {0.0f, 0.0f, 0.0f};
+    Vector ThumbMouse = {0.01f, 0.018f, 0.0f};
+    Vector ThumbOffset1 = {0.0f, 0.0f, 0.0f};
+    Vector ThumbOffset0 = {0.0f, 0.0f, 0.0f};
+    Vector PrevMouse = {0.012f, 0.009f, 0.0f};
+    Vector PrevOffset = {0.0f, 0.0f, 0.0f};
+    Vector NextMouse = {0.012f, 0.009f, 0.0f};
+    Vector NextOffset = {0.0f, 0.0f, 0.0f};
+    Vector BackMouse = {0.01f, 0.14f, 0.0f};
+    Vector BackOffset = {0.0f, 0.0f, 0.0f};
     FormatTradeWidgetName("ScrollBar");
     ScrollBar = Parent->CreateScrollControl(
-        G_TradeWidgetName, BackMesh, BackOffset, ScrollBackHp, BackMouse, true, kDownArrowMesh,
-        NextOffset, ScrollDownHp, NextMouse, false, kUpArrowMesh, PrevOffset, ScrollUpHp,
-        PrevMouse, false, kScrollHandleMesh, ThumbOffset0, ThumbOffset1, ThumbTopHp,
-        ThumbBottomHp, ThumbMouse, false, 0, 0, VisibleRows, false, false);
+        G_TradeWidgetName, BackMesh, &BackOffset, ScrollBackHp, &BackMouse, true, kDownArrowMesh,
+        &NextOffset, ScrollDownHp, &NextMouse, false, kUpArrowMesh, &PrevOffset, ScrollUpHp,
+        &PrevMouse, false, kScrollHandleMesh, &ThumbOffset0, &ThumbOffset1, ThumbTopHp,
+        ThumbBottomHp, &ThumbMouse, false, 0, 0, VisibleRows, false, false);
     ScrollBar->OwnerData = PointerField(this);
 
     Refresh(-1);

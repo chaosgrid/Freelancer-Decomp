@@ -322,14 +322,14 @@ UiFastTable::~UiFastTable()
     // order -- then BaseRichTextWin's (FUN_00579620).
 }
 
-Vector UiFastTable::RayToLocal(float const* Ray) const
+Vector UiFastTable::RayToLocal(Vector const* Ray) const
 {
     // Position.z / Ray.z stays on the x87 stack; the three products are stored as floats.
-    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    double const Scale = static_cast<double>(Position.z) / Ray->z;
     Vector Scaled;
-    Scaled.x = static_cast<float>(Ray[0] * Scale);
-    Scaled.y = static_cast<float>(Ray[1] * Scale);
-    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Scaled.x = static_cast<float>(Ray->x * Scale);
+    Scaled.y = static_cast<float>(Ray->y * Scale);
+    Scaled.z = static_cast<float>(Ray->z * Scale);
     Vector Local;
     UiFastTableMath()->TransformXform(Local, InverseTransform, Scaled);
     return Local;
@@ -873,7 +873,7 @@ void UiFastTable::SetTransform(Transform const* NewXform)
     // out-parameter lands in the argument slot), then the layout dirtied when the grid is not
     // empty.
     SetOrientation(&NewXform->Rotation);
-    SetPosition(&NewXform->Translation.x);
+    SetPosition(&NewXform->Translation);
     float W = 0.0f;
     Transform Inverse;
     UiFastTableMath()->GeneralInverse(Inverse, W,
@@ -883,7 +883,7 @@ void UiFastTable::SetTransform(Transform const* NewXform)
         MarkDirty(true, true);
 }
 
-void UiFastTable::SetPosition(float const* NewPosition)
+void UiFastTable::SetPosition(Vector const* NewPosition)
 {
     // LAB_0058e510: BaseRichTextWin's SetPosition (FUN_0057b0a0), then the same inverse and dirty
     // test as SetTransform.
@@ -905,9 +905,9 @@ void UiFastTable::Update()
     if (Win3DGetCapture() == this && bDragging != 0)
     {
         // Dragging an edge: follow the mouse with the grab offset kept.
-        float Ray[3];
-        Win3DGetMouseRay(Ray);
-        Vector const Local = RayToLocal(Ray);
+        Vector Ray;
+        Win3DGetMouseRay(&Ray);
+        Vector const Local = RayToLocal(&Ray);
         if (bDragColumn != 0)
         {
             SetColumnEdge(DragEdge, static_cast<float>(static_cast<double>(Local.x) + DragOffset));
@@ -923,9 +923,9 @@ void UiFastTable::Update()
     if (Win3DGetCapture() != nullptr)
         return;
 
-    float Ray[3];
-    Win3DGetMouseRay(Ray);
-    Vector const Local = RayToLocal(Ray);
+    Vector Ray;
+    Win3DGetMouseRay(&Ray);
+    Vector const Local = RayToLocal(&Ray);
     HoverColumn = 0xffffffffu;
     HoverRow = 0xffffffffu;
     bHovered = 0;
@@ -1213,7 +1213,7 @@ void UiFastTable::Draw()
     Win3DEnd();
 }
 
-void UiFastTable::MouseLeave(float const* /*Ray*/)
+void UiFastTable::MouseLeave(Vector const* /*Ray*/)
 {
     // LAB_0058f210 (RET 4).
     MouseSetCursor("Arrow", false);
@@ -1284,7 +1284,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
     return WinControl::MouseEvent(Event);
 }
 
-bool UiFastTable::HitTest(float const* Ray)
+bool UiFastTable::HitTest(Vector const* Ray)
 {
     // LAB_0058f3e0: the given ray on the table plane, in table space, inside
     // [0, Width) x (-Height, 0].

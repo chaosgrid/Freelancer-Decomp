@@ -183,61 +183,61 @@ void NnNews::RevealSelected()
 bool NnNews::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004a4250 (RET 8). Extents, hit offset and the base position.
-    HalfExtents[0] = 0.43f; // +0xb4
-    HalfExtents[1] = 0.3f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.0f;    // +0xc0
-    HitOffset[1] = 0.033f;
-    HitOffset[2] = -1.0f;
+    HalfExtents.x = 0.43f; // +0xb4
+    HalfExtents.y = 0.3f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.0f;    // +0xc0
+    HitOffset.y = 0.033f;
+    HitOffset.z = -1.0f;
     BasePosition[0] = 0.0f;
     BasePosition[1] = -0.1f;
     BasePosition[2] = -1.498f;
     float const X = BasePosition[0];
     float const Y = BasePosition[1];
     float const Z = BasePosition[2];
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
     // FUN_00423b30 adds a zero offset here.
     {
-        float const Position[3] = {X + 0.0f, Y + 0.0f, Z + 0.0f};
+        Vector const Position = {X + 0.0f, Y + 0.0f, Z + 0.0f};
         Background = CreateStaticControl("NewsBackground",
                                          "Interface\\NeuroNet\\NewsVendor\\NEWS_background.cmp",
-                                         Position, nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                                         &Position, nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + -0.215f, Y + 0.217f, Z + 0.0f};
+        Vector const Position = {X + -0.215f, Y + 0.217f, Z + 0.0f};
         CreateStaticControl("NewsHeadlinesFrame",
-                            "Interface\\NeuroNet\\NewsVendor\\NEWS_headlineframe.3db", Position,
-                            nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            "Interface\\NeuroNet\\NewsVendor\\NEWS_headlineframe.3db", &Position,
+                            nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X - 0.006f, Y - 0.149f, Z};
+        Vector const Position = {X - 0.006f, Y - 0.149f, Z};
         CreateStaticControl("NewsStoryFrame", "Interface\\NeuroNet\\NewsVendor\\NEWS_textframe.3db",
-                            Position, nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            &Position, nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + 0.364f, Y + 0.24f, Z};
+        Vector const Position = {X + 0.364f, Y + 0.24f, Z};
         CreateStaticControl("NewsVideoFrame",
-                            "Interface\\NeuroNet\\NewsVendor\\NEWS_videowindow.3db", Position,
-                            nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            "Interface\\NeuroNet\\NewsVendor\\NEWS_videowindow.3db", &Position,
+                            nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X - 0.003f, Y + 0.471f, Z};
-        CreateTextControl("NewsTitle", "PageHeader", Position, nullptr, 1.22f, 0.03f, 2.0f, 0x4ab, 1,
+        Vector const Position = {X - 0.003f, Y + 0.471f, Z};
+        CreateTextControl("NewsTitle", "PageHeader", &Position, nullptr, 1.22f, 0.03f, 2.0f, 0x4ab, 1,
                           0, 0);
     }
     MaterialGroup = MiscUtilLoadMaterialLibrary(kVideoScreenMesh);
     {
-        float const Position[3] = {X + 0.364f, Y + 0.24f, Z};
-        CreateStaticControl("NewsVideoScreen", kVideoScreenMesh, Position, nullptr, Zero, 0, 0, 0, 1,
-                            1, 0, 1, 0, 0, 0, Zero);
+        Vector const Position = {X + 0.364f, Y + 0.24f, Z};
+        CreateStaticControl("NewsVideoScreen", kVideoScreenMesh, &Position, nullptr, &Zero, 0, 0, 0, 1,
+                            1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + 0.591f, Y + 0.461f, Z};
-        float const Half[3] = {0.02f, 0.02f, 0.0f};
+        Vector const Position = {X + 0.591f, Y + 0.461f, Z};
+        Vector const Half = {0.02f, 0.02f, 0.0f};
         CloseButton = CreateButtonControl("NewsCloseButton", "Interface\\NeuroNet\\Inventory\\x.3db",
-                                          nullptr, "ui_select_item", nullptr, Position, nullptr,
-                                          Half, 0, 0, 0, 0, 0x42a, 0, 0);
+                                          nullptr, "ui_select_item", nullptr, &Position, nullptr,
+                                          &Half, 0, 0, 0, 0, 0x42a, 0, 0);
     }
 
     float const Top[3] = {X - 0.39f, Y + 0.36f, Z};
@@ -250,30 +250,30 @@ bool NnNews::Create(Win3D* NewParent, void* Data)
 
         sprintf(Name, "NewsHeadlineIcon%d", Row);
         {
-            float const Position[3] = {Top[0] - 0.125f, RowY, Top[2]};
-            HeadlineIcons[Row] = CreateStaticControl(Name, kHeadlineIconMesh, Position, nullptr, Zero,
-                                                     0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+            Vector const Position = {Top[0] - 0.125f, RowY, Top[2]};
+            HeadlineIcons[Row] = CreateStaticControl(Name, kHeadlineIconMesh, &Position, nullptr, &Zero,
+                                                     0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
         }
         sprintf(Name, "NewsHeadlineIconFrame%d", Row);
         {
-            float const Position[3] = {Top[0] - 0.125f, RowY, Top[2]};
-            float const Half[3] = {0.03f, 0.03f, 0.0f};
-            IconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", Position, Half, 0, 0,
+            Vector const Position = {Top[0] - 0.125f, RowY, Top[2]};
+            Vector const Half = {0.03f, 0.03f, 0.0f};
+            IconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", &Position, &Half, 0, 0,
                                                       0x42b, 0, 0);
         }
         sprintf(Name, "NewsHeadlineBox%d", Row);
         {
-            float const Position[3] = {Top[0] + 0.19f, RowY, Top[2]};
-            float const Half[3] = {0.245f, 0.031f, 0.0f};
-            HeadlineBoxes[Row] = CreateWireButtonControl(Name, nullptr, Position, Half, 0, 0, 0x42b, 0,
+            Vector const Position = {Top[0] + 0.19f, RowY, Top[2]};
+            Vector const Half = {0.245f, 0.031f, 0.0f};
+            HeadlineBoxes[Row] = CreateWireButtonControl(Name, nullptr, &Position, &Half, 0, 0, 0x42b, 0,
                                                          0);
         }
         sprintf(Name, "NewsHeadlineHeadline%d", Row);
         {
-            HeadlinePositions[Row][0] = Top[0] - 0.045f;
-            HeadlinePositions[Row][1] = RowY + 0.036f;
-            HeadlinePositions[Row][2] = Top[2];
-            Headlines[Row] = CreateTextControl(Name, "NewsMission", HeadlinePositions[Row], nullptr,
+            HeadlinePositions[Row].x = Top[0] - 0.045f;
+            HeadlinePositions[Row].y = RowY + 0.036f;
+            HeadlinePositions[Row].z = Top[2];
+            Headlines[Row] = CreateTextControl(Name, "NewsMission", &HeadlinePositions[Row], nullptr,
                                                0.475f, 0.03f, 1.5f, 0, 0, 0, 1);
         }
         // The headline goes multi-line (the factory's result is not tested).
@@ -288,37 +288,37 @@ bool NnNews::Create(Win3D* NewParent, void* Data)
     }
 
     {
-        float const Position[3] = {X + 0.09f, Y + 0.397f, Z};
-        Scroll = CreateUIScroll("NewsHeadlineScroll", Position, 0.019f, 0.317f, 0, 5, 5, 0);
+        Vector const Position = {X + 0.09f, Y + 0.397f, Z};
+        Scroll = CreateUIScroll("NewsHeadlineScroll", &Position, 0.019f, 0.317f, 0, 5, 5, 0);
     }
     // Style *DAT_00611d0c; 2.7f is DAT_005d3fb0.
     {
-        float const Position[3] = {X + 0.105f, Y - 0.342f, Z};
-        Ticker = CreateTextControl("NewsTicker", G_NewsTickerStyle, Position, nullptr, 1.35f, 0.03f,
+        Vector const Position = {X + 0.105f, Y - 0.342f, Z};
+        Ticker = CreateTextControl("NewsTicker", G_NewsTickerStyle, &Position, nullptr, 1.35f, 0.03f,
                                    2.7f, 0, 0, 0, 0);
     }
     // Fixed x / y, the base's z.
     {
-        float const Position[3] = {-0.535f, -0.111f, BasePosition[2]};
-        float const Half[3] = {0.03f, 0.03f, 0.0f};
-        StoryIcon = CreateStaticControl("NewsStoryIcon", kHeadlineIconMesh, Position, nullptr, Half, 0,
-                                        0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+        Vector const Position = {-0.535f, -0.111f, BasePosition[2]};
+        Vector const Half = {0.03f, 0.03f, 0.0f};
+        StoryIcon = CreateStaticControl("NewsStoryIcon", kHeadlineIconMesh, &Position, nullptr, &Half, 0,
+                                        0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     }
     // Retail sprintf's the name into the buffer first (no conversion).
     sprintf(Name, "NewsStoryHeadline");
     {
-        float const Position[3] = {X + 0.02f, Y - 0.006f, Z};
-        StoryHeadline = CreateTextControl(Name, "Normal", Position, nullptr, 1.18f, 0.03f, 1.8f, 0, 1,
+        Vector const Position = {X + 0.02f, Y - 0.006f, Z};
+        StoryHeadline = CreateTextControl(Name, "Normal", &Position, nullptr, 1.18f, 0.03f, 1.8f, 0, 1,
                                           0, 0);
     }
     {
-        float const Position[3] = {X - 0.556f, Y - 0.051f, Z};
-        StoryText = CreateRichTextWin("NewsStoryText", 1.08f, 0.27f, Position, true);
+        Vector const Position = {X - 0.556f, Y - 0.051f, Z};
+        StoryText = CreateRichTextWin("NewsStoryText", 1.08f, 0.27f, &Position, true);
     }
 
     DrawLayer = 0x64;
     SetOffset(0.0f, 0.0f, 0.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
 
     IconPathCount = 7;
     IconPaths = static_cast<char const**>(::operator new(0x1c));
@@ -427,13 +427,13 @@ void NnNews::RefreshRows()
         // A headline of fewer than two lines (unsigned) moves 0.016 down. For each of Create's
         // five HeadlinePositions the double difference rounds to the same float as the extended
         // one.
-        float const* const Stored = HeadlinePositions[Row];
-        float Moved[3] = {Stored[0], Stored[1], Stored[2]};
+        Vector const* const Stored = &HeadlinePositions[Row];
+        Vector Moved = {Stored->x, Stored->y, Stored->z};
         unsigned const Lines = static_cast<unsigned>(
             FontStringChildCount(static_cast<NnTextControl*>(Headlines[Row])->GetFontString()));
         if (Lines < 2)
-            Moved[1] = static_cast<float>(static_cast<double>(Stored[1]) - 0.016);
-        Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(Moved), 0);
+            Moved.y = static_cast<float>(static_cast<double>(Stored->y) - 0.016);
+        Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(&Moved), 0);
 
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
         IconFrames[Row]->SetProperty(0xc, bSelected, 0);
@@ -753,7 +753,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
         return 0;
     }
     case kWinNotifyClick:

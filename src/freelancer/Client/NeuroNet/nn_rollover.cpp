@@ -113,7 +113,7 @@ void NnRolloverControl::InitRolloverDefaults()
     }
 }
 
-bool NnRolloverControl::HitTest(float const* /*Ray*/)
+bool NnRolloverControl::HitTest(Vector const* /*Ray*/)
 {
     return false;
 }
@@ -305,7 +305,7 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
     {
         SetText(Record.CaptionW);
     }
-    SetPosition(&Anchor.x); // slot 5 (+0x14)
+    SetPosition(&Anchor); // slot 5 (+0x14)
     KnowledgeMapReveal(static_cast<unsigned>(Record.IdsAlt)); // FUN_00459930
 }
 
@@ -346,7 +346,7 @@ void NnRolloverControl::ShowHover(FToolTipHoverInfo const* Info, float Hold)
     {
         SetText(Info->CaptionW);
     }
-    SetPosition(&Anchor.x); // slot 5 (+0x14)
+    SetPosition(&Anchor); // slot 5 (+0x14)
     KnowledgeMapReveal(static_cast<unsigned>(Info->IdsAlt)); // FUN_00459930
 }
 
@@ -386,7 +386,7 @@ void NnRolloverControl::ShowHoverAt(FToolTipHoverInfo const* Info, float Hold, f
     {
         SetText(Info->CaptionW);
     }
-    SetPosition(&Anchor.x);
+    SetPosition(&Anchor);
     KnowledgeMapReveal(static_cast<unsigned>(Info->IdsAlt));
 }
 
@@ -419,7 +419,7 @@ void NnRolloverControl::Draw()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY); // FUN_00417730(+0x60)
+    TextWinProjectPoint(&Position, &ScreenX, &ScreenY); // FUN_00417730(+0x60)
 
     if (bDrawBackground != 0)
     {

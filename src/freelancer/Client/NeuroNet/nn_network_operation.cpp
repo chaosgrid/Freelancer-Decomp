@@ -48,14 +48,14 @@ bool NnNetworkOperation::Create(Win3D* NewParent, void* Data)
     // FUN_00472230 (RET 8).
     MouseSetCursor("Arrow", false);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    float FramePosition[3] = {0.0f, 0.0f, -1.0f};
-    CreateStaticControl("ExitFrame", kExitFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
-                        0, 1, 0, 0, 0, Zero);
+    Vector FramePosition = {0.0f, 0.0f, -1.0f};
+    CreateStaticControl("ExitFrame", kExitFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1, 1,
+                        0, 1, 0, 0, 0, &Zero);
 
-    float TextPosition[3] = {0.0f, NnFloatBits(0x3d71a9fc), -1.0f};
-    ExitText = CreateTextControl("ExitText", "Normal", TextPosition, nullptr,
+    Vector TextPosition = {0.0f, NnFloatBits(0x3d71a9fc), -1.0f};
+    ExitText = CreateTextControl("ExitText", "Normal", &TextPosition, nullptr,
                                  NnFloatBits(0x3eb851ec), NnFloatBits(0x3cf5c28f),
                                  NnFloatBits(0x3fa00000), 0x736, 1, 0, 0);
 
@@ -115,7 +115,7 @@ intptr_t NnNetworkOperation::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
+        SetPosition(&Position);
     }
     return 0;
 }
@@ -143,8 +143,8 @@ void NnNetworkOperationOpen(unsigned Ids)
     if (Created == nullptr)
         return;
     NnNetworkOperation* const Dialog = static_cast<NnNetworkOperation*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     if (Dialog->ExitText != nullptr)
         Dialog->ExitText->SetProperty(kTextPropSetIds, Ids, 0);
     Dialog->CaptureMouse();

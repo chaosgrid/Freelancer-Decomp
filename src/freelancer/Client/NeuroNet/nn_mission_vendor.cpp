@@ -174,37 +174,37 @@ void NnMissionVendor::RevealSelectedOffer()
 bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
 {
     // LAB_0048b6e0 (RET 8).
-    HalfExtents[0] = 0.43f; // +0xb4
-    HalfExtents[1] = 0.3f;
-    HalfExtents[2] = 0.0f;
-    HitOffset[0] = 0.0f;    // +0xc0
-    HitOffset[1] = 0.033f;
-    HitOffset[2] = -1.0f;
+    HalfExtents.x = 0.43f; // +0xb4
+    HalfExtents.y = 0.3f;
+    HalfExtents.z = 0.0f;
+    HitOffset.x = 0.0f;    // +0xc0
+    HitOffset.y = 0.033f;
+    HitOffset.z = -1.0f;
     BasePosition[0] = 0.0f;
     BasePosition[1] = -0.1f;
     BasePosition[2] = -1.498f;
     float const X = BasePosition[0];
     float const Y = BasePosition[1];
     float const Z = BasePosition[2];
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
     {
-        float const Position[3] = {X, Y, Z};
+        Vector const Position = {X, Y, Z};
         Background = CreateStaticControl("MissionVendorBackground",
                                          "Interface\\NeuroNet\\NewsVendor\\NEWS_background.cmp",
-                                         Position, nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                                         &Position, nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + 0.584f, Y + 0.455f, Z};
-        float const Half[3] = {0.025f, 0.025f, 0.0f};
+        Vector const Position = {X + 0.584f, Y + 0.455f, Z};
+        Vector const Half = {0.025f, 0.025f, 0.0f};
         CloseButton = CreateButtonControl("MissionVendorCloseButton",
                                           "Interface\\NeuroNet\\Inventory\\x.3db", nullptr,
-                                          "ui_select_item", nullptr, Position, nullptr, Half, 0, 0,
+                                          "ui_select_item", nullptr, &Position, nullptr, &Half, 0, 0,
                                           0, 0, 0x72e, 0, 0);
     }
     {
-        float const Position[3] = {X - 0.6f, Y + 0.486f, Z};
-        Title = CreateTextControl("MissionVendorTitle", "PageHeader", Position, nullptr, 1.2f, 0.03f,
+        Vector const Position = {X - 0.6f, Y + 0.486f, Z};
+        Title = CreateTextControl("MissionVendorTitle", "PageHeader", &Position, nullptr, 1.2f, 0.03f,
                                   2.0f, 0x72b, 1, 0, 1);
     }
 
@@ -239,47 +239,47 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
             default: break;
             }
         }
-        float const Position[3] = {-0.54f, -0.01f, BasePosition[2]};
-        CreateTextControl("MissionVendorNoMissions", "SubHeader", Position, nullptr, 1.055f, 0.03f,
+        Vector const Position = {-0.54f, -0.01f, BasePosition[2]};
+        CreateTextControl("MissionVendorNoMissions", "SubHeader", &Position, nullptr, 1.055f, 0.03f,
                           2.0f, Ids, 1, 0, 1);
         HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
         return Win3D::Create(NewParent, Data);      // FUN_004b5060
     }
 
     {
-        float const Position[3] = {X - 0.215f, Y + 0.217f, Z};
+        Vector const Position = {X - 0.215f, Y + 0.217f, Z};
         CreateStaticControl("MissionVendorHeadlinesFrame",
-                            "Interface\\NeuroNet\\NewsVendor\\NEWS_headlineframe.3db", Position,
-                            nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            "Interface\\NeuroNet\\NewsVendor\\NEWS_headlineframe.3db", &Position,
+                            nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X - 0.006f, Y - 0.149f, Z};
+        Vector const Position = {X - 0.006f, Y - 0.149f, Z};
         CreateStaticControl("MissionVendorStoryFrame",
-                            "Interface\\NeuroNet\\NewsVendor\\NEWS_textframe.3db", Position, nullptr,
-                            Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            "Interface\\NeuroNet\\NewsVendor\\NEWS_textframe.3db", &Position, nullptr,
+                            &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + 0.364f, Y + 0.288f, Z};
+        Vector const Position = {X + 0.364f, Y + 0.288f, Z};
         CreateStaticControl("MissionVendorVideoFrame",
-                            "Interface\\NeuroNet\\NewsVendor\\NEWS_videowindow.3db", Position,
-                            nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                            "Interface\\NeuroNet\\NewsVendor\\NEWS_videowindow.3db", &Position,
+                            nullptr, &Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     MaterialGroup = MiscUtilLoadMaterialLibrary(kVideoScreenMesh);
     {
-        float const Position[3] = {X + 0.364f, Y + 0.288f, Z};
-        CreateStaticControl("MissionVendorVideoScreen", kVideoScreenMesh, Position, nullptr, Zero, 0,
-                            0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+        Vector const Position = {X + 0.364f, Y + 0.288f, Z};
+        CreateStaticControl("MissionVendorVideoScreen", kVideoScreenMesh, &Position, nullptr, &Zero, 0,
+                            0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
     }
     {
-        float const Position[3] = {X + 0.237f, Y + 0.105f, Z};
-        CreateTextControl("MissionVendorAcceptText", "ButtonText", Position, nullptr, 0.277f, 0.03f,
+        Vector const Position = {X + 0.237f, Y + 0.105f, Z};
+        CreateTextControl("MissionVendorAcceptText", "ButtonText", &Position, nullptr, 0.277f, 0.03f,
                           2.0f, 0x3e9, 1, 0, 1);
     }
     {
-        float const Position[3] = {X + 0.37f, Y + 0.078f, Z};
-        float const Half[3] = {0.133f, 0.026f, 0.0f};
+        Vector const Position = {X + 0.37f, Y + 0.078f, Z};
+        Vector const Half = {0.133f, 0.026f, 0.0f};
         AcceptButton = CreateWireButtonControl("MissionVendorAcceptButton", "ui_execute_transaction",
-                                               Position, Half, 0, 0, 0x331, 0, 0);
+                                               &Position, &Half, 0, 0, 0x331, 0, 0);
     }
 
     float const Top[3] = {X - 0.39f, Y + 0.36f, Z};
@@ -295,81 +295,81 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
 
         sprintf(Name, "MissionVendorSummaryIcon%d", Row);
         {
-            float const Position[3] = {RowPos[0] - 0.125f, RowPos[1], RowPos[2]};
-            SummaryIcons[Row] = CreateStaticControl(Name, kHeadlineIconMesh, Position, nullptr, Zero, 0,
-                                                    0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+            Vector const Position = {RowPos[0] - 0.125f, RowPos[1], RowPos[2]};
+            SummaryIcons[Row] = CreateStaticControl(Name, kHeadlineIconMesh, &Position, nullptr, &Zero, 0,
+                                                    0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
         }
         sprintf(Name, "MissionVendorIconFrame%d", Row);
         {
-            float const Position[3] = {RowPos[0] - 0.125f, RowPos[1], RowPos[2]};
-            float const Half[3] = {0.03f, 0.03f, 0.0f};
-            IconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", Position, Half, 0, 0,
+            Vector const Position = {RowPos[0] - 0.125f, RowPos[1], RowPos[2]};
+            Vector const Half = {0.03f, 0.03f, 0.0f};
+            IconFrames[Row] = CreateWireButtonControl(Name, "ui_select_item", &Position, &Half, 0, 0,
                                                       0x72c, 0, 0);
         }
         sprintf(Name, "MissionVendorSummaryBox%d", Row);
         {
-            float const Position[3] = {RowPos[0] + 0.185f, RowPos[1], RowPos[2]};
-            float const Half[3] = {0.245f, 0.031f, 0.0f};
-            SummaryBoxes[Row] = CreateWireButtonControl(Name, nullptr, Position, Half, 0, 0, 0x72c, 0,
+            Vector const Position = {RowPos[0] + 0.185f, RowPos[1], RowPos[2]};
+            Vector const Half = {0.245f, 0.031f, 0.0f};
+            SummaryBoxes[Row] = CreateWireButtonControl(Name, nullptr, &Position, &Half, 0, 0, 0x72c, 0,
                                                         0);
         }
         sprintf(Name, "MissionVendorSummaryDest%d", Row);
         {
-            float const Position[3] = {RowPos[0] + 0.195f, RowPos[1] + 0.017f, RowPos[2]};
-            SummaryDests[Row] = CreateTextControl(Name, "NewsMission", Position, nullptr, 0.49f, 0.03f,
+            Vector const Position = {RowPos[0] + 0.195f, RowPos[1] + 0.017f, RowPos[2]};
+            SummaryDests[Row] = CreateTextControl(Name, "NewsMission", &Position, nullptr, 0.49f, 0.03f,
                                                   1.5f, 0, 0, 0, 0);
         }
         sprintf(Name, "MissionVendorSummaryTitle%d", Row);
         {
-            float const Position[3] = {RowPos[0] + 0.195f, RowPos[1] - 0.009f, RowPos[2]};
-            SummaryTitles[Row] = CreateTextControl(Name, "NewsMission", Position, nullptr, 0.49f,
+            Vector const Position = {RowPos[0] + 0.195f, RowPos[1] - 0.009f, RowPos[2]};
+            SummaryTitles[Row] = CreateTextControl(Name, "NewsMission", &Position, nullptr, 0.49f,
                                                    0.03f, 1.5f, 0, 0, 0, 0);
         }
         sprintf(Name, "MissionVendorSummaryReward%d", Row);
         {
-            float const Position[3] = {RowPos[0] + 0.293f, RowPos[1] + 0.004f, RowPos[2]};
-            SummaryRewards[Row] = CreateTextControl(Name, "NewsMission", Position, nullptr, 0.27f,
+            Vector const Position = {RowPos[0] + 0.293f, RowPos[1] + 0.004f, RowPos[2]};
+            SummaryRewards[Row] = CreateTextControl(Name, "NewsMission", &Position, nullptr, 0.27f,
                                                     0.03f, 1.5f, 0, 2, 0, 0);
         }
     }
 
     {
-        float const Position[3] = {X + 0.09f, Y + 0.397f, Z};
-        SummaryScroll = CreateUIScroll("MissionVendorSummaryScroll", Position, 0.019f, 0.317f, 0, 5,
+        Vector const Position = {X + 0.09f, Y + 0.397f, Z};
+        SummaryScroll = CreateUIScroll("MissionVendorSummaryScroll", &Position, 0.019f, 0.317f, 0, 5,
                                        5, 0);
     }
     // The selected offer's lines. Retail sprintf's each name into the buffer first (no
     // conversions).
     {
-        float const Position[3] = {X - 0.493f, Y + 0.0085f, Z};
-        MissionReject = CreateTextControl("MissionVendorMissionReject", "Normal", Position, nullptr,
+        Vector const Position = {X - 0.493f, Y + 0.0085f, Z};
+        MissionReject = CreateTextControl("MissionVendorMissionReject", "Normal", &Position, nullptr,
                                           0.7f, 0.03f, 1.8f, 0x72f, 0, 0, 1);
     }
     {
-        float const Position[3] = {X - 0.494f, Y + 0.022f, Z};
-        MissionDest = CreateTextControl("MissionVendorMissionDest", "NewsMission", Position, nullptr,
+        Vector const Position = {X - 0.494f, Y + 0.022f, Z};
+        MissionDest = CreateTextControl("MissionVendorMissionDest", "NewsMission", &Position, nullptr,
                                         0.7f, 0.03f, 1.5f, 0, 0, 0, 1);
     }
     {
-        float const Position[3] = {X - 0.494f, Y - 0.006f, Z};
-        MissionTitle = CreateTextControl("MissionVendorMissionTitle", "NewsMission", Position,
+        Vector const Position = {X - 0.494f, Y - 0.006f, Z};
+        MissionTitle = CreateTextControl("MissionVendorMissionTitle", "NewsMission", &Position,
                                          nullptr, 0.7f, 0.03f, 1.5f, 0, 0, 0, 1);
     }
     {
-        float const Position[3] = {X + 0.348f, Y + 0.009f, Z};
-        MissionReward = CreateTextControl("MissionVendorMissionReward", "NewsMission", Position,
+        Vector const Position = {X + 0.348f, Y + 0.009f, Z};
+        MissionReward = CreateTextControl("MissionVendorMissionReward", "NewsMission", &Position,
                                           nullptr, 0.2f, 0.03f, 1.5f, 0, 2, 0, 1);
     }
     {
-        float const Position[3] = {X - 0.556f, Y - 0.051f, Z};
-        FullText = CreateRichTextWin("MissionVendorMissionFullText", 1.08f, 0.27f, Position, true);
+        Vector const Position = {X - 0.556f, Y - 0.051f, Z};
+        FullText = CreateRichTextWin("MissionVendorMissionFullText", 1.08f, 0.27f, &Position, true);
     }
     // Fixed x / y, the base's z.
     {
-        float const Position[3] = {-0.535f, -0.111f, BasePosition[2]};
-        float const Half[3] = {0.03f, 0.03f, 0.0f};
-        MissionIcon = CreateStaticControl("MissionVendorIcon", kHeadlineIconMesh, Position, nullptr,
-                                          Half, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+        Vector const Position = {-0.535f, -0.111f, BasePosition[2]};
+        Vector const Half = {0.03f, 0.03f, 0.0f};
+        MissionIcon = CreateStaticControl("MissionVendorIcon", kHeadlineIconMesh, &Position, nullptr,
+                                          &Half, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
     }
 
     DrawLayer = 0x64;

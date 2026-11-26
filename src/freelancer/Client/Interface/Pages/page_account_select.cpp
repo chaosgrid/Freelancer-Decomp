@@ -171,21 +171,21 @@ void PageAccountSelect::Update()
         {
             // Slot 42 property 6 on the buttons, slot 5 on the box.
             float const T = static_cast<float>(SlideT);
-            float BackOffset[3] = {T, 0.0f, 0.0f};
-            float ServerOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-            float const Lift[3] = {0.0f, T, 0.0f};
-            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
-            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
+            Vector BackOffset = {T, 0.0f, 0.0f};
+            Vector ServerOffset = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+            Vector const Lift = {0.0f, T, 0.0f};
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BackOffset), 0);
+            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ServerOffset), 0);
             Vector BoxPosition;
-            Win3DVec3Add(&BoxPosition.x, &BoxHome.x, Lift);
-            AccountBox->SetPosition(&BoxPosition.x);
+            Win3DVec3Add(&BoxPosition, &BoxHome, &Lift);
+            AccountBox->SetPosition(&BoxPosition);
         }
         else
         {
-            float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            AccountBox->SetPosition(&BoxHome.x);
+            Vector ZeroOffset = {0.0f, 0.0f, 0.0f};
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ZeroOffset), 0);
+            AccountBox->SetPosition(&BoxHome);
             ShowWin3D(Explain);
             ShowWin3D(AccountId);
             Back->SetSkipUpload(false);
@@ -205,12 +205,12 @@ void PageAccountSelect::Update()
     {
         SlideT = SlideT - GetClientFrameTimeCapped() * 1.5;
         float const T = static_cast<float>(SlideT);
-        float BackOffset[3] = {T, 0.0f, 0.0f};
-        float ServerOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-        Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
-        SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
+        Vector BackOffset = {T, 0.0f, 0.0f};
+        Vector ServerOffset = {static_cast<float>(-SlideT), 0.0f, 0.0f};
+        Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&BackOffset), 0);
+        SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&ServerOffset), 0);
         Vector BoxPosition = {BoxHome.x, T + BoxHome.y, BoxHome.z}; // FUN_00422b80
-        AccountBox->SetPosition(&BoxPosition.x);
+        AccountBox->SetPosition(&BoxPosition);
 
         if (SlideT <= -0.9)
         {

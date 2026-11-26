@@ -233,7 +233,7 @@ namespace AlchemyImpl
     FPooledParticle* ParticleFromUsedLink(FAppearancePool* Pool, FPoolLink* Link);
     void* EmitOneParticle(FAppearancePool* Pool, FGenericFxObjectBase* Appearance, const float* Six, float Age,
                           float Duration);
-    void FillIdentity3x3(float* Nine);
+    void FillIdentity3x3(Matrix* Out);
     // 12-float Transform (I3DMathEngine layout): Rotate (+0x30) / TransformXform (+0x28).
     void TransformDirection(const Transform* Xform, float X, float Y, float Z, Vector* Out);
     void TransformPoint(const Transform* Xform, float X, float Y, float Z, Vector* Out);
@@ -250,8 +250,8 @@ namespace AlchemyImpl
     I3DMathEngine* Acquire3DMath();
     ICamera* DrawCameraFromCookie();
     bool GetDrawCameraPosition(Vector* Out);
-    const float* GetDrawCameraTransform();
-    const float* GetDrawCameraOrientation();
+    const Transform* GetDrawCameraTransform();
+    const Matrix* GetDrawCameraOrientation();
     // ComputeGeneralInverseTransform is FUN_0622d2e0: I3DMathEngine::GeneralInverse
     // (vtable+0x5c) on a 12-float transform; used by oriented/perp/rect.
     Vector* TransformOrientedBoundsCenter(const Transform& Xform, Vector& Out,
@@ -295,7 +295,7 @@ namespace AlchemyImpl
     GENRESULT CallDrawIndexed(IDAComponent* Draw, unsigned long Prim, unsigned int MinIndex,
                               unsigned int NumVerts, unsigned int StartIndex, unsigned int Count);
     // FUN_06208640: Out = I3DMathEngine::MulTransform(A, B), 12-float transforms.
-    void ComposeTransform(float* Out12, const float* A12, const Transform& B);
+    void ComposeTransform(Transform* Out, const Transform* A, const Transform& B);
     unsigned short AlSubmitVertex(FAlDrawContext& Context, float X, float Y, float Z,
                                   unsigned long Diffuse, float U, float V);
     void AlSubmitQuadIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,

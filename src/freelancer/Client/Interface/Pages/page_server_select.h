@@ -86,8 +86,8 @@ public:
     Win3D* ServerSelectBox;                  // +0xe4 -- "ServerSelectBox"
     UiRichTextWin* Legend;                   // +0xe8 -- "Legend"
     Win3D* Version;                          // +0xec -- a TextControl this page creates
-    float InfoBoxHome[3];                    // +0xf0 -- ServerInfoBox's position after Create
-    float SelectBoxHome[3];                  // +0xfc -- ServerSelectBox's position after Create
+    Vector InfoBoxHome;                    // +0xf0 -- ServerInfoBox's position after Create
+    Vector SelectBoxHome;                  // +0xfc -- ServerSelectBox's position after Create
     double SlideT;                           // +0x108 -- Create -1.5; 0..2 in, 0..-1.5 leaving
     unsigned char bLeaving;                  // +0x110
     int LeaveDirection;                      // +0x114 -- 1 connect (Result 2), -1 back (1)

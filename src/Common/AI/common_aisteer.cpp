@@ -886,10 +886,9 @@ namespace CmnAiSteer
 
     // SelfTarget.Iface slot 0xc (get_transform), whose Transform opens with the orientation
     // Matrix. Retail has no null test.
-    Matrix* IfaceOrientation(SystemManager* Sys)
+    Matrix const* IfaceOrientation(SystemManager* Sys)
     {
-        return const_cast<Matrix*>(
-            &Sys->SelfTarget.Iface->get_transform().Rotation);
+        return &Sys->SelfTarget.Iface->get_transform().Rotation;
     }
 
     // Iface slot 0xc is IObjInspect::get_transform() everywhere and takes no arguments. At

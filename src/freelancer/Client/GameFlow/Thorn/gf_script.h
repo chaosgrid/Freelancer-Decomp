@@ -27,7 +27,7 @@ struct FGfLightWrapper;
 struct FGfCameraSlot
 {
     FRoomCamera* Camera;     // +0x00  the room camera (RoomObject+0x500) this slot drives
-    float Pos[3];            // +0x04
+    Vector Pos;            // +0x04
     float Orient[9];         // +0x10
     float HalfFovXDeg;       // +0x34  35.0
     float ZNear;             // +0x38  0.25
@@ -95,10 +95,10 @@ struct FGfLightWrapper
 };
 
 // FUN_00556fd0(Frame, Source, Direction, Group): operator new(8) zeroed, then the engine light
-// (EngineLightCreate: Frame12 = position + 3x3 orientation, Direction3 = the local direction
+// (EngineLightCreate: Frame12 = position + 3x3 orientation, Direction = the local direction
 // the orientation turns), then the group byte. Returns the wrapper.
 FGfLightWrapper* GfLightWrapperCreate(float const* Frame12, FD3dLight8 const* Source,
-                                      float const* Direction3, unsigned char Group);
+                                      Vector const* Direction, unsigned char Group);
 
 // FUN_00557130(FGfLightWrapper** Field): nothing when *Field is null; otherwise the light is
 // released through its slot 0 when present, both wrapper fields cleared, the wrapper freed and
@@ -115,7 +115,7 @@ void GfSetSceneAmbient(float R, float G, float B);
 // Directional: 3.0, taken. Range 0: 0, not taken. Point: 2 - dist^2/range^2. Spot: the same,
 // unless Pos3 lies outside the half cone (cos(Phi/2)), when the cosine of the angle replaces
 // the 2. Radius is passed by retail and never read.
-bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, float const* Dir3,
+bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, Vector const* Dir3,
                   float const* Pos3, float Radius, float* OutScore);
 
 // FUN_00557170 (cdecl) -- every wrapper of List that holds a light of this Group and scores,

@@ -42,23 +42,24 @@ namespace
     const float kTurretMouseAimDelay = 0.25f;                // .rdata 0x005c94f8
 
     // The identity 3x4 both callers of FUN_0051a7d0 build on the stack first.
-    void MakeIdentityView(float* View12)
+    void MakeIdentityView(Transform* View)
     {
+        float* const View12 = &View->Rotation.E[0][0];
         for (int Index = 0; Index < 12; ++Index)
             View12[Index] = 0.0f;
-        View12[0] = 1.0f;
-        View12[4] = 1.0f;
-        View12[8] = 1.0f;
+        View->Rotation.E[0][0] = 1.0f;
+        View->Rotation.E[1][1] = 1.0f;
+        View->Rotation.E[2][2] = 1.0f;
     }
 
     // {orientation, position} -- twelve dwords -- into the camera's world transform (+0x04).
-    void StoreWorldView(FTurretCamera* Cam, const float* View12)
+    void StoreWorldView(FTurretCamera* Cam, const Transform* View)
     {
         FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
-        memcpy(&Space->World, View12, 9 * sizeof(float));
-        Space->WorldPos.x = View12[9];
-        Space->WorldPos.y = View12[10];
-        Space->WorldPos.z = View12[11];
+        memcpy(&Space->World, &View->Rotation, 9 * sizeof(float));
+        Space->WorldPos.x = View->Translation.x;
+        Space->WorldPos.y = View->Translation.y;
+        Space->WorldPos.z = View->Translation.z;
     }
 }
 
@@ -98,7 +99,7 @@ bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4)
     return HudCameraActivate((FHudCamera*)Cam, ViewRect4);
 }
 
-bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSeconds, bool)
+bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float DeltaSeconds, bool)
 {
     // FUN_0051a7d0. The third argument (1 from the attach, 0 from the update) is never read.
     FHudCamera* const Hud = (FHudCamera*)Cam;
@@ -108,7 +109,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         return true;
 
     IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
-    const float* const ShipRot = &Object->get_transform().Rotation.E[0][0];
+    Matrix const* const ShipRot = &Object->get_transform().Rotation;
 
     // This frame's yaw (a float) and pitch (kept double).
     float Yaw = 0.0f;
@@ -195,18 +196,18 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     }
 
     // The ship's rotation turned by -yaw (columns 0 and 2; cos rounded to float, sin kept double).
-    float M[9];
-    memcpy(M, ShipRot, sizeof(M));
+    Matrix M;
+    memcpy(&M, ShipRot, sizeof(M));
     {
         const double Angle = -static_cast<double>(Cam->Yaw);
         const float CosA = static_cast<float>(cos(Angle));
         const double SinA = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
         {
-            const double A = M[Row * 3 + 0];
-            const double C = M[Row * 3 + 2];
-            M[Row * 3 + 0] = static_cast<float>(static_cast<double>(CosA) * A - SinA * C);
-            M[Row * 3 + 2] = static_cast<float>(A * SinA + static_cast<double>(CosA) * C);
+            const double A = M.E[Row][0];
+            const double C = M.E[Row][2];
+            M.E[Row][0] = static_cast<float>(static_cast<double>(CosA) * A - SinA * C);
+            M.E[Row][2] = static_cast<float>(A * SinA + static_cast<double>(CosA) * C);
         }
     }
     // Then by -pitch (columns 1 and 2).
@@ -216,38 +217,38 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         const double SinB = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
         {
-            const double B = M[Row * 3 + 1];
-            const double C = M[Row * 3 + 2];
-            M[Row * 3 + 1] = static_cast<float>(static_cast<double>(CosB) * B + SinB * C);
-            M[Row * 3 + 2] = static_cast<float>(static_cast<double>(CosB) * C - B * SinB);
+            const double B = M.E[Row][1];
+            const double C = M.E[Row][2];
+            M.E[Row][1] = static_cast<float>(static_cast<double>(CosB) * B + SinB * C);
+            M.E[Row][2] = static_cast<float>(static_cast<double>(CosB) * C - B * SinB);
         }
     }
 
     // FUN_00516fe0 with the ship's up column into a stack block that is overwritten before
     // anything reads it -- dead in retail too.
     {
-        const float Up[3] = {ShipRot[1], ShipRot[4], ShipRot[7]};
-        float Discarded[9];
-        CameraOrientFromForwardAndUp(Discarded, M, Up);
+        const Vector Up = {ShipRot->E[0][1], ShipRot->E[1][1], ShipRot->E[2][1]};
+        Matrix Discarded;
+        CameraOrientFromForwardAndUp(&Discarded, &M, &Up);
     }
 
-    HudCameraApplyShake(Hud, M);
+    HudCameraApplyShake(Hud, &M);
 
     // The tether (+0x100) through the orientation, using DAT_00675220.
     if (G_FirstPersonMathEngine == nullptr)
         G_FirstPersonMathEngine = Acquire3DMathEngine();
     Vector Offset;
-    G_FirstPersonMathEngine->TransformMatrix(Offset, *reinterpret_cast<Matrix const*>(M),
+    G_FirstPersonMathEngine->TransformMatrix(Offset, M,
                                              Cam->Tether);
 
     // Retail re-reads the watcher.
     IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
     Vector const& ShipPos = Again->get_position();
 
-    memcpy(Out12, M, 9 * sizeof(float));
-    Out12[9] = Offset.x + ShipPos.x;
-    Out12[10] = Offset.y + ShipPos.y;
-    Out12[11] = Offset.z + ShipPos.z;
+    memcpy(&OutView->Rotation, &M, 9 * sizeof(float));
+    OutView->Translation.x = Offset.x + ShipPos.x;
+    OutView->Translation.y = Offset.y + ShipPos.y;
+    OutView->Translation.z = Offset.z + ShipPos.z;
     return false;
 }
 
@@ -260,20 +261,20 @@ void TurretCameraAttach(FTurretCamera* Cam, void* Object)
     Cam->TargetPitch = 0.0f;
     HudCameraAttach((FHudCamera*)Cam, Object);
 
-    float View[12];
-    MakeIdentityView(View);
-    TurretCameraComputeView(Cam, View, 0.0f, true);
+    Transform View;
+    MakeIdentityView(&View);
+    TurretCameraComputeView(Cam, &View, 0.0f, true);
     SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
-    StoreWorldView(Cam, View);
+    StoreWorldView(Cam, &View);
 }
 
 void TurretCameraUpdate(FTurretCamera* Cam, float DeltaSeconds)
 {
     // FUN_0051a730 (slot 0x6c).
-    float View[12];
-    MakeIdentityView(View);
-    TurretCameraComputeView(Cam, View, DeltaSeconds, false);
-    StoreWorldView(Cam, View);
+    Transform View;
+    MakeIdentityView(&View);
+    TurretCameraComputeView(Cam, &View, DeltaSeconds, false);
+    StoreWorldView(Cam, &View);
     SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
     HudCameraUpdate((FHudCamera*)Cam, DeltaSeconds);
 }

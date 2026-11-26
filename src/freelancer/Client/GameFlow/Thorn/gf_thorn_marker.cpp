@@ -49,14 +49,14 @@ GENRESULT DACOM_API FThornMarker::GetTransform(Transform* OutTransform12)
 // LAB_00453750.
 GENRESULT DACOM_API FThornMarker::SetPosition(const Vector* Position)
 {
-    World.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
+    World.Pos = Frame.trans_from_frame(*Position);
     return GR_OK;
 }
 
 // LAB_00453790.
 GENRESULT DACOM_API FThornMarker::SetOrientation(const Matrix* Orient9)
 {
-    World.Orient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orient9));
+    World.Orient = Frame.trans_from_frame(*Orient9);
     return GR_OK;
 }
 

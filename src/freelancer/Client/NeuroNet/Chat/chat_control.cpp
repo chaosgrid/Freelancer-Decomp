@@ -235,9 +235,9 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     if (!Win3D::Create(NewParent, nullptr))
         return false;
 
-    Offset[0] = 0.0f;
-    Offset[1] = 0.056f;     // 0x3d656042
-    Offset[2] = 0.0f;
+    Offset.x = 0.0f;
+    Offset.y = 0.056f;     // 0x3d656042
+    Offset.z = 0.0f;
     SetMesh("Interface\\NeuroNet\\Chat\\CHAT_background.cmp", 0);
     Field2d2 = 1;
 
@@ -268,8 +268,8 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     HistoryDisplay = static_cast<MsgWin*>(WinFactoryCreate("HistoryDisplay", "MsgWin", this, nullptr));
     if (HistoryDisplay != nullptr)
     {
-        float const AttachOffset[3] = {-0.05f, 0.215f, 0.0f};  // DAT_005cef00 / DAT_005cef04
-        HistoryDisplay->SetAttachOffset(AttachOffset);
+        Vector const AttachOffset = {-0.05f, 0.215f, 0.0f};  // DAT_005cef00 / DAT_005cef04
+        HistoryDisplay->SetAttachOffset(&AttachOffset);
         HistoryDisplay->SetNormSize(G_ChatHistoryWidth, 0.335f);  // DAT_0066d4d8 / DAT_005cef08
         HistoryDisplay->SetAutoScrollbar(true);
         HistoryDisplay->SnapshotGeneration = 0;
@@ -282,11 +282,11 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     }
 
     {
-        float const Position[3] = {0.44f, 0.23f, 0.0f};     // 0x3ee147ae / 0x3e6b851f
-        float const Half[3] = {0.02f, 0.02f, 0.0f};         // 0x3ca3d70a
+        Vector const Position = {0.44f, 0.23f, 0.0f};     // 0x3ee147ae / 0x3e6b851f
+        Vector const Half = {0.02f, 0.02f, 0.0f};         // 0x3ca3d70a
         BtnCCClose = CreateButtonControl("BtnCCClose", "Interface\\NeuroNet\\Inventory\\X.3db",
-                                         nullptr, "ui_select_item", nullptr, Position, nullptr,
-                                         Half, 0, 0, 0, 0, 0x409, 0, 0);
+                                         nullptr, "ui_select_item", nullptr, &Position, nullptr,
+                                         &Half, 0, 0, 0, 0, 0x409, 0, 0);
     }
 
     {
@@ -300,8 +300,8 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     }
     if (BroadcastList != nullptr)
     {
-        float const AttachOffset[3] = {G_ChatBroadcastX, 0.215f, 0.0f};   // DAT_0066d4b4 / DAT_005cef20
-        BroadcastList->SetAttachOffset(AttachOffset);
+        Vector const AttachOffset = {G_ChatBroadcastX, 0.215f, 0.0f};   // DAT_0066d4b4 / DAT_005cef20
+        BroadcastList->SetAttachOffset(&AttachOffset);
         BroadcastList->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
         BroadcastList->SetResizable(false, false);
         BroadcastList->SetLayoutFlag(true);
@@ -325,8 +325,8 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     }
     if (PrivateList != nullptr)
     {
-        float const AttachOffset[3] = {G_ChatPrivateX, G_ChatPrivateY, 0.0f};   // DAT_0066d4ac / DAT_0066d4a8
-        PrivateList->SetAttachOffset(AttachOffset);
+        Vector const AttachOffset = {G_ChatPrivateX, G_ChatPrivateY, 0.0f};   // DAT_0066d4ac / DAT_0066d4a8
+        PrivateList->SetAttachOffset(&AttachOffset);
         PrivateList->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
         PrivateList->SetResizable(false, false);
         PrivateList->SetLayoutFlag(true);
@@ -361,20 +361,20 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
 
     // The three titles sit 0.03 above their panels.
     {
-        float const AttachOffset[3] = {G_ChatBroadcastX, 0.03f + 0.215f, 0.0f};
-        BroadcastTitle = CreateRichTextWin("BroadcastTitle", 0.35f, 0.03f, AttachOffset, false);
+        Vector const AttachOffset = {G_ChatBroadcastX, 0.03f + 0.215f, 0.0f};
+        BroadcastTitle = CreateRichTextWin("BroadcastTitle", 0.35f, 0.03f, &AttachOffset, false);
         RDLRefNode Ref(BroadcastTitleText);
         BroadcastTitle->AppendNode(Ref);
     }
     {
-        float const AttachOffset[3] = {-0.05f, 0.03f + 0.215f, 0.0f};
-        HistoryTitle = CreateRichTextWin("HistoryTitle", 0.35f, 0.03f, AttachOffset, false);
+        Vector const AttachOffset = {-0.05f, 0.03f + 0.215f, 0.0f};
+        HistoryTitle = CreateRichTextWin("HistoryTitle", 0.35f, 0.03f, &AttachOffset, false);
         RDLRefNode Ref(HistoryTitleText);
         HistoryTitle->AppendNode(Ref);
     }
     {
-        float const AttachOffset[3] = {G_ChatPrivateX, 0.03f + G_ChatPrivateY, 0.0f};
-        PrivateTitle = CreateRichTextWin("PrivateTitle", 0.35f, 0.03f, AttachOffset, false);
+        Vector const AttachOffset = {G_ChatPrivateX, 0.03f + G_ChatPrivateY, 0.0f};
+        PrivateTitle = CreateRichTextWin("PrivateTitle", 0.35f, 0.03f, &AttachOffset, false);
         RDLRefNode Ref(PrivateTitleText);
         PrivateTitle->AppendNode(Ref);
     }
@@ -387,7 +387,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     // Retail refreshes once more unconditionally.
     ChatControlRefreshAll(this);
 
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
     return true;
 }
 
@@ -883,7 +883,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(&Parent->Position.x);
+            SetPosition(&Parent->Position);
         ChatControlRefreshAll(this);
         Flags = static_cast<unsigned char>(Flags | 0x03);
         // Retail does not test HistoryDisplay for null.

@@ -589,9 +589,9 @@ MissionObjectiveWindow::~MissionObjectiveWindow()
 bool MissionObjectiveWindow::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004bb270 (RET 8).
-    float const Position[3] = {NnFloatBits(0xbf041893), NnFloatBits(0x3e83126f), 0.0f};
+    Vector const Position = {NnFloatBits(0xbf041893), NnFloatBits(0x3e83126f), 0.0f};
     Text = static_cast<NnTextControl*>(CreateTextControl(
-        "MissionObjectiveText", "MissionObjective", Position, nullptr, NnFloatBits(0x3f82f1aa),
+        "MissionObjectiveText", "MissionObjective", &Position, nullptr, NnFloatBits(0x3f82f1aa),
         NnFloatBits(0x3cf5c28f), 2.0f, 0, 1, 0, 1));
 
     // No null test.
@@ -819,17 +819,17 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
     // FUN_004bb810 (RET 8).
     NavBarCloseService(true); // FUN_004424f0(1)
     SetMesh(kStoryStarFrameMesh, 0);
-    WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
+    WinControlHalfExtentsFromMesh(&HalfExtents, &MeshHolder);
 
     // Normally the close button; when NN_MainButton forces the log (FUN_0045dcd0, no null test
     // on DAT_0066d3f0) the game pauses instead.
     if (!G_NnMainButton->GetForceMissionLog())
     {
-        float const ClosePosition[3] = {NnFloatBits(0x3ecf5c29), NnFloatBits(0x3e74bc6a), 0.0f};
-        float const CloseExtents[3] = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
+        Vector const ClosePosition = {NnFloatBits(0x3ecf5c29), NnFloatBits(0x3e74bc6a), 0.0f};
+        Vector const CloseExtents = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
         CloseButton = CreateButtonControl("StoryStarCloseButton", kStoryStarCloseMesh, nullptr,
-                                          kSelectSound, nullptr, ClosePosition, nullptr,
-                                          CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
+                                          kSelectSound, nullptr, &ClosePosition, nullptr,
+                                          &CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
     }
     else
     {
@@ -839,8 +839,8 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
     }
 
     bool const bSinglePlayer = SinglePlayer();
-    float const TitlePosition[3] = {NnFloatBits(0xbed70a3d), NnFloatBits(0x3e808312), 0.0f};
-    CreateTextControl("StoryStarTitle", "PageHeader", TitlePosition, nullptr,
+    Vector const TitlePosition = {NnFloatBits(0xbed70a3d), NnFloatBits(0x3e808312), 0.0f};
+    CreateTextControl("StoryStarTitle", "PageHeader", &TitlePosition, nullptr,
                       NnFloatBits(0x3f59db23), NnFloatBits(0x3cf5c28f), 2.0f,
                       bSinglePlayer ? 0x610u : 0x62fu, 1, 0, 1);
 
@@ -849,9 +849,9 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
     float HistoryHeight = NnFloatBits(0x3ebc6a7f);
     if (G_NnMainButton->GetForceMissionLog() && !SinglePlayer())
         HistoryHeight = NnFloatBits(0x3e9e353f);
-    float const HistoryOffset[3] = {NnFloatBits(0xbec7ae14), NnFloatBits(0x3e4ccccd), 0.0f};
+    Vector const HistoryOffset = {NnFloatBits(0xbec7ae14), NnFloatBits(0x3e4ccccd), 0.0f};
     HistoryText = CreateRichTextWin("StoryStarHistoryText", NnFloatBits(0x3f451eb8),
-                                    HistoryHeight, HistoryOffset, true);
+                                    HistoryHeight, &HistoryOffset, true);
     MissionScrollY = 0;
     LogScrollY = 0;
     PendingScrollY = -1;
@@ -860,33 +860,33 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
     {
         // The player died: DAT_0066d359 = 1 and the choice buttons.
         G_bNnKeepPanelOpen = 1;
-        float const Extents[3] = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
+        Vector const Extents = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
         if (SinglePlayer())
         {
-            float const AutosavePosition[3] = {NnFloatBits(0xbe8e5604), NnFloatBits(0xbe570a3d), 0.0f};
+            Vector const AutosavePosition = {NnFloatBits(0xbe8e5604), NnFloatBits(0xbe570a3d), 0.0f};
             LoadAutosaveButton = CreateWireButtonControl("LoadAutosaveButton", kSelectSound,
-                                                         AutosavePosition, Extents, 0, 0, 0x320,
+                                                         &AutosavePosition, &Extents, 0, 0, 0x320,
                                                          0, 0);
-            float const SavegamePosition[3] = {NnFloatBits(0x3e8c49ba), NnFloatBits(0xbe570a3d), 0.0f};
+            Vector const SavegamePosition = {NnFloatBits(0x3e8c49ba), NnFloatBits(0xbe570a3d), 0.0f};
             LoadSavegameButton = CreateWireButtonControl("LoadSavegameButton", kSelectSound,
-                                                         SavegamePosition, Extents, 0, 0, 0x321,
+                                                         &SavegamePosition, &Extents, 0, 0, 0x321,
                                                          0, 0);
         }
-        float const MainMenuPosition[3] = {NnFloatBits(0xba83126f), NnFloatBits(0xbe570a3d), 0.0f};
-        MainMenuButton = CreateWireButtonControl("MainMenuButton", kSelectSound, MainMenuPosition,
-                                                 Extents, 0, 0, 0x322, 0, 0);
+        Vector const MainMenuPosition = {NnFloatBits(0xba83126f), NnFloatBits(0xbe570a3d), 0.0f};
+        MainMenuButton = CreateWireButtonControl("MainMenuButton", kSelectSound, &MainMenuPosition,
+                                                 &Extents, 0, 0, 0x322, 0, 0);
         if (!SinglePlayer())
         {
-            float const RespawnPosition[3] = {NnFloatBits(0xbe8e5604), NnFloatBits(0xbe178d50), 0.0f};
+            Vector const RespawnPosition = {NnFloatBits(0xbe8e5604), NnFloatBits(0xbe178d50), 0.0f};
             RespawnButton = CreateWireButtonControl("RespawnButtonButton", kSelectSound,
-                                                    RespawnPosition, Extents, 0, 0, 0x5d0, 0, 0);
-            float const NewPlayerPosition[3] = {NnFloatBits(0xba83126f), NnFloatBits(0xbe178d50), 0.0f};
+                                                    &RespawnPosition, &Extents, 0, 0, 0x5d0, 0, 0);
+            Vector const NewPlayerPosition = {NnFloatBits(0xba83126f), NnFloatBits(0xbe178d50), 0.0f};
             NewPlayerButton = CreateWireButtonControl("NewPlayerButtonButton", kSelectSound,
-                                                      NewPlayerPosition, Extents, 0, 0, 0x5d1, 0,
+                                                      &NewPlayerPosition, &Extents, 0, 0, 0x5d1, 0,
                                                       0);
-            float const NewServerPosition[3] = {NnFloatBits(0x3e8c49ba), NnFloatBits(0xbe178d50), 0.0f};
+            Vector const NewServerPosition = {NnFloatBits(0x3e8c49ba), NnFloatBits(0xbe178d50), 0.0f};
             NewServerButton = CreateWireButtonControl("NewServerButtonButton", kSelectSound,
-                                                      NewServerPosition, Extents, 0, 0, 0x5d2, 0,
+                                                      &NewServerPosition, &Extents, 0, 0, 0x5d2, 0,
                                                       0);
         }
 
@@ -895,50 +895,50 @@ bool NeuroNetStoryStar::Create(Win3D* NewParent, void* Data)
         float const TextArg6 = NnFloatBits(0x3ff33333);
         if (SinglePlayer())
         {
-            float const AutosaveTextPosition[3] = {NnFloatBits(0xbed16873), NnFloatBits(0xbe428f5c), 0.0f};
+            Vector const AutosaveTextPosition = {NnFloatBits(0xbed16873), NnFloatBits(0xbe428f5c), 0.0f};
             LoadAutosaveText = CreateTextControl("LoadAutosaveText", kButtonTextStyle,
-                                                 AutosaveTextPosition, nullptr, TextWidth,
+                                                 &AutosaveTextPosition, nullptr, TextWidth,
                                                  TextHeight, TextArg6, 0x652, 1, 0, 1);
-            float const SavegameTextPosition[3] = {NnFloatBits(0x3e126e98), NnFloatBits(0xbe428f5c), 0.0f};
+            Vector const SavegameTextPosition = {NnFloatBits(0x3e126e98), NnFloatBits(0xbe428f5c), 0.0f};
             LoadSavegameText = CreateTextControl("LoadSavegameText", kButtonTextStyle,
-                                                 SavegameTextPosition, nullptr, TextWidth,
+                                                 &SavegameTextPosition, nullptr, TextWidth,
                                                  TextHeight, TextArg6, 0x653, 1, 0, 1);
         }
-        float const MainMenuTextPosition[3] = {NnFloatBits(0xbe051eb8), NnFloatBits(0xbe428f5c), 0.0f};
-        MainMenuText = CreateTextControl("MainMenuText", kButtonTextStyle, MainMenuTextPosition,
+        Vector const MainMenuTextPosition = {NnFloatBits(0xbe051eb8), NnFloatBits(0xbe428f5c), 0.0f};
+        MainMenuText = CreateTextControl("MainMenuText", kButtonTextStyle, &MainMenuTextPosition,
                                          nullptr, TextWidth, TextHeight, TextArg6, 0x655, 1, 0, 1);
         if (!SinglePlayer())
         {
-            float const RespawnTextPosition[3] = {NnFloatBits(0xbed16873), NnFloatBits(0xbe03126f), 0.0f};
+            Vector const RespawnTextPosition = {NnFloatBits(0xbed16873), NnFloatBits(0xbe03126f), 0.0f};
             RespawnText = CreateTextControl("RespawnTextText", kButtonTextStyle,
-                                            RespawnTextPosition, nullptr, TextWidth, TextHeight,
+                                            &RespawnTextPosition, nullptr, TextWidth, TextHeight,
                                             TextArg6, 0x751, 1, 0, 1);
-            float const NewPlayerTextPosition[3] = {NnFloatBits(0xbe051eb8), NnFloatBits(0xbe03126f), 0.0f};
+            Vector const NewPlayerTextPosition = {NnFloatBits(0xbe051eb8), NnFloatBits(0xbe03126f), 0.0f};
             NewPlayerText = CreateTextControl("NewPlayerTextText", kButtonTextStyle,
-                                              NewPlayerTextPosition, nullptr, TextWidth,
+                                              &NewPlayerTextPosition, nullptr, TextWidth,
                                               TextHeight, TextArg6, 0x5ce, 1, 0, 1);
-            float const NewServerTextPosition[3] = {NnFloatBits(0x3e126e98), NnFloatBits(0xbe03126f), 0.0f};
+            Vector const NewServerTextPosition = {NnFloatBits(0x3e126e98), NnFloatBits(0xbe03126f), 0.0f};
             NewServerText = CreateTextControl("NewServerTextText", kButtonTextStyle,
-                                              NewServerTextPosition, nullptr, TextWidth,
+                                              &NewServerTextPosition, nullptr, TextWidth,
                                               TextHeight, TextArg6, 0x5cf, 1, 0, 1);
         }
     }
     else if (SinglePlayer())
     {
         // Single player: the Mission / Log toggles.
-        float const Extents[3] = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
-        float const MissionPosition[3] = {NnFloatBits(0xbe4fdf3b), NnFloatBits(0xbe570a3d), 0.0f};
-        MissionButton = CreateWireButtonControl("MissionButton", kSelectSound, MissionPosition,
-                                                Extents, 0, 0, 0x323, 0, 0);
-        float const MissionTextPosition[3] = {NnFloatBits(0xbeab020c), NnFloatBits(0xbe408312), 0.0f};
-        MissionText = CreateTextControl("MissionText", kButtonTextStyle, MissionTextPosition,
+        Vector const Extents = {NnFloatBits(0x3e083127), NnFloatBits(0x3cd4fdf4), 0.0f};
+        Vector const MissionPosition = {NnFloatBits(0xbe4fdf3b), NnFloatBits(0xbe570a3d), 0.0f};
+        MissionButton = CreateWireButtonControl("MissionButton", kSelectSound, &MissionPosition,
+                                                &Extents, 0, 0, 0x323, 0, 0);
+        Vector const MissionTextPosition = {NnFloatBits(0xbeab020c), NnFloatBits(0xbe408312), 0.0f};
+        MissionText = CreateTextControl("MissionText", kButtonTextStyle, &MissionTextPosition,
                                         nullptr, NnFloatBits(0x3e883127), NnFloatBits(0x3cf5c28f),
                                         2.0f, 0x628, 1, 0, 1);
-        float const LogPosition[3] = {NnFloatBits(0x3e4dd2f2), NnFloatBits(0xbe570a3d), 0.0f};
-        LogButton = CreateWireButtonControl("LogButton", kSelectSound, LogPosition, Extents, 0, 0,
+        Vector const LogPosition = {NnFloatBits(0x3e4dd2f2), NnFloatBits(0xbe570a3d), 0.0f};
+        LogButton = CreateWireButtonControl("LogButton", kSelectSound, &LogPosition, &Extents, 0, 0,
                                             0x324, 0, 0);
-        float const LogTextPosition[3] = {NnFloatBits(0x3d8b4396), NnFloatBits(0xbe408312), 0.0f};
-        LogText = CreateTextControl("LogText", kButtonTextStyle, LogTextPosition, nullptr,
+        Vector const LogTextPosition = {NnFloatBits(0x3d8b4396), NnFloatBits(0xbe408312), 0.0f};
+        LogText = CreateTextControl("LogText", kButtonTextStyle, &LogTextPosition, nullptr,
                                     NnFloatBits(0x3e89374c), NnFloatBits(0x3cf5c28f), 2.0f, 0x629,
                                     1, 0, 1);
     }
@@ -996,7 +996,7 @@ bool NeuroNetStoryStar::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     {
         // Onto the parent's position, shown.
         if (Parent != nullptr)
-            SetPosition(&Parent->Position.x);
+            SetPosition(&Parent->Position);
         Flags = static_cast<unsigned char>(Flags | 3);
         return true;
     }
@@ -1295,15 +1295,15 @@ MissionLogMoveToNNWindow::~MissionLogMoveToNNWindow()
 bool MissionLogMoveToNNWindow::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004bcd30 (RET 8).
-    float const Start[3] = {0.0f, NnFloatBits(0x3e947ae1), NnFloatBits(0xbfa00000)};
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Start = {0.0f, NnFloatBits(0x3e947ae1), NnFloatBits(0xbfa00000)};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
     Icon = CreateButtonControl("DummyMissionLog", kStoryStarIconMesh, nullptr, nullptr, nullptr,
-                               Start, nullptr, Zero, 0, 0, 0, 0, 0, 0, 0);
+                               &Start, nullptr, &Zero, 0, 0, 0, 0, 0, 0, 0);
 
     // Over 0.3 s from the middle to the mission-log button.
-    float const End[3] = {NnFloatBits(0x3ed0e561), NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
+    Vector const End = {NnFloatBits(0x3ed0e561), NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
     ButtonMover::Start(NnFloatBits(0x3e99999a));
-    AddButton(Icon, Start, End);
+    AddButton(Icon, &Start, &End);
 
     SetOffset(0.0f, 0.0f, 0.0f);
     return Win3D::Create(NewParent, Data);
@@ -1330,15 +1330,15 @@ MissionLogMoveFromNNWindow::MissionLogMoveFromNNWindow()
 bool MissionLogMoveFromNNWindow::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004bceb0 (RET 8). The icon starts at the button.
-    float const Start[3] = {NnFloatBits(0x3ed0e561), NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Start = {NnFloatBits(0x3ed0e561), NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
     Icon = CreateButtonControl("DummyMissionLog", kStoryStarIconMesh, nullptr, nullptr, nullptr,
-                               Start, nullptr, Zero, 0, 0, 0, 0, 0, 0, 0);
+                               &Start, nullptr, &Zero, 0, 0, 0, 0, 0, 0, 0);
 
     // Over 0.2 s back to the middle.
-    float const End[3] = {0.0f, NnFloatBits(0x3e947ae1), NnFloatBits(0xbfa00000)};
+    Vector const End = {0.0f, NnFloatBits(0x3e947ae1), NnFloatBits(0xbfa00000)};
     ButtonMover::Start(NnFloatBits(0x3e4ccccd));
-    AddButton(Icon, Start, End);
+    AddButton(Icon, &Start, &End);
 
     SetOffset(0.0f, 0.0f, 0.0f);
     return Win3D::Create(NewParent, Data);

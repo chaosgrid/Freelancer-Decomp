@@ -56,23 +56,23 @@ namespace
     float const kWireLineWidth = 0.003f;
 
     // FUN_005a2a40 on the batcher DAT_0067dd90.
-    void WireBatchAddLine(float const* From, float const* To, unsigned long Argb,
+    void WireBatchAddLine(Vector const* From, Vector const* To, unsigned long Argb,
                           unsigned long Rgb, float Width)
     {
         ImmedBatchAddLine(&G_ImmedBatchA, From, To, Argb, Rgb, Width);
     }
 
-    void SetIdentity9(float* Out)
+    void SetIdentity9(Matrix* Out)
     {
-        Out[0] = 1.0f;
-        Out[1] = 0.0f;
-        Out[2] = 0.0f;
-        Out[3] = 0.0f;
-        Out[4] = 1.0f;
-        Out[5] = 0.0f;
-        Out[6] = 0.0f;
-        Out[7] = 0.0f;
-        Out[8] = 1.0f;
+        Out->E[0][0] = 1.0f;
+        Out->E[0][1] = 0.0f;
+        Out->E[0][2] = 0.0f;
+        Out->E[1][0] = 0.0f;
+        Out->E[1][1] = 1.0f;
+        Out->E[1][2] = 0.0f;
+        Out->E[2][0] = 0.0f;
+        Out->E[2][1] = 0.0f;
+        Out->E[2][2] = 1.0f;
     }
 
     // The parent notification every WireButtonControl handler inlines. Returns the parent's
@@ -103,9 +103,9 @@ namespace
         Info.WorldPos[0] = Self->WireCenter[0];   // +0x48 <- +0x350
         Info.WorldPos[1] = Self->WireCenter[1];
         Info.WorldPos[2] = Self->WireCenter[2];
-        Info.HalfExtents[0] = Self->HalfExtents[0]; // +0x54 <- +0xb4
-        Info.HalfExtents[1] = Self->HalfExtents[1];
-        Info.HalfExtents[2] = Self->HalfExtents[2];
+        Info.HalfExtents[0] = Self->HalfExtents.x; // +0x54 <- +0xb4
+        Info.HalfExtents[1] = Self->HalfExtents.y;
+        Info.HalfExtents[2] = Self->HalfExtents.z;
         Info.bLive = 1;                   // +0x60
         NnToolTipFeedHover(&Info);
     }
@@ -128,7 +128,7 @@ namespace
 WireStaticControl::WireStaticControl()
 {
     // FUN_005a3210 after FUN_0059f860.
-    SetIdentity9(WireOrientation);
+    SetIdentity9(&WireOrientation);
     WireCenter[0] = 0.0f;
     WireCenter[1] = 0.0f;
     WireCenter[2] = 0.0f;
@@ -153,18 +153,18 @@ WireStaticControl::~WireStaticControl()
     // FUN_005a3310.
 }
 
-bool WireStaticControl::HitTest(float const* Ray)
+bool WireStaticControl::HitTest(Vector const* Ray)
 {
     // FUN_0053f330.
     return Win3D::HitTest(Ray);
 }
 
-void WireStaticControl::SetPosition(float const* NewPosition)
+void WireStaticControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_005a3950 (RET 4).
-    RequestedPosition[0] = NewPosition[0];
-    RequestedPosition[1] = NewPosition[1];
-    RequestedPosition[2] = NewPosition[2];
+    RequestedPosition.x = NewPosition->x;
+    RequestedPosition.y = NewPosition->y;
+    RequestedPosition.z = NewPosition->z;
     bAttached = 1;
 
     Vector Placed;
@@ -172,23 +172,23 @@ void WireStaticControl::SetPosition(float const* NewPosition)
     {
         Vector Attach;
         GetAttachPosition(&Attach); // slot 41
-        Placed.x = NewPosition[0] + Attach.x;
-        Placed.y = Attach.y + NewPosition[1];
-        Placed.z = Attach.z + NewPosition[2];
+        Placed.x = NewPosition->x + Attach.x;
+        Placed.y = Attach.y + NewPosition->y;
+        Placed.z = Attach.z + NewPosition->z;
     }
     else
     {
-        Placed.x = NewPosition[0];
-        Placed.y = NewPosition[1];
-        Placed.z = NewPosition[2];
+        Placed.x = NewPosition->x;
+        Placed.y = NewPosition->y;
+        Placed.z = NewPosition->z;
     }
-    WinControl::SetPosition(&Placed.x); // FUN_005a0880
+    WinControl::SetPosition(&Placed); // FUN_005a0880
 
     if ((PositionFlags & 1) != 0)
     {
-        WireCenter[0] = Offset[0] + Position.x;
-        WireCenter[1] = Offset[1] + Position.y;
-        WireCenter[2] = Offset[2] + Position.z;
+        WireCenter[0] = Offset.x + Position.x;
+        WireCenter[1] = Offset.y + Position.y;
+        WireCenter[2] = Offset.z + Position.z;
     }
     else
     {
@@ -208,7 +208,7 @@ void WireStaticControl::SetOrientation(Matrix const* NewOrientation)
     Matrix Result;
     WireMathEngine()->MulMatrix(Result, *NewOrientation, Attach);
     memcpy(&Orientation, &Result, sizeof(Orientation));
-    memcpy(WireOrientation, &Result, sizeof(WireOrientation));
+    memcpy(&WireOrientation, &Result, sizeof(WireOrientation));
 }
 
 bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
@@ -218,7 +218,7 @@ bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
     Win3DRegister(this);            // FUN_0059dbf0
     Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
     if (Parent != nullptr)
-        Parent->SetPosition(&Parent->Position.x);
+        Parent->SetPosition(&Parent->Position);
     return true;
 }
 
@@ -306,12 +306,12 @@ void WireStaticControl::Draw()
     if (bUseColour != 0)
         memcpy(Rgba, Colour, sizeof(Rgba));
 
-    float const Center[3] = {Position.x + Offset[0], Position.y + Offset[1],
-                             Position.z + Offset[2]};
+    float const Center[3] = {Position.x + Offset.x, Position.y + Offset.y,
+                             Position.z + Offset.z};
     WireCenter[0] = Center[0];
     WireCenter[1] = Center[1];
     WireCenter[2] = Center[2];
-    float CornerA[3] = {-HalfExtents[0], -HalfExtents[1], -HalfExtents[2]};
+    float CornerA[3] = {-HalfExtents.x, -HalfExtents.y, -HalfExtents.z};
     float CornerB[3] = {-CornerA[0], CornerA[1], CornerA[2]};
     unsigned long const Argb = (static_cast<unsigned long>(Rgba[3]) << 24) |
                                (static_cast<unsigned long>(Rgba[0]) << 16) |
@@ -324,45 +324,45 @@ void WireStaticControl::Draw()
     // Bit 2, the bottom edge, (-hx, -hy) -> (hx, -hy).
     if ((EdgeMask & 0x4) != 0)
     {
-        float const To[3] = {Center[0] + CornerB[0], Center[1] + CornerB[1],
-                             Center[2] + CornerB[2]};
-        float const From[3] = {Center[0] + CornerA[0], Center[1] + CornerA[1],
-                               Center[2] + CornerA[2]};
-        WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
+        Vector const To = {Center[0] + CornerB[0], Center[1] + CornerB[1],
+                           Center[2] + CornerB[2]};
+        Vector const From = {Center[0] + CornerA[0], Center[1] + CornerA[1],
+                             Center[2] + CornerA[2]};
+        WireBatchAddLine(&From, &To, Argb, Rgb, kWireLineWidth);
     }
     // Bit 1, the right edge, (hx, -hy) -> (hx, hy).
     CornerA[0] = -CornerA[0];
     CornerA[1] = -CornerA[1];
     if ((EdgeMask & 0x2) != 0)
     {
-        float const To[3] = {Center[0] + CornerA[0], Center[1] + CornerA[1],
-                             Center[2] + CornerA[2]};
-        float const From[3] = {Center[0] + CornerB[0], Center[1] + CornerB[1],
-                               Center[2] + CornerB[2]};
-        WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
+        Vector const To = {Center[0] + CornerA[0], Center[1] + CornerA[1],
+                           Center[2] + CornerA[2]};
+        Vector const From = {Center[0] + CornerB[0], Center[1] + CornerB[1],
+                             Center[2] + CornerB[2]};
+        WireBatchAddLine(&From, &To, Argb, Rgb, kWireLineWidth);
     }
     // Bit 0, the top edge, (hx, hy) -> (-hx, hy).
     CornerB[0] = -CornerB[0];
     CornerB[1] = -CornerB[1];
     if ((EdgeMask & 0x1) != 0)
     {
-        float const To[3] = {Center[0] + CornerB[0], Center[1] + CornerB[1],
-                             Center[2] + CornerB[2]};
-        float const From[3] = {Center[0] + CornerA[0], Center[1] + CornerA[1],
-                               CornerA[2] + Center[2]};
-        WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
+        Vector const To = {Center[0] + CornerB[0], Center[1] + CornerB[1],
+                           Center[2] + CornerB[2]};
+        Vector const From = {Center[0] + CornerA[0], Center[1] + CornerA[1],
+                             CornerA[2] + Center[2]};
+        WireBatchAddLine(&From, &To, Argb, Rgb, kWireLineWidth);
     }
     // Bit 3, the left edge, (-hx, hy) -> (-hx, -hy).
-    CornerA[0] = -HalfExtents[0];
-    CornerA[1] = -HalfExtents[1];
-    CornerA[2] = -HalfExtents[2];
+    CornerA[0] = -HalfExtents.x;
+    CornerA[1] = -HalfExtents.y;
+    CornerA[2] = -HalfExtents.z;
     if ((EdgeMask & 0x8) != 0)
     {
-        float const To[3] = {CornerA[0] + Center[0], CornerA[1] + Center[1],
-                             CornerA[2] + Center[2]};
-        float const From[3] = {Center[0] + CornerB[0], Center[1] + CornerB[1],
-                               Center[2] + CornerB[2]};
-        WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
+        Vector const To = {CornerA[0] + Center[0], CornerA[1] + Center[1],
+                           CornerA[2] + Center[2]};
+        Vector const From = {Center[0] + CornerB[0], Center[1] + CornerB[1],
+                             Center[2] + CornerB[2]};
+        WireBatchAddLine(&From, &To, Argb, Rgb, kWireLineWidth);
     }
 
     // Bit 4 goes back to what it was before the inactive branch could clear it.
@@ -416,21 +416,21 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 }
 
-void WireStaticControl::Init(float const* NewOffset, float const* NewHalfExtents,
+void WireStaticControl::Init(Vector const* NewOffset, Vector const* NewHalfExtents,
                              unsigned char bAlwaysWhite, unsigned char bNewNoZEnable,
                              int NewToolTipIds, unsigned NewEdgeMask)
 {
     // FUN_005a3360.
     EdgeMask = (NewEdgeMask != 0) ? NewEdgeMask : 0xf;
-    Offset[0] = NewOffset[0];
-    Offset[1] = NewOffset[1];
-    Offset[2] = NewOffset[2];
-    WireCenter[0] = Offset[0] + Position.x;
-    WireCenter[1] = Offset[1] + Position.y;
-    WireCenter[2] = Offset[2] + Position.z;
-    HalfExtents[0] = NewHalfExtents[0];
-    HalfExtents[1] = NewHalfExtents[1];
-    HalfExtents[2] = NewHalfExtents[2];
+    Offset.x = NewOffset->x;
+    Offset.y = NewOffset->y;
+    Offset.z = NewOffset->z;
+    WireCenter[0] = Offset.x + Position.x;
+    WireCenter[1] = Offset.y + Position.y;
+    WireCenter[2] = Offset.z + Position.z;
+    HalfExtents.x = NewHalfExtents->x;
+    HalfExtents.y = NewHalfExtents->y;
+    HalfExtents.z = NewHalfExtents->z;
     WireState = static_cast<unsigned char>((WireState & ~kWireAlwaysWhite) | ((bAlwaysWhite << 3) & kWireAlwaysWhite));
     bNoZEnable = bNewNoZEnable;
     ToolTipIds = NewToolTipIds;
@@ -455,7 +455,7 @@ WireButtonControl::~WireButtonControl()
         Win3DRemoveCapture(this);
 }
 
-bool WireButtonControl::HitTest(float const* Ray)
+bool WireButtonControl::HitTest(Vector const* Ray)
 {
     // LAB_005a42c0.
     return WinControl::HitTest(Ray);
@@ -489,12 +489,12 @@ void WireButtonControl::Update()
         kOne / sqrt(static_cast<double>(World.x) * World.x +
                     static_cast<double>(World.y) * World.y +
                     static_cast<double>(World.z) * World.z);
-    float Ray[3];
-    Ray[0] = static_cast<float>(World.x * Inv);
-    Ray[1] = static_cast<float>(World.y * Inv);
-    Ray[2] = static_cast<float>(World.z * Inv);
+    Vector Ray;
+    Ray.x = static_cast<float>(World.x * Inv);
+    Ray.y = static_cast<float>(World.y * Inv);
+    Ray.z = static_cast<float>(World.z * Inv);
 
-    if (HitTest(Ray)) // slot 4
+    if (HitTest(&Ray)) // slot 4
     {
         if ((WireState & kWirePressed) != 0)
             return;
@@ -513,7 +513,7 @@ void WireButtonControl::Update()
     TellParent(this, kWinNotifyUnhighlight);
 }
 
-void WireButtonControl::MouseEnter(float const* /*Ray*/)
+void WireButtonControl::MouseEnter(Vector const* /*Ray*/)
 {
     // FUN_005a42d0.
     if (Parent != nullptr)
@@ -526,7 +526,7 @@ void WireButtonControl::MouseEnter(float const* /*Ray*/)
         PlayUiRolloverSound(); // FUN_00564700
 }
 
-void WireButtonControl::MouseLeave(float const* /*Ray*/)
+void WireButtonControl::MouseLeave(Vector const* /*Ray*/)
 {
     // FUN_005a4330.
     if (ToolTipIds != 0)
@@ -574,12 +574,12 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             kOne / sqrt(static_cast<double>(World.x) * World.x +
                         static_cast<double>(World.y) * World.y +
                         static_cast<double>(World.z) * World.z);
-        float Ray[3];
-        Ray[0] = static_cast<float>(World.x * Inv);
-        Ray[1] = static_cast<float>(World.y * Inv);
-        Ray[2] = static_cast<float>(World.z * Inv);
+        Vector Ray;
+        Ray.x = static_cast<float>(World.x * Inv);
+        Ray.y = static_cast<float>(World.y * Inv);
+        Ray.z = static_cast<float>(World.z * Inv);
 
-        if (!HitTest(Ray)) // slot 4
+        if (!HitTest(&Ray)) // slot 4
         {
             // Released off the button.
             TellParent(this, kWinNotifyRelease);
@@ -667,8 +667,8 @@ void WireButtonControl::Activate()
     TellParent(this, kWinNotifyClick);
 }
 
-void WireButtonControl::Init(char const* NewSoundName, float const* NewOffset,
-                             float const* NewHalfExtents, unsigned char bAlwaysWhite,
+void WireButtonControl::Init(char const* NewSoundName, Vector const* NewOffset,
+                             Vector const* NewHalfExtents, unsigned char bAlwaysWhite,
                              unsigned char bNewNoZEnable, int NewToolTipIds, int NewCommandId,
                              unsigned NewEdgeMask)
 {
@@ -693,8 +693,8 @@ RichTextWireButtonControl::~RichTextWireButtonControl()
 {
 }
 
-void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewOffset,
-                                     float const* NewHalfExtents, unsigned char bAlwaysWhite,
+void RichTextWireButtonControl::Init(char const* NewSoundName, Vector const* NewOffset,
+                                     Vector const* NewHalfExtents, unsigned char bAlwaysWhite,
                                      unsigned char bNewNoZEnable, int NewToolTipIds,
                                      unsigned CaptionIds, int NewCommandId,
                                      unsigned NewEdgeMask)
@@ -714,13 +714,13 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
         return;
 
     // The caption box sits on the wire box's top-left corner.
-    float AttachOffset[3];
-    AttachOffset[0] = Offset[0] - HalfExtents[0];
-    AttachOffset[1] = Offset[1] + HalfExtents[1];
-    AttachOffset[2] = Offset[2];
-    TextWin->SetAttachOffset(AttachOffset);                               // FUN_00579c40
-    TextWin->SetNormSize(HalfExtents[0] + HalfExtents[0],
-                         HalfExtents[1] + HalfExtents[1]);                // FUN_00579cc0
+    Vector AttachOffset;
+    AttachOffset.x = Offset.x - HalfExtents.x;
+    AttachOffset.y = Offset.y + HalfExtents.y;
+    AttachOffset.z = Offset.z;
+    TextWin->SetAttachOffset(&AttachOffset);                               // FUN_00579c40
+    TextWin->SetNormSize(HalfExtents.x + HalfExtents.x,
+                         HalfExtents.y + HalfExtents.y);                // FUN_00579cc0
     TextWin->SetAutoScrollbar(false);                                     // FUN_005799f0
     TextWin->SetNeverHit(true);                                           // FUN_00579880
     TextWin->SetAlignMode(2);                                             // FUN_00579a60

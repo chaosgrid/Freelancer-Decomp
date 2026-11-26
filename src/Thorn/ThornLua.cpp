@@ -838,7 +838,7 @@ namespace
     // ForeachEntity (06f29d5d) publishes one column after its own callbacks.
     // Row1 probes use unsigned->double after pushobject; Row2/3 instead store
     // an unsigned->float index before 27c10's repeated table predicate.
-    void ReadEntityOrientationColumn(lua_Object Table, int Column, float* Orientation)
+    void ReadEntityOrientationColumn(lua_Object Table, int Column, Matrix* Orientation)
     {
         float Coordinates[3];
         bool bComplete = true;
@@ -863,7 +863,7 @@ namespace
             std::memset(Coordinates, 0, sizeof(Coordinates));
         // 22d50 is three raw DWORD copies, not a floating-point reload.
         for (int Index = 0; Index < 3; ++Index)
-            std::memcpy(&Orientation[Index * 3 + Column], &Coordinates[Index], sizeof(float));
+            std::memcpy(&Orientation->E[Index][Column], &Coordinates[Index], sizeof(float));
     }
 
     // The entity-only SPATIAL block (06f29c3d) runs after all typed tails.
@@ -879,7 +879,7 @@ namespace
         {
             float Coordinates[3];
             ReadVec3Complete(Position, Coordinates);
-            std::memcpy(Descriptor->Pos, Coordinates, sizeof(Coordinates));
+            std::memcpy(&Descriptor->Pos, Coordinates, sizeof(Coordinates));
         }
         const lua_Object Orientation = GetFieldOrNil(Spatial, "orient");
         if (lua_isnil(Orientation) != 0)
@@ -889,7 +889,7 @@ namespace
         {
             const lua_Object Row = GetIndexOrNil(Orientation, RowIndices[Column]);
             if (lua_isnil(Row) == 0)
-                ReadEntityOrientationColumn(Row, Column, Descriptor->Orient);
+                ReadEntityOrientationColumn(Row, Column, &Descriptor->Orient);
         }
     }
 
@@ -936,7 +936,7 @@ namespace
         if (lua_isnil(Position) == 0)
         {
             Descriptor->Mask |= kThornSpatialBitPos;
-            ReadSpatialEventVector(Position, Descriptor->Position, 3);
+            ReadSpatialEventVector(Position, &Descriptor->Position, 3);
         }
         const lua_Object Quaternion = GetFieldOrNil(Spatial, "q_orient");
         if (lua_isnil(Quaternion) == 0)
@@ -950,9 +950,9 @@ namespace
         if (lua_isnil(Orientation) == 0)
         {
             Descriptor->Mask |= kThornSpatialBitOrient;
-            float Matrix[9];
+            Matrix Orient;
             // The complete modern object supplies retained columns for absent rows.
-            std::memcpy(Matrix, Descriptor->Orient, sizeof(Matrix));
+            std::memcpy(&Orient, &Descriptor->Orient, sizeof(Orient));
             const double RowIndices[3] = {1.0, 2.0, 3.0};
             for (int Column = 0; Column < 3; ++Column)
             {
@@ -962,10 +962,10 @@ namespace
                     float Coordinates[3];
                     ReadSpatialEventVector(Row, Coordinates, 3);
                     for (int Index = 0; Index < 3; ++Index)
-                        std::memcpy(&Matrix[Index * 3 + Column], &Coordinates[Index], sizeof(float));
+                        std::memcpy(&Orient.E[Index][Column], &Coordinates[Index], sizeof(float));
                 }
             }
-            std::memcpy(Descriptor->Orient, Matrix, sizeof(Matrix));
+            std::memcpy(&Descriptor->Orient, &Orient, sizeof(Orient));
         }
     }
 
@@ -1006,6 +1006,11 @@ namespace
         for (int Index = 0; Index < 3; ++Index)
             StoreLuaNumberFloat(GetLightFloatIndex(Table, &NumericIndices[Index]), &Coordinates[Index]);
         std::memcpy(Out, Coordinates, sizeof(Coordinates));
+    }
+
+    void ReadLightInlineVector(lua_Object Table, Vector* Out, bool bFloatProbe)
+    {
+        ReadLightInlineVector(Table, &Out->x, bFloatProbe);
     }
 
     // FUN_06f27fe0 — entity LIGHT and event type 4 share this table.
@@ -1063,7 +1068,7 @@ namespace
         lua_Object Dir = GetFieldOrNil(Light, "direction");
         if (lua_isnil(Dir) == 0)
         {
-            ReadLightInlineVector(Dir, Props->Direction, true);
+            ReadLightInlineVector(Dir, &Props->Direction, true);
             LoadedMask = LoadedMask | kThornLightBitDirection;
         }
         lua_Object Atten = GetFieldOrNil(Light, "atten");
@@ -1572,8 +1577,8 @@ namespace
             {
                 Descriptor->Type = Type;
                 Descriptor->Flags = Flags;
-                std::memcpy(Descriptor->Pos, PositionBits, sizeof(PositionBits));
-                std::memcpy(Descriptor->Orient, Identity, sizeof(Identity));
+                std::memcpy(&Descriptor->Pos, PositionBits, sizeof(PositionBits));
+                std::memcpy(&Descriptor->Orient, Identity, sizeof(Identity));
                 Descriptor->Name = Name;
                 Descriptor->TemplateName = TemplateName;
                 Descriptor->LtGrp = LtGroup;
@@ -1966,7 +1971,7 @@ namespace
             Descriptor->LookAtFrontAxis = FrontAxis;
             const lua_Object Offset = GetFieldOrNil(Props, "offset");
             if (lua_isnil(Offset) == 0)
-                ReadSpatialEventVector(Offset, Descriptor->Offset, 3);
+                ReadSpatialEventVector(Offset, &Descriptor->Offset, 3);
         }
         RegisterParsedEvent(Temporary, Descriptor, Common);
     }
@@ -1979,7 +1984,7 @@ namespace
         {
             const lua_Object Offset = GetFieldOrNil(Props, "offset");
             if (lua_isnil(Offset) == 0)
-                ReadSpatialEventVector(Offset, Descriptor->Offset, 3);
+                ReadSpatialEventVector(Offset, &Descriptor->Offset, 3);
             const lua_Object Part = GetFieldOrNil(Props, "target_part");
             if (lua_isnil(Part) == 0)
             {
@@ -2112,7 +2117,7 @@ namespace
             {
                 FThornEntitySnap SpatialSnap = *PrimaryDesc;
                 const unsigned int PositionBits = static_cast<unsigned int>(SpatialSnap.Flags) | 2u;
-                std::memcpy(&SpatialSnap.Pos[0], &PositionBits, sizeof(PositionBits));
+                std::memcpy(&SpatialSnap.Pos.x, &PositionBits, sizeof(PositionBits));
                 // 25904..2593c copies common17+SOUND8 before Slot37 and before any temporary.
                 G_LoadScriptEngine->UpdateEntity(Common.PrimaryIndex, &SpatialSnap);
             }

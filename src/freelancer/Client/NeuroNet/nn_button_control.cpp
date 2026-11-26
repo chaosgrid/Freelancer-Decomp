@@ -110,7 +110,7 @@ namespace
     // The mouse ray LAB_0055b660 builds inline from the software cursor through the Win3D
     // camera: near-plane point, FUN_00423b90 with a copy of the camera
     // orientation, normalised by 1 / sqrt.
-    void CursorRayForUpdate(float* Ray)
+    void CursorRayForUpdate(Vector* Ray)
     {
         FSpaceCamera* const Cam = Win3DGetCamera(); // DAT_0067dbf8
         int CursorX = 0;
@@ -130,15 +130,15 @@ namespace
             kOne / sqrt(static_cast<double>(World.x) * World.x +
                         static_cast<double>(World.y) * World.y +
                         static_cast<double>(World.z) * World.z);
-        Ray[0] = static_cast<float>(World.x * Inv);
-        Ray[1] = static_cast<float>(World.y * Inv);
-        Ray[2] = static_cast<float>(World.z * Inv);
+        Ray->x = static_cast<float>(World.x * Inv);
+        Ray->y = static_cast<float>(World.y * Inv);
+        Ray->z = static_cast<float>(World.z * Inv);
     }
 
     // The mouse ray FUN_0055b950 and LAB_0055c690 build inline: the near-plane
     // point (FUN_004bdd40), the 3DMathEngine's TransformMatrix (DAT_00679aec +0x2c) with a copy
     // of the camera orientation (DAT_0067dbfc), normalised by 1 / sqrt.
-    void CursorRayThroughMathEngine(float* Ray)
+    void CursorRayThroughMathEngine(Vector* Ray)
     {
         FSpaceCamera* const Cam = Win3DGetCamera(); // DAT_0067dbf8
         int CursorX = 0;
@@ -155,9 +155,9 @@ namespace
             kOne / sqrt(static_cast<double>(World.x) * World.x +
                         static_cast<double>(World.y) * World.y +
                         static_cast<double>(World.z) * World.z);
-        Ray[0] = static_cast<float>(World.x * Inv);
-        Ray[1] = static_cast<float>(World.y * Inv);
-        Ray[2] = static_cast<float>(World.z * Inv);
+        Ray->x = static_cast<float>(World.x * Inv);
+        Ray->y = static_cast<float>(World.y * Inv);
+        Ray->z = static_cast<float>(World.z * Inv);
     }
 
     // The holder tint FUN_00559aa0 and Draw write before FUN_0059efa0: bytes 0..2 into +0x14 / +0x18 / +0x1c, byte 3 into +0x24,
@@ -185,9 +185,9 @@ namespace
             if (Size == 0.0f)
             {
                 // GetInstanceExtent(+0x84, 1, &Size, &Centre) -- no instance test.
-                float Centre[3];
+                Vector Centre;
                 DALib::Engine->GetInstanceExtent(Button->MeshHolder.EngineInstance, 1, &Size,
-                                                 (Vector*)Centre);
+                                                 &Centre);
             }
         }
         Size = Size * kSqrt2;
@@ -202,9 +202,9 @@ namespace
         }
         else
         {
-            Where[0] = Button->Offset[0] + Button->Position.x;
-            Where[1] = Button->Position.y + Button->Offset[1];
-            Where[2] = Button->Position.z + Button->Offset[2];
+            Where[0] = Button->Offset.x + Button->Position.x;
+            Where[1] = Button->Position.y + Button->Offset.y;
+            Where[2] = Button->Position.z + Button->Offset.z;
         }
 
         if (NnMontageDrawTileAt(Tile, Where, Rgba, Size, 0, 0.0f)) // FUN_00559900
@@ -299,48 +299,48 @@ NnButtonControl::~NnButtonControl()
         Win3DRemoveCapture(this);
 }
 
-void NnButtonControl::SetPosition(float const* NewPosition)
+void NnButtonControl::SetPosition(Vector const* NewPosition)
 {
     // FUN_0055b4a0 (RET 4).
-    RequestedPosition[0] = NewPosition[0];
-    RequestedPosition[1] = NewPosition[1];
-    RequestedPosition[2] = NewPosition[2];
+    RequestedPosition.x = NewPosition->x;
+    RequestedPosition.y = NewPosition->y;
+    RequestedPosition.z = NewPosition->z;
     bAttached = 1;
 
-    float Placed[3];
+    Vector Placed;
     if ((PositionFlags & 1) != 0)
     {
-        float Attach[3];
-        GetAttachPosition(reinterpret_cast<Vector*>(Attach)); // slot 41
-        Placed[0] = NewPosition[0] + Attach[0];
-        Placed[1] = Attach[1] + NewPosition[1];
-        Placed[2] = Attach[2] + NewPosition[2];
+        Vector Attach;
+        GetAttachPosition(&Attach); // slot 41
+        Placed.x = NewPosition->x + Attach.x;
+        Placed.y = Attach.y + NewPosition->y;
+        Placed.z = Attach.z + NewPosition->z;
     }
     else
     {
-        Placed[0] = NewPosition[0];
-        Placed[1] = NewPosition[1];
-        Placed[2] = NewPosition[2];
+        Placed.x = NewPosition->x;
+        Placed.y = NewPosition->y;
+        Placed.z = NewPosition->z;
     }
-    WinControl::SetPosition(Placed); // FUN_005a0880
+    WinControl::SetPosition(&Placed); // FUN_005a0880
 
     // The instance is placed again, at +0x60 (+ +0xa8 under PositionFlags bit 0).
     if (!HasInstance(this))
         return;
-    float Instance[3];
+    Vector Instance;
     if ((PositionFlags & 1) != 0)
     {
-        Instance[0] = Offset[0] + Position.x;
-        Instance[1] = Offset[1] + Position.y;
-        Instance[2] = Offset[2] + Position.z;
+        Instance.x = Offset.x + Position.x;
+        Instance.y = Offset.y + Position.y;
+        Instance.z = Offset.z + Position.z;
     }
     else
     {
-        Instance[0] = Position.x;
-        Instance[1] = Position.y;
-        Instance[2] = Position.z;
+        Instance.x = Position.x;
+        Instance.y = Position.y;
+        Instance.z = Position.z;
     }
-    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Instance);
+    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, &Instance);
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 
@@ -410,17 +410,17 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
                 float const Y = Ini->get_value_float(1);
                 float const X = Ini->get_value_float(0);
                 float const Z = Ini->get_value_float(2);
-                Offset[0] = X;
-                Offset[1] = Y;
-                Offset[2] = Z;
+                Offset.x = X;
+                Offset.y = Y;
+                Offset.z = Z;
                 if (HasInstance(this))
                 {
                     // FUN_00422b80 builds {+0x60 + offset} and the instance moves.
-                    float Placed[3];
-                    Placed[2] = Offset[2] + Position.z;
-                    Placed[1] = Offset[1] + Position.y;
-                    Placed[0] = Position.x + Offset[0];
-                    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Placed);
+                    Vector Placed;
+                    Placed.z = Offset.z + Position.z;
+                    Placed.y = Offset.y + Position.y;
+                    Placed.x = Position.x + Offset.x;
+                    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, &Placed);
                     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
                 }
                 continue;
@@ -454,9 +454,9 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
                 float const Y = Ini->get_value_float(1);
                 float const X = Ini->get_value_float(0);
                 float const Z = Ini->get_value_float(2);
-                HalfExtents[0] = X;
-                HalfExtents[1] = Y;
-                HalfExtents[2] = Z;
+                HalfExtents.x = X;
+                HalfExtents.y = Y;
+                HalfExtents.z = Z;
                 continue;
             }
             if (Ini->is_value("no_mesh_render"))
@@ -498,7 +498,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
     // The parent is re-placed at its own position (slot 5), which positions this
     // control with it.
     if (Parent != nullptr)
-        Parent->SetPosition(&Parent->Position.x);
+        Parent->SetPosition(&Parent->Position);
     return true;
 }
 
@@ -511,9 +511,9 @@ void NnButtonControl::Update()
     // bit 2 as it moves on and off.
     if ((ButtonBits & 0x10) != 0)
     {
-        float Ray[3];
-        CursorRayForUpdate(Ray);
-        if (HitTest(Ray)) // slot 4
+        Vector Ray;
+        CursorRayForUpdate(&Ray);
+        if (HitTest(&Ray)) // slot 4
         {
             if ((ButtonBits & 0x04) == 0)
             {
@@ -698,7 +698,7 @@ void NnButtonControl::Draw()
     PostDraw(); // vt+0x9c
 }
 
-void NnButtonControl::MouseEnter(float const* /*Ray*/)
+void NnButtonControl::MouseEnter(Vector const* /*Ray*/)
 {
     // FUN_0055b8a0 (RET 4).
     if (Parent != nullptr)
@@ -711,7 +711,7 @@ void NnButtonControl::MouseEnter(float const* /*Ray*/)
         PlayUiRolloverSound(); // FUN_00564700
 }
 
-void NnButtonControl::MouseLeave(float const* /*Ray*/)
+void NnButtonControl::MouseLeave(Vector const* /*Ray*/)
 {
     // FUN_0055b900 (RET 4).
     if (ToolTipIds != 0)
@@ -743,10 +743,10 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         Win3DRemoveCapture(this); // FUN_0059d960
 
         // The cursor ray (FUN_004bdd40), through the math engine.
-        float Ray[3];
-        CursorRayThroughMathEngine(Ray);
+        Vector Ray;
+        CursorRayThroughMathEngine(&Ray);
 
-        if (!HitTest(Ray)) // slot 4
+        if (!HitTest(&Ray)) // slot 4
         {
             // Released off the button.
             TellParent(this, kWinNotifyRelease);
@@ -814,22 +814,22 @@ void NnButtonControl::ShowToolTip()
     Info.AuxField = CommandId;        // +0x44 <- +0x34c
     if (HasInstance(this))
     {
-        float Transform[12];
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-               sizeof(Transform));
-        Info.WorldPos[0] = Transform[9];
-        Info.WorldPos[1] = Transform[10];
-        Info.WorldPos[2] = Transform[11];
+        Transform Xform;
+        memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+               sizeof(Xform));
+        Info.WorldPos[0] = Xform.Translation.x;
+        Info.WorldPos[1] = Xform.Translation.y;
+        Info.WorldPos[2] = Xform.Translation.z;
     }
     else
     {
-        Info.WorldPos[0] = Position.x + Offset[0];
-        Info.WorldPos[1] = Offset[1] + Position.y;
-        Info.WorldPos[2] = Offset[2] + Position.z;
+        Info.WorldPos[0] = Position.x + Offset.x;
+        Info.WorldPos[1] = Offset.y + Position.y;
+        Info.WorldPos[2] = Offset.z + Position.z;
     }
-    Info.HalfExtents[0] = HalfExtents[0]; // +0x54 <- +0xb4
-    Info.HalfExtents[1] = HalfExtents[1];
-    Info.HalfExtents[2] = HalfExtents[2];
+    Info.HalfExtents[0] = HalfExtents.x; // +0x54 <- +0xb4
+    Info.HalfExtents[1] = HalfExtents.y;
+    Info.HalfExtents[2] = HalfExtents.z;
     Info.bLive = 1;
     NnToolTipFeedHover(&Info);
 }
@@ -888,8 +888,8 @@ void NnButtonControl::Activate()
 
 void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
                            char const* NewSoundName, char const* KeyCommandName,
-                           float const* NewOffset, char const* Hardpoint,
-                           float const* NewHalfExtents, unsigned char bNoMeshRender,
+                           Vector const* NewOffset, char const* Hardpoint,
+                           Vector const* NewHalfExtents, unsigned char bNoMeshRender,
                            unsigned char bActionButton, unsigned char bNoColorChange,
                            unsigned char bNewNoZEnable, int NewToolTipIds, int NewToolTip2Ids,
                            int NewCommandId)
@@ -918,16 +918,16 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
             RefreshAttachment(); // slot 35
     }
 
-    Offset[0] = NewOffset[0];
-    Offset[1] = NewOffset[1];
-    Offset[2] = NewOffset[2];
+    Offset.x = NewOffset->x;
+    Offset.y = NewOffset->y;
+    Offset.z = NewOffset->z;
     if (HasInstance(this))
     {
-        float Placed[3];
-        Placed[0] = Offset[0] + Position.x;
-        Placed[1] = Offset[1] + Position.y;
-        Placed[2] = Offset[2] + Position.z;
-        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Placed);
+        Vector Placed;
+        Placed.x = Offset.x + Position.x;
+        Placed.y = Offset.y + Position.y;
+        Placed.z = Offset.z + Position.z;
+        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, &Placed);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
 
@@ -956,9 +956,9 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
         }
     }
 
-    HalfExtents[0] = NewHalfExtents[0];
-    HalfExtents[1] = NewHalfExtents[1];
-    HalfExtents[2] = NewHalfExtents[2];
+    HalfExtents.x = NewHalfExtents->x;
+    HalfExtents.y = NewHalfExtents->y;
+    HalfExtents.z = NewHalfExtents->z;
     ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xfe) | (bNoMeshRender & 0x01));
     ButtonBits = static_cast<unsigned char>((ButtonBits & 0xf7) | ((bActionButton << 3) & 0x08));
     ButtonBits = static_cast<unsigned char>((ButtonBits & 0xdf) | ((bNoColorChange << 5) & 0x20));
@@ -1012,15 +1012,15 @@ namespace
         Info.bLive = 0;                  // +0x60
         Info.Ids = Ids;
         Info.IdsAlt = Ids;
-        float Transform[12];
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance),
-               sizeof(Transform));
-        Info.WorldPos[0] = Transform[9];
-        Info.WorldPos[1] = Transform[10];
-        Info.WorldPos[2] = Transform[11];
-        Info.HalfExtents[0] = Control->HalfExtents[0];
-        Info.HalfExtents[1] = Control->HalfExtents[1];
-        Info.HalfExtents[2] = Control->HalfExtents[2];
+        Transform Xform;
+        memcpy(&Xform, DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance),
+               sizeof(Xform));
+        Info.WorldPos[0] = Xform.Translation.x;
+        Info.WorldPos[1] = Xform.Translation.y;
+        Info.WorldPos[2] = Xform.Translation.z;
+        Info.HalfExtents[0] = Control->HalfExtents.x;
+        Info.HalfExtents[1] = Control->HalfExtents.y;
+        Info.HalfExtents[2] = Control->HalfExtents.z;
         Info.bLive = 1;
         NnToolTipFeedHover(&Info);
     }
@@ -1048,18 +1048,18 @@ void NnToggleButtonControl::PlaceToggleMesh()
     if (HasToggleInstance(this))
     {
         // FUN_00422b80(+0xa8 + +0x60, +0xac + +0x64, +0xb0 + +0x68).
-        float Placed[3];
-        Placed[0] = Offset[0] + Position.x;
-        Placed[1] = Offset[1] + Position.y;
-        Placed[2] = Offset[2] + Position.z;
-        DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, (const Vector*)Placed);
+        Vector Placed;
+        Placed.x = Offset.x + Position.x;
+        Placed.y = Offset.y + Position.y;
+        Placed.z = Offset.z + Position.z;
+        DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, &Placed);
         DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         if (HasInstance(this))
         {
-            float Transform[12];
-            memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-                   sizeof(Transform));
-            DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, (const Matrix*)Transform);
+            Transform Xform;
+            memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+                   sizeof(Xform));
+            DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, &Xform.Rotation);
             DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         }
     }
@@ -1092,8 +1092,8 @@ bool NnToggleButtonControl::Create(Win3D* NewParent, void* Data)
 
 void NnToggleButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
                                  char const* NewSoundName, char const* KeyCommandName,
-                                 float const* NewOffset, char const* Hardpoint,
-                                 float const* NewHalfExtents, unsigned char bNoMeshRender,
+                                 Vector const* NewOffset, char const* Hardpoint,
+                                 Vector const* NewHalfExtents, unsigned char bNoMeshRender,
                                  unsigned char bActionButton, unsigned char bNoColorChange,
                                  unsigned char bNewNoZEnable, int NewToolTipIds,
                                  int NewToolTip2Ids)
@@ -1121,7 +1121,7 @@ void NnToggleButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
     UiSoundSlotState1 = FindUiSoundSlot(SoundState1.c_str());
 }
 
-void NnToggleButtonControl::SetPosition(float const* NewPosition)
+void NnToggleButtonControl::SetPosition(Vector const* NewPosition)
 {
     // LAB_0055c510 (RET 4): ButtonControl's, then with both instances bound the main
     // instance's whole transform onto the +0x378 one (Engine vt+0x9c).
@@ -1130,10 +1130,10 @@ void NnToggleButtonControl::SetPosition(float const* NewPosition)
         return;
     if (!HasInstance(this))
         return;
-    float Transform[12];
-    memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-           sizeof(Transform));
-    DALib::Engine->SetInstanceMatrix(ToggleMesh.EngineInstance, (const ::Transform*)Transform);
+    Transform Xform;
+    memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+           sizeof(Xform));
+    DALib::Engine->SetInstanceMatrix(ToggleMesh.EngineInstance, &Xform);
     DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
 }
 
@@ -1157,10 +1157,10 @@ void NnToggleButtonControl::SetOrientation(Matrix const* NewOrientation)
         return;
     if (!HasInstance(this))
         return;
-    float Transform[12];
-    memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
-           sizeof(Transform));
-    DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, (const Matrix*)Transform);
+    Transform Xform;
+    memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
+           sizeof(Xform));
+    DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, &Xform.Rotation);
     DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
 }
 
@@ -1178,9 +1178,9 @@ void NnToggleButtonControl::Update()
 
     // Under the cached mouse ray (FUN_0059da70, slot 4) the tooltip of the current
     // state: +0x32c in state 1, else +0xcc -- each only when non-zero.
-    float MouseRay[3];
-    Win3DGetMouseRay(MouseRay);
-    if (HitTest(MouseRay))
+    Vector MouseRay;
+    Win3DGetMouseRay(&MouseRay);
+    if (HitTest(&MouseRay))
     {
         if (ToggleState == 1)
         {
@@ -1199,10 +1199,10 @@ void NnToggleButtonControl::Update()
     // written: on the button it tests bit 0 (not bit 2), off it tests bit 2.
     if ((ButtonBits & 0x10) != 0)
     {
-        float Ray[3];
-        CursorRayThroughMathEngine(Ray);
+        Vector Ray;
+        CursorRayThroughMathEngine(&Ray);
 
-        bool const bHit = HitTest(Ray); // slot 4
+        bool const bHit = HitTest(&Ray); // slot 4
         unsigned char const Bits = ButtonBits; // read after the call (0x0055cb68)
         if (bHit)
         {
@@ -1266,21 +1266,21 @@ void NnToggleButtonControl::Draw()
     // without an update.
     if (GlowArgb != 0 && Instance != InvalidInstanceIndex)
     {
-        float Saved[9];
-        memcpy(Saved, DALib::Engine->GetInstanceOrientation(Instance), sizeof(Saved)); // vt+0x98
+        Matrix Saved;
+        memcpy(&Saved, DALib::Engine->GetInstanceOrientation(Instance), sizeof(Saved)); // vt+0x98
         float const C = static_cast<float>(cos(kToggleGlowAngle));
         float const S = static_cast<float>(sin(kToggleGlowAngle));
-        float Turned[9];
-        Turned[0] = C;
-        Turned[1] = 0.0f;
-        Turned[2] = S;
-        Turned[3] = 0.0f;
-        Turned[4] = 1.0f;
-        Turned[5] = 0.0f;
-        Turned[6] = -S;
-        Turned[7] = 0.0f;
-        Turned[8] = C;
-        DALib::Engine->SetInstanceOrientation(Instance, (const Matrix*)Turned);
+        Matrix Turned;
+        Turned.E[0][0] = C;
+        Turned.E[0][1] = 0.0f;
+        Turned.E[0][2] = S;
+        Turned.E[1][0] = 0.0f;
+        Turned.E[1][1] = 1.0f;
+        Turned.E[1][2] = 0.0f;
+        Turned.E[2][0] = -S;
+        Turned.E[2][1] = 0.0f;
+        Turned.E[2][2] = C;
+        DALib::Engine->SetInstanceOrientation(Instance, &Turned);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
         unsigned char Glow[4];
         Glow[0] = static_cast<unsigned char>(GlowArgb >> 16);
@@ -1289,7 +1289,7 @@ void NnToggleButtonControl::Draw()
         Glow[3] = static_cast<unsigned char>(GlowArgb >> 24);
         SubmitWin3DTintedEngineInstanceWrapped(Win3DGetCamera(), Instance, 1, Glow, 1, 1.0f,
                                                0); // FUN_00434630
-        DALib::Engine->SetInstanceOrientation(Instance, (const Matrix*)Saved);
+        DALib::Engine->SetInstanceOrientation(Instance, &Saved);
     }
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
 }
@@ -1321,25 +1321,25 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // The offset from A; with a MAIN instance bound the +0x378 instance moves to
         // +0x60 (+ +0xa8 under +0x2f4 bit 0). Then ButtonControl's 6 as well.
         float const* const NewOffset = reinterpret_cast<float const*>(A);
-        Offset[0] = NewOffset[0];
-        Offset[1] = NewOffset[1];
-        Offset[2] = NewOffset[2];
+        Offset.x = NewOffset[0];
+        Offset.y = NewOffset[1];
+        Offset.z = NewOffset[2];
         if (HasInstance(this))
         {
-            float Placed[3];
+            Vector Placed;
             if ((PositionFlags & 1) != 0)
             {
-                Placed[0] = Offset[0] + Position.x;
-                Placed[1] = Offset[1] + Position.y;
-                Placed[2] = Offset[2] + Position.z;
+                Placed.x = Offset.x + Position.x;
+                Placed.y = Offset.y + Position.y;
+                Placed.z = Offset.z + Position.z;
             }
             else
             {
-                Placed[0] = Position.x;
-                Placed[1] = Position.y;
-                Placed[2] = Position.z;
+                Placed.x = Position.x;
+                Placed.y = Position.y;
+                Placed.z = Position.z;
             }
-            DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, (const Vector*)Placed);
+            DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, &Placed);
             DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         }
         return NnButtonControl::SetProperty(Msg, A, B); // FUN_0055bc30

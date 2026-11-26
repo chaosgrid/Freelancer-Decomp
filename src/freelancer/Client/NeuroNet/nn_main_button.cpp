@@ -115,21 +115,21 @@ namespace
                                 char const* MeshPath, float X, int ToolTipIds, int CommandId,
                                 WinControl** OutButton, WinControl** OutRoot)
     {
-        float const Position[3] = {X, NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
-        float const HalfExtents[3] = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
+        Vector const Position = {X, NnFloatBits(0x3eeb020c), NnFloatBits(0xbfa00000)};
+        Vector const HalfExtents = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
 
         WinControl* const Button =
-            Bar->CreateButtonControl(Name, MeshPath, nullptr, "ui_select_item", nullptr, Position,
-                                     nullptr, HalfExtents, 0, 0, 0, 0, 0, 0, 0);
+            Bar->CreateButtonControl(Name, MeshPath, nullptr, "ui_select_item", nullptr, &Position,
+                                     nullptr, &HalfExtents, 0, 0, 0, 0, 0, 0, 0);
         *OutButton = Button;
-        Button->HomeOffset[0] = Position[0];
-        Button->HomeOffset[1] = Position[1];
-        Button->HomeOffset[2] = Position[2];
+        Button->HomeOffset.x = Position.x;
+        Button->HomeOffset.y = Position.y;
+        Button->HomeOffset.z = Position.z;
         Button->Flags = static_cast<unsigned char>(Button->Flags & 0xfc);
 
         WinControl* const Root =
             Bar->CreateButtonControl(RootName, MeshPath, nullptr, "ui_select_item", nullptr,
-                                     Position, nullptr, HalfExtents, 0, 0, 0, 0, ToolTipIds, 0,
+                                     &Position, nullptr, &HalfExtents, 0, 0, 0, 0, ToolTipIds, 0,
                                      CommandId);
         *OutRoot = Root;
         Root->SetProperty(0x36, 1, 0);
@@ -146,9 +146,9 @@ namespace
 NN_MainButton::NN_MainButton()
 {
     // FUN_0045b700.
-    ClosingStart[0] = 0.0f;
-    ClosingStart[1] = 0.0f;
-    ClosingStart[2] = 0.0f;
+    ClosingStart.x = 0.0f;
+    ClosingStart.y = 0.0f;
+    ClosingStart.z = 0.0f;
     OpenButton = nullptr;
     ClosingButton = nullptr;
     OpenPanelId = 0;
@@ -175,23 +175,23 @@ bool NN_MainButton::Create(Win3D* NewParent, void* Data)
 {
     // LAB_0045b8f0 (RET 8).
     // (0.403, 0.366, -1) in single player, (0.362, 0.366, -1) otherwise.
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    float const Zero338[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Vector const Zero338 = {0.0f, 0.0f, 0.0f};
     if (SinglePlayer())
     {
-        float const Position[3] = {NnFloatBits(0x3ece5604), NnFloatBits(0x3ebb645a),
-                                   NnFloatBits(0xbf800000)};
+        Vector const Position = {NnFloatBits(0x3ece5604), NnFloatBits(0x3ebb645a),
+                                 NnFloatBits(0xbf800000)};
         Background = CreateStaticControl("NNBackground", "Interface\\HUD\\HUD_nnbox5.cmp",
-                                         Position, nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                         Zero338);
+                                         &Position, nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                         &Zero338);
     }
     else
     {
-        float const Position[3] = {NnFloatBits(0x3eb95810), NnFloatBits(0x3ebb645a),
-                                   NnFloatBits(0xbf800000)};
+        Vector const Position = {NnFloatBits(0x3eb95810), NnFloatBits(0x3ebb645a),
+                                 NnFloatBits(0xbf800000)};
         Background = CreateStaticControl("NNBackground", "Interface\\HUD\\HUD_nnbox7.cmp",
-                                         Position, nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
-                                         Zero338);
+                                         &Position, nullptr, &Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
+                                         &Zero338);
     }
 
     // The five common pairs: y 0.459, z -1.25, half size 0.018.
@@ -530,8 +530,8 @@ void NN_MainButton::OnScaleFinished()
             ButtonMover::Start(kAnimSeconds);
         }
         Vector const Zero = {0.0f, 0.0f, 0.0f};
-        ClosingButton->SetPosition(&Zero.x);
-        ButtonMover::AddButton(ClosingButton, ClosingStart, ClosingButton->HomeOffset);
+        ClosingButton->SetPosition(&Zero);
+        ButtonMover::AddButton(ClosingButton, &ClosingStart, &ClosingButton->HomeOffset);
         ClosingButton->ToolTipIds = ClosingToolTipIds;
         HudRemoveCancelHandler(AsHudCmdHandler(), 0);
         return;
@@ -585,7 +585,7 @@ void NN_MainButton::OnScaleFinished()
         return;
     }
 
-    OpenButton->SetPosition(&PanelOrigin[NnPanelSlot(OpenPanelId)].x);
+    OpenButton->SetPosition(&PanelOrigin[NnPanelSlot(OpenPanelId)]);
     Window->ProcessMessage(kWinMsgShow, 0, 0);
     Window->Flags = static_cast<unsigned char>(Window->Flags | 3);
     PlayOrRewindUiSoundSlot(2);
@@ -650,20 +650,20 @@ void NN_MainButton::OpenPanel(WinControl* Button, int PanelId)
     Button->Flags = static_cast<unsigned char>(Button->Flags | 3);
     ButtonMover::Start(kAnimSeconds);
     int const Slot = NnPanelSlot(PanelId);
-    float Target[3];
+    Vector Target;
     if (bInfoCardLayout != 0)
     {
-        Target[0] = 0.0f;
-        Target[1] = NnFloatBits(0xbd99999a);
-        Target[2] = NnFloatBits(0xbfa00000);
+        Target.x = 0.0f;
+        Target.y = NnFloatBits(0xbd99999a);
+        Target.z = NnFloatBits(0xbfa00000);
     }
     else
     {
-        Target[0] = OpenTarget[Slot].x;
-        Target[1] = OpenTarget[Slot].y;
-        Target[2] = OpenTarget[Slot].z;
+        Target.x = OpenTarget[Slot].x;
+        Target.y = OpenTarget[Slot].y;
+        Target.z = OpenTarget[Slot].z;
     }
-    ButtonMover::AddButton(Button, Button->HomeOffset, Target);
+    ButtonMover::AddButton(Button, &Button->HomeOffset, &Target);
     OpenButton = Button;
     OpenPanelId = PanelId;
     HudPushCancelHandler(AsHudCmdHandler(), 0);
@@ -705,16 +705,16 @@ void NN_MainButton::ClosePanel()
     ClosingToolTipIds = SavedToolTipIds;
     if (bInfoCardLayout != 0)
     {
-        ClosingStart[0] = 0.0f;
-        ClosingStart[1] = NnFloatBits(0xbd99999a);
-        ClosingStart[2] = NnFloatBits(0xbfa00000);
+        ClosingStart.x = 0.0f;
+        ClosingStart.y = NnFloatBits(0xbd99999a);
+        ClosingStart.z = NnFloatBits(0xbfa00000);
     }
     else
     {
         int const Slot = NnPanelSlot(OpenPanelId);
-        ClosingStart[0] = OpenTarget[Slot].x;
-        ClosingStart[1] = OpenTarget[Slot].y;
-        ClosingStart[2] = OpenTarget[Slot].z;
+        ClosingStart.x = OpenTarget[Slot].x;
+        ClosingStart.y = OpenTarget[Slot].y;
+        ClosingStart.z = OpenTarget[Slot].z;
     }
 
     Win3D* const Window = Win3DFindByName(Name);
@@ -745,20 +745,20 @@ void NN_MainButton::MakeScaledBackground(float Scale)
 
     // The info card at (0, -0.086, -1.288), or the slot's mesh at its BackgroundPosition.
     int const Slot = NnPanelSlot(OpenPanelId);
-    float const HalfExtents[3] = {0.0f, 0.0f, 0.0f};
-    float const Zero338[3] = {0.0f, 0.0f, 0.0f};
+    Vector const HalfExtents = {0.0f, 0.0f, 0.0f};
+    Vector const Zero338 = {0.0f, 0.0f, 0.0f};
     if (bInfoCardLayout != 0)
     {
-        float const Position[3] = {0.0f, NnFloatBits(0xbdb020c5), NnFloatBits(0xbfa4dd2f)};
+        Vector const Position = {0.0f, NnFloatBits(0xbdb020c5), NnFloatBits(0xbfa4dd2f)};
         ScaledBackground = CreateStaticControl(
             "ScaledBackground", "Interface\\NeuroNet\\Inventory\\INV_biginforcard_center.cmp",
-            Position, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero338);
+            &Position, nullptr, &HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero338);
     }
     else
     {
         ScaledBackground = CreateStaticControl("ScaledBackground", kScaledBackgroundMeshes[Slot],
-                                               &BackgroundPosition[Slot].x, nullptr, HalfExtents, 0,
-                                               0, 0, 1, 0, 0, 1, 0, 0, 0, Zero338);
+                                               &BackgroundPosition[Slot], nullptr, &HalfExtents, 0,
+                                               0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero338);
     }
 
     // The rotation becomes identity scaled by Scale, the translation is kept. No null or -1

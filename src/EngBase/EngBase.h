@@ -318,18 +318,18 @@ struct FEngineInstance
     FEngineInstance* LastChild;
     unsigned long ChildCount;
     void* UserData;
-    float Matrix[12];
+    Transform Matrix;
     // FUN_06625560: type[0], rest pos[1..3], T[4..6], 3x3[7..15], axis[16..18].
     unsigned long Relative[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
     float JointState[7];
     unsigned char bWorldDirty;
     unsigned char PadD5[3];
     float Extent;
-    float ExtentVec[3];
+    Vector ExtentVec;
     FArchetypeChild* PartChild;
 
     // FUN_0661ed40. Defined in EngBaseEngine.cpp.
-    void TransformExtra(float* OutExtent, float* OutVec);
+    void TransformExtra(float* OutExtent, Vector* OutVec);
 
     // FUN_0661ec90. Defined in EngBaseEngine.cpp.
     unsigned char ConnectChild(FEngineInstance* Child, const unsigned long* Payload);
@@ -338,7 +338,7 @@ struct FEngineInstance
     unsigned char InvalidateExtentChain(unsigned char bFromThis);
 
     // FUN_0661ece0. Defined in EngBaseEngine.cpp.
-    void SetExtentAndInvalidate(float Extent, const float* Vec, unsigned char bXform);
+    void SetExtentAndInvalidate(float Extent, const Vector* Vec, unsigned char bXform);
 
     // FUN_0661ec30. Defined in EngBaseEngine.cpp.
     unsigned char UnlinkChild(FEngineInstance* Node);
@@ -347,7 +347,7 @@ struct FEngineInstance
     unsigned char ComposeWorld();
 
     // FUN_0661ed90. Defined in EngBaseEngine.cpp.
-    void ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent, float* OutVec);
+    void ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent, Vector* OutVec);
 };
 
 struct FAggDescC
@@ -433,7 +433,7 @@ struct FEngineObject : IEngine
     unsigned long DACOM_API CreateJoint(InstanceIndex Parent, InstanceIndex Child,
                                          const unsigned long* Payload) override;
     unsigned long DACOM_API DestroyJoint(InstanceIndex Parent, InstanceIndex Child) override;
-    unsigned long* DACOM_API GetInstanceRelative(InstanceIndex Instance) override;
+    FEngineJointBlock* DACOM_API GetInstanceRelative(InstanceIndex Instance) override;
     unsigned long DACOM_API SetJointParams(InstanceIndex Instance, unsigned long Index,
                                             const float* Values) override;
     unsigned long DACOM_API GetJointParams(InstanceIndex Instance, unsigned long Index,
@@ -542,7 +542,7 @@ struct FPlayHeader
     float BlendDuration;        // [3] the mixer blend time (MixerBlendAttach)
     float Scale;                // [4] typed +0x2C
     float TranslationScale;     // [5] typed +0x30
-    const float* Transform;     // [6] type 6 only: 3x3 orientation + translation, or null
+    const ::Transform* Transform; // [6] type 6 only: 3x3 orientation + translation, or null
 };
 static_assert(sizeof(FPlayHeader) == 7 * 4, "play header is seven dwords");
 
@@ -560,13 +560,13 @@ struct FTypedChannel
     virtual unsigned long GetType();
     virtual unsigned long CopySampled(float* Out);
     virtual unsigned long BindMap(unsigned long* Map, void* Bind);
-    virtual unsigned long SetOverlayPos(const float* Pos);
-    virtual unsigned long SetOverlayExtra(const float* Extra);
-    virtual unsigned long AddOverlayPos(const float* Delta);
+    virtual unsigned long SetOverlayPos(const Vector* Pos);
+    virtual unsigned long SetOverlayExtra(const Matrix* Extra);
+    virtual unsigned long AddOverlayPos(const Vector* Delta);
     virtual float* GetSampled();
-    virtual unsigned long TouchMapped(void* OutPos, void* OutSampledPos);
+    virtual unsigned long TouchMapped(Vector* OutPos, Vector* OutSampledPos);
     virtual unsigned long UpdateDeltaRate(float Dt);
-    virtual unsigned long Step(float* Out, float Dt);
+    virtual unsigned long Step(Vector* Out, float Dt);
 
     IChannelOwner* Owner;                            // +0x04
     unsigned long Kind;                              // +0x08
@@ -635,7 +635,7 @@ struct FVectorTypedChannel : FTypedChannel
     unsigned long CopySampled(float* Out) override;                                           // LAB_066121d0
     float* GetSampled() override;                                                             // LAB_066121a0
 
-    float Sampled[3];                                // +0x3C
+    Vector Sampled;                                  // +0x3C
 };
 
 // Type 4, operator new 0x4C, table 0662912c: a quaternion sampled at +0x3C.
@@ -650,7 +650,7 @@ struct FQuatTypedChannel : FTypedChannel
     unsigned long CopySampled(float* Out) override;                                           // LAB_066121b0
     float* GetSampled() override;                                                             // LAB_066121a0
 
-    float Sampled[4];                                // +0x3C
+    Quaternion Sampled;                              // +0x3C
 };
 
 // Type 6, operator new 0x94, table 066290f0: position + orientation.
@@ -665,19 +665,19 @@ struct FPosQuatTypedChannel : FTypedChannel
     unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override;
     unsigned long GetType() override;
     unsigned long CopySampled(float* Out) override;
-    unsigned long SetOverlayPos(const float* Pos) override;
-    unsigned long SetOverlayExtra(const float* Extra) override;
-    unsigned long AddOverlayPos(const float* Delta) override;
+    unsigned long SetOverlayPos(const Vector* Pos) override;
+    unsigned long SetOverlayExtra(const Matrix* Extra) override;
+    unsigned long AddOverlayPos(const Vector* Delta) override;
     float* GetSampled() override;
-    unsigned long TouchMapped(void* OutPos, void* OutSampledPos) override;
+    unsigned long TouchMapped(Vector* OutPos, Vector* OutSampledPos) override;
     unsigned long UpdateDeltaRate(float Dt) override;
-    unsigned long Step(float* Out, float Dt) override;
+    unsigned long Step(Vector* Out, float Dt) override;
 
-    float Matrix[9];                                 // +0x3C
-    float Delta[3];                                  // +0x60
-    float StepDelta[3];                              // +0x6C (LAB_0661c320)
-    float AppliedPos[3];                             // +0x78
-    float AppliedQuat[4];                            // +0x84
+    Matrix Orientation;                              // +0x3C
+    Vector Delta;                                    // +0x60
+    Vector StepDelta;                                // +0x6C (LAB_0661c320)
+    Vector AppliedPos;                               // +0x78
+    Quaternion AppliedQuat;                          // +0x84
 };
 
 // Retail sizes, on the 32-bit target the port builds for.
@@ -746,7 +746,7 @@ struct FMixerNode
     // Slot 2: advance the sampled delta rate; blend and overlay nodes ignore Dt.
     virtual void UpdateDeltaRate(float Dt) = 0;
     // Slot 3: sample displacement into Out and return its address.
-    virtual float* SampleDisplacement(float* Out, float Dt) = 0;
+    virtual Vector* SampleDisplacement(Vector* Out, float Dt) = 0;
 
     unsigned long Type;     // +0x04: 0 leaf, 1 blend, 2 overlay
     FMixerNode* Prev;       // +0x08
@@ -762,7 +762,7 @@ struct FMixerLeaf : FMixerNode
     unsigned long Tick(float Dt) override;                    // LAB_0661d110
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d120
     void UpdateDeltaRate(float Dt) override;
-    float* SampleDisplacement(float* Out, float Dt) override;
+    Vector* SampleDisplacement(Vector* Out, float Dt) override;
 };
 
 // operator_new(0x48), vtable PTR_LAB_06629210 (built by FUN_06616090 and FUN_066152d0).
@@ -774,14 +774,14 @@ struct FMixerBlend : FMixerNode
     // +0x20, a byte: bit 0 "drop the outgoing side when done" (FUN_066152d0),
     // bit 1 "carry the root's position through the blend".
     unsigned char Flags;
-    float PoseStart[3];     // +0x24: IEngine+0x90 of the root when the blend was attached
-    float PoseRate[3];      // +0x30: predecessor's slot 3 over the duration, times InvDuration
-    float PoseCtrl[3];      // +0x3C: new leaf's slot 3 times InvDuration, minus PoseRate
+    Vector PoseStart;       // +0x24: IEngine+0x90 of the root when the blend was attached
+    Vector PoseRate;        // +0x30: predecessor's slot 3 over the duration, times InvDuration
+    Vector PoseCtrl;        // +0x3C: new leaf's slot 3 times InvDuration, minus PoseRate
 
     unsigned long Tick(float Dt) override;                    // LAB_0661d130
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d160
     void UpdateDeltaRate(float Dt) override;
-    float* SampleDisplacement(float* Out, float Dt) override;
+    Vector* SampleDisplacement(Vector* Out, float Dt) override;
 };
 
 // operator_new(0x34), FUN_0661d5b0, vtable PTR_FUN_06629518: the value the target had when
@@ -796,7 +796,7 @@ struct FMixerOverlay : FMixerNode
     unsigned long Tick(float Dt) override;                    // FUN_0661d700
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d710
     void UpdateDeltaRate(float Dt) override;
-    float* SampleDisplacement(float* Out, float Dt) override;
+    Vector* SampleDisplacement(Vector* Out, float Dt) override;
 };
 
 // FUN_06612b20, the inner map's ordering.
@@ -822,8 +822,8 @@ struct FAnimPlayback
 
     // Playback overlay writers (EngBaseMixer.cpp). Inner is the playback root's entry in the
     // mixer map (FUN_06614f70 on playback+4).
-    void WriteOverlayPos(const float* Pos, FMixerDescMap* Inner);
-    void AddOverlayPos(const float* Delta, FMixerDescMap* Inner);
+    void WriteOverlayPos(const Vector* Pos, FMixerDescMap* Inner);
+    void AddOverlayPos(const Vector* Delta, FMixerDescMap* Inner);
 
     // FUN_06612a00. Defined in EngBaseAnim.cpp.
     void FreeTyped();
@@ -838,7 +838,7 @@ struct FAnimPlayback
     unsigned long HasTyped(void* Object);
 
     // FUN_066122d0. Defined in EngBaseAnim.cpp.
-    unsigned long TouchMappedTyped(void* OutPos, void* OutSampledPos);
+    unsigned long TouchMappedTyped(Vector* OutPos, Vector* OutSampledPos);
 
     // FUN_066128f0. Defined in EngBaseAnim.cpp.
     void StopTyped();
@@ -849,7 +849,7 @@ struct FAnimPlayback
     // FUN_066126e0. Defined in EngBaseAnim.cpp.
     unsigned long EvalTyped(unsigned long Flags, float Start, float Speed,
                             unsigned long BlendDurationBits, unsigned long ScaleBits,
-                            unsigned long TranslationScaleBits, const float* Transform);
+                            unsigned long TranslationScaleBits, const ::Transform* Transform);
 
     // FUN_066127e0. Defined in EngBaseAnim.cpp.
     unsigned long EvalStoredTyped();
@@ -864,7 +864,7 @@ struct FAnimPlayback
     float StoredDuration();
 
                                    // FUN_06612a70
-    void WriteOverlayOrient(const float* Matrix, FMixerDescMap* Inner);
+    void WriteOverlayOrient(const Matrix* Mat, FMixerDescMap* Inner);
 };
 
 // Retail Animation+0x14: playback id -> record. FUN_06614580 / FUN_06612e70 compare the key
@@ -874,9 +874,9 @@ using FAnimPlaybackMap = std::map<long, FAnimPlayback>;
 // Animation exposes four facets sharing the aggregate's controlling unknown.
 struct FAnimation2Facet : IAnimation2
 {
-    unsigned long DACOM_API SetOverlayPos(unsigned long PlaybackId, float* Pos) override;
-    unsigned long DACOM_API SetOverlayExtra(unsigned long PlaybackId, float* Extra) override;
-    unsigned long DACOM_API AddOverlayPos(unsigned long PlaybackId, float* Delta) override;
+    unsigned long DACOM_API SetOverlayPos(unsigned long PlaybackId, const Vector* Pos) override;
+    unsigned long DACOM_API SetOverlayExtra(unsigned long PlaybackId, const Matrix* Extra) override;
+    unsigned long DACOM_API AddOverlayPos(unsigned long PlaybackId, const Vector* Delta) override;
 };
 
 // IChannel @ Animation +8 (slots 3..18 of 06629370: LAB_06615950 .. LAB_06616a80).
@@ -893,11 +893,11 @@ struct FAnimationChannelFacet : IChannel
     unsigned long DACOM_API Blend(unsigned long Key, float Duration) override;
     GENRESULT DACOM_API SetUser(unsigned long Key, unsigned long User) override;
     float DACOM_API GetUser(unsigned long Key) override;
-    GENRESULT DACOM_API SetOverlayPos(unsigned long Key, float* Pos) override;
-    GENRESULT DACOM_API SetOverlayExtra(unsigned long Key, float* Extra) override;
+    GENRESULT DACOM_API SetOverlayPos(unsigned long Key, const Vector* Pos) override;
+    GENRESULT DACOM_API SetOverlayExtra(unsigned long Key, const Matrix* Extra) override;
     unsigned long DACOM_API InMixer(unsigned long Key) override;
     unsigned long* DACOM_API GetHeader(unsigned long* Out, unsigned long Key) override;
-    GENRESULT DACOM_API AddOverlayPos(unsigned long Key, float* Delta) override;
+    GENRESULT DACOM_API AddOverlayPos(unsigned long Key, const Vector* Delta) override;
     GENRESULT DACOM_API GetMapped(unsigned long Key, unsigned char* Out) override;
 };
 
@@ -936,7 +936,7 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     GENRESULT DACOM_API DestroyScript(void* Script) override;
     unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags, float Time,
                                          float Speed, void* BlendDuration, void* Scale,
-                                         void* TranslationScale, void* Transform) override;
+                                         void* TranslationScale, const Transform* Xform) override;
     unsigned long DACOM_API EvalStored(unsigned long PlaybackId) override;
     unsigned long DACOM_API ApplyChannels(unsigned long PlaybackId) override;
     unsigned long DACOM_API StopPlayback(unsigned long PlaybackId) override;
@@ -944,7 +944,8 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     float DACOM_API GetStoredDuration(unsigned long PlaybackId) override;
     unsigned long DACOM_API FilterObjects(void* Filter) override;
     unsigned long DACOM_API HasObject(unsigned long PlaybackId, void* Object) override;
-    unsigned long DACOM_API TouchMapped(unsigned long PlaybackId, float* Pos, float* Extra) override;
+    unsigned long DACOM_API TouchMapped(unsigned long PlaybackId, Vector* OutPos,
+                                        Vector* OutSampledPos) override;
     unsigned long DACOM_API GetFirstInstanceField(unsigned long PlaybackId, unsigned long* Out) override;
     unsigned long DACOM_API GetDurationIfNamed(unsigned long PlaybackId, float* Out) override;
     unsigned long DACOM_API GetNamedDurationOut(void* Script, const char* Name, float* Out) override;
@@ -967,7 +968,7 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     // IAggregateComponent @ +4, slot 3 (LAB_06616d40).
     GENRESULT DACOM_API Initialize() override;
     // IRootData @ +0xC, slot 3 (LAB_06614b30).
-    unsigned char DACOM_API Eval(unsigned long PlaybackId, void* OutSampledPos, unsigned long Flags,
+    unsigned char DACOM_API Eval(unsigned long PlaybackId, Vector* OutSampledPos, unsigned long Flags,
                                  float Time, float Speed, void* BlendDuration, void* Scale,
                                  float TranslationScale) override;
 
@@ -1119,7 +1120,7 @@ struct FAnimHandleNode
 };
 
 // EngBase.cpp
-GENRESULT MathQuatToMatrix(I3DMathEngine* Math, float* Dst, const float* A);
+GENRESULT MathQuatToMatrix(I3DMathEngine* Math, Matrix* Dst, const Quaternion* A);
 char* FormatFdumpMessage(char* Buffer, const char* Format, ...);
 int DACOM_API EngBaseAggregationHook(void* Desc);
 GENRESULT DACOM_API StubRet8(void* This, void* A);
@@ -1132,8 +1133,8 @@ int FileSystemOpenNode(void* FileSystem, const char* Name);
 int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData);
 int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData);
 void FileSystemFindClose(void* FileSystem, int FindHandle);
-void MathMulMatrix3(I3DMathEngine* Math, float* Out9, const float* Left, const float* Right);
-void MathTransformVec(I3DMathEngine* Math, float* Out3, const float* Matrix, const float* In3);
+void MathMulMatrix3(I3DMathEngine* Math, Matrix* Out, const Matrix* Left, const Matrix* Right);
+void MathTransformVec(I3DMathEngine* Math, Vector* Out, const Matrix* Rotation, const Vector* In);
 
 // EngBaseAnim.cpp
 extern const char* const G_FdumpFileAnim;

@@ -84,7 +84,7 @@ static const int kThornTypeSubtitle = 19;
 struct FThornLightProps
 {
     int Color[3];
-    float Direction[3];
+    Vector Direction;
     float RangeTemp;
     float CutoffTemp;
     int On;
@@ -135,8 +135,8 @@ struct FThornEntitySnap
 {
     int Type;             // +0x00 kThornEntity*
     int Flags;            // +0x04 bit 0: a reference entity (resolved, not created)
-    float Pos[3];         // +0x08
-    float Orient[9];      // +0x14
+    Vector Pos;           // +0x08
+    Matrix Orient;        // +0x14
     char* Name;           // +0x38 the entity's name in the script
     char* TemplateName;   // +0x3c the template (archetype nickname, "PlayerShip", ...)
     unsigned char LtGrp;  // +0x40
@@ -226,7 +226,7 @@ struct FThornPathEventDesc
     float StartPercent;
     float StopPercent;
     float PercentDelta;
-    float Offset[3];
+    Vector Offset;
     int LookAtUpAxis;
     int LookAtFrontAxis;
 };
@@ -262,7 +262,7 @@ static_assert(sizeof(void*) != 4 || sizeof(FThornUserEventDesc) == 0x30,
 struct FThornAttachEventDesc
 {
     FThornEventDesc Common;
-    float Offset[3];
+    Vector Offset;
     int TargetType;
     int UpAxis;
     int FrontAxis;
@@ -391,9 +391,9 @@ struct FThornSpatialEventDesc
 {
     FThornEventDesc Common;
     int Mask;
-    float Orient[9];
-    float Position[3];
-    float Quaternion[4];
+    Matrix Orient;
+    Vector Position;
+    ::Quaternion Quaternion;
     float AxisRotAngle;
     int AxisRotAxis;
     const char* TargetPart;

@@ -1010,8 +1010,8 @@ namespace
     struct FNomadContext
     {
         InstanceIndex Inst;
-        float* World;
-        float* View;
+        const Transform* World;
+        const Transform* View;
         const FRpVertexSrcDesc* Mesh;
         unsigned short* Indices;
         FVbListing* VbListing;
@@ -1137,26 +1137,24 @@ namespace
             Start, Count);
     }
 
-    void NomadComposeViewWorld(const float* World, const float* View, float* Out) // FUN_066f9500
+    void NomadComposeViewWorld(const Transform* World, const Transform* View, Transform* Out) // FUN_066f9500
     {
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
         Transform Combined;
-        G_NomadMath->MulTransform(Combined, *(const Transform*)(View),
-            *(const Transform*)(World));
+        G_NomadMath->MulTransform(Combined, *View, *World);
         std::memcpy(Out, &Combined, sizeof(Combined));
     }
 
-    void NomadInverseLight(const float* World, const float* View, float* OutLight)
+    void NomadInverseLight(const Transform* World, const Transform* View, Vector* OutLight)
     {
         float Combined[12];
-        NomadComposeViewWorld(World, View, Combined);
+        NomadComposeViewWorld(World, View, (Transform*)Combined);
         // Retail re-reads the cache after MulTransform, independently of its helper.
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
         const Vector MinusZ = {0.0f, 0.0f, -1.0f};
-        G_NomadMath->InverseRotate(*(Vector*)(OutLight),
-            *(const Transform*)(Combined), MinusZ);
+        G_NomadMath->InverseRotate(*OutLight, *(const Transform*)Combined, MinusZ);
     }
 
     // LAB_066f95b0 / FUN_066f95c0. The two default texture cursors start with stride 8.
@@ -1178,7 +1176,7 @@ namespace
     void NomadWriteVert(FNomadCursor& PositionOut, FNomadCursor& ColorOut,
                         FNomadCursor* TextureOut, unsigned long Index,
                         const unsigned long& Stage, unsigned long Color, float Phase,
-                        const float* Position, const float* Normal, const float* Light,
+                        const float* Position, const float* Normal, const Vector* Light,
                         const unsigned char* UvBase, const unsigned long* UvIndex, unsigned long UvStride, bool bIndexed)
     {
         // DWORD copies preserve all position/UV bit patterns; neither path copies normals.
@@ -1192,9 +1190,9 @@ namespace
         const float NormalZ = Normal[2];
         *(unsigned long*)(ColorOut.Pointer) = Color;
         // Summation order Z, Y, then X, on the x87 stack.
-        const double Zy = (double)(Light[2]) * NormalZ +
-                          (double)(Light[1]) * NormalY;
-        const double Lit = ((Zy + (double)(Light[0]) * NormalX) + 1.0) * kNomadHalf;
+        const double Zy = (double)(Light->z) * NormalZ +
+                          (double)(Light->y) * NormalY;
+        const double Lit = ((Zy + (double)(Light->x) * NormalX) + 1.0) * kNomadHalf;
         if ((long)(Stage) > 1)
         {
             const unsigned long UvOffset = bIndexed ? UvIndex[Index] * UvStride : Index * UvStride;
@@ -1218,7 +1216,7 @@ namespace
 
     void NomadCopyMesh(const FRpVertexSrcDesc* Mesh, unsigned long Start, unsigned long Count,
                        FNomadCursor& PositionOut, FNomadCursor& ColorOut, FNomadCursor* TextureOut,
-                       const unsigned long& Stage, unsigned long Color, float Phase, const float* Light)
+                       const unsigned long& Stage, unsigned long Color, float Phase, const Vector* Light)
     {
         if ((Mesh->Flags & 4) != 0)
         {
@@ -1366,9 +1364,9 @@ namespace
         TextureOut[0].Stride = Stride;
         TextureOut[1].Pointer = Vertices + TextureOffset + 8;
         TextureOut[1].Stride = Stride;
-        float Light[3];
-        NomadInverseLight(Submit->World, Submit->View, Light);
-        NomadCopyMesh(Submit->Mesh, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, Light);
+        Vector Light;
+        NomadInverseLight(Submit->World, Submit->View, &Light);
+        NomadCopyMesh(Submit->Mesh, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, &Light);
         VbMgr->UnlockVertexMemory(&LockOut);
 
         FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);

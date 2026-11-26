@@ -139,7 +139,7 @@ HUD_Waypoint::HUD_Waypoint(INI_Reader& /*Reader*/)
     G_HudWaypoint = this;
     HUDItem::Name = "Waypoint";
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     Win3D::Create(nullptr, nullptr);
     SpawnCounter = 0;
     SpinAngle = 0.0f;
@@ -159,7 +159,7 @@ bool HUD_Waypoint::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004f3d70 (this = the WinControl face).
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(&Position.x);
+    SetPosition(&Position);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -331,9 +331,9 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     float const RadiansF = static_cast<float>(Radians);
     float const Cos = static_cast<float>(cos(Radians));
     float const Sin = static_cast<float>(sin(static_cast<double>(RadiansF)));
-    float Rotation[9] = {Cos, 0.0f, Sin, 0.0f, 1.0f, 0.0f, -Sin, 0.0f, Cos};
-    HudMatrixRotateRows12(Rotation, 0.0f);
-    HudMatrixRotateRows01(Rotation, 0.0f);
+    Matrix Rotation(Cos, 0.0f, Sin, 0.0f, 1.0f, 0.0f, -Sin, 0.0f, Cos);
+    HudMatrixRotateRows12(&Rotation, 0.0f);
+    HudMatrixRotateRows01(&Rotation, 0.0f);
 
     // Into the CObject's orientation when it is a CSimple.
     IObjRW* const Obj = WatchedObjRw(Waypoint);
@@ -344,7 +344,7 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         return;
     if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
-    memcpy(&Object->Orientation, Rotation, sizeof(Rotation));
+    memcpy(&Object->Orientation, &Rotation, sizeof(Rotation));
 }
 
 void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, int NewId)

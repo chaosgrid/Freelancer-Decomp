@@ -27,7 +27,7 @@ public:
     ~MsgWin() override;
 
     // slot 4 FUN_0053f330 (RichTextWin has LAB_0057aa80) -- always false: never picked.
-    bool HitTest(float const* Ray) override;
+    bool HitTest(Vector const* Ray) override;
 
     // slot 11 LAB_0046c1d0 -- post the "lost / new affiliation" notices for the local client
     // from Common's changed-affiliation map (then empty it), let the Recent snapshot age, and

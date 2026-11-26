@@ -55,7 +55,7 @@ UiTextMsgButton::~UiTextMsgButton()
     // FUN_0059ce50.
 }
 
-void UiTextMsgButton::SetPosition(float const* NewPosition)
+void UiTextMsgButton::SetPosition(Vector const* NewPosition)
 {
     // LAB_00599eb0 (RET 4). The style mesh sits at the button's centre: half the payload size
     // along the control's axes, scaled onto the z = -1 plane and written straight into the
@@ -67,12 +67,12 @@ void UiTextMsgButton::SetPosition(float const* NewPosition)
     Half.z = 0.0f;
     Vector Centre;
     Math->TransformMatrix(Centre, Orientation, Half);
-    double const SumX = static_cast<double>(Centre.x) + NewPosition[0];
-    double const SumY = static_cast<double>(Centre.y) + NewPosition[1];
-    double const Scale = -1.0 / NewPosition[2];
-    Offset[0] = static_cast<float>(SumX * Scale - NewPosition[0]);
-    Offset[1] = static_cast<float>(SumY * Scale - NewPosition[1]);
-    Offset[2] = -1.0f - NewPosition[2];
+    double const SumX = static_cast<double>(Centre.x) + NewPosition->x;
+    double const SumY = static_cast<double>(Centre.y) + NewPosition->y;
+    double const Scale = -1.0 / NewPosition->z;
+    Offset.x = static_cast<float>(SumX * Scale - NewPosition->x);
+    Offset.y = static_cast<float>(SumY * Scale - NewPosition->y);
+    Offset.z = -1.0f - NewPosition->z;
     BaseRichTextWin::SetPosition(NewPosition);
 }
 
@@ -83,17 +83,17 @@ void UiTextMsgButton::SetOrientation(Matrix const* NewOrientation)
     WinControl::SetOrientation(NewOrientation);
     if (!ClientMeshHolderHasInstance(&MeshHolder))
         return;
-    float Identity[9];
-    Identity[0] = 1.0f;
-    Identity[1] = 0.0f;
-    Identity[2] = 0.0f;
-    Identity[3] = 0.0f;
-    Identity[4] = 1.0f;
-    Identity[5] = 0.0f;
-    Identity[6] = 0.0f;
-    Identity[7] = 0.0f;
-    Identity[8] = 1.0f;
-    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, (const Matrix*)Identity);
+    Matrix Identity;
+    Identity.E[0][0] = 1.0f;
+    Identity.E[0][1] = 0.0f;
+    Identity.E[0][2] = 0.0f;
+    Identity.E[1][0] = 0.0f;
+    Identity.E[1][1] = 1.0f;
+    Identity.E[1][2] = 0.0f;
+    Identity.E[2][0] = 0.0f;
+    Identity.E[2][1] = 0.0f;
+    Identity.E[2][2] = 1.0f;
+    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, &Identity);
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 
@@ -211,7 +211,7 @@ void UiTextMsgButton::Draw()
     BaseRichTextWin::Draw();
 }
 
-void UiTextMsgButton::MouseEnter(float const* /*Ray*/)
+void UiTextMsgButton::MouseEnter(Vector const* /*Ray*/)
 {
     // LAB_0059a240 (RET 4).
     if (bInteractive != 0)

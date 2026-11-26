@@ -66,13 +66,13 @@ FThornLight::FThornLight(Csys const& ScriptFrame, FGfScript* InOwner, FThornEnti
       Wrapper(nullptr),
       RegistryIndex(-1)
 {
-    float const* const Props = reinterpret_cast<float const*>(&Desc->Light);
-    Wrapper = GfLightWrapperCreate(Desc->Pos, ThornLightPropsD3d(Props),
+    FThornLightProps const* const Props = &Desc->Light;
+    Wrapper = GfLightWrapperCreate(&Desc->Pos.x, ThornLightPropsD3d(Props),
                                    ThornLightPropsTarget(Props), Desc->LtGrp);
-    memcpy(&Orient, Desc->Orient, sizeof(Orient));
-    Direction.x = Desc->Light.Direction[0];
-    Direction.y = Desc->Light.Direction[1];
-    Direction.z = Desc->Light.Direction[2];
+    memcpy(&Orient, &Desc->Orient, sizeof(Orient));
+    Direction.x = Desc->Light.Direction.x;
+    Direction.y = Desc->Light.Direction.y;
+    Direction.z = Desc->Light.Direction.z;
     RegistryIndex = GfLightRegistryAdd(Wrapper, Desc->Light.On != 0);
 }
 
@@ -81,7 +81,7 @@ GENRESULT DACOM_API FThornLight::SetTransform(const Transform* Transform12)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, &Transform12->Translation.x);
+        EngineLightSetPosition(Light, &Transform12->Translation);
     memcpy(&Orient, Transform12, sizeof(Orient));
     PushLightOrientation(*this);
     return GR_OK;
@@ -93,9 +93,9 @@ GENRESULT DACOM_API FThornLight::GetTransform(Transform* OutTransform12)
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
     {
-        OutTransform12->Translation.x = Light->Position[0];
-        OutTransform12->Translation.y = Light->Position[1];
-        OutTransform12->Translation.z = Light->Position[2];
+        OutTransform12->Translation.x = Light->Position.x;
+        OutTransform12->Translation.y = Light->Position.y;
+        OutTransform12->Translation.z = Light->Position.z;
     }
     memcpy(OutTransform12, &Orient, sizeof(Orient));
     return GR_OK;
@@ -106,7 +106,7 @@ GENRESULT DACOM_API FThornLight::SetPosition(const Vector* Position)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, &Position->x);
+        EngineLightSetPosition(Light, Position);
     return GR_OK;
 }
 
@@ -124,9 +124,9 @@ GENRESULT DACOM_API FThornLight::GetPosition(Vector* OutPosition)
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
     {
-        OutPosition->x = Light->Position[0];
-        OutPosition->y = Light->Position[1];
-        OutPosition->z = Light->Position[2];
+        OutPosition->x = Light->Position.x;
+        OutPosition->y = Light->Position.y;
+        OutPosition->z = Light->Position.z;
     }
     return GR_OK;
 }
@@ -156,11 +156,11 @@ GENRESULT DACOM_API FThornLight::SetLight(void const* D3dLight8)
 }
 
 // LAB_00453330.
-GENRESULT DACOM_API FThornLight::SetDirection(float* Dir3)
+GENRESULT DACOM_API FThornLight::SetDirection(Vector* Dir)
 {
-    Direction.x = Dir3[0];
-    Direction.y = Dir3[1];
-    Direction.z = Dir3[2];
+    Direction.x = Dir->x;
+    Direction.y = Dir->y;
+    Direction.z = Dir->z;
     PushLightOrientation(*this);
     return GR_OK;
 }
@@ -184,11 +184,11 @@ GENRESULT DACOM_API FThornLight::GetLight(void* OutD3dLight8)
 }
 
 // LAB_00453420.
-GENRESULT DACOM_API FThornLight::GetDirection(float* OutDir3)
+GENRESULT DACOM_API FThornLight::GetDirection(Vector* OutDir)
 {
-    OutDir3[0] = Direction.x;
-    OutDir3[1] = Direction.y;
-    OutDir3[2] = Direction.z;
+    OutDir->x = Direction.x;
+    OutDir->y = Direction.y;
+    OutDir->z = Direction.z;
     return GR_OK;
 }
 
@@ -322,11 +322,11 @@ GENRESULT DACOM_API FThornLightReference::SetLight(void const* D3dLight8)
     return Target->SetLight(D3dLight8);
 }
 
-GENRESULT DACOM_API FThornLightReference::SetDirection(float* Dir3)
+GENRESULT DACOM_API FThornLightReference::SetDirection(Vector* Dir)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
-    return Target->SetDirection(Dir3);
+    return Target->SetDirection(Dir);
 }
 
 GENRESULT DACOM_API FThornLightReference::GetOn(int* OutOn)
@@ -343,11 +343,11 @@ GENRESULT DACOM_API FThornLightReference::GetLight(void* OutD3dLight8)
     return Target->GetLight(OutD3dLight8);
 }
 
-GENRESULT DACOM_API FThornLightReference::GetDirection(float* OutDir3)
+GENRESULT DACOM_API FThornLightReference::GetDirection(Vector* OutDir)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
-    return Target->GetDirection(OutDir3);
+    return Target->GetDirection(OutDir);
 }
 
 // LAB_00450cd0.

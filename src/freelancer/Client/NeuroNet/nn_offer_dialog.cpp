@@ -79,66 +79,66 @@ bool NnOfferDialog::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004a61b0 (RET 8). NewParent is not read: Win3D::Create gets the window's own +0x04.
     (void)NewParent;
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
-    CreateStaticControl("OfferDialogBackground", kOfferDialogBackgroundMesh, Zero, nullptr, Zero,
-                        0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
+    CreateStaticControl("OfferDialogBackground", kOfferDialogBackgroundMesh, &Zero, nullptr, &Zero,
+                        0, 0, 0, 1, 0, 0, 1, 0, 0, 0, &Zero);
 
     // {-0.418, 0.253, 0}, 0.839 x 0.06, 1.2.
-    float const TitlePosition[3] = {NnFloatBits(0xbed60419), NnFloatBits(0x3e818937), 0.0f};
-    Title = CreateTextControl("OfferDialogTitle", "PageHeader", TitlePosition, nullptr,
+    Vector const TitlePosition = {NnFloatBits(0xbed60419), NnFloatBits(0x3e818937), 0.0f};
+    Title = CreateTextControl("OfferDialogTitle", "PageHeader", &TitlePosition, nullptr,
                               NnFloatBits(0x3f56c8b4), NnFloatBits(0x3d75c28f),
                               NnFloatBits(0x3f99999a), 0x3e8, 1, 0, 1);
 
     // 0.785 x 0.34 at {-0.4, 0.181, 0}.
-    float const TextOffset[3] = {NnFloatBits(0xbecccccd), NnFloatBits(0x3e395810), 0.0f};
+    Vector const TextOffset = {NnFloatBits(0xbecccccd), NnFloatBits(0x3e395810), 0.0f};
     OfferText = CreateRichTextWin("OfferDialogOfferText", NnFloatBits(0x3f48f5c3),
-                                  NnFloatBits(0x3eae147b), TextOffset, true);
+                                  NnFloatBits(0x3eae147b), &TextOffset, true);
 
     // {-0.142, -0.21, 0}, half extents {0.09, 0.026, 0}.
-    float const ButtonExtents[3] = {NnFloatBits(0x3db851ec), NnFloatBits(0x3cd4fdf4), 0.0f};
-    float const AcceptPosition[3] = {NnFloatBits(0xbe116873), NnFloatBits(0xbe570a3d), 0.0f};
+    Vector const ButtonExtents = {NnFloatBits(0x3db851ec), NnFloatBits(0x3cd4fdf4), 0.0f};
+    Vector const AcceptPosition = {NnFloatBits(0xbe116873), NnFloatBits(0xbe570a3d), 0.0f};
     AcceptButton = CreateWireButtonControl("OfferDialogAcceptButton", kOfferDialogSelectSound,
-                                           AcceptPosition, ButtonExtents, 0, 0, 0x332, 0, 0);
+                                           &AcceptPosition, &ButtonExtents, 0, 0, 0x332, 0, 0);
 
     // {0.397, 0.231, 0}, half extents {0.018, 0.018, 0}.
-    float const ClosePosition[3] = {NnFloatBits(0x3ecb4396), NnFloatBits(0x3e6c8b44), 0.0f};
-    float const CloseExtents[3] = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
+    Vector const ClosePosition = {NnFloatBits(0x3ecb4396), NnFloatBits(0x3e6c8b44), 0.0f};
+    Vector const CloseExtents = {NnFloatBits(0x3c9374bc), NnFloatBits(0x3c9374bc), 0.0f};
     CloseButton = CreateButtonControl("OfferDialogCloseButton", kOfferDialogCloseMesh, nullptr,
-                                      kOfferDialogSelectSound, nullptr, ClosePosition, nullptr,
-                                      CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
+                                      kOfferDialogSelectSound, nullptr, &ClosePosition, nullptr,
+                                      &CloseExtents, 0, 0, 0, 0, 0x409, 0, 0);
 
     // {0.13, -0.21, 0}
-    float const DeclinePosition[3] = {NnFloatBits(0x3e051eb8), NnFloatBits(0xbe570a3d), 0.0f};
+    Vector const DeclinePosition = {NnFloatBits(0x3e051eb8), NnFloatBits(0xbe570a3d), 0.0f};
     DeclineButton = CreateWireButtonControl("OfferDialogDeclineButton", kOfferDialogSelectSound,
-                                            DeclinePosition, ButtonExtents, 0, 0, 0x333, 0, 0);
+                                            &DeclinePosition, &ButtonExtents, 0, 0, 0x333, 0, 0);
 
     // {-0.23, -0.188, 0}, 0.172 x 0.06, 1.5.
-    float const AcceptTextPosition[3] = {NnFloatBits(0xbe6b851f), NnFloatBits(0xbe408312), 0.0f};
-    AcceptText = CreateTextControl("OfferDialogAcceptText", "ButtonText", AcceptTextPosition,
+    Vector const AcceptTextPosition = {NnFloatBits(0xbe6b851f), NnFloatBits(0xbe408312), 0.0f};
+    AcceptText = CreateTextControl("OfferDialogAcceptText", "ButtonText", &AcceptTextPosition,
                                    nullptr, NnFloatBits(0x3e3020c5), NnFloatBits(0x3d75c28f),
                                    NnFloatBits(0x3fc00000), 0x4ad, 1, 0, 1);
 
     // {0.041, -0.188, 0}, 0.177 x 0.06.
-    float const DeclineTextPosition[3] = {NnFloatBits(0x3d27ef9e), NnFloatBits(0xbe408312),
-                                          0.0f};
-    DeclineText = CreateTextControl("OfferDialogDeclineText", "ButtonText", DeclineTextPosition,
+    Vector const DeclineTextPosition = {NnFloatBits(0x3d27ef9e), NnFloatBits(0xbe408312),
+                                        0.0f};
+    DeclineText = CreateTextControl("OfferDialogDeclineText", "ButtonText", &DeclineTextPosition,
                                     nullptr, NnFloatBits(0x3e353f7d), NnFloatBits(0x3d75c28f),
                                     NnFloatBits(0x3fc00000), 0x548, 1, 0, 1);
 
-    float const Close2Position[3] = {0.0f, NnFloatBits(0xbe570a3d), 0.0f};
+    Vector const Close2Position = {0.0f, NnFloatBits(0xbe570a3d), 0.0f};
     Close2Button = CreateWireButtonControl("OfferDialogClose2Button", kOfferDialogSelectSound,
-                                           Close2Position, ButtonExtents, 0, 0, 0x334, 0, 0);
+                                           &Close2Position, &ButtonExtents, 0, 0, 0x334, 0, 0);
 
     // {-0.09, -0.19, 0}, 0.179 x 0.06.
-    float const CloseTextPosition[3] = {NnFloatBits(0xbdb851ec), NnFloatBits(0xbe428f5c), 0.0f};
-    CloseText = CreateTextControl("OfferDialogCloseText", "ButtonText", CloseTextPosition,
+    Vector const CloseTextPosition = {NnFloatBits(0xbdb851ec), NnFloatBits(0xbe428f5c), 0.0f};
+    CloseText = CreateTextControl("OfferDialogCloseText", "ButtonText", &CloseTextPosition,
                                   nullptr, NnFloatBits(0x3e374bc7), NnFloatBits(0x3d75c28f),
                                   NnFloatBits(0x3fc00000), 0x3a1, 1, 0, 1);
 
     // {0, 0, -1.288}
     Vector const WindowPosition = {0.0f, 0.0f, NnFloatBits(0xbfa4dd2f)};
-    SetPosition(&WindowPosition.x);
+    SetPosition(&WindowPosition);
 
     RegisterEvent(USER_CANCEL);
 
@@ -237,17 +237,17 @@ void NnOfferDialog::Open(int Type, FmtStr const* Text, bool bInSingleButton,
         HideControl(CloseButton);
         bSingleButton = 1;
 
-        float AcceptOld[3];
-        AcceptButton->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(AcceptOld), 0);
-        float const AcceptNew[3] = {0.0f, NnFloatBits(0xbe570a3d), 0.0f};
-        AcceptButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(AcceptNew), 0);
-        float const DeltaZ = AcceptNew[2] - AcceptOld[2];
-        float const DeltaY = AcceptNew[1] - AcceptOld[1];
-        float const DeltaX = AcceptNew[0] - AcceptOld[0];
+        Vector AcceptOld;
+        AcceptButton->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&AcceptOld), 0);
+        Vector const AcceptNew = {0.0f, NnFloatBits(0xbe570a3d), 0.0f};
+        AcceptButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&AcceptNew), 0);
+        float const DeltaZ = AcceptNew.z - AcceptOld.z;
+        float const DeltaY = AcceptNew.y - AcceptOld.y;
+        float const DeltaX = AcceptNew.x - AcceptOld.x;
 
-        float TextOld[3];
-        AcceptText->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(TextOld), 0);
-        float const TextNew[3] = {DeltaX + TextOld[0], TextOld[1] + DeltaY, TextOld[2] + DeltaZ};
-        AcceptText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(TextNew), 0);
+        Vector TextOld;
+        AcceptText->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(&TextOld), 0);
+        Vector const TextNew = {DeltaX + TextOld.x, TextOld.y + DeltaY, TextOld.z + DeltaZ};
+        AcceptText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(&TextNew), 0);
     }
 }

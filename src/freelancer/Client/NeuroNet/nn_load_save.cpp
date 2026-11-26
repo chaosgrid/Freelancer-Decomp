@@ -125,21 +125,21 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     // LAB_00485be0 (RET 8, 0x26c-byte frame). No null test on Data (0x00485c07).
     Mode = *static_cast<int const*>(Data);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
     float const ZFar = NnFloatBits(0xbf866666); // -1.05
 
-    float const PlanePosition[3] = {0.0f, 0.0f, -1.0f};
-    CreateStaticControl("LoadSave_BlackPlane", kBlackPlaneMesh, PlanePosition, nullptr, Zero, 0, 0,
-                        0, 1, 1, 0, 1, 0, 0, 0, Zero); // FUN_005a0db0
+    Vector const PlanePosition = {0.0f, 0.0f, -1.0f};
+    CreateStaticControl("LoadSave_BlackPlane", kBlackPlaneMesh, &PlanePosition, nullptr, &Zero, 0, 0,
+                        0, 1, 1, 0, 1, 0, 0, 0, &Zero); // FUN_005a0db0
 
     // {0.14, 0, -1.05}
-    float const FramePosition[3] = {NnFloatBits(0x3e0f5c29), 0.0f, ZFar};
-    CreateStaticControl("LoadSave_Frame", kFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
-                        0, 1, 0, 0, 0, Zero);
+    Vector const FramePosition = {NnFloatBits(0x3e0f5c29), 0.0f, ZFar};
+    CreateStaticControl("LoadSave_Frame", kFrameMesh, &FramePosition, nullptr, &Zero, 0, 0, 0, 1, 1,
+                        0, 1, 0, 0, 0, &Zero);
 
     // {0.145, 0.25, -1.05}, 0.27 x 0.03 (FUN_005a0e30).
-    float const TitlePosition[3] = {NnFloatBits(0x3e147ae1), NnFloatBits(0x3e800000), ZFar};
-    Title = CreateTextControl("LoadSave_Title", "PageHeader", TitlePosition, nullptr,
+    Vector const TitlePosition = {NnFloatBits(0x3e147ae1), NnFloatBits(0x3e800000), ZFar};
+    Title = CreateTextControl("LoadSave_Title", "PageHeader", &TitlePosition, nullptr,
                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
     Title->SetProperty(kTextPropSetIds, 0x586, 0);
 
@@ -148,22 +148,22 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     // extents {0.089, 0.021, 0}.
     float const ButtonX = NnFloatBits(0xbea8f5c2);
     float const ButtonY = NnFloatBits(0x3e8a3d71);
-    float const ButtonHalf[3] = {NnFloatBits(0x3db645a2), NnFloatBits(0x3cac0831), 0.0f};
-    float const SavePosition[3] = {ButtonX, ButtonY, ZFar};
+    Vector const ButtonHalf = {NnFloatBits(0x3db645a2), NnFloatBits(0x3cac0831), 0.0f};
+    Vector const SavePosition = {ButtonX, ButtonY, ZFar};
     Buttons[0] = CreateButtonControl("LoadSave_SaveGame", kButtonMesh, nullptr, nullptr, nullptr,
-                                     SavePosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x58c, 0, 0);
+                                     &SavePosition, nullptr, &ButtonHalf, 0, 0, 1, 0, 0x58c, 0, 0);
     Buttons[1] = CreateButtonControl("LoadSave_LoadGame", kButtonMesh, nullptr, nullptr, nullptr,
-                                     SavePosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x58d, 0, 0);
-    float const DeletePosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3dbb98c8), ZFar};
+                                     &SavePosition, nullptr, &ButtonHalf, 0, 0, 1, 0, 0x58d, 0, 0);
+    Vector const DeletePosition = {ButtonX, ButtonY - NnFloatBits(0x3dbb98c8), ZFar};
     Buttons[2] = CreateButtonControl("LoadSave_Delete", kButtonMesh, nullptr, nullptr, nullptr,
-                                     DeletePosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x58e, 0, 0);
-    float const MainMenuPosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3e3b98c8), ZFar};
+                                     &DeletePosition, nullptr, &ButtonHalf, 0, 0, 1, 0, 0x58e, 0, 0);
+    Vector const MainMenuPosition = {ButtonX, ButtonY - NnFloatBits(0x3e3b98c8), ZFar};
     Buttons[3] = CreateButtonControl("LoadSave_MainMenu", kButtonMesh, nullptr, nullptr, nullptr,
-                                     MainMenuPosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x58f, 0,
+                                     &MainMenuPosition, nullptr, &ButtonHalf, 0, 0, 1, 0, 0x58f, 0,
                                      0);
-    float const ResumePosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3e8cb296), ZFar};
+    Vector const ResumePosition = {ButtonX, ButtonY - NnFloatBits(0x3e8cb296), ZFar};
     Buttons[4] = CreateButtonControl("LoadSave_ResumeGame", kButtonMesh, nullptr, nullptr, nullptr,
-                                     ResumePosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x590, 0, 0);
+                                     &ResumePosition, nullptr, &ButtonHalf, 0, 0, 1, 0, 0x590, 0, 0);
 
     // No null test.
     for (int Index = 0; Index < 5; ++Index)
@@ -171,24 +171,24 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
 
     // The captions (FUN_005a0e30): Y = the button row's Y + 0.0018 (Save, Load), - 0.0898,
     // - 0.1814, - 0.273.
-    float const SaveTextPosition[3] = {ButtonX, ButtonY + NnFloatBits(0x3aebedfa), ZFar};
-    ButtonTexts[0] = CreateTextControl("LoadSave_SaveGameText", "ButtonText", SaveTextPosition,
+    Vector const SaveTextPosition = {ButtonX, ButtonY + NnFloatBits(0x3aebedfa), ZFar};
+    ButtonTexts[0] = CreateTextControl("LoadSave_SaveGameText", "ButtonText", &SaveTextPosition,
                                        nullptr, NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                        1.0f, 0, 1, 0, 0);
-    ButtonTexts[1] = CreateTextControl("LoadSave_LoadGameText", "ButtonText", SaveTextPosition,
+    ButtonTexts[1] = CreateTextControl("LoadSave_LoadGameText", "ButtonText", &SaveTextPosition,
                                        nullptr, NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                        1.0f, 0, 1, 0, 0);
-    float const DeleteTextPosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3db7e910), ZFar};
-    ButtonTexts[2] = CreateTextControl("LoadSave_DeleteText", "ButtonText", DeleteTextPosition,
+    Vector const DeleteTextPosition = {ButtonX, ButtonY - NnFloatBits(0x3db7e910), ZFar};
+    ButtonTexts[2] = CreateTextControl("LoadSave_DeleteText", "ButtonText", &DeleteTextPosition,
                                        nullptr, NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                        1.0f, 0, 1, 0, 0);
-    float const MainMenuTextPosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3e39c0ec), ZFar};
+    Vector const MainMenuTextPosition = {ButtonX, ButtonY - NnFloatBits(0x3e39c0ec), ZFar};
     ButtonTexts[3] = CreateTextControl("LoadSave_MainMenuText", "ButtonText",
-                                       MainMenuTextPosition, nullptr, NnFloatBits(0x3e8a3d71),
+                                       &MainMenuTextPosition, nullptr, NnFloatBits(0x3e8a3d71),
                                        NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
-    float const ResumeTextPosition[3] = {ButtonX, ButtonY - NnFloatBits(0x3e8bc6a8), ZFar};
+    Vector const ResumeTextPosition = {ButtonX, ButtonY - NnFloatBits(0x3e8bc6a8), ZFar};
     ButtonTexts[4] = CreateTextControl("LoadSave_ResumeGameText", "ButtonText",
-                                       ResumeTextPosition, nullptr, NnFloatBits(0x3e8a3d71),
+                                       &ResumeTextPosition, nullptr, NnFloatBits(0x3e8a3d71),
                                        NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
 
     for (int Index = 0; Index < 5; ++Index)
@@ -205,9 +205,9 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
 
     // {-0.33, -0.2, -1.05}
-    float const InfoFramePosition[3] = {ButtonX, NnFloatBits(0xbe4ccccd), ZFar};
-    CreateStaticControl("LoadSave_InfoFrame", kInfoFrameMesh, InfoFramePosition, nullptr, Zero, 0,
-                        0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
+    Vector const InfoFramePosition = {ButtonX, NnFloatBits(0xbe4ccccd), ZFar};
+    CreateStaticControl("LoadSave_InfoFrame", kInfoFrameMesh, &InfoFramePosition, nullptr, &Zero, 0,
+                        0, 0, 1, 1, 0, 1, 0, 0, 0, &Zero);
 
     // The info texts, from {-0.32, -0.125, -1.05} down by 0, 0.02, 0.0425, 0.0625, 0.085, 0.105,
     // 0.1275, 0.1475; created title, data, title, data...
@@ -222,29 +222,29 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                           "LoadSave_InfoRankData", "LoadSave_InfoShipData"};
     {
         // Spelled out per text so every subtraction is retail's single float FSUB.
-        float const LocationTitlePosition[3] = {InfoX, InfoY, ZFar};
-        InfoTitles[0] = CreateTextControl(InfoTitleNames[0], "Normal", LocationTitlePosition,
+        Vector const LocationTitlePosition = {InfoX, InfoY, ZFar};
+        InfoTitles[0] = CreateTextControl(InfoTitleNames[0], "Normal", &LocationTitlePosition,
                                           nullptr, InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const LocationDataPosition[3] = {InfoX, InfoY - NnFloatBits(0x3ca3d70a), ZFar};
-        InfoValues[0] = CreateTextControl(InfoDataNames[0], "Normal", LocationDataPosition,
+        Vector const LocationDataPosition = {InfoX, InfoY - NnFloatBits(0x3ca3d70a), ZFar};
+        InfoValues[0] = CreateTextControl(InfoDataNames[0], "Normal", &LocationDataPosition,
                                           nullptr, InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const CreditsTitlePosition[3] = {InfoX, InfoY - NnFloatBits(0x3d2e147b), ZFar};
-        InfoTitles[1] = CreateTextControl(InfoTitleNames[1], "Normal", CreditsTitlePosition,
+        Vector const CreditsTitlePosition = {InfoX, InfoY - NnFloatBits(0x3d2e147b), ZFar};
+        InfoTitles[1] = CreateTextControl(InfoTitleNames[1], "Normal", &CreditsTitlePosition,
                                           nullptr, InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const CreditsDataPosition[3] = {InfoX, InfoY - NnFloatBits(0x3d800000), ZFar};
-        InfoValues[1] = CreateTextControl(InfoDataNames[1], "Normal", CreditsDataPosition,
+        Vector const CreditsDataPosition = {InfoX, InfoY - NnFloatBits(0x3d800000), ZFar};
+        InfoValues[1] = CreateTextControl(InfoDataNames[1], "Normal", &CreditsDataPosition,
                                           nullptr, InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const RankTitlePosition[3] = {InfoX, InfoY - NnFloatBits(0x3dae147b), ZFar};
-        InfoTitles[2] = CreateTextControl(InfoTitleNames[2], "Normal", RankTitlePosition, nullptr,
+        Vector const RankTitlePosition = {InfoX, InfoY - NnFloatBits(0x3dae147b), ZFar};
+        InfoTitles[2] = CreateTextControl(InfoTitleNames[2], "Normal", &RankTitlePosition, nullptr,
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const RankDataPosition[3] = {InfoX, InfoY - NnFloatBits(0x3dd70a3e), ZFar};
-        InfoValues[2] = CreateTextControl(InfoDataNames[2], "Normal", RankDataPosition, nullptr,
+        Vector const RankDataPosition = {InfoX, InfoY - NnFloatBits(0x3dd70a3e), ZFar};
+        InfoValues[2] = CreateTextControl(InfoDataNames[2], "Normal", &RankDataPosition, nullptr,
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const ShipTitlePosition[3] = {InfoX, InfoY - NnFloatBits(0x3e028f5c), ZFar};
-        InfoTitles[3] = CreateTextControl(InfoTitleNames[3], "Normal", ShipTitlePosition, nullptr,
+        Vector const ShipTitlePosition = {InfoX, InfoY - NnFloatBits(0x3e028f5c), ZFar};
+        InfoTitles[3] = CreateTextControl(InfoTitleNames[3], "Normal", &ShipTitlePosition, nullptr,
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
-        float const ShipDataPosition[3] = {InfoX, InfoY - NnFloatBits(0x3e170a3e), ZFar};
-        InfoValues[3] = CreateTextControl(InfoDataNames[3], "Normal", ShipDataPosition, nullptr,
+        Vector const ShipDataPosition = {InfoX, InfoY - NnFloatBits(0x3e170a3e), ZFar};
+        InfoValues[3] = CreateTextControl(InfoDataNames[3], "Normal", &ShipDataPosition, nullptr,
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
     }
 
@@ -293,24 +293,24 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         // FUN_005a1900; the edit is not null-tested.
         float const DescripX = NnFloatBits(0x3e000000);
         float const DescripY = NnFloatBits(0x3e21cac1);
-        float const EditPosition[3] = {DescripX - NnFloatBits(0x3e851eb8),
-                                       DescripY + NnFloatBits(0x3c75c28f), ZFar};
-        DescripEdit = CreateUiTextEdit("LoadSave_Edit2", EditPosition, NnFloatBits(0x3f051eb8),
+        Vector const EditPosition = {DescripX - NnFloatBits(0x3e851eb8),
+                                     DescripY + NnFloatBits(0x3c75c28f), ZFar};
+        DescripEdit = CreateUiTextEdit("LoadSave_Edit2", &EditPosition, NnFloatBits(0x3f051eb8),
                                        NnFloatBits(0x3cf5c28f), const_cast<wchar_t*>(kEmptyText));
         DescripEdit->SetMaxLength(0x1e);
         DescripEdit->Activate();
 
-        float const DescripPosition[3] = {DescripX, DescripY, ZFar};
-        float const DescripHalf[3] = {NnFloatBits(0x3e8a3d71), NnFloatBits(0x3ced9168), 0.0f};
+        Vector const DescripPosition = {DescripX, DescripY, ZFar};
+        Vector const DescripHalf = {NnFloatBits(0x3e8a3d71), NnFloatBits(0x3ced9168), 0.0f};
         DescripButton = CreateButtonControl("LoadSave_DescripButton", kDescripButtonMesh, nullptr,
-                                            nullptr, nullptr, DescripPosition, nullptr,
-                                            DescripHalf, 0, 0, 1, 0, 0x596, 0, 0);
+                                            nullptr, nullptr, &DescripPosition, nullptr,
+                                            &DescripHalf, 0, 0, 1, 0, 0x596, 0, 0);
         static_cast<NnButtonControl*>(DescripButton)->SetMontageMode(1);
         DescripButton->SetProperty(0x32, 1, 0);
 
-        float const DescripTextPosition[3] = {NnFloatBits(0xbc1374bc), NnFloatBits(0x3e50e560),
-                                              ZFar};
-        DescripText = CreateTextControl("LoadSave_DescripText", "ListText", DescripTextPosition,
+        Vector const DescripTextPosition = {NnFloatBits(0xbc1374bc), NnFloatBits(0x3e50e560),
+                                            ZFar};
+        DescripText = CreateTextControl("LoadSave_DescripText", "ListText", &DescripTextPosition,
                                         nullptr, NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                         1.0f, 0, 0, 0, 0);
         DescripText->SetProperty(kTextPropSetIds, 0x592, 0);
@@ -330,15 +330,15 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         ScrollY = NnFloatBits(0x3ddb22d1);
         ScrollHeight = NnFloatBits(0x3ebd70a4);
     }
-    float const ScrollPosition[3] = {NnFloatBits(0x3ecfdf3c), ScrollY, ZFar};
-    Scroll = CreateUIScroll("LoadSave_Scroll", ScrollPosition, NnFloatBits(0x3ca3d70a),
+    Vector const ScrollPosition = {NnFloatBits(0x3ecfdf3c), ScrollY, ZFar};
+    Scroll = CreateUIScroll("LoadSave_Scroll", &ScrollPosition, NnFloatBits(0x3ca3d70a),
                             ScrollHeight, 0, 100, VisibleRows, 0);
 
     // {0.415, 0.26, -1.05}
-    float const ClosePosition[3] = {NnFloatBits(0x3ed47ae2), NnFloatBits(0x3e851eb8), ZFar};
-    float const CloseHalf[3] = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
+    Vector const ClosePosition = {NnFloatBits(0x3ed47ae2), NnFloatBits(0x3e851eb8), ZFar};
+    Vector const CloseHalf = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
     CloseButton = CreateButtonControl("LoadSave_Close", kCloseMesh, nullptr, nullptr, nullptr,
-                                      ClosePosition, nullptr, CloseHalf, 0, 1, 0, 0, 0x409, 0, 0);
+                                      &ClosePosition, nullptr, &CloseHalf, 0, 1, 0, 0, 0x409, 0, 0);
     static_cast<NnButtonControl*>(CloseButton)->SetMontageMode(1);
 
     // The buffer is used even after a failed lookup.
@@ -589,15 +589,15 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // Each list goes to the window position plus its offset (float adds).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(&Position.x);
-        float const NamePosition[3] = {Position.x + NameListOffset[0],
-                                       Position.y + NameListOffset[1],
-                                       Position.z + NameListOffset[2]};
-        NameList.SetPosition(NamePosition);
-        float const TimePosition[3] = {Position.x + TimeListOffset[0],
-                                       Position.y + TimeListOffset[1],
-                                       Position.z + TimeListOffset[2]};
-        TimeList.SetPosition(TimePosition);
+        SetPosition(&Position);
+        Vector const NamePosition = {Position.x + NameListOffset[0],
+                                     Position.y + NameListOffset[1],
+                                     Position.z + NameListOffset[2]};
+        NameList.SetPosition(&NamePosition);
+        Vector const TimePosition = {Position.x + TimeListOffset[0],
+                                     Position.y + TimeListOffset[1],
+                                     Position.z + TimeListOffset[2]};
+        TimeList.SetPosition(&TimePosition);
         return 0;
     }
     case kWinNotifyClick:
@@ -1003,8 +1003,8 @@ void OpenNnLoadSave(int Mode)
     if (Created == nullptr)
         return;
     NnLoadSave* const LoadSave = static_cast<NnLoadSave*>(Created);
-    float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    LoadSave->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    LoadSave->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(&Zero), 0);
     LoadSave->CaptureMouse();
 }
 

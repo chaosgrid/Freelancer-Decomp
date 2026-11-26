@@ -260,15 +260,15 @@ namespace UIPage
 
         // The Win3D camera (DAT_0067dbf8).
         ICamera* Camera = AsCamera(GetWin3DSceneCamera());
-        float TopLeft[3];
-        Camera->Unproject((Vector*)TopLeft, 0.0f, 0.0f);
-        float BottomRight[3];
+        Vector TopLeft;
+        Camera->Unproject(&TopLeft, 0.0f, 0.0f);
+        Vector BottomRight;
         // The created surface size (DAT_00610850 / DAT_00610854).
-        Camera->Unproject((Vector*)BottomRight,
+        Camera->Unproject(&BottomRight,
                           static_cast<float>(static_cast<int>(G_RenderSurfaceWidth)),
                           static_cast<float>(static_cast<int>(G_RenderSurfaceHeight)));
 
-        float const Height = TopLeft[1] - BottomRight[1];
+        float const Height = TopLeft.y - BottomRight.y;
 
         Transform Frame;
         Frame.Rotation.E[0][0] = Height;
@@ -282,7 +282,7 @@ namespace UIPage
         Frame.Rotation.E[2][2] = 1.0f;
         Frame.Translation.x = 0.0f;
         Frame.Translation.y = 0.0f;
-        Frame.Translation.z = FloatFromBits(kMasterWinDepthBiasBits) + TopLeft[2];
+        Frame.Translation.z = FloatFromBits(kMasterWinDepthBiasBits) + TopLeft.z;
 
         PageObject = CreatePage(PageData, &Frame, this);
         return PageObject != nullptr;

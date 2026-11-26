@@ -55,7 +55,7 @@ void UiStaticText::SetTransform(Transform const* NewXform)
     // LAB_00599b70 (RET 4). Unlike the other UI* widgets, the projection's matrix is the
     // argument block itself, not this+0x3c.
     SetOrientation(&NewXform->Rotation);
-    SetPosition(&NewXform->Translation.x);
+    SetPosition(&NewXform->Translation);
     UiWidgetProjectExtent(&NewXform->Rotation, NewXform->Translation.z, LocalWidth, LocalHeight,
                           &Width, &Height);
 }
