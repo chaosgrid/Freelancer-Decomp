@@ -266,7 +266,7 @@ public:
     // heading blend and the ObstacleAvoidance tick. ctor: 1.
     unsigned char bObstacleAvoidanceEnabled;   // +0x245
     unsigned char Pad246[2];
-    int NudgeObstacleTypeMask;                 // +0x248 FindClosestObstacleToAvoid's type mask; ctor: -1
+    int NudgeObstacleTypeMask;                 // +0x248 SystemManagerTimerTable::FindClosestObstacleToAvoid's type mask; ctor: -1
     // SetAvoidanceAllowed's two latches (raw bytes, ctor: 1): mask bit 0 gates
     // SelectObstacleDirection, bit 1 SelectAvoidancePoint and Update's heading blend / avoidance tick.
     unsigned char bObstacleNudgeAllowed;       // +0x24C
@@ -281,6 +281,8 @@ public:
     bool bHasCachedObstacle;                   // +0x264 ctor: 0
     unsigned char Pad265[3];
     ObstacleAvoidance Avoidance;               // +0x268 (0x318 bytes -- ends exactly at 0x580)
+
+    void SetObjectDb(IObjDB* ObjectDb);
 };
 
 static_assert(offsetof(PathfindManager::UserZone, Invert) == 0x04, "UserZone+0x04 Invert");
@@ -339,4 +341,3 @@ static_assert(sizeof(PathfindManager) == 0x580,
 // database's type has no published interface; its slot 0 is the PhySys system id getter the
 // launcher line-of-fire probe also calls (common_aifirecontrol.cpp).
 struct IObjDB;
-void SetPathfindObjectDb(PathfindManager* Self, IObjDB* ObjectDb);

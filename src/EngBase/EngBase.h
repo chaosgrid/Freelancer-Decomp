@@ -376,6 +376,9 @@ struct FEngineInstance
 
     // FUN_0661ed90. Defined in EngBaseEngine.cpp.
     void ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent, Vector* OutVec);
+
+    // FUN_0661eb80 (thiscall). Defined in EngBaseEngine.cpp.
+    FEngineInstance* Init(FArchetypeHandle* Handle);
 };
 
 struct FAggDescC
@@ -484,6 +487,16 @@ struct FEngineObject : IEngine
 
     // FUN_06621710. Defined in EngBaseEngine.cpp.
     void DestroyInstanceBody(FEngineInstance* Instance);
+
+    // FUN_066201b0 (thiscall). Defined in EngBaseEngine.cpp.
+    GENRESULT LinkCmpndPartHandle(const char* Name, void* CmpndFs, unsigned long FindHandle,
+                                  IFileSystem* ParentFs, FArchetypeChild* Child);
+
+    // FUN_06620500 (thiscall). Defined in EngBaseEngine.cpp.
+    GENRESULT ParseCmpndChildren(FArchetypeHandle* Handle, void* CmpndFs, IFileSystem* ParentFs);
+
+    // FUN_06622860 (thiscall). Defined in EngBaseEngine.cpp.
+    FEngineInstance* CreateInstanceTree(FArchetypeHandle* Handle, IEngineInstance* Callbacks);
 };
 
 // Track copies retain the channel and duplicate names; destruction releases them.
@@ -893,6 +906,9 @@ struct FAnimPlayback
 
                                    // FUN_06612a70
     void WriteOverlayOrient(const Matrix* Mat, FMixerDescMap* Inner);
+
+    // FUN_066124e0 (thiscall). Defined in EngBaseAnim.cpp.
+    void BindTracks(FEngineInstance* Root, void* Sink, void* SinkContext);
 };
 
 // Retail Animation+0x14: playback id -> record. FUN_06614580 / FUN_06612e70 compare the key
@@ -1044,6 +1060,9 @@ struct FHardpointObject : IHardpoint, IEngineComponent
 
     // FUN_06625c70. Defined in EngBaseHardPoint.cpp.
     void Construct();
+
+    // FUN_06625d00 (thiscall). Defined in EngBaseHardPoint.cpp.
+    void Destroy();
 };
 
 // ChannelArchetype, operator_new(0x20). LAB_0661d8d0 loads a 0xC-byte Header plus a Frames blob.
@@ -1174,8 +1193,6 @@ FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc);
 bool FindAnimHandle(unsigned long Key);
 unsigned long RegisterAnimHandle(unsigned long Key);
 void UnregisterAnimHandle(unsigned long Key);
-void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Sink,
-                        void* SinkContext);
 
 // EngBaseAnimComponent.cpp
 GENRESULT InnerQueryTable(void* Object, const char* Iid, void** Out,

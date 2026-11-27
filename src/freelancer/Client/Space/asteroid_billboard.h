@@ -11,7 +11,7 @@
 // +0x19C block, see cli_asteroid.h), and the vertex-buffer batch they are drawn through.
 //
 // Call path: the per-field tick (CliAsteroidTickOne, FUN_005225d0) -> (bHasBillboards,
-// ASTEROID_EXT > 1, [EFFECTS], BillboardNearCamera) -> the ambient pass -> BillboardDraw.
+// ASTEROID_EXT > 1, [EFFECTS], BillboardNearCamera) -> the ambient pass -> FAsteroidBillboardBlock::Draw.
 //
 // The batch is one static object, DAT_006797d0 (static init LAB_0054dad0 = FUN_0054daf0(0x142),
 // atexit LAB_0054db50 -> FUN_0054db70). It is an immediate-mode writer over
@@ -113,17 +113,6 @@ extern FAsteroidBillboardBatch G_AsteroidBillboardBatch;
 // FUN_0054f800 (cdecl): SetRenderState for each {state, value} pair up to a zero state.
 void BillboardApplyRenderStates(IRenderPipeline* Pipeline, unsigned const* Table);
 
-// FUN_0054e130 (thiscall on the billboard block): the ambient colour (D3DRS_AMBIENT *
-// ambient_intensity / 255 * tinted ambient * color_shift) into all five outputs, then for up
-// to MaxLights directional (type 3) lights within 100 of Pos, each light's ambient share and
-// its tinted diffuse colour weighted by how far the light faces each of the five directions
-// Forward + Right, Forward - Right, Forward + Up, Forward - Up and Forward; each output
-// clamped to 1.0 per component.
-void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
-                              float const* Forward, float const* Up, float const* Right,
-                              float* OutCenter, float* OutCorner0, float* OutCorner1,
-                              float* OutCorner2, float* OutCorner3);
-
 // FUN_0054f9f0 (thiscall on the billboard block, which is not read): one rock as
 // a single triangle into G_AsteroidBillboardBatch -- base P -/+ A, apex P + B, A and B the
 // rock-size-scaled Right / Up (swapped by bSwapAxes, B negated by bNegateApex), the base
@@ -132,8 +121,3 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
 void BillboardEmitRock(FAsteroidBillboardBlock* Bb, FAsteroidBillboardRock* Rock,
                        float const* Right, float const* Up, float const* CornerColor,
                        float const* CenterColor);
-
-// FUN_0054e900 (thiscall on the billboard block). The field tick passes the field's
-// ExclusionMgr (+0xdc) and ExcludeType 2 (billboards).
-void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
-                   Exclusion::AsteroidExclusionZoneMgr* Excl, int ExcludeType);

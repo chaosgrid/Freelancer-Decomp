@@ -357,12 +357,12 @@ void FSrvAsteroidField::load(char const* Path) {
         }
     }
 
-    if (Field != nullptr) {
-        Reader.set_state(Start);
-        Field->load(Reader, CubeSize);
-        Field->FillDist = FillDist;
-        Field->EmptyFreq = static_cast<float>(EmptyFreq);
-    }
+    if (Field == nullptr)
+        return;
+    Reader.set_state(Start);
+    Field->load(Reader, CubeSize);
+    Field->FillDist = FillDist;
+    Field->EmptyFreq = static_cast<float>(EmptyFreq);
 }
 
 // FUN_06d04480 (thiscall on the entry); callers SrvAsteroidSystem::update and FUN_06d03480.

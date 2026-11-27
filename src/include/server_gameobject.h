@@ -458,6 +458,9 @@ public:
     // others). Non-virtual on purpose -- retail inlines the guard everywhere.
     CObject* cobj() const;
     CSimple* csimple() const;
+    // FUN_06ce6870 (RET 0): cobj() narrowed to the equipment-carrying CObject by the
+    // (ObjectClass & 0x103) test; null when it is not one.
+    CEqObj* ceqobj() const;
 
     // -----------------------------------------------------------------
     // retail +0x14 .. +0x1F -- the "marked by" player list, a VC6 std::list of dwords
@@ -591,8 +594,6 @@ public:
     // NOT an ABI change: the slot already exists on GameObject, this only
     // overrides it.
     virtual void get_damage_list(DamageList& Out, float StatusCeiling) const;
-
-    CEqObj* ceqobj() const;
 
     // Retail FUN_06ce7e20 (.text:06ce7e20, RET 4). GameObject::update's gate
     // (FUN_06cee9e0), the weapons-offline repair pass, the dock-bay tick

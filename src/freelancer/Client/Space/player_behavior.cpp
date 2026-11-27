@@ -188,13 +188,13 @@ void SetPlayerThrottle(float Throttle)
         Manager->update_current_behavior_throttle(G_PlayerThrottle);
 
     // A zero throttle (ordered equal only) cancels cruise.
-    if (G_PlayerThrottle == 0.0f)
-    {
-        // Retail re-fetches the manager rather than reusing the one above.
-        IBehaviorManager* const Again = PlayerBehaviorManager();
-        if (Again != nullptr)
-            Again->update_current_behavior_cruise(false);
-    }
+    if (G_PlayerThrottle != 0.0f)
+        return;
+
+    // Retail re-fetches the manager rather than reusing the one above.
+    IBehaviorManager* const Again = PlayerBehaviorManager();
+    if (Again != nullptr)
+        Again->update_current_behavior_cruise(false);
 }
 
 float GetLastPlayerThrottle()
@@ -212,18 +212,18 @@ void SetPlayerBehaviorDirectionGated(float X, float Y, float Z)
 {
     // FUN_004c78d0. NaN is not zero; HUD_Status is read without a null test.
     bool const bDirIsZero = (X == 0.0f) && (Y == 0.0f);
-    if (bDirIsZero || (!HudStatusIsTurretView() && !HudStatusIsRearView()))
-    {
-        IBehaviorManager* const Manager = PlayerBehaviorManager();
-        if (Manager != nullptr)
-        {
-            Vector Dir;
-            Dir.x = X;
-            Dir.y = Y;
-            Dir.z = Z;
-            Manager->update_current_behavior_direction(Dir);
-        }
-    }
+    if (!bDirIsZero && (HudStatusIsTurretView() || HudStatusIsRearView()))
+        return;
+
+    IBehaviorManager* const Manager = PlayerBehaviorManager();
+    if (Manager == nullptr)
+        return;
+
+    Vector Dir;
+    Dir.x = X;
+    Dir.y = Y;
+    Dir.z = Z;
+    Manager->update_current_behavior_direction(Dir);
 }
 
 bool GetPlayerEngineCruiseActive()

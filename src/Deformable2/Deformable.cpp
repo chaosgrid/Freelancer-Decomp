@@ -173,24 +173,20 @@ static void WriteIdentity3x4(float* Matrix)
 }
 
 // FUN_065f1410 (thiscall).
-static void AddRefSkeleton(FSkeleton* Skel)
+void FSkeleton::AddRef()
 {
-    if (Skel == nullptr)
-        return;
-    Skel->RefCount += 1;
+    RefCount += 1;
 }
 
 // FUN_065f1420 (thiscall).
-int ReleaseSkeleton(FSkeleton* Skel)
+int FSkeleton::Release()
 {
-    if (Skel == nullptr)
-        return 0;
-    Skel->RefCount -= 1;
-    const int Remaining = Skel->RefCount;
+    RefCount -= 1;
+    const int Remaining = RefCount;
     if (Remaining <= 0)
     {
-        Skel->DestroyHandles();
-        delete Skel;
+        DestroyHandles();
+        delete this;
     }
     return Remaining;
 }
@@ -202,19 +198,17 @@ static bool __cdecl BoneLinkCallbackThunk(InstanceIndex BoneInst, int Parent, FL
 }
 
 // FUN_065f1470 (thiscall).
-static void DestroyLodHolderBody(FLodHolder* Holder)
+void FLodHolder::DestroyBody()
 {
-    if (Holder == nullptr)
-        return;
-    if (Holder->BoneSlots != nullptr)
+    if (BoneSlots != nullptr)
     {
-        delete[] (unsigned char*)Holder->BoneSlots;
-        Holder->BoneSlots = nullptr;
+        delete[] (unsigned char*)BoneSlots;
+        BoneSlots = nullptr;
     }
-    if (Holder->Skeleton != nullptr)
+    if (Skeleton != nullptr)
     {
-        ReleaseSkeleton(Holder->Skeleton);
-        Holder->Skeleton = nullptr;
+        Skeleton->Release();
+        Skeleton = nullptr;
     }
 }
 
@@ -287,12 +281,12 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel)
     {
         if (Skeleton != nullptr)
         {
-            ReleaseSkeleton(Skeleton);
+            Skeleton->Release();
             Skeleton = nullptr;
         }
         Skeleton = Skel;
         if (Skel != nullptr)
-            AddRefSkeleton(Skel);
+            Skel->AddRef();
     }
 
     Skel = Skeleton;
@@ -460,24 +454,20 @@ bool DACOM_API FBoneRuntime::joint_changed(long /*Inst*/)
 }
 
 // FUN_065f17d0 (thiscall).
-void AddRefLodHolder(FLodHolder* Holder)
+void FLodHolder::AddRef()
 {
-    if (Holder == nullptr)
-        return;
-    Holder->RefCount += 1;
+    RefCount += 1;
 }
 
 // FUN_065f17e0 (thiscall).
-int ReleaseLodHolder(FLodHolder* Holder)
+int FLodHolder::Release()
 {
-    if (Holder == nullptr)
-        return 0;
-    Holder->RefCount -= 1;
-    const int Remaining = Holder->RefCount;
+    RefCount -= 1;
+    const int Remaining = RefCount;
     if (Remaining <= 0)
     {
-        DestroyLodHolderBody(Holder);
-        delete Holder;
+        DestroyBody();
+        delete this;
     }
     return Remaining;
 }
@@ -699,7 +689,7 @@ static void ApplyParsedRate(unsigned long Rate)
 }
 
 // FUN_065f1900 (thiscall on the component: Desc).
-static GENRESULT ApplyCreateInstanceInit(FDeformableObject* Object, FAggDesc18* Desc)
+GENRESULT FDeformableObject::ApplyCreateInstanceInit(FAggDesc18* Desc)
 {
     G_System = Desc->SystemAt14;
     if (G_System == nullptr)
@@ -743,7 +733,7 @@ static GENRESULT ApplyCreateInstanceInit(FDeformableObject* Object, FAggDesc18* 
         ApplyParsedRate(Rate);
     }
 
-    if (Object->QueryInterface(Iids::Engine, (void**)(&G_Engine)) < 0)
+    if (QueryInterface(Iids::Engine, (void**)(&G_Engine)) < 0)
     {
         LogDeformError(0xB5, "Deform: Initialize: Unable to acquire IID_IEngine, unable to continue.");
         ReleaseInterface(G_System);
@@ -1414,7 +1404,7 @@ GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, v
         *Extended->InnerOut = InnerUnknown;
     }
 
-    const GENRESULT InitResult = ApplyCreateInstanceInit(Object, Extended);
+    const GENRESULT InitResult = Object->ApplyCreateInstanceInit(Extended);
     if (InitResult != GR_OK)
     {
         if (Extended->InnerOut != nullptr)

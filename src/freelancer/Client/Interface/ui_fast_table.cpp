@@ -214,7 +214,7 @@ void UiFastTableRefPtr::Reset()
 FUiFastTableTip::FUiFastTableTip()
 {
     // The caption and the Font::String (FUN_004144b0): FToolTipHoverInfo's own ctor.
-    ToolTipHoverReset(&Info); // FUN_004963a0
+    Info.Reset(); // FUN_004963a0
     for (int Axis = 0; Axis < 3; ++Axis)
     {
         Info.WorldPos[Axis] = 0.0f;
@@ -678,7 +678,7 @@ void UiFastTable::SetTipMode(int Mode)
     int Key = static_cast<int>(reinterpret_cast<intptr_t>(this)) + 1;
     for (std::vector<FUiFastTableTip>::iterator It = Tips.begin(); It != Tips.end(); ++It)
     {
-        ToolTipHoverReset(&It->Info);
+        It->Info.Reset();
         It->Info.Ids = Key;
         It->Info.IdsAlt = 0;
         ++Key;

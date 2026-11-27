@@ -16,7 +16,7 @@
 #include <cstring>
 
 // The values themselves live in the options object: DisplaySettings::options (globals.h), .data
-// 0x00679be8 = 0x00679bc0 + 0x28. FUN_005621a0 (LoadStartupConfig) scatters the table below into
+// 0x00679be8 = 0x00679bc0 + 0x28. FUN_005621a0 (DisplaySettings::DisplaySettings::LoadStartupConfig) scatters the table below into
 // it before anything reads an option.
 
 // The descriptor table at .data 0x006143b8, row for row. Rows are in menu order, not index

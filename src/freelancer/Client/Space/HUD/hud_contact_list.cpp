@@ -12,7 +12,7 @@
 #include "Common/Graphics/client_mesh_load.h"        // Win3DModelCachePreload (FUN_0059e980)
 #include "Space/client_objdb.h"            // ClientObjDb_* (FUN_00540fc0 / 00540a00 / 005416c0 ...)
 #include "Common/Fonts/font_imp.h"                // FindMenuFontImp (FUN_004177b0)
-#include "Common/Fonts/font_string.h"             // FontStringSetFont / SetScale / SetText
+#include "Common/Fonts/font_string.h"             // FFontString::SetFont / SetScale / SetText
 #include "Core/game_options.h"            // GetGameOption (FUN_005792b0)
 #include "Core/globals.h"                 // GetClientFrameTimeCapped, ShouldSkipLocalServerTick
 #include "Core/widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
@@ -262,13 +262,13 @@ namespace
             FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index); // FUN_004c4ff0
             Vector Pos;
             unsigned System = 0;
-            if (BestPathWaypointResolvePosition(Waypoint, &Pos, &System) && // FUN_004c52d0
+            if (Waypoint->ResolvePosition(&Pos, &System) && // FUN_004c52d0
                 GetHudWaypoint()->IsWaypointAt(&Pos))
             {
                 return true;
             }
             // 0x004d41ee: the object is resolved before bByObject is looked at.
-            IObjRW* const Object = BestPathWaypointResolveObject(Waypoint); // FUN_004c5110
+            IObjRW* const Object = Waypoint->ResolveObject(); // FUN_004c5110
             return bByObject && Object != nullptr && Object->get_id() == TargetId;
         }
         return false;
@@ -344,8 +344,8 @@ namespace
     {
         Gameobj->SetFlag3(true);
         FFontString* const Label = Gameobj->GetFontString48();
-        FontStringSetFont(Label, Font);
-        FontStringSetScale(Label, kLabelScale, -1.0f);
+        Label->SetFont(Font);
+        Label->SetScale(kLabelScale, -1.0f);
         IFont* const Measure = Label->FontIface;
         int Size[2] = {0, 0};
         Measure->MeasureString(Size, Name, -1);
@@ -371,7 +371,7 @@ namespace
             Name[Last] = 0;
             Measure->MeasureString(Size, Name, Last);
         }
-        FontStringSetText(Label, Name);
+        Label->SetText(Name);
         return Label;
     }
 
@@ -482,7 +482,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             Vector Pos;
             unsigned System = 0;
             // No position, or not in the player's system -- 0, and the final clamp is skipped.
-            if (!BestPathWaypointResolvePosition(Waypoint, &Pos, &System))
+            if (!Waypoint->ResolvePosition(&Pos, &System))
             {
                 Distance = 0.0f;
                 return;
@@ -502,7 +502,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             float const DzF = static_cast<float>(Dz);
             Distance = static_cast<float>(sqrt(Dz * DzF + static_cast<double>(DyF) * DyF +
                                                static_cast<double>(DxF) * DxF));
-            IObjRW* const Resolved = BestPathWaypointResolveObject(Waypoint);
+            IObjRW* const Resolved = Waypoint->ResolveObject();
             if (Resolved != nullptr)
             {
                 Distance = static_cast<float>(static_cast<int>(Distance));
@@ -1090,7 +1090,7 @@ void HUD_ContactList::RebuildContacts()
             FBestPathWaypoint* const First = BestPathGetWaypoint(0);
             if (First != nullptr)
             {
-                IObjRW* const Resolved = BestPathWaypointResolveObject(First);
+                IObjRW* const Resolved = First->ResolveObject();
                 if (Resolved != nullptr)
                 {
                     ExcludeId = Resolved->get_id();
@@ -1442,12 +1442,12 @@ void HUD_ContactList::RebuildContacts()
                     }
                     continue;
                 }
-                if ((TypeBits & OBJ_DESTROYABLE_DEPOT) != 0)
+                if ((TypeBits & OBJ_DESTROYABLE_DEPOT) == 0)
+                    continue;
+
+                if (!HudIsUnvisitedSolar(EqObj) && bShown)
                 {
-                    if (!HudIsUnvisitedSolar(EqObj) && bShown)
-                    {
-                        Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
-                    }
+                    Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
                 }
             }
 
@@ -1578,15 +1578,15 @@ void HUD_ContactList::RebuildContacts()
                         }
                         continue;
                     }
-                    if ((TypeBits & OBJ_DESTROYABLE_DEPOT) != 0)
+                    if ((TypeBits & OBJ_DESTROYABLE_DEPOT) == 0)
+                        continue;
+
+                    // Here the loot and "all" filters show it (the large-solar pass above
+                    // uses solars / all).
+                    if (!HudIsUnvisitedSolar(Simple) &&
+                        (FilterMode == kContactFilterLoot || FilterMode == kContactFilterAll || bNear != 0))
                     {
-                        // Here the loot and "all" filters show it (the large-solar pass above
-                        // uses solars / all).
-                        if (!HudIsUnvisitedSolar(Simple) &&
-                            (FilterMode == kContactFilterLoot || FilterMode == kContactFilterAll || bNear != 0))
-                        {
-                            Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
-                        }
+                        Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
                     }
                 }
             }
@@ -1617,14 +1617,14 @@ void HUD_ContactList::RebuildContacts()
             for (int Point = 0; Point < PathCount; ++Point)
             {
                 FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Point);
-                if (BestPathWaypointResolveObject(Waypoint) != nullptr)
+                if (Waypoint->ResolveObject() != nullptr)
                 {
                     Contacts.push_back(FHudContactEntry(kContactBestPathWaypoint, nullptr, 0.0f, 0, Point));
                     continue;
                 }
                 Vector Pos;
                 unsigned PointSystem = 0;
-                if (BestPathWaypointResolvePosition(Waypoint, &Pos, &PointSystem) &&
+                if (Waypoint->ResolvePosition(&Pos, &PointSystem) &&
                     PointSystem == System->GetId())
                 {
                     Contacts.push_back(FHudContactEntry(kContactBestPathWaypoint, nullptr, 0.0f, 0, Point));

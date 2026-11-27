@@ -200,7 +200,7 @@ void WidescreenHudCursorRay(Vector* OutRay)
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
     FSpaceCamera* const Cam = Win3DGetCamera();
     Vector Local;
-    Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX), static_cast<float>(CursorY));
+    Cam->ScreenToNearPlane(Local, static_cast<float>(CursorX), static_cast<float>(CursorY));
     Matrix Orientation;
     memcpy(&Orientation, &Cam->World, sizeof(Orientation));
     Vector World;

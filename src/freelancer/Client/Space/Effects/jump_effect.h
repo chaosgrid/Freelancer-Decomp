@@ -83,15 +83,15 @@ struct FJumpGateEffect
     unsigned char Pad19[3];
     FJumpFxCompanion Fx;               // +0x1c
     FJumpGateRingFx Rings[5];          // +0x2c
+
+    // FUN_00503380 -- bFire = 1. Caller: the solar notify.
+    void Fire();
 };
 static_assert(offsetof(FJumpGateEffect, JumpOutPosition) == 0x0c, "JumpGateEffect +0x0c");
 static_assert(offsetof(FJumpGateEffect, bFire) == 0x18, "JumpGateEffect +0x18");
 static_assert(offsetof(FJumpGateEffect, Fx) == 0x1c, "JumpGateEffect +0x1c");
 static_assert(offsetof(FJumpGateEffect, Rings) == 0x2c, "JumpGateEffect rings +0x2c");
 static_assert(sizeof(FJumpGateEffect) == 0xe0, "JumpGateEffect operator_new(0xe0)");
-
-// FUN_00503380 -- bFire = 1. Caller: the solar notify.
-void JumpGateEffectFire(FJumpGateEffect* Gate);
 
 struct FJumpShipEffect
 {
@@ -107,7 +107,7 @@ struct FJumpShipEffect
     FJumpShipEffect& operator=(FJumpShipEffect const&) = delete;
 
     // FUN_00503e20 -- the camera-shake amplitude for the ship's jump state, unrounded. Caller:
-    // HudCameraUpdateShake.
+    // FHudCamera::UpdateShake.
     double ShakeAmplitude() const;
 
     // The four state hooks FUN_005437d0 (FClientShipGameobj::SetJumpState) calls. Its case 3

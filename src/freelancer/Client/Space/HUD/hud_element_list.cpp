@@ -459,7 +459,7 @@ void LoadHudElementsFromIni()
                     }
                     else if (Reader.is_value("static_txm"))
                     {
-                        TextureRefLoad(&G_HudStaticTexture, Reader.get_value_string()); // FUN_004255c0
+                        G_HudStaticTexture.Load(Reader.get_value_string()); // FUN_004255c0
                     }
                     else if (Reader.is_value("static_blend"))
                     {
@@ -562,7 +562,7 @@ HUD_Steer::HUD_Steer(INI_Reader& Reader)
     Range = 200.0f;
     Radius = 40.0f;
     Byte48 = 0;
-    ClientMeshLoadFromPath(&MeshHolder, "interface\\hud\\HUD_steeringarrow.3db", 0, true);
+    MeshHolder.LoadFromPath("interface\\hud\\HUD_steeringarrow.3db", 0, true);
 
     while (Reader.read_value())
     {
@@ -578,7 +578,7 @@ HUD_Steer::~HUD_Steer()
     // FUN_004c8c20; the holder's own destructor then runs the same release again and finds
     // nothing.
     if (MeshHolder.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&MeshHolder);
+        MeshHolder.ReleaseWithAnim();
 }
 
 bool HUD_Steer::Slot1()

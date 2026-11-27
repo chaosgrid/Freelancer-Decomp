@@ -7,7 +7,7 @@
 // Port-only (no retail counterpart): the ray-marched volumetric nebula. See nebula_volume.h and
 // docs/re/rp9.md, "Volumetric nebula".
 //
-// Frame flow (space_scene_obj_draw.cpp, SpaceObjDrawPass):
+// Frame flow (space_scene_obj_draw.cpp, FGameCamera::DrawScene):
 //   SelectFieldControllers -> NebulaVolume::BeginFrame: the nebulae drawn this frame (inside
 //                              and, with exterior, within exterior_max_distance), nearest first;
 //                              then the lightning (UpdateLightning: strikes placed in their
@@ -2142,7 +2142,7 @@ namespace
         {
             FStarSphere const* const Star = Stars->Sentinel->Next->Sphere;
             Vector StarPos;
-            StarSphereGetOwnerPosition(Star, &StarPos);
+            Star->GetOwnerPosition(&StarPos);
             // Toward the star from the camera inside; from outside the reference slides toward
             // the zone centre with the distance (s / (s + largest radius)), so a far nebula is
             // lit from its own position and nothing jumps at the surface.
@@ -2966,13 +2966,13 @@ namespace
             return false;
         }
         FGameLight* const Light = GameLightConstruct(static_cast<FGameLight*>(Memory));
-        EngineLightSetType(Light, kLightDirectional, false);
+        Light->SetType(kLightDirectional, false);
         const Vector Zero = {0.0f, 0.0f, 0.0f};
-        EngineLightSetPosition(Light, &Zero);
+        Light->SetPosition(&Zero);
         const unsigned char White[3] = {0xff, 0xff, 0xff};
-        EngineLightSetColorBytesAlt(Light, White);
-        EngineLightSetRangeRaw(Light, kShipLightRange);
-        GameLightAddRef(Light);
+        Light->SetColorBytesAlt(White);
+        Light->SetRangeRaw(kShipLightRange);
+        Light->AddRef();
         GShipLight = Light;
         return true;
     }
@@ -3074,11 +3074,11 @@ namespace
         const Vector DirF = {Length > 1.0e-6 ? (float)(Dir[0] / Length) : 0.0f,
                              Length > 1.0e-6 ? (float)(Dir[1] / Length) : -1.0f,
                              Length > 1.0e-6 ? (float)(Dir[2] / Length) : 0.0f};
-        EngineLightSetPosition(Target, reinterpret_cast<Vector const*>(CamPosF));
-        EngineLightSetDirection(Target, &DirF);
-        EngineLightSetColorBytes(Target, Rgb);
+        Target->SetPosition(reinterpret_cast<Vector const*>(CamPosF));
+        Target->SetDirection(&DirF);
+        Target->SetColorBytes(Rgb);
         if ((Target->Flags & kLightFlagEnabled) == 0)
-            GameLightEnable(Target);
+            Target->FGameLight::Enable();
     }
 
     // Once per frame, after the entries are chosen (BeginFrame): strikes of nebulae no longer
@@ -3362,7 +3362,7 @@ void NebulaVolume::Shutdown()
     if (GShipLight != nullptr)
     {
         SwitchLightOff(GShipLight);
-        while (GameLightRelease(GShipLight) > 0)
+        while (GShipLight->Release() > 0)
         {
         }
         GShipLight = nullptr;

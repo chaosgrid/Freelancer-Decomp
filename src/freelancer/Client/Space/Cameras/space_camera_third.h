@@ -99,6 +99,18 @@ struct FThirdPersonCamera : FHudCamera
     unsigned char bInitialised;         // +0x214  set on every exit from the attach; the next
                                         //         update skips its own solve and clears it
     unsigned char Pad215[3];
+
+    // FUN_005187d0. Opens the cockpit ini and validates it; returns false when the file is missing
+    // or the aspect ratio is off, which is exactly when retail emits its two FDUMP warnings.
+    bool Load(const char* CockpitIniPath);
+
+    // FUN_00518600: HUDCamera's ctor, the two vptrs, then this class's defaults (see the .cpp).
+    void Construct();
+
+    // FUN_00518f20: the chase-camera solver. Out12 = {3x3, position}; false (Out12
+    // untouched) when the watcher does not hold a client ship. bReset seeds the speed tracker, the
+    // level axis and the orientation history from the ship.
+    bool Solve(float* Out12, float DeltaSeconds, bool bReset);
 };
 
 // The turret camera sits at controller + 0x3c8 and this one at + 0x1b0, so the class is
@@ -132,41 +144,10 @@ static_assert(offsetof(FThirdPersonCamera, SpeedSlack) == 0x1fc, "TP +0x1fc");
 static_assert(offsetof(FThirdPersonCamera, TurnRateScale) == 0x200, "TP +0x200");
 
 
-// FUN_005187d0. Opens the cockpit ini and validates it; returns false when the file is missing
-// or the aspect ratio is off, which is exactly when retail emits its two FDUMP warnings.
-bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath);
-
 // Slot 0x54 (0x005187c0): the class name, a plain .rdata literal.
 const char* ThirdPersonCameraGetName();
 
-// FUN_0051a190 -- slot 0 of the ThirdPerson Event::Handler face (+0xf8, table 0x005dbb0c):
-// blocked mouse pick -> false; HUDCamera's FUN_0051d7f0 first; event 0x3f flips +0x13c and hands
-// it to the watched ship's IBehaviorManager::update_level_camera, answering true.
-bool ThirdPersonCameraOnEvent(FThirdPersonCamera* Cam, unsigned MsgId);
-
-// FUN_00518600: HUDCamera's ctor, the two vptrs, then this class's defaults (see the .cpp).
-void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam);
-
-// Slot 0x64 (FUN_00518ad0): register the face for event 0x3f, then HUDCamera's
-// activate (FUN_0051cad0) -- its answer.
-bool ThirdPersonCameraActivate(FThirdPersonCamera* Cam, const int* ViewRect4);
-
-// Slot 0x58 (LAB_00518af0): HUDCamera's attach, the ship companion's camera
-// block, the target's orientation copies and world transform, the HpCockpit hardpoint (or the
-// fallback), then a reset solve from an identity view into the world transform and +0x130.
-// With nothing watched it only warns (Cockpit.cpp 0x3c9). Either way +0x214 ends up 1.
-void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object);
-
-// Slot 0x6c (LAB_00518e40): unless the attach just ran (+0x214), solve from an
-// identity view into the world transform (warning at Cockpit.cpp 0x3e9 when there is no ship);
-// then HUDCamera's update, and +0x214 cleared.
-void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds);
 
 // FUN_0051a140: Out9 = A9 * B9 through DAT_00675220's I3DMathEngine::MulMatrix into a local,
 // copied out; returns Out9. Called by the solver below and from 0x0055c5c9.
 float* CockpitMulMatrix(float* Out9, const float* A9, const float* B9);
-
-// FUN_00518f20: the chase-camera solver. Out12 = {3x3, position}; false (Out12
-// untouched) when the watcher does not hold a client ship. bReset seeds the speed tracker, the
-// level axis and the orientation history from the ship.
-bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSeconds, bool bReset);

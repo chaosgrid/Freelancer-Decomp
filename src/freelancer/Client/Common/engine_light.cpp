@@ -135,7 +135,7 @@ namespace
         DALib::Pipeline->SetLight(&Light->D3d, (const D3DLIGHT8*)&Light->D3d);
     }
 
-    // Shared by the destructor (FUN_00410ab0/ba0) and EngineLightUnregister (FUN_00410e20):
+    // Shared by the destructor (FUN_00410ab0/ba0) and FEngineLight::Disable (FUN_00410e20):
     // unlink from the global light list and notify the pipeline (vtable slot 41 — a
     // RemoveLight-shaped call taking the D3DLIGHT8 pointer plus a trailing 0).
     void UnlinkFromList(FEngineLight* Light)
@@ -230,106 +230,106 @@ FEngineLight::FEngineLight(int LightType)
     this->ColorCurvePeriod = 0.f;
 }
 
-void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source)
+void FEngineLight::SetLight(FD3dLight8 const* Source)
 {
     // FUN_00411120 (thiscall, RET 4). No null tests.
-    unsigned char const Was = Light->Flags;
-    Light->Flags = static_cast<unsigned char>(Was | kLightFlagHasD3d);
+    unsigned char const Was = Flags;
+    Flags = static_cast<unsigned char>(Was | kLightFlagHasD3d);
     if ((Was & kLightFlagRegistered) == 0)
     {
         // Not registered yet: the incoming type still gets to set both fields.
-        Light->Flags = static_cast<unsigned char>((Was & ~kLightFlagDynamic) | kLightFlagHasD3d);
-        StoreType(Light, static_cast<int>(Source->Type), true);
+        Flags = static_cast<unsigned char>((Was & ~kLightFlagDynamic) | kLightFlagHasD3d);
+        StoreType(this, static_cast<int>(Source->Type), true);
     }
 
-    memcpy(Light->D3d.Diffuse, Source->Diffuse, sizeof(float) * 4);
-    memcpy(Light->D3d.Specular, Source->Specular, sizeof(float) * 4);
-    memcpy(Light->D3d.Ambient, Source->Ambient, sizeof(float) * 4);
+    memcpy(D3d.Diffuse, Source->Diffuse, sizeof(float) * 4);
+    memcpy(D3d.Specular, Source->Specular, sizeof(float) * 4);
+    memcpy(D3d.Ambient, Source->Ambient, sizeof(float) * 4);
     // Position / Direction are skipped — FUN_00410ef0 and FUN_00410f60 own them.
-    Light->D3d.Range = Source->Range;
-    Light->D3d.Falloff = Source->Falloff;
-    Light->D3d.Attenuation0 = Source->Attenuation0;
-    Light->D3d.Attenuation1 = Source->Attenuation1;
-    Light->D3d.Attenuation2 = Source->Attenuation2;
-    Light->D3d.Theta = Source->Theta;
-    Light->D3d.Phi = Source->Phi;
+    D3d.Range = Source->Range;
+    D3d.Falloff = Source->Falloff;
+    D3d.Attenuation0 = Source->Attenuation0;
+    D3d.Attenuation1 = Source->Attenuation1;
+    D3d.Attenuation2 = Source->Attenuation2;
+    D3d.Theta = Source->Theta;
+    D3d.Phi = Source->Phi;
 
-    Light->Color[2] = Light->D3d.Diffuse[2];
-    Light->Color[0] = Light->D3d.Diffuse[0];
-    Light->Color[1] = Light->D3d.Diffuse[1];
+    Color[2] = D3d.Diffuse[2];
+    Color[0] = D3d.Diffuse[0];
+    Color[1] = D3d.Diffuse[1];
 
-    if (Light->D3d.Type != kLightDirectional)
+    if (D3d.Type != kLightDirectional)
     {
         // Unordered does not warn.
-        if (Light->D3d.Phi > kPi)
+        if (D3d.Phi > kPi)
         {
             FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x23b,
                   "invalid light detected: phi > pi");
-            Light->D3d.Phi = kPi;
+            D3d.Phi = kPi;
         }
         // Retail quirk: the warning fires when all three are <= 0 (ordered), not only when all
         // three are exactly zero.
-        if (Light->D3d.Attenuation0 <= 0.f && Light->D3d.Attenuation1 <= 0.f &&
-            Light->D3d.Attenuation2 <= 0.f)
+        if (D3d.Attenuation0 <= 0.f && D3d.Attenuation1 <= 0.f &&
+            D3d.Attenuation2 <= 0.f)
         {
             FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x241,
                   "invalid light detected: atten all zero");
-            Light->D3d.Attenuation0 = 0.1f;
+            D3d.Attenuation0 = 0.1f;
         }
     }
 
-    PushLightUpdate(Light);
+    PushLightUpdate(this);
 }
 
-void EngineLightSetPosition(FEngineLight* Light, Vector const* Pos3)
+void FEngineLight::SetPosition(Vector const* Pos3)
 {
     // FUN_00410ef0 (thiscall, RET 4). No null tests.
-    Light->Position.x = Pos3->x;
-    Light->Position.y = Pos3->y;
-    Light->Position.z = Pos3->z;
+    Position.x = Pos3->x;
+    Position.y = Pos3->y;
+    Position.z = Pos3->z;
 
     // A directional light has no position; everything else gets it with Z negated.
-    if (Light->Type != kLightDirectional)
+    if (Type != kLightDirectional)
     {
-        Light->D3d.Position.x = Light->Position.x;
-        Light->D3d.Position.y = Light->Position.y;
-        Light->D3d.Position.z = -Light->Position.z;
+        D3d.Position.x = Position.x;
+        D3d.Position.y = Position.y;
+        D3d.Position.z = -Position.z;
     }
 
-    PushLightUpdate(Light);
+    PushLightUpdate(this);
 }
 
-void EngineLightSetOrientation(FEngineLight* Light, float const* Orient9)
+void FEngineLight::SetOrientation(float const* Orient9)
 {
     // FUN_00410f60 (thiscall, RET 4): anything but a point light also gets the D3D direction
     // from FUN_00411370, z negated. No null tests.
-    memcpy(&Light->Orient, Orient9, sizeof(float) * 9);
+    memcpy(&Orient, Orient9, sizeof(float) * 9);
 
-    if (Light->Type != kLightPoint)
+    if (Type != kLightPoint)
     {
         Vector Dir;
-        EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
-        Light->D3d.Direction[0] = Dir.x;
-        Light->D3d.Direction[1] = Dir.y;
-        Light->D3d.Direction[2] = -Dir.z;
+        ComputeDirection(&Dir, nullptr, nullptr);
+        D3d.Direction[0] = Dir.x;
+        D3d.Direction[1] = Dir.y;
+        D3d.Direction[2] = -Dir.z;
     }
 
-    PushLightUpdate(Light);
+    PushLightUpdate(this);
 }
 
-bool EngineLightRegister(FEngineLight* Light)
+bool FEngineLight::Enable()
 {
     // FUN_00410dd0 (thiscall): bit 3 is set and returned (always 1). No test of the light or
     // the pipeline.
-    unsigned char const Was = Light->Flags;
+    unsigned char const Was = Flags;
     if ((Was & kLightFlagRegistered) == 0)
     {
-        Light->Flags = static_cast<unsigned char>(Was | kLightFlagRegistered);
+        Flags = static_cast<unsigned char>(Was | kLightFlagRegistered);
         if (G_PipelineLightState == 0)
-            DALib::Pipeline->AddLight(&Light->D3d);
+            DALib::Pipeline->AddLight(&D3d);
     }
-    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagEnabled);
-    return ((Light->Flags >> 3) & 1u) != 0;
+    Flags = static_cast<unsigned char>(Flags | kLightFlagEnabled);
+    return ((Flags >> 3) & 1u) != 0;
 }
 
 FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
@@ -348,8 +348,8 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
         Local.Phi = kPi;
     }
 
-    EngineLightSetLight(Light, &Local);
-    EngineLightSetPosition(Light, reinterpret_cast<Vector const*>(Frame12));
+    Light->SetLight(&Local);
+    Light->SetPosition(reinterpret_cast<Vector const*>(Frame12));
 
     // Direction turned by the frame's orientation (Frame12 + 3, the 3x3 after the position),
     // then LookMatrixYup on that vector.
@@ -361,7 +361,7 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
     Dir.y = Rotated.y;
     Dir.z = Rotated.z;
     const Matrix Look = LookMatrixYup(Dir);
-    EngineLightSetOrientation(Light, &Look.E[0][0]);
+    Light->SetOrientation(&Look.E[0][0]);
 
     // Vtable slot 1 of the plain EngineLight table, i.e. FUN_00410dd0. This is not a
     // GameLight: it is never on the DAT_00675570 list and has no +0xc8..+0xd0 fields.
@@ -393,94 +393,94 @@ void EngineLightDelete(FEngineLight* Light)
     delete Light;
 }
 
-void EngineLightUnregister(FEngineLight* Light)
+void FEngineLight::Disable()
 {
     // FUN_00410e20 (thiscall). Retail's relink arm after the unlink is dead (the bit was just
     // cleared). No null test.
-    unsigned char const Was = Light->Flags;
-    Light->Flags = static_cast<unsigned char>(Was & ~kLightFlagEnabled); // clear "enabled"
+    unsigned char const Was = Flags;
+    Flags = static_cast<unsigned char>(Was & ~kLightFlagEnabled); // clear "enabled"
     if ((Was & kLightFlagLinked) != 0)
     {
-        Light->Flags = static_cast<unsigned char>(Light->Flags & ~kLightFlagLinked);
-        UnlinkFromList(Light);
+        Flags = static_cast<unsigned char>(Flags & ~kLightFlagLinked);
+        UnlinkFromList(this);
     }
 }
 
-void EngineLightPushUpdate(FEngineLight* Light)
+void FEngineLight::PushUpdate()
 {
     // FUN_00410ec0 (thiscall). No null test.
-    PushLightUpdate(Light);
+    PushLightUpdate(this);
 }
 
 void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, Vector const* Pos3)
 {
     // FUN_00410fe0 (thiscall, RET 4) on one {Orient[9], Pos[3]} block: FUN_00410ef0's body,
     // then FUN_00410f60's, inlined. Same order, same two pushes. No null tests.
-    EngineLightSetPosition(Light, Pos3);
-    EngineLightSetOrientation(Light, Orient9);
+    Light->SetPosition(Pos3);
+    Light->SetOrientation(Orient9);
 }
 
-void EngineLightSetType(FEngineLight* Light, int LightType, bool bDynamic)
+void FEngineLight::SetType(int LightType, bool bDynamic)
 {
     // FUN_004110c0 (thiscall, RET 8): the argument's bit 0 into Flags bit 0, then the type
     // switch. No null test.
-    Light->Flags = static_cast<unsigned char>((Light->Flags & ~kLightFlagDynamic) |
+    Flags = static_cast<unsigned char>((Flags & ~kLightFlagDynamic) |
                                               (bDynamic ? kLightFlagDynamic : 0u));
-    StoreType(Light, LightType, true);
+    StoreType(this, LightType, true);
 }
 
-void EngineLightSetRangeRaw(FEngineLight* Light, float Range)
+void FEngineLight::SetRangeRaw(float Range)
 {
-    Light->D3d.Range = Range; // FUN_004112f0. No push, no null test.
+    D3d.Range = Range; // FUN_004112f0. No push, no null test.
 }
 
-void EngineLightSetRadius(FEngineLight* Light, float Radius)
+void FEngineLight::SetRadius(float Radius)
 {
     // FUN_00411300 (thiscall, RET 4). r*r stays on the x87 stack (double here), one float
     // store at the end. No null test.
-    Light->D3d.Range = Radius;
-    Light->D3d.Attenuation0 = 1.f;
-    Light->D3d.Attenuation1 = 0.f;
+    D3d.Range = Radius;
+    D3d.Attenuation0 = 1.f;
+    D3d.Attenuation1 = 0.f;
     double const RadiusSq = static_cast<double>(Radius) * static_cast<double>(Radius);
-    Light->D3d.Attenuation2 = static_cast<float>(16.0 / RadiusSq);
-    PushLightUpdate(Light);
+    D3d.Attenuation2 = static_cast<float>(16.0 / RadiusSq);
+    PushLightUpdate(this);
 }
 
-void EngineLightSetDirection(FEngineLight* Light, Vector const* Dir3)
+void FEngineLight::SetDirection(Vector const* Dir3)
 {
     // FUN_00411470 (thiscall, RET 4). No null test.
-    if (Light->Type != kLightPoint)
+    if (Type != kLightPoint)
     {
-        Light->D3d.Direction[0] = Dir3->x;
-        Light->D3d.Direction[1] = Dir3->y;
-        Light->D3d.Direction[2] = -Dir3->z;
+        D3d.Direction[0] = Dir3->x;
+        D3d.Direction[1] = Dir3->y;
+        D3d.Direction[2] = -Dir3->z;
     }
-    Light->Orient.E[0][2] = -Dir3->x;
-    Light->Orient.E[1][2] = -Dir3->y;
-    Light->Orient.E[2][2] = -Dir3->z;
+    Orient.E[0][2] = -Dir3->x;
+    Orient.E[1][2] = -Dir3->y;
+    Orient.E[2][2] = -Dir3->z;
 
-    PushLightUpdate(Light);
+    PushLightUpdate(this);
 }
 
-void EngineLightSetColorBytes(FEngineLight* Light, unsigned char const RGB[3])
+void FEngineLight::SetColorBytes(unsigned char const RGB[3])
 {
     // FUN_004114f0 (thiscall, RET 4): no test of the light or the byte pointer.
-    SetColorFromBytes(Light, RGB);
+    SetColorFromBytes(this, RGB);
 }
 
-void EngineLightSetColorBytesAlt(FEngineLight* Light, unsigned char const RGB[3])
+void FEngineLight::SetColorBytesAlt(unsigned char const RGB[3])
 {
     // FUN_004115b0 (thiscall, RET 4): the same body; no tests.
-    SetColorFromBytes(Light, RGB);
+    SetColorFromBytes(this, RGB);
 }
 
-void EngineLightSetConeAngle(FEngineLight* Light, float DegreesFullAngle)
+void FEngineLight::SetConeAngle(float DegreesFullAngle)
 {
     // FUN_00411670 (thiscall, RET 4) — no test of the light, and deliberately no
     // PushLightUpdate call, matching retail. Theta = Phi * 0.5 is exact either way.
-    Light->D3d.Falloff = 1.f;
-    Light->D3d.Phi = DegreesFullAngle * (kPi / 180.f);
-    Light->D3d.Theta = Light->D3d.Phi * 0.5f;
+    D3d.Falloff = 1.f;
+    D3d.Phi = DegreesFullAngle * (kPi / 180.f);
+    D3d.Theta = D3d.Phi * 0.5f;
 }
 
 double Vec3Length(Vector const* V)
@@ -574,52 +574,52 @@ void MatrixSetColumn2(Matrix* Matrix9, Vector const* Vec3)
     Matrix9->E[2][2] = Vec3->z;
 }
 
-FLightCurveName* LightCurveNameInit(FLightCurveName* Name, char const* Source)
+FLightCurveName* FLightCurveName::Init(char const* Source)
 {
     // FUN_00411f00 — __thiscall, RET 4.
-    Name->Len = 0;
-    Name->Text[0] = '\0';
+    this->Len = 0;
+    Text[0] = '\0';
     if (Source == nullptr)
     {
-        Name->Len = 0;
-        Name->Text[0] = '\0';
-        return Name;
+        this->Len = 0;
+        Text[0] = '\0';
+        return this;
     }
     unsigned Len = static_cast<unsigned>(strlen(Source));
     if (Len >= 0x80)
         Len = 0x7f;
-    memcpy(Name->Text, Source, Len);
-    Name->Text[Len] = '\0';
-    Name->Len = Len;
-    return Name;
+    memcpy(Text, Source, Len);
+    Text[Len] = '\0';
+    this->Len = Len;
+    return this;
 }
 
-void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
+void FEngineLight::SetAttenCurve(char const* GraphName)
 {
     // FUN_00411d90 — __thiscall, RET 4.
-    if (Light->Type == kLightAmbient)
+    if (Type == kLightAmbient)
     {
         // An ambient light takes the graph as its ambient curve instead.
-        if (Light->AmbientCurve != nullptr)
+        if (AmbientCurve != nullptr)
         {
-            Light->AmbientCurve->Release();
-            Light->AmbientCurve = nullptr;
+            AmbientCurve->Release();
+            AmbientCurve = nullptr;
         }
         IGraph* const Graph = GraphLibraryFind(GraphName);
         if (Graph != nullptr)
         {
-            Light->AmbientCurve = Graph;
-            Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
+            AmbientCurve = Graph;
+            Flags = static_cast<unsigned char>(Flags | kLightFlagHasCurve);
             return;
         }
         MessageBoxA(nullptr, GraphName, "Error: unknown graph name", 0);
         return;
     }
 
-    if (Light->ZoneCurve != nullptr)
+    if (ZoneCurve != nullptr)
     {
-        Light->ZoneCurve->Release();
-        Light->ZoneCurve = nullptr;
+        ZoneCurve->Release();
+        ZoneCurve = nullptr;
     }
     IGraph* const Graph = GraphLibraryFind(GraphName);
     if (Graph == nullptr)
@@ -627,22 +627,22 @@ void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
         MessageBoxA(nullptr, GraphName, "Error: unknown graph name", 0);
         return;
     }
-    if (Light->Type != kLightPoint && Light->Type != kLightSpot && Light->Type != kLightDirectional)
+    if (Type != kLightPoint && Type != kLightSpot && Type != kLightDirectional)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid dynamic light type (%s)", kEngineLightCpp,
               0x360, GraphName);
     }
-    Light->ZoneCurve = Graph;
-    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
+    ZoneCurve = Graph;
+    Flags = static_cast<unsigned char>(Flags | kLightFlagHasCurve);
 }
 
-void EngineLightSetColorCurve(FEngineLight* Light, char const* GraphName, float Period)
+void FEngineLight::SetColorCurve(char const* GraphName, float Period)
 {
     // FUN_00411e90 — __thiscall, RET 8.
-    if (Light->ColorCurve != nullptr)
+    if (ColorCurve != nullptr)
     {
-        Light->ColorCurve->Release();
-        Light->ColorCurve = nullptr;
+        ColorCurve->Release();
+        ColorCurve = nullptr;
     }
     IGraph* const Graph = GraphLibraryFind(GraphName);
     if (Graph == nullptr)
@@ -650,12 +650,12 @@ void EngineLightSetColorCurve(FEngineLight* Light, char const* GraphName, float 
         MessageBoxA(nullptr, GraphName, "Error: unknown graph name", 0);
         return;
     }
-    Light->ColorCurve = Graph;
-    Light->ColorCurvePeriod = Period;
-    Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
+    ColorCurve = Graph;
+    ColorCurvePeriod = Period;
+    Flags = static_cast<unsigned char>(Flags | kLightFlagHasCurve);
 }
 
-bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Value)
+bool FEngineLight::ReadValue(char const* Name, char const* Value)
 {
     // FUN_00411690 — __thiscall, RET 8. Every recognised key returns true; ValueNum fields are
     // read highest index first, as retail does.
@@ -665,22 +665,22 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         Pos[2] = static_cast<float>(ValueNum(Value, 2));
         Pos[1] = static_cast<float>(ValueNum(Value, 1));
         Pos[0] = static_cast<float>(ValueNum(Value, 0));
-        Light->Position.x = Pos[0];
-        Light->Position.y = Pos[1];
-        Light->Position.z = Pos[2];
-        if (Light->Type != kLightDirectional)
+        Position.x = Pos[0];
+        Position.y = Pos[1];
+        Position.z = Pos[2];
+        if (Type != kLightDirectional)
         {
-            Light->D3d.Position.x = Light->Position.x;
-            Light->D3d.Position.y = Light->Position.y;
-            Light->D3d.Position.z = -Light->Position.z;
+            D3d.Position.x = Position.x;
+            D3d.Position.y = Position.y;
+            D3d.Position.z = -Position.z;
         }
-        PushLightUpdate(Light); // FUN_00410ec0
+        PushLightUpdate(this); // FUN_00410ec0
         return true;
     }
 
     if (_stricmp(Name, "range") == 0)
     {
-        Light->D3d.Range = static_cast<float>(ValueNum(Value, 0));
+        D3d.Range = static_cast<float>(ValueNum(Value, 0));
         return true;
     }
 
@@ -695,14 +695,14 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         EngineLightPackColorBytes(Packed, Rgb);
         float Color[3];
         float const* const Unpacked = EngineLightUnpackColorBytes(Packed, Color);
-        Light->Color[0] = Unpacked[0];
-        Light->Color[1] = Unpacked[1];
-        Light->Color[2] = Unpacked[2];
-        Light->D3d.Diffuse[0] = Light->Color[0];
-        Light->D3d.Diffuse[1] = Light->Color[1];
-        Light->D3d.Diffuse[2] = Light->Color[2];
-        Light->D3d.Diffuse[3] = 1.0f;
-        PushLightUpdate(Light);
+        this->Color[0] = Unpacked[0];
+        this->Color[1] = Unpacked[1];
+        this->Color[2] = Unpacked[2];
+        D3d.Diffuse[0] = this->Color[0];
+        D3d.Diffuse[1] = this->Color[1];
+        D3d.Diffuse[2] = this->Color[2];
+        D3d.Diffuse[3] = 1.0f;
+        PushLightUpdate(this);
         return true;
     }
 
@@ -710,7 +710,7 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
     {
         // FUN_00411cd0 and FUN_004110c0(type, false) inlined; the FDUMP flag word there comes
         // out of FUN_00411c50(0x10000, 1) = 0x100001, the same constant.
-        EngineLightSetType(Light, EngineLightParseType(Value), false);
+        SetType(EngineLightParseType(Value), false);
         return true;
     }
 
@@ -718,9 +718,9 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
     {
         float const Atten2 = static_cast<float>(ValueNum(Value, 2));
         float const Atten1 = static_cast<float>(ValueNum(Value, 1));
-        Light->D3d.Attenuation0 = static_cast<float>(ValueNum(Value, 0));
-        Light->D3d.Attenuation1 = Atten1;
-        Light->D3d.Attenuation2 = Atten2;
+        D3d.Attenuation0 = static_cast<float>(ValueNum(Value, 0));
+        D3d.Attenuation1 = Atten1;
+        D3d.Attenuation2 = Atten2;
         return true;
     }
 
@@ -738,31 +738,31 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         Dir.x = static_cast<float>(Dir.x * InvLength);
         Dir.y = static_cast<float>(Dir.y * InvLength);
         Dir.z = static_cast<float>(Dir.z * InvLength);
-        if (Light->Type != kLightPoint)
+        if (Type != kLightPoint)
         {
-            Light->D3d.Direction[0] = Dir.x;
-            Light->D3d.Direction[1] = Dir.y;
-            Light->D3d.Direction[2] = -Dir.z;
+            D3d.Direction[0] = Dir.x;
+            D3d.Direction[1] = Dir.y;
+            D3d.Direction[2] = -Dir.z;
         }
         Vector Negated;
         Vec3Negate(&Negated, &Dir);                  // FUN_00411350
-        MatrixSetColumn2(&Light->Orient, &Negated);  // FUN_00411f70 on light +0x74
-        PushLightUpdate(Light);
+        MatrixSetColumn2(&Orient, &Negated);  // FUN_00411f70 on light +0x74
+        PushLightUpdate(this);
         return true;
     }
 
     if (_stricmp(Name, "ambient_curve") == 0)
     {
-        if (Light->AmbientCurve != nullptr)
+        if (AmbientCurve != nullptr)
         {
-            Light->AmbientCurve->Release();
-            Light->AmbientCurve = nullptr;
+            AmbientCurve->Release();
+            AmbientCurve = nullptr;
         }
         IGraph* const Graph = GraphLibraryFind(Value);
         if (Graph != nullptr)
         {
-            Light->AmbientCurve = Graph;
-            Light->Flags = static_cast<unsigned char>(Light->Flags | kLightFlagHasCurve);
+            AmbientCurve = Graph;
+            Flags = static_cast<unsigned char>(Flags | kLightFlagHasCurve);
             return true;
         }
         MessageBoxA(nullptr, Value, "Error: unknown graph name", 0);
@@ -774,60 +774,60 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         // "atten_curve = graph[, type]": an optional light type first, then the graph.
         char const* const TypeName = StringIndex(Value, 1);
         if (TypeName != nullptr && TypeName[0] != '\0')
-            EngineLightSetType(Light, EngineLightParseType(TypeName), false);
-        EngineLightSetAttenCurve(Light, StringIndex(Value, 0));
+            SetType(EngineLightParseType(TypeName), false);
+        SetAttenCurve(StringIndex(Value, 0));
         return true;
     }
 
     if (_stricmp(Name, "color_curve") == 0)
     {
         FLightCurveName CurveName;
-        LightCurveNameInit(&CurveName, StringIndex(Value, 0));
+        CurveName.Init(StringIndex(Value, 0));
         float const Period = static_cast<float>(ValueNum(Value, 1));
-        EngineLightSetColorCurve(Light, CurveName.Text, Period);
+        SetColorCurve(CurveName.Text, Period);
         return true;
     }
 
     return false;
 }
 
-bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, float ExtraRadius)
+bool FEngineLight::AffectsPoint(float const* Point3, float ExtraRadius) const
 {
     // FUN_00410a40 (thiscall, RET 8). No null test.
-    if ((Light->Flags & kLightFlagEnabled) == 0)
+    if ((Flags & kLightFlagEnabled) == 0)
         return false;
 
-    if (Light->Type == kLightDirectional && (Light->Flags & kLightFlagHasCurve) == 0)
+    if (Type == kLightDirectional && (Flags & kLightFlagHasCurve) == 0)
         return true;
 
     // Kept on the x87 stack (double here); true only when strictly greater (ordered).
-    double const Dx = static_cast<double>(Point3[0]) - Light->Position.x;
-    double const Dy = static_cast<double>(Point3[1]) - Light->Position.y;
-    double const Dz = static_cast<double>(Point3[2]) - Light->Position.z;
-    double const Reach = static_cast<double>(Light->D3d.Range) + ExtraRadius;
+    double const Dx = static_cast<double>(Point3[0]) - Position.x;
+    double const Dy = static_cast<double>(Point3[1]) - Position.y;
+    double const Dz = static_cast<double>(Point3[2]) - Position.z;
+    double const Reach = static_cast<double>(D3d.Range) + ExtraRadius;
     double const DistSq = (Dx * Dx + Dz * Dz) + Dy * Dy;
     return Reach * Reach > DistSq;
 }
 
-bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutColor3)
+bool FEngineLight::GetEffectiveColor(float Dist, float* OutColor3)
 {
     // DAT_005c89c8, a double.
     double const kInv255 = 1.0 / 255.0;
 
-    OutColor3[0] = Light->Color[0];
-    OutColor3[1] = Light->Color[1];
-    OutColor3[2] = Light->Color[2];
+    OutColor3[0] = Color[0];
+    OutColor3[1] = Color[1];
+    OutColor3[2] = Color[2];
 
     bool bModified = false;
-    if (Light->ColorCurve != nullptr)
+    if (ColorCurve != nullptr)
     {
         // Range {wrap, 0, ColorCurvePeriod}; retail writes only the flag byte of bClamp's dword.
         FGraphRange Period;
         Period.bClamp = 0;
         Period.Min = 0.0f;
-        Period.Max = Light->ColorCurvePeriod;
+        Period.Max = ColorCurvePeriod;
         float const Now = static_cast<float>(GetClientElapsedTime()); // FUN_0042d660
-        unsigned const Packed = Light->ColorCurve->EvaluateColor(Now, &Period);
+        unsigned const Packed = ColorCurve->EvaluateColor(Now, &Period);
         // Double-precision products, one float store each.
         OutColor3[0] = static_cast<float>(((Packed >> 0x10) & 0xffu) * kInv255 * OutColor3[0]);
         OutColor3[1] = static_cast<float>(((Packed >> 8) & 0xffu) * kInv255 * OutColor3[1]);
@@ -835,14 +835,14 @@ bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutCol
         bModified = true;
     }
 
-    if (Light->ZoneCurve != nullptr)
+    if (ZoneCurve != nullptr)
     {
         FGraphRange Reach;
         Reach.bClamp = 1;
         Reach.Min = 0.0f;
-        Reach.Max = Light->D3d.Range;
+        Reach.Max = D3d.Range;
         // The unrounded result multiplies each channel.
-        double const Scale = Light->ZoneCurve->Evaluate(Dist, &Reach);
+        double const Scale = ZoneCurve->Evaluate(Dist, &Reach);
         OutColor3[0] = static_cast<float>(Scale * OutColor3[0]);
         OutColor3[1] = static_cast<float>(Scale * OutColor3[1]);
         OutColor3[2] = static_cast<float>(Scale * OutColor3[2]);
@@ -852,21 +852,20 @@ bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutCol
     return bModified;
 }
 
-Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float const* Point,
-                                   float* OutDist)
+Vector* FEngineLight::ComputeDirection(Vector* OutDir3, float const* Point, float* OutDist)
 {
     // FUN_00411370 (thiscall, RET 0xc). No null tests.
-    int const Type = Light->Type;
+    int const Type = this->Type;
     bool const bTowardPoint =
         (Type == kLightPoint) ||
-        (((Light->Flags & kLightFlagHasCurve) != 0) && (Type == kLightDirectional || Type == kLightSpot));
+        (((Flags & kLightFlagHasCurve) != 0) && (Type == kLightDirectional || Type == kLightSpot));
 
     if (Point != nullptr && (bTowardPoint || OutDist != nullptr))
     {
         // x87 precision: dx and dz stay on the stack, dy is rounded to a float.
-        double const Dx = static_cast<double>(Point[0]) - Light->Position.x;
-        float const Dy = Point[1] - Light->Position.y;
-        double const Dz = static_cast<double>(Point[2]) - Light->Position.z;
+        double const Dx = static_cast<double>(Point[0]) - Position.x;
+        float const Dy = Point[1] - Position.y;
+        double const Dz = static_cast<double>(Point[2]) - Position.z;
         double const Len = sqrt((Dz * Dz + Dx * Dx) + static_cast<double>(Dy) * Dy);
         if (OutDist != nullptr)
             *OutDist = static_cast<float>(Len);
@@ -882,41 +881,41 @@ Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float 
     }
 
     // Default: negate Orient column 2.
-    OutDir3->x = -Light->Orient.E[0][2];
-    OutDir3->y = -Light->Orient.E[1][2];
-    OutDir3->z = -Light->Orient.E[2][2];
+    OutDir3->x = -Orient.E[0][2];
+    OutDir3->y = -Orient.E[1][2];
+    OutDir3->z = -Orient.E[2][2];
     return OutDir3;
 }
 
-bool EngineLightSample(FEngineLight* Light, float const* Point, float* OutDir3,
-                       float* InOutAmbient3, float* OutColor3)
+bool FEngineLight::Sample(float const* Point, float* OutDir3, float* InOutAmbient3,
+                          float* OutColor3)
 {
     // FUN_00410960.
-    if ((Light->Flags & kLightFlagEnabled) == 0)
+    if ((Flags & kLightFlagEnabled) == 0)
         return false;
 
     // Retail reuses the Point argument slot for the distance.
     Vector Dir;
     float Dist;
-    Vector const* const Result = EngineLightComputeDirection(Light, &Dir, Point, &Dist);
+    Vector const* const Result = ComputeDirection(&Dir, Point, &Dist);
     OutDir3[0] = Result->x;
     OutDir3[1] = Result->y;
     OutDir3[2] = Result->z;
 
     // The return value is not read.
-    EngineLightGetEffectiveColor(Light, Dist, OutColor3);
+    GetEffectiveColor(Dist, OutColor3);
 
-    if (Light->Type == kLightAmbient)
+    if (Type == kLightAmbient)
     {
         // The unrounded curve result is kept on the x87 stack.
         double Scale = 1.0;
-        if (Light->AmbientCurve != nullptr)
+        if (AmbientCurve != nullptr)
         {
             FGraphRange Reach;
             Reach.bClamp = 1;
             Reach.Min = 0.0f;
-            Reach.Max = Light->D3d.Range;
-            Scale = Light->AmbientCurve->Evaluate(Dist, &Reach);
+            Reach.Max = D3d.Range;
+            Scale = AmbientCurve->Evaluate(Dist, &Reach);
         }
         // Each product rounded to a float before the add.
         float const AddR = static_cast<float>(Scale * OutColor3[0]);
@@ -962,65 +961,64 @@ namespace
     }
 }
 
-bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* Pos3,
-                            float* InOutAmbient)
+bool FEngineLight::ApplyNearby(ICamera* Camera, float const* Pos3, float* InOutAmbient)
 {
     // FUN_004104e0 (thiscall, RET 0xc). No argument is tested.
     bool bLit = false;
     Vector Dir = {};
-    if ((Light->Flags & kLightFlagEnabled) != 0)
+    if ((Flags & kLightFlagEnabled) != 0)
     {
-        if ((Light->Flags & kLightFlagHasD3d) != 0)
+        if ((Flags & kLightFlagHasD3d) != 0)
         {
-            EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
+            ComputeDirection(&Dir, nullptr, nullptr);
             bLit = true;
         }
         else
         {
             float Dist = -1.0f;
-            EngineLightComputeDirection(Light, &Dir, Pos3, &Dist);
+            ComputeDirection(&Dir, Pos3, &Dist);
 
-            if ((Light->Flags & kLightFlagHasCurve) != 0 &&
-                (Light->Type == kLightDirectional || Light->Type == kLightSpot))
+            if ((Flags & kLightFlagHasCurve) != 0 &&
+                (Type == kLightDirectional || Type == kLightSpot))
             {
-                if (Light->Type != kLightPoint)
+                if (Type != kLightPoint)
                 {
-                    Light->D3d.Direction[0] = Dir.x;
-                    Light->D3d.Direction[1] = Dir.y;
-                    Light->D3d.Direction[2] = -Dir.z;
+                    D3d.Direction[0] = Dir.x;
+                    D3d.Direction[1] = Dir.y;
+                    D3d.Direction[2] = -Dir.z;
                 }
                 Vector Neg;
                 Vec3Negate(&Neg, &Dir);
-                Light->Orient.E[0][2] = Neg.x;
-                Light->Orient.E[1][2] = Neg.y;
-                Light->Orient.E[2][2] = Neg.z;
-                EngineLightPushUpdate(Light);
+                Orient.E[0][2] = Neg.x;
+                Orient.E[1][2] = Neg.y;
+                Orient.E[2][2] = Neg.z;
+                PushUpdate();
             }
 
             // FUN_00410850 always writes the colour; a modified one becomes the diffuse.
             float Color[3];
-            bool const bColorMod = EngineLightGetEffectiveColor(Light, Dist, Color);
+            bool const bColorMod = GetEffectiveColor(Dist, Color);
             if (bColorMod)
             {
-                Light->D3d.Diffuse[0] = Color[0];
-                Light->D3d.Diffuse[1] = Color[1];
-                Light->D3d.Diffuse[2] = Color[2];
-                Light->D3d.Diffuse[3] = 1.0f;
-                PushLightUpdate(Light);
+                D3d.Diffuse[0] = Color[0];
+                D3d.Diffuse[1] = Color[1];
+                D3d.Diffuse[2] = Color[2];
+                D3d.Diffuse[3] = 1.0f;
+                PushLightUpdate(this);
             }
 
             // An ambient light adds its colour, scaled by its ambient curve at Dist when it has
             // one, to the accumulator.
-            if (Light->Type == kLightAmbient)
+            if (Type == kLightAmbient)
             {
                 float Scale = 1.0f;
-                if (Light->AmbientCurve != nullptr)
+                if (AmbientCurve != nullptr)
                 {
                     FGraphRange Reach;
                     Reach.bClamp = 1;
                     Reach.Min = 0.0f;
-                    Reach.Max = Light->D3d.Range;
-                    Scale = static_cast<float>(Light->AmbientCurve->Evaluate(Dist, &Reach));
+                    Reach.Max = D3d.Range;
+                    Scale = static_cast<float>(AmbientCurve->Evaluate(Dist, &Reach));
                 }
                 float Scaled[3];
                 ScaleVec3(Scaled, Color, Scale);
@@ -1036,23 +1034,23 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
 
         // DAT_00610588 as it is (no query here) -- non-zero goes soft.
         if (G_PipelineLightState != 0)
-            SoftCameraRewriteLight(Light, Camera, &Dir);
+            SoftCameraRewriteLight(this, Camera, &Dir);
     }
 
     // Bit 4 (list link) follows bLit.
-    unsigned char const OldFlags = Light->Flags;
+    unsigned char const OldFlags = Flags;
     bool const bWasLinked = (OldFlags & kLightFlagLinked) != 0;
     if (bWasLinked != bLit)
     {
         unsigned char const NewFlags = static_cast<unsigned char>(
             (((static_cast<unsigned>(bLit) << 4) ^ OldFlags) & kLightFlagLinked) ^ OldFlags);
-        Light->Flags = NewFlags;
+        Flags = NewFlags;
         if ((NewFlags & kLightFlagLinked) != 0)
         {
-            LinkIntoRegisteredList(Light);
+            LinkIntoRegisteredList(this);
             return bLit;
         }
-        UnlinkFromList(Light);
+        UnlinkFromList(this);
     }
     return bLit;
 }
@@ -1110,7 +1108,7 @@ void EngineLightApplyList(FEngineLight* const* Lights, unsigned Count, ICamera* 
 
     unsigned Index = 0;
     for (Index = 0; Index < Count; ++Index)
-        EngineLightApplyNearby(Lights[Index], Camera, Pos3, Ambient);
+        Lights[Index]->ApplyNearby(Camera, Pos3, Ambient);
 
     // Each float * 255.0 in double, truncated and clamped (G and B through FUN_004104c0).
     int const R = ClampColorByte(static_cast<int>(static_cast<double>(Ambient[0]) * 255.0));
@@ -1161,59 +1159,57 @@ FEngineLight* EngineLightGameListNext(FEngineLight* Light)
 }
 
 // FUN_00537690, thiscall on a GameLight.
-bool GameLightEnable(FEngineLight* Light)
+bool FGameLight::Enable()
 {
-    FGameLight* const Game = reinterpret_cast<FGameLight*>(Light);
-    if (((Light->Flags >> 3) & 1u) != 0)
+    if (((Flags >> 3) & 1u) != 0)
         return true;
-    if (!EngineLightRegister(Light))
+    if (!FEngineLight::Enable())
         return false;
     // Append at the tail, count and reference.
-    Game->ListPrev = G_GameLightTail;
+    ListPrev = G_GameLightTail;
     if (G_GameLightTail != nullptr)
-        G_GameLightTail->ListNext = Game;
+        G_GameLightTail->ListNext = this;
     else
-        G_GameLightHead = Game;
-    G_GameLightTail = Game;
-    Game->ListNext = nullptr;
+        G_GameLightHead = this;
+    G_GameLightTail = this;
+    ListNext = nullptr;
     ++G_GameLightCount;
-    ++Game->RefCount;
+    ++RefCount;
     return true;
 }
 
 // FUN_005376f0, thiscall on a GameLight.
-void GameLightDisable(FEngineLight* Light)
+void FGameLight::Disable()
 {
-    FGameLight* const Game = reinterpret_cast<FGameLight*>(Light);
-    if ((Light->Flags & kLightFlagEnabled) == 0)
+    if ((Flags & kLightFlagEnabled) == 0)
         return;
-    EngineLightUnregister(Light);
-    FGameLight* const Prev = Game->ListPrev;
+    FEngineLight::Disable();
+    FGameLight* const Prev = ListPrev;
     if (Prev == nullptr)
     {
-        G_GameLightHead = Game->ListNext;
+        G_GameLightHead = ListNext;
         if (G_GameLightHead != nullptr)
             G_GameLightHead->ListPrev = nullptr;
         else
             G_GameLightTail = nullptr;
     }
-    else if (Game->ListNext == nullptr)
+    else if (ListNext == nullptr)
     {
         G_GameLightTail = Prev;
         Prev->ListNext = nullptr;
     }
     else
     {
-        Prev->ListNext = Game->ListNext;
-        Game->ListNext->ListPrev = Game->ListPrev;
+        Prev->ListNext = ListNext;
+        ListNext->ListPrev = ListPrev;
     }
     // Clear the links, count and reference; slot 0 (1) at <= 0.
-    Game->ListPrev = nullptr;
-    Game->ListNext = nullptr;
+    ListPrev = nullptr;
+    ListNext = nullptr;
     --G_GameLightCount;
-    int const Remaining = --Game->RefCount;
+    int const Remaining = --RefCount;
     if (Remaining <= 0)
-        GameLightCallDestroy(Game);
+        GameLightCallDestroy(this);
 }
 
 void EngineLightSetAmbientRgbBytes(unsigned char const Rgb[3])
@@ -1247,7 +1243,7 @@ FGameLight* GameLightConstruct(FGameLight* Light)
 FGameLight::FGameLight() : FEngineLight(kLightNone)
 {
     // FUN_005374e0 (thiscall). No null test; the list links +0xc8 / +0xcc are not written
-    // (GameLightEnable sets them).
+    // (FGameLight::Enable sets them).
     this->RefCount = 1;
     memset(&this->Anim, 0, sizeof(this->Anim));
     this->Anim.CurrentIndex = -1;
@@ -1271,10 +1267,10 @@ FGameLight* GameLightCreatePoint(Vector const* Pos3, unsigned char const Rgb[3],
     FGameLight* Light = nullptr;
     if (Mem != nullptr)
         Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
-    EngineLightSetType((FEngineLight*)Light, kLightPoint, true);           // FUN_004110c0(1, 1)
-    EngineLightSetPosition((FEngineLight*)Light, Pos3);          // FUN_00410ef0
-    EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);      // FUN_004115b0
-    EngineLightSetRadius((FEngineLight*)Light, Range);           // FUN_00411300
+    ((FEngineLight*)Light)->SetType(kLightPoint, true);           // FUN_004110c0(1, 1)
+    ((FEngineLight*)Light)->SetPosition(Pos3);          // FUN_00410ef0
+    ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);      // FUN_004115b0
+    ((FEngineLight*)Light)->SetRadius(Range);           // FUN_00411300
     if (Light->Enable()) // vtable slot 1
         return Light;
 
@@ -1310,57 +1306,57 @@ Light::AnimationArch::~AnimationArch()
 void LightAnimationLoad(char const* Path)
 {
     INI_Reader Reader;
-    if (Reader.open(Path, false) && Reader.read_header())
+    if (!Reader.open(Path, false) || !Reader.read_header())
+        return;
+
+    do
     {
-        do
+        if (!Reader.is_header("LightAnim"))
+            continue;
+
+        Light::AnimationArch* const Anim = new Light::AnimationArch();
+        Light::AnimFrame* LastFrame = nullptr; // cleared per section
+        if (Reader.read_value())
         {
-            if (!Reader.is_header("LightAnim"))
-                continue;
-
-            Light::AnimationArch* const Anim = new Light::AnimationArch();
-            Light::AnimFrame* LastFrame = nullptr; // cleared per section
-            if (Reader.read_value())
+            do
             {
-                do
+                if (Reader.is_value("name"))
                 {
-                    if (Reader.is_value("name"))
+                    char const* const Value = Reader.get_value_string();
+                    if (Value == nullptr)
                     {
-                        char const* const Value = Reader.get_value_string();
-                        if (Value == nullptr)
-                        {
-                            Anim->NameLen = 0;
-                            Anim->Name[0] = '\0';
-                        }
-                        else
-                        {
-                            Anim->NameLen = CopyBoundedString(Anim->Name, 0x20, Value);
-                        }
+                        Anim->NameLen = 0;
+                        Anim->Name[0] = '\0';
                     }
-                    else if (Reader.is_value("frame"))
+                    else
                     {
-                        LastFrame = new Light::AnimFrame;
-                        LastFrame->Time = Reader.get_value_float(0);
-                        LastFrame->Rgb[0] = static_cast<unsigned char>(
-                            static_cast<int>(Reader.get_value_float(1)));
-                        LastFrame->Rgb[1] = static_cast<unsigned char>(
-                            static_cast<int>(Reader.get_value_float(2)));
-                        LastFrame->Rgb[2] = static_cast<unsigned char>(
-                            static_cast<int>(Reader.get_value_float(3)));
-                        LastFrame->Intensity = Reader.get_value_float(4);
-                        // Only a positive (or unordered) intensity is kept.
-                        if (LastFrame->Intensity <= 0.0f)
-                            LastFrame->Intensity = 0.01f;
-                        LastFrame->EndMarker = 0;
-                        Anim->append(LastFrame);
+                        Anim->NameLen = CopyBoundedString(Anim->Name, 0x20, Value);
                     }
-                } while (Reader.read_value());
-            }
+                }
+                else if (Reader.is_value("frame"))
+                {
+                    LastFrame = new Light::AnimFrame;
+                    LastFrame->Time = Reader.get_value_float(0);
+                    LastFrame->Rgb[0] = static_cast<unsigned char>(
+                        static_cast<int>(Reader.get_value_float(1)));
+                    LastFrame->Rgb[1] = static_cast<unsigned char>(
+                        static_cast<int>(Reader.get_value_float(2)));
+                    LastFrame->Rgb[2] = static_cast<unsigned char>(
+                        static_cast<int>(Reader.get_value_float(3)));
+                    LastFrame->Intensity = Reader.get_value_float(4);
+                    // Only a positive (or unordered) intensity is kept.
+                    if (LastFrame->Intensity <= 0.0f)
+                        LastFrame->Intensity = 0.01f;
+                    LastFrame->EndMarker = 0;
+                    Anim->append(LastFrame);
+                }
+            } while (Reader.read_value());
+        }
 
-            if (LastFrame != nullptr)
-                LastFrame->EndMarker = -1;
-            G_LightAnimations.append(Anim);
-        } while (Reader.read_header());
-    }
+        if (LastFrame != nullptr)
+            LastFrame->EndMarker = -1;
+        G_LightAnimations.append(Anim);
+    } while (Reader.read_header());
 }
 
 void LightAnimationFreeAll()
@@ -1381,18 +1377,18 @@ Light::AnimationArch* GameLightFindAnimByName(char const* Name)
     return nullptr;
 }
 
-void GameLightBindAnimKeys(FGameLightAnimSlot* Slot, Light::AnimationArch* Anim, float RangeScale,
-                           float IntensityScale, float TimeScale, float StartTime)
+void FGameLightAnimSlot::BindAnimKeys(Light::AnimationArch* Anim, float RangeScale,
+                                      float IntensityScale, float TimeScale, float StartTime)
 {
     // FUN_005388e0 — thiscall on the slot, RET 0x14.
-    if (Slot->Def != nullptr)
+    if (Def != nullptr)
     {
-        Slot->Def->KeyBuffers.append(static_cast<void*>(Slot->Keys));
-        Slot->Keys = nullptr;
-        Slot->Def = nullptr;
+        Def->KeyBuffers.append(static_cast<void*>(this->Keys));
+        this->Keys = nullptr;
+        Def = nullptr;
     }
 
-    Slot->Def = Anim;
+    Def = Anim;
     MetaNode<void>* Spare = Anim->KeyBuffers.get_head();
     Light::AnimFrame* Buffer;
     if (Spare != nullptr)
@@ -1400,82 +1396,82 @@ void GameLightBindAnimKeys(FGameLightAnimSlot* Slot, Light::AnimationArch* Anim,
     else
         Buffer = static_cast<Light::AnimFrame*>(malloc(Anim->count() * sizeof(Light::AnimFrame)));
     Anim->KeyBuffers.remove(Spare); // FUN_0043cf80; a null node is a no-op
-    Slot->Keys = Buffer;
-    Slot->KeyCount = static_cast<int>(Slot->Def->count());
+    this->Keys = Buffer;
+    KeyCount = static_cast<int>(Def->count());
 
     int Index = 0;
-    for (MetaNode<Light::AnimFrame>* Node = Slot->Def->get_head(); Node != nullptr;
+    for (MetaNode<Light::AnimFrame>* Node = Def->get_head(); Node != nullptr;
          Node = Node->Next)
     {
-        Slot->Keys[Index] = *Node->Data;
-        Slot->Keys[Index].Time *= TimeScale;
-        Slot->Keys[Index].Intensity *= IntensityScale;
+        this->Keys[Index] = *Node->Data;
+        this->Keys[Index].Time *= TimeScale;
+        this->Keys[Index].Intensity *= IntensityScale;
         ++Index;
     }
 
-    Slot->Elapsed = StartTime;
-    Slot->RangeScale = RangeScale;
-    Slot->CurrentIndex = 0;
+    Elapsed = StartTime;
+    this->RangeScale = RangeScale;
+    CurrentIndex = 0;
 
-    int const Count = Slot->KeyCount;
-    Light::AnimFrame const* const Keys = Slot->Keys;
+    int const Count = KeyCount;
+    Light::AnimFrame const* const Keys = this->Keys;
     // A last key at or before the start time (ordered) ends it here.
     if (Keys[Count - 1].Time <= StartTime)
     {
-        Slot->CurrentIndex = -1;
+        CurrentIndex = -1;
         return;
     }
     for (int Key = 0; Key < Count; ++Key)
     {
         // Keys at or after the start time (and unordered ones) are skipped.
         if (Keys[Key].Time < StartTime)
-            Slot->CurrentIndex = Key;
+            CurrentIndex = Key;
     }
 }
 
-bool GameLightAttachAnim(FGameLight* Light, Light::AnimationArch* Anim, float IntensityScale,
-                         float TimeScale, float StartTime)
+bool FGameLight::AttachAnim(Light::AnimationArch* Anim, float IntensityScale, float TimeScale,
+                            float StartTime)
 {
     // FUN_00537960.
-    GameLightBindAnimKeys(&Light->Anim, Anim, Light->D3d.Range, IntensityScale, TimeScale,
-                          StartTime);
-    bool const bBound = Light->Anim.Keys != nullptr;
+    this->Anim.BindAnimKeys(Anim, D3d.Range, IntensityScale, TimeScale,
+                            StartTime);
+    bool const bBound = this->Anim.Keys != nullptr;
     if (bBound)
-        ++Light->RefCount;
+        ++RefCount;
     return bBound;
 }
 
-void GameLightTickAnim(FGameLightAnimSlot* Slot, float Dt, FGameLight* Light)
+void FGameLightAnimSlot::TickAnim(float Dt, FGameLight* Light)
 {
     // FUN_005386d0 — thiscall on the slot, RET 8.
-    Light::AnimFrame* const Keys = Slot->Keys;
+    Light::AnimFrame* const Keys = this->Keys;
     if (Keys == nullptr)
         return;
-    if (Slot->CurrentIndex < 0)
+    if (CurrentIndex < 0)
         return;
 
-    int const Count = Slot->KeyCount;
+    int const Count = KeyCount;
     Light::AnimFrame const* const Last = &Keys[Count - 1];
     // The sum stays unrounded on the x87 stack for the compares.
-    double const Elapsed = static_cast<double>(Dt) + Slot->Elapsed;
-    Slot->Elapsed = static_cast<float>(Elapsed);
+    double const Elapsed = static_cast<double>(Dt) + this->Elapsed;
+    this->Elapsed = static_cast<float>(Elapsed);
 
     // Before the last key (or unordered) scans forward.
     if (!(Elapsed >= Last->Time))
     {
-        for (int Index = Slot->CurrentIndex; Index < Count; ++Index)
+        for (int Index = CurrentIndex; Index < Count; ++Index)
         {
             // Only a key strictly before Elapsed moves the index.
             if (Elapsed > Keys[Index].Time)
-                Slot->CurrentIndex = Index;
+                CurrentIndex = Index;
         }
     }
     else
     {
-        Slot->CurrentIndex = -1;
+        CurrentIndex = -1;
     }
 
-    int const Current = Slot->CurrentIndex;
+    int const Current = CurrentIndex;
     if (Current != -1)
     {
         Light::AnimFrame const& From = Keys[Current];
@@ -1493,61 +1489,61 @@ void GameLightTickAnim(FGameLightAnimSlot* Slot, float Dt, FGameLight* Light)
             Rgb[Channel] = static_cast<unsigned char>(
                 static_cast<int>(Delta * static_cast<double>(Blend) + From.Rgb[Channel]));
         }
-        EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb); // FUN_004115b0
+        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb); // FUN_004115b0
 
         double const Intensity =
             (static_cast<double>(To.Intensity) - From.Intensity) * Blend + From.Intensity;
-        EngineLightSetRadius((FEngineLight*)Light, static_cast<float>(Intensity * Slot->RangeScale));
+        ((FEngineLight*)Light)->SetRadius(static_cast<float>(Intensity * RangeScale));
         return;
     }
 
     if (Last->EndMarker == -1)
     {
         // FUN_005379b0, inlined in retail.
-        GameLightAnimDetach(Light);
+        Light->AnimDetach();
         return;
     }
 
-    EngineLightSetColorBytesAlt((FEngineLight*)Light, Last->Rgb);
-    EngineLightSetRadius((FEngineLight*)Light, Last->Intensity * Slot->RangeScale);
+    ((FEngineLight*)Light)->SetColorBytesAlt(Last->Rgb);
+    ((FEngineLight*)Light)->SetRadius(Last->Intensity * RangeScale);
 }
 
 I3DMathEngine* G_GameLightMath = nullptr; // DAT_006789c0
 
-void GameLightTick(FGameLight* Light, float Dt)
+void FGameLight::Tick(float Dt)
 {
     // FUN_00537860 (thiscall, RET 4). No null test on the light: both callers (the list walk
     // FUN_00538390 through vtable slot 3 and the equip light's tick) hand a live one.
-    if ((Light->Flags & kLightFlagEnabled) == 0)
+    if ((Flags & kLightFlagEnabled) == 0)
         return;
-    if (Light->EngineIndex == 0xffffffffu)
+    if (EngineIndex == 0xffffffffu)
     {
         // x87 precision: the z product is rounded to a float before its add; x and y are
         // rounded once, after theirs.
-        double const Xv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityX);
-        double const Yv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityY);
-        float const Zv = static_cast<float>(static_cast<double>(Dt) * static_cast<double>(Light->VelocityZ));
+        double const Xv = static_cast<double>(Dt) * static_cast<double>(VelocityX);
+        double const Yv = static_cast<double>(Dt) * static_cast<double>(VelocityY);
+        float const Zv = static_cast<float>(static_cast<double>(Dt) * static_cast<double>(VelocityZ));
         Vector Pos;
-        Pos.x = static_cast<float>(Xv + static_cast<double>(Light->Position.x));
-        Pos.y = static_cast<float>(Yv + static_cast<double>(Light->Position.y));
-        Pos.z = static_cast<float>(static_cast<double>(Zv) + static_cast<double>(Light->Position.z));
-        EngineLightSetPosition((FEngineLight*)Light, &Pos);
+        Pos.x = static_cast<float>(Xv + static_cast<double>(Position.x));
+        Pos.y = static_cast<float>(Yv + static_cast<double>(Position.y));
+        Pos.z = static_cast<float>(static_cast<double>(Zv) + static_cast<double>(Position.z));
+        ((FEngineLight*)this)->SetPosition(&Pos);
     }
     else
     {
         // No null test on the engine or the result.
         const float* const InstRaw = (const float*)DALib::Engine->GetInstanceTransform(
-            Light->EngineIndex);
+            EngineIndex);
         if (G_GameLightMath == nullptr)
             G_GameLightMath = Acquire3DMathEngine();
         Transform World;
         G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
-                                      Light->LocalXform);
+                                      LocalXform);
         Transform const Copy = World;
-        EngineLightSetTransform((FEngineLight*)Light, &Copy.Rotation.E[0][0], &Copy.Translation);
+        EngineLightSetTransform((FEngineLight*)this, &Copy.Rotation.E[0][0], &Copy.Translation);
     }
-    if (Light->Anim.Keys != nullptr)
-        GameLightTickAnim(&Light->Anim, Dt, Light);
+    if (Anim.Keys != nullptr)
+        Anim.TickAnim(Dt, this);
 }
 
 void GameLightTickAll(float Dt)
@@ -1670,45 +1666,45 @@ void GameLightHeapShrink()
     G_GameLightHeap.Shrink();
 }
 
-void GameLightAddRef(FGameLight* Light)
+void FGameLight::AddRef()
 {
     // FUN_00537ac0 (thiscall). No null test (every caller tests or dereferences the light
     // first).
-    Light->RefCount = Light->RefCount + 1;
+    RefCount = RefCount + 1;
 }
 
-int GameLightRelease(FGameLight* Light)
+int FGameLight::Release()
 {
     // FUN_00537ad0 (thiscall): at <= 0 the deleting destructor (vtable slot 0); the new count
     // returned. No null test.
-    int const Next = Light->RefCount - 1;
-    Light->RefCount = Next;
+    int const Next = RefCount - 1;
+    RefCount = Next;
     if (Next <= 0)
     {
-        delete Light;
+        delete this;
     }
     return Next;
 }
 
-void GameLightAnimDetach(FGameLight* Light)
+void FGameLight::AnimDetach()
 {
     // FUN_005379b0.
-    if (Light->Anim.Keys == nullptr)
+    if (Anim.Keys == nullptr)
         return;
-    if (Light->Anim.Def != nullptr)
+    if (Anim.Def != nullptr)
     {
-        Light->Anim.Def->KeyBuffers.append(static_cast<void*>(Light->Anim.Keys));
-        Light->Anim.Keys = nullptr;
-        Light->Anim.Def = nullptr;
+        Anim.Def->KeyBuffers.append(static_cast<void*>(Anim.Keys));
+        Anim.Keys = nullptr;
+        Anim.Def = nullptr;
     }
 
-    Light->Disable(); // vtable slot 2
-    int const Remaining = --Light->RefCount;
+    Disable(); // vtable slot 2
+    int const Remaining = --RefCount;
     if (Remaining <= 0)
-        delete Light; // vtable slot 0
+        delete this; // vtable slot 0
 }
 
-void GameLightLoad(FGameLight* Light, INI_Reader* Reader)
+void FGameLight::Load(INI_Reader* Reader)
 {
     // FUN_00537a40 — __thiscall, RET 4: every value of the [LightSource] section goes to
     // FUN_00411690 (value string fetched before the key name, as retail does), then vtable
@@ -1717,24 +1713,14 @@ void GameLightLoad(FGameLight* Light, INI_Reader* Reader)
     {
         char const* const Value = Reader->get_value_string();
         char const* const Name = Reader->get_name_ptr();
-        EngineLightReadValue((FEngineLight*)Light, Name, Value);
+        ((FEngineLight*)this)->ReadValue(Name, Value);
     }
-    Light->Enable(); // vtable slot 1
+    Enable(); // vtable slot 1
 }
 
 FEngineLight::~FEngineLight()
 {
     DestructLightBody(this);
-}
-
-bool FEngineLight::Enable()
-{
-    return EngineLightRegister(this);
-}
-
-void FEngineLight::Disable()
-{
-    EngineLightUnregister(this);
 }
 
 FGameLight::~FGameLight()
@@ -1753,17 +1739,3 @@ void FGameLight::operator delete(void* Memory)
     G_GameLightHeap.Free(Memory);
 }
 
-bool FGameLight::Enable()
-{
-    return GameLightEnable(this);
-}
-
-void FGameLight::Disable()
-{
-    GameLightDisable(this);
-}
-
-void FGameLight::Tick(float Dt)
-{
-    GameLightTick(this, Dt);
-}

@@ -129,10 +129,10 @@ void FObjectProp::DrawOpaque(ICamera* /*Camera*/)
     // A type-5 prop first casts its shadow (FUN_0044b370).
     if (Type == PetalCategoryEquipmentCart)
     {
-        RoomControlDrawShadow(Owner, static_cast<unsigned long>(GetEngineInstance()), 0,
-                              0);
+        Owner->DrawShadow(static_cast<unsigned long>(GetEngineInstance()), 0,
+                          0);
     }
-    RoomControlDrawObject(Owner, this); // FUN_0044af60
+    Owner->DrawObject(this); // FUN_0044af60
 }
 
 void FObjectProp::DrawTranslucent(ICamera* Camera)

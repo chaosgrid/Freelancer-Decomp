@@ -232,7 +232,7 @@ void IVP_Compact_Ledge_Solver::give_world_coords_AT(const IVP_Compact_Edge* Edge
                                                     IVP_U_Point* OutWorld)
 {
     const IVP_U_Float_Point* const Point = Cache->compact_poly_points + Edge->GetStartPointIndex();
-    IVP_TransformSlotToWorldSpace(Cache->cache_object, reinterpret_cast<const IVP_U_Point*>(Point), OutWorld);
+    Cache->cache_object->transform_slot_to_world_space(reinterpret_cast<const IVP_U_Point*>(Point), OutWorld);
 }
 
 // FUN_0635af70, cdecl. Rotates by M, then by O transposed; double throughout, each output
@@ -399,16 +399,16 @@ int32_t IVP_Compact_Ledge_Solver::calc_unscaled_KK_vals(const IVP_KK_Input* In, 
         IVP_U_Point Pos;
         Pos.set_interpolate(&In->K_Los[0], &In->K_Los[1], T);
         const double QuadDist = quad_dist_edge_to_point_K_space(LedgeL, In->L, &Pos);
-        if (!(QuadDist >= MinQuadDist))
-        {
-            MinQuadDist = (float)(QuadDist);
-            OutResult->checks_K[0] = T;
-            OutResult->checks_K[1] = (float)(1.0 - (double)(T));
-            IVP_Unscaled_S_Result S;
-            calc_unscaled_s_val_K_space(LedgeL, In->L, &Pos, &S);
-            OutResult->checks_L[0] = S.Checks[0];
-            OutResult->checks_L[1] = S.Checks[1];
-        }
+        if (QuadDist >= MinQuadDist)
+            continue;
+
+        MinQuadDist = (float)(QuadDist);
+        OutResult->checks_K[0] = T;
+        OutResult->checks_K[1] = (float)(1.0 - (double)(T));
+        IVP_Unscaled_S_Result S;
+        calc_unscaled_s_val_K_space(LedgeL, In->L, &Pos, &S);
+        OutResult->checks_L[0] = S.Checks[0];
+        OutResult->checks_L[1] = S.Checks[1];
     }
 
     IVP_U_Point L0InK;
@@ -423,16 +423,16 @@ int32_t IVP_Compact_Ledge_Solver::calc_unscaled_KK_vals(const IVP_KK_Input* In, 
         IVP_U_Point Pos;
         Pos.set_interpolate(&L0InK, &L1InK, T);
         const double QuadDist = quad_dist_edge_to_point_K_space(LedgeK, In->K, &Pos);
-        if (!(QuadDist >= MinQuadDist))
-        {
-            MinQuadDist = (float)(QuadDist);
-            OutResult->checks_L[0] = T;
-            OutResult->checks_L[1] = (float)(1.0 - (double)(T));
-            IVP_Unscaled_S_Result S;
-            calc_unscaled_s_val_K_space(LedgeK, In->K, &Pos, &S);
-            OutResult->checks_K[0] = S.Checks[0];
-            OutResult->checks_K[1] = S.Checks[1];
-        }
+        if (QuadDist >= MinQuadDist)
+            continue;
+
+        MinQuadDist = (float)(QuadDist);
+        OutResult->checks_L[0] = T;
+        OutResult->checks_L[1] = (float)(1.0 - (double)(T));
+        IVP_Unscaled_S_Result S;
+        calc_unscaled_s_val_K_space(LedgeK, In->K, &Pos, &S);
+        OutResult->checks_K[0] = S.Checks[0];
+        OutResult->checks_K[1] = S.Checks[1];
     }
     return 0;
 }

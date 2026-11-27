@@ -65,7 +65,7 @@ unsigned short* CliAsteroidSlot1bcBody(unsigned short* Out);
 // MedAsteroid gameobjs of its live asteroids. Retail value 0x50 bytes (node +0x10 .. +0x5f).
 struct FCliAsteroidCube
 {
-    // Inlined in CliAsteroidUpdate: the inner map (FUN_004b6800), CubeId = 0, CubeSize = 0xfa;
+    // Inlined in FCliAsteroid::Update: the inner map (FUN_004b6800), CubeId = 0, CubeSize = 0xfa;
     // Cube, Orient and Pos are left as the stack held them.
     FCliAsteroidCube();
     // FUN_00526a40 -- memberwise.
@@ -97,8 +97,6 @@ typedef std::map<unsigned long, FCliAsteroidCube> FCliAsteroidCubeMap;
 
 // The map in FCliAsteroid::CubeMapStorage.
 FCliAsteroidCubeMap& CliAsteroidCubeMap(FCliAsteroid* Field);
-// FUN_005274a0, inlined in the field constructor -- placement construction into CubeMapStorage.
-void CliAsteroidCubeMapConstruct(FCliAsteroid* Field);
 // The field destructor's FUN_00527310 and inline head free -- erase every cube (each value's
 // destructor runs), then the map's own destructor. FUN_00520500 is the EH-unwind copy of the
 // same body.

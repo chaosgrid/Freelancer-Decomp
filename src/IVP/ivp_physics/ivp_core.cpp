@@ -281,54 +281,54 @@ void IVP_Core::remove_object(IVP_Real_Object* Object)
 {
     int RemovedIndex = Objects.RemoveElement(Object);
 
-    if (Objects.n_elems == 0)
+    if (Objects.n_elems != 0)
+        return;
+
+    // FUN_06346f20 compares MovementState's low byte against 8 SIGNED (0x80-0xFF
+    // count as "< 8").
+    if (static_cast<int8_t>(MovementState & 0xFF) < IVP_MT_NOT_SIM)
     {
-        // FUN_06346f20 compares MovementState's low byte against 8 SIGNED (0x80-0xFF
-        // count as "< 8").
-        if (static_cast<int8_t>(MovementState & 0xFF) < IVP_MT_NOT_SIM)
-        {
-            freeze_simulation_core(); // :06346f87 FUN_06347040 (its object loop is empty here)
-        }
-
-        // IVP_Core::~IVP_Core() (FUN_063477e0), four steps before the vector buffers
-        // (which `delete Core` frees through IVP_U_Vector's destructor).
-
-        // Step 1: dequeue Core from Environment->event_queue (clears Flags 0x30).
-        Environment->dequeue_core(this);
-
-        // Step 2: (Flags & 0xC) == 4 -> destroy ObjectHashMap (FUN_06352620) and
-        // free it (FUN_06391d5a). Otherwise every controller gets
-        // core_is_going_to_be_deleted_event(Core) (vtable slot 0).
-        if ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
-        {
-            if (ObjectHashMap != nullptr)
-            {
-                ((IVP_VHash_Store*)ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
-                free(ObjectHashMap); // FUN_06391d5a
-                ObjectHashMap = nullptr;
-            }
-        }
-        else
-        {
-            int ControllerCount = Controllers.Len();
-            for (int i = ControllerCount - 1; i >= 0; --i) // :06347839-06347852, count read once, elems re-read, no null test
-            {
-                Controllers.ElementAt(i)->core_is_going_to_be_deleted_event(this);
-            }
-        }
-
-        // Step 3: detach from the owning sim unit (FUN_06348cb0).
-        if (OwningSimUnit != nullptr)
-        {
-            OwningSimUnit->detach_core(this);
-        }
-
-        // Step 4: free SpinClipping (+0x4c) unconditionally (FUN_06391d5a).
-        free(SpinClipping);
-        SpinClipping = nullptr;
-
-        delete this;
+        freeze_simulation_core(); // :06346f87 FUN_06347040 (its object loop is empty here)
     }
+
+    // IVP_Core::~IVP_Core() (FUN_063477e0), four steps before the vector buffers
+    // (which `delete Core` frees through IVP_U_Vector's destructor).
+
+    // Step 1: dequeue Core from Environment->event_queue (clears Flags 0x30).
+    Environment->dequeue_core(this);
+
+    // Step 2: (Flags & 0xC) == 4 -> destroy ObjectHashMap (FUN_06352620) and
+    // free it (FUN_06391d5a). Otherwise every controller gets
+    // core_is_going_to_be_deleted_event(Core) (vtable slot 0).
+    if ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
+    {
+        if (ObjectHashMap != nullptr)
+        {
+            ((IVP_VHash_Store*)ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
+            free(ObjectHashMap); // FUN_06391d5a
+            ObjectHashMap = nullptr;
+        }
+    }
+    else
+    {
+        int ControllerCount = Controllers.Len();
+        for (int i = ControllerCount - 1; i >= 0; --i) // :06347839-06347852, count read once, elems re-read, no null test
+        {
+            Controllers.ElementAt(i)->core_is_going_to_be_deleted_event(this);
+        }
+    }
+
+    // Step 3: detach from the owning sim unit (FUN_06348cb0).
+    if (OwningSimUnit != nullptr)
+    {
+        OwningSimUnit->detach_core(this);
+    }
+
+    // Step 4: free SpinClipping (+0x4c) unconditionally (FUN_06391d5a).
+    free(SpinClipping);
+    SpinClipping = nullptr;
+
+    delete this;
 }
 
 // ============================================================================
@@ -666,13 +666,13 @@ void IVP_Core::recalc_interpolated_frame()
     MWorldFCore.vv.z = (float)((double)(Elapsed) * DeltaWorldFCore.z + PosWorldFCore.z);
     MWorldFCore.vv.x = (float)((double)(Elapsed) * DeltaWorldFCore.x + PosWorldFCore.x);
 
-    if ((Flags & IVP_CORE_ROT_INERTIAS_ARE_EQUAL) == 0)
-    {
-        const float TwoIDeltaTime = (float)((double)(IDeltaTime) + IDeltaTime);
-        RotSpeed.x = (float)(std::asin((double)(DeltaQuat.x)) * TwoIDeltaTime);
-        RotSpeed.y = (float)(std::asin((double)(DeltaQuat.y)) * TwoIDeltaTime);
-        RotSpeed.z = (float)(std::asin((double)(DeltaQuat.z)) * TwoIDeltaTime);
-    }
+    if ((Flags & IVP_CORE_ROT_INERTIAS_ARE_EQUAL) != 0)
+        return;
+
+    const float TwoIDeltaTime = (float)((double)(IDeltaTime) + IDeltaTime);
+    RotSpeed.x = (float)(std::asin((double)(DeltaQuat.x)) * TwoIDeltaTime);
+    RotSpeed.y = (float)(std::asin((double)(DeltaQuat.y)) * TwoIDeltaTime);
+    RotSpeed.z = (float)(std::asin((double)(DeltaQuat.z)) * TwoIDeltaTime);
 }
 
 // FUN_063563d0, Ipion IVP_Core::grow_friction_system:

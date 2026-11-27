@@ -403,13 +403,13 @@ void CSolar::configure_system_gate(char const* AnimName)
     GateAnim.Index = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->get_script_index()),
                                              this->EngineInstanceId, AnimName,
                                              nullptr, nullptr);
-    if (GateAnim.Index == -1)
-    {
-        FDUMP(kFdumpError,
-              "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
-              "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0xe3, AnimName,
-              Archetype->Nickname.get_string());
-    }
+    if (GateAnim.Index != -1)
+        return;
+
+    FDUMP(kFdumpError,
+          "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
+          "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0xe3, AnimName,
+          Archetype->Nickname.get_string());
 }
 
 int CSolar::update(float Dt, unsigned Flags)

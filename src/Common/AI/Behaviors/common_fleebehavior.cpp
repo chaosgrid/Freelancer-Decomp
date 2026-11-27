@@ -377,7 +377,7 @@ void FleeBehavior::OnDisengage()
         if (DockDelegate == nullptr)
             return;
         DockDelegate->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(DockDelegate);                            // FUN_062d21c0
+        DockDelegate->ReleaseDirectiveTarget();                            // FUN_062d21c0
         IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
         if (Current != nullptr &&
             Current->GetBehaviorId() == BEHAVIOR_DOCK &&

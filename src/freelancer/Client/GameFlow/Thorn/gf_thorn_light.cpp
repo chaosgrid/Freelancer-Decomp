@@ -51,7 +51,7 @@ namespace
         Matrix const LookOrient = LookMatrixYup(Look);
         FEngineLight* const Light = EngineLightOf(Self.Wrapper);
         if (Light != nullptr)
-            EngineLightSetOrientation(Light, &LookOrient.E[0][0]);
+            Light->SetOrientation(&LookOrient.E[0][0]);
     }
 }
 
@@ -81,7 +81,7 @@ GENRESULT DACOM_API FThornLight::SetTransform(const Transform* Transform12)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, &Transform12->Translation);
+        Light->SetPosition(&Transform12->Translation);
     memcpy(&Orient, Transform12, sizeof(Orient));
     PushLightOrientation(*this);
     return GR_OK;
@@ -101,12 +101,12 @@ GENRESULT DACOM_API FThornLight::GetTransform(Transform* OutTransform12)
     return GR_OK;
 }
 
-// LAB_00453130. EngineLightSetPosition is FUN_00410ef0.
+// LAB_00453130. FEngineLight::SetPosition is FUN_00410ef0.
 GENRESULT DACOM_API FThornLight::SetPosition(const Vector* Position)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, Position);
+        Light->SetPosition(Position);
     return GR_OK;
 }
 
@@ -146,12 +146,12 @@ GENRESULT DACOM_API FThornLight::SetOn(int On)
     return GR_OK;
 }
 
-// LAB_004533d0. EngineLightSetLight is FUN_00411120.
+// LAB_004533d0. FEngineLight::SetLight is FUN_00411120.
 GENRESULT DACOM_API FThornLight::SetLight(void const* D3dLight8)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetLight(Light, static_cast<FD3dLight8 const*>(D3dLight8));
+        Light->SetLight(static_cast<FD3dLight8 const*>(D3dLight8));
     return GR_OK;
 }
 

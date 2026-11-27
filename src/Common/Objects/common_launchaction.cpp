@@ -93,14 +93,14 @@ LaunchAction::~LaunchAction()
     // member destructor runs after this body.
     IObjRW* Dock = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
 
-    if (Dock != nullptr)
+    if (Dock == nullptr)
+        return;
+
+    IBehaviorManager* BM = GetBehaviorManager(Dock);
+    if (BM != nullptr)
     {
-        IBehaviorManager* BM = GetBehaviorManager(Dock);
-        if (BM != nullptr)
-        {
-            // Same +0x18 DirectiveCallback adjustment as set_directive_callback in Start.
-            BM->clear_directive_callback(this);
-        }
+        // Same +0x18 DirectiveCallback adjustment as set_directive_callback in Start.
+        BM->clear_directive_callback(this);
     }
 }
 

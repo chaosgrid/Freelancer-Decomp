@@ -61,7 +61,6 @@ float Behavior_GetProjectedThrottle(IObjInspect const* Obj, float Value, ThrustE
 // Behavior-family object and +0x28 the Flags28 byte FormationBehavior::OnApplyDirective
 // (LAB_062cd630) sets bit 0x2 of.
 class Behavior;
-void Behavior_ReleaseDirectiveTarget(Behavior* Target);
 
 // FUN_062e5af0. Same shape as Behavior_GetProjectedThrottle on slot 0xd8,
 // IObjInspect::get_speed(float, ThrustEquipType).
@@ -152,15 +151,15 @@ Transform const* Behavior_GetTransform(void* Node);
 // dereferenced unconditionally. Only caller: EvadeBehavior::OnUpdate mode 4. Retail names
 // unknown.
 struct SystemManagerTimerTable;
-bool TimerTableMissileWithinReaction00(SystemManagerTimerTable const* Self);   // FUN_062e8910
-bool TimerTableMissileWithinReaction04(SystemManagerTimerTable const* Self);   // FUN_062e8940
-bool TimerTableMissileWithinReaction08(SystemManagerTimerTable const* Self);   // FUN_062e8970
+   // FUN_062e8910
+   // FUN_062e8940
+   // FUN_062e8970
 
 // ============================================================================
 // Behavior::Flags28 (+0x28) bits.
 enum EBehaviorFlags28
 {
-    // Set by Behavior_ReleaseDirectiveTarget (FUN_062d21c0) and by the behaviors' own
+    // Set by Behavior::ReleaseDirectiveTarget (FUN_062d21c0) and by the behaviors' own
     // disengage paths (`Flags28 |= 1; OnDisengage(); Flags28 &= ~2`); cleared by OnEngage
     // (FUN_062d20d0). A behavior that sees it on its next OnUpdate finishes with result 2.
     kBehaviorFlagDisengageRequested = 0x1,
@@ -380,10 +379,12 @@ public:
     float DeltaTime;                // +0x1c
     IBehaviorManager* BehaviorMgr;  // +0x20, the owning manager (binder); not written by the ctor
     SystemManager* SysMgr;          // +0x24, the owner's SystemManager (binder)
-    // +0x28: bit 0x1 is cleared by OnEngage and set by Behavior_ReleaseDirectiveTarget; bit 0x2
+    // +0x28: bit 0x1 is cleared by OnEngage and set by Behavior::ReleaseDirectiveTarget; bit 0x2
     // is set by the slot-10 overrides that accept a directive and cleared by cancel_notify.
     unsigned char Flags28;          // +0x28
     unsigned char Flag29;           // +0x29, cleared by OnDisengage; slot 5 answers 3 while set
+
+    void ReleaseDirectiveTarget();
 };
 static_assert(offsetof(Behavior, TypeId) == 0x04, "Behavior::TypeId offset");
 static_assert(offsetof(Behavior, OwnerId) == 0x08, "Behavior::OwnerId offset");

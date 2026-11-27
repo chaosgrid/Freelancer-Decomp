@@ -509,31 +509,31 @@ void* IVP_VHash_Store::FindElem(void* Key, unsigned HashIndex)
 void IVP_VHash_Store::ChangeElem(void* Key, void* NewValue)
 {
     unsigned crc = IVP_Crc32HashKey((unsigned)Key);
-    if (Size > 0)
+    if (Size <= 0)
+        return;
+
+    unsigned hash = crc | 0x80000000;
+    unsigned idx = hash;
+    int probes = 0;
+    for (;;)
     {
-        unsigned hash = crc | 0x80000000;
-        unsigned idx = hash;
-        int probes = 0;
-        for (;;)
+        idx = static_cast<unsigned>(SizeMm) & idx;
+        FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+        FVHashStoreElem* slot = &buckets[idx];
+        probes = probes + 1;
+        if (slot->value == nullptr)
         {
-            idx = static_cast<unsigned>(SizeMm) & idx;
-            FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
-            FVHashStoreElem* slot = &buckets[idx];
-            probes = probes + 1;
-            if (slot->value == nullptr)
-            {
-                return;
-            }
-            if (((slot->hash | 0x80000000) == hash) && (slot->key == Key))
-            {
-                slot->value = NewValue;
-                return;
-            }
-            idx = idx + 1;
-            if (Size <= probes)
-            {
-                return;
-            }
+            return;
+        }
+        if (((slot->hash | 0x80000000) == hash) && (slot->key == Key))
+        {
+            slot->value = NewValue;
+            return;
+        }
+        idx = idx + 1;
+        if (Size <= probes)
+        {
+            return;
         }
     }
 }

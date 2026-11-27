@@ -224,7 +224,7 @@ void PhysicalSystem::AddRef()
     // retail.
     float const PsiTime = 1.0f / PhySys::PHYSICAL_SIM_RATE;
     G_IVP_MindistSettings.max_spawned_mindist_count = PhySys::MAX_SPAWNED_MINDIST_COUNT;
-    IVP_Environment_SetDeltaPsiTime(Environment, PsiTime);
+    Environment->set_delta_PSI_time(PsiTime);
 
     IVP_Range_Manager* const RangeManager = Environment->range_manager;
     RangeManager->look_ahead_time_world = PhySys::RMGR_LOOK_AHEAD_TIME_WORLD;                 // +0x20
@@ -241,14 +241,14 @@ void PhysicalSystem::AddRef()
     // Zero gravity (the fourth float is not written).
     IVP_U_Point Gravity;
     Gravity.set(0.0f, 0.0f, 0.0f);
-    IVP_Environment_SetGravity(Environment, &Gravity);
+    Environment->set_gravity(&Gravity);
 
     // The IVP helpers take void*, so the base sub-objects are formed first (implicit upcasts:
     // IVP_Listener_Object at +0x00, IVP_Listener_Collision at +0x04).
     IVP_Listener_Object* const ObjectListener = this;
     IVP_Listener_Collision* const CollisionListener = this;
-    IVP_Environment_Append_Object_Listener(Environment, ObjectListener);
-    IVP_Environment_Add_Listener_Collision(Environment, CollisionListener);
+    Environment->add_listener_object(ObjectListener);
+    Environment->add_listener_collision(CollisionListener);
 
     Environment->anomaly_limits->MaxVelocity = PhySys::ANOM_LIMITS_MAX_VELOCITY;
     Environment->anomaly_limits->MaxAngularVelocityPerPsi = PhySys::ANOM_LIMITS_MAX_ANGULAR_VELOCITY_PER_PSI;
@@ -267,7 +267,7 @@ void PhysicalSystem::Update(float Dt)
         // Clamped only when strictly greater (NaN passes).
         if ((double)(Dt) > 0.0999)
             Dt = (float)(0.0999);
-        IVP_Environment_SimulateDTime(Environment, Dt);
+        Environment->simulate_dtime(Dt);
     }
     else
     {
@@ -278,7 +278,7 @@ void PhysicalSystem::Update(float Dt)
             // Whole 0.0999 steps, each followed by a sync of the moving objects.
             while (G_PhySysSimAccumulator > 0.0999)
             {
-                IVP_Environment_SimulateDTime(Environment, (float)(0.0999));
+                Environment->simulate_dtime((float)(0.0999));
                 G_PhySysSimAccumulator -= 0.0999;
                 FPhysicsTickScope SyncProfile(EPhysicsTickSection::SyncObjects);
                 for (std::set<CObject*>::iterator It = MovingObjects.begin(); It != MovingObjects.end(); ++It)
@@ -287,7 +287,7 @@ void PhysicalSystem::Update(float Dt)
             // The remainder, when above 1e-5f (DAT_0639c3f0).
             if (G_PhySysSimAccumulator > (double)(1.0e-5f))
             {
-                IVP_Environment_SimulateDTime(Environment, (float)(G_PhySysSimAccumulator));
+                Environment->simulate_dtime((float)(G_PhySysSimAccumulator));
             }
             G_PhySysSimAccumulator = 0.0;
         }
@@ -389,7 +389,7 @@ void PhysicalSystem::GenerateCollisions(CBeam* Beam, Vector const& Direction, fl
         // The object-space hit normal rotated to world space through the cache slot.
         IVP_NarrowPhaseCacheSlot* const Slot = HitObject->ResolveNarrowPhaseCacheSlot();
         IVP_U_Point NormalWs;
-        IVP_RotateSlotToWorldSpace(Slot, &Hit->hit_surface_direction_os, &NormalWs);
+        Slot->rotate_slot_to_world_space(&Hit->hit_surface_direction_os, &NormalWs);
         HitObject->ReleaseNarrowPhaseCacheSlot(Slot);
         Event.SurfaceNormal.x = NormalWs.x;
         Event.SurfaceNormal.y = NormalWs.y;
@@ -444,8 +444,8 @@ void PhysicalSystem::CreatePolygonBody(CObject* Object, IVP_RealObjectConstructi
         Template->Material = G_PhySysMaterial;
 
     // Object->SurfaceManager is the one BuildPartIVP_Real stores.
-    IVP_Polygon* const Body = IVP_Environment_CreatePolygon(Environment, Object->SurfaceManager, Template,
-                                                            &Rotation, &Position);
+    IVP_Polygon* const Body = Environment->create_polygon(Object->SurfaceManager, Template,
+                                                          &Rotation, &Position);
 
     Object->BodyPtr = Body;
     Object->PhysicsSystemId = SystemId;
@@ -467,7 +467,7 @@ IVP_Ball* PhysicalSystem::CreateBallBody(Vector const& Position, Matrix const& O
 
     // The radius is passed by address (FUN_0634cdf0).
     float BallRadius = Radius;
-    return IVP_Environment_CreateBall(Environment, &BallRadius, Template, &Rotation, &BallPosition);
+    return Environment->create_ball(&BallRadius, Template, &Rotation, &BallPosition);
 }
 
 // ============================================================================
@@ -508,7 +508,7 @@ void __cdecl PhySys::Shutdown(unsigned SystemId)
             IVP_Environment* const Env = System.Environment;
             if (Env != nullptr)
             {
-                IVP_Environment_Destructor(Env);
+                Env->destroy();
                 ::operator delete(Env);
             }
             System.Environment = nullptr;
@@ -519,13 +519,13 @@ void __cdecl PhySys::Shutdown(unsigned SystemId)
 
     // The material goes when the map is empty, whether or not SystemId was found; then IVP's
     // cached point-soup surface is freed (FUN_0636c7e0).
-    if (G_PhysicalSystems.empty())
-    {
-        if (G_PhySysMaterial != nullptr)
-            delete G_PhySysMaterial;
-        G_PhySysMaterial = nullptr;
-        IVP_SurfaceBuilder_Pointsoup::Cleanup();
-    }
+    if (!G_PhysicalSystems.empty())
+        return;
+
+    if (G_PhySysMaterial != nullptr)
+        delete G_PhySysMaterial;
+    G_PhySysMaterial = nullptr;
+    IVP_SurfaceBuilder_Pointsoup::Cleanup();
 }
 
 // ============================================================================

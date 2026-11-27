@@ -17,7 +17,7 @@
 #include "common_csys.h"   // Acquire3DMathEngine, MatrixColumn2 (update_current_behavior_direction)
 #include "x86math.h"       // I3DMathEngine::TransposeTransform, Vector, Matrix
 #include "common_goods.h"
-#include "common_iustategraph.h" // GetAiTargetList / GetClosestTrailingShipDistance --
+#include "common_iustategraph.h" // GetAiTargetList / SystemManagerTimerTable::GetClosestTrailingShipDistance --
                                   // the SystemManager+0x34 AI target list that
                                   // get_closest_trailing_ship tail-calls into
 
@@ -138,7 +138,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
 
     // operator_new(0x195c) + FUN_062e6260, then FUN_062e6490(Owner, this).
     Sys = new SystemManager();
-    (void)InitSystemManager(Sys, Owner, this);
+    (void)Sys->Init(Owner, this);
 
     // Build all 21 behaviours and bind each one (vtbl[1]); no null test on the
     // CREATE_BEHAVIOR result.
@@ -231,8 +231,8 @@ void ConnectBehaviorManagerObjectDb(IBehaviorManager* Self, IObjDB* ObjectDb)
         Self->BehaviorDispatchTable[Index]->SetObjectDb(Self->ObjectDb);
     }
 
-    SetSystemManagerSharedListHead(Self->Sys, ObjectDb);
-    SetPathfindObjectDb(Self->Pathfind, ObjectDb);
+    Self->Sys->SetSharedListHead(ObjectDb);
+    Self->Pathfind->SetObjectDb(ObjectDb);
 }
 
 // ============================================================================
@@ -307,9 +307,9 @@ bool IBehaviorManager::get_camera_level_status()
 
 float IBehaviorManager::get_closest_trailing_ship() const
 {
-    // 0x062d4a30: tail-call to FUN_062e7820 (GetClosestTrailingShipDistance) on the AI target
+    // 0x062d4a30: tail-call to FUN_062e7820 (SystemManagerTimerTable::GetClosestTrailingShipDistance) on the AI target
     // list at Sys+0x34. No null test; the ctor always builds Sys.
-    return GetClosestTrailingShipDistance(GetAiTargetList(Sys));
+    return GetAiTargetList(Sys)->GetClosestTrailingShipDistance();
 }
 
 IDirectiveInfo const* IBehaviorManager::get_current_directive()
@@ -529,7 +529,7 @@ void IBehaviorManager::set_personality(pub::AI::Personality const& Personality)
     Sys->PersonalityData = Personality;
     // FUN_062e6950: rebuilds the weapon fire-control config, the eleven Personality-derived
     // timer thresholds and the RepairManager's helper thresholds.
-    NotifySystemManagerPersonalityChanged(Sys);
+    Sys->NotifyPersonalityChanged();
 }
 
 void IBehaviorManager::set_ship_up_direction(Vector const& Dir)
@@ -1092,10 +1092,10 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     }
 
     // FUN_062e66c0, then FUN_062ec6b0 on Sys+0x1364.
-    UpdateSystemManager(Sys, Dt);
+    Sys->Update(Dt);
     Sys->FormationLeaders.SyncFormationLeader();
 
-    // No null test, as in retail: UpdateSystemManager has just re-resolved the iface from the
+    // No null test, as in retail: SystemManager::Update has just re-resolved the iface from the
     // live watched object.
     bool const ExternalIfaceFlag = Sys->SelfTarget.Iface->is_player();
 
@@ -1281,7 +1281,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     {
         if (Sys->Timers.IsTimer3Active() && CurrentBehaviorIndex != BEHAVIOR_FACE)   // FUN_062e8830
             bReevaluate = true;
-        if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers) && CurrentBehaviorIndex != BEHAVIOR_EVADE)
+        if (Sys->Timers.HasMissileReactionTarget() && CurrentBehaviorIndex != BEHAVIOR_EVADE)
             bReevaluate = true;
     }
 
@@ -1727,7 +1727,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
     {
     case FBehaviorManagerEvent::kEventDamageTaken:
         // FUN_062e86d0(Sys+0x34, Data).
-        AccumulateSystemManagerTimerLevel(&Sys->Timers, Data);
+        Sys->Timers.AccumulateTimerLevel(Data);
         return;
 
     case FBehaviorManagerEvent::kEventMunitionHit:
@@ -1774,7 +1774,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         if (LeftId == Sys->SelfTarget.Iface->get_id())
             Rec->SetValueB0(0);
 
-        ClearFormationLeaderWatcherIfTarget(Sys, static_cast<int>(LeftId));
+        Sys->ClearFormationLeaderWatcherIfTarget(static_cast<int>(LeftId));
 
         // Behavior slot 21 (+0x54) with the dword [Data+8].
         for (int Index = 0; Index < 21; ++Index)
@@ -1852,7 +1852,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
     case FBehaviorManagerEvent::kEventMissileLaunched:
         // FUN_062e8720(Sys+0x34, Data).
-        AppendSystemManagerTimerListEntry(&Sys->Timers, Data);
+        Sys->Timers.AppendTimerListEntry(Data);
         return;
 
     case FBehaviorManagerEvent::kEventObjectDying:

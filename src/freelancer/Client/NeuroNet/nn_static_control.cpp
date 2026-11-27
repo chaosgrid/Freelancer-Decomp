@@ -173,7 +173,7 @@ NnStaticControl::NnStaticControl()
     , RotationSpeed(0.0f)
 {
     // FUN_00587e40 after FUN_0059f860.
-    SpaceCameraConstruct(&Camera);
+    Camera.Construct();
     StartYpr[0] = 0.0f;
     StartYpr[1] = 0.0f;
     StartYpr[2] = 0.0f;
@@ -379,18 +379,18 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
                 bEnableRotation = IniFlag(Ini);
                 continue;
             }
-            if (Ini->is_value("starting_yaw_pitch_roll"))
-            {
-                float const Pitch = static_cast<float>(Ini->get_value_float(1));
-                float const Yaw = static_cast<float>(Ini->get_value_float(0));
-                float const Roll = static_cast<float>(Ini->get_value_float(2));
-                StartYpr[0] = Yaw;
-                StartYpr[1] = Pitch;
-                StartYpr[2] = Roll;
-                CurYaw = StartYpr[0];
-                CurPitch = StartYpr[1];
-                CurRoll = StartYpr[2];
-            }
+            if (!Ini->is_value("starting_yaw_pitch_roll"))
+                continue;
+
+            float const Pitch = static_cast<float>(Ini->get_value_float(1));
+            float const Yaw = static_cast<float>(Ini->get_value_float(0));
+            float const Roll = static_cast<float>(Ini->get_value_float(2));
+            StartYpr[0] = Yaw;
+            StartYpr[1] = Pitch;
+            StartYpr[2] = Roll;
+            CurYaw = StartYpr[0];
+            CurPitch = StartYpr[1];
+            CurRoll = StartYpr[2];
         }
     }
 
@@ -501,7 +501,7 @@ void NnStaticControl::Draw()
         // The instance's box projected by the Win3D camera, truncated, shrunk by two pixels and
         // flipped in y; off-screen or clipped boxes draw nothing.
         Win3DGetViewport(0xba2, SavedViewport); // FUN_00422390
-        float const* const At = (const float*)ClientMeshHolderGetPosition(&MeshHolder); // FUN_00420fb0
+        float const* const At = (const float*)MeshHolder.GetPosition(); // FUN_00420fb0
         Placed.x = At[0];
         Placed.y = At[1];
         Placed.z = At[2];
@@ -546,13 +546,13 @@ void NnStaticControl::Draw()
         // The instance moved in front of the window camera, fitted to the rect with the Win3D
         // camera's near / far (FUN_0040fb60).
         Vector const Behind = {0.0f, 0.0f, kWindowDepth};
-        ClientMeshHolderSetPosition(&MeshHolder, &Behind); // FUN_00420fd0
+        MeshHolder.SetPosition(&Behind); // FUN_00420fd0
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
-        SpaceCameraSetViewportEx(&Camera, Rect, 1); // FUN_0040fb80
+        Camera.SetViewportEx(Rect, 1); // FUN_0040fb80
         FSpaceCamera const* const SceneCamera = Win3DGetCamera();
         Camera.ZNear = SceneCamera->ZNear; // DAT_0067dc9c
         Camera.ZFar = SceneCamera->ZFar;   // DAT_0067dca0
-        SpaceCameraSetFovY(&Camera, kWindowFovY);                  // FUN_0040fa10
+        Camera.SetFovY(kWindowFovY);                  // FUN_0040fa10
         Win3DSetViewport(AsCamera(&Camera), kStaticControlCpp, 0x13d); // FUN_00422610
         Win3DApplyCameraPerspective(AsCamera(&Camera));             // FUN_00422910
         ViewCamera = &Camera;
@@ -580,13 +580,13 @@ void NnStaticControl::Draw()
             }
             else
             {
-                SubmitWin3DEngineInstance(&MeshHolder, ViewCamera, 1, Scale, 0); // FUN_0059efa0
+                MeshHolder.SubmitWin3DEngineInstance(ViewCamera, 1, Scale, 0); // FUN_0059efa0
             }
         }
         else
         {
             Win3DDisable(0xb71); // FUN_00421ed0
-            SubmitWin3DEngineInstance(&MeshHolder, ViewCamera, 0, Scale, 0);
+            MeshHolder.SubmitWin3DEngineInstance(ViewCamera, 0, Scale, 0);
         }
     }
 
@@ -612,7 +612,7 @@ void NnStaticControl::Draw()
         Win3DApplyCamera(AsCamera(Win3DGetCamera())); // FUN_00422950(&DAT_0067dbf8)
         Win3DSetViewportRect(SavedViewport[0], SavedViewport[1], SavedViewport[2],
                              SavedViewport[3], kStaticControlCpp, 0x185); // FUN_00421620
-        ClientMeshHolderSetPosition(&MeshHolder, &Placed);
+        MeshHolder.SetPosition(&Placed);
     }
     Win3DDisable(0xb71);
     PostDraw();
@@ -705,7 +705,7 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case kStaticPropSetInstance:
     {
         // A new engine instance handed in.
-        ClientUiMeshHolderRelease(&MeshHolder);
+        MeshHolder.ReleaseWithAnim();
         MeshHolder.EngineInstance = A;
         StartYpr[0] = 0.0f;
         StartYpr[1] = 0.0f;

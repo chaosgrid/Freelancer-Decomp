@@ -63,48 +63,48 @@ namespace
     }
 }
 
-void TurretCameraConstruct(FTurretCamera* Cam)
+void FTurretCamera::Construct()
 {
     // FUN_0051a210, in retail's own order: Z of the tether goes in first, then X and Y.
-    HudCameraConstruct((FHudCamera*)Cam);
+    FHudCamera::Construct();
 
-    Cam->Tether.z = 25.0f;      // 0x41c80000
-    Cam->Tether.x = 0.0f;
-    Cam->Tether.y = 5.0f;       // 0x40a00000
+    Tether.z = 25.0f;      // 0x41c80000
+    Tether.x = 0.0f;
+    Tether.y = 5.0f;       // 0x40a00000
 
-    Cam->Yaw = 0.0f;
-    Cam->TargetYaw = 0.0f;
-    Cam->Pitch = 0.0f;
-    Cam->TargetPitch = 0.0f;
-    Cam->YawKeyRate = 0.0f;
-    Cam->PitchKeyRate = 0.0f;
+    Yaw = 0.0f;
+    TargetYaw = 0.0f;
+    Pitch = 0.0f;
+    TargetPitch = 0.0f;
+    YawKeyRate = 0.0f;
+    PitchKeyRate = 0.0f;
 
-    Cam->KeyRotateRate = 0.75f;       // 0x3f400000 -- nothing in the ini can move this
-    Cam->YawRotateSpeed = 2.0f;  // 0x40000000
-    Cam->PitchRotateSpeed = 1.5f;// 0x3fc00000
-    Cam->AccelSpeed = 5.0f;      // retail reuses the register still holding Tether[1]'s 5.0f
+    KeyRotateRate = 0.75f;       // 0x3f400000 -- nothing in the ini can move this
+    YawRotateSpeed = 2.0f;  // 0x40000000
+    PitchRotateSpeed = 1.5f;// 0x3fc00000
+    AccelSpeed = 5.0f;      // retail reuses the register still holding Tether[1]'s 5.0f
 
     // +0x134 (MouseAimTime) is not written by the retail ctor: the controller lives in zeroed
     // static storage (G_SpaceApp), as the port's camera does.
 }
 
-bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4)
+bool FTurretCamera::Activate(int const* ViewRect4)
 {
     // FUN_0051a640: the five turret ids registered on the face at +0xf8, then HUDCamera's
     // activate.
     static const unsigned kTurretEvents[5] = {USER_LOOK_ROTATE_CAMERA_LEFT, USER_LOOK_ROTATE_CAMERA_RIGHT,
                                               USER_LOOK_ROTATE_CAMERA_UP, USER_LOOK_ROTATE_CAMERA_DOWN,
                                               USER_LOOK_ROTATE_CAMERA_RESET};
-    FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
+    FHudCmdHandler* const Face = AsHudCmdHandler();
     for (unsigned Index = 0; Index < 5; ++Index)
-        HudRegisterCommandHandler(Face, kTurretEvents[Index]);
-    return HudCameraActivate((FHudCamera*)Cam, ViewRect4);
+        Face->RegisterEvent(kTurretEvents[Index]);
+    return FHudCamera::Activate(ViewRect4);
 }
 
-bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float DeltaSeconds, bool)
+bool FTurretCamera::ComputeView(Transform* OutView, float DeltaSeconds, bool)
 {
     // FUN_0051a7d0. The third argument (1 from the attach, 0 from the update) is never read.
-    FHudCamera* const Hud = (FHudCamera*)Cam;
+    FHudCamera* const Hud = (FHudCamera*)this;
 
     // Not a watched ship (CObject mask 0x503) -> true.
     if (GameCameraWatchedShip(Hud) == nullptr)
@@ -121,19 +121,19 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
     {
         // Keys: the clock resets; each non-zero key rate (only an ordered zero skips) times its
         // speed and dt.
-        Cam->MouseAimTime = 0.0f;
-        if (Cam->YawKeyRate != 0.0f)
-            Yaw = static_cast<float>(static_cast<double>(Cam->YawRotateSpeed) * Cam->YawKeyRate *
+        MouseAimTime = 0.0f;
+        if (YawKeyRate != 0.0f)
+            Yaw = static_cast<float>(static_cast<double>(YawRotateSpeed) * YawKeyRate *
                                      DeltaSeconds);
-        if (Cam->PitchKeyRate != 0.0f)
-            Pitch = static_cast<double>(Cam->PitchRotateSpeed) * Cam->PitchKeyRate * DeltaSeconds;
+        if (PitchKeyRate != 0.0f)
+            Pitch = static_cast<double>(PitchRotateSpeed) * PitchKeyRate * DeltaSeconds;
     }
     else
     {
         // Left button held or mouse flight locked: the clock runs (compared unrounded); under
         // 0.25s (or unordered) nothing steers yet.
-        const double Clock = GetClientFrameTimeCapped() + Cam->MouseAimTime;
-        Cam->MouseAimTime = static_cast<float>(Clock);
+        const double Clock = GetClientFrameTimeCapped() + MouseAimTime;
+        MouseAimTime = static_cast<float>(Clock);
         if (!(Clock >= kTurretMouseAimDelay))
         {
             bSteer = false;
@@ -148,8 +148,8 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
             int CursorZ = 0;
             GetClientSoftwareCursor(&CursorX, &CursorY, &CursorZ);
             Yaw = static_cast<float>((static_cast<double>(CursorX) - HalfW) / HalfW *
-                                     Cam->YawRotateSpeed * DeltaSeconds);
-            Pitch = (static_cast<double>(CursorY) - HalfH) / HalfH * Cam->PitchRotateSpeed *
+                                     YawRotateSpeed * DeltaSeconds);
+            Pitch = (static_cast<double>(CursorY) - HalfH) / HalfH * PitchRotateSpeed *
                     DeltaSeconds;
         }
     }
@@ -158,42 +158,42 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
     if (bSteer && (Yaw != 0.0f || Pitch != 0.0))
     {
         // Yaw target (+0x110), wrapped into [0, 2*pi] by moving the current yaw (+0x10c) along.
-        const double YawTarget = static_cast<double>(Yaw) + Cam->TargetYaw;
-        Cam->TargetYaw = static_cast<float>(YawTarget);
+        const double YawTarget = static_cast<double>(Yaw) + TargetYaw;
+        TargetYaw = static_cast<float>(YawTarget);
         if (YawTarget > kTurretYawWrap)
         {
-            Cam->TargetYaw = static_cast<float>(YawTarget - kTurretYawWrap);
-            Cam->Yaw = static_cast<float>(static_cast<double>(Cam->Yaw) - kTurretYawWrap);
+            TargetYaw = static_cast<float>(YawTarget - kTurretYawWrap);
+            this->Yaw = static_cast<float>(static_cast<double>(this->Yaw) - kTurretYawWrap);
         }
         else if (YawTarget < 0.0)
         {
-            Cam->TargetYaw = static_cast<float>(YawTarget + kTurretYawWrap);
-            Cam->Yaw = static_cast<float>(static_cast<double>(Cam->Yaw) + kTurretYawWrap);
+            TargetYaw = static_cast<float>(YawTarget + kTurretYawWrap);
+            this->Yaw = static_cast<float>(static_cast<double>(this->Yaw) + kTurretYawWrap);
         }
 
         // Pitch target (+0x118), clamped to +/- pi/3.
-        const double PitchTarget = Pitch + Cam->TargetPitch;
-        Cam->TargetPitch = static_cast<float>(PitchTarget);
+        const double PitchTarget = Pitch + TargetPitch;
+        TargetPitch = static_cast<float>(PitchTarget);
         if (PitchTarget > kTurretPitchLimit)
-            Cam->TargetPitch = kTurretPitchLimit;
+            TargetPitch = kTurretPitchLimit;
         else if (PitchTarget < kTurretPitchLimitNeg)
-            Cam->TargetPitch = kTurretPitchLimitNeg;
+            TargetPitch = kTurretPitchLimitNeg;
     }
 
     // Ease the current angles towards the targets by dt * accel_speed; over 1.0f they snap.
     {
-        const double Ease = static_cast<double>(DeltaSeconds) * Cam->AccelSpeed;
+        const double Ease = static_cast<double>(DeltaSeconds) * AccelSpeed;
         if (Ease > 1.0f)
         {
-            Cam->Yaw = Cam->TargetYaw;
-            Cam->Pitch = Cam->TargetPitch;
+            this->Yaw = TargetYaw;
+            this->Pitch = TargetPitch;
         }
         else
         {
-            Cam->Yaw = static_cast<float>(
-                (static_cast<double>(Cam->TargetYaw) - Cam->Yaw) * Ease + Cam->Yaw);
-            Cam->Pitch = static_cast<float>(
-                (static_cast<double>(Cam->TargetPitch) - Cam->Pitch) * Ease + Cam->Pitch);
+            this->Yaw = static_cast<float>(
+                (static_cast<double>(TargetYaw) - this->Yaw) * Ease + this->Yaw);
+            this->Pitch = static_cast<float>(
+                (static_cast<double>(TargetPitch) - this->Pitch) * Ease + this->Pitch);
         }
     }
 
@@ -201,7 +201,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
     Matrix M;
     memcpy(&M, ShipRot, sizeof(M));
     {
-        const double Angle = -static_cast<double>(Cam->Yaw);
+        const double Angle = -static_cast<double>(this->Yaw);
         const float CosA = static_cast<float>(cos(Angle));
         const double SinA = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
@@ -214,7 +214,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
     }
     // Then by -pitch (columns 1 and 2).
     {
-        const double Angle = -static_cast<double>(Cam->Pitch);
+        const double Angle = -static_cast<double>(this->Pitch);
         const float CosB = static_cast<float>(cos(Angle));
         const double SinB = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
@@ -234,14 +234,14 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
         CameraOrientFromForwardAndUp(&Discarded, &M, &Up);
     }
 
-    HudCameraApplyShake(Hud, &M);
+    Hud->ApplyShake(&M);
 
     // The tether (+0x100) through the orientation, using DAT_00675220.
     if (G_FirstPersonMathEngine == nullptr)
         G_FirstPersonMathEngine = Acquire3DMathEngine();
     Vector Offset;
     G_FirstPersonMathEngine->TransformMatrix(Offset, M,
-                                             Cam->Tether);
+                                             Tether);
 
     // Retail re-reads the watcher.
     IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
@@ -254,39 +254,39 @@ bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float Delta
     return false;
 }
 
-void TurretCameraAttach(FTurretCamera* Cam, void* Object)
+void FTurretCamera::Attach(void* Object)
 {
     // FUN_0051a6a0 (slot 0x58). The view solve's answer is ignored.
-    Cam->Yaw = 0.0f;
-    Cam->Pitch = 0.0f;
-    Cam->TargetYaw = 0.0f;
-    Cam->TargetPitch = 0.0f;
-    HudCameraAttach((FHudCamera*)Cam, Object);
+    Yaw = 0.0f;
+    Pitch = 0.0f;
+    TargetYaw = 0.0f;
+    TargetPitch = 0.0f;
+    FHudCamera::Attach(Object);
 
     Transform View;
     MakeIdentityView(&View);
-    TurretCameraComputeView(Cam, &View, 0.0f, true);
-    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
-    StoreWorldView(Cam, &View);
+    ComputeView(&View, 0.0f, true);
+    SpaceCameraOf((FHudCamera*)this)->bViewDirty = 1;
+    StoreWorldView(this, &View);
 }
 
-void TurretCameraUpdate(FTurretCamera* Cam, float DeltaSeconds)
+void FTurretCamera::Update(float DeltaSeconds)
 {
     // FUN_0051a730 (slot 0x6c).
     Transform View;
     MakeIdentityView(&View);
-    TurretCameraComputeView(Cam, &View, DeltaSeconds, false);
-    StoreWorldView(Cam, &View);
-    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
-    HudCameraUpdate((FHudCamera*)Cam, DeltaSeconds);
+    ComputeView(&View, DeltaSeconds, false);
+    StoreWorldView(this, &View);
+    SpaceCameraOf((FHudCamera*)this)->bViewDirty = 1;
+    FHudCamera::Update(DeltaSeconds);
 }
 
-bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
+bool FTurretCamera::OnEvent(unsigned MsgId)
 {
     // FUN_0051ac20 (slot 0 of the Event::Handler face).
     if (HudIsMousePickBlocked())
         return false;
-    if (HudCameraOnEvent((FHudCamera*)Cam, MsgId))
+    if (FHudCamera::OnEvent(MsgId))
         return true;
 
     // The record's key-down byte decides between +/-KeyRotateRate and 0.
@@ -294,23 +294,23 @@ bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
     switch (MsgId)
     {
     case USER_LOOK_ROTATE_CAMERA_LEFT:
-        Cam->YawKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
+        YawKeyRate = bDown ? -KeyRotateRate : 0.0f;
         return true;
     case USER_LOOK_ROTATE_CAMERA_RIGHT:
-        Cam->YawKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
+        YawKeyRate = bDown ? KeyRotateRate : 0.0f;
         return true;
     case USER_LOOK_ROTATE_CAMERA_UP:
-        Cam->PitchKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
+        PitchKeyRate = bDown ? -KeyRotateRate : 0.0f;
         return true;
     case USER_LOOK_ROTATE_CAMERA_DOWN:
-        Cam->PitchKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
+        PitchKeyRate = bDown ? KeyRotateRate : 0.0f;
         return true;
     case USER_LOOK_ROTATE_CAMERA_RESET:
         // Recentre.
-        Cam->Yaw = 0.0f;
-        Cam->Pitch = 0.0f;
-        Cam->TargetYaw = 0.0f;
-        Cam->TargetPitch = 0.0f;
+        Yaw = 0.0f;
+        Pitch = 0.0f;
+        TargetYaw = 0.0f;
+        TargetPitch = 0.0f;
         return true;
     default:
         return false;
@@ -322,7 +322,7 @@ const char* TurretCameraGetName()
     return "Turret";             // 0x0051a2a0 -> .rdata 0x005dbd44
 }
 
-bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
+bool FTurretCamera::Load(const char* CockpitIniPath)
 {
     // FUN_0051a2b0. Same shape as the rear-view loader, four keys instead of one.
     bool bOk = true;
@@ -356,21 +356,21 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
                 const float X = Reader.get_value_float(0);
                 const float Y = Reader.get_value_float(1);
                 const float Z = Reader.get_value_float(2);
-                Cam->Tether.x = X;
-                Cam->Tether.y = Y;
-                Cam->Tether.z = Z;
+                Tether.x = X;
+                Tether.y = Y;
+                Tether.z = Z;
             }
             else if (Reader.is_value("yaw_rotate_speed"))
             {
-                Cam->YawRotateSpeed = Reader.get_value_float(0);
+                YawRotateSpeed = Reader.get_value_float(0);
             }
             else if (Reader.is_value("pitch_rotate_speed"))
             {
-                Cam->PitchRotateSpeed = Reader.get_value_float(0);
+                PitchRotateSpeed = Reader.get_value_float(0);
             }
             else if (Reader.is_value("accel_speed"))
             {
-                Cam->AccelSpeed = Reader.get_value_float(0);
+                AccelSpeed = Reader.get_value_float(0);
             }
         }
     }
@@ -383,29 +383,9 @@ char const* FTurretCamera::GetName()
     return TurretCameraGetName();
 }
 
-void FTurretCamera::Attach(void* Object)
-{
-    TurretCameraAttach(this, Object);
-}
-
-bool FTurretCamera::Activate(int const* ViewRect4)
-{
-    return TurretCameraActivate(this, ViewRect4);
-}
-
-void FTurretCamera::Update(float DeltaSeconds)
-{
-    TurretCameraUpdate(this, DeltaSeconds);
-}
-
-bool FTurretCamera::OnEvent(unsigned MsgId)
-{
-    return TurretCameraOnEvent(this, MsgId);
-}
-
 void FTurretCamera::Deactivate()
 {
-    HudCameraDerivedDeactivate(this);
+    DerivedDeactivate();
 }
 
 void FTurretCamera::DrawScene(unsigned LayerFlags, unsigned Param2)

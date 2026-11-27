@@ -121,7 +121,7 @@ void FSystemZoneEnumerator::OnZone(unsigned int const* ZoneId, INI_Reader* Reade
     FZonePathLabel PathLabel;
     PathLabel.Label.clear();
 
-    if (ParseSystemZone(&Zone, Reader, &PathLabel, bLoadEncounters))
+    if (Zone.Parse(Reader, &PathLabel, bLoadEncounters))
     {
         Zones->insert(Zones->end(), 1, Zone);
         if (PathLabels != nullptr && PathLabel.ZoneId != 0)
@@ -144,38 +144,37 @@ namespace
 }
 
 // FUN_06fa7980.
-bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* PathLabel,
-                     bool bLoadEncounters)
+bool FSystemZone::Parse(INI_Reader* Reader, FZonePathLabel* PathLabel, bool bLoadEncounters)
 {
     while (Reader->read_value())
     {
         if (Reader->is_value("nickname"))
         {
-            Zone->Nickname.Id = CreateID(Reader->get_value_string());
+            Nickname.Id = CreateID(Reader->get_value_string());
             if (strstr(Reader->get_value_string(), "Tradelane") != nullptr)
             {
                 ZoneShape Shape;
-                pub::Zone::GetShape(Zone->ZoneId, Shape);
+                pub::Zone::GetShape(ZoneId, Shape);
                 if (Shape == ZONE_SHAPE_BOX)
                 {
                     Vector Size;
-                    pub::Zone::GetSize(Zone->ZoneId, Size);
+                    pub::Zone::GetSize(ZoneId, Size);
                     // DAT_06fb4438 = 10.0f; unordered skips. The product stays on the x87
                     // stack (not rounded to float).
                     if (static_cast<double>(Size.x) * 10.0 < static_cast<double>(Size.z) &&
                         static_cast<double>(Size.y) * 10.0 < static_cast<double>(Size.z))
-                        Zone->bTradelane = true;
+                        bTradelane = true;
                 }
             }
             else if (strstr(Reader->get_value_string(), "vignette") != nullptr)
             {
-                Zone->bLawful = true;
+                bLawful = true;
             }
         }
         else if (Reader->is_value("path_label"))
         {
             // Label, then unique path indices from value 1 on.
-            PathLabel->ZoneId = Zone->ZoneId;
+            PathLabel->ZoneId = ZoneId;
             PathLabel->Label.Id = CreateID(Reader->get_value_string(0));
             AddUniqueIndex(&PathLabel->Indices, Reader->get_value_int(1));
             unsigned int Index = 2;
@@ -208,51 +207,51 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (Reader->is_value("density"))
         {
-            Zone->Population.Density = Reader->get_value_int(0);
+            Population.Density = Reader->get_value_int(0);
         }
         else if (Reader->is_value("repop_time"))
         {
             // A value <= 0 becomes 1.0 (NaN stays).
-            Zone->Population.RepopTime = Reader->get_value_float(0);
-            if (Zone->Population.RepopTime <= 0.0f)
-                Zone->Population.RepopTime = 1.0f;
+            Population.RepopTime = Reader->get_value_float(0);
+            if (Population.RepopTime <= 0.0f)
+                Population.RepopTime = 1.0f;
         }
         else if (Reader->is_value("mission_type"))
         {
             // bUnlawful is not reset first.
-            Zone->bLawful = false;
+            bLawful = false;
             unsigned int Index = 0;
             while (!Reader->is_value_empty(Index))
             {
                 if (_stricmp(Reader->get_value_string(Index), "unlawful") == 0)
-                    Zone->bUnlawful = true;
+                    bUnlawful = true;
                 else if (_stricmp(Reader->get_value_string(Index), "lawful") == 0)
-                    Zone->bLawful = true;
+                    bLawful = true;
                 ++Index;
             }
-            if (!Zone->bUnlawful && !Zone->bLawful)
-                Zone->bLawful = true;
+            if (!bUnlawful && !bLawful)
+                bLawful = true;
         }
         else if (Reader->is_value("vignette_type"))
         {
             if (_stricmp(Reader->get_value_string(0), "field") == 0)
-                Zone->VignetteType = kVignetteZoneField;
+                VignetteType = kVignetteZoneField;
             else if (_stricmp(Reader->get_value_string(0), "exclusion") == 0)
-                Zone->VignetteType = kVignetteZoneExclusion;
+                VignetteType = kVignetteZoneExclusion;
             else
-                Zone->VignetteType = kVignetteZoneOpen;
+                VignetteType = kVignetteZoneOpen;
         }
         else if (bLoadEncounters)
         {
             // The return value is not used.
-            Zone->Population.ParseValue(Reader, Zone->System, Zone);
+            Population.ParseValue(Reader, System, this);
         }
     }
 
     if (bLoadEncounters)
-        Zone->bUnpopulated = !Zone->Population.bHasPopulationKeys && PathLabel->ZoneId == 0;
+        bUnpopulated = !Population.bHasPopulationKeys && PathLabel->ZoneId == 0;
 
-    if (Zone->bUnpopulated && PathLabel->ZoneId == 0 && !Zone->bLawful && !Zone->bUnlawful)
+    if (bUnpopulated && PathLabel->ZoneId == 0 && !bLawful && !bUnlawful)
         return false;
     return true;
 }

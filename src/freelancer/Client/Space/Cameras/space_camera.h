@@ -106,6 +106,52 @@ struct FSpaceCamera : ICamera
     int    Viewport[4];
     unsigned char FlagBC;       // +0x0bc  ctor sets 0
     unsigned char Pad0BD[3];
+
+    // FUN_0040f150: explicit field initialization; the C++ object already owns its vptr.
+    void Construct();
+
+    // FUN_0040f8c0 -- a NON-virtual method, not a vtable slot. Takes the HALF horizontal angle in
+    // degrees, stores it at +0x98, derives the vertical half-angle at +0x9c through the live aspect
+    // and rebuilds both frustum planes and both screen scales. The ctor and the "fovx" branch of
+    // FUN_0040f5f0 are inlined copies of exactly this; the GameCamera ctor (0x0051b2f0) calls it.
+    void SetHalfFovX(float HalfFovXDeg);
+
+    // FUN_0040fa10 -- the vertical twin of the one above (thiscall, RET 4): stores
+    // FovYDeg at +0x9c, derives the horizontal half-angle at +0x98 through the live aspect, then
+    // rebuilds both frustum planes and both screen scales. The "fovy" branch of FUN_0040f5f0 is an
+    // inlined copy; ShipViewControl's draw (0x00584509) calls it.
+    void SetFovY(float FovYDeg);
+
+    // FUN_0040fd60 -- the other non-virtual rebuild, and the mirror image of the one above: the
+    // HALF-FOV is held fixed and the VIEWPORT changes, so the aspect comes out of the rectangle
+    // rather than out of the ini. Stores the four edges at +0xac, derives the aspect, both
+    // half-extents, the screen centre and the vertical half-angle, then rebuilds the two frustum
+    // planes and both screen scales.
+    //
+    // ViewRect4 is Common's ViewRect: left, top, right, bottom, INCLUSIVE (extents are
+    // `right - left + 1` and `bottom - top + 1`).
+    //
+    // Always returns true; retail's callers (FGameCamera's activate slot) still branch on it.
+    bool SetViewport(const int* ViewRect4);
+
+    // FUN_0040fb80 -- byte for byte the same body as FUN_0040fd60 with two differences: it takes a
+    // second argument and it returns nothing. The second argument is never read. Both overloads
+    // survived into the shipped build, so both are here.
+    void SetViewportEx(const int* ViewRect4, int UnusedFlag);
+
+    // FUN_0040fb60 -- ZNear (+0xa4) and ZFar (+0xa8) written.
+    void SetNearFar(float ZNear, float ZFar);
+
+    // FUN_0051c970 / FUN_0051c9e0 -- with options 0x25, 0x24 and 0x28 all
+    // on, walk FUN_0050c620()'s environment-effect list around the first-person cockpit draw:
+    // before, slot 0x10 (camera, 1.0f) on each entry, or +0x34 = 1.0f when fully inside a field;
+    // after, slot 0x14 (camera, 1.0f). The first-person scene slot FUN_00518420 calls both.
+    void EnvFxBeginCockpitPass();
+    void EnvFxEndCockpitPass();
+
+    // FUN_004bdd40 (thiscall on the camera) -- the camera-space point on the near plane under a
+    // screen pixel: ((x - cx) * (znear / xscale), (y - cy) * (znear / yscale), -znear).
+    void ScreenToNearPlane(Vector& Out, float ScreenX, float ScreenY) const;
 };
 
 // The base ctor's highest write is the byte at +0xbc, and the third-person camera derived from
@@ -115,49 +161,12 @@ static_assert(sizeof(FSpaceCamera) == 0xc0, "FSpaceCamera must be 0xc0");
 
 inline ICamera* AsCamera(FSpaceCamera* Cam) { return Cam; }
 
-// FUN_0040f150: explicit field initialization; the C++ object already owns its vptr.
-void SpaceCameraConstruct(FSpaceCamera* Cam);
-
-// FUN_0040f8c0 -- a NON-virtual method, not a vtable slot. Takes the HALF horizontal angle in
-// degrees, stores it at +0x98, derives the vertical half-angle at +0x9c through the live aspect
-// and rebuilds both frustum planes and both screen scales. The ctor and the "fovx" branch of
-// FUN_0040f5f0 are inlined copies of exactly this; the GameCamera ctor (0x0051b2f0) calls it.
-void SpaceCameraSetHalfFovX(FSpaceCamera* Cam, float HalfFovXDeg);
-
-// FUN_0040fa10 -- the vertical twin of the one above (thiscall, RET 4): stores
-// FovYDeg at +0x9c, derives the horizontal half-angle at +0x98 through the live aspect, then
-// rebuilds both frustum planes and both screen scales. The "fovy" branch of FUN_0040f5f0 is an
-// inlined copy; ShipViewControl's draw (0x00584509) calls it.
-void SpaceCameraSetFovY(FSpaceCamera* Cam, float FovYDeg);
-
-// FUN_0040f5f0 -- the base SetProperty ("fovx" / "fovy" / "znear" / "zfar"; nonzero when the key
-// was one of them), called DIRECTLY, not through slot 0x4c: the GameCamera override
-// (0x0051b3fe) calls the base body this way. Through the vtable it is ICamera::SetProperty.
-int SpaceCameraSetProperty(FSpaceCamera* Cam, const char* Key, const char* Value);
-
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
 // Port-only (widescreen.h): the Hor+ factor for this camera's stored viewport. Under the define
 // +0x98 is the horizontal half-angle on a 4:3 surface; the planes, XScale and +0x9c use
 // tan(+0x98) times this factor.
 double SpaceCameraHorPlusScale(const FSpaceCamera* Cam);
 #endif
-
-// FUN_0040fd60 -- the other non-virtual rebuild, and the mirror image of the one above: the
-// HALF-FOV is held fixed and the VIEWPORT changes, so the aspect comes out of the rectangle
-// rather than out of the ini. Stores the four edges at +0xac, derives the aspect, both
-// half-extents, the screen centre and the vertical half-angle, then rebuilds the two frustum
-// planes and both screen scales.
-//
-// ViewRect4 is Common's ViewRect: left, top, right, bottom, INCLUSIVE (extents are
-// `right - left + 1` and `bottom - top + 1`).
-//
-// Always returns true; retail's callers (FGameCamera's activate slot) still branch on it.
-bool SpaceCameraSetViewport(FSpaceCamera* Cam, const int* ViewRect4);
-
-// FUN_0040fb80 -- byte for byte the same body as FUN_0040fd60 with two differences: it takes a
-// second argument and it returns nothing. The second argument is never read. Both overloads
-// survived into the shipped build, so both are here.
-void SpaceCameraSetViewportEx(FSpaceCamera* Cam, const int* ViewRect4, int UnusedFlag);
 
 // The eight camera slots FUN_00549e70 selects between, at their retail offsets inside the
 // in-flight controller (the `this` of FUN_00549e70).

@@ -113,9 +113,6 @@ static_assert(offsetof(FTexturePanels, bLoaded) == 0x74, "bLoaded +0x74");
 
 FTexturePanels* TexturePanelsCreate(); // FUN_0050bfa0
 
-// FUN_00551500 — shared Clouds panel draw (this = FNebulaClouds).
-void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* ExclusionCtx);
-
 // FUN_0050c040 — destroy all TexturePanels in the global Create list.
 void TexturePanelsDestroyAll();
 

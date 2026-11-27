@@ -459,12 +459,12 @@ unsigned int FRpcDebugLoadSystemPacket::Decode(const unsigned char* Buffer,
 }
 
 void FRpcDebugLoadSystemPacket::CopyString(const char* Text) {
-    if (Text != nullptr) {
-        const unsigned int Length = static_cast<unsigned int>(std::strlen(Text)) + 1u;
-        Data = static_cast<char*>(::operator new(Length, std::nothrow));
-        std::strcpy(Data, Text);
-        DataSize = Length;
-    }
+    if (Text == nullptr)
+        return;
+    const unsigned int Length = static_cast<unsigned int>(std::strlen(Text)) + 1u;
+    Data = static_cast<char*>(::operator new(Length, std::nothrow));
+    std::strcpy(Data, Text);
+    DataSize = Length;
 }
 
 unsigned int FRpcDebugDestroyObjectPacket::Encode(unsigned char** BufferHolder,
@@ -812,12 +812,12 @@ FRpcItemChangePacketBase::~FRpcItemChangePacketBase() {
 }
 
 void FRpcItemChangePacketBase::CopyHardpoint(const void* Data, unsigned int Size) {
-    if (Size != 0 && Data != nullptr) {
-        // Replacing an existing pointer without freeing it is native behavior.
-        Hardpoint = static_cast<char*>(::operator new(Size, std::nothrow));
-        std::memcpy(Hardpoint, Data, Size);
-        HardpointSize = Size;
-    }
+    if (Size == 0 || Data == nullptr)
+        return;
+    // Replacing an existing pointer without freeing it is native behavior.
+    Hardpoint = static_cast<char*>(::operator new(Size, std::nothrow));
+    std::memcpy(Hardpoint, Data, Size);
+    HardpointSize = Size;
 }
 
 unsigned int FRpcItemChangePacketBase::EncodeFields(const unsigned int& Selector,

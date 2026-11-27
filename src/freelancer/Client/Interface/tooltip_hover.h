@@ -16,10 +16,6 @@
 
 struct FToolTipHoverInfo;
 
-// FUN_00444ee0, the record's destructor: the Font::String at +0x10, then the caption buffer at
-// +0x08. Defined in cargo_bar_control.cpp.
-void ToolTipHoverDestroy(FToolTipHoverInfo* Info);
-
 // Every retail site that builds one constructs the caption buffer and the Font::String, and
 // tears the record down through FUN_00444ee0 (or its inlined body) on the normal and the unwind
 // path (FuncInfo_005fed48 for FUN_005a0530). The rest of the record is written by each site;
@@ -32,7 +28,7 @@ struct FToolTipHoverInfo
     {
     }
     // FUN_00444ee0. The Font::String member dtor that follows finds it already empty.
-    ~FToolTipHoverInfo() { ToolTipHoverDestroy(this); }
+    ~FToolTipHoverInfo() { Destroy(); }
     FToolTipHoverInfo(FToolTipHoverInfo const&) = delete;
     FToolTipHoverInfo& operator=(FToolTipHoverInfo const&) = delete;
 
@@ -45,6 +41,15 @@ struct FToolTipHoverInfo
     float WorldPos[3];           // +0x48
     float HalfExtents[3];        // +0x54
     unsigned char bLive;         // +0x60
+
+    // FUN_004963a0 (thiscall on the record) -- Ids -1, IdsAlt 0, AuxField 0, the caption emptied
+    // when it has a non-empty buffer, bLive 0. WorldPos / HalfExtents / Text are untouched.
+    // Callers: NeuroNetNavMap::Update, UiFastTable and one more site.
+    void Reset();
+
+    // FUN_00444ee0, the record's destructor: the Font::String at +0x10, then the caption buffer at
+    // +0x08. Defined in cargo_bar_control.cpp.
+    void Destroy();
 };
 
 static_assert(offsetof(FToolTipHoverInfo, AuxField) == 0x44, "hover +0x44");
@@ -56,7 +61,3 @@ static_assert(sizeof(FToolTipHoverInfo) == 0x64, "BaseRichTextWin +0x40c..+0x470
 // FUN_004be370 -- guarded forward to the ToolTip singleton's UpdateFromHover.
 void NnToolTipFeedHover(FToolTipHoverInfo const* Info);
 
-// FUN_004963a0 (thiscall on the record) -- Ids -1, IdsAlt 0, AuxField 0, the caption emptied
-// when it has a non-empty buffer, bLive 0. WorldPos / HalfExtents / Text are untouched.
-// Callers: NeuroNetNavMap::Update, UiFastTable and one more site.
-void ToolTipHoverReset(FToolTipHoverInfo* Info);

@@ -565,7 +565,7 @@ void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
 
     if (Cam != nullptr)
     {
-        // Inclusive edges: the extents are the difference plus one, as SpaceCameraSetViewport.
+        // Inclusive edges: the extents are the difference plus one, as FSpaceCamera::SetViewport.
         const int* const Rect = Cam->GetViewport();
         Left = Rect[0];
         Top = Rect[1];
@@ -587,13 +587,13 @@ void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
 void Win3DGetViewport(int Query, int* Out4)
 {
     // FUN_00422390. The out array is written untested.
-    if (Query == kWin3DQueryViewport)
-    {
-        Out4[0] = G_ViewportLeft;
-        Out4[1] = G_ViewportFlippedTop;
-        Out4[2] = G_ViewportWidth;
-        Out4[3] = G_ViewportHeight;
-    }
+    if (Query != kWin3DQueryViewport)
+        return;
+
+    Out4[0] = G_ViewportLeft;
+    Out4[1] = G_ViewportFlippedTop;
+    Out4[2] = G_ViewportWidth;
+    Out4[3] = G_ViewportHeight;
 }
 
 void Win3DSetViewportRect(int X, int Y, int Width, int Height, const char* SourceFile,

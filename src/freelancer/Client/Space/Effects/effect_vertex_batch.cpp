@@ -128,7 +128,7 @@ namespace
     // FUN_00425640 — the shape's GPU texture handle for a frame, or 0 without a texture.
     void* ResolveBeamTextureHandle(void* ShapeObj, int Frame)
     {
-        return TexShapeGetGpuHandle(static_cast<FTexShape const*>(ShapeObj), Frame);
+        return (static_cast<FTexShape const*>(ShapeObj))->GetGpuHandle(Frame);
     }
 }
 
@@ -179,134 +179,133 @@ void EffectVertexBatchStaticShutdown()
     }
 }
 
-void EffectVertexBatchDestroy(FEffectVertexBatch* Batch)
+void FEffectVertexBatch::Destroy()
 {
     // FUN_0046e9c0. The buffers are freed without a null test.
-    if (Batch->Pipeline != nullptr)
+    if (Pipeline != nullptr)
     {
-        Batch->Pipeline->Release();
-        Batch->Pipeline = nullptr;
+        Pipeline->Release();
+        Pipeline = nullptr;
     }
-    BatchFree(Batch->Vertices);
-    Batch->Vertices = nullptr;
-    BatchFree(Batch->Indices);
-    Batch->Indices = nullptr;
+    BatchFree(Vertices);
+    Vertices = nullptr;
+    BatchFree(Indices);
+    Indices = nullptr;
 }
 
-void EffectVertexBatchGrowVertices(FEffectVertexBatch* Batch)
+void FEffectVertexBatch::GrowVertices()
 {
     // FUN_0046ecd0: nothing while count < capacity (unsigned). Otherwise grow by +0x1c; a null
     // from VC6's operator new leaves the batch untouched (std::nothrow here), and the old buffer
     // is freed even when null.
-    if (static_cast<unsigned>(Batch->VertCount) < Batch->VertCapacity)
+    if (static_cast<unsigned>(VertCount) < VertCapacity)
         return;
 
     FEffectVertex* NewBuf = static_cast<FEffectVertex*>(operator new(
-        static_cast<size_t>(static_cast<unsigned>(Batch->Growth) + Batch->VertCapacity) *
+        static_cast<size_t>(static_cast<unsigned>(Growth) + VertCapacity) *
             sizeof(FEffectVertex),
         std::nothrow));
     if (NewBuf == nullptr)
         return;
 
-    if (Batch->Vertices != nullptr)
-        std::memcpy(NewBuf, Batch->Vertices,
-                    static_cast<size_t>(Batch->VertCapacity) * sizeof(FEffectVertex));
-    BatchFree(Batch->Vertices);
-    Batch->Vertices = NewBuf;
-    Batch->VertCapacity = Batch->VertCapacity + static_cast<unsigned>(Batch->Growth);
+    if (Vertices != nullptr)
+        std::memcpy(NewBuf, Vertices,
+                    static_cast<size_t>(VertCapacity) * sizeof(FEffectVertex));
+    BatchFree(Vertices);
+    Vertices = NewBuf;
+    VertCapacity = VertCapacity + static_cast<unsigned>(Growth);
 }
 
-void EffectVertexBatchReset(FEffectVertexBatch* Batch)
+void FEffectVertexBatch::Reset()
 {
-    Batch->VertCount = 0;
-    Batch->bStripMode = 0;
-    Batch->bCloseLoop = 0;
-    Batch->StripCounter = 0;
-    Batch->IndexCount = 0;
-    EffectVertexBatchGrowVertices(Batch);
-    if (Batch->IndexCapacity < static_cast<unsigned>(Batch->IndexCount) + 1u)
-        GrowIndexBuffer(Batch, static_cast<unsigned>(Batch->Growth * 3));
+    VertCount = 0;
+    bStripMode = 0;
+    bCloseLoop = 0;
+    StripCounter = 0;
+    IndexCount = 0;
+    GrowVertices();
+    if (IndexCapacity < static_cast<unsigned>(IndexCount) + 1u)
+        GrowIndexBuffer(this, static_cast<unsigned>(Growth * 3));
 }
 
-int EffectVertexBatchAppend(FEffectVertexBatch* Batch, float X, float Y, float Z)
+int FEffectVertexBatch::Append(float X, float Y, float Z)
 {
-    if (Batch->bStripMode != 0)
+    if (bStripMode != 0)
     {
-        if ((Batch->StripCounter & 3u) == 3u)
+        if ((StripCounter & 3u) == 3u)
         {
-            Batch->VertCount = Batch->VertCount + 2;
-            EffectVertexBatchGrowVertices(Batch);
-            FEffectVertex* Base = Batch->Vertices;
-            int const C = Batch->VertCount;
+            VertCount = VertCount + 2;
+            GrowVertices();
+            FEffectVertex* Base = Vertices;
+            int const C = VertCount;
             Base[C - 2] = Base[C - 5];
             Base[C - 1] = Base[C - 3];
         }
-        Batch->StripCounter = Batch->StripCounter + 1;
+        StripCounter = StripCounter + 1;
     }
 
-    FEffectVertex* Vert = &Batch->Vertices[Batch->VertCount];
-    Vert->R = Batch->ColorR;
-    Vert->G = Batch->ColorG;
-    Vert->B = Batch->ColorB;
-    Vert->A = Batch->ColorA;
-    Vert->U = Batch->U;
-    Vert->V = Batch->V;
+    FEffectVertex* Vert = &Vertices[VertCount];
+    Vert->R = ColorR;
+    Vert->G = ColorG;
+    Vert->B = ColorB;
+    Vert->A = ColorA;
+    Vert->U = U;
+    Vert->V = V;
     Vert->X = X;
     Vert->Y = Y;
     Vert->Z = Z;
-    Batch->VertCount = Batch->VertCount + 1;
-    EffectVertexBatchGrowVertices(Batch);
-    return Batch->VertCount - 1;
+    VertCount = VertCount + 1;
+    GrowVertices();
+    return VertCount - 1;
 }
 
-void EffectVertexBatchEnsureIndices(FEffectVertexBatch* Batch, int Needed)
+void FEffectVertexBatch::EnsureIndices(int Needed)
 {
-    if (Batch->IndexCapacity >= static_cast<unsigned>(Batch->IndexCount + Needed))
+    if (IndexCapacity >= static_cast<unsigned>(IndexCount + Needed))
         return;
-    GrowIndexBuffer(Batch, static_cast<unsigned>(Batch->Growth * 3));
+    GrowIndexBuffer(this, static_cast<unsigned>(Growth * 3));
 }
 
-void EffectVertexBatchPushTriangle(FEffectVertexBatch* Batch, unsigned short I0,
-                                   unsigned short I1, unsigned short I2)
+void FEffectVertexBatch::PushTriangle(unsigned short I0, unsigned short I1, unsigned short I2)
 {
-    if (Batch->IndexCapacity < static_cast<unsigned>(Batch->IndexCount + 3))
-        GrowIndexBuffer(Batch, static_cast<unsigned>(Batch->Growth * 3));
+    if (IndexCapacity < static_cast<unsigned>(IndexCount + 3))
+        GrowIndexBuffer(this, static_cast<unsigned>(Growth * 3));
 
-    Batch->Indices[Batch->IndexCount] = I0;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I1;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I2;
-    Batch->IndexCount = Batch->IndexCount + 1;
+    Indices[IndexCount] = I0;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I1;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I2;
+    IndexCount = IndexCount + 1;
 }
 
-void EffectVertexBatchPushQuad(FEffectVertexBatch* Batch, unsigned short I0,
-                               unsigned short I1, unsigned short I2, unsigned short I3)
+void FEffectVertexBatch::PushQuad(unsigned short I0, unsigned short I1, unsigned short I2,
+                                  unsigned short I3)
 {
-    if (Batch->IndexCapacity < static_cast<unsigned>(Batch->IndexCount + 6))
-        GrowIndexBuffer(Batch, static_cast<unsigned>(Batch->Growth * 3));
+    if (IndexCapacity < static_cast<unsigned>(IndexCount + 6))
+        GrowIndexBuffer(this, static_cast<unsigned>(Growth * 3));
 
-    Batch->Indices[Batch->IndexCount] = I0;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I1;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I2;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I0;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I2;
-    Batch->IndexCount = Batch->IndexCount + 1;
-    Batch->Indices[Batch->IndexCount] = I3;
-    Batch->IndexCount = Batch->IndexCount + 1;
+    Indices[IndexCount] = I0;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I1;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I2;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I0;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I2;
+    IndexCount = IndexCount + 1;
+    Indices[IndexCount] = I3;
+    IndexCount = IndexCount + 1;
 }
 
-void EffectVertexBatchSetColor(FEffectVertexBatch* Batch, float R, float G, float B)
+void FEffectVertexBatch::SetColor(float R, float G, float B)
 {
     // FUN_004fc950: each argument * 255.0 (double 0x005c89c0) truncated, the low byte stored.
-    Batch->ColorR = static_cast<unsigned char>(static_cast<long>(static_cast<double>(R) * 255.0));
-    Batch->ColorG = static_cast<unsigned char>(static_cast<long>(static_cast<double>(G) * 255.0));
-    Batch->ColorB = static_cast<unsigned char>(static_cast<long>(static_cast<double>(B) * 255.0));
-    Batch->ColorA = 0xff;
+    ColorR = static_cast<unsigned char>(static_cast<long>(static_cast<double>(R) * 255.0));
+    ColorG = static_cast<unsigned char>(static_cast<long>(static_cast<double>(G) * 255.0));
+    ColorB = static_cast<unsigned char>(static_cast<long>(static_cast<double>(B) * 255.0));
+    ColorA = 0xff;
 }
 
 // FUN_004f9de0. Its sole caller is the beam branch of FUN_004f7480. It works on the Effect.cpp

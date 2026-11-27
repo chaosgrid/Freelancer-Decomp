@@ -48,14 +48,14 @@ FThornPsys::FThornPsys(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntity
     MatrixSetIdentity(Local.Orient);
 }
 
-// FUN_00453e60. FindVisEffectByNickname is FUN_0042dd20, VisEffectArchAddRef FUN_0042e080. The
+// FUN_00453e60. FindVisEffectByNickname is FUN_0042dd20, FVisEffectArch::AddRef FUN_0042e080. The
 // StringAlloc'd copy is never freed, as retail.
 void FThornPsys::BindVisEffect(char const* EffectName)
 {
     Vis = FindVisEffectByNickname(StringAlloc(EffectName, false));
     if (Vis != nullptr)
     {
-        VisEffectArchAddRef(Vis);
+        Vis->AddRef();
         return;
     }
     FDUMP(kFdumpError, "%s(%d) : *** ERROR: Thorn_Psys: Failed to find [VisEffect] %s.",
@@ -169,7 +169,7 @@ void FThornPsys::Stop()
 {
     static_cast<IPSysControl*>(this)->StopEffect();
     if (Vis != nullptr)
-        VisEffectArchRelease(Vis);
+        Vis->Release();
 }
 
 // FUN_00450870.

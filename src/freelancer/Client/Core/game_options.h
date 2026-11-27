@@ -131,7 +131,7 @@ extern const FGameOptionDesc GGameOptionDescs[];
 extern const int GGameOptionDescCount;
 
 // The first loop of FUN_005621a0 -- the scatter of the descriptor defaults into the value array --
-// is LoadStartupConfig itself (startup_config.cpp); WinMain runs it before the window class is
+// is DisplaySettings::DisplaySettings::LoadStartupConfig itself (startup_config.cpp); WinMain runs it before the window class is
 // registered, so it is in effect before anything queries an option.
 
 // FUN_005792b0. Indices from 0x46 give 0. The compare is signed: a negative index reads the

@@ -2604,16 +2604,16 @@ void CndTimer::Parse(INI_Reader& Reader)
         float const RandUnit = static_cast<float>(rand()) * GRandUnitScale;
         Duration = (Upper - Lower) * RandUnit + Lower;
     }
-    if (!Reader.is_value_empty(2))
+    if (Reader.is_value_empty(2))
+        return;
+
+    if (_stricmp(Reader.get_value_string(2), "RUN_ON_BASE") == 0)
     {
-        if (_stricmp(Reader.get_value_string(2), "RUN_ON_BASE") == 0)
-        {
-            bRunOnBase = 1;
-            return;
-        }
-        if (_stricmp(Reader.get_value_string(2), "RUN_IN_SPACE_ONLY") == 0)
-            bRunOnBase = 0;
+        bRunOnBase = 1;
+        return;
     }
+    if (_stricmp(Reader.get_value_string(2), "RUN_IN_SPACE_ONLY") == 0)
+        bRunOnBase = 0;
 }
 
 // FUN_06ec1660. EventParms is the float* delta the tick message (0x20) carries; docked time

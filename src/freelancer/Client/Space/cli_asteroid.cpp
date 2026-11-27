@@ -90,7 +90,7 @@ namespace
     // LIFETIME. The list is a namespace-scope static on purpose, not a function-local one: it
     // is constructed during CRT start-up, like the XC initializer, so its destructor is
     // registered with atexit before WinMain registers ClientAtExitTeardown (LAB_005b2190).
-    // atexit runs in reverse order, so the teardown's ShutdownSpaceState -> StarSysLeave ->
+    // atexit runs in reverse order, so the teardown's SpaceApp::Shutdown -> StarSysLeave ->
     // CliAsteroidDestroyAll still sees a live list. A function-local static would be
     // constructed in game, after that registration, and so destroyed before the teardown.
     std::list<FCliAsteroid*> GCliAsteroidFields;
@@ -351,7 +351,7 @@ namespace
                 void* const Dyn = *It;
                 if (Dyn != nullptr)
                 {
-                    CliDynamicAsteroidDestroy(static_cast<FCliDynamicAsteroid*>(Dyn));
+                    (static_cast<FCliDynamicAsteroid*>(Dyn))->Destroy();
                     operator delete(Dyn);
                 }
             }
@@ -556,7 +556,7 @@ namespace
         // A shape whose frame-0 handle IsTexture rejects (non-zero) is dropped.
         if (Bb->Shape != nullptr)
         {
-            void* const Handle = TexShapeGetGpuHandle(Bb->Shape, 0);
+            void* const Handle = Bb->Shape->GetGpuHandle(0);
             if (DALib::Pipeline->IsTexture(Handle) != 0)
                 Bb->Shape = nullptr;
         }
@@ -620,7 +620,7 @@ namespace
         for (void** It = This->DynBegin; It != This->DynEnd; ++It)
         {
             FCliDynamicAsteroid* const Dyn = static_cast<FCliDynamicAsteroid*>(*It);
-            CliDynamicAsteroidReleaseSlots(Dyn);
+            Dyn->ReleaseSlots();
             operator delete(Dyn->SlotPtrs);
             Dyn->DetailScale = DynDetail;
             Dyn->SlotPtrs = nullptr;
@@ -642,7 +642,7 @@ namespace
     FCliAsteroid* CliAsteroidConstructRetail(FCliAsteroid* This)
     {
         // The cube map at +0x08 (allocator bytes +0x08 / +0x09, byte +0x14, FUN_005274a0).
-        CliAsteroidCubeMapConstruct(This);
+        This->CubeMapConstruct();
 
         This->DiffuseColor0 = 1.0f;
         This->DiffuseColor1 = 1.0f;
@@ -820,12 +820,12 @@ namespace
     }
 }
 
-FCliAsteroid* CliAsteroidConstruct(FCliAsteroid* This)
+FCliAsteroid* FCliAsteroid::Construct()
 {
-    return CliAsteroidConstructRetail(This);
+    return CliAsteroidConstructRetail(this);
 }
 
-void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
+void FCliAsteroid::LoadFieldIni(char const* FieldIniRel)
 {
     // No entry null test of `This` or the file name, as retail.
     INI_Reader Reader;
@@ -833,24 +833,24 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     char FieldIniPath[MAX_PATH] = {};
     GetFileSysPath(FieldIniPath, FieldIniRel, DALib::Data);
 
-    This->CubeSize = 0xfa;
-    This->EmptyCubeFreq = 0.0f;
+    CubeSize = 0xfa;
+    EmptyCubeFreq = 0.0f;
     int Lod = 0;
-    This->MaxAlpha = 1.0f;
-    This->bHasBand = 0;
-    This->bHasBillboards = 0;
-    This->bHasExclusionBands = 0;
-    This->bTestPlacement = 0;
+    MaxAlpha = 1.0f;
+    bHasBand = 0;
+    bHasBillboards = 0;
+    bHasExclusionBands = 0;
+    bTestPlacement = 0;
 
     // A field with no zone is reported and loading goes on.
-    if (This->Zone == nullptr)
+    if (Zone == nullptr)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: Asteroid field (%s) must be hooked up to a zone",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x187, FieldIniRel);
     }
 
-    BandVectorClear(This);
-    DynVectorClear(This);
+    BandVectorClear(this);
+    DynVectorClear(this);
 
     // An open failure is reported and still runs the band/billboard/mesh tail.
     if (!Reader.open(FieldIniPath, false))
@@ -861,7 +861,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     else
     {
         // The reader's state is saved for the common field.
-        This->bLoaded = 1;
+        bLoaded = 1;
 
         INI_Reader::State Saved;
         Reader.get_state(Saved);
@@ -876,26 +876,26 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                         continue;
                     char const* Rel = Reader.get_value_string();
                     char const* Full = GetFullFilename(Rel);
-                    ShapeDBAt(This->ShapeDbStorage)->Load(Full, nullptr);
+                    ShapeDBAt(ShapeDbStorage)->Load(Full, nullptr);
                 }
             }
             else if (Reader.is_header("Field"))
             {
-                ParseFieldSection(This, Reader, Lod);
+                ParseFieldSection(this, Reader, Lod);
             }
             else if (Reader.is_header("Band"))
             {
                 // The field's own band (+0xfc).
-                This->bHasBand = 1;
-                BandParseIni(&This->Band, Reader, ShapeDBAt(This->ShapeDbStorage));
-                float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
-                float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
-                BandApplyTints(&This->Band, Diffuse, Ambient);
+                bHasBand = 1;
+                BandParseIni(&this->Band, Reader, ShapeDBAt(ShapeDbStorage));
+                float Diffuse[3] = {DiffuseColor0, DiffuseColor1, DiffuseColor2};
+                float Ambient[3] = {AmbientColor0, AmbientColor1, AmbientColor2};
+                BandApplyTints(&this->Band, Diffuse, Ambient);
                 float Inc[3];
-                ScaleRgb255(Inc, static_cast<float>(This->AmbientIncrease0),
-                            static_cast<float>(This->AmbientIncrease1),
-                            static_cast<float>(This->AmbientIncrease2));
-                BandSetAmbientIncrease(&This->Band, Inc);
+                ScaleRgb255(Inc, static_cast<float>(AmbientIncrease0),
+                            static_cast<float>(AmbientIncrease1),
+                            static_cast<float>(AmbientIncrease2));
+                BandSetAmbientIncrease(&this->Band, Inc);
             }
             else if (Reader.is_header("ExclusionBand"))
             {
@@ -906,11 +906,11 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                     static_cast<FAsteroidBand*>(operator new(sizeof(FAsteroidBand)));
                 if (Band != nullptr)
                     InitBand(Band);
-                BandVectorPush(This, Band);
+                BandVectorPush(this, Band);
 
                 // The vector's last element, no null test, as retail.
-                FAsteroidBand* const Last = This->BandEnd[-1];
-                BandParseIni(Last, Reader, ShapeDBAt(This->ShapeDbStorage));
+                FAsteroidBand* const Last = BandEnd[-1];
+                BandParseIni(Last, Reader, ShapeDBAt(ShapeDbStorage));
 
                 // The section again: every "zone" into the band's Zone.
                 Reader.set_state(ExState);
@@ -937,22 +937,20 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             }
             else if (Reader.is_header("AsteroidBillboards"))
             {
-                This->bHasBillboards = 1;
-                BillboardSetQuality(&This->Billboard, AsteroidDetailScalar());
-                BillboardParseIni(&This->Billboard, Reader, ShapeDBAt(This->ShapeDbStorage));
-                float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
-                float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
-                BillboardApplyTints(&This->Billboard, Diffuse, Ambient);
+                bHasBillboards = 1;
+                BillboardSetQuality(&Billboard, AsteroidDetailScalar());
+                BillboardParseIni(&Billboard, Reader, ShapeDBAt(ShapeDbStorage));
+                float Diffuse[3] = {DiffuseColor0, DiffuseColor1, DiffuseColor2};
+                float Ambient[3] = {AmbientColor0, AmbientColor1, AmbientColor2};
+                BillboardApplyTints(&Billboard, Diffuse, Ambient);
             }
             else if (Reader.is_header("DynamicAsteroids"))
             {
                 INI_Reader::State SavedDyn;
                 Reader.get_state(SavedDyn);
 
-                FCliDynamicAsteroid* const Dyn = CliDynamicAsteroidConstruct(
-                    static_cast<FCliDynamicAsteroid*>(operator new(sizeof(FCliDynamicAsteroid))),
-                    This->CmnField);
-                DynVectorPush(This, Dyn);
+                FCliDynamicAsteroid* const Dyn = (static_cast<FCliDynamicAsteroid*>(operator new(sizeof(FCliDynamicAsteroid))))->Construct(CmnField);
+                DynVectorPush(this, Dyn);
 
                 // InvDetailScale divides by the unrounded value; no zero guard.
                 double const Detail = AsteroidDetailScalar();
@@ -960,7 +958,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                 Dyn->DetailScale = static_cast<float>(DetailScale);
                 Dyn->InvDetailScale = static_cast<float>(1.0 / DetailScale);
 
-                CliDynamicAsteroidParseIni(Dyn, Reader);
+                Dyn->ParseIni(Reader);
 
                 // The section again: every "zone" into +0; no zone found -> the field's zone,
                 // when it has one.
@@ -991,23 +989,23 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                         }
                     } while (Reader.read_value());
                 }
-                if (bZoneSet == 0 && This->Zone != nullptr)
-                    Dyn->Zone = This->Zone;
+                if (bZoneSet == 0 && Zone != nullptr)
+                    Dyn->Zone = Zone;
 
-                CliDynamicAsteroidApplyParentTints(Dyn, This);
+                CliDynamicAsteroidApplyParentTints(Dyn, this);
             }
         }
 
         // The common field loads from the saved state; the fill distance is truncated from the
         // unrounded product.
-        if (This->CmnField != nullptr)
+        if (CmnField != nullptr)
         {
             Reader.set_state(Saved);
-            This->CmnField->load(Reader, This->CubeSize);
-            This->CmnField->set_fill_dist(static_cast<int>(
-                static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale)));
-            This->CmnField->set_empty_freq(This->EmptyCubeFreq);
-            This->ExclusionMgr = This->CmnField->ExclusionMgr;
+            CmnField->load(Reader, CubeSize);
+            CmnField->set_fill_dist(static_cast<int>(
+                static_cast<double>(FillDist) * static_cast<double>(FillDetailScale)));
+            CmnField->set_empty_freq(EmptyCubeFreq);
+            ExclusionMgr = CmnField->ExclusionMgr;
         }
         else
         {
@@ -1019,23 +1017,23 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
 
         // With billboards, the count raised to the exclusion manager's maximum and
         // DensityScale = old count / new count (no zero test).
-        if (This->bHasBillboards != 0)
+        if (bHasBillboards != 0)
         {
-            int Use = This->Billboard.Count;
-            if (This->ExclusionMgr != nullptr)
+            int Use = Billboard.Count;
+            if (ExclusionMgr != nullptr)
             {
-                int const MaxBb = This->ExclusionMgr->get_max_billboard_count();
+                int const MaxBb = ExclusionMgr->get_max_billboard_count();
                 if (Use < MaxBb)
                     Use = MaxBb;
-                int const OldCount = This->Billboard.Count;
-                This->Billboard.Count = Use;
-                This->Billboard.DensityScale = static_cast<float>(
+                int const OldCount = Billboard.Count;
+                Billboard.Count = Use;
+                Billboard.DensityScale = static_cast<float>(
                     static_cast<double>(OldCount) / static_cast<double>(Use));
-                This->ExclusionMgr->normalize_billboard_density(Use);
+                ExclusionMgr->normalize_billboard_density(Use);
             }
             else
             {
-                This->Billboard.DensityScale = 1.0f;
+                Billboard.DensityScale = 1.0f;
             }
         }
     }
@@ -1043,63 +1041,63 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     // The field's own band gets the zone (+0x100) and its rings; the piece cursor starts at its
     // piece count (+0x154).
     int PieceCursor = 0;
-    if (This->bHasBand != 0)
+    if (bHasBand != 0)
     {
-        This->Band.Zone = This->Zone;
-        BandBuildExclusionRings(&This->Band);
-        PieceCursor = This->Band.RenderParts;
+        this->Band.Zone = Zone;
+        BandBuildExclusionRings(&this->Band);
+        PieceCursor = this->Band.RenderParts;
     }
     // Every exclusion band gets the tints, the ambient increase, its rings and its first piece
     // index, and adds its piece count to ExclusionPieceCount. No null test of the band, as
     // retail.
-    This->ExclusionPieceCount = 0;
-    if (This->BandBegin != nullptr && This->BandEnd != This->BandBegin)
+    ExclusionPieceCount = 0;
+    if (BandBegin != nullptr && BandEnd != BandBegin)
     {
-        This->bHasExclusionBands = 1;
-        for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
+        bHasExclusionBands = 1;
+        for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
         {
             FAsteroidBand* const Band = *It;
-            float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
-            float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
+            float Diffuse[3] = {DiffuseColor0, DiffuseColor1, DiffuseColor2};
+            float Ambient[3] = {AmbientColor0, AmbientColor1, AmbientColor2};
             BandApplyTints(Band, Diffuse, Ambient);
             float Inc[3];
-            ScaleRgb255(Inc, static_cast<float>(This->AmbientIncrease0),
-                        static_cast<float>(This->AmbientIncrease1),
-                        static_cast<float>(This->AmbientIncrease2));
+            ScaleRgb255(Inc, static_cast<float>(AmbientIncrease0),
+                        static_cast<float>(AmbientIncrease1),
+                        static_cast<float>(AmbientIncrease2));
             BandSetAmbientIncrease(Band, Inc);
             BandBuildExclusionRings(Band);
             Band->FirstPiece = PieceCursor;
             int const PieceCount = Band->RenderParts;
             PieceCursor += PieceCount;
-            This->ExclusionPieceCount += static_cast<unsigned>(PieceCount);
+            ExclusionPieceCount += static_cast<unsigned>(PieceCount);
         }
     }
 
     // FillScaled is rounded to float before the add.
-    if (This->bHasBillboards != 0)
+    if (bHasBillboards != 0)
     {
-        This->Billboard.ZoneRef = This->Zone;
-        BillboardEnsureRocks(&This->Billboard);
+        Billboard.ZoneRef = Zone;
+        BillboardEnsureRocks(&Billboard);
         float const FillScaled = static_cast<float>(
-            static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale));
+            static_cast<double>(FillDist) * static_cast<double>(FillDetailScale));
         float const FadeFar = static_cast<float>(
-            static_cast<double>(This->CubeSize) * 1.25 + static_cast<double>(FillScaled));
-        BillboardSetFadePlanes(&This->Billboard, FillScaled, FadeFar);
+            static_cast<double>(CubeSize) * 1.25 + static_cast<double>(FillScaled));
+        BillboardSetFadePlanes(&Billboard, FillScaled, FadeFar);
     }
 
     // Retail inlines the two setters: the CliAsteroid distance squared unrounded into +0x14, and
     // the constant 10000.0f into +0x18 (what the exported setter stores for 100).
-    if (This->ExclusionMgr != nullptr)
+    if (ExclusionMgr != nullptr)
     {
         FCliAsteroidExclusionInline::SetMaxCliDist(
-            This->ExclusionMgr, static_cast<double>(This->FillDist) *
-                                    static_cast<double>(This->FillDetailScale) *
+            ExclusionMgr, static_cast<double>(FillDist) *
+                                    static_cast<double>(FillDetailScale) *
                                     static_cast<double>(1.25f));
-        This->ExclusionMgr->set_max_dynamicasteroid_exclusion_distance(100.0f);
+        ExclusionMgr->set_max_dynamicasteroid_exclusion_distance(100.0f);
     }
 
     // The archetype mesh merge into +0xa0..+0xac and the vertex source.
-    CliAsteroidMergeCubeMesh(This, Lod, FieldIniRel);
+    CliAsteroidMergeCubeMesh(this, Lod, FieldIniRel);
 }
 
 bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
@@ -1108,7 +1106,7 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
     // on the list.
     FCliAsteroid* Obj = static_cast<FCliAsteroid*>(operator new(sizeof(FCliAsteroid)));
     if (Obj != nullptr)
-        CliAsteroidConstruct(Obj);
+        Obj->Construct();
     Registry().push_back(Obj);
 
     Universe::IZone* Zone = Universe::get_non_const_zone(StarSysGetActiveSystemId(), ZoneNickname);
@@ -1136,7 +1134,7 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
         Obj->CmnField->set_zone(Zone);
 
     CliAsteroidApplyDetail(Obj, AsteroidDetailScalar());
-    CliAsteroidLoadFieldIni(Obj, FieldIniRel);
+    Obj->LoadFieldIni(FieldIniRel);
     return true;
 }
 
@@ -1153,7 +1151,7 @@ void CliAsteroidUpdateFields(void* Camera, float Dt)
         return;
     std::list<FCliAsteroid*>& List = Registry();
     for (std::list<FCliAsteroid*>::iterator It = List.begin(); It != List.end(); ++It)
-        CliAsteroidUpdate(*It, static_cast<FSpaceCamera*>(Camera), Dt);
+        (*It)->Update(static_cast<FSpaceCamera*>(Camera), Dt);
 }
 
 void CliAsteroidDestroyAll()
@@ -1165,32 +1163,32 @@ void CliAsteroidDestroyAll()
         FCliAsteroid* const Field = *It;
         if (Field != nullptr)
         {
-            CliAsteroidDestruct(Field);
+            Field->Destruct();
             operator delete(Field);
         }
     }
     List.clear();
 }
 
-void CliAsteroidDestruct(FCliAsteroid* This)
+void FCliAsteroid::Destruct()
 {
     // Explicit releases in retail order, then the inlined member destructors.
-    if (This->CmnField != nullptr)
+    if (CmnField != nullptr)
     {
-        This->CmnField->Release();
-        This->CmnField = nullptr;
+        CmnField->Release();
+        CmnField = nullptr;
     }
-    if (This->Material != nullptr)
+    if (Material != nullptr)
     {
-        static_cast<IDAComponent*>(This->Material)->Release();
-        This->Material = nullptr;
+        static_cast<IDAComponent*>(Material)->Release();
+        Material = nullptr;
     }
-    operator delete(This->MeshVerts);
-    This->MeshVerts = nullptr;
-    operator delete(This->MeshIndices);
-    This->MeshIndices = nullptr;
-    ShapeDBAt(This->ShapeDbStorage)->Clear();
-    for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
+    operator delete(MeshVerts);
+    MeshVerts = nullptr;
+    operator delete(MeshIndices);
+    MeshIndices = nullptr;
+    ShapeDBAt(ShapeDbStorage)->Clear();
+    for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
     {
         FAsteroidBand* const Band = *It;
         if (Band != nullptr)
@@ -1199,33 +1197,33 @@ void CliAsteroidDestruct(FCliAsteroid* This)
             operator delete(Band);
         }
     }
-    This->BandEnd = This->BandBegin;
-    for (void** It = This->DynBegin; It != This->DynEnd; ++It)
+    BandEnd = BandBegin;
+    for (void** It = DynBegin; It != DynEnd; ++It)
     {
         FCliDynamicAsteroid* const Dyn = static_cast<FCliDynamicAsteroid*>(*It);
         if (Dyn != nullptr)
         {
-            CliDynamicAsteroidDestroy(Dyn);
+            Dyn->Destroy();
             operator delete(Dyn);
         }
     }
-    This->DynEnd = This->DynBegin;
-    This->ExclusionMgr = nullptr;
-    operator delete(This->DynBegin);
-    This->DynBegin = nullptr;
-    This->DynEnd = nullptr;
-    This->DynCap = nullptr;
+    DynEnd = DynBegin;
+    ExclusionMgr = nullptr;
+    operator delete(DynBegin);
+    DynBegin = nullptr;
+    DynEnd = nullptr;
+    DynCap = nullptr;
     // The Rocks pointer itself is left as it was.
-    operator delete(This->Billboard.Rocks);
-    This->Billboard.Count = 0;
-    This->Billboard.ZoneRef = nullptr;
-    operator delete(This->BandBegin);
-    This->BandBegin = nullptr;
-    This->BandEnd = nullptr;
-    This->BandCap = nullptr;
-    BandFreeRingMesh(&This->Band);
-    ShapeDBDestructAt(This->ShapeDbStorage);
-    CliAsteroidCubeMapDestruct(This);
+    operator delete(Billboard.Rocks);
+    Billboard.Count = 0;
+    Billboard.ZoneRef = nullptr;
+    operator delete(BandBegin);
+    BandBegin = nullptr;
+    BandEnd = nullptr;
+    BandCap = nullptr;
+    BandFreeRingMesh(&this->Band);
+    ShapeDBDestructAt(ShapeDbStorage);
+    CliAsteroidCubeMapDestruct(this);
 }
 
 void CliAsteroidClampColorToOne(float* Rgb)
@@ -1266,10 +1264,10 @@ void CliAsteroidApplyGlobalDetail(float Detail)
         CliAsteroidApplyDetail(*It, Detail);
 }
 
-int CliAsteroidPieceCount(FCliAsteroid* Field)
+int FCliAsteroid::PieceCount()
 {
     // No null test, as retail.
-    return Field->Band.RenderParts + static_cast<int>(Field->ExclusionPieceCount);
+    return Band.RenderParts + static_cast<int>(ExclusionPieceCount);
 }
 
 namespace
@@ -1340,7 +1338,7 @@ namespace
             if (Light->Type != kLightDirectional)
                 continue;
             float* const Dir = Lights[DirCount];
-            EngineLightSample(Light, ZonePos, Dir, Ambient, Dir + 3);
+            Light->Sample(ZonePos, Dir, Ambient, Dir + 3);
             ++DirCount;
             double const Inv =
                 1.0 / sqrt((static_cast<double>(Dir[0]) * Dir[0] + static_cast<double>(Dir[1]) * Dir[1]) +
@@ -1458,7 +1456,7 @@ namespace
             *Fade = (AbsDot - 0.3f) * *Fade * 5.0f;
     }
 
-    // FUN_0054d410 (thiscall on the band) -- the band's per-frame update from CliAsteroidUpdate:
+    // FUN_0054d410 (thiscall on the band) -- the band's per-frame update from FCliAsteroid::Update:
     // the lighting baked on the second call (UpdateCount counts up while bLit is clear), then,
     // unless MaxAlpha is below 0.001 (DAT_005c75f8), every particle's fade against the squares
     // of the four fade distances.
@@ -1489,7 +1487,7 @@ namespace
     }
 
     // FUN_0054d4e0 (thiscall on the band) — Win3D triangle-pair quads for one piece index.
-    // Retail's first stack argument (the camera position CliAsteroidDrawFarPiece passes) is
+    // Retail's first stack argument (the camera position FCliAsteroid::DrawFarPiece passes) is
     // never read, so the port drops it. Nothing is tested for null.
     void BandDrawPiece(FAsteroidBand* Band, int PieceIndex)
     {
@@ -1516,7 +1514,7 @@ namespace
         // A shape binds its frame-0 handle, null included.
         FTexShape const* Shape = Band->Shape;
         if (Shape != nullptr)
-            Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0));
+            Win3DBindTexture(Shape->GetGpuHandle(0));
 
         int const EndIdx = Band->Pieces[Rel].EndParticle;
         int const StartIdx = Band->Pieces[Rel].FirstParticle;
@@ -1643,16 +1641,16 @@ namespace
     }
 } // namespace
 
-void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
+void FCliAsteroid::Update(FSpaceCamera* Cam, float Dt)
 {
     // Once (bNebulaLookupPending, set by the constructor), with a zone: the nebula at the zone's position
     // into +0xd4. The flag is cleared either way.
-    if (This->bNebulaLookupPending != 0 && This->Zone != nullptr)
+    if (bNebulaLookupPending != 0 && Zone != nullptr)
     {
-        This->FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
-            StarSysFindNebula(&This->Zone->GetPos(), nullptr, nullptr)));
+        FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
+            StarSysFindNebula(&Zone->GetPos(), nullptr, nullptr)));
     }
-    This->bNebulaLookupPending = 0;
+    bNebulaLookupPending = 0;
 
     const Vector* const Pos3 = AsCamera(Cam)->GetPosition();
     Vector CamPos;
@@ -1665,20 +1663,20 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 
     // The exclusion timer (+0xd8): above 0.5 (DAT_00613848) or on a camera cut (the camera's
     // +0xbc byte), the exclusion manager is re-sorted around the camera.
-    This->ExclusionSortTimer += Dt;
-    if (This->ExclusionSortTimer > 0.5f || Cam->FlagBC != 0)
+    ExclusionSortTimer += Dt;
+    if (ExclusionSortTimer > 0.5f || Cam->FlagBC != 0)
     {
-        This->ExclusionSortTimer = 0.0f;
-        if (This->ExclusionMgr != nullptr)
-            This->ExclusionMgr->sort(&CamPos);
+        ExclusionSortTimer = 0.0f;
+        if (ExclusionMgr != nullptr)
+            ExclusionMgr->sort(&CamPos);
     }
 
-    if (GetGameOption(kGameOptObjectsGroup) != 0 && This->CmnField != nullptr)
+    if (GetGameOption(kGameOptObjectsGroup) != 0 && CmnField != nullptr)
     {
-        FCliAsteroidCubeMap& Cubes = CliAsteroidCubeMap(This);
+        FCliAsteroidCubeMap& Cubes = CliAsteroidCubeMap(this);
 
         // Every change event of the common field, in list order.
-        for (CmnAsteroid::asteroid_marker* Event = This->CmnField->get_changes();
+        for (CmnAsteroid::asteroid_marker* Event = CmnField->get_changes();
              Event != nullptr; Event = Event->Next)
         {
             FCliAsteroidCubeMap::iterator It = Cubes.find(Event->CubeId);
@@ -1689,14 +1687,14 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
                          .first;
                 FCliAsteroidCube& Value = It->second;
                 // The common cube copied in (looked up by value).
-                CmnAsteroid::CAsteroidCube* const Cube = This->CmnField->find_cube(Event->CubeId);
+                CmnAsteroid::CAsteroidCube* const Cube = CmnField->find_cube(Event->CubeId);
                 if (Cube != nullptr)
                 {
                     Value.Cube = Cube;
                     Value.CubeId = Cube->get_id();
                     Value.Orient = Cube->Orient;
                     Value.Pos = Cube->Pos;
-                    Value.CubeSize = This->CubeSize;
+                    Value.CubeSize = CubeSize;
                 }
                 else
                 {
@@ -1719,45 +1717,45 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
         }
 
         // The exclusion manager is re-read per manager.
-        for (void** DynIt = This->DynBegin; DynIt != This->DynEnd; ++DynIt)
+        for (void** DynIt = DynBegin; DynIt != DynEnd; ++DynIt)
         {
-            CliDynamicAsteroidUpdate(static_cast<FCliDynamicAsteroid*>(*DynIt), Cam, Dt,
-                                     This->ExclusionMgr);
+            (static_cast<FCliDynamicAsteroid*>(*DynIt))->Update(Cam, Dt,
+                                                                ExclusionMgr);
         }
     }
 
     // [EFFECTS], the common field, ASTEROID_EXT in (0, 3) (signed compares).
-    if (GetGameOption(kGameOptEffectsGroup) == 0 || This->CmnField == nullptr)
+    if (GetGameOption(kGameOptEffectsGroup) == 0 || CmnField == nullptr)
         return;
     if (GetGameOption(kGameOptAsteroidExt) <= 0)
         return;
     if (GetGameOption(kGameOptAsteroidExt) >= 3)
         return;
 
-    if (This->bHasBand != 0)
-        BandUpdate(&This->Band, &CamPos);
+    if (bHasBand != 0)
+        BandUpdate(&Band, &CamPos);
 
     // Exclusion bands: one near-field fraction into every band's MaxAlpha.
-    if (This->bHasExclusionBands == 0)
+    if (bHasExclusionBands == 0)
         return;
-    float const Fraction = This->CmnField->near_field_fraction(CamPos, 1000.0f);
-    for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
+    float const Fraction = CmnField->near_field_fraction(CamPos, 1000.0f);
+    for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
     {
         (*It)->MaxAlpha = Fraction;
         BandUpdate(*It, &CamPos);
     }
 }
 
-float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ)
+float* FCliAsteroid::GetPiecePos(int PieceIndex, float* OutXYZ)
 {
     // A piece in [0, band count +0x154) comes from the field's own band.
-    int const Primary = Field->Band.RenderParts;
+    int const Primary = this->Band.RenderParts;
     if (PieceIndex < Primary && PieceIndex >= 0)
-        return BandGetPiecePos(&Field->Band, PieceIndex, OutXYZ);
+        return BandGetPiecePos(&this->Band, PieceIndex, OutXYZ);
 
     // Otherwise the first exclusion band with FirstPiece <= piece < FirstPiece + RenderParts;
     // entries are read unchecked.
-    for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
+    for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
     {
         FAsteroidBand* const Band = *It;
         int const Base = Band->FirstPiece;
@@ -1774,14 +1772,14 @@ float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ
     return OutXYZ;
 }
 
-float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex)
+float FCliAsteroid::GetPieceRadius(int PieceIndex)
 {
-    // Same band lookup as CliAsteroidGetPiecePos.
-    int const Primary = Field->Band.RenderParts;
+    // Same band lookup as FCliAsteroid::GetPiecePos.
+    int const Primary = this->Band.RenderParts;
     if (PieceIndex < Primary && PieceIndex >= 0)
-        return BandGetPieceRadius(&Field->Band, PieceIndex);
+        return BandGetPieceRadius(&this->Band, PieceIndex);
 
-    for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
+    for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
     {
         FAsteroidBand* const Band = *It;
         int const Base = Band->FirstPiece;
@@ -1804,10 +1802,10 @@ void CliAsteroidForEach(FCliAsteroidVisitFn Fn, void* Ctx)
         Fn(*It, Ctx);
 }
 
-void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIndex)
+void FCliAsteroid::DrawFarPiece(FSpaceCamera* Cam, int PieceIndex)
 {
     // Nothing is tested for null.
-    if (Field->bHasBand == 0 && Field->bHasExclusionBands == 0)
+    if (bHasBand == 0 && bHasExclusionBands == 0)
         return;
     if (GetGameOption(kGameOptAsteroidExt) == 0)
         return;
@@ -1815,7 +1813,7 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
         return;
     if (GetGameOption(kGameOptAsteroidExt) >= 3)
         return;
-    if (Field->bDrawFarBands == 0)
+    if (bDrawFarBands == 0)
         return;
 
     // Retail also fetches the camera orientation and position and the zone position; they are
@@ -1846,15 +1844,15 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
 
         // The own band when piece < count (+0x154) + base (+0x158); otherwise the first
         // exclusion band that holds it, read unchecked. No band -- nothing drawn.
-        int const PrimaryCount = Field->Band.RenderParts;
-        int const PrimaryBase = Field->Band.FirstPiece;
+        int const PrimaryCount = Band.RenderParts;
+        int const PrimaryBase = Band.FirstPiece;
         if (PieceIndex < PrimaryCount + PrimaryBase)
         {
-            BandDrawPiece(&Field->Band, PieceIndex);
+            BandDrawPiece(&Band, PieceIndex);
         }
         else
         {
-            for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
+            for (FAsteroidBand** It = BandBegin; It != BandEnd; ++It)
             {
                 FAsteroidBand* const ExBand = *It;
                 int const ExBase = ExBand->FirstPiece;
@@ -2841,13 +2839,13 @@ namespace
                 float const SavedNear = Field->Billboard.NearFadeStart;
                 Field->Billboard.NearFadeEnd = SpawnReach;
                 Field->Billboard.NearFadeStart = static_cast<float>(SpawnReach - ExtFadeBand);
-                BillboardDraw(&Field->Billboard, Cam, Field->ExclusionMgr, 2);
+                Field->Billboard.Draw(Cam, Field->ExclusionMgr, 2);
                 Field->Billboard.NearFadeEnd = SavedFar;
                 Field->Billboard.NearFadeStart = SavedNear;
             }
             else
 #endif
-                BillboardDraw(&Field->Billboard, Cam, Field->ExclusionMgr, 2);
+                Field->Billboard.Draw(Cam, Field->ExclusionMgr, 2);
         }
 
         // After the near-field draw the ambient byte is cleared again when max_alpha (+0xcc) is
@@ -2898,14 +2896,14 @@ namespace
         }
 
         for (void** It = Field->DynBegin; It != Field->DynEnd; ++It)
-            CliDynamicAsteroidDraw(static_cast<FCliDynamicAsteroid*>(*It), Cam, &bAmbientDone,
-                                   Field);
+            (static_cast<FCliDynamicAsteroid*>(*It))->Draw(Cam, &bAmbientDone,
+                                                           Field);
     }
 } // namespace
 
-void CliAsteroidLightAround(FCliAsteroid* Field, FSpaceCamera* Cam, float Scale)
+void FCliAsteroid::LightAround(FSpaceCamera* Cam, float Scale)
 {
-    CliAsteroidAmbientPass(Field, Cam, Scale);
+    CliAsteroidAmbientPass(this, Cam, Scale);
 }
 
 void CliAsteroidFillVertexSource(FRpVertexSrcDesc* Desc, void* Verts, unsigned short VertCount)

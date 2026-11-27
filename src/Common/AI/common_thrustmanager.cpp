@@ -14,10 +14,10 @@
 #include "common_misc.h"      // SUBOBJ_ID_NONE
 #include "common_iface.h"     // IBehaviorManager::Pathfind, IObjInspect, ObjRwFromWatchable
 #include "common_pathfind.h"  // PathfindManager::IsCruiseUnobstructed (FUN_062de160)
-#include "common_iustategraph.h" // ClearAiTargetVector, BuildAiTargetList (ScanGunGroupTargets)
+#include "common_iustategraph.h" // ClearAiTargetVector, SystemManagerTimerTable::BuildAiTargetList (ScanGunGroupTargets)
 #include "common_cobject.h"    // CEqObj::EquipManager / get_behavior_interface (ScanGunGroupTargets)
 #include "common_cequip.h"     // CELauncher::cast / GetBarrelPosWS (ScanGunGroupTargets)
-#include "common_cobjdb.h"     // IObjDB::FindById (AppendSystemManagerTimerListEntry)
+#include "common_cobjdb.h"     // IObjDB::FindById (SystemManagerTimerTable::AppendTimerListEntry)
 #include "dacom.h"             // DACOM_API
 
 #include <cmath>

@@ -413,8 +413,8 @@ namespace
                 FGameLight* Light = nullptr;
                 if (Mem != nullptr)
                     Light = GameLightConstruct(static_cast<FGameLight*>(Mem)); // FUN_005374e0
-                GameLightLoad(Light, &Reader);                               // FUN_00537a40
-                GameLightRelease(Light);                                     // FUN_00537ad0
+                Light->Load(&Reader);                               // FUN_00537a40
+                Light->Release();                                     // FUN_00537ad0
             }
             else if (Reader.is_header("Object"))
             {
@@ -615,22 +615,22 @@ namespace
     // Load one background layer's mesh when it is not bound yet.
     void StarSphereLoadLayer(FStarSphereLayer* Layer)
     {
-        if (!ClientMeshHolderHasInstance(&Layer->Holder))
+        if (!Layer->Holder.HasInstance())
         {
-            if (ClientMeshHolderLoad(&Layer->Holder, Layer->Name.Value, nullptr)) // FUN_00420dd0
+            if (Layer->Holder.Load(Layer->Name.Value, nullptr)) // FUN_00420dd0
             {
                 float Extent = 0.0f;
                 Vector Center = {0.0f, 0.0f, 0.0f};
                 DALib::Engine->GetInstanceExtent(Layer->Holder.EngineInstance, 0, &Extent,
                                                  (Vector*)&Center);
-                ClientMeshHolderSetPosition(&Layer->Holder, &Center); // FUN_00420fd0
-                ClientMeshHolderUpdate(&Layer->Holder);              // FUN_00421070
+                Layer->Holder.SetPosition(&Center); // FUN_00420fd0
+                Layer->Holder.Update();              // FUN_00421070
             }
-            if (!ClientMeshHolderHasInstance(&Layer->Holder))
+            if (!Layer->Holder.HasInstance())
                 FDUMP(kFdumpError, "%s(%d) : *** ERROR: couldnt create starsphere %s",
                       kStarSphereFile, 0x35, Layer->Name.Value);
         }
-        (void)ClientMeshHolderHasInstance(&Layer->Holder); // the return value is unused
+        (void)Layer->Holder.HasInstance(); // the return value is unused
     }
 
     // ------------------------------------------------------------ FUN_00552ea0
@@ -645,23 +645,23 @@ namespace
             {
             case kStarSphereQualityNebulae:
                 StarSphereLoadLayer(&This->Layers[0]);
-                ClientMeshHolderRelease(&This->Layers[1].Holder);
-                ClientMeshHolderRelease(&This->Layers[2].Holder);
+                This->Layers[1].Holder.Release();
+                This->Layers[2].Holder.Release();
                 break;
             case kStarSphereQualityBasicStars:
                 StarSphereLoadLayer(&This->Layers[0]);
                 StarSphereLoadLayer(&This->Layers[1]);
-                ClientMeshHolderRelease(&This->Layers[2].Holder);
+                This->Layers[2].Holder.Release();
                 break;
             case kStarSphereQualityComplexStars:
                 StarSphereLoadLayer(&This->Layers[0]);
-                ClientMeshHolderRelease(&This->Layers[1].Holder);
+                This->Layers[1].Holder.Release();
                 StarSphereLoadLayer(&This->Layers[2]);
                 break;
             default:
-                ClientMeshHolderRelease(&This->Layers[0].Holder);
-                ClientMeshHolderRelease(&This->Layers[1].Holder);
-                ClientMeshHolderRelease(&This->Layers[2].Holder);
+                This->Layers[0].Holder.Release();
+                This->Layers[1].Holder.Release();
+                This->Layers[2].Holder.Release();
                 break;
             }
             This->CurrentQuality = This->DesiredQuality;
@@ -672,11 +672,11 @@ namespace
                                           reinterpret_cast<void**>(&Appearance)) == 0)
         {
             // Draw order: basic stars, complex stars, nebulae.
-            if (ClientMeshHolderHasInstance(&This->Layers[1].Holder))
+            if (This->Layers[1].Holder.HasInstance())
                 Appearance->DrawStarsphere(Camera, This->Layers[1].Holder.EngineInstance);
-            if (ClientMeshHolderHasInstance(&This->Layers[2].Holder))
+            if (This->Layers[2].Holder.HasInstance())
                 Appearance->DrawStarsphere(Camera, This->Layers[2].Holder.EngineInstance);
-            if (ClientMeshHolderHasInstance(&This->Layers[0].Holder))
+            if (This->Layers[0].Holder.HasInstance())
                 Appearance->DrawStarsphere(Camera, This->Layers[0].Holder.EngineInstance);
         }
         if (Appearance != nullptr)
@@ -698,7 +698,7 @@ FStarSphereBackground::FStarSphereBackground()
     // FUN_00552b80: each layer = FUN_00420d40 + CacheString::clear.
     for (int I = 0; I < 3; ++I)
     {
-        MeshHolderConstruct(&Layers[I].Holder);
+        Layers[I].Holder.Construct();
         Layers[I].Name.clear();
     }
     CurrentQuality = kStarSphereQualityOff;
@@ -927,9 +927,9 @@ void StarSysLeave(IObjRW* Player)
     PhySys::Shutdown(StarSysGetActiveSystemId());
     RefreshLoadingProgress();
 
-    ClientMeshHolderRelease(&G_StarSphereBackground.Layers[0].Holder);
-    ClientMeshHolderRelease(&G_StarSphereBackground.Layers[1].Holder);
-    ClientMeshHolderRelease(&G_StarSphereBackground.Layers[2].Holder);
+    G_StarSphereBackground.Layers[0].Holder.Release();
+    G_StarSphereBackground.Layers[1].Holder.Release();
+    G_StarSphereBackground.Layers[2].Holder.Release();
     G_StarSphereBackground.CurrentQuality = kStarSphereQualityOff;
     RefreshLoadingProgress();
 

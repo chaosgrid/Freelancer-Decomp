@@ -198,11 +198,6 @@ namespace
     }
 }
 
-int SpaceCameraSetProperty(FSpaceCamera* Cam, const char* Key, const char* Value)
-{
-    return SetPropertyImpl(Cam, Key, Value);
-}
-
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
 double SpaceCameraHorPlusScale(const FSpaceCamera* Cam)
 {
@@ -211,129 +206,129 @@ double SpaceCameraHorPlusScale(const FSpaceCamera* Cam)
 }
 #endif
 
-void SpaceCameraSetHalfFovX(FSpaceCamera* Cam, float HalfFovXDeg)
+void FSpaceCamera::SetHalfFovX(float HalfFovXDeg)
 {
     // FUN_0040f8c0. A NON-virtual method (RET 4) that owns the whole projection derivation;
     // the ctor and the "fovx" property branch are inlined copies of it, and the GameCamera ctor
     // calls it directly with 35.0f. X plane / XScale with the unrounded tangent, Y plane /
     // YScale with the stored float.
-    Cam->HalfFovXDeg = HalfFovXDeg;
+    this->HalfFovXDeg = HalfFovXDeg;
 
     double TanX = tan(static_cast<double>(HalfFovXDeg) * static_cast<double>(kDegreesToRadians));
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: +0x98 keeps the 4:3 angle, the frustum takes the widened one.
-    TanX *= SpaceCameraHorPlusScale(Cam);
+    TanX *= SpaceCameraHorPlusScale(this);
 #endif
-    const double TanY = TanX / static_cast<double>(Cam->Aspect);
+    const double TanY = TanX / static_cast<double>(Aspect);
     const float TanYStored = static_cast<float>(TanY);
-    Cam->FovYDeg = TangentToDegrees(TanY);
+    FovYDeg = TangentToDegrees(TanY);
 
-    RebuildPlaneX(Cam, TanX);
-    RebuildPlaneY(Cam, TanYStored);
+    RebuildPlaneX(this, TanX);
+    RebuildPlaneY(this, TanYStored);
 }
 
-void SpaceCameraSetFovY(FSpaceCamera* Cam, float FovYDeg)
+void FSpaceCamera::SetFovY(float FovYDeg)
 {
     // FUN_0040fa10. Both plane rebuilds use the UNROUNDED tangents.
-    Cam->FovYDeg = FovYDeg;
+    this->FovYDeg = FovYDeg;
     const double TanY = tan(static_cast<double>(FovYDeg) * static_cast<double>(kDegreesToRadians));
-    const double TanX = TanY * static_cast<double>(Cam->Aspect);
+    const double TanX = TanY * static_cast<double>(Aspect);
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: +0x98 is the 4:3 angle the widened tangent came from.
-    Cam->HalfFovXDeg = TangentToDegrees(TanX / SpaceCameraHorPlusScale(Cam));
+    HalfFovXDeg = TangentToDegrees(TanX / SpaceCameraHorPlusScale(this));
 #else
-    Cam->HalfFovXDeg = TangentToDegrees(TanX);
+    HalfFovXDeg = TangentToDegrees(TanX);
 #endif
-    RebuildPlaneX(Cam, TanX);
-    RebuildPlaneY(Cam, TanY);
+    RebuildPlaneX(this, TanX);
+    RebuildPlaneY(this, TanY);
 }
 
-bool SpaceCameraSetViewport(FSpaceCamera* Cam, const int* ViewRect4)
+bool FSpaceCamera::SetViewport(const int* ViewRect4)
 {
     // FUN_0040fd60 (thiscall, RET 4).
-    Cam->Viewport[0] = ViewRect4[0];
-    Cam->Viewport[1] = ViewRect4[1];
-    Cam->Viewport[2] = ViewRect4[2];
-    Cam->Viewport[3] = ViewRect4[3];
+    Viewport[0] = ViewRect4[0];
+    Viewport[1] = ViewRect4[1];
+    Viewport[2] = ViewRect4[2];
+    Viewport[3] = ViewRect4[3];
 
     // Both extents are the difference PLUS ONE (inclusive edges).
-    const int Width = Cam->Viewport[2] - Cam->Viewport[0] + 1;
-    const int Height = Cam->Viewport[3] - Cam->Viewport[1] + 1;
+    const int Width = Viewport[2] - Viewport[0] + 1;
+    const int Height = Viewport[3] - Viewport[1] + 1;
 
     // The centre x adds the float half-width, the centre y the unrounded half-height (0.5 is
     // the double DAT_005c75e8).
     const float AspectStored = static_cast<float>(static_cast<double>(Width) / static_cast<double>(Height));
-    Cam->Aspect = AspectStored;
+    Aspect = AspectStored;
     const float HalfWidthStored = static_cast<float>(static_cast<double>(Width) * 0.5);
-    Cam->HalfWidth = HalfWidthStored;
+    HalfWidth = HalfWidthStored;
     const double HalfHeight = static_cast<double>(Height) * 0.5;
-    Cam->HalfHeight = static_cast<float>(HalfHeight);
-    Cam->ScreenCenterX = static_cast<float>(static_cast<double>(Cam->Viewport[0]) + HalfWidthStored);
-    Cam->ScreenCenterY = static_cast<float>(static_cast<double>(Cam->Viewport[1]) + HalfHeight);
+    this->HalfHeight = static_cast<float>(HalfHeight);
+    ScreenCenterX = static_cast<float>(static_cast<double>(Viewport[0]) + HalfWidthStored);
+    ScreenCenterY = static_cast<float>(static_cast<double>(Viewport[1]) + HalfHeight);
 
     // Divided by the stored float aspect. X plane / XScale with the unrounded tangent, Y plane /
     // YScale with the stored float.
-    double TanX = tan(static_cast<double>(Cam->HalfFovXDeg) * static_cast<double>(kDegreesToRadians));
+    double TanX = tan(static_cast<double>(HalfFovXDeg) * static_cast<double>(kDegreesToRadians));
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: the 4:3 angle at +0x98 widened for the viewport just stored.
-    TanX *= SpaceCameraHorPlusScale(Cam);
+    TanX *= SpaceCameraHorPlusScale(this);
 #endif
     const double TanY = TanX / static_cast<double>(AspectStored);
     const float TanYStored = static_cast<float>(TanY);
-    Cam->FovYDeg = TangentToDegrees(TanY);
+    FovYDeg = TangentToDegrees(TanY);
 
-    RebuildPlaneX(Cam, TanX);
-    RebuildPlaneY(Cam, TanYStored);
+    RebuildPlaneX(this, TanX);
+    RebuildPlaneY(this, TanYStored);
     return true;
 }
 
-void SpaceCameraSetViewportEx(FSpaceCamera* Cam, const int* ViewRect4, int UnusedFlag)
+void FSpaceCamera::SetViewportEx(const int* ViewRect4, int UnusedFlag)
 {
     // FUN_0040fb80. See the header: the flag really is dead in the shipped build.
     (void)UnusedFlag;
-    SpaceCameraSetViewport(Cam, ViewRect4);
+    SetViewport(ViewRect4);
 }
 
-void SpaceCameraConstruct(FSpaceCamera* Cam)
+void FSpaceCamera::Construct()
 {
     // FUN_0040f150. No memset: retail writes exactly the fields below and leaves ScreenCenterX/Y
     // (+0x68/+0x6c), the viewport (+0xac..+0xbb) and the pad bytes (+0x35..+0x37,
     // +0xbd..+0xbf) as the storage held them -- SetViewport (FUN_0040fd60) fills those in.
     for (int Index = 0; Index < 9; ++Index)
     {
-        (&Cam->World.E[0][0])[Index] = 0.0f;
-        (&Cam->View.E[0][0])[Index] = 0.0f;
+        (&World.E[0][0])[Index] = 0.0f;
+        (&View.E[0][0])[Index] = 0.0f;
     }
-    Cam->World.E[0][0] = 1.0f;
-    Cam->World.E[1][1] = 1.0f;
-    Cam->World.E[2][2] = 1.0f;
-    Cam->View.E[0][0] = 1.0f;
-    Cam->View.E[1][1] = 1.0f;
-    Cam->View.E[2][2] = 1.0f;
+    World.E[0][0] = 1.0f;
+    World.E[1][1] = 1.0f;
+    World.E[2][2] = 1.0f;
+    View.E[0][0] = 1.0f;
+    View.E[1][1] = 1.0f;
+    View.E[2][2] = 1.0f;
     for (int Index = 0; Index < 3; ++Index)
     {
-        (&Cam->WorldPos.x)[Index] = 0.0f;
-        (&Cam->ViewPos.x)[Index] = 0.0f;
+        (&WorldPos.x)[Index] = 0.0f;
+        (&ViewPos.x)[Index] = 0.0f;
     }
 
-    Cam->bViewDirty = 1;
-    Cam->FlagBC = 0;
+    bViewDirty = 1;
+    FlagBC = 0;
 
-    Cam->Aspect = kDefaultAspect;
-    Cam->HalfWidth = kDefaultHalfWidth;
-    Cam->ZNear = kDefaultZNear;           // DAT_00610530
-    Cam->HalfHeight = kDefaultHalfHeight;
-    Cam->ZFar = kDefaultZFar;             // DAT_00610534
-    Cam->HalfFovXDeg = kHalfFovXDegrees;
+    Aspect = kDefaultAspect;
+    HalfWidth = kDefaultHalfWidth;
+    ZNear = kDefaultZNear;           // DAT_00610530
+    HalfHeight = kDefaultHalfHeight;
+    ZFar = kDefaultZFar;             // DAT_00610534
+    HalfFovXDeg = kHalfFovXDegrees;
 
     // X plane and XScale against the unrounded tangent; the Y plane and YScale against the
     // skew rounded to a float.
     const double TanX = tan(kHalfFovXRadians);
     const double Skew = static_cast<double>(kInverseAspect) * TanX;
     const float SkewStored = static_cast<float>(Skew);
-    Cam->FovYDeg = TangentToDegrees(Skew);
-    RebuildPlaneX(Cam, TanX);
-    RebuildPlaneY(Cam, SkewStored);
+    FovYDeg = TangentToDegrees(Skew);
+    RebuildPlaneX(this, TanX);
+    RebuildPlaneY(this, SkewStored);
 }
 
 const float kSpaceCameraCutCosine = 0.95f;      // .data 0x0061402c
@@ -426,7 +421,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
         Game->ClearColor[1] = Fog[1];
         Game->ClearColor[2] = Fog[2];
         Game->Flags = static_cast<unsigned char>(Game->Flags | kGameCameraClearColour | kGameCameraClearDepth);
-        GameCameraClear(Game);
+        Game->Clear();
     }
 
     G_SpaceApp.ActiveCamera = NewCam;
@@ -460,10 +455,10 @@ bool SpaceCameraLoadCockpit(const char* CockpitIniPath)
     // order. Deviation: retail ignores every return value; the port folds them so a caller can
     // tell whether anything complained.
     bool bOk = true;
-    FirstPersonCameraLoad(&G_SpaceApp.FirstPerson, CockpitIniPath);
-    bOk = ThirdPersonCameraLoad(&G_SpaceApp.ThirdPerson, CockpitIniPath) && bOk;
-    bOk = TurretCameraLoad(&G_SpaceApp.Turret, CockpitIniPath) && bOk;
-    bOk = RearViewCameraLoad(&G_SpaceApp.RearView, CockpitIniPath) && bOk;
+    G_SpaceApp.FirstPerson.Load(CockpitIniPath);
+    bOk = G_SpaceApp.ThirdPerson.Load(CockpitIniPath) && bOk;
+    bOk = G_SpaceApp.Turret.Load(CockpitIniPath) && bOk;
+    bOk = G_SpaceApp.RearView.Load(CockpitIniPath) && bOk;
     return bOk;
 }
 
@@ -588,7 +583,7 @@ FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget)
 void ReleaseSpaceCameraControllerParts()
 {
     // 0x0054aef4: FUN_00518410 on controller + 0x00c.
-    FirstPersonCameraReleaseMesh(&G_SpaceApp.FirstPerson);
+    G_SpaceApp.FirstPerson.ReleaseMesh();
     // Retail's calls on + 0x1b0, + 0x3c8 and + 0x500 are the ICF-folded bare RET 0x00401e90.
 }
 
@@ -690,14 +685,14 @@ void BeginDockingCameraSequence(float Seconds)
               "static docking camera must be the active camera before setting the fade out "
               "timer");
     }
-    DockingCameraBeginSequence(&G_SpaceApp.Docking, Seconds);
+    G_SpaceApp.Docking.BeginSequence(Seconds);
 }
 
 void SetupSpaceScriptCamera(void* Object, const float* Transform12, const char* ScriptName)
 {
     // FUN_0054bb10 (cdecl). FUN_0051e3b0 with the arguments reordered, before the guard like
     // FUN_0054bb90.
-    ScriptCameraSetup(&G_SpaceApp.Script, ScriptName, Object, Transform12);
+    G_SpaceApp.Script.Setup(ScriptName, Object, Transform12);
 
     if (G_SpaceApp.bCameraReady)
         SwitchSpaceCameraMode("script", nullptr);
@@ -919,6 +914,9 @@ void FSpaceCamera::GetVelocity(Vector* Out)
     Out->z = 0.0f;
 }
 
+// FUN_0040f5f0 -- the base SetProperty ("fovx" / "fovy" / "znear" / "zfar"; nonzero when the key
+// was one of them), called DIRECTLY, not through slot 0x4c: the GameCamera override
+// (0x0051b3fe) calls the base body this way. Through the vtable it is ICamera::SetProperty.
 int FSpaceCamera::SetProperty(char const* Key, char const* Value)
 {
     return SetPropertyImpl(this, Key, Value);

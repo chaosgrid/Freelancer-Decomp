@@ -12,7 +12,7 @@
                                    // BuildPerpendicularFrame, BuildOrientationBasis
 #include "common_iface.h"          // IObjInspect, ObjInspectOf
 #include "common_pub.h"            // pub::AI::Personality::EngineKillUseStruct
-#include "common_iustategraph.h"   // FindClosestHostileTarget
+#include "common_iustategraph.h"   // SystemManagerTimerTable::FindClosestHostileTarget
 
 #include <cstdint>
 
@@ -136,8 +136,7 @@ int FaceBehavior::OnEvaluateReadiness(float Unused)
         PathfindManager* const Pathfind = BehaviorMgr->Pathfind;
         if (!(Pathfind->CachedObstacleId != 0 && Pathfind->bHasCachedObstacle))
         {
-            IObjInspect* const Closest = FindClosestHostileTarget(
-                &Sys->Timers, Sys->PersonalityData.EngineKillParams.EngineKillMaxTargetDistance);
+            IObjInspect* const Closest = Sys->Timers.FindClosestHostileTarget(Sys->PersonalityData.EngineKillParams.EngineKillMaxTargetDistance);
             Watcher30.set(static_cast<Watchable const*>(static_cast<IObjRW*>(Closest)));
 
             IObjRW* const Watched = GetWatchedRawBlock();

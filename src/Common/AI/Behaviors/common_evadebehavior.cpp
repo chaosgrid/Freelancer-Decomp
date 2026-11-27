@@ -10,7 +10,7 @@
                                    // GetIfaceVectorMagnitude
 #include "common_csys.h"           // Transform
 #include "common_iface.h"          // IObjInspect, IObjRW, ObjInspectOf, ObjRwFromWatchable
-#include "common_iustategraph.h"   // FindClosestHostileTarget
+#include "common_iustategraph.h"   // SystemManagerTimerTable::FindClosestHostileTarget
 #include "common_systemmanager.h"  // SystemManager -- what SysMgr points at
 
 #include <cmath>
@@ -215,16 +215,16 @@ void EvadeBehavior::OnEngage()
         BreakAway.AfterburnerDelay = static_cast<float>(static_cast<double>(B.EvadeBreakAfterburnerDelay) - R);
     }
 
-    if (SysMgr->SelfTarget.Iface->is_player())
-    {
-        // Negated rotation column 2 -> FUN_062d88c0.
-        Transform const& Xf = SysMgr->SelfTarget.Iface->get_transform();
-        Vector Forward;
-        Forward.x = -Xf.Rotation.E[0][2];
-        Forward.y = -Xf.Rotation.E[1][2];
-        Forward.z = -Xf.Rotation.E[2][2];
-        Dodge.SetPreferredForward(Forward);
-    }
+    if (!SysMgr->SelfTarget.Iface->is_player())
+        return;
+
+    // Negated rotation column 2 -> FUN_062d88c0.
+    Transform const& Xf = SysMgr->SelfTarget.Iface->get_transform();
+    Vector Forward;
+    Forward.x = -Xf.Rotation.E[0][2];
+    Forward.y = -Xf.Rotation.E[1][2];
+    Forward.z = -Xf.Rotation.E[2][2];
+    Dodge.SetPreferredForward(Forward);
 }
 
 // ----------------------------------------------------------------------------
@@ -257,7 +257,7 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
         Result = 0;
     }
 
-    if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers))   // FUN_062e8870
+    if (Sys->Timers.HasMissileReactionTarget())   // FUN_062e8870
     {
         Readiness = Flag29 ? 3 : 0;
         return Readiness;
@@ -268,8 +268,7 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
         return Readiness;
     }
 
-    IObjInspect* const Closest = FindClosestHostileTarget(&Sys->Timers,
-                                                          Sys->PersonalityData.EvadeDodgeParams.EvadeActivateRange);
+    IObjInspect* const Closest = Sys->Timers.FindClosestHostileTarget(Sys->PersonalityData.EvadeDodgeParams.EvadeActivateRange);
     Watcher2a0.set(static_cast<Watchable const*>(static_cast<IObjRW*>(Closest)));
 
     if (IsWatching(Watcher2a0))
@@ -350,7 +349,7 @@ int EvadeBehavior::OnUpdate()
     }
 
     int const OldMode = EvadeMode;
-    if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers))
+    if (Sys->Timers.HasMissileReactionTarget())
     {
         EvadeMode = kEvadeModeMissile;
     }
@@ -491,11 +490,11 @@ int EvadeBehavior::OnUpdate()
         // the Personality::MissileReaction range it falls inside.
         void* const MissileRaw = *reinterpret_cast<void* const*>(Sys->Timers.BestCandidateWatcherBytes);
         int Mode;
-        if (TimerTableMissileWithinReaction00(&Sys->Timers))        // FUN_062e8910
+        if (Sys->Timers.MissileWithinReaction00())        // FUN_062e8910
             Mode = kDodgeMissileBreak;
-        else if (TimerTableMissileWithinReaction04(&Sys->Timers))   // FUN_062e8940
+        else if (Sys->Timers.MissileWithinReaction04())   // FUN_062e8940
             Mode = kDodgeMissileSlide;
-        else if (TimerTableMissileWithinReaction08(&Sys->Timers))   // FUN_062e8970
+        else if (Sys->Timers.MissileWithinReaction08())   // FUN_062e8970
             Mode = kDodgeMissileAfterburn;
         else
         {
@@ -529,7 +528,7 @@ bool EvadeBehavior::OnApplyDirective(void* DirectiveOp)
     }
     else
     {
-        Target = FindClosestHostileTarget(&Sys->Timers, Sys->PersonalityData.EvadeDodgeParams.EvadeActivateRange);
+        Target = Sys->Timers.FindClosestHostileTarget(Sys->PersonalityData.EvadeDodgeParams.EvadeActivateRange);
     }
     Watcher2a0.set(Target != nullptr
                        ? reinterpret_cast<Watchable const*>(static_cast<char*>(Target) + 8)

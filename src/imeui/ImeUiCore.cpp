@@ -183,20 +183,20 @@ void ImeUi_Uninitialize()
 
 void ImeUi_SetState(bool bState)
 {
-    if (GbInitialized && GWindow)
+    if (!GbInitialized || !GWindow)
+        return;
+
+    if (GbDisabled)
+        bState = false;
+    if (GWindow == GMessageWindow)
     {
-        if (GbDisabled)
-            bState = false;
-        if (GWindow == GMessageWindow)
-        {
-            HIMC hImc = bState ? GCapturedContext : NULL;
-            ImmAssociateContext(GWindow, hImc);
-        }
-        GbEnabled = bState;
-        if (bState)
-        {
-            ImeUi_GetState();
-        }
+        HIMC hImc = bState ? GCapturedContext : NULL;
+        ImmAssociateContext(GWindow, hImc);
+    }
+    GbEnabled = bState;
+    if (bState)
+    {
+        ImeUi_GetState();
     }
 }
 
@@ -246,16 +246,16 @@ void ImeUi_SetSupportLevel(DWORD Level)
     if (!GbInitialized)
         return;
     GRequestedSupportLevel = Level;
-    if (Level >= 2 && Level <= 3)
+    if (Level < 2 || Level > 3)
+        return;
+
+    if ((GLanguage & 0x3FF) == LANG_KOREAN) // Korean
     {
-        if ((GLanguage & 0x3FF) == LANG_KOREAN) // Korean
-        {
-            Level = 3;
-        }
-        GSupportLevel = Level;
-        ImeUi_FinalizeString(true);
-        UpdateCompositionColors();
+        Level = 3;
     }
+    GSupportLevel = Level;
+    ImeUi_FinalizeString(true);
+    UpdateCompositionColors();
 }
 
 DWORD ImeUi_GetSupportLevel()
@@ -265,19 +265,19 @@ DWORD ImeUi_GetSupportLevel()
 
 void ImeUi_SetAppearance(const _IMEUI_APPEARANCE* Appearance)
 {
-    if (GbInitialized && Appearance)
-    {
-        memcpy(&GAppearance, Appearance, sizeof(_IMEUI_APPEARANCE));
-        GAppearance.SymbolOnColor &= 0x00ffffff;
-        GAppearance.SymbolOffColor &= 0x00ffffff;
-        GAppearance.SymbolBackgroundColor &= 0x00ffffff;
-        GAppearance.CompositionInputColor &= 0x00ffffff;
-        GAppearance.CompositionTargetColor &= 0x00ffffff;
-        GAppearance.CompositionConvertedColor &= 0x00ffffff;
-        GAppearance.CompositionTargetConvertedColor &= 0x00ffffff;
-        GAppearance.CompositionErrorColor &= 0x00ffffff;
-        UpdateCompositionColors();
-    }
+    if (!GbInitialized || !Appearance)
+        return;
+
+    memcpy(&GAppearance, Appearance, sizeof(_IMEUI_APPEARANCE));
+    GAppearance.SymbolOnColor &= 0x00ffffff;
+    GAppearance.SymbolOffColor &= 0x00ffffff;
+    GAppearance.SymbolBackgroundColor &= 0x00ffffff;
+    GAppearance.CompositionInputColor &= 0x00ffffff;
+    GAppearance.CompositionTargetColor &= 0x00ffffff;
+    GAppearance.CompositionConvertedColor &= 0x00ffffff;
+    GAppearance.CompositionTargetConvertedColor &= 0x00ffffff;
+    GAppearance.CompositionErrorColor &= 0x00ffffff;
+    UpdateCompositionColors();
 }
 
 void ImeUi_GetAppearance(_IMEUI_APPEARANCE* Appearance)
@@ -339,13 +339,13 @@ void ImeUi_SetCaretPosition(int X, int Y)
 
 void ImeUi_SetFontAppearance(CImeUiFont_Base* Font, unsigned Color, const RECT* Rect)
 {
-    if (GbInitialized)
-    {
-        GCompositionFont = Font;
-        GBounding = *Rect;
-        GCandidateColor = GAppearance.CandidateColor ? GAppearance.CandidateColor : Color;
-        GCompositionColor = GAppearance.CompositionColor ? GAppearance.CompositionColor : Color;
-    }
+    if (!GbInitialized)
+        return;
+
+    GCompositionFont = Font;
+    GBounding = *Rect;
+    GCandidateColor = GAppearance.CandidateColor ? GAppearance.CandidateColor : Color;
+    GCompositionColor = GAppearance.CompositionColor ? GAppearance.CompositionColor : Color;
 }
 
 void ImeUi_SetScreenSize(int Width, int Height)
@@ -359,31 +359,31 @@ void ImeUi_SetScreenSize(int Width, int Height)
 
 void ImeUi_FinalizeString(bool bSendMsg)
 {
-    if (GbInitialized && GWindow)
+    if (!GbInitialized || !GWindow)
+        return;
+
+    HIMC hImc = ImmGetContext(GWindow);
+    if (!hImc)
+        return;
+
+    if (GbFinalizing)
     {
-        HIMC hImc = ImmGetContext(GWindow);
-        if (hImc)
-        {
-            if (GbFinalizing)
-            {
-                ImmReleaseContext(GWindow, hImc);
-                return;
-            }
-            GbFinalizing = true;
-            if (GSupportLevel == 2 && bSendMsg)
-            {
-                SendComposition();
-            }
-            memset(GComposition, 0, sizeof(GComposition));
-            memset(GCompositionAttributes, 0, sizeof(GCompositionAttributes));
-            GClientCaret = 0;
-            GCompositionCursor = 0;
-            ImmNotifyIME(hImc, NI_CLOSECANDIDATE, 4, 0);
-            ImmNotifyIME(hImc, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
-            ImmReleaseContext(GWindow, hImc);
-            GbFinalizing = false;
-        }
+        ImmReleaseContext(GWindow, hImc);
+        return;
     }
+    GbFinalizing = true;
+    if (GSupportLevel == 2 && bSendMsg)
+    {
+        SendComposition();
+    }
+    memset(GComposition, 0, sizeof(GComposition));
+    memset(GCompositionAttributes, 0, sizeof(GCompositionAttributes));
+    GClientCaret = 0;
+    GCompositionCursor = 0;
+    ImmNotifyIME(hImc, NI_CLOSECANDIDATE, 4, 0);
+    ImmNotifyIME(hImc, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
+    ImmReleaseContext(GWindow, hImc);
+    GbFinalizing = false;
 }
 
 static void SendComposition()
@@ -1103,14 +1103,14 @@ static void SetupReadingApi()
     GGetReadingString = NULL;
     GShowReadingWindow = NULL;
     char FileName[264];
-    if (ImmGetIMEFileNameA(GKeyboardLayout, FileName, 260))
+    if (!ImmGetIMEFileNameA(GKeyboardLayout, FileName, 260))
+        return;
+
+    HMODULE Library = LoadLibraryA(FileName);
+    if (Library)
     {
-        HMODULE Library = LoadLibraryA(FileName);
-        if (Library)
-        {
-            GGetReadingString = reinterpret_cast<PFN_GETREADINGSTRING>(GetProcAddress(Library, "GetReadingString"));
-            GShowReadingWindow = reinterpret_cast<PFN_SHOWREADINGWINDOW>(GetProcAddress(Library, "ShowReadingWindow"));
-        }
+        GGetReadingString = reinterpret_cast<PFN_GETREADINGSTRING>(GetProcAddress(Library, "GetReadingString"));
+        GShowReadingWindow = reinterpret_cast<PFN_SHOWREADINGWINDOW>(GetProcAddress(Library, "ShowReadingWindow"));
     }
 }
 // FUN_067142e0: synthesized cursor keys do not feed the client's normal key filtering.
@@ -1269,19 +1269,19 @@ static void UpdateReadingOrientation(DWORD Id)
     lstrcpyA(KeyName, "software\\microsoft\\windows\\currentversion\\");
     lstrcatA(KeyName, Version < 0x05010000 ? "TINTLGNT" : "MSTCIPH");
     HKEY Key;
-    if (RegOpenKeyExA(HKEY_CURRENT_USER, KeyName, 0, KEY_READ, &Key) == ERROR_SUCCESS)
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, KeyName, 0, KEY_READ, &Key) != ERROR_SUCCESS)
+        return;
+
+    DWORD Mapping;
+    DWORD Size = 4;
+    DWORD Type;
+    if (RegQueryValueExA(Key, "keyboard mapping", NULL, &Type, reinterpret_cast<BYTE*>(&Mapping), &Size) == ERROR_SUCCESS)
     {
-        DWORD Mapping;
-        DWORD Size = 4;
-        DWORD Type;
-        if (RegQueryValueExA(Key, "keyboard mapping", NULL, &Type, reinterpret_cast<BYTE*>(&Mapping), &Size) == ERROR_SUCCESS)
-        {
-            BYTE Value = static_cast<BYTE>(Mapping);
-            if ((Version <= 0x05000000 && (Value == 0x22 || Value == 0x23)) || ((Version == 0x05010000 || Version == 0x05020000) && Value >= 0x22 && Value <= 0x24))
-                GbHorizontalReading = true;
-        }
-        RegCloseKey(Key);
+        BYTE Value = static_cast<BYTE>(Mapping);
+        if ((Version <= 0x05000000 && (Value == 0x22 || Value == 0x23)) || ((Version == 0x05010000 || Version == 0x05020000) && Value >= 0x22 && Value <= 0x24))
+            GbHorizontalReading = true;
     }
+    RegCloseKey(Key);
 }
 
 static void AssembleReading()

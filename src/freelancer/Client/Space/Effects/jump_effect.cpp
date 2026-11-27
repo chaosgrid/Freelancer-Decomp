@@ -187,10 +187,10 @@ void FJumpGateEffect::Update(float Dt)
     }
 }
 
-void JumpGateEffectFire(FJumpGateEffect* Gate)
+void FJumpGateEffect::Fire()
 {
     // FUN_00503380.
-    Gate->bFire = 1;
+    bFire = 1;
 }
 
 JumpShipEffectDesc* JumpShipEffectDescGet()
@@ -537,7 +537,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         Tunnel = Found;
         if (Found != nullptr)
         {
-            GateTunnelSetShip(Found, Ship);
+            Found->SetShip(Ship);
             Found->Frame = GateHardpointFrame;
         }
         DestSystem = SolarObj->DestSystem;
@@ -603,7 +603,7 @@ namespace
                                Transform const& Xform)
     {
         if (Fx.Particle != nullptr)
-            ParticleEffectAttach(Fx.Particle, Ship, Index, &Xform);
+            Fx.Particle->Attach(Ship, Index, &Xform);
         if (Fx.Sound != nullptr)
             Fx.Sound->SetPose(Index, &Xform);
         if (Fx.Light != nullptr)
@@ -625,8 +625,7 @@ void FJumpShipEffect::StartJumpOut()
     bool bStarted = false;
     if (!TunnelEffect.IsEmpty())
     {
-        bStarted = CliCreateEffectWorldOneShotOn(
-                       &G_CliEffectFactoryJump, FindEffectArch(&TunnelEffect.Id),
+        bStarted = G_CliEffectFactoryJump.CreateEffectWorldOneShotOn(FindEffectArch(&TunnelEffect.Id),
                        &GateHardpointFrame, Velocity, &FxB) != 0;
     }
     if (!bStarted)
@@ -656,8 +655,8 @@ void FJumpShipEffect::EnterTunnel()
 
     ID_String const& JumpOutEffect = Desc->Ids[1];
     if (!JumpOutEffect.IsEmpty() &&
-        CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpOutEffect.Id),
-                                      &World, Velocity, &FxA) != 0)
+        G_CliEffectFactoryJump.CreateEffectWorldOneShotOn(FindEffectArch(&JumpOutEffect.Id),
+                                                          &World, Velocity, &FxA) != 0)
     {
         Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());
@@ -682,8 +681,8 @@ void FJumpShipEffect::StartJumpIn()
 
     ID_String const& JumpInEffect = Desc->Ids[2];
     if (!JumpInEffect.IsEmpty() &&
-        CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpInEffect.Id),
-                                      &World, Velocity, &FxC) != 0)
+        G_CliEffectFactoryJump.CreateEffectWorldOneShotOn(FindEffectArch(&JumpInEffect.Id),
+                                                          &World, Velocity, &FxC) != 0)
     {
         Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());

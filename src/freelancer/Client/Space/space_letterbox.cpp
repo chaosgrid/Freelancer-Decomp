@@ -183,7 +183,7 @@ void UpdateLetterbox(FSpaceCamera* Cam, float DeltaSeconds)
     const ViewRect View = Rect_to_ViewRect(Bounds);
 
     // The flag argument is dead.
-    SpaceCameraSetViewportEx(Cam, &View.Left, 0);
+    Cam->SetViewportEx(&View.Left, 0);
 }
 
 void UpdateRoomLetterbox(FRoomCamera* Cam, float DeltaSeconds)

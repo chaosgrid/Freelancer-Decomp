@@ -326,13 +326,13 @@ FCargoScanRoute::FCargoScanRoute(FCargoScanRoute const& Other)
 // by the members' destructors in that order.
 FCargoScanRoute::~FCargoScanRoute()
 {
-    if (TargetId != 0)
-    {
-        FContentShipBase* Target = FindSystemShip(Ship, TargetId);
-        if (Target != nullptr)
-            Target->bScanTarget = 0;
-        TargetId = 0;
-    }
+    if (TargetId == 0)
+        return;
+
+    FContentShipBase* Target = FindSystemShip(Ship, TargetId);
+    if (Target != nullptr)
+        Target->bScanTarget = 0;
+    TargetId = 0;
 }
 
 // FUN_06f0c500.

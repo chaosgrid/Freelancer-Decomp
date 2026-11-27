@@ -243,7 +243,7 @@ bool WinControlHalfExtentsFromMesh(Vector* HalfExtents, FClientMeshHolder* Holde
 {
     // FUN_005a1340.
     FClientMeshAabb Box;
-    if (!ClientMeshQueryAabb(Holder, &Box))
+    if (!Holder->QueryAabb(&Box))
         return false;
     HalfExtents->x = Box.Values[0];
     HalfExtents->y = Box.Values[2];

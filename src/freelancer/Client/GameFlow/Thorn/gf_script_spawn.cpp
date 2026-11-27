@@ -261,7 +261,7 @@ void FGfScript::ApplySpecialMarker(FThornEntitySnap const* Snap, FThornComponent
     SetGeoPose(Obj, &Local.Pos, &Local.Orient);
     if (_stricmp(EntityName, "special/p") != 0)
         return;
-    FCharacterObject* const Player = RoomControlPlayerCharacter(Room);
+    FCharacterObject* const Player = Room->PlayerCharacter();
     if (Player != nullptr)
         Player->SetFloorHeight(Local.Pos.y);
 }
@@ -564,7 +564,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
     FThornEntitySnap const* const Snap = EntitySnap(Engine, Index);
     if ((Snap->Flags & 1) != 0)
     {
-        FObjectProp* const Prop = RoomControlFindProp(Room, Snap->Name);
+        FObjectProp* const Prop = Room->FindProp(Snap->Name);
         if (Prop == nullptr)
         {
             FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find referenced prop %s in the set layer",
@@ -618,7 +618,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
     if (bPropsToRoom == 0)
         Sequence->AddProp(Prop, Data.Name.c_str());
     else
-        RoomControlAddProp(Room, Prop);
+        Room->AddProp(Prop);
 }
 
 // FUN_0044e870. The player is FUN_00449cd0, a room role FUN_00449d50. Otherwise BindMode picks
@@ -643,7 +643,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
 
     if (bPlayer)
     {
-        Character = RoomControlPlayerCharacter(Room);
+        Character = Room->PlayerCharacter();
         if (Character == nullptr)
         {
             FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptFile, 0x358,
@@ -655,7 +655,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
     }
     if (bRole)
     {
-        Character = RoomControlFindCharacterByName(Room, Actor);
+        Character = Room->FindCharacterByName(Actor);
         if (Character == nullptr)
             return nullptr;
         Character->TakeOverForScript(bOwnScript);

@@ -166,23 +166,23 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
         Speed0.z = SpeedDelta0.z + Speed0.z;
     }
 
-    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
-    {
-        Vector Impulse;
-        Impulse.x = Push0.x * Magnitude; // single-precision products
-        Impulse.y = Push0.y * Magnitude;
-        Impulse.z = Push0.z * Magnitude;
-        IVP_U_Point ImpulseOS;
-        MWorldFCore[1]->vimult(AsPoint(&Impulse), &ImpulseOS);
-        Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], AsVector(&ImpulseOS), &Impulse,
-                                      &SpeedDelta1, &RotSpeedDelta1);
-        RotSpeed1.x = RotSpeedDelta1.x + RotSpeed1.x;
-        RotSpeed1.y = RotSpeedDelta1.y + RotSpeed1.y;
-        RotSpeed1.z = RotSpeedDelta1.z + RotSpeed1.z;
-        Speed1.x = SpeedDelta1.x + Speed1.x;
-        Speed1.y = SpeedDelta1.y + Speed1.y;
-        Speed1.z = SpeedDelta1.z + Speed1.z;
-    }
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
+        return;
+
+    Vector Impulse;
+    Impulse.x = Push0.x * Magnitude; // single-precision products
+    Impulse.y = Push0.y * Magnitude;
+    Impulse.z = Push0.z * Magnitude;
+    IVP_U_Point ImpulseOS;
+    MWorldFCore[1]->vimult(AsPoint(&Impulse), &ImpulseOS);
+    Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], AsVector(&ImpulseOS), &Impulse,
+                                  &SpeedDelta1, &RotSpeedDelta1);
+    RotSpeed1.x = RotSpeedDelta1.x + RotSpeed1.x;
+    RotSpeed1.y = RotSpeedDelta1.y + RotSpeed1.y;
+    RotSpeed1.z = RotSpeedDelta1.z + RotSpeed1.z;
+    Speed1.x = SpeedDelta1.x + Speed1.x;
+    Speed1.y = SpeedDelta1.y + Speed1.y;
+    Speed1.z = SpeedDelta1.z + Speed1.z;
 }
 
 // FUN_06356f30: RelativePointSpeed = point speed of core 1 - point speed of core 0.
@@ -271,23 +271,23 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
         Speed0.z = Speed0.z + SpeedDelta0.z;
     }
 
-    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
-    {
-        Vector NegImpulse;
-        NegImpulse.x = -Impulse.x; // * DAT_063a5498 (-1.0f)
-        NegImpulse.y = -Impulse.y;
-        NegImpulse.z = -Impulse.z;
-        Vector ImpulseOS;
-        IVP_ImpactSolver_RotateWSToOSInline(MWorldFCore[1], NegImpulse.x, NegImpulse.y, NegImpulse.z, &ImpulseOS);
-        Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], &ImpulseOS, &NegImpulse, &SpeedDelta1,
-                                      &RotSpeedDelta1);
-        RotSpeed1.x = RotSpeed1.x + RotSpeedDelta1.x;
-        RotSpeed1.y = RotSpeed1.y + RotSpeedDelta1.y;
-        RotSpeed1.z = RotSpeed1.z + RotSpeedDelta1.z;
-        Speed1.x = SpeedDelta1.x + Speed1.x;
-        Speed1.y = SpeedDelta1.y + Speed1.y;
-        Speed1.z = SpeedDelta1.z + Speed1.z;
-    }
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
+        return;
+
+    Vector NegImpulse;
+    NegImpulse.x = -Impulse.x; // * DAT_063a5498 (-1.0f)
+    NegImpulse.y = -Impulse.y;
+    NegImpulse.z = -Impulse.z;
+    Vector ImpulseOS;
+    IVP_ImpactSolver_RotateWSToOSInline(MWorldFCore[1], NegImpulse.x, NegImpulse.y, NegImpulse.z, &ImpulseOS);
+    Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], &ImpulseOS, &NegImpulse, &SpeedDelta1,
+                                  &RotSpeedDelta1);
+    RotSpeed1.x = RotSpeed1.x + RotSpeedDelta1.x;
+    RotSpeed1.y = RotSpeed1.y + RotSpeedDelta1.y;
+    RotSpeed1.z = RotSpeed1.z + RotSpeedDelta1.z;
+    Speed1.x = SpeedDelta1.x + Speed1.x;
+    Speed1.y = SpeedDelta1.y + Speed1.y;
+    Speed1.z = SpeedDelta1.z + Speed1.z;
 }
 
 // FUN_06357340: subtracts the deltas StepImpulse2 last wrote.
@@ -303,15 +303,15 @@ void IVP_Impact_Solver::UndoLastStepImpulse()
         Speed0.z = Speed0.z - SpeedDelta0.z;
     }
 
-    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
-    {
-        RotSpeed1.x = RotSpeed1.x - RotSpeedDelta1.x;
-        RotSpeed1.y = RotSpeed1.y - RotSpeedDelta1.y;
-        RotSpeed1.z = RotSpeed1.z - RotSpeedDelta1.z;
-        Speed1.x = Speed1.x - SpeedDelta1.x;
-        Speed1.y = Speed1.y - SpeedDelta1.y;
-        Speed1.z = Speed1.z - SpeedDelta1.z;
-    }
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
+        return;
+
+    RotSpeed1.x = RotSpeed1.x - RotSpeedDelta1.x;
+    RotSpeed1.y = RotSpeed1.y - RotSpeedDelta1.y;
+    RotSpeed1.z = RotSpeed1.z - RotSpeedDelta1.z;
+    Speed1.x = Speed1.x - SpeedDelta1.x;
+    Speed1.y = Speed1.y - SpeedDelta1.y;
+    Speed1.z = Speed1.z - SpeedDelta1.z;
 }
 
 // FUN_06356fb0. The sign test uses the unrounded dot; the rest uses its float.

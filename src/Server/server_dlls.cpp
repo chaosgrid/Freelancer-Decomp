@@ -67,12 +67,12 @@ IClient* Server_LoadClientDll(const char* module_path) {
 // live IChatClient is never zeroed in retail. Shutdown pushes an argument the body never
 // reads, so the port takes none.
 void Server_FreeClientDll() {
-    if (g_hClientDll) {
-        FreeLibrary(g_hClientDll);
-        g_hClientDll = nullptr;
-        GLoadedClientInterface = nullptr;
-        GLoadedChatClientInterface = nullptr;
-    }
+    if (!g_hClientDll)
+        return;
+    FreeLibrary(g_hClientDll);
+    g_hClientDll = nullptr;
+    GLoadedClientInterface = nullptr;
+    GLoadedChatClientInterface = nullptr;
 }
 
 // FUN_06d433c0; sole caller Startup.
@@ -327,46 +327,46 @@ void Server_LoadInitialDlls(const char* IniPath) {
 
     INI_Reader Reader;
     unsigned int Priority = 0;
-    if (Reader.open(IniPath, false) && Reader.read_header()) {
-        do {
-            RefreshLoadingProgress();
-            if (((Reader.is_header("Initial SP DLLs") && SinglePlayer()) ||
-                 (Reader.is_header("Initial MP DLLs") && !SinglePlayer())) &&
-                Reader.read_value()) {
-                do {
-                    if (Reader.is_value("path")) {
-                        const char* PathValue = Reader.get_value_string();
-                        if (PathValue == nullptr) {
-                            GDllPathLength = 0;
-                            GDllPath[0] = '\0';
-                        } else {
-                            GDllPathLength = FBounded::Copy(GDllPath, sizeof(GDllPath), PathValue);
-                        }
-                    } else if (Reader.is_value("DLL")) {
-                        char DllName[0x104];
-                        char InterfaceName[0x104];
-                        char PriorityName[0x20];
-                        const char* Value = Reader.get_value_string(0);
-                        DllName[0] = '\0';
-                        if (Value != nullptr) FBounded::Copy(DllName, sizeof(DllName), Value);
-                        Value = Reader.get_value_string(1);
-                        InterfaceName[0] = '\0';
-                        if (Value != nullptr) FBounded::Copy(InterfaceName, sizeof(InterfaceName), Value);
-                        Value = Reader.get_value_string(2);
-                        PriorityName[0] = '\0';
-                        if (Value != nullptr) FBounded::Copy(PriorityName, sizeof(PriorityName), Value);
-                        for (unsigned int Row = 0; Row < 5; ++Row) {
-                            if (_stricmp(PriorityTable[Row].Name, PriorityName) == 0) {
-                                Priority = PriorityTable[Row].Value;
-                                break;
-                            }
-                        }
-                        Server_ControllerCreate(DllName, InterfaceName, nullptr, Priority);
+    if (!Reader.open(IniPath, false) || !Reader.read_header())
+        return;
+    do {
+        RefreshLoadingProgress();
+        if (((Reader.is_header("Initial SP DLLs") && SinglePlayer()) ||
+             (Reader.is_header("Initial MP DLLs") && !SinglePlayer())) &&
+            Reader.read_value()) {
+            do {
+                if (Reader.is_value("path")) {
+                    const char* PathValue = Reader.get_value_string();
+                    if (PathValue == nullptr) {
+                        GDllPathLength = 0;
+                        GDllPath[0] = '\0';
+                    } else {
+                        GDllPathLength = FBounded::Copy(GDllPath, sizeof(GDllPath), PathValue);
                     }
-                } while (Reader.read_value());
-            }
-        } while (Reader.read_header());
-    }
+                } else if (Reader.is_value("DLL")) {
+                    char DllName[0x104];
+                    char InterfaceName[0x104];
+                    char PriorityName[0x20];
+                    const char* Value = Reader.get_value_string(0);
+                    DllName[0] = '\0';
+                    if (Value != nullptr) FBounded::Copy(DllName, sizeof(DllName), Value);
+                    Value = Reader.get_value_string(1);
+                    InterfaceName[0] = '\0';
+                    if (Value != nullptr) FBounded::Copy(InterfaceName, sizeof(InterfaceName), Value);
+                    Value = Reader.get_value_string(2);
+                    PriorityName[0] = '\0';
+                    if (Value != nullptr) FBounded::Copy(PriorityName, sizeof(PriorityName), Value);
+                    for (unsigned int Row = 0; Row < 5; ++Row) {
+                        if (_stricmp(PriorityTable[Row].Name, PriorityName) == 0) {
+                            Priority = PriorityTable[Row].Value;
+                            break;
+                        }
+                    }
+                    Server_ControllerCreate(DllName, InterfaceName, nullptr, Priority);
+                }
+            } while (Reader.read_value());
+        }
+    } while (Reader.read_header());
 }
 
 // Neither arm tests the record's interface pointer before calling it.

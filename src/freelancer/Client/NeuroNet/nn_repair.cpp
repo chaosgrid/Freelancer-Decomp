@@ -13,7 +13,7 @@
                                     // GetClientLocationBaseMarket (FUN_0043a510),
                                     // GetClientCurrentLocationBaseData (FUN_0043b630)
 #include "Common/client_cliobj.h"          // Archetype::CliObjMaterialPaths (companion +0x20)
-#include "Space/HUD/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
+#include "Space/HUD/hud_command_dispatch.h"   // EventHandler::PushCancelHandler (FUN_00576360)
 #include "Space/HUD/hud_target.h"             // HudIsMousePickBlocked (FUN_0045a740),
                                     // HudCollisionGroupTypeIds (FUN_0045a7c0)
 #include "Interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
@@ -269,7 +269,7 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
     }
 
     ShowPlayerCash();
-    HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
+    PushCancelHandler(0); // FUN_00576360
     return Win3D::Create(NewParent, Data);      // FUN_004b5060
 }
 

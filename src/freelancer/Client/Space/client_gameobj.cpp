@@ -10,7 +10,7 @@
 #include "Space/Effects/cli_projectile_fx.h"   // CliEffectListClear / FCliEquipFirePacket / fire-host ports
 #include "Common/client_cliobj.h"       // Archetype::CliShipBayDoorSound (CliShip +0x58 / +0x5c)
 #include "Space/client_debris.h"       // FindDebrisArch / CreateDebrisGameobjForObject (FUN_00533d10)
-#include "Space/Effects/client_equip_fx.h"     // EquippedObjRebuildEquipFx / EquippedObjClearEquipFx
+#include "Space/Effects/client_equip_fx.h"     // FClientGameobj::RebuildEquipFx / FClientGameobj::ClearEquipFx
 #include "Space/Effects/client_explosion.h"    // Action_Explode (FUN_005361e0)
 #include "Space/Effects/client_fuse.h"         // FFuseBurnNode
 #include "Space/client_objdb.h"        // GetClientObjDb (DAT_00678a2c)
@@ -48,20 +48,20 @@
 #include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteViolet (DAT_00679b80)
 #include "Interface/win3d_engine_submit.h" // FUN_00433f40 / FUN_00434630 (Solar waypoint marker)
 #include "Space/client_land_action.h"  // Action_Land (FUN_00542b70)
-#include "Space/Effects/particle_effect.h"     // FParticleEffect, ParticleEffectArmDeath / Release
+#include "Space/Effects/particle_effect.h"     // FParticleEffect, FParticleEffect::Kill / Release
 #include "Space/player_behavior.h"     // GetPlayerObjRW (FUN_0054baf0)
 #include "Space/player_spawn.h"        // GetPlayerCharacterId (DAT_00673378), GetPlayerConnectionId
 #include "render/rendcomp.h"     // IRenderer2 (Guided slot 112's extents / centre)
 #include "Network/server_connect.h"      // GetLocalServerInterface (DAT_0067ecd0)
 #include "soundmanager.h"        // ISoundSource
 #include "Space/Cameras/space_camera.h"        // SetDockingCameraTransform / RequestSpaceCameraMode
-#include "Space/space_scene_obj_draw.h" // GameobjPickLodRetail (FUN_00539820)
+#include "Space/space_scene_obj_draw.h" // FClientGameobj::PickLod (FUN_00539820)
 #include "Space/space_state.h"         // SetPendingLandBase (FUN_00548ef0)
 #include "Space/star_sphere.h"         // FStarSphere (Solar +0xe4)
 #include "Space/star_sys.h"            // StarSysSuppressPlayerCollisions, GetAttitudeClass
 #include "Common/Graphics/texture_panels.h"      // TexturePanelsCreate / Load (Solar "ring", FUN_005485c0)
 #include "Space/Effects/tradelane_fx.h"        // TradeLaneShipGoHandler (the LAB_00546e90 tail)
-#include "Common/Graphics/vis_effect_arch.h"     // FindEffectArch / EffectArchAddRef / EffectArchRelease
+#include "Common/Graphics/vis_effect_arch.h"     // FindEffectArch / FEffectArch::AddRef / FEffectArch::Release
 
 #include <cmath>
 #include <cstdio>
@@ -141,17 +141,16 @@ FGameobjEffectList::~FGameobjEffectList()
     CliEffectListClear(this, nullptr);
 }
 
-void GameobjCreateOfClass(FClientGameobj* Self, CObject::Class ObjectClass,
-                          Archetype::Root* Arch)
+void FClientGameobj::CreateOfClass(CObject::Class ObjectClass, Archetype::Root* Arch)
 {
     // FUN_00539bc0. create_instance's return value is dropped (the engine stores the id at
     // CObject+4 through IEngineInstance::initialize_instance). No null tests. open is NOT part
     // of it -- the caller does that afterwards.
-    Self->Object = CObject::Alloc(ObjectClass);
-    Arch->create_instance(static_cast<IEngineInstance*>(Self->Object));
-    DALib::Engine->UpdateInstance(Self->Object->EngineInstanceId, 0u,
+    Object = CObject::Alloc(ObjectClass);
+    Arch->create_instance(static_cast<IEngineInstance*>(Object));
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0u,
                                   nullptr);
-    Self->advise(true);
+    advise(true);
 }
 
 namespace
@@ -172,7 +171,7 @@ namespace
     void CreateOpenConnect(FClientEquippedObj* Self, CObject::Class ObjectClass,
                            Archetype::Root* Arch)
     {
-        GameobjCreateOfClass(Self, ObjectClass, Arch);
+        Self->CreateOfClass(ObjectClass, Arch);
         unsigned const Mask = static_cast<unsigned>(ObjectClass);
         NarrowObject(Self, Mask)->open(Arch);
         static_cast<CEqObj*>(NarrowObject(Self, Mask))->connect(static_cast<INotify*>(Self));
@@ -279,7 +278,7 @@ FClientGameobj::FClientGameobj(EClientGameobjKind Kind)
 FClientGameobj::~FClientGameobj()
 {
     // FUN_005394b0 (this = the CBase sub-object).
-    FontStringClearContents(&HudLabel); // FUN_004144f0
+    HudLabel.ClearContents(); // FUN_004144f0
 
     // The count is taken once; a null begin counts as empty.
     int const SoundCount = (SoundsBegin == nullptr) ? 0 : static_cast<int>(SoundsEnd - SoundsBegin);
@@ -297,8 +296,8 @@ FClientGameobj::~FClientGameobj()
         FParticleEffect* const Effect = HitEffects[Index];
         if (Effect == nullptr)
             continue;
-        ParticleEffectArmDeath(Effect); // vt+4 (LAB_004f84d0, shared by both particle vtables)
-        ParticleEffectRelease(HitEffects[Index]);
+        Effect->FParticleEffect::Kill(); // vt+4 (LAB_004f84d0, shared by both particle vtables)
+        HitEffects[Index]->Release();
         HitEffects[Index] = nullptr;
     }
 
@@ -318,7 +317,7 @@ FClientGameobj::~FClientGameobj()
     // The font string's own destructor, inlined in retail at this point. Called explicitly to
     // keep retail's order against the hand-written teardowns around it; ~FFontString then runs
     // on an empty string.
-    FontStringDestroy(&HudLabel);
+    HudLabel.Destroy();
 
     // Retail then inlines the effect list's destructor (FUN_005393e0) -- here
     // ~FGameobjEffectList, run as a member after ~FFontString (+0x48) and before ~ActionDB
@@ -369,7 +368,7 @@ void FClientGameobj::Slot164(bool bValue)
 void FClientGameobj::create(Archetype::Root* Arch)
 {
     // LAB_005396f0: FUN_00539bc0's body inlined with class 1.
-    GameobjCreateOfClass(this, CObject::ClassObject, Arch);
+    CreateOfClass(CObject::ClassObject, Arch);
 }
 
 void FClientGameobj::PostCreateInit()
@@ -415,29 +414,9 @@ float FClientGameobj::GetPhysicalRadius(Vector& Center)
     return Object->get_physical_radius_r(Center);
 }
 
-unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
-{
-    // FUN_00539820 -- the body is GameobjPickLodRetail (space_scene_obj_draw.cpp), which
-    // EquippedObj's override FUN_00533710 also calls directly.
-    return GameobjPickLodRetail(this, OutLod, Camera, CachedLod);
-}
-
 void FClientGameobj::PreSubmitDraw()
 {
     // LAB_00401e90: empty.
-}
-
-void FClientGameobj::UpdateDrawLighting(void* Camera)
-{
-    // FUN_00539b40 -- the body is GameobjUpdateDrawLightingRetail (space_scene_obj_draw.cpp).
-    GameobjUpdateDrawLightingRetail(this, Camera);
-}
-
-unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                  Transform const* Xform, void* Extra)
-{
-    // FUN_00539980 -- the body is GameobjSubmitDrawRetail (space_scene_obj_draw.cpp).
-    return GameobjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Xform, Extra);
 }
 
 unsigned FClientGameobj::GetNebula(unsigned* OutB)
@@ -698,9 +677,10 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
     {
         // No null test on the allocation.
         FParticleEffect* const Effect = ParticleEffectCreate();
-        if (ParticleEffectStart(Effect, EffectArch) == 0)
+// FUN_004f8160 — vtable[0] start(EffectArch*).
+        if (Effect->FParticleEffect::Start(EffectArch) == 0)
         {
-            ParticleEffectRelease(Effect);
+            Effect->Release();
         }
         else
         {
@@ -727,9 +707,9 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
             // LAB_004f84d0.
             if (HitEffects[Chosen] != nullptr)
             {
-                ParticleEffectCleanupAlchemy(HitEffects[Chosen]);
-                ParticleEffectArmDeath(HitEffects[Chosen]);
-                ParticleEffectRelease(HitEffects[Chosen]);
+                HitEffects[Chosen]->CleanupAlchemy();
+                HitEffects[Chosen]->FParticleEffect::Kill();
+                HitEffects[Chosen]->Release();
                 HitEffects[Chosen] = nullptr;
             }
             HitEffects[Chosen] = Effect;
@@ -744,7 +724,7 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
                                                *Normal);
             Transform AttachXform;
             BuildHitEffectTransform(&AttachXform, Object, LocalNormal, LocalPos);
-            ParticleEffectAttach(Effect, this, static_cast<int>(get_index()), &AttachXform);
+            Effect->Attach(this, static_cast<int>(get_index()), &AttachXform);
         }
     }
 
@@ -1029,7 +1009,7 @@ FClientEquippedObj::~FClientEquippedObj()
 {
     // FUN_00532d40 (this = the CBase sub-object). The equip-FX wrappers are deleted first
     // (FUN_00533080's body, client_equip_fx.cpp).
-    EquippedObjClearEquipFx(this);
+    ClearEquipFx();
 
     // No null test on the narrowed object.
     CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
@@ -1164,8 +1144,8 @@ void FClientEquippedObj::SpawnPartDebris(CObject* PartObject, ID_String const* D
 
 void FClientEquippedObj::PostCreateInit()
 {
-    // FUN_00533e10 -- ported as EquippedObjRebuildEquipFx (client_equip_fx.cpp).
-    EquippedObjRebuildEquipFx(this);
+    // FUN_00533e10 -- ported as FClientGameobj::RebuildEquipFx (client_equip_fx.cpp).
+    RebuildEquipFx();
 }
 
 void FClientEquippedObj::update(float Dt)
@@ -1208,19 +1188,12 @@ unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, void* Camera, unsigned c
         *OutLod = 0xffff0001u;
         return OutLod;
     }
-    return GameobjPickLodRetail(this, OutLod, Camera, CachedLod);
+    return FClientGameobj::PickLod(OutLod, Camera, CachedLod);
 }
 
 void FClientEquippedObj::PreSubmitDraw()
 {
     // LAB_0051b480: a jump to the empty LAB_00401e90 -- the same body as GameObject's slot 96.
-}
-
-unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
-                                      Transform const* Xform, void* Extra)
-{
-    // FUN_00533780 -- the body is EquippedObjSubmitDrawRetail (space_scene_obj_draw.cpp).
-    return EquippedObjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Xform, Extra);
 }
 
 void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
@@ -1287,7 +1260,7 @@ void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* 
     if (SubObjectID::IsShieldEquipID(SubObj))
     {
         // FUN_00533100 inlined.
-        FClientEquip* const Wrapper = EquippedObjFindEquipFx(this, SubObj);
+        FClientEquip* const Wrapper = FindEquipFx(SubObj);
         // A shield wrapper (equipment type 0x100; the equipment is not null-tested).
         if (Wrapper != nullptr && Wrapper->Equip->Type == EquipTypeShield)
         {
@@ -1309,7 +1282,7 @@ void FClientEquippedObj::OnMunitionHit(void const* A, void const* B, FClientGame
     if (SubObjectID::IsShieldEquipID(SubObj))
     {
         // FUN_00533100 inlined, as in slot 104.
-        FClientEquip* const Wrapper = EquippedObjFindEquipFx(this, SubObj);
+        FClientEquip* const Wrapper = FindEquipFx(SubObj);
         if (Wrapper != nullptr && Wrapper->Equip->Type == EquipTypeShield)
         {
             CliShieldEquipFxMunitionHit(Wrapper, A, Munition);
@@ -1417,13 +1390,6 @@ void FClientEquippedObj::Explode(Vector const* Pos)
     FClientGameobj::Explode(Pos);
 }
 
-bool FClientEquippedObj::LightFuse(unsigned SourceId, ID_String const* FuseId,
-                                 unsigned short SubObjId, float AtT, float Lifetime)
-{
-    // FUN_00534240 -- its body is HostIgniteFuse (client_equip_fx.cpp).
-    return HostIgniteFuse(this, SourceId, *FuseId, SubObjId, AtT, Lifetime);
-}
-
 bool FClientEquippedObj::UnLightFuse(ID_String const* FuseId, unsigned short SubObjId, float AtT)
 {
     // FUN_005343d0
@@ -1470,13 +1436,6 @@ int FClientEquippedObj::scan_cargo(IObjRW* Scanned, EquipDescVector& OutCargo) c
         LocalServer()->SPScanCargo(SelfId, ScannedId, GetPlayerConnectionId());
     }
     return Result;
-}
-
-unsigned char FClientEquippedObj::HandleEquipMsg(FCliEquipFirePacket const* Packet)
-{
-    // FUN_00534460 -- ported as EquippedObjHandleEquipMsg (cli_projectile_fx.cpp), which reads
-    // the gameobj through its fire-host view (+0x10 object, +0xb8 equip-FX list).
-    return EquippedObjHandleEquipMsg(this, Packet);
 }
 
 int FClientEquippedObj::fire_weapons(unsigned short const* EquipIds, unsigned Count,
@@ -1745,9 +1704,9 @@ float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
     if (StarSphere != nullptr)
     {
         Vector StarPos;
-        StarSphereGetOwnerPosition(StarSphere, &StarPos);
+        StarSphere->GetOwnerPosition(&StarPos);
         Center = StarPos;
-        return StarSphereMaxGlowScale(StarSphere);
+        return StarSphere->MaxGlowScale();
     }
 
     // A planet / star / moon type (TypeBits & 7; no null test on the narrowed object) -> the
@@ -1830,7 +1789,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
         // EquippedObj's draw FUN_00533780 into a temporary.
         unsigned Temp = 0;
         unsigned* const Result =
-            EquippedObjSubmitDrawRetail(this, &Temp, Camera, CachedLod, Xform, Extra);
+            FClientEquippedObj::SubmitDraw(&Temp, Camera, CachedLod, Xform, Extra);
         *OutLod = *Result;
         return OutLod;
     }
@@ -2013,7 +1972,7 @@ FClientShipGameobj::FClientShipGameobj()
     AtmosphereBurnCompanion[2] = nullptr;
     AtmosphereBurnCompanion[3] = nullptr;
     PilotMeshArch = nullptr;
-    MeshHolderConstruct(&PilotMeshHolder);                                         // FUN_00420d40
+    PilotMeshHolder.Construct();                                         // FUN_00420d40
     PilotTransform.Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
     PilotTransform.Translation.x = 0.0f;
     PilotTransform.Translation.y = 0.0f;
@@ -2046,7 +2005,7 @@ FClientShipGameobj::~FClientShipGameobj()
 {
     // FUN_005444a0. It runs with ESI = this + 0xc (the CBase sub-object), so retail's
     // ESI-relative offsets are 0xc below the gameobj offsets used here.
-    ClientMeshHolderRelease(&PilotMeshHolder); // FUN_00420f70
+    PilotMeshHolder.Release(); // FUN_00420f70
     if (PilotMeshArch != nullptr)
     {
         PilotMeshArch->Release();
@@ -2112,11 +2071,11 @@ namespace
     {
         FScopedEffectArch()
         {
-            EffectArchConstruct(&Arch);
+            Arch.Construct();
         }
         ~FScopedEffectArch()
         {
-            EffectArchDestruct(&Arch);
+            Arch.Destruct();
         }
         FEffectArch Arch;
 
@@ -2155,9 +2114,9 @@ namespace
         void** const Companion = static_cast<void**>(Companion16);
 
         FParticleEffect* const Particle = static_cast<FParticleEffect*>(Companion[2]);
-        if (Particle != nullptr && ParticleEffectStart(Particle, Arch) == 0)
+        if (Particle != nullptr && Particle->FParticleEffect::Start(Arch) == 0)
         {
-            ParticleEffectRelease(Particle);
+            Particle->Release();
             Companion[2] = nullptr;
         }
 
@@ -2178,22 +2137,22 @@ namespace
         FGameLight* const Light = static_cast<FGameLight*>(Companion[3]);
         if (Light != nullptr)
         {
-            EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
-            EngineLightSetColorBytesAlt((FEngineLight*)Light, &Arch->LgtColorR);
-            EngineLightSetRadius((FEngineLight*)Light, Arch->LgtRadius);
-            if (!GameLightEnable((FEngineLight*)Light))
+            ((FEngineLight*)Light)->SetType(kLightPoint, true);
+            ((FEngineLight*)Light)->SetColorBytesAlt(&Arch->LgtColorR);
+            ((FEngineLight*)Light)->SetRadius(Arch->LgtRadius);
+            if (!Light->FGameLight::Enable())
             {
                 ID_String Name;
                 Name.Id = Arch->NicknameId;
                 FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: couldnt open light",
                       kCreateEffectSourceFile, 0xce, Name.get_string());
-                GameLightRelease(Light);
+                Light->Release();
                 Companion[3] = nullptr;
             }
             else if (Arch->LgtEffectLen != 0)
             {
-                GameLightAttachAnim(Light, GameLightFindAnimByName(Arch->LgtEffect),
-                                    Arch->LgtRangeScale, Arch->LgtTimeScale, 0.0f);
+                Light->AttachAnim(GameLightFindAnimByName(Arch->LgtEffect),
+                                  Arch->LgtRangeScale, Arch->LgtTimeScale, 0.0f);
             }
         }
 
@@ -2234,8 +2193,8 @@ namespace
             Companion[3] = GameLightConstruct(static_cast<FGameLight*>(GameLightHeapAlloc(0x12c)));
 
         if (Companion[2] != nullptr)
-            ParticleEffectAttach(static_cast<FParticleEffect*>(Companion[2]), Go, EngineIndex,
-                                 Pose);
+            static_cast<FParticleEffect*>(Companion[2])->Attach(Go, EngineIndex,
+                                                                  Pose);
         if (Companion[1] != nullptr)
             static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, Pose);
         if (Companion[3] != nullptr)
@@ -2486,7 +2445,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect != nullptr)
-                    JumpGateEffectFire(static_cast<FJumpGateEffect*>(JumpGateEffect));
+                    static_cast<FJumpGateEffect*>(JumpGateEffect)->Fire();
             }
         }
         else if (Sub == 3)
@@ -2897,7 +2856,7 @@ void FClientShipGameobj::UpdateDrawLighting(void* Camera)
         FGameLight* const Light = Effect->Tunnel->Light;
         if (Light == nullptr)
             return;
-        EngineLightSetPosition((FEngineLight*)Light, &Pos);
+        ((FEngineLight*)Light)->SetPosition(&Pos);
         FEngineLight* const Lights[1] = {(FEngineLight*)Light};
         EngineLightApplyList(Lights, 1u, static_cast<ICamera*>(Camera), &Pos.x);
         return;
@@ -2960,7 +2919,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
     unsigned short const LodLow = static_cast<unsigned short>(CachedLod & 0xffffu);
     short const LodHigh = static_cast<short>(CachedLod >> 16);
     if (GetGameOption(kGameOptShips) > 0 && LodLow >= 3 && LodHigh < 2 && LodHigh < 1 &&
-        ClientMeshHolderHasInstance(&PilotMeshHolder))
+        PilotMeshHolder.HasInstance())
     {
         // A cloaking ship passes its appearance value on to the pilot. No null test on the
         // narrowed object.
@@ -2982,7 +2941,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
                                           PilotTransform);
         Transform Copy;
         CopyTransform12(&Copy, &PilotXform);
-        ClientMeshHolderSetMatrix(&PilotMeshHolder, &Copy);
+        PilotMeshHolder.SetMatrix(&Copy);
         DALib::Renderer->RenderInstance(Camera, PilotMeshHolder.EngineInstance, 1.0f, kDrawPickSwitch, nullptr, Extra);
     }
 
@@ -2994,7 +2953,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
     if (Stars != nullptr && Stars->Count != 0 && Stars->Sentinel->Next->Sphere != nullptr)
     {
         Vector StarPos;
-        StarSphereGetOwnerPosition(Stars->Sentinel->Next->Sphere, &StarPos);
+        Stars->Sentinel->Next->Sphere->GetOwnerPosition(&StarPos);
         Vector const& Pos = get_position();
         double const Dz = static_cast<double>(Pos.z) - StarPos.z;
         double const Dy = static_cast<double>(Pos.y) - StarPos.y;
@@ -3008,7 +2967,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
 
     unsigned Lod = 0;
     unsigned* const Result =
-        EquippedObjSubmitDrawRetail(this, &Lod, Camera, CachedLod, Xform, Extra);
+        FClientEquippedObj::SubmitDraw(&Lod, Camera, CachedLod, Xform, Extra);
     *OutLod = *Result;
     return OutLod;
 }
@@ -3216,8 +3175,8 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
 
 unsigned char FClientShipGameobj::HandleEquipMsg(FCliEquipFirePacket const* Packet)
 {
-    // FUN_00544d70 -- ported as CliShipHandleEquipUpdate (cli_projectile_fx.cpp).
-    return CliShipHandleEquipUpdate(this, Packet);
+    // FUN_00544d70 -- ported as FClientEquippedObj::ShipHandleEquipUpdate (cli_projectile_fx.cpp).
+    return ShipHandleEquipUpdate(Packet);
 }
 
 void FClientShipGameobj::PlayFireFailedSound()
@@ -4133,7 +4092,7 @@ FClientBeamGameobj::~FClientBeamGameobj()
     CliEffectCompanionClear(Companion);
     if (BeamAlloc != nullptr)
     {
-        BeamEffectRelease(BeamAlloc);
+        BeamAlloc->Release();
         BeamAlloc = nullptr;
     }
     CliEffectCompanionClear(Companion);
@@ -4142,7 +4101,7 @@ FClientBeamGameobj::~FClientBeamGameobj()
 void FClientBeamGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053f2f0. No null test on the narrowed object.
-    GameobjCreateOfClass(this, CObject::ClassBeam, Arch);
+    CreateOfClass(CObject::ClassBeam, Arch);
     NarrowObject(this, CObject::ClassBeam)->open(Arch);
 }
 
@@ -4183,8 +4142,8 @@ void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameob
     BeamObj->Velocity.z = 0.0f;
     if (BeamAlloc != nullptr)
     {
-        BeamEffectSetHitFlags(BeamAlloc, true, bOtherIsPlayer); // FUN_004fc8f0
-        BeamEffectRelease(BeamAlloc);
+        BeamAlloc->SetHitFlags(true, bOtherIsPlayer); // FUN_004fc8f0
+        BeamAlloc->Release();
         BeamAlloc = nullptr;
     }
     CliEffectListRemove(&EffectList, Companion);
@@ -4315,7 +4274,7 @@ Vector FClientMineGameobj::get_velocity() const
 void FClientMineGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053e930
-    GameobjCreateOfClass(this, CObject::ClassMine, Arch);
+    CreateOfClass(CObject::ClassMine, Arch);
     NarrowObject(this, CObject::ClassMine)->open(Arch);
 }
 
@@ -4365,7 +4324,7 @@ FClientCounterMeasureGameobj::~FClientCounterMeasureGameobj()
 void FClientCounterMeasureGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0052ff90
-    GameobjCreateOfClass(this, CObject::ClassCounterMeasure, Arch);
+    CreateOfClass(CObject::ClassCounterMeasure, Arch);
     NarrowObject(this, CObject::ClassCounterMeasure)->open(Arch);
 }
 
@@ -4416,7 +4375,7 @@ FClientGuidedGameobj::~FClientGuidedGameobj()
 void FClientGuidedGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053ec30
-    GameobjCreateOfClass(this, CObject::ClassGuided, Arch);
+    CreateOfClass(CObject::ClassGuided, Arch);
     NarrowObject(this, CObject::ClassGuided)->open(Arch);
 }
 
@@ -4482,7 +4441,7 @@ void FClientGuidedGameobj::Explode(Vector const* Pos)
     if (Particle != nullptr)
     {
         Transform const& Frame = get_transform();
-        ParticleEffectAttach(Particle, nullptr, -1, &Frame);
+        Particle->Attach(nullptr, -1, &Frame);
     }
     FClientProjectileGameobj::Explode(Pos);
 }
@@ -4626,7 +4585,7 @@ FClientLootGameobj::~FClientLootGameobj()
 void FClientLootGameobj::create(Archetype::Root* Arch)
 {
     // LAB_0053e550
-    GameobjCreateOfClass(this, CObject::ClassLoot, Arch);
+    CreateOfClass(CObject::ClassLoot, Arch);
     NarrowObject(this, CObject::ClassLoot)->open(Arch);
 }
 
@@ -4800,7 +4759,7 @@ void ExplosionArchAddRef(Archetype::Explosion const* Expl)
     {
         FEffectArch* const Fx = FindEffectArch(&Expl->Effects[Index].Fx.Id);
         if (Fx != nullptr)
-            EffectArchAddRef(Fx, 1u);
+            Fx->AddRef(1u);
     }
     for (size_t Index = 0; Index < Expl->InnardsDebrisObjects.size(); ++Index)
     {
@@ -4819,7 +4778,7 @@ void ExplosionArchRelease(Archetype::Explosion const* Expl)
     {
         FEffectArch* const Fx = FindEffectArch(&Expl->Effects[Index].Fx.Id);
         if (Fx != nullptr)
-            EffectArchRelease(Fx);
+            Fx->Release();
     }
     for (size_t Index = 0; Index < Expl->InnardsDebrisObjects.size(); ++Index)
     {

@@ -14,7 +14,7 @@
 #include "Space/space_scene_obj_draw.h"
 
 #include "Space/client_gameobj.h"          // FClientShipGameobj::JumpState
-#include "Space/HUD/hud_command_dispatch.h"    // HudRegisterCommandHandler (FUN_005760d0)
+#include "Space/HUD/hud_command_dispatch.h"    // EventHandler::RegisterEvent (FUN_005760d0)
 #include "Space/HUD/hud_target.h"              // HudIsMousePickBlocked (FUN_0045a740)
 #include "Space/Cameras/ship_camera_params.h"      // FShipCameraParams (ship companion +0x68)
 #include "Space/Cameras/space_camera_first.h"      // G_FirstPersonMathEngine (DAT_00675220)
@@ -203,29 +203,29 @@ float* CockpitMulMatrix(float* Out9, const float* A9, const float* B9)
     return Out9;
 }
 
-bool ThirdPersonCameraOnEvent(FThirdPersonCamera* Cam, unsigned MsgId)
+bool FThirdPersonCamera::OnEvent(unsigned MsgId)
 {
     // FUN_0051a190 (slot 0 of the Event::Handler face).
     if (HudIsMousePickBlocked())
         return false;
-    if (HudCameraOnEvent((FHudCamera*)Cam, MsgId))
+    if (FHudCamera::OnEvent(MsgId))
         return true;
 
     // Only 0x3f is this class's own: toggles auto-level.
     if (MsgId != USER_TOGGLE_LEVEL_CAMERA)
         return false;
 
-    Cam->bCameraLevelEnabled = (Cam->bCameraLevelEnabled == 0) ? 1 : 0;
+    bCameraLevelEnabled = (bCameraLevelEnabled == 0) ? 1 : 0;
 
     const unsigned char* const Held =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     IObjRW* const Target =
         (Held != nullptr)
             ? reinterpret_cast<IObjRW*>(const_cast<unsigned char*>(Held - kWatchableOffset))
             : nullptr;
     IBehaviorManager* const Manager = GetBehaviorManager(Target);
     if (Manager != nullptr)
-        Manager->update_level_camera(Cam->bCameraLevelEnabled != 0);
+        Manager->update_level_camera(bCameraLevelEnabled != 0);
     return true;
 }
 
@@ -235,108 +235,108 @@ const char* ThirdPersonCameraGetName()
     return "ThirdPerson";
 }
 
-void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
+void FThirdPersonCamera::Construct()
 {
     // FUN_00518600: HUDCamera's ctor, then the two vptrs, then the fields in retail's order.
-    HudCameraConstruct((FHudCamera*)Cam);
+    FHudCamera::Construct();
 
-    Cam->HardpointPos[0] = 0.0f;
-    Cam->HardpointPos[1] = 0.0f;
-    Cam->HardpointPos[2] = 0.0f;
+    HardpointPos[0] = 0.0f;
+    HardpointPos[1] = 0.0f;
+    HardpointPos[2] = 0.0f;
 
-    Cam->HardpointOrient[7] = 0.0f;   // +0x128
-    Cam->HardpointOrient[6] = 0.0f;   // +0x124
-    Cam->HardpointOrient[5] = 0.0f;   // +0x120
-    Cam->HardpointOrient[3] = 0.0f;   // +0x118
-    Cam->HardpointOrient[2] = 0.0f;   // +0x114
-    Cam->HardpointOrient[1] = 0.0f;   // +0x110
-    Cam->HardpointOrient[8] = 1.0f;   // +0x12c
-    Cam->HardpointOrient[4] = 1.0f;   // +0x11c
-    Cam->HardpointOrient[0] = 1.0f;   // +0x10c
+    HardpointOrient[7] = 0.0f;   // +0x128
+    HardpointOrient[6] = 0.0f;   // +0x124
+    HardpointOrient[5] = 0.0f;   // +0x120
+    HardpointOrient[3] = 0.0f;   // +0x118
+    HardpointOrient[2] = 0.0f;   // +0x114
+    HardpointOrient[1] = 0.0f;   // +0x110
+    HardpointOrient[8] = 1.0f;   // +0x12c
+    HardpointOrient[4] = 1.0f;   // +0x11c
+    HardpointOrient[0] = 1.0f;   // +0x10c
 
     // The look offset {0, 7, 60}.
-    Cam->LookOffsetX = 0.0f;
-    Cam->LookOffsetY = 7.0f;
-    Cam->LookOffsetZ = 60.0f;
+    LookOffsetX = 0.0f;
+    LookOffsetY = 7.0f;
+    LookOffsetZ = 60.0f;
 
     // The second offset vector.
-    Cam->ExtraOffsetX = 0.0f;
-    Cam->ExtraOffsetY = 0.0f;
-    Cam->ExtraOffsetZ = 0.0f;
+    ExtraOffsetX = 0.0f;
+    ExtraOffsetY = 0.0f;
+    ExtraOffsetZ = 0.0f;
 
     // HUDCamera's bytes +0xfc and +0xfd.
-    Cam->bFlagFC = 0;
-    Cam->bFlagFD = 0;
+    bFlagFC = 0;
+    bFlagFD = 0;
 
     // The speed tracker, auto-level on.
-    Cam->SpeedSlack = 0.0f;
-    Cam->SmoothedSpeed = 0.0f;
-    Cam->PrevSpeed = 0.0f;
-    Cam->bCameraLevelEnabled = 1;
-    Cam->LookAheadMultiplier = 0.05f;      // 0x3d4ccccd
-    Cam->AccelerationLimit = 40.0f;        // 0x42200000
+    SpeedSlack = 0.0f;
+    SmoothedSpeed = 0.0f;
+    PrevSpeed = 0.0f;
+    bCameraLevelEnabled = 1;
+    LookAheadMultiplier = 0.05f;      // 0x3d4ccccd
+    AccelerationLimit = 40.0f;        // 0x42200000
 
     // The orientation history, identity.
-    Cam->ResetOrient[8] = 1.0f;   // +0x178
-    Cam->ResetOrient[4] = 1.0f;   // +0x168
-    Cam->ResetOrient[0] = 1.0f;   // +0x158
-    Cam->ResetOrient[7] = 0.0f;   // +0x174
-    Cam->ResetOrient[6] = 0.0f;   // +0x170
-    Cam->ResetOrient[5] = 0.0f;   // +0x16c
-    Cam->ResetOrient[3] = 0.0f;   // +0x164
-    Cam->ResetOrient[2] = 0.0f;   // +0x160
-    Cam->ResetOrient[1] = 0.0f;   // +0x15c
+    ResetOrient[8] = 1.0f;   // +0x178
+    ResetOrient[4] = 1.0f;   // +0x168
+    ResetOrient[0] = 1.0f;   // +0x158
+    ResetOrient[7] = 0.0f;   // +0x174
+    ResetOrient[6] = 0.0f;   // +0x170
+    ResetOrient[5] = 0.0f;   // +0x16c
+    ResetOrient[3] = 0.0f;   // +0x164
+    ResetOrient[2] = 0.0f;   // +0x160
+    ResetOrient[1] = 0.0f;   // +0x15c
 
     // The turn angles (radians) and the look-ahead slerp.
-    Cam->VerticalTurnUpAngle = 0.1f;          // 0x3dcccccd
-    Cam->TurnLookAheadSlerpAmount = 0.5f;     // 0x3f000000
-    Cam->HorizontalTurnAngle = 0.2f;          // 0x3e4ccccd
-    Cam->VerticalTurnDownAngle = 0.2f;        // 0x3e4ccccd
+    VerticalTurnUpAngle = 0.1f;          // 0x3dcccccd
+    TurnLookAheadSlerpAmount = 0.5f;     // 0x3f000000
+    HorizontalTurnAngle = 0.2f;          // 0x3e4ccccd
+    VerticalTurnDownAngle = 0.2f;        // 0x3e4ccccd
 
-    Cam->UpAxis.y = 1.0f;
-    Cam->UpAxis.x = 0.0f;
-    Cam->UpAxis.z = 0.0f;
-    Cam->Unused210 = 0.0f;
+    UpAxis.y = 1.0f;
+    UpAxis.x = 0.0f;
+    UpAxis.z = 0.0f;
+    Unused210 = 0.0f;
 
-    Cam->TurnRateScale = 2.0f;                // 0x40000000
-    Cam->LevelAxis.x = 0.0f;
-    Cam->LevelAxis.y = 0.0f;
-    Cam->LevelAxis.z = -1.0f;                // 0xbf800000
-    Cam->PrevAngularRate = 0.0f;
-    Cam->bInitialised = 0;
+    TurnRateScale = 2.0f;                // 0x40000000
+    LevelAxis.x = 0.0f;
+    LevelAxis.y = 0.0f;
+    LevelAxis.z = -1.0f;                // 0xbf800000
+    PrevAngularRate = 0.0f;
+    bInitialised = 0;
 
-    Cam->AngularSlerpMultiplier = 2.0f;       // 0x40000000
-    Cam->AngularAcceleration = 0.049087385f;  // 0x3d490fdb (pi / 64)
+    AngularSlerpMultiplier = 2.0f;       // 0x40000000
+    AngularAcceleration = 0.049087385f;  // 0x3d490fdb (pi / 64)
 
     // Not written by the retail ctor (the controller is zeroed static storage):
     // TranslationCache (+0x130), TargetOrientB (+0x17c), TargetOrientA (+0x1b0) and the pad bytes.
 }
 
-bool ThirdPersonCameraActivate(FThirdPersonCamera* Cam, const int* ViewRect4)
+bool FThirdPersonCamera::Activate(int const* ViewRect4)
 {
     // FUN_00518ad0: event 0x3f registered on the face at +0xf8, then HUDCamera's activate.
-    FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
-    HudRegisterCommandHandler(Face, USER_TOGGLE_LEVEL_CAMERA);
-    return HudCameraActivate((FHudCamera*)Cam, ViewRect4);
+    FHudCmdHandler* const Face = AsHudCmdHandler();
+    Face->RegisterEvent(USER_TOGGLE_LEVEL_CAMERA);
+    return FHudCamera::Activate(ViewRect4);
 }
 
-void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
+void FThirdPersonCamera::Attach(void* Object)
 {
     // LAB_00518af0 (slot 0x58).
-    HudCameraAttach((FHudCamera*)Cam, Object);
+    FHudCamera::Attach(Object);
 
     // The second offset vector, on every attach.
-    Cam->ExtraOffsetX = 0.0f;
-    Cam->ExtraOffsetY = 0.0f;
-    Cam->ExtraOffsetZ = 0.0f;
+    ExtraOffsetX = 0.0f;
+    ExtraOffsetY = 0.0f;
+    ExtraOffsetZ = 0.0f;
 
     const unsigned char* const Held =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (Held != nullptr && Held - kWatchableOffset != nullptr)
     {
         // With a client ship, the camera block (+0x68) of its archetype's companion (Root +
         // 0x04), read at fixed offsets (FShipCameraParams).
-        CEqObj* const Ship = WatchedShip(Cam);
+        CEqObj* const Ship = WatchedShip(this);
         if (Ship != nullptr)
         {
             const unsigned char* const Companion = reinterpret_cast<const unsigned char*>(
@@ -345,31 +345,31 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
             {
                 const FShipCameraParams* const Params =
                     reinterpret_cast<const FShipCameraParams*>(Companion + 0x68);
-                Cam->AngularSlerpMultiplier = Params->AngularSlerpMultiplier;      // +0x74
-                Cam->AngularAcceleration = Params->AngularAcceleration;            // +0x70
-                Cam->HorizontalTurnAngle = Params->HorizontalTurnAngle;            // +0x78
-                Cam->VerticalTurnUpAngle = Params->VerticalTurnUpAngle;            // +0x7c
-                Cam->VerticalTurnDownAngle = Params->VerticalTurnDownAngle;        // +0x80
-                Cam->TurnLookAheadSlerpAmount = Params->TurnLookAheadSlerpAmount;  // +0x84
-                Cam->LookOffsetX = 0.0f;
-                Cam->LookOffsetY = Params->Offset[0];                                  // +0x68
-                Cam->LookOffsetZ = Params->Offset[1];                                  // +0x6c
+                AngularSlerpMultiplier = Params->AngularSlerpMultiplier;      // +0x74
+                AngularAcceleration = Params->AngularAcceleration;            // +0x70
+                HorizontalTurnAngle = Params->HorizontalTurnAngle;            // +0x78
+                VerticalTurnUpAngle = Params->VerticalTurnUpAngle;            // +0x7c
+                VerticalTurnDownAngle = Params->VerticalTurnDownAngle;        // +0x80
+                TurnLookAheadSlerpAmount = Params->TurnLookAheadSlerpAmount;  // +0x84
+                LookOffsetX = 0.0f;
+                LookOffsetY = Params->Offset[0];                                  // +0x68
+                LookOffsetZ = Params->Offset[1];                                  // +0x6c
             }
         }
 
         // Two copies of the object's orientation; the up axis is the first one's column 1.
-        IObjRW* const Target = WatchedObject(Cam);
-        memcpy(Cam->TargetOrientA, &Target->get_transform().Rotation.E[0][0], 9 * sizeof(float));
-        memcpy(Cam->TargetOrientB, &WatchedObject(Cam)->get_transform().Rotation.E[0][0],
+        IObjRW* const Target = WatchedObject(this);
+        memcpy(TargetOrientA, &Target->get_transform().Rotation.E[0][0], 9 * sizeof(float));
+        memcpy(TargetOrientB, &WatchedObject(this)->get_transform().Rotation.E[0][0],
                9 * sizeof(float));
-        Cam->UpAxis.x = Cam->TargetOrientA[1];
-        Cam->UpAxis.y = Cam->TargetOrientA[4];
-        Cam->UpAxis.z = Cam->TargetOrientA[7];
+        UpAxis.x = TargetOrientA[1];
+        UpAxis.y = TargetOrientA[4];
+        UpAxis.z = TargetOrientA[7];
 
         // Slot 0x10's transform (twelve dwords) to the world transform, view dirty first.
-        FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
+        FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
         const float* const Xform =
-            reinterpret_cast<const float*>(&WatchedObject(Cam)->get_orientation());
+            reinterpret_cast<const float*>(&WatchedObject(this)->get_orientation());
         Space->bViewDirty = 1;
         memcpy(&Space->World, Xform, 9 * sizeof(float));
         Space->WorldPos.x = Xform[9];
@@ -379,38 +379,38 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         // The "HpCockpit" hardpoint in parent space; the fallback is (0, 0, -4) and identity.
         long HardpointHandle = 0;
         HardpointInfo Info;
-        if (FindHardpoint_PS(WatchedObject(Cam)->get_index(), "HpCockpit", HardpointHandle, Info))
+        if (FindHardpoint_PS(WatchedObject(this)->get_index(), "HpCockpit", HardpointHandle, Info))
         {
-            Cam->HardpointPos[0] = Info.Position.x;
-            Cam->HardpointPos[1] = Info.Position.y;
-            Cam->HardpointPos[2] = Info.Position.z;
-            memcpy(Cam->HardpointOrient, &Info.Orient, 9 * sizeof(float));
+            HardpointPos[0] = Info.Position.x;
+            HardpointPos[1] = Info.Position.y;
+            HardpointPos[2] = Info.Position.z;
+            memcpy(HardpointOrient, &Info.Orient, 9 * sizeof(float));
         }
         else
         {
-            Cam->HardpointPos[0] = 0.0f;
-            Cam->HardpointPos[1] = 0.0f;
-            Cam->HardpointPos[2] = -4.0f;   // 0xc0800000
-            Cam->HardpointOrient[8] = 1.0f;
-            Cam->HardpointOrient[4] = 1.0f;
-            Cam->HardpointOrient[0] = 1.0f;
-            Cam->HardpointOrient[7] = 0.0f;
-            Cam->HardpointOrient[6] = 0.0f;
-            Cam->HardpointOrient[5] = 0.0f;
-            Cam->HardpointOrient[3] = 0.0f;
-            Cam->HardpointOrient[2] = 0.0f;
-            Cam->HardpointOrient[1] = 0.0f;
+            HardpointPos[0] = 0.0f;
+            HardpointPos[1] = 0.0f;
+            HardpointPos[2] = -4.0f;   // 0xc0800000
+            HardpointOrient[8] = 1.0f;
+            HardpointOrient[4] = 1.0f;
+            HardpointOrient[0] = 1.0f;
+            HardpointOrient[7] = 0.0f;
+            HardpointOrient[6] = 0.0f;
+            HardpointOrient[5] = 0.0f;
+            HardpointOrient[3] = 0.0f;
+            HardpointOrient[2] = 0.0f;
+            HardpointOrient[1] = 0.0f;
         }
     }
 
     // Retail tests the watcher again.
     const unsigned char* const HeldAgain =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (HeldAgain == nullptr || HeldAgain - kWatchableOffset == nullptr)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kCockpitCpp, 0x3c9,
               "no object linked to third person camera");
-        Cam->bInitialised = 1;
+        bInitialised = 1;
         return;
     }
 
@@ -418,31 +418,31 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
     // cached in +0x130.
     float View[12];
     MakeIdentityView(View);
-    ThirdPersonCameraSolve(Cam, View, 0.0f, true);
-    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
+    Solve(View, 0.0f, true);
+    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
     memcpy(&Space->World, View, 9 * sizeof(float));
     Space->WorldPos.x = View[9];
     Space->WorldPos.y = View[10];
     Space->WorldPos.z = View[11];
-    Cam->TranslationCache[0] = View[9];
-    Cam->TranslationCache[1] = View[10];
-    Cam->TranslationCache[2] = View[11];
+    TranslationCache[0] = View[9];
+    TranslationCache[1] = View[10];
+    TranslationCache[2] = View[11];
     Space->bViewDirty = 1;
-    Cam->bInitialised = 1;
+    bInitialised = 1;
 }
 
-void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
+void FThirdPersonCamera::Update(float DeltaSeconds)
 {
     // LAB_00518e40 (slot 0x6c). The identity view is built on every call.
     float View[12];
     MakeIdentityView(View);
 
     // Skipped for the frame right after an attach.
-    if (Cam->bInitialised == 0)
+    if (bInitialised == 0)
     {
-        if (ThirdPersonCameraSolve(Cam, View, DeltaSeconds, false))
+        if (Solve(View, DeltaSeconds, false))
         {
-            FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
+            FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
             memcpy(&Space->World, View, 9 * sizeof(float));
             Space->WorldPos.x = View[9];
             Space->WorldPos.y = View[10];
@@ -457,26 +457,26 @@ void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
     }
 
     // HUDCamera's update, then the attach latch cleared.
-    HudCameraUpdate((FHudCamera*)Cam, DeltaSeconds);
-    Cam->bInitialised = 0;
+    FHudCamera::Update(DeltaSeconds);
+    bInitialised = 0;
 }
 
-bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSeconds, bool bReset)
+bool FThirdPersonCamera::Solve(float* Out12, float DeltaSeconds, bool bReset)
 {
     // FUN_00518f20.
-    if (WatchedShip(Cam) == nullptr)
+    if (WatchedShip(this) == nullptr)
         return false;
 
     // The rotation pointer is kept and read again further down; M is a working copy.
-    const float* const ShipRot = &WatchedObject(Cam)->get_transform().Rotation.E[0][0];
+    const float* const ShipRot = &WatchedObject(this)->get_transform().Rotation.E[0][0];
     float M[9];
     memcpy(M, ShipRot, sizeof(M));
 
-    const Vector ShipPosRef = WatchedObject(Cam)->get_position();
+    const Vector ShipPosRef = WatchedObject(this)->get_position();
     float Pos[3] = {ShipPosRef.x, ShipPosRef.y, ShipPosRef.z};
 
     // The speed, rounded to float.
-    const Vector Velocity = WatchedObject(Cam)->get_velocity();
+    const Vector Velocity = WatchedObject(this)->get_velocity();
     Vector Heading = {Velocity.x, Velocity.y, Velocity.z};
     const double SpeedExact = Vec3Length(&Heading);
     const float Speed = static_cast<float>(SpeedExact);
@@ -486,7 +486,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     // retail the direction's frame slot is overwritten on every later path before a read).
     if (SpeedExact > 1.0f)
     {
-        const Vector Again = WatchedObject(Cam)->get_velocity();
+        const Vector Again = WatchedObject(this)->get_velocity();
         Vector VelocityDir;
         VelocityDir.x = Again.x;
         VelocityDir.y = Again.y;
@@ -495,91 +495,91 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         VelocityDir.x = static_cast<float>(VelocityDir.x * Inv);
         VelocityDir.y = static_cast<float>(VelocityDir.y * Inv);
         VelocityDir.z = static_cast<float>(VelocityDir.z * Inv);
-        const float* const Rot = &WatchedObject(Cam)->get_transform().Rotation.E[0][0];
+        const float* const Rot = &WatchedObject(this)->get_transform().Rotation.E[0][0];
         Heading.x = -Rot[2];
         Heading.y = -Rot[5];
         Heading.z = -Rot[8];
     }
 
     // Null allowed.
-    IBehaviorManager* const Manager = GetBehaviorManager(WatchedObject(Cam));
+    IBehaviorManager* const Manager = GetBehaviorManager(WatchedObject(this));
 
     // The reset: tracker seeded with this speed, level axis (0,0,-1), the orientation history
     // from the object's rotation, up = its column 1, and the manager put in level mode.
     if (bReset)
     {
-        Cam->SmoothedSpeed = Speed;
-        Cam->PrevSpeed = Speed;
-        Cam->SpeedSlack = 0.0f;
-        Cam->LevelAxis.x = 0.0f;
-        Cam->LevelAxis.y = 0.0f;
-        Cam->LevelAxis.z = -1.0f;
-        memcpy(Cam->ResetOrient, &WatchedObject(Cam)->get_transform().Rotation.E[0][0],
+        SmoothedSpeed = Speed;
+        PrevSpeed = Speed;
+        SpeedSlack = 0.0f;
+        LevelAxis.x = 0.0f;
+        LevelAxis.y = 0.0f;
+        LevelAxis.z = -1.0f;
+        memcpy(ResetOrient, &WatchedObject(this)->get_transform().Rotation.E[0][0],
                9 * sizeof(float));
         Vector ResetUp;
-        GetColumn(&ResetUp, Cam->ResetOrient, 1);
-        Cam->UpAxis.x = ResetUp.x;
-        Cam->UpAxis.y = ResetUp.y;
-        Cam->UpAxis.z = ResetUp.z;
+        GetColumn(&ResetUp, ResetOrient, 1);
+        UpAxis.x = ResetUp.x;
+        UpAxis.y = ResetUp.y;
+        UpAxis.z = ResetUp.z;
         if (Manager != nullptr)
         {
             Manager->set_camera_mode(IBehaviorManager::CameraModeLevel);
             Vector Up;
-            Up.x = Cam->ResetOrient[1];
-            Up.y = Cam->ResetOrient[4];
-            Up.z = Cam->ResetOrient[7];
+            Up.x = ResetOrient[1];
+            Up.y = ResetOrient[4];
+            Up.z = ResetOrient[7];
             Manager->submit_camera_up(Up);
         }
     }
 
     // The speed tracker. Speed * look-ahead stays unrounded until the (updated) slack is added
     // at the end.
-    const double LookAheadBase = static_cast<double>(Speed) * Cam->LookAheadMultiplier;
+    const double LookAheadBase = static_cast<double>(Speed) * LookAheadMultiplier;
     // dt not above 1e-5 (or NaN) gives 0.0.
     double Accel = 0.0;
     if (DeltaSeconds > kMinDeltaTime)
-        Accel = (static_cast<double>(Speed) - Cam->PrevSpeed) / DeltaSeconds;
+        Accel = (static_cast<double>(Speed) - PrevSpeed) / DeltaSeconds;
     // The slack, zeroed when the unrounded sum is below zero.
     const double SlackSum =
-        (static_cast<double>(Speed) - Cam->SmoothedSpeed) * DeltaSeconds + Cam->SpeedSlack;
-    Cam->SpeedSlack = static_cast<float>(SlackSum);
+        (static_cast<double>(Speed) - SmoothedSpeed) * DeltaSeconds + SpeedSlack;
+    SpeedSlack = static_cast<float>(SlackSum);
     if (SlackSum < 0.0f)
-        Cam->SpeedSlack = 0.0f;
+        SpeedSlack = 0.0f;
     // The catch-up limit, rounded to float.
-    const double Slack = Cam->SpeedSlack;
+    const double Slack = SpeedSlack;
     const float Limit = static_cast<float>(
-        (Slack * Slack * kSlackAccelScale + 1.0f) * Cam->AccelerationLimit);
+        (Slack * Slack * kSlackAccelScale + 1.0f) * AccelerationLimit);
     // Ramp when the slack is over 0.01 or the acceleration strictly above the limit; otherwise
     // snap.
     bool bRamp = true;
-    if (!(static_cast<double>(Cam->SpeedSlack) > kSlackThreshold))
+    if (!(static_cast<double>(SpeedSlack) > kSlackThreshold))
         bRamp = Accel > Limit;
     if (bRamp)
     {
         // limit * dt onto the smoothed speed, capped by k*k*speed + speed with k = slack * 0.04f
         // -- the cap rounded, the ramp compared unrounded.
-        const double Ramped = static_cast<double>(Limit) * DeltaSeconds + Cam->SmoothedSpeed;
-        Cam->SmoothedSpeed = static_cast<float>(Ramped);
-        const double K = static_cast<double>(Cam->SpeedSlack) * kSlackCapScale;
+        const double Ramped = static_cast<double>(Limit) * DeltaSeconds + SmoothedSpeed;
+        SmoothedSpeed = static_cast<float>(Ramped);
+        const double K = static_cast<double>(SpeedSlack) * kSlackCapScale;
         const float Cap = static_cast<float>(K * K * Speed + Speed);
         if (Ramped > Cap)
-            Cam->SmoothedSpeed = Cap;
+            SmoothedSpeed = Cap;
     }
     else
     {
-        Cam->SmoothedSpeed = Speed;
+        SmoothedSpeed = Speed;
     }
-    const float LookAhead = static_cast<float>(LookAheadBase + Cam->SpeedSlack);
+    const float LookAhead = static_cast<float>(LookAheadBase + SpeedSlack);
 
     // The camera offset = hardpoint + ((look offset + extra offset) + (0, 0, look-ahead)), each
     // sum rounded to float.
-    Vector CameraOffset = {Cam->HardpointPos[0], Cam->HardpointPos[1], Cam->HardpointPos[2]};
+    Vector CameraOffset = {HardpointPos[0], HardpointPos[1], HardpointPos[2]};
     float LookAheadOffset[3];
     LookAheadOffset[0] = 0.0f;
     LookAheadOffset[1] = 0.0f;
     LookAheadOffset[2] = LookAhead;
     float LookOffsetSum[3];
-    Vec3AddStored(LookOffsetSum, &Cam->LookOffsetX, &Cam->ExtraOffsetX);
+    Vec3AddStored(LookOffsetSum, &LookOffsetX, &ExtraOffsetX);
     float OffsetPlusLookAhead[3];
     Vec3AddStored(OffsetPlusLookAhead, LookOffsetSum, LookAheadOffset);
     CameraOffset.x = static_cast<float>(static_cast<double>(OffsetPlusLookAhead[0]) + CameraOffset.x);
@@ -591,31 +591,31 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     Quaternion QSlerpCopy;
 
     // Auto-level only with +0x13c set, a manager, and the manager's camera-level status.
-    if (Cam->bCameraLevelEnabled != 0 && Manager != nullptr && Manager->get_camera_level_status())
+    if (bCameraLevelEnabled != 0 && Manager != nullptr && Manager->get_camera_level_status())
     {
         if (Manager->get_user_turning_input_state())
         {
             // The player is steering: tell the manager the reset orientation's up (column 1).
             Vector Up;
-            Up.x = Cam->ResetOrient[1];
-            Up.y = Cam->ResetOrient[4];
-            Up.z = Cam->ResetOrient[7];
+            Up.x = ResetOrient[1];
+            Up.y = ResetOrient[4];
+            Up.z = ResetOrient[7];
             Manager->submit_camera_up(Up);
 
             // q(M levelled to +0x204).
             float Levelled[9];
-            CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &Cam->UpAxis);
+            CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &UpAxis);
             Quaternion QFromUpAxis;
             CockpitMathEngine()->MatrixToQuaternion(QFromUpAxis, AsMatrix(Levelled));
 
             // q(M levelled to the reset up).
             Vector HistoryUp;
-            GetColumn(&HistoryUp, Cam->ResetOrient, 1);
+            GetColumn(&HistoryUp, ResetOrient, 1);
             CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &HistoryUp);
             Quaternion QFromHistory;
             CockpitMathEngine()->MatrixToQuaternion(QFromHistory, AsMatrix(Levelled));
 
-            const float T = static_cast<float>(static_cast<double>(DeltaSeconds) * Cam->TurnRateScale);
+            const float T = static_cast<float>(static_cast<double>(DeltaSeconds) * TurnRateScale);
             CockpitMathEngine()->QuatSlerp(QSlerp, QFromUpAxis, QFromHistory, T);
 
             // Back to a matrix; up = its column 1; M = it.
@@ -625,9 +625,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             Vector SlerpedUp;
             GetColumn(&SlerpedUp, Slerped, 1);
             memcpy(M, Slerped, sizeof(M));
-            Cam->UpAxis.x = SlerpedUp.x;
-            Cam->UpAxis.y = SlerpedUp.y;
-            Cam->UpAxis.z = SlerpedUp.z;
+            UpAxis.x = SlerpedUp.x;
+            UpAxis.y = SlerpedUp.y;
+            UpAxis.z = SlerpedUp.z;
         }
         else
         {
@@ -641,7 +641,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             // other than exactly (0, 1, 0) -- NaN included -- is replaced by it and pushed to the
             // manager.
             const unsigned char* const Held =
-                reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+                reinterpret_cast<const unsigned char*>(Watched.target());
             if (Held != nullptr && Held - kWatchableOffset != nullptr)
             {
                 FClientShipGameobj* const ShipGo = static_cast<FClientShipGameobj*>(
@@ -667,9 +667,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             float Levelled[9];
             CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(Levelled), reinterpret_cast<Matrix const*>(M), &LevelUp);
             float Dot = static_cast<float>(
-                (static_cast<double>(LevelUp.z) * Cam->UpAxis.z +
-                 static_cast<double>(LevelUp.y) * Cam->UpAxis.y) +
-                static_cast<double>(LevelUp.x) * Cam->UpAxis.x);
+                (static_cast<double>(LevelUp.z) * UpAxis.z +
+                 static_cast<double>(LevelUp.y) * UpAxis.y) +
+                static_cast<double>(LevelUp.x) * UpAxis.x);
             const float UpAgree = static_cast<float>(
                 (static_cast<double>(Levelled[7]) * ShipRot[7] +
                  static_cast<double>(Levelled[4]) * ShipRot[4]) +
@@ -682,7 +682,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                 if (fabs(static_cast<double>(Dot)) < kLevelTurnMaxDot)
                 {
                     float FromUpAxis[9];
-                    CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(FromUpAxis), reinterpret_cast<Matrix const*>(M), &Cam->UpAxis);
+                    CameraOrientFromForwardAndUp(reinterpret_cast<Matrix*>(FromUpAxis), reinterpret_cast<Matrix const*>(M), &UpAxis);
                     Quaternion QTowards;
                     CockpitMathEngine()->MatrixToQuaternion(QTowards, AsMatrix(Levelled));
                     Quaternion QFrom;
@@ -690,7 +690,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                     if (Dot < 0.0f)
                         Dot = 0.0f;
                     const float T = static_cast<float>(
-                        (static_cast<double>(Dot) + 1.0f) * Cam->TurnRateScale * DeltaSeconds * 0.5f);
+                        (static_cast<double>(Dot) + 1.0f) * TurnRateScale * DeltaSeconds * 0.5f);
                     CockpitMathEngine()->QuatSlerp(QSlerp, QFrom, QTowards, T);
                     QSlerpCopy = QSlerp;
                     float Turned[9];
@@ -703,9 +703,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                     LevelUp.z = TurnedUp.z;
                 }
 
-                Cam->UpAxis.x = LevelUp.x;
-                Cam->UpAxis.y = LevelUp.y;
-                Cam->UpAxis.z = LevelUp.z;
+                UpAxis.x = LevelUp.x;
+                UpAxis.y = LevelUp.y;
+                UpAxis.z = LevelUp.z;
                 Vector Up;
                 Up.x = Levelled[1];
                 Up.y = Levelled[4];
@@ -716,16 +716,16 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             else if (static_cast<double>(UpAgree) > kLevelUpAgreeDot)
             {
                 // Almost opposite, but the ship's own up agrees: adopt it without turning.
-                Cam->UpAxis.x = LevelUp.x;
-                Cam->UpAxis.y = LevelUp.y;
-                Cam->UpAxis.z = LevelUp.z;
+                UpAxis.x = LevelUp.x;
+                UpAxis.y = LevelUp.y;
+                UpAxis.z = LevelUp.z;
             }
         }
     }
 
     if (bReset)
     {
-        memcpy(Cam->ResetOrient, M, sizeof(M));
+        memcpy(ResetOrient, M, sizeof(M));
         Vector Offset;
         CockpitMathEngine()->TransformMatrix(Offset, AsMatrix(M), AsVector(&CameraOffset));
         Pos[0] = static_cast<float>(static_cast<double>(Offset.x) + Pos[0]);
@@ -745,7 +745,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Throttle.x = OffsetPlusLookAhead[0];
         Throttle.y = OffsetPlusLookAhead[1];
         Throttle.z = OffsetPlusLookAhead[2];
-        WatchedObject(Cam)->get_axis_throttle(Throttle);
+        WatchedObject(this)->get_axis_throttle(Throttle);
         Vector Local;
         CockpitMathEngine()->TransposeTransform(Local, AsMatrix(M),
                                                 Throttle);
@@ -764,18 +764,18 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         if (LocalThrottle[0] > 0.0f)
         {
             RotatePitchRows(ThrottleTurn,
-                            -(static_cast<double>(LocalThrottle[0]) * Cam->VerticalTurnUpAngle));
+                            -(static_cast<double>(LocalThrottle[0]) * VerticalTurnUpAngle));
             RotateYawRows(ThrottleTurn,
-                          -(static_cast<double>(LocalThrottle[1]) * Cam->HorizontalTurnAngle));
+                          -(static_cast<double>(LocalThrottle[1]) * HorizontalTurnAngle));
         }
         else
         {
             // Not above zero, or NaN: the down angle, and yaw scaled by |x| * 0.8f + 1.0.
             RotatePitchRows(ThrottleTurn,
-                            -(static_cast<double>(LocalThrottle[0]) * Cam->VerticalTurnDownAngle));
+                            -(static_cast<double>(LocalThrottle[0]) * VerticalTurnDownAngle));
             const double Scale = fabs(static_cast<double>(LocalThrottle[0])) * kDownTurnYawScale + 1.0;
             RotateYawRows(ThrottleTurn,
-                          Scale * -(static_cast<double>(LocalThrottle[1]) * Cam->HorizontalTurnAngle));
+                          Scale * -(static_cast<double>(LocalThrottle[1]) * HorizontalTurnAngle));
         }
 
         float Product[9];
@@ -784,7 +784,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
         // The level axis through the ship's live rotation, against M's column 1.
         Vector LevelWorld;
-        CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(&Cam->LevelAxis));
+        CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(&LevelAxis));
         Vector CamUp;
         GetColumn(&CamUp, M, 1);
         Vector LevelDir;
@@ -842,17 +842,17 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         const double InvDt = 1.0f / static_cast<double>(DeltaSeconds);
         const float InvDtStored = static_cast<float>(InvDt);
         double Rate = InvDt * Angle;
-        if (Rate - Cam->PrevAngularRate > Cam->AngularAcceleration)
-            Rate = static_cast<double>(Cam->AngularAcceleration) + Cam->PrevAngularRate;
+        if (Rate - PrevAngularRate > AngularAcceleration)
+            Rate = static_cast<double>(AngularAcceleration) + PrevAngularRate;
         float Fraction = 1.0f;
         if (static_cast<double>(Angle) > kMinTurnAngle)
             Fraction = static_cast<float>(static_cast<double>(DeltaSeconds) / Angle * Rate);
-        if (Fraction > Cam->AngularSlerpMultiplier)
+        if (Fraction > AngularSlerpMultiplier)
         {
-            Fraction = Cam->AngularSlerpMultiplier;
+            Fraction = AngularSlerpMultiplier;
             Rate = static_cast<double>(InvDtStored) * Fraction * Angle;
         }
-        Cam->PrevAngularRate = static_cast<float>(Rate);
+        PrevAngularRate = static_cast<float>(Rate);
 
         CockpitMathEngine()->QuatSlerp(QSlerp, QTarget, QTurned, Fraction);
         QSlerpCopy = QSlerp;
@@ -873,34 +873,34 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         GetColumn(&NewBack, M, 2);
         Vector BackLocal;
         CockpitMathEngine()->TransposeTransform(BackLocal, AsMatrix(ShipRot), AsVector(&NewBack));
-        Cam->LevelAxis.x = -BackLocal.x;
-        Cam->LevelAxis.y = -BackLocal.y;
-        Cam->LevelAxis.z = -BackLocal.z;
+        LevelAxis.x = -BackLocal.x;
+        LevelAxis.y = -BackLocal.y;
+        LevelAxis.z = -BackLocal.z;
 
         // The history = M, then M = slerp(q(M), q(before), +0x1e8).
-        memcpy(Cam->ResetOrient, M, sizeof(M));
+        memcpy(ResetOrient, M, sizeof(M));
         Quaternion QAfterTurn;
         CockpitMathEngine()->MatrixToQuaternion(QAfterTurn, AsMatrix(M));
-        const float LookAheadSlerp = Cam->TurnLookAheadSlerpAmount;
+        const float LookAheadSlerp = TurnLookAheadSlerpAmount;
         CockpitMathEngine()->QuatSlerp(QSlerp, QAfterTurn, QBeforeTurn, LookAheadSlerp);
         QSlerpCopy = QSlerp;
         CockpitMathEngine()->QuaternionToMatrix(AsMatrix(Slerped), QSlerpCopy);
         memcpy(M, Slerped, sizeof(M));
     }
 
-    Cam->TranslationCache[0] = Pos[0];
-    Cam->TranslationCache[1] = Pos[1];
-    Cam->TranslationCache[2] = Pos[2];
-    Cam->PrevSpeed = Speed;
-    HudCameraApplyShake((FHudCamera*)Cam, reinterpret_cast<Matrix*>(M));
+    TranslationCache[0] = Pos[0];
+    TranslationCache[1] = Pos[1];
+    TranslationCache[2] = Pos[2];
+    PrevSpeed = Speed;
+    FHudCamera::ApplyShake(reinterpret_cast<Matrix*>(M));
     memcpy(Out12, M, 9 * sizeof(float));
-    Out12[9] = Cam->TranslationCache[0];
-    Out12[10] = Cam->TranslationCache[1];
-    Out12[11] = Cam->TranslationCache[2];
+    Out12[9] = TranslationCache[0];
+    Out12[10] = TranslationCache[1];
+    Out12[11] = TranslationCache[2];
     return true;
 }
 
-bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
+bool FThirdPersonCamera::Load(const char* CockpitIniPath)
 {
     // FUN_005187d0, in retail's order.
     bool bOk = true;
@@ -927,7 +927,7 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
     }
 
     // The 4:3 aspect sanity check, read through the vtable (slots 0x18 and 0x1c).
-    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)Cam));
+    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)this));
 
     const double TanX = tan(static_cast<double>(Space->GetHalfFovXDeg() * kDegreesToRadians));
     const double TanY = tan(static_cast<double>(Space->GetFovYDeg() * kDegreesToRadians));
@@ -949,29 +949,9 @@ char const* FThirdPersonCamera::GetName()
     return ThirdPersonCameraGetName();
 }
 
-void FThirdPersonCamera::Attach(void* Object)
-{
-    ThirdPersonCameraAttach(this, Object);
-}
-
-bool FThirdPersonCamera::Activate(int const* ViewRect4)
-{
-    return ThirdPersonCameraActivate(this, ViewRect4);
-}
-
-void FThirdPersonCamera::Update(float DeltaSeconds)
-{
-    ThirdPersonCameraUpdate(this, DeltaSeconds);
-}
-
-bool FThirdPersonCamera::OnEvent(unsigned MsgId)
-{
-    return ThirdPersonCameraOnEvent(this, MsgId);
-}
-
 void FThirdPersonCamera::Deactivate()
 {
-    HudCameraDerivedDeactivate(this);
+    DerivedDeactivate();
 }
 
 void FThirdPersonCamera::DrawScene(unsigned LayerFlags, unsigned Param2)

@@ -6,7 +6,7 @@
 
 #include "NeuroNet/nn_main_button.h"
 
-#include "Common/Graphics/client_mesh_load.h"    // ClientUiMeshHolderRelease (FUN_0059eee0), ClientMeshLoadFromPath (FUN_0059ec80)
+#include "Common/Graphics/client_mesh_load.h"    // FClientMeshHolder::ReleaseWithAnim (FUN_0059eee0), FClientMeshHolder::LoadFromPath (FUN_0059ec80)
 #include "Core/globals.h"             // IsClientServerTickPaused (FUN_0042d730), GetClientFrameTimeCapped (FUN_0042d680)
 #include "Space/HUD/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0), Hud{Push,Remove}CancelHandler
 #include "Space/HUD/hud_target.h"          // HudIsMousePickBlocked (FUN_0045a740)
@@ -535,7 +535,7 @@ void NN_MainButton::OnScaleFinished()
         ClosingButton->SetPosition(&Zero);
         ButtonMover::AddButton(ClosingButton, &ClosingStart, &ClosingButton->HomeOffset);
         ClosingButton->ToolTipIds = ClosingToolTipIds;
-        HudRemoveCancelHandler(AsHudCmdHandler(), 0);
+        RemoveCancelHandler(0);
         return;
     }
 
@@ -591,7 +591,7 @@ void NN_MainButton::OnScaleFinished()
     Window->ProcessMessage(kWinMsgShow, 0, 0);
     Window->Flags = static_cast<unsigned char>(Window->Flags | kWin3DActive | kWin3DVisible);
     PlayOrRewindUiSoundSlot(kUiSoundWindowOpen);
-    HudPushCancelHandler(AsHudCmdHandler(), 0);
+    PushCancelHandler(0);
     UpdateRootHighlights();
 }
 
@@ -668,7 +668,7 @@ void NN_MainButton::OpenPanel(WinControl* Button, int PanelId)
     ButtonMover::AddButton(Button, &Button->HomeOffset, &Target);
     OpenButton = Button;
     OpenPanelId = PanelId;
-    HudPushCancelHandler(AsHudCmdHandler(), 0);
+    PushCancelHandler(0);
     UpdateRootHighlights();
 }
 
@@ -849,8 +849,8 @@ void NN_MainButton::SetGroupButtonMesh(int Mode)
                    sizeof(Saved));
         }
         strcpy(Control->MeshPath, Path);
-        ClientUiMeshHolderRelease(&Control->MeshHolder);
-        ClientMeshLoadFromPath(&Control->MeshHolder, Path, 0, false);
+        Control->MeshHolder.ReleaseWithAnim();
+        Control->MeshHolder.LoadFromPath(Path, 0, false);
         const InstanceIndex Instance = Control->MeshHolder.EngineInstance;
         if (Instance != InvalidInstanceIndex)
         {

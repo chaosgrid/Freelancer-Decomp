@@ -587,15 +587,15 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
         Ctx.bPassThrough = false;
         std::list<FChatCommand>::reverse_iterator It = GChatCommands.rbegin();
         for (; It != GChatCommands.rend(); ++It) {
-            if (It->match(&Ctx, GChatText + 1)) {
-                if (!Ctx.bPassThrough)
-                    return;
-                Sender = Ctx.Sender;
-                Target = Ctx.Target;
-                Data = Ctx.Data;
-                Size = Ctx.Size;
-                break;
-            }
+            if (!It->match(&Ctx, GChatText + 1))
+                continue;
+            if (!Ctx.bPassThrough)
+                return;
+            Sender = Ctx.Sender;
+            Target = Ctx.Target;
+            Data = Ctx.Data;
+            Size = Ctx.Size;
+            break;
         }
     }
 

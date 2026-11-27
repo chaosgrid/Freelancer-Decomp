@@ -399,13 +399,13 @@ GENRESULT DACOM_API FMaterialLibrary::DeleteGroup(int GroupId)
             --Slot->RefCount;
             Slot->Material->Release();
         }
-        if ((int)Slot->RefCount <= 1)
-        {
-            --Slot->RefCount;
-            Slot->Material->Release();
-            Slot->Material = nullptr;
-            CrcMap.erase(Group->Members[Index]);
-        }
+        if ((int)Slot->RefCount > 1)
+            continue;
+
+        --Slot->RefCount;
+        Slot->Material->Release();
+        Slot->Material = nullptr;
+        CrcMap.erase(Group->Members[Index]);
     }
     Groups.erase((unsigned long)GroupId);
     return GR_OK;

@@ -9,9 +9,9 @@
 
 #include "common_iface.h"         // TargetManager, IBehaviorManager, IObjRW, ObjInspectOf
 #include "common_systemmanager.h" // SystemManager
-#include "common_aisteer.h"       // FAiTarget, ClampedDot3, GetCachedRange, GetIfacePositionOrZero
+#include "common_aisteer.h"       // FAiTarget, ClampedDot3, FAiTarget::GetCachedRange, GetIfacePositionOrZero
 #include "AI/common_aisteer_internal.h" // CmnAiSteer::InlineFastLength (retail's inlined x87 fast length)
-#include "common_iustategraph.h"  // BuildAiTargetList / GetAiTargetList / ResetAiTargetList
+#include "common_iustategraph.h"  // SystemManagerTimerTable::BuildAiTargetList / GetAiTargetList / SystemManagerTimerTable::ResetAiTargetList
 #include "common_pathfind.h"      // PathfindManager user-zone probes (FUN_062ddcd0 / FUN_062db830)
 #include "common_cobject.h"       // CShip::get_targeted_enemy_count / get_formation_followers
 #include "common_cobjdb.h"        // IObjDB -- TargetManager::GetScanResponse's FindById call
@@ -153,7 +153,7 @@ void TargetManager::SetAttackState(int NewState)
     }
 }
 
-// FUN_062e77e0 is ResetAiTargetList (common_iustategraph.cpp); FUN_062ee390 is
+// FUN_062e77e0 is SystemManagerTimerTable::ResetAiTargetList (common_iustategraph.cpp); FUN_062ee390 is
 // TargetManager::GetHostilePowerRatio (below).
 
 // TargetManager's two enemy-count clamp bounds, .data dwords initialised to 2. Written only by
@@ -362,7 +362,7 @@ double TargetManager::GetHostilePowerRatio()
     TargetManager_EnsurePhysicalCacheFresh(Owner);
 
     // FUN_062e7580; End is re-read on every pass.
-    FAiTargetVector* const List = BuildAiTargetList(GetAiTargetList(Owner));
+    FAiTargetVector* const List = GetAiTargetList(Owner)->BuildAiTargetList();
     for (FAiTarget* Elem = List->Begin; Elem != List->End; ++Elem)
     {
         // The lazily cached type; the guard is raised after the get_type call.
@@ -380,11 +380,11 @@ double TargetManager::GetHostilePowerRatio()
         // ordered) adds to our own.
         float Attitude = 0.0f;
         float Reverse = 0.0f;
-        GetCachedRange(Elem, &Attitude, &Reverse);
+        Elem->GetCachedRange(&Attitude, &Reverse);
         bool bHostile = (Reverse <= -0.6f);
         if (!bHostile)
         {
-            GetCachedRange(Elem, &Attitude, &Reverse);
+            Elem->GetCachedRange(&Attitude, &Reverse);
             bHostile = (Attitude <= -0.6f);
         }
 
@@ -395,7 +395,7 @@ double TargetManager::GetHostilePowerRatio()
             continue;
         }
 
-        GetCachedRange(Elem, &Attitude, &Reverse);
+        Elem->GetCachedRange(&Attitude, &Reverse);
         if (Reverse >= 0.6f)
         {
             Own = (float)((double)(Elem->Iface->get_toughness())
@@ -417,7 +417,7 @@ pub::AI::ScanResponse TargetManager::GetScanResponse(uint Type)
     Owner->ObjectDb->FindById(&Type);
 
     // FUN_062e77e0: drop the cached AI target list.
-    ResetAiTargetList(GetAiTargetList(Owner));
+    GetAiTargetList(Owner)->ResetAiTargetList();
 
     double const Ratio = GetHostilePowerRatio(); // unrounded, compared below
 
@@ -815,7 +815,7 @@ void TargetManager::UpdateAttackTargetOverride()
     FAiTargetVector* savedTargets = nullptr;
     {
         FAiTargetList* const targetList = GetAiTargetList(Sys);
-        FAiTargetVector* const targets = BuildAiTargetList(targetList);
+        FAiTargetVector* const targets = targetList->BuildAiTargetList();
         savedTargets = targets;
 
         // JobParams.RangeThreshold (Sys+0x1824) picks a fraction of 5000.0f (.rdata:063a0810): the
@@ -836,7 +836,7 @@ void TargetManager::UpdateAttackTargetOverride()
         {
             float attitude = 0.0f;
             float reverseAttitude = 0.0f;
-            GetCachedRange(elem, &attitude, &reverseAttitude);
+            elem->GetCachedRange(&attitude, &reverseAttitude);
 
             if (!(attitude <= -0.6f))
             {
@@ -964,7 +964,7 @@ void TargetManager::UpdateAttackTargetOverride()
         // The first scan's gate, against its possibly tightened threshold.
         float candAttitude = 0.0f;
         float candReverseAttitude = 0.0f;
-        GetCachedRange(cand, &candAttitude, &candReverseAttitude);
+        cand->GetCachedRange(&candAttitude, &candReverseAttitude);
         if (!(candAttitude <= hostileThreshold))
         {
             continue;

@@ -109,13 +109,13 @@ void CECargo::Init(float HealthFrac, unsigned StackCount, CacheString const& Har
         Pod = CECargoPod::cast(Owner->EquipManager.Traverse(Walk));
     }
 
-    if (CargoPod == nullptr)
-    {
-        FDUMP(kFdumpError,
-              "%s(%d) : *** ERROR: %s cannot find a cargo pod attached to hardpoint %s for %s.",
-              kCECargoSource, 0x39, IdentifyEquipment(), Hp,
-              Owner->Archetype->Nickname.get_string());
-    }
+    if (CargoPod != nullptr)
+        return;
+
+    FDUMP(kFdumpError,
+          "%s(%d) : *** ERROR: %s cannot find a cargo pod attached to hardpoint %s for %s.",
+          kCECargoSource, 0x39, IdentifyEquipment(), Hp,
+          Owner->Archetype->Nickname.get_string());
 }
 
 void CECargo::AddToStack(unsigned Amount, float HealthFrac)

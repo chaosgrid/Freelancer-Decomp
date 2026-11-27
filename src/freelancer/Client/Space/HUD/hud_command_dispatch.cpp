@@ -106,7 +106,9 @@ namespace
     }
 }
 
-void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId)
+// FUN_005760d0 — register Handler for MsgId into DAT_0067c3a4 multimap (after existing entries
+// with the same id; duplicates allowed).
+void EventHandler::RegisterEvent(unsigned MsgId)
 {
     // FUN_005760d0 → FUN_00575e00: multimap insert. An equal key goes right, so the new entry
     // lands after every existing entry with the same id. The _Multi byte skips the duplicate
@@ -115,7 +117,7 @@ void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId)
 
     FHudCmdRegEntry Entry;
     Entry.MsgId = MsgId;
-    Entry.Handler = Handler;
+    Entry.Handler = this;
 
     std::vector<FHudCmdRegEntry>& Registry = *G_HudCmdRegistryPtr;
     std::vector<FHudCmdRegEntry>::iterator It = Registry.begin();
@@ -124,7 +126,8 @@ void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId)
     Registry.insert(It, Entry);
 }
 
-void HudUnregisterCommand(FHudCmdHandler* Handler, unsigned MsgId)
+// FUN_005760f0 — erase Handler's entries for one MsgId (the tree is kept even if it empties).
+void EventHandler::UnregisterEvent(unsigned MsgId)
 {
     // FUN_005760f0: erase the nodes of equal_range(MsgId) whose +0x10 is this handler. The tree
     // is not freed here even when it empties.
@@ -134,20 +137,21 @@ void HudUnregisterCommand(FHudCmdHandler* Handler, unsigned MsgId)
     std::vector<FHudCmdRegEntry>::iterator It = Registry.begin();
     while (It != Registry.end())
     {
-        if (It->MsgId == MsgId && It->Handler == Handler)
+        if (It->MsgId == MsgId && It->Handler == this)
             It = Registry.erase(It);
         else
             ++It;
     }
 }
 
-void HudUnregisterCommandHandler(FHudCmdHandler* Handler)
+// FUN_00576190 — erase every entry whose handler == Handler; free the tree once it is empty.
+void EventHandler::UnregisterAllEvents()
 {
     // FUN_00576190.
-    EraseAllRegistrations(Handler);
+    EraseAllRegistrations(this);
 }
 
-void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip)
+void EventHandler::RemoveCancelHandler(int Skip)
 {
     // FUN_005762f0.
     if (G_HudCmdCancelCount == 0)
@@ -158,7 +162,7 @@ void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip)
     std::list<FHudCmdHandler*>::iterator It = G_HudCmdCancelNodes->begin();
     while (It != G_HudCmdCancelNodes->end())
     {
-        if (*It == Handler)
+        if (*It == this)
         {
             if (Skip != 0)
             {
@@ -174,21 +178,21 @@ void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip)
     }
 }
 
-void HudPushCancelHandler(FHudCmdHandler* Handler, int Skip)
+void EventHandler::PushCancelHandler(int Skip)
 {
     // FUN_00576360.
-    HudRemoveCancelHandler(Handler, Skip);
-    G_HudCmdCancelNodes->push_back(Handler);
+    RemoveCancelHandler(Skip);
+    G_HudCmdCancelNodes->push_back(this);
     G_HudCmdCancelCount = G_HudCmdCancelCount + 1;
 }
 
-void HudDestroyEventHandler(FHudCmdHandler* Handler)
+EventHandler::~EventHandler()
 {
     // FUN_00576010 — the Event::Handler base destructor (vptr 005cbed8); FUN_00576190's erase is
     // inlined.
-    HudPopInputFocus(Handler);
-    EraseAllRegistrations(Handler);
-    HudRemoveCancelHandler(Handler, 0);
+    HudPopInputFocus(this);
+    EraseAllRegistrations(this);
+    RemoveCancelHandler(0);
 }
 
 int HudDispatchCommand(unsigned MsgId, int Mode)

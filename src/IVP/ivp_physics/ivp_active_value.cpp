@@ -211,13 +211,13 @@ IVP_U_Active_Value_Hash::~IVP_U_Active_Value_Hash()
     for (int Index = SizeMm; Index >= 0; --Index)
     {
         IVP_U_Active_Value* Value = Entries[Index].Value;
-        if (Value != nullptr)
+        if (Value == nullptr)
+            continue;
+
+        --Value->ReferenceCount;
+        if (Value->ReferenceCount == 0)
         {
-            --Value->ReferenceCount;
-            if (Value->ReferenceCount == 0)
-            {
-                delete Value;
-            }
+            delete Value;
         }
     }
 }

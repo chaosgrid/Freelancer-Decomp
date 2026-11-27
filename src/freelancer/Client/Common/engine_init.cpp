@@ -21,7 +21,7 @@
 #include "dacom.h"
 #include "Core/dataconfig_progress.h"
 #include "Common/Fonts/font_atlas.h"
-#include "Common/Fonts/font_string.h"   // FHudWideText, WideTextReserve / WideTextFree
+#include "Common/Fonts/font_string.h"   // FHudWideText, FHudWideText::Reserve / FHudWideText::Free
 #include "GameFlow/gameflow.h"
 #include "Core/client_state.h"  // GetIntroFocusState (FUN_00575430)
 #include "Space/space_state.h"   // GetSpaceState (FUN_0054bd30)
@@ -345,7 +345,7 @@ namespace
             return;
         int const Old = Text->Text != nullptr ? static_cast<int>(wcslen(Text->Text)) : 0;
         int const Total = Old + Length;
-        WideTextReserve(Text, static_cast<unsigned>(Total + 1));
+        Text->Reserve(static_cast<unsigned>(Total + 1));
         wcsncpy(Text->Text + Old, Source, static_cast<size_t>(Length));
         Text->Text[Total] = 0;
     }
@@ -605,7 +605,7 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
         ViewRect[1] = 0;
         ViewRect[2] = static_cast<int>(G_RenderSurfaceWidth) - 1;
         ViewRect[3] = static_cast<int>(G_RenderSurfaceHeight) - 1;
-        SpaceCameraSetViewportEx(GetWin3DSceneCamera(), ViewRect, 1);
+        GetWin3DSceneCamera()->SetViewportEx(ViewRect, 1);
     }
     // The current client state's slot 11 Resize: space_state.cpp, gameflow.cpp /
     // client_state.cpp (shared LAB_00437400), mission_briefing.cpp.
@@ -747,7 +747,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
         WarningText.Capacity = 0;
         if (!BuildLowMachineWarning(&WarningText))
         {
-            WideTextFree(&WarningText);
+            WarningText.Free();
         }
         else
         {
@@ -780,7 +780,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
         }
     }
 
-    ApplyDisplayCmdlineOverrides(&Mode, CommandLine);
+    Mode.ApplyCmdlineOverrides(CommandLine);
     if (!SelectInitialRenderMode(g_client.window, &Mode, Mode.fullscreen))
         ShowEngineFatalError(0xc9);
 

@@ -8,7 +8,7 @@
 // timer table at SystemManager+0x34 (retail run 0x062e6af0-0x062e8970).
 
 #include "common_systemmanager.h"
-#include "common_behavior.h" // TimerTableMissileWithinReaction00/04/08 declarations
+#include "common_behavior.h" // SystemManagerTimerTable::MissileWithinReaction00/04/08 declarations
 #include "common_iface.h"   // IObjRW, IObjInspect::get_id
 #include "common_cobjdb.h"  // IObjDB::FindById
 #include "common_aisteer.h" // SustainedThresholdTimer
@@ -83,28 +83,28 @@ IObjRW* SystemManagerTimerTable::FindVerifiedObject(unsigned const* Id) const
 
 // FUN_062e8910 / 062e8940 / 062e8970 -- see common_behavior.h. Each needs Best > 0, then is
 // true on less or equal (false on greater or unordered).
-bool TimerTableMissileWithinReaction00(SystemManagerTimerTable const* Self)
+bool SystemManagerTimerTable::MissileWithinReaction00() const
 {
-    float const Best = Self->BestValueSoFar;
+    float const Best = BestValueSoFar;
     if (!(Best > 0.0f))
         return false;
-    return Best <= Self->Owner->PersonalityData.MissileReaction.EvadeBreakMissileReactionTime;   // +0x17b4
+    return Best <= Owner->PersonalityData.MissileReaction.EvadeBreakMissileReactionTime;   // +0x17b4
 }
 
-bool TimerTableMissileWithinReaction04(SystemManagerTimerTable const* Self)
+bool SystemManagerTimerTable::MissileWithinReaction04() const
 {
-    float const Best = Self->BestValueSoFar;
+    float const Best = BestValueSoFar;
     if (!(Best > 0.0f))
         return false;
-    return Best <= Self->Owner->PersonalityData.MissileReaction.EvadeSlideMissileReactionTime;   // +0x17b8
+    return Best <= Owner->PersonalityData.MissileReaction.EvadeSlideMissileReactionTime;   // +0x17b8
 }
 
-bool TimerTableMissileWithinReaction08(SystemManagerTimerTable const* Self)
+bool SystemManagerTimerTable::MissileWithinReaction08() const
 {
-    float const Best = Self->BestValueSoFar;
+    float const Best = BestValueSoFar;
     if (!(Best > 0.0f))
         return false;
-    return Best <= Self->Owner->PersonalityData.MissileReaction.EvadeAfterburnMissileReactionTime;   // +0x17bc
+    return Best <= Owner->PersonalityData.MissileReaction.EvadeAfterburnMissileReactionTime;   // +0x17bc
 }
 
 namespace
@@ -122,11 +122,11 @@ namespace
 // ============================================================================
 // SystemManagerTimerTable -- FUN_062e6af0.
 // ============================================================================
-void ConstructSystemManagerTimerTable(SystemManagerTimerTable* Self)
+void SystemManagerTimerTable::Construct()
 {
-    std::memset(Self, 0, sizeof(*Self));
+    std::memset(this, 0, sizeof(*this));
 
-    SustainedThresholdTimer* const Timers = Self->Timers;
+    SustainedThresholdTimer* const Timers = this->Timers;
     for (int i = 0; i < 11; ++i)
     {
         Timers[i].Active = 0;
@@ -135,17 +135,17 @@ void ConstructSystemManagerTimerTable(SystemManagerTimerTable* Self)
         Timers[i].Accumulator = 0.0f;
     }
 
-    Self->DecayScale = 0.5f;
+    DecayScale = 0.5f;
 
     // An empty, self-referential circular-list sentinel head (operator new(0x10)).
     SystemManagerTimerListNode* const Node =
         static_cast<SystemManagerTimerListNode*>(::operator new(0x10));
     Node->Next = Node;
     Node->Prev = Node;
-    Self->ListHeadNode = Node;
-    Self->ListCount = 0;
+    ListHeadNode = Node;
+    ListCount = 0;
 
-    Self->BestValueSoFar = 3.402823466e38f; // FLT_MAX
+    BestValueSoFar = 3.402823466e38f; // FLT_MAX
 }
 
 namespace
@@ -189,15 +189,15 @@ SystemManagerTimerTable::~SystemManagerTimerTable()
 // Slot00 case 6, with the event's Data -- the {OwnerId, missile id} block Server's
 // StarSystem::create_guided sends. Data is not an object: the missile is looked up by id.
 // Retail's SEH frame only tears down the scratch watcher on an exception; RAII does the same.
-void AppendSystemManagerTimerListEntry(SystemManagerTimerTable* Self, void* Source)
+void SystemManagerTimerTable::AppendTimerListEntry(void* Source)
 {
     if (Source == nullptr)
         return;
 
-    // The ObjectDb set by SetSystemManagerSharedListHead (FUN_062e68e0); not null-tested, as
+    // The ObjectDb set by SystemManager::SetSharedListHead (FUN_062e68e0); not null-tested, as
     // in retail.
     unsigned const* const IdBlock = static_cast<unsigned const*>(Source);
-    IObjRW* const Candidate = Self->ObjectDb->FindById(IdBlock + 1);
+    IObjRW* const Candidate = ObjectDb->FindById(IdBlock + 1);
 
     // Retail tests both Candidate and Candidate+8.
     BaseWatcher Scratch;
@@ -210,7 +210,7 @@ void AppendSystemManagerTimerListEntry(SystemManagerTimerTable* Self, void* Sour
     }
 
     // std::list _Buynode(Head, Head->Prev): a null Prev means the new node itself.
-    SystemManagerTimerListNode* const Head = static_cast<SystemManagerTimerListNode*>(Self->ListHeadNode);
+    SystemManagerTimerListNode* const Head = static_cast<SystemManagerTimerListNode*>(ListHeadNode);
     SystemManagerTimerListNode* Prev = Head->Prev;
 
     SystemManagerTimerListNode* const NewNode =
@@ -226,19 +226,19 @@ void AppendSystemManagerTimerListEntry(SystemManagerTimerTable* Self, void* Sour
     Watchable* ScratchTarget = const_cast<Watchable*>(Scratch.target());
     new (NewNode->Watcher) BaseWatcher(&ScratchTarget);
 
-    ++Self->ListCount;
+    ++ListCount;
 
     Scratch.set(nullptr);
 }
 
 // FUN_062e86d0. Candidate is an unidentified per-object record accessed via raw offsets.
-void AccumulateSystemManagerTimerLevel(SystemManagerTimerTable* Self, void* Candidate)
+void SystemManagerTimerTable::AccumulateTimerLevel(void* Candidate)
 {
     // Only the param is tested; Owner and its SelfTarget.Iface are dereferenced blind.
     if (Candidate == nullptr)
         return;
 
-    int const CurrentId = static_cast<int>(Self->Owner->SelfTarget.Iface->get_id());
+    int const CurrentId = static_cast<int>(Owner->SelfTarget.Iface->get_id());
 
     int CandidateId;
     std::memcpy(&CandidateId, static_cast<unsigned char*>(Candidate) + 0x08, sizeof(int));
@@ -249,26 +249,26 @@ void AccumulateSystemManagerTimerLevel(SystemManagerTimerTable* Self, void* Cand
     {
         float Value;
         std::memcpy(&Value, static_cast<unsigned char*>(Candidate) + 0x18, sizeof(float));
-        Self->Level += Value;
+        Level += Value;
     }
 }
 
 // FUN_062e8870. Retail re-tests Best > 0 before each of the three compares; the answer cannot
 // change, so one test suffices. Each compare is true on less or equal. Owner is read without
 // a check.
-bool SystemManagerTimerTableHasMissileReactionTarget(SystemManagerTimerTable const* Self)
+bool SystemManagerTimerTable::HasMissileReactionTarget() const
 {
-    float const Best = Self->BestValueSoFar;
+    float const Best = BestValueSoFar;
     if (!(Best > 0.0f))
         return false;
 
-    pub::AI::Personality::MissileReactionStruct const& Reaction = Self->Owner->PersonalityData.MissileReaction;
+    pub::AI::Personality::MissileReactionStruct const& Reaction = Owner->PersonalityData.MissileReaction;
     return Best <= Reaction.EvadeBreakMissileReactionTime || Best <= Reaction.EvadeSlideMissileReactionTime ||
            Best <= Reaction.EvadeAfterburnMissileReactionTime;
 }
 
 // FUN_062e6c60, RET 4; this = &Sys->Timers. DecayRate is MaxShield + MaxHitPts.
-bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Owner)
+bool SystemManagerTimerTable::Arm(SystemManager* Owner)
 {
     if (Owner == nullptr)
         return false;
@@ -277,12 +277,12 @@ bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Ow
     if (WatcherTarget == nullptr || reinterpret_cast<std::uintptr_t>(WatcherTarget) == 8)
         return false;
 
-    Self->Owner = Owner;
+    this->Owner = Owner;
 
     // Retail re-reads the watcher here.
     IObjRW* const Object = ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()));
     // The scanner equipment id the AI target list rebuild is gated on.
-    if (static_cast<IObjInspect*>(Object)->find_equipment(&Self->ScannerEquipId, 1, EquipTypeScanner) != 0)
+    if (static_cast<IObjInspect*>(Object)->find_equipment(&ScannerEquipId, 1, EquipTypeScanner) != 0)
         return false;
 
     float HitPts = 0.0f;
@@ -293,9 +293,9 @@ bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Ow
     bool bShieldActive = false;
     (void)static_cast<IObjInspect*>(Object)->get_shield_status(HitPts, MaxShield, bShieldActive);
 
-    Self->bBuilt = 0;
-    Self->bKeepCache = 0;
-    Self->DecayRate = MaxShield + MaxHitPts;
+    bBuilt = 0;
+    bKeepCache = 0;
+    DecayRate = MaxShield + MaxHitPts;
 
     return true;
 }
@@ -306,9 +306,9 @@ bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Ow
 // Each slot gets TriggerThreshold = <percent> * DecayRate and Duration = <time>
 // (1.0f for slots 0-2); the slot index follows from the write offset.
 // ============================================================================
-bool RefreshSystemManagerTimerThresholdsFromPersonality(SystemManagerTimerTable* Self)
+bool SystemManagerTimerTable::RefreshTimerThresholdsFromPersonality()
 {
-    SystemManager* const Sys = Self->Owner;
+    SystemManager* const Sys = Owner;
     if (Sys == nullptr)
         return true;
 
@@ -316,9 +316,9 @@ bool RefreshSystemManagerTimerThresholdsFromPersonality(SystemManagerTimerTable*
     pub::AI::Personality::DamageReactionStruct const& D = P.DamageReaction;
     pub::AI::Personality::FormationUseStruct const& F = P.FormationParams;
 
-    float const Scale = Self->DecayRate;
+    float const Scale = DecayRate;
 
-    SustainedThresholdTimer* const Timers = Self->Timers;
+    SustainedThresholdTimer* const Timers = this->Timers;
 
     // Slot 0 (Personality +0x1770)
     Timers[0].TriggerThreshold = D.EvadeBreakDamageTriggerPercent * Scale;
@@ -374,32 +374,32 @@ bool RefreshSystemManagerTimerThresholdsFromPersonality(SystemManagerTimerTable*
 //     BestDistance / (|CandidateVel| - |OwnerVel| * dot(norm OwnerVel, norm CandidateVel))
 // kept unrounded, and commits it to BestValueSoFar only when strictly less than
 // the previous value and strictly greater than zero (unordered fails both).
-// SystemManagerTimerTableHasMissileReactionTarget compares that against three
+// SystemManagerTimerTable::HasMissileReactionTarget compares that against three
 // MissileReaction time thresholds. Retail calls get_velocity on the owner twice
 // in the tail (no CSE); the values are identical.
 // ============================================================================
-void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*UnusedArg*/)
+void SystemManagerTimerTable::UpdateCandidateScan(float /*UnusedArg*/)
 {
     BaseWatcher* const BestWatcher =
-        reinterpret_cast<BaseWatcher*>(Self->BestCandidateWatcherBytes);
+        reinterpret_cast<BaseWatcher*>(BestCandidateWatcherBytes);
 
     BestWatcher->set(nullptr);
 
     float const kNoCandidate = 3.402823466e38f;      // FLT_MAX
 
     // Only ListCount is tested; Owner is dereferenced unguarded inside the loop.
-    if (Self->ListCount == 0)
+    if (ListCount == 0)
     {
-        Self->BestValueSoFar = kNoCandidate;
+        BestValueSoFar = kNoCandidate;
         return;
     }
 
     SystemManagerTimerListNode* const Head =
-        static_cast<SystemManagerTimerListNode*>(Self->ListHeadNode);
+        static_cast<SystemManagerTimerListNode*>(ListHeadNode);
     SystemManagerTimerListNode* Cur = Head->Next;
     if (Cur == Head)
     {
-        Self->BestValueSoFar = kNoCandidate;
+        BestValueSoFar = kNoCandidate;
         return;
     }
 
@@ -422,7 +422,7 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*Unu
             Next->Prev = Prev;
             NodeWatcher->~BaseWatcher();             // FUN_062b57e0 with flag 0
             ::operator delete(Cur);
-            --Self->ListCount;
+            --ListCount;
             Cur = Next;
         }
         else
@@ -430,7 +430,7 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*Unu
             IObjRW* const Candidate =
                 ObjRwFromWatchable(const_cast<Watchable*>(Watched));
 
-            SystemManager* const Owner = Self->Owner;
+            SystemManager* const Owner = this->Owner;
 
             // Lazily cached centre/radius; Iface is not null-tested.
             if (Owner->SelfTarget.bPosValid == 0)
@@ -475,19 +475,19 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*Unu
             Cur = Cur->Next;
         }
 
-        if (Self->ListCount == 0 || Cur == Head)
+        if (ListCount == 0 || Cur == Head)
             break;
     }
 
     // Owner and its Iface are dereferenced blind below.
     if (!bFound)
     {
-        Self->BestValueSoFar = kNoCandidate;
+        BestValueSoFar = kNoCandidate;
         return;
     }
 
     // ---- the x87 tail (see the header comment) ----
-    Vector OwnerVelocity = Self->Owner->SelfTarget.Iface->get_velocity();
+    Vector OwnerVelocity = this->Owner->SelfTarget.Iface->get_velocity();
 
     Vector OwnerDirection;
     Vector CandidateDirection;
@@ -496,7 +496,7 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*Unu
     float const Dot = ClampedDot3(OwnerDirection, CandidateDirection);
 
     // Retail calls get_velocity() a second time into the same slot.
-    OwnerVelocity = Self->Owner->SelfTarget.Iface->get_velocity();
+    OwnerVelocity = this->Owner->SelfTarget.Iface->get_velocity();
 
     // Everything below stays on the x87 stack until the final store.
     double const CandidateSpeed = std::sqrt(
@@ -511,30 +511,30 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float /*Unu
     double const ClosingRate = CandidateSpeed - OwnerSpeed * Dot;
     double const Estimate = BestDistance / ClosingRate;
 
-    if (Estimate < Self->BestValueSoFar && Estimate > 0.0)
-        Self->BestValueSoFar = (float)Estimate;
+    if (Estimate < BestValueSoFar && Estimate > 0.0)
+        BestValueSoFar = (float)Estimate;
 }
 
 // ============================================================================
 // FUN_062e7010; `this` is &Timers. DeltaTime is passed through to the candidate
 // scan, which does not read it.
 // ============================================================================
-void UpdateSystemManagerTimerTable(SystemManagerTimerTable* Self, float DeltaTime)
+void SystemManagerTimerTable::Update(float DeltaTime)
 {
-    UpdateSystemManagerCandidateScan(Self, DeltaTime);
+    UpdateCandidateScan(DeltaTime);
 
     // FUN_062e6a20 eleven times: slots 0-7 inlined, 8-10 as real calls; identical bodies.
     for (int Slot = 0; Slot < 11; ++Slot)
-        (void)Self->Timers[Slot].Update(DeltaTime, Self->Level);
+        (void)Timers[Slot].Update(DeltaTime, Level);
 
     // Decay only while the old Level is positive. The unrounded difference is tested, so
     // only a strictly negative result clamps to 0.
-    if (Self->Level > 0.0f)
+    if (Level > 0.0f)
     {
-        double const NewLevel = Self->Level -
-            (double)Self->DecayScale * Self->DecayRate * DeltaTime;
-        Self->Level = (float)NewLevel;
+        double const NewLevel = Level -
+            (double)DecayScale * DecayRate * DeltaTime;
+        Level = (float)NewLevel;
         if (NewLevel < 0.0)
-            Self->Level = 0.0f;
+            Level = 0.0f;
     }
 }

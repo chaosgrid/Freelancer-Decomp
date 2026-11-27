@@ -28,6 +28,9 @@ struct FTexturePlayback
     FTexturePlayback() : Source(nullptr), LocalRate(0.0f), bUseLocalRate(false),
         PlaybackDirection(1.0f), CurrentFrame(0), FrameCount(0), ElapsedTime(0.0),
         TotalDuration(0.0), RefCount(0), WrapMode(kTextureWrapLoop) {}
+
+    // FUN_06ebe7f0 (thiscall). Defined in TextureLibrary.cpp.
+    GENRESULT ReadFrame(unsigned int Frame, unsigned long* Out);
 };
 
 // Named group owns playback IDs, independently of canonical name records.

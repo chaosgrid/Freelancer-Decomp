@@ -14,15 +14,6 @@
 struct SpaceApp;
 
 IEnvironment* GetSpaceState();
-// FUN_0054ab40 -- slot 12 (+0x30). True when the space init finished with no
-// next state pending (DAT_00679778 == 0).
-bool InitSpaceState(SpaceApp* State, int Param);
-int UpdateSpaceState(SpaceApp* State, float DeltaSeconds);
-void DestroySpaceState(SpaceApp* State);
-// FUN_0054ab20 -- slot 9 (+0x24) of the space state vftable .rdata 0x005e0554: FUN_00554e80,
-// this->slot 13 (DestroySpaceState), CObject::ReleaseAll, then FUN_0051fbc0. Caller: the client
-// atexit teardown, on the FUN_0054bd30 singleton.
-void ShutdownSpaceState(SpaceApp* State);
 
 // FUN_00548ef0 -- store the base a landing ship asked for (DAT_00679784). Callers: the Ship's
 // land request and the Land action's update.

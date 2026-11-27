@@ -45,10 +45,10 @@ struct FGateTunnelCoeff
     float C1; // +0x04
     float C2; // +0x08
     float C3; // +0x0c
-};
 
-// FUN_00501c40 -- the cubic at T, unrounded.
-double GateTunnelCoeffEval(FGateTunnelCoeff const* Coeff, float T);
+    // FUN_00501c40 -- the cubic at T, unrounded.
+    double Eval(float T) const;
+};
 
 // FUN_005018a0 -- the natural-end cubic spline through Y[0..N] (tridiagonal solve for
 // the tangents D, then Out[i] = {Y[i], D[i], 3(Y[i+1]-Y[i]) - 2D[i] - D[i+1],
@@ -177,6 +177,9 @@ struct FGateTunnel
     int State;                     // +0x2a4
     FGameLight* Light;             // +0x2a8
     Vector LightDirection;         // +0x2ac
+
+    // FUN_004ff3b0 -- +0x260 = Ship. Caller: FUN_00503440.
+    void SetShip(FClientShipGameobj* Ship);
 };
 
 // DAT_00674f98 (allocator byte; first DAT_00674f9c, last DAT_00674fa0, end DAT_00674fa4) -- the
@@ -196,9 +199,6 @@ extern FGateTunnelList G_GateTunnels;
 // FUN_004fedd0 -- the tunnel whose +4 id equals *Id, else an FDUMP warning and null. Caller:
 // FUN_00503440.
 FGateTunnel* GateTunnelFind(ID_String const* Id);
-
-// FUN_004ff3b0 -- +0x260 = Ship. Caller: FUN_00503440.
-void GateTunnelSetShip(FGateTunnel* Tunnel, FClientShipGameobj* Ship);
 
 // FUN_004fe1c0 (the resolved path) -- [gate_tunnel] / [layer] sections into G_GateTunnels.
 // Caller: the space init.

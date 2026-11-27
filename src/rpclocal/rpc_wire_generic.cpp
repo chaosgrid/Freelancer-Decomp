@@ -892,35 +892,36 @@ bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot) {
 }
 
 // 0x06d916a0 (slot) + 0x06da2240 (body) -- Encode.
-unsigned int RpcEncodeWireEquipList(FRpcEquipListPacket& Packet, unsigned char** BufferHolder,
-                                    unsigned int Capacity, unsigned int* OutLength) {
-    FRpcEquipWireHandle* const* Slot = &Packet.EquipHandle;
+unsigned int FRpcEquipListPacket::EncodeWireEquipList(unsigned char** BufferHolder,
+                                                      unsigned int Capacity,
+                                                      unsigned int* OutLength) {
+    FRpcEquipWireHandle* const* Slot = &EquipHandle;
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
 
     if (!RpcPutEquipList(Stream, Slot)) {                                // FUN_06da2240
         return FRpcMarshalStream::kEncodeOverflow;
     }
 
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // 0x06d95bf0 (slot) + 0x06da2480 (body) -- Decode.
-unsigned int RpcDecodeWireEquipList(FRpcEquipListPacket& Packet, const unsigned char* Buffer,
-                                    unsigned int Size, unsigned int* OutLength) {
-    FRpcEquipWireHandle** Slot = &Packet.EquipHandle;
+unsigned int FRpcEquipListPacket::DecodeWireEquipList(const unsigned char* Buffer,
+                                                      unsigned int Size, unsigned int* OutLength) {
+    FRpcEquipWireHandle** Slot = &EquipHandle;
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!RpcGetEquipList(Stream, Slot)) {                                // FUN_06da2480
         return Stream.GetError();
     }
 
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 

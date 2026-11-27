@@ -42,7 +42,7 @@ namespace
     {
         FWin3DSceneCameraStaticInit()
         {
-            SpaceCameraConstruct(&G_Win3DSceneCamera);
+            G_Win3DSceneCamera.Construct();
         }
     };
     FWin3DSceneCameraStaticInit G_Win3DSceneCameraStaticInit;
@@ -145,8 +145,8 @@ void Win3DUnprojectScreenRayDir(FSpaceCamera* Cam, float ScreenX, float ScreenY,
     OutDir[2] = Wz;
 }
 
-void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
-                               unsigned char bDepthTested, float Scale, unsigned long Flags)
+void FClientMeshHolder::SubmitWin3DEngineInstance(void* ArchAnchor, unsigned char bDepthTested,
+                                                  float Scale, unsigned long Flags)
 {
     // FUN_0059efa0 (thiscall on the holder, RET 0x10). No test of the holder, its instance, the
     // renderer or the pipeline; the depth states are not restored.
@@ -164,7 +164,7 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
         SlotFlags |= kDrawRotateOffset | kDrawConjugate;
     }
 
-    DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Xform, nullptr);
+    DALib::Renderer->RenderInstance(ArchAnchor, EngineInstance, 1.0f, SlotFlags, Xform, nullptr);
 }
 
 void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInstance,

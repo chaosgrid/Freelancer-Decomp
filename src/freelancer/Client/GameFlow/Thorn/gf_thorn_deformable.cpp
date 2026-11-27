@@ -90,14 +90,14 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
     int Index = 0;
     for (; Index < kMotionSlots; ++Index)
     {
-        if (Motions[Index].bActive == 0)
-        {
-            Slot = Index;
-            Motions[Slot].EventId = EventId;
-            Motions[Slot].ScriptId = ScriptId;
-            Motions[Slot].bActive = 1;
-            break;
-        }
+        if (Motions[Index].bActive != 0)
+            continue;
+
+        Slot = Index;
+        Motions[Slot].EventId = EventId;
+        Motions[Slot].ScriptId = ScriptId;
+        Motions[Slot].bActive = 1;
+        break;
     }
 
     void* const AnimScript = GetCharacterInfoDb()->AcquireScript(ScriptId);

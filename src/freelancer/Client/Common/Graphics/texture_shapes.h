@@ -52,6 +52,18 @@ struct FTextureRef
     FTextureRef(FTextureRef const& Other);
     ~FTextureRef();
     FTextureRef& operator=(FTextureRef const& Other) = delete;
+
+    // FUN_004255c0 -- release the current record, then look Name up through Slot12 with its CRC32;
+    // FDUMP an error when it is not defined. Returns whether a record is now held.
+    bool Load(char const* Name);
+
+    // FUN_00425680 -- swap the record a reference holds: release the old one, store the new one and
+    // take a reference on it (slot +0x34).
+    void SetTexture(void* Texture);
+
+    // FUN_00425640 -- TextureLib Slot22(Ref->Texture, Frame, out5); returns out5[0], the GPU
+    // handle, or null when no record is held.
+    void* GetGpuHandle(int Frame = 0) const;
 };
 
 // The shape record, 0x30 bytes: the texture reference at +0, then what FUN_004256c0 stores. Its
@@ -68,6 +80,12 @@ struct FTexShape : FTextureRef
     float ScaleV;  // +0x24
     float OffsetU; // +0x28
     float OffsetV; // +0x2c
+
+    // FUN_004256c0 -- recompute the UV rect and the centred scale/offset from a pixel (or
+    // normalised) rect plus an optional explicit upper-left / lower-right pair. Negative
+    // upper-left / lower-right components mean "derive from the rect".
+    void SetRect(float X, float Y, float W, float H, float UpperLeftU, float UpperLeftV,
+                 float LowerRightU, float LowerRightV);
 };
 
 static_assert(sizeof(FTextureRef) == 0x08, "retail texture reference is 8 bytes");
@@ -75,24 +93,6 @@ static_assert(offsetof(FTexShape, U0) == 0x08, "shape U0 at +0x08");
 static_assert(offsetof(FTexShape, PixelW) == 0x18, "shape pixel width at +0x18");
 static_assert(offsetof(FTexShape, ScaleU) == 0x20, "shape scale at +0x20");
 static_assert(sizeof(FTexShape) == 0x30, "retail shape record is 0x30 bytes");
-
-// FUN_004255c0 -- release the current record, then look Name up through Slot12 with its CRC32;
-// FDUMP an error when it is not defined. Returns whether a record is now held.
-bool TextureRefLoad(FTextureRef* Ref, char const* Name);
-
-// FUN_00425680 -- swap the record a reference holds: release the old one, store the new one and
-// take a reference on it (slot +0x34).
-void TexShapeSetTexture(FTextureRef* Ref, void* Texture);
-
-// FUN_00425640 -- TextureLib Slot22(Ref->Texture, Frame, out5); returns out5[0], the GPU
-// handle, or null when no record is held.
-void* TexShapeGetGpuHandle(FTextureRef const* Ref, int Frame = 0);
-
-// FUN_004256c0 -- recompute the UV rect and the centred scale/offset from a pixel (or
-// normalised) rect plus an optional explicit upper-left / lower-right pair. Negative
-// upper-left / lower-right components mean "derive from the rect".
-void TexShapeSetRect(FTexShape* Shape, float X, float Y, float W, float H, float UpperLeftU,
-                     float UpperLeftV, float LowerRightU, float LowerRightV);
 
 // The three spellings of the header path the inlined ShapeDB::Find FDUMPs with.
 extern char const kShapeDbHeaderFull[];  // s_E:\FL\...\cmn\ShapeDB.h (005c95c8)

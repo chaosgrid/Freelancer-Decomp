@@ -70,7 +70,7 @@ enum EGameCameraSlot
                                            // 0x005dc08c..0x005dc108, the name string at 0x005dc10c)
 };
 
-// FGameCamera::Flags (+0xe8), read by FUN_0051b500 (GameCameraClear).
+// FGameCamera::Flags (+0xe8), read by FUN_0051b500 (FGameCamera::Clear).
 enum EGameCameraFlag
 {
     kGameCameraClearColour = 0x1, // clear the colour buffer to ClearColor
@@ -114,6 +114,21 @@ struct FGameCamera : FSpaceCamera
     unsigned char  bFlagF5;          // +0x0f5
     unsigned char  bFlagF6;          // +0x0f6
     unsigned char  Pad0F7;
+
+    // Field initialisation only; C++ construction owns the vptrs.
+    void Construct();
+
+    // FUN_0051b4b0 (non-virtual, thiscall): the space frame's per-camera preamble, called from
+    // FUN_0054b000 at 0x0054b0fd right before the camera's slot 0x78. Advances the letterbox with
+    // the capped frame time (FUN_0041a420), runs FUN_0051b500 when +0xe8 has either clear bit, then
+    // sets this camera's viewport (FUN_00422610, "Gamecam.cpp" line 0x85) and applies it to Win3D
+    // (FUN_00422950).
+    void BeginFrame();
+
+    // FUN_0051b500: +0xe8 bit 0 clears the colour buffer with ClearColor/255 (black first over the
+    // whole surface when the letterbox shows and the colour is not black, then the colour inside
+    // the camera's viewport), bit 1 adds the depth buffer; the first clear is always full-surface.
+    void Clear();
 };
 
 // The HUDCamera ctor's first own write is the vptr at +0xf8, so FGameCamera is exactly 0xf8.
@@ -151,6 +166,24 @@ struct FHudCamera : FGameCamera, EventHandler
     unsigned char bFlagFD;          // +0x0fd  only the FirstPerson ctor clears it
     unsigned char bFlagFE;          // +0x0fe  ctor sets 1
     unsigned char PadFF;
+
+    void Construct();
+
+    // FUN_0051b0b0 -- slot 0x68 of all four HUDCamera subclasses (FirstPerson .rdata 0x005db9ac,
+    // ThirdPerson 0x005dbb7c, Turret 0x005dbd2c, RearView 0x005dbe8c): unregister the Event::Handler
+    // face at +0xf8 from every command (FUN_00576190), then HUDCamera's own slot 0x68 (FUN_0051cb70).
+    // Each cockpit camera overrides Deactivate with this shared body.
+    void DerivedDeactivate();
+
+    // FUN_0051db00: decay the cockpit shake amplitude DAT_00675294 by DAT_0061373c (zero under
+    // 1e-4), then raise it from the watched client ship's hit flags (Gameobj +0x18c) and jump effect
+    // (+0x158/+0x188).
+    void UpdateShake();
+
+    // FUN_0051dbd0: FHudCamera::UpdateShake, then with a positive amplitude two random rotations of the
+    // 3x3 orientation (rows 0/2, then rows 0/1) by angles in [-amp, amp). Called by the FirstPerson
+    // and RearView updates.
+    void ApplyShake(Matrix* Orientation);
 };
 
 // The RearView ctor's first own write is +0x100, so FHudCamera is exactly 0x100.
@@ -165,66 +198,10 @@ inline FSpaceCamera* SpaceCameraOf(FHudCamera* Cam)  { return Cam; }
 // The half-FOV both intermediate ctors start from: 0x420c0000.
 extern const float kGameCameraDefaultHalfFovXDeg;
 
-// Field initialisation only; C++ construction owns the vptrs.
-void GameCameraConstruct(FGameCamera* Cam);
-void HudCameraConstruct(FHudCamera* Cam);
-
 // Slot 0x54: the two intermediate classes' own name literals (0x0051b3b0 and 0x0051cac0).
 const char* GameCameraGetName();
 const char* HudCameraGetName();
 
-// Slot 0x48 (0x0051b700): copies the three floats at +0xdc into the caller's vector, replacing
-// the base's write-a-zero-vector stub.
-void GameCameraGetVelocity(const FGameCamera* Cam, Vector* OutVelocity);
-
-// Slot 0x6c (FUN_0051b650): the per-frame update every GameCamera shares. With a non-zero dt
-// the velocity (+0xdc) becomes (position - last position) / dt; the position (the camera's
-// own slot 0x0c) is then remembered in +0xd0. Derived updates call it last (HUDCamera at
-// 0x0051d7b7).
-void GameCameraUpdate(FGameCamera* Cam, float DeltaSeconds);
-
-// FUN_0051b4b0 (non-virtual, thiscall): the space frame's per-camera preamble, called from
-// FUN_0054b000 at 0x0054b0fd right before the camera's slot 0x78. Advances the letterbox with
-// the capped frame time (FUN_0041a420), runs FUN_0051b500 when +0xe8 has either clear bit, then
-// sets this camera's viewport (FUN_00422610, "Gamecam.cpp" line 0x85) and applies it to Win3D
-// (FUN_00422950).
-void GameCameraBeginFrame(FGameCamera* Cam);
-// FUN_0051b500: +0xe8 bit 0 clears the colour buffer with ClearColor/255 (black first over the
-// whole surface when the letterbox shows and the colour is not black, then the colour inside
-// the camera's viewport), bit 1 adds the depth buffer; the first clear is always full-surface.
-void GameCameraClear(FGameCamera* Cam);
-
-// Slot 0x4c (0x0051b3f0): forwards to the base setter and, when it accepted a "fovx" or "fovy",
-// re-caches the resulting half-angle into +0xc8. Returns false without doing anything else when
-// the base refused the key.
-bool GameCameraSetProperty(FGameCamera* Cam, const char* Key, const char* Value);
-
-// Slot 0x58 (0x0051b3c0): binds the camera to an object. Object is an IObjRW*; retail stores it
-// PLUS 8 (its Watchable subobject) and skips the work entirely when that is already the value.
-// Passing null unbinds. Returns whether the watcher was actually re-pointed.
-bool GameCameraAttach(FGameCamera* Cam, void* Object);
-
-// Slot 0x60 (0x005172f0): true when the camera has nothing bound. Retail computes
-// `(watched - 8) == 0`, so a watcher holding the degenerate value 8 also reads as empty.
-bool GameCameraHasNoTarget(const FGameCamera* Cam);
-
-// Slot 0x64 (FUN_0051b450) -- the activate every derived camera either inherits or calls into.
-// Hands the viewport to the base rebuild and, when that succeeds (always), calls virtual slot
-// 0x5c with the SAME rectangle. Retail therefore applies the viewport TWICE per activate (the
-// one-argument FUN_0040fd60, then FUN_0040fb80 via slot 0x5c). Reproduced.
-bool GameCameraActivate(FGameCamera* Cam, const int* ViewRect4);
-
-// Slot 0x5c (FUN_0051b490). Applies the viewport and then forgets which camera the letterbox
-// was last drawn on, so the bars are reapplied on the next update.
-void GameCameraApplyViewport(FGameCamera* Cam, const int* ViewRect4);
-
-// Slot 0x58 of HUDCamera and RearView (FUN_0051cbb0): GameCamera's watcher swap, then
-// HudElementListSetTarget with the watched object when it is a client ship (Gameobj +0x1c == 1),
-// else null.
-void HudCameraAttach(FHudCamera* Cam, void* Object);
-
-// Slot 0x5c of every HUDCamera (FUN_0051cb90): FUN_0051b490, then HudElementListSetViewport.
-void HudCameraApplyViewport(FHudCamera* Cam, const int* ViewRect4);
 
 // Slots 0x70 (FUN_0051da40 / LAB_0051ad20) and 0x74 (LAB_0051da70) of every HUDCamera: offer a
 // command to the HUD elements unless a NeuroNet window is up. GameCamera's own 0x70/0x74
@@ -232,50 +209,8 @@ void HudCameraApplyViewport(FHudCamera* Cam, const int* ViewRect4);
 int HudCameraCommand70(void* Command);
 int HudCameraCommand74(void* Command);
 
-// Slot 0x64 of HUDCamera (FUN_0051cad0): raise the cockpit-strings flag
-// (FUN_004c7290(1)), activate the "IDR_COCKPIT" accelerator group, register the Event::Handler
-// face at +0xf8 for the nine cockpit command ids {0x5c, 0x2a..0x2f, 0xc7, 0xc8}, then
-// GameCamera's activate (FUN_0051b450) -- whose answer is this one's.
-bool HudCameraActivate(FHudCamera* Cam, const int* ViewRect4);
-// Slot 0x68 of HUDCamera (FUN_0051cb70): drop "IDR_COCKPIT", lower the cockpit-strings flag,
-// then the empty IDPMsgHandler::OnDisconnect. The nine event registrations stay.
-void HudCameraDeactivate(FHudCamera* Cam);
-// FUN_0051b0b0 -- slot 0x68 of all four HUDCamera subclasses (FirstPerson .rdata 0x005db9ac,
-// ThirdPerson 0x005dbb7c, Turret 0x005dbd2c, RearView 0x005dbe8c): unregister the Event::Handler
-// face at +0xf8 from every command (FUN_00576190), then HUDCamera's own slot 0x68 (FUN_0051cb70).
-// Each cockpit camera overrides Deactivate with this shared body.
-void HudCameraDerivedDeactivate(FHudCamera* Cam);
-// (FUN_0051b250, slot 0x78 of ThirdPerson, Turret and RearView, is SpaceCameraRenderSlot78 in
-// space_scene_obj_draw.cpp; FirstPerson's 0x78 is its own LAB_00518420.)
-//
-// Slot 0x78 of HUDCamera (FUN_0051daa0, both stack arguments unread): with a
-// watched object and options 6 ([INTERFACE]) and 10 (HUD) on, apply this camera to Win3D
-// (FUN_00422950) and render the HUD element list with the capped frame time (FUN_004c8090).
-// Only GameCamera fields are read, and FUN_0051b250 calls it directly (0x0051b294) on its own
-// `this`, so it takes the GameCamera.
-void HudCameraDraw(FGameCamera* Cam);
-// FUN_0051d7f0 -- slot 0 of the HUDCamera Event::Handler face (+0xf8; also RearView's). Blocked
-// mouse pick (FUN_0045a740) -> false. 0x2a..0x2f set the six keyboard steering halves from the
-// record's key-down byte, 0xc7 (unless the cursor is the arrow) the fire latch, 0xc8 toggles the
-// mouse-flight lock; all of those answer false. 0x5c builds a 0x28-byte command record and hands
-// it to the watched client ship's slot 0x1cc, answering true.
-bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId);
-// Slot 0x6c of HUDCamera (FUN_0051d070); all four cockpit cameras call it from their own updates.
-// Cinematic exclusion -> cursor latch / letterbox, fire latch upkeep, aim point to every gun,
-// firing while the latch is up, keyboard steering (ramp or shift-to-target falloff) forwarded to
-// the behavior manager when it moved, the once-a-second visit scan (FUN_0051cc00), the HUD
-// hazard warning (FUN_004f5330), then GameCamera's update.
-void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds);
-// FUN_0051db00: decay the cockpit shake amplitude DAT_00675294 by DAT_0061373c (zero under
-// 1e-4), then raise it from the watched client ship's hit flags (Gameobj +0x18c) and jump effect
-// (+0x158/+0x188).
-void HudCameraUpdateShake(FHudCamera* Cam);
 // The space init's store DAT_00675294 = 0 (0x0054ad78).
 void ResetCameraShakeAmount();
-// FUN_0051dbd0: HudCameraUpdateShake, then with a positive amplitude two random rotations of the
-// 3x3 orientation (rows 0/2, then rows 0/1) by angles in [-amp, amp). Called by the FirstPerson
-// and RearView updates.
-void HudCameraApplyShake(FHudCamera* Cam, Matrix* Orientation);
 
 // FUN_00516fe0 (called by the third-person solver FUN_00518f20 and the turret FUN_0051a7d0).
 // Keeps M's forward column (column 2) and rebuilds the other two around Up:

@@ -50,7 +50,7 @@ void UiWinObject::SetPosition(Vector const* NewPosition)
 {
     // LAB_0059ab10 (RET 4).
     WinObject::SetPosition(NewPosition);
-    ClientMeshHolderUpdate(&MeshHolder);
+    MeshHolder.Update();
 }
 
 void UiWinObject::SetTransform(Transform const* NewXform)
@@ -131,7 +131,7 @@ bool UiWinObject::Create(Win3D* NewParent, void* Payload)
     // Retail goes through a std::string copy; the loader always stores a non-null path.
     char const* MeshPath = ObjPayload->ExtraName;
 
-    if (!ClientMeshLoadFromPath(&MeshHolder, MeshPath, 0, false))
+    if (!MeshHolder.LoadFromPath(MeshPath, 0, false))
         return false;
 
     Win3DReparent(this, NewParent);

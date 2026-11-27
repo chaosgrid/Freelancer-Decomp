@@ -40,17 +40,17 @@ struct FImmedBatcher
     unsigned char Dirty;         // +0x24  set by every flush; Win3DImmedBatchReset rewinds on it
     unsigned char bOrtho;        // +0x25  flush through the ortho box instead of the perspective
     unsigned char Pad26[2];
+
+    // FUN_005a2a40 (thiscall on a batcher, RET 0x14) -- one thick line A -> B: both batchers are
+    // flushed and rewound first when 12 more indices or 8 more vertices would not fit, then eight
+    // vertices (A and B in Color, each also pushed Width to either side along the perpendicular in
+    // EdgeColor) and twelve indices.
+    void AddLine(Vector const* A, Vector const* B, unsigned long Color, unsigned long EdgeColor,
+                 float Width);
 };
 
 extern FImmedBatcher G_ImmedBatchA; // DAT_0067dd90
 extern FImmedBatcher G_ImmedBatchB; // DAT_0067dd68
-
-// FUN_005a2a40 (thiscall on a batcher, RET 0x14) -- one thick line A -> B: both batchers are
-// flushed and rewound first when 12 more indices or 8 more vertices would not fit, then eight
-// vertices (A and B in Color, each also pushed Width to either side along the perpendicular in
-// EdgeColor) and twelve indices.
-void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
-                       unsigned long Color, unsigned long EdgeColor, float Width);
 
 // FUN_005a2970 -- create both batchers, then B's bOrtho = 1.
 void Win3DImmedBatchCreateAll();
@@ -63,7 +63,7 @@ void Win3DImmedBatchReset();
 // FUN_005a2a20 -- flush A, then B.
 void Win3DImmedBatchFlushAll();
 
-// FUN_005a2940 (cdecl) -- ImmedBatchAddLine on B. Callers: HUD_Targetable_Objects' bracket
+// FUN_005a2940 (cdecl) -- FImmedBatcher::AddLine on B. Callers: HUD_Targetable_Objects' bracket
 // drawer and lead-marker cross.
 void Win3DImmedDrawLine(Vector const* A, Vector const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width);

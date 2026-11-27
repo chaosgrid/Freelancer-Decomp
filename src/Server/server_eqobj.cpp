@@ -125,17 +125,18 @@ EqObj::~EqObj()
     clear_server_equip();
 }
 
-// Retail FUN_06ce6870, the (& 0x103) narrowing both cargo paths use. In retail it is a
-// FREE function on the raw object, so it can take a plain GameObject*; EqObj::ceqobj() is
-// the same test as a member, and this is its free twin.
-CEqObj* GameObject_ceqobj(GameObject* Obj)
+// Retail FUN_06ce6870 (RET 0), the (& 0x103) narrowing both cargo paths use.
+CEqObj* GameObject::ceqobj() const
 {
-    CObject* const Raw = (Obj != nullptr) ? Obj->cobj() : nullptr;
-    if (Raw == nullptr)
+    CObject* Obj = cobj();
+    if (Obj == nullptr)
         return nullptr;
-    if ((static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
+    // Retail's own narrowing test on this family is the ObjectClass mask, not
+    // RTTI: Ship::create checks (ObjectClass & 0x503) == 0x503, Loot::create
+    // (ObjectClass & 0x803) == 0x803. Everything CEqObj-derived carries 0x103.
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return nullptr;
-    return static_cast<CEqObj*>(Raw);
+    return static_cast<CEqObj*>(Obj);
 }
 
 // ---------------------------------------------------------------------------
@@ -1036,19 +1037,6 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
     return true;
 }
 
-CEqObj* EqObj::ceqobj() const
-{
-    CObject* Obj = cobj();
-    if (Obj == nullptr)
-        return nullptr;
-    // Retail's own narrowing test on this family is the ObjectClass mask, not
-    // RTTI: Ship::create checks (ObjectClass & 0x503) == 0x503, Loot::create
-    // (ObjectClass & 0x803) == 0x803. Everything CEqObj-derived carries 0x103.
-    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
-        return nullptr;
-    return static_cast<CEqObj*>(Obj);
-}
-
 // FUN_06ce83c0 (only caller EqObj::destroy): CSimple+0xb4 through the
 // (ObjectClass & 3) guard; retail dereferences the null the guard produces.
 unsigned int EqObj::owner_player() const
@@ -1372,16 +1360,16 @@ void EqObj::damage_sub_obj(FSubObjDamage const& Hit, DamageList& Damage)
         return;
     }
 
-    if (SubObjectID::IsEquipID(Hit.SubObjId))
-    {
-        CEquip* const Equip = ceqobj()->EquipManager.FindByID(Hit.SubObjId);
-        if (Equip == nullptr)
-            return;
-        if (Equip->Type == EquipTypeShield)
-            damage_shield(static_cast<CEShield*>(Equip), Hit.Damage, Damage);   // vt +0x214
-        else
-            damage_equip(Equip, Hit.Damage, Damage);               // vt +0x210
-    }
+    if (!SubObjectID::IsEquipID(Hit.SubObjId))
+        return;
+
+    CEquip* const Equip = ceqobj()->EquipManager.FindByID(Hit.SubObjId);
+    if (Equip == nullptr)
+        return;
+    if (Equip->Type == EquipTypeShield)
+        damage_shield(static_cast<CEShield*>(Equip), Hit.Damage, Damage);   // vt +0x214
+    else
+        damage_equip(Equip, Hit.Damage, Damage);               // vt +0x210
 }
 
 // +0x180 -- .text:06ce9350.

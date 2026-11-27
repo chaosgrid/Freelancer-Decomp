@@ -16,10 +16,10 @@
 #include "NeuroNet/Economy/infocard_map.h"  // InfocardMapCreate / InfocardMapDestroy (FUN_00458790 / FUN_00458860)
 #include "NeuroNet/Economy/knowledge_map.h" // KnowledgeMapCreate / KnowledgeMapDestroy (FUN_00459830 / FUN_00459900)
 #include "Interface/cargo_bar_control.h"
-#include "Common/Fonts/font_string.h"   // FontStringConstruct (FUN_004144b0)
+#include "Common/Fonts/font_string.h"   // FFontString::Construct (FUN_004144b0)
 #include "Interface/menu_ui_widgets.h"
 #include "NeuroNet/nn_rollover.h"   // NnRolloverShowHoverGlobal (FUN_004b62d0)
-#include "Interface/tooltip_hover.h" // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
+#include "Interface/tooltip_hover.h" // FToolTipHoverInfo, FToolTipHoverInfo::Reset (FUN_004963a0)
 #include "GameFlow/nav_bar.h"       // NavBarHasServiceWindow (FUN_00442720)
 #include "NeuroNet/nn_arrival_text.h"
 #include "NeuroNet/nn_inventory.h"  // IsPlayerDockedRetail (FUN_004c4810)
@@ -481,7 +481,7 @@ void NnMainButtonOnUnclaimedMouse(unsigned Msg, unsigned WParam, unsigned LParam
         return;
 
     FToolTipHoverInfo Record;
-    ToolTipHoverReset(&Record);
+    Record.Reset();
     Record.Ids = 0x45e;
     Record.IdsAlt = 0x45e;
     // In the base's "Cityscape" room (runtime +0x38) the ids are 0x3a0 instead.

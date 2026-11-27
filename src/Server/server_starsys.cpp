@@ -3106,7 +3106,7 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
     if (arch_is_combinable(ArchId) && !bMission)
     {
         // No test of the narrowing.
-        CEqObj* const EqObj = GameObject_ceqobj(Obj);
+        CEqObj* const EqObj = Obj->ceqobj();
         {
             CEquipTraverser Walk(EquipTypeCargo);
             CEquipManager& Mgr = EqObj->EquipManager;
@@ -3186,7 +3186,7 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
         Desc.make_internal();
 
         // No test of the narrowing.
-        CEqObj* const EqObj = GameObject_ceqobj(Obj);
+        CEqObj* const EqObj = Obj->ceqobj();
         if (EqObj->add_item(Desc))
         {
             Stack = CECargo::cast(EqObj->EquipManager.FindByID(EquipId));
@@ -3224,7 +3224,7 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
 void StarSystem::remove_cargo(GameObject* Obj, unsigned short EquipId, int Count)
 {
     // No test on the narrowing; only FindByID's result is tested.
-    CEqObj* const EqObj = GameObject_ceqobj(Obj);
+    CEqObj* const EqObj = Obj->ceqobj();
     CEquip* const Item = EqObj->EquipManager.FindByID(EquipId);
     if (Item == nullptr)
         return;

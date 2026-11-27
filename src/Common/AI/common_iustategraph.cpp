@@ -43,7 +43,7 @@ namespace
         return &Sys->SelfTarget;
     }
 
-    // Inlined identically in FUN_062e7820 and FUN_062e8280; FUN_062e6a80 (GetCachedRange) is
+    // Inlined identically in FUN_062e7820 and FUN_062e8280; FUN_062e6a80 (FAiTarget::GetCachedRange) is
     // the out-of-line variant that also hands the pair back. Slot +0x6C
     // (get_attitude_towards_symmetrical) returns 0 on success; on failure, or when either
     // interface is null, both cached values are 0.0f.
@@ -104,12 +104,12 @@ namespace
     float const kHostileAttitudeStrict = -0.6f;
     // .rdata:063a0794 == 0xBE4CCCCD.
     float const kHostileAttitudeLoose = -0.2f;
-    // The object-type mask BuildAiTargetList scans and filters with
+    // The object-type mask SystemManagerTimerTable::BuildAiTargetList scans and filters with
     // (0x7FFFFF minus bit 0x200).
     unsigned const kScanTypeMask = OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK;
     // The narrower "ship-ish" mask both scan loops re-test each candidate against.
     unsigned const kShipTypeMask = OBJ_SHIP_MASK;
-    // .rdata:0x47C35000 -- FindClosestHostileTarget's seed distance.
+    // .rdata:0x47C35000 -- SystemManagerTimerTable::FindClosestHostileTarget's seed distance.
     float const kMaxConsideredDistance = 100000.0f;
 }
 
@@ -172,10 +172,10 @@ void ClearAiTargetVector(FAiTargetVector* Self)
 
 // FUN_062e77e0. The same dead shift loop as above; unlike ClearAiTargetVector, retail makes no
 // DestroyAiTargetRange call here.
-void ResetAiTargetList(FAiTargetList* Self)
+void SystemManagerTimerTable::ResetAiTargetList()
 {
-    Self->bBuilt = 0;
-    Self->Targets.End = Self->Targets.Begin;
+    bBuilt = 0;
+    Targets.End = Targets.Begin;
 }
 
 // FUN_062ed140: MSVC 7.0's `std::vector<FAiTarget>::insert(Where, Count, Value)` /
@@ -184,19 +184,19 @@ void ResetAiTargetList(FAiTargetList* Self)
 // Every element move in retail is a 0x22-dword `rep movsd` guarded by the same null-Dest test
 // CopyElemRange has. No branch here can reach a null cursor once the allocation succeeded, so
 // the memcpy calls below are unconditional.
-void InsertAiTargets(FAiTargetVector* Self, FAiTarget* Where, unsigned Count, FAiTarget const& Value)
+void FAiTargetVector::InsertAiTargets(FAiTarget* Where, unsigned Count, FAiTarget const& Value)
 {
     // Count is retail's size_type: every compare against it is unsigned.
-    int const CapacityRoom = (int)(Self->Cap - Self->End);
+    int const CapacityRoom = (int)(Cap - End);
 
     if ((unsigned)CapacityRoom < Count)
     {
         // --- Branch 1 (0x062ed172): reallocate. ---
         unsigned Size = 0;
         unsigned Growth = Count;
-        if (Self->Begin != nullptr)
+        if (Begin != nullptr)
         {
-            Size = (unsigned)(Self->End - Self->Begin);
+            Size = (unsigned)(End - Begin);
             // max(Size, Count).
             if (Count < Size)
             {
@@ -211,7 +211,7 @@ void InsertAiTargets(FAiTargetVector* Self, FAiTarget* Where, unsigned Count, FA
 
         // [Begin, Where) -> NewBuf
         FAiTarget* Dest = NewBuf;
-        for (FAiTarget* Src = Self->Begin; Src != Where; ++Src, ++Dest)
+        for (FAiTarget* Src = Begin; Src != Where; ++Src, ++Dest)
         {
             std::memcpy(Dest, Src, kElemStride);
         }
@@ -221,50 +221,50 @@ void InsertAiTargets(FAiTargetVector* Self, FAiTarget* Where, unsigned Count, FA
             std::memcpy(Dest, &Value, kElemStride);
         }
         // [Where, End) -> after the inserted block
-        for (FAiTarget* Src = Where; Src != Self->End; ++Src, ++Dest)
+        for (FAiTarget* Src = Where; Src != End; ++Src, ++Dest)
         {
             std::memcpy(Dest, Src, kElemStride);
         }
 
         // Raw operator delete (0x06391d5a); retail does not call the destroy-range helper here.
-        ::operator delete(Self->Begin);
+        ::operator delete(Begin);
 
-        Self->Cap = NewBuf + NewCapacity;
+        Cap = NewBuf + NewCapacity;
         // Recomputed from the old Begin/End, still in place at this point.
         unsigned OldSize = 0;
-        if (Self->Begin != nullptr)
+        if (Begin != nullptr)
         {
-            OldSize = (unsigned)(Self->End - Self->Begin);
+            OldSize = (unsigned)(End - Begin);
         }
-        Self->Begin = NewBuf;
-        Self->End = NewBuf + (OldSize + Count);
+        Begin = NewBuf;
+        End = NewBuf + (OldSize + Count);
         return;
     }
 
-    unsigned const TailLength = (unsigned)(Self->End - Where);
+    unsigned const TailLength = (unsigned)(End - Where);
 
     if (TailLength < Count)
     {
         // --- Branch 2 (0x062ed2d3): in place, but more new elements than
         // existing tail elements. ---
         FAiTarget* Dest = Where + Count;
-        for (FAiTarget* Src = Where; Src != Self->End; ++Src, ++Dest)
+        for (FAiTarget* Src = Where; Src != End; ++Src, ++Dest)
         {
             std::memcpy(Dest, Src, kElemStride);
         }
 
         // Fill the (Count - TailLength) slots past the old End, then [Where, old End).
-        FAiTarget* Fill = Self->End;
+        FAiTarget* Fill = End;
         for (unsigned Extra = Count - TailLength; Extra != 0; --Extra, ++Fill)
         {
             std::memcpy(Fill, &Value, kElemStride);
         }
-        for (FAiTarget* Slot = Where; Slot != Self->End; ++Slot)
+        for (FAiTarget* Slot = Where; Slot != End; ++Slot)
         {
             std::memcpy(Slot, &Value, kElemStride);
         }
 
-        Self->End += Count;
+        End += Count;
         return;
     }
 
@@ -276,14 +276,14 @@ void InsertAiTargets(FAiTargetVector* Self, FAiTarget* Where, unsigned Count, FA
 
     // Move the last Count elements past End, then shift the remainder of the
     // tail right (backwards, to stay overlap-safe), then fill the hole.
-    FAiTarget* Dest = Self->End;
-    for (FAiTarget* Src = Self->End - Count; Src != Self->End; ++Src, ++Dest)
+    FAiTarget* Dest = End;
+    for (FAiTarget* Src = End - Count; Src != End; ++Src, ++Dest)
     {
         std::memcpy(Dest, Src, kElemStride);
     }
 
-    FAiTarget* Back = Self->End;
-    FAiTarget* Src = Self->End - Count;
+    FAiTarget* Back = End;
+    FAiTarget* Src = End - Count;
     while (Src != Where)
     {
         --Src;
@@ -296,28 +296,28 @@ void InsertAiTargets(FAiTargetVector* Self, FAiTarget* Where, unsigned Count, FA
         std::memcpy(Slot, &Value, kElemStride);
     }
 
-    Self->End += Count;
+    End += Count;
 }
 
 // FUN_062e7580. See common_iustategraph.h.
-FAiTargetVector* BuildAiTargetList(FAiTargetList* Self)
+FAiTargetVector* SystemManagerTimerTable::BuildAiTargetList()
 {
-    FAiTargetVector* const Vec = &Self->Targets;
+    FAiTargetVector* const Vec = &Targets;
 
     // A non-persistent list is thrown away before anything else.
-    if (Self->bKeepCache == 0)
+    if (bKeepCache == 0)
     {
         ClearAiTargetVector(Vec);
     }
 
     // A persistent list that has already been built stands.
-    if (Self->bBuilt != 0 && Self->bKeepCache != 0)
+    if (bBuilt != 0 && bKeepCache != 0)
     {
         return Vec;
     }
 
-    SystemManager* const Sys = Self->Owner;
-    Self->bBuilt = 1;
+    SystemManager* const Sys = Owner;
+    bBuilt = 1;
 
     // Zeroed, then filled as get_scanlist's out-parameter (through a LEA'd address, which is
     // why Ghidra's XREFs show only the zeroing).
@@ -338,7 +338,7 @@ FAiTargetVector* BuildAiTargetList(FAiTargetList* Self)
     Status.Pad02 = 0;
     Status.Pad03 = 0;
     Status.EquipFlags = 0;
-    OwnerObj->get_equipment_status(Status, Self->ScannerEquipId);
+    OwnerObj->get_equipment_status(Status, ScannerEquipId);
     if ((Status.Flags & EquipStatusFlagDestroyed) != 0)
     {
         return Vec;
@@ -347,7 +347,7 @@ FAiTargetVector* BuildAiTargetList(FAiTargetList* Self)
     // Retail re-reads the watcher and, unlike the first read, calls get_scanlist through the
     // adjusted pointer without testing it.
     IObjInspect* const OwnerObjAgain = RecoverObjInspect(Sys->Watcher.target());
-    if (OwnerObjAgain->get_scanlist(List, kScanTypeMask, Self->bKeepCache != 0) != 0)
+    if (OwnerObjAgain->get_scanlist(List, kScanTypeMask, bKeepCache != 0) != 0)
     {
         return Vec;
     }
@@ -393,7 +393,7 @@ FAiTargetVector* BuildAiTargetList(FAiTargetList* Self)
         // make that harmless, but the port zero-fills to stay defined.
         FAiTarget Local;
         std::memset(&Local, 0, sizeof(Local));
-        Local.AttitudeRefIface = RecoverObjInspect(Self->Owner->Watcher.target());
+        Local.AttitudeRefIface = RecoverObjInspect(Owner->Watcher.target());
         Local.Iface = Candidate;
         Local.bAttitudeValid = 0;
         Local.bFlagsValid = 0;
@@ -407,21 +407,21 @@ FAiTargetVector* BuildAiTargetList(FAiTargetList* Self)
             continue;
         }
 
-        InsertAiTargets(Vec, Vec->End, 1, Local);
+        Vec->InsertAiTargets(Vec->End, 1, Local);
     }
 
     return Vec;
 }
 
 // FUN_062e7820, the body of IBehaviorManager::get_closest_trailing_ship.
-float GetClosestTrailingShipDistance(FAiTargetList* Self)
+float SystemManagerTimerTable::GetClosestTrailingShipDistance()
 {
     // Returned unchanged when nothing qualifies.
     float Best = FLT_MAX;
 
     // The list is reached through the owner (Owner+0x34), not through `this`.
-    FAiTargetVector* const Vec = BuildAiTargetList(&Self->Owner->Timers);
-    SystemManager* const Sys = Self->Owner;
+    FAiTargetVector* const Vec = Owner->Timers.BuildAiTargetList();
+    SystemManager* const Sys = Owner;
     FAiTarget* const OwnerElem = OwnerElementOf(Sys);
 
     for (FAiTarget* Elem = Vec->Begin; Elem != Vec->End; ++Elem)
@@ -486,21 +486,21 @@ float GetClosestTrailingShipDistance(FAiTargetList* Self)
     return Best;
 }
 
-// FUN_062e8280. A method of FAiTargetList itself: BuildAiTargetList gets `this` unchanged, no
+// FUN_062e8280. A method of FAiTargetList itself: SystemManagerTimerTable::BuildAiTargetList gets `this` unchanged, no
 // +0x34 adjustment.
-IObjInspect* FindClosestHostileTarget(FAiTargetList* Self, float MaxClearance)
+IObjInspect* SystemManagerTimerTable::FindClosestHostileTarget(float MaxClearance)
 {
     IObjInspect* BestIface = nullptr;
     // Anything farther than 100000 is never returned.
     float BestDistance = kMaxConsideredDistance;
 
     // The owner's own position is fetched before the list is (re)built.
-    IObjInspect* const OwnerObj = RecoverObjInspect(Self->Owner->Watcher.target());
+    IObjInspect* const OwnerObj = RecoverObjInspect(Owner->Watcher.target());
     Vector OwnerPosition;
     GetIfacePositionOrZero(&OwnerPosition, OwnerObj);
 
-    FAiTargetVector* const Vec = BuildAiTargetList(Self);
-    FAiTarget* const OwnerElem = OwnerElementOf(Self->Owner);
+    FAiTargetVector* const Vec = BuildAiTargetList();
+    FAiTarget* const OwnerElem = OwnerElementOf(Owner);
 
     for (FAiTarget* Elem = Vec->Begin; Elem != Vec->End; ++Elem)
     {

@@ -40,14 +40,14 @@ void WinObject::SetPosition(Vector const* NewPosition)
     Position.x = NewPosition->x;
     Position.y = NewPosition->y;
     Position.z = NewPosition->z;
-    ClientMeshHolderSetPosition(&MeshHolder, NewPosition);
+    MeshHolder.SetPosition(NewPosition);
 }
 
 void WinObject::Destroy()
 {
     // FUN_004c9150.
-    if (ClientMeshHolderHasInstance(&MeshHolder))
-        ClientUiMeshHolderRelease(&MeshHolder);
+    if (MeshHolder.HasInstance())
+        MeshHolder.ReleaseWithAnim();
     Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
@@ -76,7 +76,7 @@ bool WinObject::LoadMeshAndCreate(Win3D* Parent, char const* MeshPath,
                                   char const* MaterialPath)
 {
     // FUN_0059f1c0.
-    if (!ClientMeshLoadFromPath(&MeshHolder, MeshPath, MaterialPath, false))
+    if (!MeshHolder.LoadFromPath(MeshPath, MaterialPath, false))
         return false;
     return Create(Parent, nullptr);
 }
@@ -86,14 +86,14 @@ void WinObject::Draw()
     // FUN_0059f120.
     if ((Flags & kWin3DVisible) == 0)
         return;
-    Win3DDrawChildren(this);
+    DrawChildren();
 
     // Plain pass unless bit1 (FUN_0059efa0).
     if ((DrawFlags & 2) == 0)
     {
         DALib::Pipeline->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
         DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-        SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0);
+        MeshHolder.SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0);
     }
 
     // Tinted pass when bit0 (FUN_00434630): front culling, lighting unless bit1.

@@ -135,7 +135,7 @@ namespace
     void DeleteMountHolder(FClientMeshHolder* Holder)
     {
         if (Holder->EngineInstance != -1)
-            ClientUiMeshHolderRelease(Holder);
+            Holder->ReleaseWithAnim();
         delete Holder;
     }
 }
@@ -264,7 +264,7 @@ ShipViewControl::ShipViewControl()
     // retail.
     ShipId.clear();
     ClientMeshHolderConstruct(&ShipHolder);
-    SpaceCameraConstruct(&Camera);
+    Camera.Construct();
     Ambient[3] = 0;
     Ambient[2] = 0;
     Ambient[1] = 0;
@@ -327,7 +327,7 @@ ShipViewControl::ShipViewControl()
         FEngineLight* const Light = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
         EngineLightInit(Light, kLightNone);
         Lights[Index] = Light;
-        EngineLightSetType(Light, kLightDirectional, false);
+        Light->SetType(kLightDirectional, false);
 
         // The direction negated and normalised; the squares sum y, z, x, as retail.
         float const X = Directions[Index][0];
@@ -338,9 +338,9 @@ ShipViewControl::ShipViewControl()
         Direction.x = -(X * Inverse);
         Direction.y = -(Y * Inverse);
         Direction.z = -(Z * Inverse);
-        EngineLightSetDirection(Light, &Direction);
-        EngineLightSetColorBytes(Light, Colors[Index]);
-        EngineLightRegister(Light);
+        Light->SetDirection(&Direction);
+        Light->SetColorBytes(Colors[Index]);
+        Light->FEngineLight::Enable();
     }
     Byte55c = 0;
 }
@@ -363,7 +363,7 @@ ShipViewControl::~ShipViewControl()
         delete Visuals;
         Visuals = nullptr;
     }
-    ClientUiMeshHolderRelease(&ShipHolder);
+    ShipHolder.ReleaseWithAnim();
 }
 
 void ShipViewControl::Reset()
@@ -555,8 +555,8 @@ void ShipViewControl::Draw()
     EngineLightApplyList(Lights, static_cast<unsigned>(LightCount), AsCamera(&Camera), nullptr);
 
     // The camera into the screen rect, the old viewport kept.
-    SpaceCameraSetFovY(&Camera, FovY);
-    SpaceCameraSetViewportEx(&Camera, ScreenRect, 1);
+    Camera.SetFovY(FovY);
+    Camera.SetViewportEx(ScreenRect, 1);
     int SavedViewport[4];
     Win3DGetViewport(0xba2, SavedViewport);
     ICamera* const ViewCamera = AsCamera(&Camera);
@@ -615,7 +615,7 @@ bool ShipViewControl::IsPositionInViewport(unsigned A)
 void ShipViewControl::Update()
 {
     // LAB_00584740 -- no base Update call.
-    if (ClientMeshHolderHasInstance(&ShipHolder))
+    if (ShipHolder.HasInstance())
     {
         // Rotate while any rot_speed component squared is non-zero; NaN rotates.
         double const Square0 = static_cast<double>(RotSpeed[0]) * RotSpeed[0];
@@ -637,7 +637,7 @@ void ShipViewControl::Update()
             HudMatrixRotateRows12(M, (RotAccum[1] + ObjectYpr[1]) * kDegToRad);
             HudMatrixRotateRows01(M, (RotAccum[2] + ObjectYpr[2]) * kDegToRad);
             DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, M);
-            ClientMeshHolderUpdate(&ShipHolder);
+            ShipHolder.Update();
 
             // With no equipment shown, re-centre the hull on its longest axis.
             float Axis[3];
@@ -711,7 +711,7 @@ void ShipViewControl::Update()
         else
         {
             DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, &ObjectOrientation);
-            ClientMeshHolderUpdate(&ShipHolder);
+            ShipHolder.Update();
         }
     }
     ComputeScreenRect(&Position.x, true);
@@ -881,8 +881,8 @@ void ShipViewControl::LoadEquipment(EquipDescList const* List)
         // operator new(0x28).
         FClientMeshHolder* const Holder = new FClientMeshHolder();
         ClientMeshHolderConstruct(Holder);
-        ClientMeshLoadFromPath(Holder, "Interface\\NeuroNet\\Inventory\\mountpoint.3db", 0,
-                               true);
+        Holder->LoadFromPath("Interface\\NeuroNet\\Inventory\\mountpoint.3db", 0,
+                             true);
         MountHolders.push_back(Holder);
     }
 }
@@ -893,8 +893,8 @@ void ShipViewControl::SetInstance(long NewInstance, bool bFixedDistance)
     if (NewInstance == -1)
     {
         Instance = -1;
-        if (ClientMeshHolderHasInstance(&ShipHolder))
-            ClientUiMeshHolderRelease(&ShipHolder);
+        if (ShipHolder.HasInstance())
+            ShipHolder.ReleaseWithAnim();
         return;
     }
     Instance = NewInstance;
@@ -1034,8 +1034,8 @@ bool ShipViewControl::LoadMesh(char const* Path, char const* MaterialPath, bool 
     // FUN_00585890 (RET 0x10).
     if (Path != nullptr && Path[0] != '\0')
     {
-        ClientUiMeshHolderRelease(&ShipHolder);
-        ClientMeshLoadFromPath(&ShipHolder, Path, MaterialPath, false);
+        ShipHolder.ReleaseWithAnim();
+        ShipHolder.LoadFromPath(Path, MaterialPath, false);
         // The player ship's damaged parts.
         if (bDpConnect)
             GfShipApplyCollisionDamage(ShipHolder.EngineInstance);
@@ -1341,13 +1341,13 @@ void ShipViewControl::ComputeScreenRect(float const* Where, bool bSetCamera)
         ScreenRect[0] = 0;
         return;
     }
-    if (bSetCamera)
-    {
-        SpaceCameraSetViewportEx(&Camera, ScreenRect, 1);
-        // SpaceCameraSetNearFar's two stores, inlined.
-        Camera.ZNear = 0.1f;
-        Camera.ZFar = 10000.0f;
-    }
+    if (!bSetCamera)
+        return;
+
+    Camera.SetViewportEx(ScreenRect, 1);
+    // FSpaceCamera::SetNearFar's two stores, inlined.
+    Camera.ZNear = 0.1f;
+    Camera.ZFar = 10000.0f;
 }
 
 intptr_t ShipViewControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -1549,13 +1549,13 @@ void ShipViewControl::BuildHardpointList()
             else if (Left.SortKey == Right.SortKey &&
                      _stricmp(Left.Name.c_str(), Right.Name.c_str()) < 0)
                 bSwap = true;
-            if (bSwap)
-            {
-                int const Swapped = Order[Index];
-                Order[Index] = Order[Index + 1];
-                Order[Index + 1] = Swapped;
-                bSorted = false;
-            }
+            if (!bSwap)
+                continue;
+
+            int const Swapped = Order[Index];
+            Order[Index] = Order[Index + 1];
+            Order[Index + 1] = Swapped;
+            bSorted = false;
         }
     } while (!bSorted);
 

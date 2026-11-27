@@ -37,9 +37,6 @@ void PlayerDB_LeaveBase(PlayerData& Slot, unsigned int SessionId);
 // PlayerDB.cpp (server_playerdb.cpp)
 unsigned short AccountNameFileXorKey();
 
-// EqObj.cpp (server_eqobj.cpp)
-CEqObj* GameObject_ceqobj(GameObject* Obj);
-
 // SrvMisc.cpp (server_srvmisc.cpp)
 namespace pub {
 namespace SpaceObj {

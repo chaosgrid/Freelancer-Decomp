@@ -9,7 +9,7 @@
 #include "Space/Effects/client_equip_fx.h"
 
 #include "Space/Effects/cli_projectile_fx.h"
-#include "Space/Effects/cli_tractor_beam.h" // CliTractorBeamCreate / CliTractorBeamInit (FUN_0052fa10)
+#include "Space/Effects/cli_tractor_beam.h" // CliTractorBeamCreate / FCliTractorBeam::Init (FUN_0052fa10)
 #include "Space/Effects/effect_base.h"
 #include "Space/Effects/effect_type_info.h" // EFT_FLASHLIGHT
 #include "Common/engine_light.h"
@@ -101,8 +101,8 @@ namespace
     // FUN_004f7810 then runs slots +0x14 / +0x18 / +0x1c / +0x10 on it.
     //
     // PTR_LAB_005da3f8 (9 slots) -- G_CliEquipLightVtable below:
-    //   0 LAB_004f7ab0  Effect base start (EffectBaseStart)
-    //   1 FUN_004f7bd0  Effect base kill (EffectKill)
+    //   0 LAB_004f7ab0  Effect base start (FEffectBase::Start)
+    //   1 FUN_004f7bd0  Effect base kill (FEffectBase::Kill)
     //   2 LAB_004fe040  world position out, radius back
     //   3 0x0053e4a0    empty (a shared folded stub)
     //   4 LAB_004fd990  Flags +8 bit 0
@@ -171,7 +171,7 @@ namespace
     }
 
     // FUN_00534240 — the host's Ignite slot (+0x1c0; NOT FUN_005340b0 at +0x1a0). Published as
-    // HostIgniteFuse (end of file); FClientEquippedObj::LightFuse runs it.
+    // FClientEquippedObj::LightFuse (end of file); FClientEquippedObj::LightFuse runs it.
     bool HostIgniteFuseImpl(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
                             unsigned short SubObjId, float AtT, float OverrideLifetime)
     {
@@ -282,7 +282,7 @@ namespace
         if (Self->EngineLight != nullptr)
         {
             Self->EngineLight->Disable();
-            GameLightRelease(Self->EngineLight);
+            Self->EngineLight->Release();
             Self->EngineLight = nullptr;
         }
     }
@@ -359,24 +359,24 @@ namespace
                 Rgb[0] = LightColorByte(View->Color[0]);
                 Rgb[1] = LightColorByte(View->Color[1]);
                 Rgb[2] = LightColorByte(View->Color[2]);
-                EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);
-                EngineLightSetRadius((FEngineLight*)Light, View->Intensity);
+                ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
+                ((FEngineLight*)Light)->SetRadius(View->Intensity);
 
                 // A cone below 180 is a spot (type 2), anything else (NaN too) a point.
                 if (View->LightsourceCone < kFullConeDegrees)
                 {
-                    EngineLightSetType((FEngineLight*)Light, kLightSpot, true);
-                    EngineLightSetConeAngle((FEngineLight*)Light, View->LightsourceCone);
+                    ((FEngineLight*)Light)->SetType(kLightSpot, true);
+                    ((FEngineLight*)Light)->SetConeAngle(View->LightsourceCone);
                 }
                 else
                 {
-                    EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
+                    ((FEngineLight*)Light)->SetType(kLightPoint, true);
                 }
 
                 // A refused enable releases the light.
                 if (!Light->Enable())
                 {
-                    GameLightRelease(Self->EngineLight);
+                    Self->EngineLight->Release();
                     Self->EngineLight = nullptr;
                 }
             }
@@ -389,7 +389,7 @@ namespace
     unsigned char CliEquipLightDrawFlare(FCliEquipLight* Self, FSpaceCamera* Cam)
     {
         Transform World;
-        EffectGetWorldTransform(Self, &World);
+        Self->GetWorldTransform(&World);
         ScreenQuadBeginBatchFrame(Self->TexFrame, 1, true);
 
         FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
@@ -477,7 +477,7 @@ namespace
     {
         FCliEquipLight* const Self = this;
         Transform World;
-        EffectGetWorldTransform(Self, &World);
+        Self->GetWorldTransform(&World);
         Out->x = World.Translation.x;
         Out->y = World.Translation.y;
         Out->z = World.Translation.z;
@@ -558,9 +558,9 @@ namespace
     void FCliEquipGameLight::Tick(float Dt)
     {
         FCliEquipGameLight* const Self = this;
-        GameLightTick(Self, Dt);
+        Self->FGameLight::Tick(Dt);
         Transform World;
-        EffectGetWorldTransform(Self->Owner, &World);
+        Self->Owner->GetWorldTransform(&World);
         EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.E[0][0], &World.Translation);
     }
 
@@ -660,7 +660,7 @@ namespace
         HardpointInfo Hardpoint;
         if (!External->GetHardPointInfo(Hardpoint))
         {
-            EffectRelease(Light);
+            Light->Release();
             return 0;
         }
 
@@ -671,7 +671,7 @@ namespace
         Local.Translation.y = Hardpoint.Position.y;
         Local.Translation.z = Hardpoint.Position.z;
         long const Part = External->GetParentConnector(false);
-        EffectAttach(Light, Host, static_cast<int>(Part), &Local);
+        Light->Attach(Host, static_cast<int>(Part), &Local);
 
         // The arch's CliEQLight companion, null without an equipment.
         Archetype::ICliObj* const LightArch = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
@@ -682,22 +682,22 @@ namespace
             // +0x10 (the old contents released), then the local destroyed.
             void* const Local4[4] = {nullptr, nullptr, Light, nullptr};
             if (Light != nullptr)
-                EffectAddRef(Light);
+                Light->AddRef();
             CliEffectCompanionClear(Companion);
             Companion[0] = Local4[0];
             Companion[2] = Local4[2];
             if (Light != nullptr)
-                EffectAddRef(Light);
+                Light->AddRef();
             Companion[1] = Local4[1];
             Companion[3] = Local4[3];
             if (Light != nullptr)
-                EffectRelease(Light);
+                Light->Release();
 
             CliEffectListInsert(&Host->EffectList, Companion);
         }
 
         // The allocation's own reference goes.
-        EffectRelease(Light);
+        Light->Release();
         return bOk;
     }
 
@@ -1553,11 +1553,11 @@ namespace
             return;
         if (Ref != nullptr)
         {
-            ParticleEffectRelease(Ref);
+            Ref->Release();
             Ref = nullptr;
         }
         Ref = Effect;
-        ParticleEffectAddRef(Effect);
+        Effect->AddRef();
     }
 
     // FUN_00528980 (on the wrapper): one slot per nozzle whose hardpoint resolves, with a trail
@@ -1624,10 +1624,10 @@ namespace
             if (TrailArch != nullptr)
             {
                 FParticleEffect* const Effect = ParticleEffectCreate();
-                ParticleEffectAttach(Effect, Wrapper->Host, Part, Local);
-                if (ParticleEffectStart(Effect, TrailArch) != 0)
+                Effect->Attach(Wrapper->Host, Part, Local);
+                if (Effect->FParticleEffect::Start(TrailArch) != 0)
                     CliEngineAssignParticleRef(Slot->TrailFx, Effect);
-                ParticleEffectRelease(Effect);
+                Effect->Release();
             }
             // Cruise: the NPC arch makes the 0x90 cruise effect, the player's arch a plain one.
             FEffectArch* CruiseArch = nullptr;
@@ -1644,10 +1644,10 @@ namespace
             }
             if (CruiseArch != nullptr)
             {
-                ParticleEffectAttach(Cruise, Wrapper->Host, Part, Local);
-                if (ParticleEffectStart(Cruise, CruiseArch) != 0)
+                Cruise->Attach(Wrapper->Host, Part, Local);
+                if (Cruise->FParticleEffect::Start(CruiseArch) != 0)
                     CliEngineAssignParticleRef(Slot->CruiseFx, Cruise);
-                ParticleEffectRelease(Cruise);
+                Cruise->Release();
             }
         }
     }
@@ -1954,7 +1954,7 @@ namespace
         if (!Operating->IsEmpty())
         {
             Wrapper->OperatingEffect = FindEffectArch(&Operating->Id);
-            EffectArchAddRef(Wrapper->OperatingEffect, 1u);
+            Wrapper->OperatingEffect->AddRef(1u);
         }
         // tractor_complete_snd, acquired with no test of the lookup.
         ID_String const* const Complete = reinterpret_cast<ID_String const*>(Comp + 0x5c);
@@ -1975,7 +1975,7 @@ namespace
     {
         // FUN_0052f660.
         if (OperatingEffect != nullptr)
-            EffectArchRelease(OperatingEffect);
+            OperatingEffect->Release();
         // Not cleared.
         if (CompleteSound != nullptr)
             static_cast<Archetype::ISound*>(CompleteSound)->Release();
@@ -1989,33 +1989,33 @@ namespace
     {
         // FUN_0052fa10. A failed allocation leaves null, used anyway.
         FCliTractorBeam* const Beam = CliTractorBeamCreate();
-        unsigned char const bOk = CliTractorBeamInit(Beam, this);
+        unsigned char const bOk = Beam->Init(this);
         if (bOk != 0)
         {
             // A local companion {0, 0, beam, 0} (its copy takes a reference) into the host's
             // list, then destroyed.
             void* Local[4] = {nullptr, nullptr, Beam, nullptr};
             if (Beam != nullptr)
-                EffectAddRef(Beam);
+                Beam->AddRef();
             CliEffectListInsert(&Host->EffectList, Local);
             if (Local[2] != nullptr)
-                EffectRelease(static_cast<FEffectBase*>(Local[2]));
+                static_cast<FEffectBase*>(Local[2])->Release();
 
             // A second local {0, 0, beam, 0} assigned into +0x10 (the old contents released),
             // then the local released.
             if (Beam != nullptr)
-                EffectAddRef(Beam);
+                Beam->AddRef();
             CliEffectCompanionClear(BeamCompanion);
             BeamCompanion[2] = Beam;
             if (Beam != nullptr)
-                EffectAddRef(Beam);
+                Beam->AddRef();
             BeamCompanion[1] = nullptr;
             BeamCompanion[3] = nullptr;
             if (Beam != nullptr)
-                EffectRelease(Beam);
+                Beam->Release();
         }
         // The allocation's own reference, no test.
-        EffectRelease(Beam);
+        Beam->Release();
         return bOk;
     }
 
@@ -2374,7 +2374,7 @@ namespace
         if (!BackfireId->IsEmpty())
         {
             Wrapper->TrailEffect = FindEffectArch(&BackfireId->Id);
-            EffectArchAddRef(Wrapper->TrailEffect, 0);
+            Wrapper->TrailEffect->AddRef(0);
         }
 
         CliEngineAttachExhaustEffects(Wrapper);
@@ -2505,7 +2505,7 @@ namespace
     {
         if (Ref != nullptr)
         {
-            ParticleEffectRelease(Ref);
+            Ref->Release();
             Ref = nullptr;
         }
     }
@@ -2742,7 +2742,7 @@ namespace
                     CliEngineKillParticle(Slot->TrailFx);
                     if (Slot->TrailFx != nullptr)
                     {
-                        ParticleEffectRelease(Slot->TrailFx);
+                        Slot->TrailFx->Release();
                         Slot->TrailFx = nullptr;
                     }
                 }
@@ -2778,7 +2778,7 @@ namespace
                     CliEngineKillParticle(Slot->TrailFx);
                     if (Slot->TrailFx != nullptr)
                     {
-                        ParticleEffectRelease(Slot->TrailFx);
+                        Slot->TrailFx->Release();
                         Slot->TrailFx = nullptr;
                     }
                 }
@@ -2787,7 +2787,7 @@ namespace
                     CliEngineKillParticle(Slot->CruiseFx);
                     if (Slot->CruiseFx != nullptr)
                     {
-                        ParticleEffectRelease(Slot->CruiseFx);
+                        Slot->CruiseFx->Release();
                         Slot->CruiseFx = nullptr;
                     }
                 }
@@ -2814,7 +2814,7 @@ namespace
                 CliEngineKillParticle(Slot->TrailFx);
                 if (Slot->TrailFx != nullptr)
                 {
-                    ParticleEffectRelease(Slot->TrailFx);
+                    Slot->TrailFx->Release();
                     Slot->TrailFx = nullptr;
                 }
             }
@@ -2823,7 +2823,7 @@ namespace
                 CliEngineKillParticle(Slot->CruiseFx);
                 if (Slot->CruiseFx != nullptr)
                 {
-                    ParticleEffectRelease(Slot->CruiseFx);
+                    Slot->CruiseFx->Release();
                     Slot->CruiseFx = nullptr;
                 }
             }
@@ -2833,7 +2833,7 @@ namespace
         CliEngineReleaseSoundEmitters(this);
         // The pointer is left as it is.
         if (TrailEffect != nullptr)
-            EffectArchRelease(TrailEffect);
+            TrailEffect->Release();
         // The vector's destructor (FUN_005298e0 inlined) runs as the Nozzles member's after this
         // body; ~FClientEquip (FUN_00531af0) follows it.
     }
@@ -3157,12 +3157,10 @@ namespace
 
 }
 
-void EquippedObjClearEquipFx(FClientGameobj* Host)
+void FClientGameobj::ClearEquipFx()
 {
     // FUN_00533080.
-    if (Host == nullptr)
-        return;
-    FCliEquipFxListNode* Sentinel = EquipFxSentinelRef(Host);
+    FCliEquipFxListNode* Sentinel = EquipFxSentinelRef(this);
     if (Sentinel == nullptr)
         return;
     for (FCliEquipFxListNode* Node = Sentinel->Next; Node != nullptr && Node != Sentinel;
@@ -3183,17 +3181,17 @@ void EquippedObjClearEquipFx(FClientGameobj* Host)
         if (Cur->Next != nullptr)
             Cur->Next->Prev = Cur->Prev;
         ::operator delete(Cur);
-        EquipFxCountRef(Host) = EquipFxCountRef(Host) - 1;
+        EquipFxCountRef(this) = EquipFxCountRef(this) - 1;
         Cur = Next;
     }
     Sentinel->Next = Sentinel;
     Sentinel->Prev = Sentinel;
 }
 
-void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId)
+void FClientGameobj::CreateEquipFx(unsigned short EquipId)
 {
     // FUN_00533160 — full type switch.
-    CEqObj* Eq = ResolveEqObjFromHost(Host);
+    CEqObj* Eq = ResolveEqObjFromHost(this);
     if (Eq == nullptr)
         return;
     CEquip* Equip = Eq->EquipManager.FindByID(EquipId);
@@ -3203,58 +3201,58 @@ void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId)
     FClientEquip* Wrapper = nullptr;
 
     if (Type == static_cast<unsigned>(EquipTypeLight))
-        Wrapper = CliLightEquipFxConstruct(Equip, Host);
+        Wrapper = CliLightEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeGun))
-        Wrapper = CliGunEquipFxConstruct(Equip, Host);
+        Wrapper = CliGunEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeAttachedFX))
-        Wrapper = CliAttachedFxEquipFxConstruct(Equip, Host);
+        Wrapper = CliAttachedFxEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeEngine))
-        Wrapper = CliEngineEquipFxConstruct(Equip, Host);
+        Wrapper = CliEngineEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeShieldGen))
-        Wrapper = CliShieldGenEquipFxConstruct(Equip, Host);
+        Wrapper = CliShieldGenEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeThruster))
-        Wrapper = CliThrusterEquipFxConstruct(Equip, Host);
+        Wrapper = CliThrusterEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeTractor))
-        Wrapper = CliTractorEquipFxConstruct(Equip, Host);
+        Wrapper = CliTractorEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeMineDropper))
-        Wrapper = CliMineEquipFxConstruct(Equip, Host);
+        Wrapper = CliMineEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeCmDropper))
-        Wrapper = CliCmEquipFxConstruct(Equip, Host);
+        Wrapper = CliCmEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeShield))
-        Wrapper = CliShieldEquipFxConstruct(Equip, Host);
+        Wrapper = CliShieldEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeCloak))
-        Wrapper = CliCloakEquipFxConstruct(Equip, Host);
+        Wrapper = CliCloakEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeRepairDroid))
-        Wrapper = CliRepairDroidEquipFxConstruct(Equip, Host);
+        Wrapper = CliRepairDroidEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeInternalFX))
-        Wrapper = CliInternalFxEquipFxConstruct(Equip, Host);
+        Wrapper = CliInternalFxEquipFxConstruct(Equip, this);
     else if (Type == static_cast<unsigned>(EquipTypeTradeLane))
-        Wrapper = CliTradeLaneEquipFxConstruct(Equip, Host);
+        Wrapper = CliTradeLaneEquipFxConstruct(Equip, this);
     else
     {
         return;
     }
     if (Wrapper == nullptr)
         return;
-    EquipFxListInsert(Host, Wrapper);
+    EquipFxListInsert(this, Wrapper);
 }
 
-void EquippedObjRebuildEquipFx(FClientGameobj* Host)
+void FClientGameobj::RebuildEquipFx()
 {
     // FUN_00533e10 (returns nothing: EAX is whatever FUN_00539740 left).
-    EquippedObjClearEquipFx(Host);
+    ClearEquipFx();
     // Each step narrows the object by 0x103 again (null otherwise) and traverses its equipment
     // without a test.
-    CEqObj* Eq = ResolveEqObjFromHost(Host);
+    CEqObj* Eq = ResolveEqObjFromHost(this);
     CEquipTraverser Walk;
     CEquip* Equip = Eq->EquipManager.Traverse(Walk);
     while (Equip != nullptr)
     {
-        EquippedObjCreateEquipFx(Host, Equip->GetID());
+        CreateEquipFx(Equip->GetID());
         Equip = Eq->EquipManager.Traverse(Walk);
     }
-    EquippedObjScanFuseIgnitions(Host);
-    EquippedObjResolveExplosion(Host);
+    EquippedObjScanFuseIgnitions(this);
+    EquippedObjResolveExplosion(this);
 }
 
 // The CliEquipLights are linked into bucket 0x2e by the owner's effect-list sweep (FUN_004fd040,
@@ -3313,10 +3311,10 @@ void CliTradeLaneEquipFxAttachLaneEffects(FClientEquip* Wrapper)
     CliTradeLaneAttachLaneEffects(static_cast<FCliTradeLaneEquipFx*>(Wrapper));
 }
 
-void ClientEquipBaseFill(FClientEquip* Wrapper, CEquip* Equip, FClientGameobj* Host)
+void FClientEquip::BaseFill(CEquip* Equip, FClientGameobj* Host)
 {
     // FUN_00531a30 for the constructors outside this file (the launcher family).
-    CliEquipFxBaseFill(Wrapper, Equip, Host);
+    CliEquipFxBaseFill(this, Equip, Host);
 }
 
 bool RemoveAppearanceInstanceValue(int Key)
@@ -3336,13 +3334,13 @@ bool RemoveAppearanceInstanceValue(int Key)
     return bOk;
 }
 
-FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipId)
+FClientEquip* FClientGameobj::FindEquipFx(unsigned short EquipId)
 {
     // FUN_00533100 (on the EquippedObj). The narrowed object is used without a test.
-    CEqObj* const Eq = ResolveEqObjFromHost(Host);
+    CEqObj* const Eq = ResolveEqObjFromHost(this);
     CEquip const* const Equip = Eq->EquipManager.FindByID(EquipId);
     // The first wrapper on the +0xb8 list whose +4 is that equipment.
-    FCliEquipFxListNode* const Sentinel = EquipFxSentinelRef(Host);
+    FCliEquipFxListNode* const Sentinel = EquipFxSentinelRef(this);
     for (FCliEquipFxListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
         if (Node->Wrapper->Equip == Equip)
@@ -3351,11 +3349,12 @@ FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipI
     return nullptr;
 }
 
-bool HostIgniteFuse(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
-                    unsigned short SubObjId, float AtT, float OverrideLifetime)
+// FUN_00534240 -- its body is FClientEquippedObj::LightFuse (client_equip_fx.cpp).
+bool FClientEquippedObj::LightFuse(unsigned SourceId, ID_String const* InFuseId,
+                                 unsigned short SubObjId, float AtT, float OverrideLifetime)
 {
     // FUN_00534240 (FClientEquippedObj::LightFuse's body).
-    return HostIgniteFuseImpl(Host, SourceId, FuseId, SubObjId, AtT, OverrideLifetime);
+    return HostIgniteFuseImpl(this, SourceId, *InFuseId, SubObjId, AtT, OverrideLifetime);
 }
 
 void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units)

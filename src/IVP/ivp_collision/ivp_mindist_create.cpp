@@ -14,7 +14,7 @@
 #include "ivp_collision.h"                            // IVP_Collision, IVP_Collision_Delegator
 #include "../ivp_compact_builder/ivp_compact_ledge.h" // IVP_Compact_Ledge
 #include "../ivp_physics/ivp_mindist.h"               // IVP_Ledge_Mindist, IVP_Complex_Mindist
-#include "../ivp_physics/ivp_real_object.h"           // IVP_Real_Object, IVP_TransformWorldToSlotSpace
+#include "../ivp_physics/ivp_real_object.h"           // IVP_Real_Object, IVP_NarrowPhaseCacheSlot::transform_world_to_slot_space
 #include "../ivp_physics/ivp_surface_manager.h"       // IVP_SurfaceManager, IVP_SurfaceManager_OutList
 #include "../ivp_physics/ivp_environment.h"           // IVP_Environment
 #include "../ivp_physics/ivp_core.h"                  // IVP_Core
@@ -164,7 +164,7 @@ namespace
         // get_cache_object_no_lock (inlined), then FUN_06348470.
         IVP_NarrowPhaseCacheSlot* Cache = Object->get_cache_object_no_lock();
         IVP_U_Point CentreObject;
-        IVP_TransformWorldToSlotSpace(Cache, &CentreWorld, &CentreObject);
+        Cache->transform_world_to_slot_space(&CentreWorld, &CentreObject);
 
         // Surface manager slot 4; the other-object argument is 0.
         Object->surface_manager->get_all_ledges_within_radius(

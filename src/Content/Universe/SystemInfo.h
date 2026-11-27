@@ -32,6 +32,7 @@ struct FContentNpcShipParams;       // NpcShip.h (TU43)
 struct FSpawnRequest;               // Populators.h (the SpacePop population request)
 struct FSystemInfo;
 struct FSystemZone;
+struct FZonePathLabel;
 
 // ---------------------------------------------------------------------------------------
 // TU30 -- the zone population block (zone +0x18, retail 0x44 bytes).
@@ -147,6 +148,9 @@ struct FSystemZone
     weighted_vector<unsigned int> const* GetPopulationFactions();
     // FUN_06fa7fd0 (x87 result): 0 for an unpopulated zone, else Population.TradelaneAttack.
     float GetTradelaneAttack() const;
+
+    // FUN_06fa7980: parse one [Zone] section into Zone / PathLabel; false = drop.
+    bool Parse(INI_Reader* Reader, FZonePathLabel* PathLabel, bool bLoadEncounters);
 };
 
 // "path_label" record the enumerator collects for FUN_06f76380 (retail 0x38 bytes; the
@@ -176,10 +180,6 @@ struct FSystemZoneEnumerator : public pub::System::ZoneEnumerator
     // FUN_06fa77c0.
     void OnZone(unsigned int const* ZoneId, INI_Reader* Reader) override;
 };
-
-// FUN_06fa7980: parse one [Zone] section into Zone / PathLabel; false = drop.
-bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* PathLabel,
-                     bool bLoadEncounters);
 
 // ---------------------------------------------------------------------------------------
 // TU58 -- SystemInfo.

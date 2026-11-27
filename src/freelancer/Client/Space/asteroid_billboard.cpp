@@ -497,10 +497,10 @@ void BillboardApplyRenderStates(IRenderPipeline* Pipeline, unsigned const* Table
     }
 }
 
-void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
-                              float const* Forward, float const* Up, float const* Right,
-                              float* OutCenter, float* OutCorner0, float* OutCorner1,
-                              float* OutCorner2, float* OutCorner3)
+void FAsteroidBillboardBlock::ComputeLighting(float const* Pos, float const* Forward,
+                                              float const* Up, float const* Right, float* OutCenter,
+                                              float* OutCorner0, float* OutCorner1,
+                                              float* OutCorner2, float* OutCorner3)
 {
     void* Slots[16];
     int const LightCount = SpaceCollectNearbyLights(Slots, 0x10, Pos, 100.0f, 0);
@@ -513,22 +513,22 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
     OutCorner0[2] = static_cast<float>(Ambient[2]);
 
     // ambient_intensity * 1/255 (DAT_005c7f68).
-    float const AmbientScale = Bb->AmbientIntensity * 0.003921568859368563f;
+    float const AmbientScale = AmbientIntensity * 0.003921568859368563f;
     OutCorner0[0] = AmbientScale * OutCorner0[0];
     OutCorner0[1] = AmbientScale * OutCorner0[1];
     OutCorner0[2] = AmbientScale * OutCorner0[2];
 
     // Times the tinted ambient (+0x58), then times color_shift (+0x64), each through a
     // temporary (FUN_00422b80).
-    float const Ax = OutCorner0[0] * Bb->TintedAmbient0;
-    float const Ay = OutCorner0[1] * Bb->TintedAmbient1;
-    float const Az = OutCorner0[2] * Bb->TintedAmbient2;
+    float const Ax = OutCorner0[0] * TintedAmbient0;
+    float const Ay = OutCorner0[1] * TintedAmbient1;
+    float const Az = OutCorner0[2] * TintedAmbient2;
     OutCorner0[0] = Ax;
     OutCorner0[1] = Ay;
     OutCorner0[2] = Az;
-    float const Sx = OutCorner0[0] * Bb->ColorShift0;
-    float const Sy = OutCorner0[1] * Bb->ColorShift1;
-    float const Sz = OutCorner0[2] * Bb->ColorShift2;
+    float const Sx = OutCorner0[0] * ColorShift0;
+    float const Sy = OutCorner0[1] * ColorShift1;
+    float const Sz = OutCorner0[2] * ColorShift2;
     OutCorner0[0] = Sx;
     OutCorner0[1] = Sy;
     OutCorner0[2] = Sz;
@@ -543,7 +543,7 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
     }
 
     // Deviation: retail's direction and colour locals are not initialised, so a light that
-    // EngineLightSample rejects (not enabled) leaves the previous light's values -- or stack
+    // FEngineLight::Sample rejects (not enabled) leaves the previous light's values -- or stack
     // garbage for the first one -- in them. They start at zero here.
     float LightDir[3] = {0.0f, 0.0f, 0.0f};
     float LightColor[3] = {0.0f, 0.0f, 0.0f};
@@ -552,7 +552,7 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
     int SlotIndex = 0;
     for (SlotIndex = 0; SlotIndex < LightCount; ++SlotIndex)
     {
-        if (Lit >= Bb->MaxLights)
+        if (Lit >= MaxLights)
             break;
         FEngineLight* const Light = static_cast<FEngineLight*>(Slots[SlotIndex]);
         // Only directional lights (+0xb0 == 3).
@@ -560,12 +560,12 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
             continue;
 
         float LightAmbient[3] = {0.0f, 0.0f, 0.0f};
-        EngineLightSample(Light, Pos, LightDir, LightAmbient, LightColor);
+        Light->Sample(Pos, LightDir, LightAmbient, LightColor);
 
         // The colour times the tinted diffuse (+0x4c).
-        float const Cx = LightColor[0] * Bb->TintedDiffuse0;
-        float const Cy = LightColor[1] * Bb->TintedDiffuse1;
-        float const Cz = LightColor[2] * Bb->TintedDiffuse2;
+        float const Cx = LightColor[0] * TintedDiffuse0;
+        float const Cy = LightColor[1] * TintedDiffuse1;
+        float const Cz = LightColor[2] * TintedDiffuse2;
         LightColor[0] = Cx;
         LightColor[1] = Cy;
         LightColor[2] = Cz;
@@ -693,8 +693,8 @@ void BillboardEmitRock(FAsteroidBillboardBlock* /*Bb*/, FAsteroidBillboardRock* 
     Batch.Vertex(Apex[0], Apex[1], Apex[2]);
 }
 
-void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
-                   Exclusion::AsteroidExclusionZoneMgr* Excl, int ExcludeType)
+void FAsteroidBillboardBlock::Draw(FSpaceCamera* Camera, Exclusion::AsteroidExclusionZoneMgr* Excl,
+                                   int ExcludeType)
 {
     ICamera* const Cam = AsCamera(Camera);
 
@@ -710,12 +710,12 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
 
     // The centre of the rock sphere, SphereAhead ahead of the camera.
     float FarCenter[3];
-    FarCenter[0] = static_cast<float>(static_cast<double>(Forward[0]) * Bb->SphereAhead + CamPos[0]);
-    FarCenter[1] = static_cast<float>(static_cast<double>(Forward[1]) * Bb->SphereAhead + CamPos[1]);
-    FarCenter[2] = static_cast<float>(static_cast<double>(Forward[2]) * Bb->SphereAhead + CamPos[2]);
+    FarCenter[0] = static_cast<float>(static_cast<double>(Forward[0]) * SphereAhead + CamPos[0]);
+    FarCenter[1] = static_cast<float>(static_cast<double>(Forward[1]) * SphereAhead + CamPos[1]);
+    FarCenter[2] = static_cast<float>(static_cast<double>(Forward[2]) * SphereAhead + CamPos[2]);
 
     // Right = normalise(Forward x Up).
-    float* const Up = Bb->Up;
+    float* const Up = this->Up;
     double const CrossX =
         static_cast<double>(Forward[1]) * Up[2] - static_cast<double>(Forward[2]) * Up[1];
     double const CrossY =
@@ -753,12 +753,12 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     float Corner3[3];
     if (GetGameOption(kGameOptLighting) != 0)
     {
-        BillboardComputeLighting(Bb, CamPos, Forward, Bb->Up, Right, CenterColor, Corner0,
-                                 Corner1, Corner2, Corner3);
+        ComputeLighting(CamPos, Forward, this->Up, Right, CenterColor, Corner0,
+                        Corner1, Corner2, Corner3);
     }
     else
     {
-        float const Diffuse[3] = {Bb->TintedDiffuse0, Bb->TintedDiffuse1, Bb->TintedDiffuse2};
+        float const Diffuse[3] = {TintedDiffuse0, TintedDiffuse1, TintedDiffuse2};
         int Axis = 0;
         for (Axis = 0; Axis < 3; ++Axis)
         {
@@ -771,13 +771,13 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     }
 
     // No shape: nothing drawn and no state touched.
-    if (Bb->Shape == nullptr)
+    if (Shape == nullptr)
         return;
 
     // All doubles. The camera byte +0xbc re-scatters every rock.
-    double const RadiusSq = static_cast<double>(Bb->SphereRadius) * Bb->SphereRadius;
+    double const RadiusSq = static_cast<double>(SphereRadius) * SphereRadius;
     unsigned char const bScatterAll = Camera->FlagBC;
-    double const FadeSq = static_cast<double>(Bb->SphereFadeWidth) * Bb->SphereFadeWidth;
+    double const FadeSq = static_cast<double>(SphereFadeWidth) * SphereFadeWidth;
     double const InvFadeSq = 1.0 / FadeSq;
     double const InnerSq = RadiusSq - FadeSq;
 
@@ -789,7 +789,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     Pipe->GetRenderState(D3DRS_ALPHAREF, &OldAlphaRef);
     Pipe->SetRenderState(D3DRS_ALPHAREF, 0x80);
     // The shape's frame-0 texture on stage 0, TEXCOORDINDEX 0.
-    Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(Bb->Shape, 0));
+    Pipe->SetTextureStageTexture(0, Shape->GetGpuHandle(0));
     Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
     ApplyTextureStageStates(Pipe, 0, kStage0States);
     ApplyTextureStageStates(Pipe, 1, kStage1States);
@@ -801,7 +801,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     Batch.SetInterfaces(DALib::Pipeline, DALib::VertexBuffer);
 
     int Deferred = 0;
-    int const VertexTotal = Bb->RockCount * 3;
+    int const VertexTotal = RockCount * 3;
     Batch.Reset();
     if (VertexTotal != 0)
     {
@@ -816,22 +816,22 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
 
             // Place, fade and draw the opaque rocks.
             int RockIndex = 0;
-            for (RockIndex = 0; RockIndex < Bb->RockCount; ++RockIndex)
+            for (RockIndex = 0; RockIndex < RockCount; ++RockIndex)
             {
-                FAsteroidBillboardRock* const Rock = &Bb->Rocks[RockIndex];
+                FAsteroidBillboardRock* const Rock = &Rocks[RockIndex];
                 Vector const& RockPos = *reinterpret_cast<Vector const*>(Rock->Pos);
                 double DistSq = 0.0;
 
                 if (bScatterAll != 0)
                 {
                     // Anywhere inside the sphere.
-                    Vector const Offset = random_inside_sphere(Bb->SphereRadius);
+                    Vector const Offset = random_inside_sphere(SphereRadius);
                     Rock->Pos[0] = static_cast<float>(static_cast<double>(FarCenter[0]) + Offset.x);
                     Rock->Pos[1] = static_cast<float>(static_cast<double>(FarCenter[1]) + Offset.y);
                     Rock->Pos[2] = static_cast<float>(static_cast<double>(FarCenter[2]) + Offset.z);
 
                     // Outside the zone (immersion exactly 0) -> hidden.
-                    if (Bb->ZoneRef != nullptr && Bb->ZoneRef->GetImmersion(RockPos) == 0.0f)
+                    if (ZoneRef != nullptr && ZoneRef->GetImmersion(RockPos) == 0.0f)
                     {
                         Rock->bVisible = 0;
                         continue;
@@ -854,7 +854,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                         }
                         else
                         {
-                            if (Rock->Phase > Bb->DensityScale)
+                            if (Rock->Phase > DensityScale)
                                 Rock->bVisible = 0;
                         }
                     }
@@ -876,14 +876,14 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                         // Respawned on the sphere's surface, invisible (alpha 0) for this frame.
                         Rock->bVisible = 1;
                         Vector const Dir = random_on_unit_sphere();
-                        float const Radius = Bb->SphereRadius;
+                        float const Radius = SphereRadius;
                         float const OffsetZ = static_cast<float>(static_cast<double>(Radius) * Dir.z);
                         Rock->Pos[0] = static_cast<float>(static_cast<double>(Radius) * Dir.x + FarCenter[0]);
                         Rock->Pos[1] = static_cast<float>(static_cast<double>(Radius) * Dir.y + FarCenter[1]);
                         Rock->Pos[2] = static_cast<float>(static_cast<double>(OffsetZ) + FarCenter[2]);
                         Rock->Alpha = 0.0f;
 
-                        if (Bb->ZoneRef != nullptr && Bb->ZoneRef->GetImmersion(RockPos) == 0.0f)
+                        if (ZoneRef != nullptr && ZoneRef->GetImmersion(RockPos) == 0.0f)
                         {
                             Rock->bVisible = 0;
                             continue;
@@ -906,7 +906,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                         }
                         else
                         {
-                            if (Rock->Phase > Bb->DensityScale)
+                            if (Rock->Phase > DensityScale)
                                 Rock->bVisible = 0;
                         }
                         continue;
@@ -923,17 +923,17 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                     static_cast<double>(Rock->Pos[1] - CamPos[1]) * Forward[1];
                 float const Depth = static_cast<float>(DepthD);
 
-                if (DepthD > Bb->SphereAhead)
+                if (DepthD > SphereAhead)
                 {
                     // Beyond the sphere centre the fade band narrows with depth.
-                    double T = 1.0 - (static_cast<double>(Bb->SphereRadius) -
-                                      (static_cast<double>(Depth) - Bb->SphereAhead)) /
-                                         Bb->SphereRadius;
+                    double T = 1.0 - (static_cast<double>(SphereRadius) -
+                                      (static_cast<double>(Depth) - SphereAhead)) /
+                                         SphereRadius;
                     if (T > 1.0)
                         T = 1.0;
                     double const Band =
-                        ((1.0 - Bb->FadeDistPercent) * T * 0.5 + Bb->FadeDistPercent) *
-                        Bb->SphereRadius;
+                        ((1.0 - FadeDistPercent) * T * 0.5 + FadeDistPercent) *
+                        SphereRadius;
                     double const BandSq = Band * Band;
                     if (!(DistSq > RadiusSq - BandSq))
                         Rock->Alpha = 1.0f;
@@ -951,14 +951,14 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                 if (Rock->Alpha < 0.02f) // DAT_005d1fe4
                     continue;
                 // The near fade planes (FUN_0054feb0's NearFadeEnd/NearFadeStart).
-                if (Depth < Bb->NearFadeEnd)
+                if (Depth < NearFadeEnd)
                 {
-                    if (Depth < Bb->NearFadeStart)
+                    if (Depth < NearFadeStart)
                         Rock->Alpha = 0.0f;
                     else
                         Rock->Alpha = static_cast<float>(
-                            (static_cast<double>(Depth) - Bb->NearFadeStart) /
-                            (static_cast<double>(Bb->NearFadeEnd) - Bb->NearFadeStart) * Rock->Alpha);
+                            (static_cast<double>(Depth) - NearFadeStart) /
+                            (static_cast<double>(NearFadeEnd) - NearFadeStart) * Rock->Alpha);
                 }
                 // Translucent rocks wait for the blended pass.
                 if (Rock->Alpha < 1.0f)
@@ -970,10 +970,10 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                 // Retail quirk, kept: the corner colour uses rock 0's FlipU (+0x15 off the array
                 // pointer, not the element) and this rock's FlipV.
                 int const Index =
-                    static_cast<int>(Bb->Rocks[0].bFlipU) + static_cast<int>(Rock->bFlipV) * 2;
+                    static_cast<int>(Rocks[0].bFlipU) + static_cast<int>(Rock->bFlipV) * 2;
                 float const* const Pick = PickCorner(Index, Corner0, Corner1, Corner2, Corner3);
                 float CornerColor[3] = {Pick[0], Pick[1], Pick[2]};
-                BillboardEmitRock(Bb, Rock, Right, Bb->Up, CornerColor, CenterColor);
+                BillboardEmitRock(this, Rock, Right, this->Up, CornerColor, CenterColor);
             }
 
             BatchFlush(Batch);
@@ -1000,9 +1000,9 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                                           static_cast<unsigned>(Batch.Lock.Listing.Fvf));
 
                         int Drawn = 0;
-                        for (RockIndex = 0; RockIndex < Bb->RockCount; ++RockIndex)
+                        for (RockIndex = 0; RockIndex < RockCount; ++RockIndex)
                         {
-                            FAsteroidBillboardRock* const Rock = &Bb->Rocks[RockIndex];
+                            FAsteroidBillboardRock* const Rock = &Rocks[RockIndex];
                             if (Rock->bVisible == 0)
                                 continue;
                             if (!(Rock->Alpha < 1.0f))
@@ -1017,12 +1017,12 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                                       "asteroid billboard render count mistake");
                                 continue;
                             }
-                            int const Index = static_cast<int>(Bb->Rocks[0].bFlipU) +
+                            int const Index = static_cast<int>(Rocks[0].bFlipU) +
                                               static_cast<int>(Rock->bFlipV) * 2;
                             float const* const Pick =
                                 PickCorner(Index, Corner0, Corner1, Corner2, Corner3);
                             float CornerColor[3] = {Pick[0], Pick[1], Pick[2]};
-                            BillboardEmitRock(Bb, Rock, Right, Bb->Up, CornerColor, CenterColor);
+                            BillboardEmitRock(this, Rock, Right, this->Up, CornerColor, CenterColor);
                         }
 
                         BatchFlush(Batch);

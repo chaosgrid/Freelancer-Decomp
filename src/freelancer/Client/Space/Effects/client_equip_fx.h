@@ -37,12 +37,12 @@ struct FClientEquip : INotify
     CEquip* Equip;                              // +0x04
     FClientGameobj* Host;                       // +0x08
     Archetype::Explosion* SeparationExplosion;  // +0x0c
-};
 
-// FUN_00531a30 -- the ClientEquip constructor body every type constructor runs first (called by
-// FUN_0052c830, inlined into most others): the fields, CEquip::ConnectClientEquip, the attached
-// equipment's separation explosion.
-void ClientEquipBaseFill(FClientEquip* Wrapper, CEquip* Equip, FClientGameobj* Host);
+    // FUN_00531a30 -- the ClientEquip constructor body every type constructor runs first (called by
+    // FUN_0052c830, inlined into most others): the fields, CEquip::ConnectClientEquip, the attached
+    // equipment's separation explosion.
+    void BaseFill(CEquip* Equip, FClientGameobj* Host);
+};
 
 // One node of the EquippedObj +0xb8 list (operator new(0xc), FUN_0042a7e0): a VC6 std::list
 // node whose sentinel is at +0xb8 and whose size is at +0xbc.
@@ -57,11 +57,6 @@ struct FEquipFxListNode
 // succeeded, released either way; answers whether the removal succeeded. Callers: the cloak
 // notify, the equipped object's LOD pick; the cloak destructor FUN_00531f30 inlines the same body.
 bool RemoveAppearanceInstanceValue(int Key);
-
-// FUN_00533100 (on the EquippedObj) -- the equipment EquipId of the host's
-// CEqObj (narrowed by 0x103, CEquipManager::FindByID with no test of the object), then the
-// first wrapper on the +0xb8 list whose Equip is it; null when none is.
-FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipId);
 
 // FUN_0052f9a0 (on the CliTractor wrapper) -- the ITEMTRACTORED handler's (FUN_0053c5d0) second
 // step. Wrapper must be the tractor's (FUN_00533100 with the
@@ -82,26 +77,6 @@ void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, void const* HitInfo,
 // energy_damage, then the munition's splash effect.
 void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
                                  FClientGameobj* Munition);
-
-// FUN_00534240 (on the EquippedObj) -- the body of
-// FClientEquippedObj::LightFuse (vtable +0x1c0): the first fuse named FuseId on the burning list
-// (+0xc4) gets Fuse::IgniteAt(SourceId, SubObjId, AtT); otherwise the ClientFuseDB prototype is
-// copied onto the list, bound to Host, randomised, given OverrideLifetime unless it is -1 and
-// ignited. False (FDUMP "Fuse(%s) not found in FuseDB") only when the prototype is missing.
-// Callers go through the virtual slot (a ship overrides it with FUN_00545a90).
-bool HostIgniteFuse(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
-                    unsigned short SubObjId, float AtT, float OverrideLifetime);
-
-// FUN_00533080 — destroy every wrapper in Host+0xb8 and free list nodes.
-void EquippedObjClearEquipFx(FClientGameobj* Host);
-
-// FUN_00533160 — find equip by id, dispatch on its EEquipType (14 arms), insert the wrapper at
-// Host+0xb8.
-void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId);
-
-// FUN_00533e10 — clear, a wrapper per equipment, the fuse threshold walks (through the host's
-// Ignite slot, FUN_00534240 / HostIgniteFuse) and the explosion arch.
-void EquippedObjRebuildEquipFx(FClientGameobj* Host);
 
 // The CliTradeLaneEquip wrapper (FUN_00516c30, EEquipType 0x800000) as the solar's lane switch
 // FUN_00516910 uses it. Wrapper must be that type (FUN_00516910 picks it with

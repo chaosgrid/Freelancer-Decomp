@@ -1378,21 +1378,21 @@ void CEqObj::connect(IObjDB* ObjDb)
 // FUN_062aa1c0 (the IObjDB overload).
 void CEqObj::disconnect(IObjDB* ObjDb)
 {
-    if (ObjectDb != nullptr && ObjectDb == ObjDb)
-    {
-        if (BehaviorMgr != nullptr)
-            ConnectBehaviorManagerObjectDb(BehaviorMgr, nullptr);
-        CSimple::disconnect(ObjDb);
+    if (ObjectDb == nullptr || ObjectDb != ObjDb)
+        return;
 
-        // The first scanner's scan and cargo results are emptied (storage kept). Retail uses
-        // the FindFirst result without a type re-check.
-        CEquip* Eq = const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeScanner));
-        if (Eq != nullptr)
-        {
-            CEScanner* const Scanner = (CEScanner*)Eq;
-            Scanner->Scans.reset();
-            Scanner->CargoVecEnd = Scanner->CargoVecBegin;
-        }
+    if (BehaviorMgr != nullptr)
+        ConnectBehaviorManagerObjectDb(BehaviorMgr, nullptr);
+    CSimple::disconnect(ObjDb);
+
+    // The first scanner's scan and cargo results are emptied (storage kept). Retail uses
+    // the FindFirst result without a type re-check.
+    CEquip* Eq = const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeScanner));
+    if (Eq != nullptr)
+    {
+        CEScanner* const Scanner = (CEScanner*)Eq;
+        Scanner->Scans.reset();
+        Scanner->CargoVecEnd = Scanner->CargoVecBegin;
     }
 }
 

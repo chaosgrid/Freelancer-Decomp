@@ -40,7 +40,6 @@ namespace
 {
 
 // Defined further down in this file's second anonymous block; FontStringChild::Paint uses both.
-FFontAtlasPage* FontStringChildEnsurePages(FontStringChild* Glyph, unsigned char bSkipSizeCheck);
 unsigned NumberPackColor(unsigned char Alpha, unsigned Source);
 
 // DAT_00616524 -- VC6 std::map<unsigned, NumberFace*>, key compared unsigned. Built by XC thunk
@@ -286,37 +285,37 @@ struct FFontStringChildTemp
 // The {Text, Capacity} wide-string head (FHudWideText)
 // ---------------------------------------------------------------------------
 
-void WideTextReserve(FHudWideText* Self, unsigned Need)
+void FHudWideText::Reserve(unsigned Need)
 {
     // FUN_004142a0. Allocation results are stored unchecked.
-    if (Need <= Self->Capacity)
+    if (Need <= Capacity)
         return;
-    if (Self->Text != nullptr)
+    if (Text != nullptr)
     {
-        Self->Text = static_cast<wchar_t*>(realloc(Self->Text, Need * 2));
-        Self->Capacity = Need;
+        Text = static_cast<wchar_t*>(realloc(Text, Need * 2));
+        Capacity = Need;
         return;
     }
-    Self->Text = static_cast<wchar_t*>(malloc(Need * 2));
-    Self->Text[0] = 0;
-    Self->Capacity = Need;
+    Text = static_cast<wchar_t*>(malloc(Need * 2));
+    Text[0] = 0;
+    Capacity = Need;
 }
 
-void WideTextClear(FHudWideText* Self)
+void FHudWideText::Clear()
 {
     // FUN_00414280.
-    if (Self->Text != nullptr && Self->Text[0] != 0)
-        Self->Text[0] = 0;
+    if (Text != nullptr && Text[0] != 0)
+        Text[0] = 0;
 }
 
-void WideTextFree(FHudWideText* Self)
+void FHudWideText::Free()
 {
     // FUN_00444e20.
-    if (Self->Text != nullptr)
+    if (Text != nullptr)
     {
-        free(Self->Text);
-        Self->Text = nullptr;
-        Self->Capacity = 0;
+        free(Text);
+        Text = nullptr;
+        Capacity = 0;
     }
 }
 
@@ -532,7 +531,7 @@ void FontStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
 
     // FUN_00402d30(DAT_00616670).
     ScreenQuadSetMaterialKey(FontAtlasMaterialKey());
-    FFontAtlasPage* Row = FontStringChildEnsurePages(this, 1);
+    FFontAtlasPage* Row = EnsurePages(1);
     if (Row == nullptr)
         return;
 
@@ -643,43 +642,43 @@ void FontStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
 // Font::String host
 // ---------------------------------------------------------------------------
 
-void FontStringConstruct(FFontString* Self)
+void FFontString::Construct()
 {
     // FUN_004144b0
-    Self->Text = nullptr;
-    Self->Capacity = 0;
-    Self->MaxLines = 0x7fff;
-    Self->ChildAlloc = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Self) >> 24);
-    Self->Pad0D[0] = 0;
-    Self->Pad0D[1] = 0;
-    Self->Pad0D[2] = 0;
-    Self->ChildBegin = nullptr;
-    Self->ChildEnd = nullptr;
-    Self->ChildCap = nullptr;
-    Self->FontIface = nullptr;
-    Self->ExtentW = 0;
-    Self->ExtentH = 0;
-    Self->LayoutGen = 0;
-    Self->ScaleKey = 0x7fff;
-    Self->bMultiLine = 0;
-    Self->Pad31[0] = 0;
-    Self->Pad31[1] = 0;
-    Self->Pad31[2] = 0;
+    Text = nullptr;
+    Capacity = 0;
+    MaxLines = 0x7fff;
+    ChildAlloc = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(this) >> 24);
+    Pad0D[0] = 0;
+    Pad0D[1] = 0;
+    Pad0D[2] = 0;
+    ChildBegin = nullptr;
+    ChildEnd = nullptr;
+    ChildCap = nullptr;
+    FontIface = nullptr;
+    ExtentW = 0;
+    ExtentH = 0;
+    LayoutGen = 0;
+    ScaleKey = 0x7fff;
+    bMultiLine = 0;
+    Pad31[0] = 0;
+    Pad31[1] = 0;
+    Pad31[2] = 0;
 }
 
-void FontStringClearContents(FFontString* Self)
+void FFontString::ClearContents()
 {
     // FUN_004144f0 — does NOT free the child vector buffer or clear ExtentW/H.
-    if (Self->Text != nullptr)
+    if (Text != nullptr)
     {
-        FreeWide(Self->Text);
-        Self->Text = nullptr;
-        Self->Capacity = 0;
+        FreeWide(Text);
+        Text = nullptr;
+        Capacity = 0;
     }
-    if (Self->ChildBegin != nullptr)
+    if (ChildBegin != nullptr)
     {
-        FFontStringChildSlot* It = Self->ChildBegin;
-        FFontStringChildSlot* End = Self->ChildEnd;
+        FFontStringChildSlot* It = ChildBegin;
+        FFontStringChildSlot* End = ChildEnd;
         while (It != End)
         {
             if (It->Child != nullptr)
@@ -688,9 +687,9 @@ void FontStringClearContents(FFontString* Self)
             }
             ++It;
         }
-        Self->ChildEnd = Self->ChildBegin;
+        ChildEnd = ChildBegin;
     }
-    Self->LayoutGen = 0;
+    LayoutGen = 0;
 }
 
 // FUN_00445dc0 (vector<child slot>::_Destroy; thiscall on the vector, RET 8). The slots
@@ -707,55 +706,55 @@ void FontStringChildSlotsDestroy(FFontStringChildSlot* First, FFontStringChildSl
 }
 
 // FUN_00445d70 (the child vector's destructor; ECX = Font::String + 0xc).
-void FontStringChildVectorDestroy(FFontString* Self)
+void FFontString::ChildVectorDestroy()
 {
-    FontStringChildSlotsDestroy(Self->ChildBegin, Self->ChildEnd);
-    operator delete[](Self->ChildBegin);
-    Self->ChildBegin = nullptr;
-    Self->ChildEnd = nullptr;
-    Self->ChildCap = nullptr;
+    FontStringChildSlotsDestroy(ChildBegin, ChildEnd);
+    operator delete[](ChildBegin);
+    ChildBegin = nullptr;
+    ChildEnd = nullptr;
+    ChildCap = nullptr;
 }
 
 // FUN_00444e50 (Font::String::~String): FUN_004144f0, then FUN_00445d70 and FUN_00444e20
 // inlined.
-void FontStringDestroy(FFontString* Self)
+void FFontString::Destroy()
 {
-    FontStringClearContents(Self);
-    FontStringChildVectorDestroy(Self);
-    if (Self->Text != nullptr)
+    ClearContents();
+    ChildVectorDestroy();
+    if (Text != nullptr)
     {
-        FreeWide(Self->Text);
-        Self->Text = nullptr;
-        Self->Capacity = 0;
+        FreeWide(Text);
+        Text = nullptr;
+        Capacity = 0;
     }
 }
 
-void FontStringSetFont(FFontString* Self, IFont* Font)
+void FFontString::SetFont(IFont* Font)
 {
     // FUN_004ea670 (thiscall, RET 4). The size is re-read each pass; no null test on the child,
     // no look at the kind byte.
-    if (Self->FontIface == Font)
+    if (FontIface == Font)
         return;
-    Self->FontIface = Font;
+    FontIface = Font;
     for (unsigned Index = 0;
-         Self->ChildBegin != nullptr &&
-         Index < static_cast<unsigned>(Self->ChildEnd - Self->ChildBegin);
+         ChildBegin != nullptr &&
+         Index < static_cast<unsigned>(ChildEnd - ChildBegin);
          ++Index)
     {
-        Self->ChildBegin[Index].Child->BindFont(Self->FontIface);
+        ChildBegin[Index].Child->BindFont(FontIface);
     }
-    Self->LayoutGen = 0;
+    LayoutGen = 0;
 }
 
-void FontStringSetText(FFontString* Self, wchar_t const* Text)
+void FFontString::SetText(wchar_t const* Text)
 {
     // FUN_00415860
-    if (Self->Text == Text)
+    if (this->Text == Text)
     {
         return;
     }
     wchar_t const* Left = Text != nullptr ? Text : L"";
-    wchar_t const* Right = Self->Text != nullptr ? Self->Text : L"";
+    wchar_t const* Right = this->Text != nullptr ? this->Text : L"";
     if (wcscmp(Left, Right) == 0)
     {
         return;
@@ -763,13 +762,13 @@ void FontStringSetText(FFontString* Self, wchar_t const* Text)
 
     // A non-empty old text is freed, then the child vector is erased whole (inlined
     // erase(begin, end)). No null test on begin -- an empty vector's begin == end.
-    if (Self->Text != nullptr && Self->Text[0] != L'\0')
+    if (this->Text != nullptr && this->Text[0] != L'\0')
     {
-        FreeWide(Self->Text);
-        Self->Text = nullptr;
-        Self->Capacity = 0;
-        FFontStringChildSlot* It = Self->ChildBegin;
-        FFontStringChildSlot* End = Self->ChildEnd;
+        FreeWide(this->Text);
+        this->Text = nullptr;
+        Capacity = 0;
+        FFontStringChildSlot* It = ChildBegin;
+        FFontStringChildSlot* End = ChildEnd;
         while (It != End)
         {
             if (It->Child != nullptr)
@@ -778,42 +777,42 @@ void FontStringSetText(FFontString* Self, wchar_t const* Text)
             }
             ++It;
         }
-        Self->ChildEnd = Self->ChildBegin;
-        Self->LayoutGen = 0;
+        ChildEnd = ChildBegin;
+        LayoutGen = 0;
     }
 
     if (Text != nullptr)
     {
         size_t const Len = wcslen(Text);
         unsigned const Need = static_cast<unsigned>(Len + 1u);
-        if (Need > Self->Capacity)
+        if (Need > Capacity)
         {
             // Neither allocation result is null-tested.
-            if (Self->Text == nullptr)
+            if (this->Text == nullptr)
             {
-                Self->Text = AllocWideBytes(Need * sizeof(wchar_t));
-                Self->Text[0] = L'\0';
+                this->Text = AllocWideBytes(Need * sizeof(wchar_t));
+                this->Text[0] = L'\0';
             }
             else
             {
-                Self->Text = ReallocWide(Self->Text, Need * sizeof(wchar_t));
+                this->Text = ReallocWide(this->Text, Need * sizeof(wchar_t));
             }
-            Self->Capacity = Need;
+            Capacity = Need;
         }
-        wcsncpy(Self->Text, Text, Len);
-        Self->Text[Len] = L'\0';
-        Self->LayoutGen = 0;
+        wcsncpy(this->Text, Text, Len);
+        this->Text[Len] = L'\0';
+        LayoutGen = 0;
         return;
     }
 
-    if (Self->Text != nullptr && Self->Text[0] != L'\0')
+    if (this->Text != nullptr && this->Text[0] != L'\0')
     {
-        Self->Text[0] = L'\0';
+        this->Text[0] = L'\0';
     }
-    Self->LayoutGen = 0;
+    LayoutGen = 0;
 }
 
-void FontStringSetScale(FFontString* Self, float WorldSize, float ViewDepth)
+void FFontString::SetScale(float WorldSize, float ViewDepth)
 {
     // FUN_004145d0. DAT_0067dc70 and DAT_0067dc9c are not font globals: they are the XScale
     // (+0x78) and ZNear (+0xa4) of the Win3D scene camera DAT_0067dbf8, read straight out of it.
@@ -831,23 +830,23 @@ void FontStringSetScale(FFontString* Self, float WorldSize, float ViewDepth)
         static_cast<double>(WorldSize) +
         0.5;
     int const Key = static_cast<int>(std::floor(Term));
-    if (Key != Self->ScaleKey)
+    if (Key != ScaleKey)
     {
-        Self->ScaleKey = Key;
-        Self->LayoutGen = 0;
+        ScaleKey = Key;
+        LayoutGen = 0;
     }
 }
 
 // FUN_00414640 (thiscall, RET 8: Index, Kind) -- the child at Index of the requested kind,
 // created when missing. Returns the element; its callers go through its virtual slots.
-FontStringElement* FontStringEnsureChild(FFontString* Self, unsigned Index, unsigned char Kind)
+FontStringElement* FFontString::EnsureChild(unsigned Index, unsigned char Kind)
 {
     FontStringElement* Result = nullptr;
     bool bReuse = false;
 
-    if (Self->ChildBegin != nullptr && Index < static_cast<unsigned>(Self->ChildEnd - Self->ChildBegin))
+    if (ChildBegin != nullptr && Index < static_cast<unsigned>(ChildEnd - ChildBegin))
     {
-        FFontStringChildSlot& Slot = Self->ChildBegin[Index];
+        FFontStringChildSlot& Slot = ChildBegin[Index];
         if (Slot.Kind == Kind)
         {
             Result = Slot.Child;
@@ -868,13 +867,13 @@ FontStringElement* FontStringEnsureChild(FFontString* Self, unsigned Index, unsi
             Result = new NumberStringChild();
         else
             Result = new FontStringChild();
-        Result->BindFont(Self->FontIface);
+        Result->BindFont(FontIface);
     }
 
     // The size is re-read. The kind byte of a replaced child of the other kind stays as it was.
-    if (Self->ChildBegin != nullptr && Index < static_cast<unsigned>(Self->ChildEnd - Self->ChildBegin))
+    if (ChildBegin != nullptr && Index < static_cast<unsigned>(ChildEnd - ChildBegin))
     {
-        Self->ChildBegin[Index].Child = Result;
+        ChildBegin[Index].Child = Result;
         return Result;
     }
 
@@ -882,7 +881,7 @@ FontStringElement* FontStringEnsureChild(FFontString* Self, unsigned Index, unsi
     // final Release (no null test) the vector keeps the single reference the constructor gave.
     {
         FFontStringChildTemp Temp(Result, Kind);
-        ChildVectorInsertAtEnd(Self, 1u, Temp.Slot);
+        ChildVectorInsertAtEnd(this, 1u, Temp.Slot);
     }
     Result->Release();
     return Result;
@@ -895,27 +894,27 @@ NumberStringChild* FontStringEnsureNumberChild(FFontString* Self, unsigned Index
     // a stale kind byte 1 over a FontString needs the FontString children of a non-empty text
     // (FUN_004155c0 builds none for an empty one) to outlive that text, and every path that
     // empties it (FUN_00415860, FUN_004159a0, FUN_004144f0) releases the children first.
-    return static_cast<NumberStringChild*>(FontStringEnsureChild(Self, Index, 1));
+    return static_cast<NumberStringChild*>(Self->EnsureChild(Index, 1));
 }
 
-void FontStringRebuild(FFontString* Self)
+void FFontString::Rebuild()
 {
     // FUN_004155c0 (thiscall). Without text or font the extents are left as they are.
-    Self->LayoutGen = G_FontLayoutGeneration;
+    LayoutGen = G_FontLayoutGeneration;
 
-    wchar_t const* Text = Self->Text;
-    if (Text == nullptr || Text[0] == L'\0' || Self->FontIface == nullptr)
+    wchar_t const* Text = this->Text;
+    if (Text == nullptr || Text[0] == L'\0' || FontIface == nullptr)
     {
         return;
     }
 
     int LineCount = 0;
 
-    if (Self->bMultiLine != 0)
+    if (bMultiLine != 0)
     {
         // 0x400 {line, capacity} elements (FUN_00415850 through the EH vector constructor);
         // MaxLines capped unsigned; the width is the ScaleKey read unsigned.
-        unsigned MaxLines = static_cast<unsigned>(Self->MaxLines);
+        unsigned MaxLines = static_cast<unsigned>(this->MaxLines);
         if (MaxLines >= 0x400u)
         {
             MaxLines = 0x400u;
@@ -928,15 +927,15 @@ void FontStringRebuild(FFontString* Self)
             LineCaps[I] = 0u;
         }
         float const WrapWidth =
-            static_cast<float>(static_cast<double>(static_cast<unsigned>(Self->ScaleKey)));
-        FontStringWordWrap(Self->FontIface, Text, WrapWidth, LinePtrs, LineCaps, &LineCount,
+            static_cast<float>(static_cast<double>(static_cast<unsigned>(ScaleKey)));
+        FontStringWordWrap(FontIface, Text, WrapWidth, LinePtrs, LineCaps, &LineCount,
                            static_cast<int>(MaxLines));
 
         // Trailing spaces cut, never below one character.
         for (int I = 0; I < LineCount; ++I)
         {
             FontStringElement* const Child =
-                FontStringEnsureChild(Self, static_cast<unsigned>(I), 0);
+                EnsureChild(static_cast<unsigned>(I), 0);
             wchar_t* const Line = LinePtrs[I];
             size_t Len = wcslen(Line);
             while (Len > 1u && Line[Len - 1u] == L' ')
@@ -961,10 +960,10 @@ void FontStringRebuild(FFontString* Self)
     else
     {
         // IFont slot 9: anything that fits gives one line with the whole text.
-        if (Self->FontIface->ProbeString(Self->ScaleKey, Text, -1) > 0)
+        if (FontIface->ProbeString(ScaleKey, Text, -1) > 0)
         {
             LineCount = 1;
-            FontStringEnsureChild(Self, 0, 0)->SetText(Self->Text);
+            EnsureChild(0, 0)->SetText(this->Text);
         }
     }
 
@@ -973,113 +972,110 @@ void FontStringRebuild(FFontString* Self)
     {
         FFontStringChildTemp EmptySlot(nullptr, 0);
         unsigned const Wanted = static_cast<unsigned>(LineCount);
-        unsigned const Used = (Self->ChildBegin == nullptr)
+        unsigned const Used = (ChildBegin == nullptr)
                                   ? 0u
-                                  : static_cast<unsigned>(Self->ChildEnd - Self->ChildBegin);
+                                  : static_cast<unsigned>(ChildEnd - ChildBegin);
         if (Used < Wanted)
         {
-            ChildVectorInsertAtEnd(Self, Wanted - Used, EmptySlot.Slot);
+            ChildVectorInsertAtEnd(this, Wanted - Used, EmptySlot.Slot);
         }
-        else if (Self->ChildBegin != nullptr && Wanted < Used)
+        else if (ChildBegin != nullptr && Wanted < Used)
         {
             // FUN_00418f70(0) on each surplus slot.
             for (unsigned I = Wanted; I < Used; ++I)
             {
-                ReleaseChildSlot(Self->ChildBegin[I]);
+                ReleaseChildSlot(ChildBegin[I]);
             }
-            Self->ChildEnd = Self->ChildBegin + Wanted;
+            ChildEnd = ChildBegin + Wanted;
         }
     }
 
     // The extents: max width (unsigned compare), summed heights; no test of the child.
-    Self->ExtentW = 0;
-    Self->ExtentH = 0;
-    for (unsigned I = 0; Self->ChildBegin != nullptr &&
-                         I < static_cast<unsigned>(Self->ChildEnd - Self->ChildBegin);
+    ExtentW = 0;
+    ExtentH = 0;
+    for (unsigned I = 0; ChildBegin != nullptr &&
+                         I < static_cast<unsigned>(ChildEnd - ChildBegin);
          ++I)
     {
         int Size[2] = {0, 0};
-        Self->ChildBegin[I].Child->GetSize(Size);
-        if (static_cast<unsigned>(Self->ExtentW) < static_cast<unsigned>(Size[0]))
+        ChildBegin[I].Child->GetSize(Size);
+        if (static_cast<unsigned>(ExtentW) < static_cast<unsigned>(Size[0]))
         {
-            Self->ExtentW = Size[0];
+            ExtentW = Size[0];
         }
-        Self->ExtentH += Size[1];
+        ExtentH += Size[1];
     }
 }
 
-int* FontStringGetExtent(FFontString* Self, int* OutWH)
+int* FFontString::GetExtent(int* OutWH)
 {
     // FUN_00414570 (thiscall, RET 4). No null test of OutWH.
-    if (Self->LayoutGen != G_FontLayoutGeneration)
+    if (LayoutGen != G_FontLayoutGeneration)
     {
-        FontStringRebuild(Self);
+        Rebuild();
     }
-    OutWH[0] = Self->ExtentW;
-    OutWH[1] = Self->ExtentH;
+    OutWH[0] = ExtentW;
+    OutWH[1] = ExtentH;
     return OutWH;
 }
 
-int FontStringChildCount(FFontString* Self)
+int FFontString::ChildCount()
 {
     // FUN_004145a0 (thiscall).
-    if (Self->LayoutGen != G_FontLayoutGeneration)
+    if (LayoutGen != G_FontLayoutGeneration)
     {
-        FontStringRebuild(Self);
+        Rebuild();
     }
-    if (Self->ChildBegin == nullptr)
+    if (ChildBegin == nullptr)
     {
         return 0;
     }
-    return static_cast<int>(Self->ChildEnd - Self->ChildBegin);
+    return static_cast<int>(ChildEnd - ChildBegin);
 }
-
-namespace
-{
 
 // FUN_004142f0 (thiscall ECX = the draw origin, RET 0xc): the child's size, the box alignment,
 // then the child's vt+0x24 with a local origin.
-void DrawChildAligned(FFontStringDrawOrigin const* Origin, FontStringElement* Child,
-                      void* DrawCtx, void* DrawArg)
+void FFontStringDrawOrigin::DrawChildAligned(FontStringElement* Child, void* DrawCtx,
+                                             void* DrawArg) const
 {
     int Size[2] = {0, 0};
     Child->GetSize(Size);
 
     FFontStringDrawOrigin Local;
     // Centring reads the width unsigned, right alignment signed.
-    unsigned const HMode = Origin->HAlign;
+    unsigned const HMode = HAlign;
     if (HMode == 1u)
     {
         double const Span =
-            static_cast<double>(Origin->Scale) - static_cast<double>(static_cast<unsigned>(Size[0]));
-        Local.X = static_cast<float>(Span * 0.5 + static_cast<double>(Origin->X));
+            static_cast<double>(Scale) - static_cast<double>(static_cast<unsigned>(Size[0]));
+        Local.X = static_cast<float>(Span * 0.5 + static_cast<double>(X));
     }
     else if (HMode == 2u)
     {
-        Local.X = static_cast<float>(static_cast<double>(Origin->Scale) +
-                                     static_cast<double>(Origin->X) -
+        Local.X = static_cast<float>(static_cast<double>(Scale) +
+                                     static_cast<double>(X) -
                                      static_cast<double>(Size[0]));
     }
     else
     {
-        Local.X = Origin->X;
+        Local.X = X;
     }
-    unsigned const VMode = Origin->VAlign;
+    unsigned const VMode = VAlign;
     if (VMode == 1u)
     {
         double const Span =
-            static_cast<double>(Origin->Height) - static_cast<double>(static_cast<unsigned>(Size[1]));
-        Local.Y = static_cast<float>(Span * 0.5 + static_cast<double>(Origin->Y));
+            static_cast<double>(Height) - static_cast<double>(static_cast<unsigned>(Size[1]));
+        Local.Y = static_cast<float>(Span * 0.5 + static_cast<double>(Y));
     }
     else if (VMode == 2u)
     {
-        Local.Y = static_cast<float>(static_cast<double>(Origin->Height) +
-                                     static_cast<double>(Origin->Y) -
+        Local.Y = static_cast<float>(static_cast<double>(Height) +
+                                     static_cast<double>(Y) -
                                      static_cast<double>(Size[1]));
     }
     else
     {
-        Local.Y = Origin->Y;
+        Local.Y = Y;
     }
     // The local origin is {x, y} followed on the stack by the {w, h} pair; the child paints
     // read only x and y.
@@ -1091,21 +1087,18 @@ void DrawChildAligned(FFontStringDrawOrigin const* Origin, FontStringElement* Ch
     Child->Paint(&Local, DrawCtx, DrawArg);
 }
 
-} // namespace
-
-void FontStringDrawChildren(FFontStringDrawOrigin* Origin, FFontString* Self, void* DrawCtx,
-                            void* DrawArg)
+void FFontStringDrawOrigin::DrawChildren(FFontString* Self, void* DrawCtx, void* DrawArg)
 {
     // FUN_004143c0 — thiscall ECX = Origin, args (Font::String*, DrawCtx, DrawArg), RET 0xc.
     if (Self == nullptr)
     {
         return;
     }
-    float const SavedX = Origin->X;
-    float const SavedY = Origin->Y;
+    float const SavedX = X;
+    float const SavedY = Y;
 
     // ftol(width) (truncation) is the wrap key.
-    int const ScaleKey = static_cast<int>(Origin->Scale);
+    int const ScaleKey = static_cast<int>(Scale);
     if (ScaleKey != Self->ScaleKey)
     {
         Self->ScaleKey = ScaleKey;
@@ -1113,7 +1106,7 @@ void FontStringDrawChildren(FFontStringDrawOrigin* Origin, FFontString* Self, vo
     }
     if (Self->LayoutGen != G_FontLayoutGeneration)
     {
-        FontStringRebuild(Self);
+        Self->Rebuild();
     }
 
     // The count is taken once; each pass re-checks the vector bounds and a null child.
@@ -1138,9 +1131,9 @@ void FontStringDrawChildren(FFontStringDrawOrigin* Origin, FFontString* Self, vo
         int Size[2] = {0, 0};
         Child->GetSize(Size);
         unsigned const LineOffset = static_cast<unsigned>(Size[1] * I);
-        Origin->X = SavedX;
-        Origin->Y = static_cast<float>(static_cast<double>(LineOffset) + static_cast<double>(SavedY));
-        DrawChildAligned(Origin, Child, DrawCtx, DrawArg);
+        X = SavedX;
+        Y = static_cast<float>(static_cast<double>(LineOffset) + static_cast<double>(SavedY));
+        DrawChildAligned(Child, DrawCtx, DrawArg);
     }
 }
 
@@ -1238,20 +1231,25 @@ void AssignWideCount(wchar_t*& Text, unsigned& Capacity, wchar_t const* Source, 
     Text[Len] = L'\0';
 }
 
+} // namespace
+
 // FUN_004152e0 (thiscall on a FontString, RET 4): a stale grid goes back to the pool, an empty
 // one is rasterised (FUN_004127d0 with the argument). The generation is not stamped here.
-FFontAtlasPage* FontStringChildEnsurePages(FontStringChild* Glyph, unsigned char bSkipSizeCheck)
+FFontAtlasPage* FontStringChild::EnsurePages(unsigned char bSkipSizeCheck)
 {
-    if (Glyph->LayoutGen_ != G_FontLayoutGeneration && Glyph->GlyphHead_ != nullptr)
+    if (LayoutGen_ != G_FontLayoutGeneration && GlyphHead_ != nullptr)
     {
-        FontAtlasFreePages(Glyph->GlyphHead_);
+        FontAtlasFreePages(GlyphHead_);
     }
-    if (Glyph->GlyphHead_ == nullptr)
+    if (GlyphHead_ == nullptr)
     {
-        FontAtlasRasterize(Glyph, bSkipSizeCheck);
+        Rasterize(bSkipSizeCheck);
     }
-    return Glyph->GlyphHead_;
+    return GlyphHead_;
 }
+
+namespace
+{
 
 // The glyph FontString of a face, as three retail sites build it inline (FUN_00413710,
 // LAB_00415090, FUN_00414070): FUN_00417620, the face key, FUN_00413df0 with DAT_00616638 /
@@ -1263,7 +1261,7 @@ void NumberFaceCreateGlyph(FNumberFace* Face)
     Face->Glyph = Glyph;
     Glyph->BindFont(Face->FontKey);
     AssignWideCount(Glyph->Text_, Glyph->Capacity_, G_NumberGlyphText, G_NumberGlyphTextCapacity);
-    if (FontStringChildEnsurePages(Glyph, 0) == nullptr)
+    if (Glyph->EnsurePages(0) == nullptr)
     {
         Glyph->Release();
         Face->Glyph = nullptr;
@@ -1305,32 +1303,37 @@ void NumberFaceBuildTable(FNumberFace* Face, FontStringChild* Glyph, FFontAtlasP
     }
 }
 
+} // namespace
+
 // FUN_00414070 (thiscall on the face) -- rebuild the advance / texture table when the face's
 // generation is stale.
-void NumberFaceRebuild(FNumberFace* Face)
+void FNumberFace::Rebuild()
 {
-    if (Face->LayoutGen == G_FontLayoutGeneration)
+    if (LayoutGen == G_FontLayoutGeneration)
     {
         return;
     }
-    if (Face->Glyph == nullptr)
+    if (this->Glyph == nullptr)
     {
-        NumberFaceCreateGlyph(Face);
+        NumberFaceCreateGlyph(this);
     }
-    FontStringChild* const Glyph = Face->Glyph;
+    FontStringChild* const Glyph = this->Glyph;
     if (Glyph == nullptr)
     {
         return;
     }
     // The generation is stamped before the pages are looked at.
-    Face->LayoutGen = G_FontLayoutGeneration;
-    FFontAtlasPage* const Page = FontStringChildEnsurePages(Glyph, 0);
+    LayoutGen = G_FontLayoutGeneration;
+    FFontAtlasPage* const Page = Glyph->EnsurePages(0);
     if (Page == nullptr)
     {
         return;
     }
-    NumberFaceBuildTable(Face, Glyph, Page);
+    NumberFaceBuildTable(this, Glyph, Page);
 }
+
+namespace
+{
 
 // FUN_00418890(Last, 1, &Glyph) -- VC6 vector<char>::insert at the end: with no spare
 // capacity a new buffer of size + max(1, size) (1 for an empty vector), the old bytes copied,
@@ -1379,11 +1382,11 @@ unsigned NumberPackColor(unsigned char Alpha, unsigned Source)
 
 } // namespace
 
-void WideTextAssign(FHudWideText* Self, wchar_t const* Source, unsigned Len)
+void FHudWideText::Assign(wchar_t const* Source, unsigned Len)
 {
     // FUN_00413df0 on a free-standing {Text, Capacity} head (PageCharacterSelectSingle's
     // ShowDetails).
-    AssignWideCount(Self->Text, Self->Capacity, Source, Len);
+    AssignWideCount(Text, Capacity, Source, Len);
 }
 
 NumberStringChild::NumberStringChild()
@@ -1519,7 +1522,7 @@ int* NumberStringChild::GetSize(int* OutWH)
                         if (Current != nullptr)
                         {
                             Face->LayoutGen = G_FontLayoutGeneration;
-                            FFontAtlasPage* const Page = FontStringChildEnsurePages(Current, 0);
+                            FFontAtlasPage* const Page = Current->EnsurePages(0);
                             if (Page != nullptr)
                             {
                                 NumberFaceBuildTable(Face, Current, Page);
@@ -1656,7 +1659,7 @@ void NumberStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
         return;
     }
     // No release of the glyph on failure here.
-    FFontAtlasPage* const Page = FontStringChildEnsurePages(Glyph, 0);
+    FFontAtlasPage* const Page = Glyph->EnsurePages(0);
     if (Page == nullptr)
     {
         return;
@@ -1678,7 +1681,7 @@ void NumberStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
     ScreenQuadBeginBatchFrame(Frame, 2, true);
     if (Face->LayoutGen != G_FontLayoutGeneration)
     {
-        NumberFaceRebuild(Face);
+        Face->Rebuild();
     }
     int Size[2] = {0, 0};
     GetSize(Size);
@@ -1720,12 +1723,12 @@ void NumberStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
         // FUN_00414070 on a stale face, before and after the advance read.
         if (Face->LayoutGen != G_FontLayoutGeneration)
         {
-            NumberFaceRebuild(Face);
+            Face->Rebuild();
         }
         float const Advance = static_cast<float>(Face->Advance[Index]);
         if (Face->LayoutGen != G_FontLayoutGeneration)
         {
-            NumberFaceRebuild(Face);
+            Face->Rebuild();
         }
         float const GlyphX0 = PenX;
         PenX = static_cast<float>(static_cast<double>(Advance) + PenX);

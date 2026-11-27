@@ -101,7 +101,7 @@ public:
     // +0x04: IVP's upper_limit_radius, the radius of the sphere bounding this core.
     // The OV-tree insertion adds it to a collision range and subtracts it back out
     // (0634ec97 / 0634eceb); DAngularLimitFactor = 0.5f / it. Written by SetRadius()
-    // (from IVP_InitCoreRestStateAndDamping) and grown when objects join a core.
+    // (from IVP_Real_Object::init_core_rest_state_and_damping) and grown when objects join a core.
     float UpperLimitRadius;                   // +0x04
     // +0x08: IVP's max_surface_deviation, the largest distance from the centre to the
     // surface: MaxSurfaceRotSpeed = AbsOmega * it (FUN_06351a50).
@@ -377,7 +377,7 @@ public:
     // FUN_063474d0: the whole world transform (MWorldFCore / PosWorldFCore /
     // QWorldFCore / QWorldFCoreNext) from LocalCsys concatenated onto the existing
     // MWorldFCore (Old * LocalCsys, IVP_U_Matrix::mmult4). Sole caller
-    // FUN_06345b20 (IVP_InitCoreRestStateAndDamping, ivp_real_object.cpp).
+    // FUN_06345b20 (IVP_Real_Object::init_core_rest_state_and_damping, ivp_real_object.cpp).
     void init_world_transform_from_local_csys(const IVP_U_Matrix* LocalCsys);
 
     // FUN_06347410 (IVP's calc_calc; also ported, on raw offsets, as
@@ -385,7 +385,7 @@ public:
     // 1/RotInertia, InvMass = 1/Mass, Flags 0x40/0x80 from an "isotropic"
     // check of the reciprocals, DAngularLimitFactor = 0.5f/UpperLimitRadius.
     // Retail divides unconditionally (zero gives +/-INF). Called from
-    // IVP_InitCoreRestStateAndDamping right after RotInertia/Mass are set.
+    // IVP_Real_Object::init_core_rest_state_and_damping right after RotInertia/Mass are set.
     void RecomputeInverseInertia();
 
     // ---- the core helpers PhySys calls ----

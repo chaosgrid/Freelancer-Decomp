@@ -30,22 +30,13 @@ public:
     }
 
     // FUN_005760d0 (thiscall, RET 4) -- add (MsgId, this) to the registry.
-    void RegisterEvent(unsigned MsgId)
-    {
-        HudRegisterCommandHandler(AsHudCmdHandler(), MsgId);
-    }
+    void RegisterEvent(unsigned MsgId);
 
     // FUN_005760f0 (thiscall, RET 4) -- drop this handler's entries for MsgId.
-    void UnregisterEvent(unsigned MsgId)
-    {
-        HudUnregisterCommand(AsHudCmdHandler(), MsgId);
-    }
+    void UnregisterEvent(unsigned MsgId);
 
     // FUN_00576190 (thiscall) -- drop every entry of this handler.
-    void UnregisterAllEvents()
-    {
-        HudUnregisterCommandHandler(AsHudCmdHandler());
-    }
+    void UnregisterAllEvents();
 
 protected:
     EventHandler()
@@ -54,12 +45,18 @@ protected:
 
     // FUN_00576010 -- vftable back to 0x005cbed8, FUN_00577c30(this), erase every registration
     // (freeing an emptied tree), FUN_005762f0(this, 0).
-    ~EventHandler()
-    {
-        HudDestroyEventHandler(AsHudCmdHandler());
-    }
+    ~EventHandler();
 
 private:
     EventHandler(EventHandler const&) = delete;
     EventHandler& operator=(EventHandler const&) = delete;
+
+public:
+    // FUN_005762f0 — cancel stack DAT_0067c270: skip the first Skip entries holding Handler and
+    // unlink every later one.
+    void RemoveCancelHandler(int Skip);
+
+    // FUN_00576360 — EventHandler::RemoveCancelHandler(Handler, Skip), then push Handler on the cancel stack;
+    // USER_CANCEL (0xf) in mode 1 pops it and calls its slot 0 with 0x10 (FUN_00576410 tail).
+    void PushCancelHandler(int Skip);
 };

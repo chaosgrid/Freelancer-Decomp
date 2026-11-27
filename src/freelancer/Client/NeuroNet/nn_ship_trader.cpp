@@ -9,7 +9,7 @@
 #include "Interface/Pages/character_select_equip.h" // GetPlayerShipArchetypeIdRetail, GetPlayerCreditsRetail,
                                     // GetPlayerEquipDescListRetail, GetPlayerRankLevelRetail
 #include "NeuroNet/Economy/client_base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510) and the market
-#include "Space/HUD/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
+#include "Space/HUD/hud_command_dispatch.h"   // EventHandler::PushCancelHandler (FUN_00576360)
 #include "Common/Fonts/ids_rdl.h"                // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
 #include "Common/Fonts/ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Common/input_manager.h"          // GetClientMouseButtons (DAT_00616850)
@@ -459,7 +459,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
     RefreshRows();
 
     // The ship list goes either way.
-    HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
+    PushCancelHandler(0); // FUN_00576360
     return Win3D::Create(NewParent, Data);      // FUN_004b5060
 }
 
@@ -591,17 +591,17 @@ void NnShipTrader::Draw()
     // Under the mouse, a held button (DAT_00616850 & 3) drags the ship round; otherwise the next
     // drag starts afresh.
     Vector Ray;
-    if (ShipView->HitTest(Win3DGetMouseRay(&Ray))) // FUN_0059da70, slot 4
+    if (!ShipView->HitTest(Win3DGetMouseRay(&Ray))) // FUN_0059da70, slot 4
+        return;
+
+    if ((GetClientMouseButtons() & 3) != 0)
     {
-        if ((GetClientMouseButtons() & 3) != 0)
-        {
-            ShipView->DragRotate(bDragStart != 0); // FUN_00584c80
-            bDragStart = 0;
-        }
-        else
-        {
-            bDragStart = 1;
-        }
+        ShipView->DragRotate(bDragStart != 0); // FUN_00584c80
+        bDragStart = 0;
+    }
+    else
+    {
+        bDragStart = 1;
     }
 }
 

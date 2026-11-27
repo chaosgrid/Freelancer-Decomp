@@ -20,7 +20,7 @@
 #include "Space/Cameras/space_camera_third.h"   // CockpitMulMatrix (FUN_0051a140)
 #include "Interface/tooltip_hover.h"        // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
 #include "Interface/win3d.h"
-#include "Interface/win3d_engine_submit.h"  // SubmitWin3DEngineInstance / ..TintedEngineInstanceWrapped
+#include "Interface/win3d_engine_submit.h"  // FClientMeshHolder::FClientMeshHolder::SubmitWin3DEngineInstance / ..TintedEngineInstanceWrapped
 #include "Interface/win3d_immediate.h"      // Win3DDisable (FUN_00421ed0)
 #include "Interface/win_factory.h"
 
@@ -145,7 +145,7 @@ namespace
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
         Vector Local;
-        Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
+        Cam->ScreenToNearPlane(Local, static_cast<float>(CursorX),
                                static_cast<float>(CursorY));
         Matrix CamOrientation;
         memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
@@ -195,7 +195,7 @@ namespace
         float Where[3];
         if (HasInstance(Button))
         {
-            const Vector* const Placed = ClientMeshHolderGetPosition(&Button->MeshHolder); // FUN_00420fb0
+            const Vector* const Placed = Button->MeshHolder.GetPosition(); // FUN_00420fb0
             Where[0] = Placed->x;
             Where[1] = Placed->y;
             Where[2] = Placed->z;
@@ -212,7 +212,7 @@ namespace
         if (!HasInstance(Button))
             return;
         SetHolderTint(&Button->MeshHolder, Rgba);
-        SubmitWin3DEngineInstance(&Button->MeshHolder, Win3DGetCamera(), 0, 1.0f, 0); // FUN_0059efa0
+        Button->MeshHolder.SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0); // FUN_0059efa0
     }
 
     void SetRgba(unsigned char* Out, unsigned char R, unsigned char G, unsigned char B,
@@ -575,7 +575,7 @@ void NnButtonControl::Draw()
     if (bBlink != 0 && bBlinkPhase != 0)
         return;
 
-    Win3DDrawChildren(this); // FUN_0059e5c0
+    DrawChildren(); // FUN_0059e5c0
     unsigned char const SavedSelected = static_cast<unsigned char>((ButtonBits >> 6) & 1);
 
     if (bSpin != 0)
@@ -670,7 +670,7 @@ void NnButtonControl::Draw()
             if (HasInstance(this))
             {
                 SetHolderTint(&MeshHolder, Body);
-                SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0); // FUN_0059efa0
+                MeshHolder.SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0); // FUN_0059efa0
             }
         }
         else
@@ -1077,7 +1077,7 @@ bool NnToggleButtonControl::Create(Win3D* NewParent, void* Data)
     // whose instance takes the main holder's floats +0x94 as user data (Engine vt+0x7c).
     if (Mesh2.c_str()[0] != '\0')
     {
-        ClientMeshLoadFromPath(&ToggleMesh, Mesh2.c_str(), 0, false);
+        ToggleMesh.LoadFromPath(Mesh2.c_str(), 0, false);
         DALib::Engine->SetInstanceUserData(ToggleMesh.EngineInstance, &MeshHolder.UserFloats[0]);
         PlaceToggleMesh();
     }
@@ -1109,7 +1109,7 @@ void NnToggleButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
     // A non-null NewMesh2 (only null is tested here) into the +0x378 holder.
     if (NewMesh2 != nullptr)
     {
-        ClientMeshLoadFromPath(&ToggleMesh, NewMesh2, 0, false); // FUN_0059ec80(path, 0, 0)
+        ToggleMesh.LoadFromPath(NewMesh2, 0, false); // FUN_0059ec80(path, 0, 0)
         DALib::Engine->SetInstanceUserData(ToggleMesh.EngineInstance, &MeshHolder.UserFloats[0]);
         PlaceToggleMesh();
     }
@@ -1169,9 +1169,9 @@ void NnToggleButtonControl::Update()
 {
     // LAB_0055c690. The +0x378 mesh is loaded late when it is still unbound and
     // "mesh2" is set -- without the user data Create / Init give it.
-    if (!ClientMeshHolderHasInstance(&ToggleMesh) && Mesh2.c_str()[0] != '\0') // FUN_00420d60
+    if (!ToggleMesh.HasInstance() && Mesh2.c_str()[0] != '\0') // FUN_00420d60
     {
-        ClientMeshLoadFromPath(&ToggleMesh, Mesh2.c_str(), 0, false); // FUN_0059ec80(path, 0, 0)
+        ToggleMesh.LoadFromPath(Mesh2.c_str(), 0, false); // FUN_0059ec80(path, 0, 0)
         PlaceToggleMesh();
     }
 

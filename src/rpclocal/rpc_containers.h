@@ -370,11 +370,6 @@ __declspec(dllexport) const FRpcLootWireList* RpcPacketLootList(const FPacketBas
 // new(0xc) for the node, link at the tail, ++Size.
 void RpcRelationListPushBack(FRpcRelationList* List, const FRpcRelation& Value);
 
-// The node half alone: FUN_06d8cad0's insert of a value the caller already allocated --
-// the decoders (06d91b5a / 06d925a2) new(8) the element before reading into it, so a
-// failed read leaks it, as retail's does.
-void RpcRelationListLink(FRpcRelationList* List, FRpcRelation* Block);
-
 // ===========================================================================
 // The mission-objective record list (ch2 0x35 SETMISSIONOBJECTIVES)
 //
@@ -978,14 +973,6 @@ unsigned int RpcEncodeWireBlobBufferFirst(FPacketBase& Packet, unsigned char** B
 // 0x06da62d0 -- the 0x0c channel-1 buffer family: reuses a buffer already in the payload.
 unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* Buffer,
                                       unsigned int Size, unsigned int* OutLength);
-// 0x06d916a0 + 0x06da2240 / 0x06d95bf0 + 0x06da2480 -- the equipment/cargo list. Four
-// types: ch2 0x24 SETEQUIPMENT, ch2 0x25 SETCARGO, ch3 0x16 REQEQUIPMENT, ch3 0x17
-// REQCARGO. A word count then one { dword, float, dword, word, byte, byte, word, run }
-// record per element; the payload's four bytes are the handle POINTER, not the handle.
-unsigned int RpcEncodeWireEquipList(FRpcEquipListPacket& Packet, unsigned char** BufferHolder,
-                                    unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeWireEquipList(FRpcEquipListPacket& Packet, const unsigned char* Buffer,
-                                    unsigned int Size, unsigned int* OutLength);
 
 // ===========================================================================
 // The hardpoint-name dictionary (FUN_06da2820 / FUN_06da2980 / FUN_06da2a80)

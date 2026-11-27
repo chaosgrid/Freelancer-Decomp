@@ -117,6 +117,13 @@ protected:
     // The code-0xa body LAB_0052ccb0 shares with the mine / CM / gun notifies (each inlines it
     // after its own player voice line).
     void DropOnDestroying();
+
+public:
+    // FUN_0052dde0 — CliLauncher fire → new Beam → create/init → activate → register.
+    void FireProjectiles(Vector const* Target);
+
+    // FUN_0052cfd0 — muzzle: AnimDB / player gamelit / ParticleEffect(004f8060+004f8160).
+    void PlayMuzzleFx();
 };
 static_assert(sizeof(FCliLauncherFx) == 0x40, "CliLauncherFx 0x40");
 static_assert(offsetof(FCliLauncherFx, AnimJointIndex) == 0x10, "AnimJoint @ +0x10");
@@ -212,12 +219,6 @@ static_assert(offsetof(FCliEquipFirePacket, ActivateSubOp) == 0x14, "activate su
 static_assert(offsetof(FCliEquipFirePacket, TargetPos) == 0x18, "fire pkt tgt @ +0x18");
 static_assert(sizeof(FCliEquipFirePacket) == 0x28, "fire pkt 0x28 (10 dwords)");
 
-// FUN_004fc8b0
-void BeamEffectSetProgressFromSpeed(FBeamEffect* This, float Speed);
-// FUN_004fc8f0 -- Flags70 bit 1 = bHit, bit 2 = bHitPlayer (the other bits kept). Caller: Beam
-// slot 101 LAB_0053f690 with (1, Other == player).
-void BeamEffectSetHitFlags(FBeamEffect* This, bool bHit, bool bHitPlayer);
-
 // FUN_005154a0 (on the 0x10 companion) -- +0x00 Arch, +0x04 Sound,
 // +0x08 Particle, +0x0c Light (retail argument order: Arch, Particle, Sound, Light), AddRef
 // each non-null one. Callers: Beam activate FUN_0053f340 (Beam +0xc0) and the effect paths.
@@ -255,23 +256,8 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
 // FUN_004fd480 — copy 4 pointers + AddRef particle(+8) / sound(+4) / light(+0xc).
 void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots);
 
-// FUN_005377a0 — copy velocity/offset float[3] into GameLight+0x120.
-void GameLightSetFreeMotionOffset(FGameLight* Light, float const* Offset3);
-
 // FUN_005377c0 — explosion FX local transform (when SlotExplosionFx non-null).
 void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform const* LocalXform);
-
-// FUN_0053f340 (on the Beam, non-virtual) -- the Beam's activate: beam effect
-// + light into the +0xc0 companion, insert it into the effect list, then Projectile slot 92
-// FUN_005426e0 called directly. Caller: CliLauncher fire FUN_0052dde0.
-void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
-                            unsigned char bUseLookDir);
-
-// FUN_0052dde0 — CliLauncher fire → new Beam → create/init → activate → register.
-void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target);
-
-// FUN_0052cfd0 — muzzle: AnimDB / player gamelit / ParticleEffect(004f8060+004f8160).
-void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher);
 
 // The fire hooks FUN_0052d410 / FUN_0052d280 / FUN_0052d510 / FUN_0052dd00 / FUN_0052dd40 are
 // the FCliLauncherFx / FCliGunFx virtuals TryFire / FireBarrelAim / FireDirect above.
@@ -288,22 +274,6 @@ unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointI
 // every path.
 int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
                          unsigned char bOn, int PlayerId);
-
-// FUN_00534460 — EquippedObj message: 0x18 fire, 0x19 ActivateEquip cases 0..4.
-// Returns 1 if handled (0x18), 0 otherwise (retail 0x19 leaves local_29=0).
-unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
-                                        FCliEquipFirePacket const* Packet);
-
-// FUN_00544e70 — preprocess: op 0x1a/0x1b → 0x19 + next launcher hardpoint (subop 3).
-void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket* Packet);
-
-// FUN_00544d70 — CShip equip-update: gate + copy + preprocess + EquippedObjHandleEquipMsg.
-// 0x1c → FindById + Host+4 vt+0x48 (LAB_005468e0) + FUN_005351d0 walk; 0xbb → LeadAimFire.
-unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
-                                       FCliEquipFirePacket const* Packet);
-
-// FUN_00544880 — lead-aim → Host+4 vt+0x34 (CliShipFireWeapons).
-void CliShipLeadAimFire(FClientEquippedObj* Host);
 
 // LAB_005468e0 — CShip IObjAffect vt+0x48 set_target(target, sub, player).
 // AdjustorThis = Host+4.

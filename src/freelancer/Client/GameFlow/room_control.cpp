@@ -83,188 +83,6 @@ namespace
 
 }
 
-// ---------------------------------------------------------------------------
-// RoomControl subobjects
-// ---------------------------------------------------------------------------
-
-// Runtime+0x4C is the named-script table FAnimScriptSet (anim_script_set.h, FUN_00555a40 ..
-// FUN_00555ca0).
-
-// Runtime+0x504 is the character placement vector (FRoomCharPlacement, room_control.h): a VC6
-// std::vector of 8-byte elements, built empty by FUN_0059ec40 (the allocator byte is an
-// uninitialised stack byte there), filled by FUN_004356d0 and freed by FUN_004de730. The port
-// keeps a std::vector, 0x10 bytes in the iterator-debug builds like retail's.
-
-// One ship pad of the room (0x10 bytes): a RoomData ship placement (+0x184, both
-// [PlayerShipPlacement] and [ForSaleShipPlacement]) and the ship standing on it.
-struct FRoomShipPad
-{
-    // FUN_004486d0 (thiscall) -- each ship deleted through its slot 0 (with 1) and cleared.
-    void Clear();
-    // FUN_004487f0 (thiscall) -- the player's ship (Gf ObjectShip, operator new(0xb0)) on this
-    // pad: the pad's frame, shadow on, the pad's y, its launching script, the player's ship
-    // archetype and equipment list (FUN_004c3e10 / FUN_004c4060).
-    void CreatePlayerShip();
-    // FUN_00448700 (thiscall, RET 4) -- a DealerShipObject (operator new(0x64)) of the ship
-    // package GoodId on this pad: its hull's ship archetype and the package's addon list.
-    void CreateForSaleShip(unsigned GoodId);
-
-    FRoomRuntime* Room;        // +0x00
-    ShipPlaceInfo* Place;      // +0x04
-    FObjectShip* Ship;         // +0x08
-    FDealerShipObject* ForSale; // +0x0c
-};
-
-// The room's ship-pad table at Runtime+0x1020 (0x18 bytes: a VC6 vector of FRoomShipPad, then
-// two ints). Built by FUN_00448a60 at the room load, destroyed by FUN_004488f0.
-struct FRoomShipPadTable
-{
-    FRoomShipPadTable();
-    // FUN_004488f0 -- every pad cleared (FUN_004486d0 inlined), the vector freed. The runtime's
-    // destructor calls it as the member destructor; FUN_00448e90 is
-    // the same teardown on the constructor's unwind path.
-    ~FRoomShipPadTable();
-
-    // FUN_004488d0 -- +0x00 the allocator byte, +0x04..+0x10 = 0, +0x14 = -1.
-    void Init();
-    // FUN_00448a60 (thiscall, RET 8) -- one pad per RoomData ship placement; the first free
-    // player pad gets the player's ship (with a ship archetype and "player_ship" enabled); each
-    // ship package the market sells (category 3) goes on the next free for-sale pad.
-    void Build(FRoomRuntime* Runtime, FClientMarket* Market);
-    // FUN_00448a00 -- the player pad has a landing script.
-    bool HasLandingScript() const;
-    // FUN_00448a20 -- with DAT_00668ab0, a player pad, a landing script and a ship there: the
-    // ship plays the landing script; true then.
-    bool PlayLanding();
-
-    std::vector<FRoomShipPad> Pads; // +0x00 allocator byte, begin +0x04, end +0x08, cap +0x0c
-    int Count;                      // +0x10 the placement count
-    int PlayerPad;                  // +0x14 the pad of the player's ship, -1 = none
-
-private:
-    FRoomShipPadTable(FRoomShipPadTable const&) = delete;
-    FRoomShipPadTable& operator=(FRoomShipPadTable const&) = delete;
-};
-
-#if defined(_ITERATOR_DEBUG_LEVEL) && _ITERATOR_DEBUG_LEVEL != 0
-static_assert(sizeof(FRoomShipPadTable) == 0x18, "FRoomShipPadTable sizeof 0x18");
-#endif
-static_assert(sizeof(FRoomShipPad) == 0x10, "FRoomShipPad sizeof 0x10");
-
-// FRoomRuntime::SceneFlags (+0x514 .. +0x517).
-enum ERoomSceneFlag
-{
-    // +0x514: the room characters' start script was looked for (FUN_0044aca0, LAB_0044ab70);
-    // it is not looked for again.
-    kRoomStartScriptChecked = 0,
-    // +0x515: FUN_0044a540 started a landing, goods-cart or character start-script sequence;
-    // the start script then waits for the request below.
-    kRoomEntryScriptStarted = 1,
-    // +0x516: the start script requested (FUN_0044ad70, from the sequence stop FUN_004554c0).
-    kRoomStartScriptRequested = 2,
-    // +0x517: a room character's start script ran (read by FUN_005588a0).
-    kRoomStartScriptRan = 3,
-};
-
-// Retail FUN_00449260 object (RoomControl). The RoomObject base (+0x00..+0x2f) is
-// FRoomObject; RoomControl registers itself with a null owner (FUN_005593d0(0)), so no room's
-// draw ever visits it. The Event::Handler face follows at +0x30: vftable 0x005cbe98 over the
-// base's 0x005cbed8; registered for id 0xf by FUN_004496b0; torn down by FUN_00576010.
-struct FRoomRuntime : public FRoomObject, public EventHandler
-{
-    FRoomRuntime();
-    ~FRoomRuntime() override;
-
-    // Slot 5 is LAB_0044ab70 in RoomControl's vtable 0x005cbea0; slots 1-4 and 6-12 are the
-    // RoomObject ones.
-    void Update(double DeltaSeconds) override;
-
-    // LAB_0044ad80 -- Event::Handler slot 0 of the +0x30 face (0x005cbe98).
-    bool OnEvent(unsigned MsgId) override;
-
-    unsigned BaseId;                   // +0x34 FUN_004496b0 argument 1
-    unsigned RoomId;                    // +0x38 FUN_004496b0 argument 2
-    void* LocationBase;                 // +0x3C BaseData* of BaseId (FUN_0043a2b0)
-    RoomData* Room;                     // +0x40 FUN_0043a3d0
-    // +0x44 / +0x48: -1 from FUN_004496b0, then FUN_0044a030 takes them from the prop whose
-    // RoomPropInfo +0x3f is set: its slot-6 engine instance and its script table's +0x0c script.
-    InstanceIndex MainInstance;         // +0x44 RoomData::fixup argument
-    unsigned long MainScript;           // +0x48 FUN_00555bf0 on +0x4c when not -1
-    FAnimScriptSet Scripts;             // +0x4C FUN_00555a40 (0x18) → +0x64
-    // +0x64: the playback of each room animation (FUN_004498b0), -1 when it has none.
-    unsigned long Handles64[0x20];      // +0x64 all -1 at first
-    // +0xE4: one FUN_00556fd0 wrapper per RoomData+0x144 light (FUN_004496b0).
-    FGfLightWrapper* RoomLights[0x80];
-    int RoomLightCount;                 // +0x2E4
-    // +0x2E8: the per-frame light list FUN_0044b450 builds (at most 0x80).
-    FGfLightWrapper* FrameLights[0x80];
-    int FrameLightCount;                // +0x4E8
-    float FrameAmbient[3];              // +0x4EC RoomData+0xd8..+0xe0, or 0 in single-light mode
-    int SingleLightIndex;               // +0x4F8 index into RoomLights for single-light mode
-    unsigned char bSingleLight;         // +0x4FC
-    unsigned char Pad4FD[3];            // +0x4FD .. +0x4FF
-    FRoomCamera* Camera;                // +0x500 FUN_00556be0
-    std::vector<FRoomCharPlacement> Placements; // +0x504 FUN_0059ec40 (0x10) → +0x514
-    // +0x514 .. +0x517, indexed by ERoomSceneFlag. Kept as one array: a new character with all
-    // 0x40 slots full lands here (RoomControlUpdateCharacter).
-    unsigned char SceneFlags[4];        // +0x514
-    FCharacterObject* Characters[0x40];    // +0x518 the room's characters (FUN_00449e60)
-    // +0x618: the room's props -- FUN_0044a030 appends one Gf::ObjectProp per enabled
-    // RoomData+0x158 record, FUN_0044a380 appends one more, FUN_0044a2f0 finds one by name.
-    FObjectProp* Props[0x80];           // +0x618
-    int PropCount;                      // +0x818
-    // +0x81C: the room's FlashLight objects (FUN_0044a3a0 fills them from the RoomData
-    // FlashLightSet records); FUN_0044b570 hands them to FUN_00558000.
-    FFlashLight* Flashlights[0x200];    // +0x81C
-    int FlashlightCount;                // +0x101C
-    FRoomShipPadTable ShipPads;         // +0x1020 FUN_004488d0 (0x18) → +0x1038
-    // +0x1038 / +0x108c / +0x10e0: the room's "scene =" scripts FUN_0044a540 collects by type
-    // (1 ambient, 2 traffic, 3 once), malloc'd paths, each with a flag byte (1 for the room's own
-    // records) and a count. No bound check in FUN_0044a540.
-    char* SceneAmbient[0x10];           // +0x1038
-    unsigned char SceneAmbientFlag[0x10]; // +0x1078
-    int SceneAmbientCount;              // +0x1088
-    char* SceneTraffic[0x10];           // +0x108C
-    unsigned char SceneTrafficFlag[0x10]; // +0x10CC
-    int SceneTrafficCount;              // +0x10DC
-    char* SceneOnce[0x10];              // +0x10E0
-    unsigned char SceneOnceFlag[0x10];  // +0x1120
-    int SceneOnceCount;                 // +0x1130
-    // +0x1134 the room buttons FUN_0044ced0 builds from the RoomData hotspots (one per
-    // hotspot whose behavior is 1..6), count +0x1334 (room_control_hotspot.h).
-    RoomButton* Controllers[0x80];      // +0x1134
-    int ControllerCount;                // +0x1334
-    // The room camera move (FUN_0044ba60 starts it, FUN_00449990 runs it, FUN_0044c290 /
-    // FUN_0044c490 stop it). To* is where the camera goes (from a RoomData camera), From* where
-    // it was when the move started.
-    unsigned char bCameraMoving;        // +0x1338
-    unsigned char Pad1339[3];
-    float CameraMoveDuration;           // +0x133c 2.0f (FUN_0044ba60)
-    // +0x1340 -- NavBar stores it before a move (1, or 0 for the scripted track); FUN_00449990
-    // ends a move at once when it and the skip latch are set.
-    unsigned char bCameraMoveSkippable; // +0x1340
-    unsigned char Pad1341[3];
-    float CameraMoveElapsed;            // +0x1344
-    Quaternion CameraToQuat;           // +0x1348
-    float CameraToPos[3];               // +0x1358
-    float CameraToHalfFovX;             // +0x1364
-    float CameraToZNear;                // +0x1368
-    float CameraToZFar;                 // +0x136c
-    Quaternion CameraFromQuat;         // +0x1370
-    float CameraFromPos[3];             // +0x1380
-    float CameraFromHalfFovX;           // +0x138c
-    float CameraFromZNear;              // +0x1390
-    float CameraFromZFar;               // +0x1394
-    FRoomCameraDoneCallback CameraDone; // +0x1398
-    void* CameraDoneA;                  // +0x139c
-    void* CameraDoneB;                  // +0x13a0
-    // +0x13a4 -- the "Camera_Track_%d" step of FUN_0044bfd0 (RoomControlTrackScriptCamera).
-    int TrackCameraIndex;                   // +0x13a4
-    // +0x13a8 -- a dword FUN_0044ceb0 and FUN_0044ced0 zero; nothing in the exe reads it. TODO:
-    // meaning not recovered.
-    int Field_0x13a8;                   // +0x13a8
-};
-
 static_assert(offsetof(FRoomObject, bNoUpdate) == 0x04, "RoomObject +0x04");
 static_assert(offsetof(FRoomObject, Owner) == 0x08, "RoomObject owner +0x08");
 static_assert(offsetof(FRoomObject, AmbientSource) == 0x0C, "RoomObject +0x0c");
@@ -542,31 +360,30 @@ static FCharacterObject* CreatePlacedCharacter(std::vector<FRoomCharPlacement>& 
 
 // FUN_00449e10 (thiscall, RET 4) -- character Slot deleted: its placement freed
 // (FUN_00435b20 on +0x504), the object through its deleting destructor, the slot cleared.
-static void RoomControlDeleteCharacter(FRoomRuntime* Runtime, int Slot);
 
 // FUN_0044ceb0 (thiscall) -- the +0x1134 buttons, +0x1334 and +0x13a8 zeroed. Caller: the ctor
 // FUN_00449260.
-static void RoomControlClearButtons(FRoomRuntime* Runtime)
+void FRoomRuntime::ClearButtons()
 {
     int Index = 0;
     for (Index = 0; Index < 0x80; ++Index)
-        Runtime->Controllers[Index] = nullptr;
-    Runtime->ControllerCount = 0;
-    Runtime->Field_0x13a8 = 0;
+        Controllers[Index] = nullptr;
+    ControllerCount = 0;
+    Field_0x13a8 = 0;
 }
 
 // FUN_0044d1c0 (thiscall) -- every non-null +0x1134 button deleted (slot 0 with 1) and its slot
 // cleared; the count (+0x1334, re-read each pass) is left as it is. Caller: the dtor
 // FUN_00449420.
-static void RoomControlDeleteButtons(FRoomRuntime* Runtime)
+void FRoomRuntime::DeleteButtons()
 {
     int Index = 0;
-    for (Index = 0; Index < Runtime->ControllerCount; ++Index)
+    for (Index = 0; Index < ControllerCount; ++Index)
     {
-        if (Runtime->Controllers[Index] != nullptr)
+        if (Controllers[Index] != nullptr)
         {
-            delete Runtime->Controllers[Index];
-            Runtime->Controllers[Index] = nullptr;
+            delete Controllers[Index];
+            Controllers[Index] = nullptr;
         }
     }
 }
@@ -618,7 +435,7 @@ FRoomRuntime::FRoomRuntime()
         Flashlights[Index] = nullptr;
     FlashlightCount = 0;
 
-    RoomControlClearButtons(this); // FUN_0044ceb0
+    ClearButtons(); // FUN_0044ceb0
 
     // One index of each array per pass, as retail.
     for (Index = 0; Index < 0x10; ++Index)
@@ -651,7 +468,7 @@ FRoomRuntime::~FRoomRuntime()
     for (SceneIndex = 0; SceneIndex < SceneOnceCount; ++SceneIndex)
         malloc_strfree(&SceneOnce[SceneIndex]);
 
-    RoomControlDeleteButtons(this); // FUN_0044d1c0
+    DeleteButtons(); // FUN_0044d1c0
 
     // Only with RoomData+0x1a4 (the FlashLightSet records) not empty.
     if (!Room->FlashLightSets.empty())
@@ -684,7 +501,7 @@ FRoomRuntime::~FRoomRuntime()
 
     int CharacterSlot = 0;
     for (CharacterSlot = 0; CharacterSlot < 0x40; ++CharacterSlot)
-        RoomControlDeleteCharacter(this, CharacterSlot);
+        DeleteCharacter(CharacterSlot);
 
     RoomCameraDestroy(Camera);
     Camera = nullptr;
@@ -713,13 +530,13 @@ FRoomRuntime::~FRoomRuntime()
 // FUN_0044a030 (thiscall, no arguments) -- one Gf::ObjectProp per RoomData+0x158 record whose
 // priority the RtcSlider enables, its RoomObject flags copied from the record; the record
 // marked as the room's main prop hands its engine instance and main script to +0x44 / +0x48.
-static void RoomControlLoadProps(FRoomRuntime* Runtime)
+void FRoomRuntime::LoadProps()
 {
-    Runtime->PropCount = 0;
+    PropCount = 0;
     unsigned Index = 0;
-    for (Index = 0; Index < Runtime->Room->Props.size(); ++Index)
+    for (Index = 0; Index < Room->Props.size(); ++Index)
     {
-        RoomPropInfo const* Record = Runtime->Room->Props[Index];
+        RoomPropInfo const* Record = Room->Props[Index];
         if (!RtcSlider::is_enabled(static_cast<unsigned long>(Record->PriorityId)))
             continue;
 
@@ -731,8 +548,8 @@ static void RoomControlLoadProps(FRoomRuntime* Runtime)
         Data.Orient = Record->Frame.Orient;
         Data.Loadout = Record->Loadout;
 
-        FObjectProp* Prop = new FObjectProp(Runtime, Data); // operator new(0x80)
-        Runtime->Props[Runtime->PropCount] = Prop;
+        FObjectProp* Prop = new FObjectProp(this, Data); // operator new(0x80)
+        Props[PropCount] = Prop;
         Prop->bVisible = Record->bVisible ? 1 : 0;
         Prop->bLit = Record->bLit ? 1 : 0;
         Prop->bFog = Record->bFog ? 1 : 0;
@@ -743,30 +560,30 @@ static void RoomControlLoadProps(FRoomRuntime* Runtime)
         Prop->bRunningLights = Record->bRunningLights ? 1 : 0;
         if (Record->bRoomMain)
         {
-            Runtime->MainInstance = Prop->GetEngineInstance();
-            Runtime->MainScript = Prop->GetMainScript();
+            MainInstance = Prop->GetEngineInstance();
+            MainScript = Prop->GetMainScript();
         }
-        ++Runtime->PropCount;
+        ++PropCount;
     }
 }
 
-FObjectProp* RoomControlFindProp(FRoomRuntime* Runtime, char const* Name)
+FObjectProp* FRoomRuntime::FindProp(char const* Name)
 {
     // FUN_0044a2f0: the first prop whose +0x38 name (null -> "") equals Name byte for byte.
     int Index = 0;
-    for (Index = 0; Index < Runtime->PropCount; ++Index)
+    for (Index = 0; Index < PropCount; ++Index)
     {
-        if (strcmp(Runtime->Props[Index]->GetName(), Name) == 0)
-            return Runtime->Props[Index];
+        if (strcmp(Props[Index]->GetName(), Name) == 0)
+            return Props[Index];
     }
     return nullptr;
 }
 
-void RoomControlAddProp(FRoomRuntime* Runtime, FObjectProp* Prop)
+void FRoomRuntime::AddProp(FObjectProp* Prop)
 {
     // FUN_0044a380: no bound check.
-    Runtime->Props[Runtime->PropCount] = Prop;
-    ++Runtime->PropCount;
+    Props[PropCount] = Prop;
+    ++PropCount;
 }
 
 unsigned GetRoomRuntimeBaseId(FRoomRuntime* Runtime)
@@ -781,16 +598,16 @@ RoomData* GetRoomRuntimeRoomData(FRoomRuntime* Runtime)
     return Runtime->Room;
 }
 
-unsigned char RoomControlIsCameraMoving(FRoomRuntime* Runtime)
+unsigned char FRoomRuntime::IsCameraMoving()
 {
     // FUN_0044c4a0.
-    return Runtime->bCameraMoving;
+    return bCameraMoving;
 }
 
-void RoomControlClearCameraMoving(FRoomRuntime* Runtime)
+void FRoomRuntime::ClearCameraMoving()
 {
     // FUN_0044c490. G_bNnKeepPanelOpen is DAT_0066d359.
-    Runtime->bCameraMoving = 0;
+    bCameraMoving = 0;
     G_bNnKeepPanelOpen = 0;
 }
 
@@ -800,7 +617,7 @@ void RoomControlSetCameraMoveSkippable(FRoomRuntime* Runtime, unsigned char Valu
     Runtime->bCameraMoveSkippable = Value;
 }
 
-void RoomControlNotifyControllers(FRoomRuntime* Runtime, int /*A*/, int B, int C)
+void FRoomRuntime::NotifyControllers(int /*A*/, int B, int C)
 {
     // FUN_0044d240.
     if (C == -1)
@@ -809,9 +626,9 @@ void RoomControlNotifyControllers(FRoomRuntime* Runtime, int /*A*/, int B, int C
         return;
     // The count is re-read each pass and the entries are not null-tested.
     int Index = 0;
-    for (Index = 0; Index < Runtime->ControllerCount; ++Index)
+    for (Index = 0; Index < ControllerCount; ++Index)
     {
-        RoomButton* const Button = Runtime->Controllers[Index];
+        RoomButton* const Button = Controllers[Index];
         if (static_cast<int>(Button->Location) == C || Button->Behavior == C)
             Button->Activate();
     }
@@ -929,144 +746,144 @@ namespace
     }
 }
 
-bool RoomControlSnapCamera(FRoomRuntime* Runtime, char const* CameraName)
+bool FRoomRuntime::SnapCamera(char const* CameraName)
 {
     // FUN_0044c290. Any move stops before the lookup.
-    Runtime->bCameraMoving = 0;
+    bCameraMoving = 0;
     G_bNnKeepPanelOpen = 0;
-    RoomCameraInfo const* const Info = FindRoomDataCamera(Runtime, CameraName);
+    RoomCameraInfo const* const Info = FindRoomDataCamera(this, CameraName);
     if (Info == nullptr)
         return false;
 
-    Runtime->CameraFromZFar = SetCameraMoveEnds(Runtime, Info);
+    CameraFromZFar = SetCameraMoveEnds(this, Info);
 
     // The destination goes back through the quaternion (slot 0x54), as retail.
     Matrix Orient;
-    RoomCameraMath()->QuaternionToMatrix(Orient, Runtime->CameraToQuat);
-    ApplyRoomCameraFrame(Runtime, Orient, Runtime->CameraToPos, Runtime->CameraToHalfFovX,
-                         Runtime->CameraToZNear, Runtime->CameraToZFar);
+    RoomCameraMath()->QuaternionToMatrix(Orient, CameraToQuat);
+    ApplyRoomCameraFrame(this, Orient, CameraToPos, CameraToHalfFovX,
+                         CameraToZNear, CameraToZFar);
     return true;
 }
 
-bool RoomControlTrackCamera(FRoomRuntime* Runtime, char const* CameraName,
-                            FRoomCameraDoneCallback Done, void* A, void* B)
+bool FRoomRuntime::TrackCamera(char const* CameraName, FRoomCameraDoneCallback Done, void* A,
+                               void* B)
 {
     // FUN_0044ba60.
-    if (Runtime->bCameraMoving != 0)
+    if (bCameraMoving != 0)
         return false;
-    RoomCameraInfo const* const Info = FindRoomDataCamera(Runtime, CameraName);
+    RoomCameraInfo const* const Info = FindRoomDataCamera(this, CameraName);
     if (Info == nullptr)
         return false;
 
-    Runtime->bCameraMoving = 1;
+    bCameraMoving = 1;
     G_bNnKeepPanelOpen = 1;
-    Runtime->CameraMoveElapsed = 0.0f;
-    Runtime->CameraMoveDuration = 2.0f;
+    CameraMoveElapsed = 0.0f;
+    CameraMoveDuration = 2.0f;
 
-    float const FromZFar = SetCameraMoveEnds(Runtime, Info);
-    Runtime->CameraFromZFar = FromZFar;
-    Runtime->CameraDone = Done;
-    Runtime->CameraDoneA = A;
-    Runtime->CameraDoneB = B;
+    float const FromZFar = SetCameraMoveEnds(this, Info);
+    CameraFromZFar = FromZFar;
+    CameraDone = Done;
+    CameraDoneA = A;
+    CameraDoneB = B;
 
     // When the camera is already there (a NaN keeps the move) the move is dropped again. The far
     // test uses the slot 9 value itself, before it went through +0x1394 (the same float).
     double const kPosEps = kCameraPosEps;
     double const kFovEps = kCameraFovEps;
     double const kQuatEps = kCameraQuatEps;
-    if (CameraMoveNear(Runtime->CameraToPos[0], Runtime->CameraFromPos[0], kPosEps) &&
-        CameraMoveNear(Runtime->CameraToPos[1], Runtime->CameraFromPos[1], kPosEps) &&
-        CameraMoveNear(Runtime->CameraToPos[2], Runtime->CameraFromPos[2], kPosEps) &&
-        CameraMoveNear(Runtime->CameraToHalfFovX, Runtime->CameraFromHalfFovX, kFovEps) &&
-        CameraMoveNear(Runtime->CameraToZNear, Runtime->CameraFromZNear, kPosEps) &&
-        CameraMoveNear(Runtime->CameraToZFar, FromZFar, kPosEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.x, Runtime->CameraToQuat.x, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.y, Runtime->CameraToQuat.y, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.z, Runtime->CameraToQuat.z, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.w, Runtime->CameraToQuat.w, kQuatEps))
+    if (CameraMoveNear(CameraToPos[0], CameraFromPos[0], kPosEps) &&
+        CameraMoveNear(CameraToPos[1], CameraFromPos[1], kPosEps) &&
+        CameraMoveNear(CameraToPos[2], CameraFromPos[2], kPosEps) &&
+        CameraMoveNear(CameraToHalfFovX, CameraFromHalfFovX, kFovEps) &&
+        CameraMoveNear(CameraToZNear, CameraFromZNear, kPosEps) &&
+        CameraMoveNear(CameraToZFar, FromZFar, kPosEps) &&
+        CameraMoveNear(CameraFromQuat.x, CameraToQuat.x, kQuatEps) &&
+        CameraMoveNear(CameraFromQuat.y, CameraToQuat.y, kQuatEps) &&
+        CameraMoveNear(CameraFromQuat.z, CameraToQuat.z, kQuatEps) &&
+        CameraMoveNear(CameraFromQuat.w, CameraToQuat.w, kQuatEps))
     {
-        Runtime->bCameraMoving = 0;
+        bCameraMoving = 0;
         G_bNnKeepPanelOpen = 0;
     }
 
-    return Runtime->bCameraMoving != 0;
+    return bCameraMoving != 0;
 }
 
-void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta)
+void FRoomRuntime::UpdateCameraMove(float Delta)
 {
     // FUN_00449990.
-    if (Runtime->bCameraMoving == 0)
+    if (bCameraMoving == 0)
         return;
 
     // Stored as a float; the unrounded sum is compared (a NaN is not done).
     double const Elapsed = static_cast<double>(Delta) +
-                           static_cast<double>(Runtime->CameraMoveElapsed);
-    Runtime->CameraMoveElapsed = static_cast<float>(Elapsed);
-    bool const bDone = Elapsed > static_cast<double>(Runtime->CameraMoveDuration);
+                           static_cast<double>(CameraMoveElapsed);
+    CameraMoveElapsed = static_cast<float>(Elapsed);
+    bool const bDone = Elapsed > static_cast<double>(CameraMoveDuration);
 
     // The skip latch is FUN_00454910.
-    if ((GfScriptSequenceSkipLatch() && Runtime->bCameraMoveSkippable != 0) || bDone)
+    if ((GfScriptSequenceSkipLatch() && bCameraMoveSkippable != 0) || bDone)
     {
-        Runtime->bCameraMoving = 0;
+        bCameraMoving = 0;
         G_bNnKeepPanelOpen = 0;
         Matrix Orient;
-        RoomCameraMath()->QuaternionToMatrix(Orient, Runtime->CameraToQuat);
-        ApplyRoomCameraFrame(Runtime, Orient, Runtime->CameraToPos, Runtime->CameraToHalfFovX,
-                             Runtime->CameraToZNear, Runtime->CameraToZFar);
-        if (Runtime->CameraDone != nullptr)
-            Runtime->CameraDone(Runtime->CameraDoneA, Runtime->CameraDoneB, 0);
+        RoomCameraMath()->QuaternionToMatrix(Orient, CameraToQuat);
+        ApplyRoomCameraFrame(this, Orient, CameraToPos, CameraToHalfFovX,
+                             CameraToZNear, CameraToZFar);
+        if (CameraDone != nullptr)
+            CameraDone(CameraDoneA, CameraDoneB, 0);
         return;
     }
 
     // DAT_005c8a5c pi, DAT_005c75dc 1.0, DAT_005c75e0 0.5, all floats; T is stored as a float.
-    double const Phase = static_cast<double>(Runtime->CameraMoveElapsed) /
-                         static_cast<double>(Runtime->CameraMoveDuration) *
+    double const Phase = static_cast<double>(CameraMoveElapsed) /
+                         static_cast<double>(CameraMoveDuration) *
                          static_cast<double>(3.14159274101257324f);
     float const T = static_cast<float>(1.0 - (cos(Phase) + 1.0) * 0.5);
 
     // Pos = (To - From) * T + From. x's product and z's difference are rounded to floats on the
     // way, y stays on the x87 stack throughout.
-    double const DeltaX = static_cast<double>(Runtime->CameraToPos[0]) -
-                          static_cast<double>(Runtime->CameraFromPos[0]);
-    double const DeltaY = static_cast<double>(Runtime->CameraToPos[1]) -
-                          static_cast<double>(Runtime->CameraFromPos[1]);
-    float const DeltaZ = static_cast<float>(static_cast<double>(Runtime->CameraToPos[2]) -
-                                            static_cast<double>(Runtime->CameraFromPos[2]));
+    double const DeltaX = static_cast<double>(CameraToPos[0]) -
+                          static_cast<double>(CameraFromPos[0]);
+    double const DeltaY = static_cast<double>(CameraToPos[1]) -
+                          static_cast<double>(CameraFromPos[1]);
+    float const DeltaZ = static_cast<float>(static_cast<double>(CameraToPos[2]) -
+                                            static_cast<double>(CameraFromPos[2]));
     float const ScaledX = static_cast<float>(DeltaX * static_cast<double>(T));
     float Pos[3];
     Pos[0] = static_cast<float>(static_cast<double>(ScaledX) +
-                                static_cast<double>(Runtime->CameraFromPos[0]));
+                                static_cast<double>(CameraFromPos[0]));
     Pos[1] = static_cast<float>(DeltaY * static_cast<double>(T) +
-                                static_cast<double>(Runtime->CameraFromPos[1]));
+                                static_cast<double>(CameraFromPos[1]));
     Pos[2] = static_cast<float>(static_cast<double>(DeltaZ) * static_cast<double>(T) +
-                                static_cast<double>(Runtime->CameraFromPos[2]));
+                                static_cast<double>(CameraFromPos[2]));
 
     // Slerp (slot 0x58), back to a matrix (slot 0x54).
     Quaternion Quat;
-    RoomCameraMath()->QuatSlerp(Quat, Runtime->CameraFromQuat, Runtime->CameraToQuat, T);
+    RoomCameraMath()->QuatSlerp(Quat, CameraFromQuat, CameraToQuat, T);
     Matrix Orient;
     RoomCameraMath()->QuaternionToMatrix(Orient, Quat);
     float Transform[12];
     memcpy(Transform, &Orient, sizeof(float) * 9);
     memcpy(Transform + 9, Pos, sizeof(float) * 3);
-    RoomCameraSetTransform(Runtime->Camera, Transform);
+    RoomCameraSetTransform(Camera, Transform);
 
     // Each (To - From) * T + From rounded once.
-    RoomCameraSetHalfFovX(Runtime->Camera,
-                          static_cast<float>((static_cast<double>(Runtime->CameraToHalfFovX) -
-                                              static_cast<double>(Runtime->CameraFromHalfFovX)) *
+    RoomCameraSetHalfFovX(Camera,
+                          static_cast<float>((static_cast<double>(CameraToHalfFovX) -
+                                              static_cast<double>(CameraFromHalfFovX)) *
                                                  static_cast<double>(T) +
-                                             static_cast<double>(Runtime->CameraFromHalfFovX)));
-    RoomCameraSetZNear(Runtime->Camera,
-                       static_cast<float>((static_cast<double>(Runtime->CameraToZNear) -
-                                           static_cast<double>(Runtime->CameraFromZNear)) *
+                                             static_cast<double>(CameraFromHalfFovX)));
+    RoomCameraSetZNear(Camera,
+                       static_cast<float>((static_cast<double>(CameraToZNear) -
+                                           static_cast<double>(CameraFromZNear)) *
                                               static_cast<double>(T) +
-                                          static_cast<double>(Runtime->CameraFromZNear)));
-    RoomCameraSetZFar(Runtime->Camera,
-                      static_cast<float>((static_cast<double>(Runtime->CameraToZFar) -
-                                          static_cast<double>(Runtime->CameraFromZFar)) *
+                                          static_cast<double>(CameraFromZNear)));
+    RoomCameraSetZFar(Camera,
+                      static_cast<float>((static_cast<double>(CameraToZFar) -
+                                          static_cast<double>(CameraFromZFar)) *
                                              static_cast<double>(T) +
-                                         static_cast<double>(Runtime->CameraFromZFar)));
+                                         static_cast<double>(CameraFromZFar)));
 }
 
 // LAB_0044ad80 (Event::Handler slot 0 of the +0x30 face; retail's offsets are 0x30 lower because
@@ -1087,9 +904,8 @@ bool FRoomRuntime::OnEvent(unsigned MsgId)
     return true;
 }
 
-bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0,
-                                  FRoomCameraDoneCallback Done, void* A, void* B,
-                                  unsigned char bArg4)
+bool FRoomRuntime::TrackScriptCamera(int Arg0, FRoomCameraDoneCallback Done, void* A, void* B,
+                                     unsigned char bArg4)
 {
     // FUN_0044bfd0 -- a step along the room's numbered "Camera_Track_%d" cameras, +0x13a4 the
     // current number (0 = none yet). Only Arg0's low byte is tested: set steps
@@ -1100,50 +916,50 @@ bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0,
     char const* const kFirstTrack = "Camera_Track_1"; // s_Camera_Track_1_005cb893+1
     char Name[0x100];
 
-    if (Runtime->TrackCameraIndex == 0)
+    if (TrackCameraIndex == 0)
     {
         // The first step goes to Camera_Track_1.
-        Runtime->TrackCameraIndex = 1;
-        if (bArg4 != 0 && IsRoomCameraAt(Runtime, kFirstTrack))
-            return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
-        return RoomControlTrackCamera(Runtime, kFirstTrack, Done, A, B);
+        TrackCameraIndex = 1;
+        if (bArg4 != 0 && IsRoomCameraAt(this, kFirstTrack))
+            return TrackScriptCamera(Arg0, Done, A, B, 0);
+        return TrackCamera(kFirstTrack, Done, A, B);
     }
 
     if (bForward)
     {
-        Runtime->TrackCameraIndex += 1;
-        sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
-        if (bArg4 != 0 && IsRoomCameraAt(Runtime, Name))
-            return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
-        if (RoomControlTrackCamera(Runtime, Name, Done, A, B))
+        TrackCameraIndex += 1;
+        sprintf(Name, "Camera_Track_%d", TrackCameraIndex);
+        if (bArg4 != 0 && IsRoomCameraAt(this, Name))
+            return TrackScriptCamera(Arg0, Done, A, B, 0);
+        if (TrackCamera(Name, Done, A, B))
             return true;
         // No such camera, or already there -> back to 1.
-        Runtime->TrackCameraIndex = 1;
-        if (bArg4 != 0 && IsRoomCameraAt(Runtime, kFirstTrack))
-            return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
-        return RoomControlTrackCamera(Runtime, kFirstTrack, Done, A, B);
+        TrackCameraIndex = 1;
+        if (bArg4 != 0 && IsRoomCameraAt(this, kFirstTrack))
+            return TrackScriptCamera(Arg0, Done, A, B, 0);
+        return TrackCamera(kFirstTrack, Done, A, B);
     }
 
-    Runtime->TrackCameraIndex -= 1;
-    if (Runtime->TrackCameraIndex == 0)
+    TrackCameraIndex -= 1;
+    if (TrackCameraIndex == 0)
     {
         // Below 1 wraps to the highest number whose camera exists
         // (counting up from 1 until a name has no RoomData camera; 0 when there is none).
         for (;;)
         {
-            Runtime->TrackCameraIndex += 1;
-            sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
-            if (FindRoomDataCamera(Runtime, Name) == nullptr)
+            TrackCameraIndex += 1;
+            sprintf(Name, "Camera_Track_%d", TrackCameraIndex);
+            if (FindRoomDataCamera(this, Name) == nullptr)
                 break;
         }
-        Runtime->TrackCameraIndex -= 1;
+        TrackCameraIndex -= 1;
     }
 
     // The repeat passes Arg0 = 0 (backward).
-    sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
-    if (bArg4 != 0 && IsRoomCameraAt(Runtime, Name))
-        return RoomControlTrackScriptCamera(Runtime, 0, Done, A, B, 0);
-    return RoomControlTrackCamera(Runtime, Name, Done, A, B);
+    sprintf(Name, "Camera_Track_%d", TrackCameraIndex);
+    if (bArg4 != 0 && IsRoomCameraAt(this, Name))
+        return TrackScriptCamera(0, Done, A, B, 0);
+    return TrackCamera(Name, Done, A, B);
 }
 
 unsigned char RoomControlStartScriptRan(FRoomRuntime* Runtime)
@@ -1152,11 +968,11 @@ unsigned char RoomControlStartScriptRan(FRoomRuntime* Runtime)
     return Runtime->SceneFlags[kRoomStartScriptRan];
 }
 
-void RoomControlRequestCharacterScripts(FRoomRuntime* Runtime)
+void FRoomRuntime::RequestCharacterScripts()
 {
     // FUN_0044ad70. Read by the room update LAB_0044ab70, which then runs the room characters'
     // start script once.
-    Runtime->SceneFlags[kRoomStartScriptRequested] = 1;
+    SceneFlags[kRoomStartScriptRequested] = 1;
 }
 
 unsigned GetRoomRuntimeRoomId(FRoomRuntime* Runtime)
@@ -1165,26 +981,26 @@ unsigned GetRoomRuntimeRoomId(FRoomRuntime* Runtime)
     return Runtime->RoomId;
 }
 
-FCharacterObject* RoomControlFindCharacterByKey(FRoomRuntime* Runtime, unsigned Key)
+FCharacterObject* FRoomRuntime::FindCharacterByKey(unsigned Key)
 {
     // FUN_00449c90: the first slot whose character's record key (+0x154) is Key.
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character != nullptr && Character->Props.Key == Key)
             return Character;
     }
     return nullptr;
 }
 
-FCharacterObject* RoomControlPlayerCharacter(FRoomRuntime* Runtime)
+FCharacterObject* FRoomRuntime::PlayerCharacter()
 {
     // FUN_00449cd0: the first character on a placement (+0x1b8) whose char type (+0x34) is 1.
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character == nullptr)
             continue;
         CharPlaceInfo const* const Placement = Character->Placement;
@@ -1194,27 +1010,27 @@ FCharacterObject* RoomControlPlayerCharacter(FRoomRuntime* Runtime)
     return nullptr;
 }
 
-FCharacterObject* RoomControlFindCharacterByRole(FRoomRuntime* Runtime, int Role)
+FCharacterObject* FRoomRuntime::FindCharacterByRole(int Role)
 {
     // FUN_00449d10: the first character whose role (+0x300) is Role.
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character != nullptr && Character->Role == Role)
             return Character;
     }
     return nullptr;
 }
 
-FCharacterObject* RoomControlFindCharacterByName(FRoomRuntime* Runtime, char const* Name)
+FCharacterObject* FRoomRuntime::FindCharacterByName(char const* Name)
 {
     // FUN_00449d50: the first character on a placement whose setpoint segment
     // (SetpointProperties::extract_from_name, +0x08) is Name (DACOM stricmp).
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character == nullptr)
             continue;
         CharPlaceInfo const* const Placement = Character->Placement;
@@ -1228,23 +1044,23 @@ FCharacterObject* RoomControlFindCharacterByName(FRoomRuntime* Runtime, char con
     return nullptr;
 }
 
-static void RoomControlDeleteCharacter(FRoomRuntime* Runtime, int Slot)
+void FRoomRuntime::DeleteCharacter(int Slot)
 {
     // FUN_00449e10.
-    FCharacterObject* const Character = Runtime->Characters[Slot];
+    FCharacterObject* const Character = Characters[Slot];
     if (Character == nullptr)
         return;
     // Its placement freed again (FUN_00435b20).
     if (Character->PlacementIndex != -1)
-        Runtime->Placements[Character->PlacementIndex].Character = nullptr;
-    delete Runtime->Characters[Slot];
-    Runtime->Characters[Slot] = nullptr;
+        Placements[Character->PlacementIndex].Character = nullptr;
+    delete Characters[Slot];
+    Characters[Slot] = nullptr;
 }
 
-void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const& Props)
+void FRoomRuntime::UpdateCharacter(CharacterProperties const& Props)
 {
     // FUN_00449e60. Only this room's records with a costume (FUN_00435b40).
-    if (Props.RoomId != Runtime->RoomId)
+    if (Props.RoomId != RoomId)
         return;
     if (!CostumeHasParts(Props.Cost))
         return;
@@ -1252,7 +1068,7 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character != nullptr && Character->Props.Key == Props.Key)
             break;
     }
@@ -1260,11 +1076,11 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     {
         // Updated in place: the hotspot re-gated (FUN_00445a60) and the record's idle script
         // made the own one (FUN_00445580 with 0).
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         Character->Props.destroy();
         Character->Props = Props;
         Character->UpdateHotspotEnabled();
-        Runtime->Characters[Slot]->SetOwnScript(Props.Script, 0);
+        Characters[Slot]->SetOwnScript(Props.Script, 0);
         return;
     }
 
@@ -1274,19 +1090,19 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     int Free = -1;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        if (Runtime->Characters[Slot] == nullptr)
+        if (Characters[Slot] == nullptr)
         {
             Free = Slot;
             break;
         }
     }
-    FCharacterObject* const Character = CreatePlacedCharacter(Runtime->Placements, Props, Runtime);
+    FCharacterObject* const Character = CreatePlacedCharacter(Placements, Props, this);
     if (Free == -1)
     {
-        memcpy(Runtime->SceneFlags, &Character, sizeof(Runtime->SceneFlags));
+        memcpy(SceneFlags, &Character, sizeof(SceneFlags));
         return;
     }
-    Runtime->Characters[Free] = Character;
+    Characters[Free] = Character;
 }
 
 namespace
@@ -1322,16 +1138,15 @@ namespace
 // a fresh walk to it. No behaviour with the character's id -> +0x09 is read through null, as
 // retail (no guard). No break: the last such character wins. Callers: FUN_0044a540,
 // FUN_0044aca0, the room update LAB_0044ab70.
-static bool RoomControlFindStartScript(FRoomRuntime* Runtime, int* OutCharacterKey,
-                                       int* OutBehaviorKey)
+bool FRoomRuntime::FindStartScript(int* OutCharacterKey, int* OutBehaviorKey)
 {
     *OutCharacterKey = 0;
     *OutBehaviorKey = -1;
     bool bFound = false;
     TMirrorPropertyBucket<CharacterProperties>* const Characters =
-        GetClientLocationRoomCharacters(Runtime->RoomId);
+        GetClientLocationRoomCharacters(RoomId);
     TMirrorPropertyBucket<ScriptBehavior>* const Behaviors =
-        GetClientLocationRoomScriptBehaviors(Runtime->RoomId);
+        GetClientLocationRoomScriptBehaviors(RoomId);
 
     int CharacterCount = 0;
     MetaNode<CharacterProperties>* CharacterCursor = nullptr;
@@ -1402,9 +1217,9 @@ static void RoomControlRunStartScript(FRoomRuntime* Runtime, int CharacterKey, i
 // FUN_0044a540 -- start the room's scene scripts: the RoomData "scene =" records and the room
 // state's ambient scripts (FUN_0043aff0) are collected (no bound check) and played; a room
 // character with a start script (FUN_00449f40) skips the ship, goods-cart and character scripts.
-static void RoomControlStartScenes(FRoomRuntime* Runtime)
+void FRoomRuntime::StartScenes()
 {
-    RoomData* const Room = Runtime->Room;
+    RoomData* const Room = this->Room;
     int RecordIndex = 0;
     for (RecordIndex = 0; RecordIndex < static_cast<int>(Room->AmbientScripts.size());
          ++RecordIndex)
@@ -1414,26 +1229,26 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             continue;
         if (Record.Type == kAmbientScriptAmbient)
         {
-            malloc_strcpy(&Runtime->SceneAmbient[Runtime->SceneAmbientCount], Record.Path);
-            Runtime->SceneAmbientFlag[Runtime->SceneAmbientCount] = 1;
-            ++Runtime->SceneAmbientCount;
+            malloc_strcpy(&SceneAmbient[SceneAmbientCount], Record.Path);
+            SceneAmbientFlag[SceneAmbientCount] = 1;
+            ++SceneAmbientCount;
         }
         else if (Record.Type == kAmbientScriptTraffic)
         {
-            malloc_strcpy(&Runtime->SceneTraffic[Runtime->SceneTrafficCount], Record.Path);
-            Runtime->SceneTrafficFlag[Runtime->SceneTrafficCount] = 1;
-            ++Runtime->SceneTrafficCount;
+            malloc_strcpy(&SceneTraffic[SceneTrafficCount], Record.Path);
+            SceneTrafficFlag[SceneTrafficCount] = 1;
+            ++SceneTrafficCount;
         }
         else if (Record.Type == kAmbientScriptOnce)
         {
-            malloc_strcpy(&Runtime->SceneOnce[Runtime->SceneOnceCount], Record.Path);
-            Runtime->SceneOnceFlag[Runtime->SceneOnceCount] = 1;
-            ++Runtime->SceneOnceCount;
+            malloc_strcpy(&SceneOnce[SceneOnceCount], Record.Path);
+            SceneOnceFlag[SceneOnceCount] = 1;
+            ++SceneOnceCount;
         }
     }
 
     TMirrorPropertyBucket<AmbientScriptProperties>* const Scripts =
-        GetClientLocationRoomAmbientScripts(Runtime->RoomId);
+        GetClientLocationRoomAmbientScripts(RoomId);
     int NodeCount = 0;
     MetaNode<AmbientScriptProperties>* Cursor = nullptr;
     while (Scripts->List.traverse(Cursor, true))
@@ -1456,49 +1271,49 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
         }
         if (Script->ScriptId == kAmbientScriptAmbient)
         {
-            malloc_strcpy(&Runtime->SceneAmbient[Runtime->SceneAmbientCount], Script->Name);
-            Runtime->SceneAmbientFlag[Runtime->SceneAmbientCount] =
+            malloc_strcpy(&SceneAmbient[SceneAmbientCount], Script->Name);
+            SceneAmbientFlag[SceneAmbientCount] =
                 static_cast<unsigned char>(Script->bFlag);
-            ++Runtime->SceneAmbientCount;
+            ++SceneAmbientCount;
         }
         else if (Script->ScriptId == kAmbientScriptTraffic)
         {
-            malloc_strcpy(&Runtime->SceneTraffic[Runtime->SceneTrafficCount], Script->Name);
-            Runtime->SceneTrafficFlag[Runtime->SceneTrafficCount] =
+            malloc_strcpy(&SceneTraffic[SceneTrafficCount], Script->Name);
+            SceneTrafficFlag[SceneTrafficCount] =
                 static_cast<unsigned char>(Script->bFlag);
-            ++Runtime->SceneTrafficCount;
+            ++SceneTrafficCount;
         }
         else if (Script->ScriptId == kAmbientScriptOnce)
         {
-            malloc_strcpy(&Runtime->SceneOnce[Runtime->SceneOnceCount], Script->Name);
-            Runtime->SceneOnceFlag[Runtime->SceneOnceCount] =
+            malloc_strcpy(&SceneOnce[SceneOnceCount], Script->Name);
+            SceneOnceFlag[SceneOnceCount] =
                 static_cast<unsigned char>(Script->bFlag);
-            ++Runtime->SceneOnceCount;
+            ++SceneOnceCount;
         }
     }
 
-    PlayRoomSceneList(Runtime, Runtime->SceneAmbient, Runtime->SceneAmbientFlag,
-                      Runtime->SceneAmbientCount, 1, 0, 1);
-    PlayRoomSceneList(Runtime, Runtime->SceneTraffic, Runtime->SceneTrafficFlag,
-                      Runtime->SceneTrafficCount, 0, 5, 0);
-    PlayRoomSceneList(Runtime, Runtime->SceneOnce, Runtime->SceneOnceFlag,
-                      Runtime->SceneOnceCount, 0, 0, 0);
+    PlayRoomSceneList(this, SceneAmbient, SceneAmbientFlag,
+                      SceneAmbientCount, 1, 0, 1);
+    PlayRoomSceneList(this, SceneTraffic, SceneTrafficFlag,
+                      SceneTrafficCount, 0, 5, 0);
+    PlayRoomSceneList(this, SceneOnce, SceneOnceFlag,
+                      SceneOnceCount, 0, 0, 0);
 
     int StartCharacterKey = 0;
     int StartBehaviorKey = -1;
-    if (RoomControlFindStartScript(Runtime, &StartCharacterKey, &StartBehaviorKey))
+    if (FindStartScript(&StartCharacterKey, &StartBehaviorKey))
     {
         RoomControlSetLandingPending(0);
         return;
     }
 
-    if (Runtime->ShipPads.PlayLanding()) // FUN_00448a20
-        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
+    if (ShipPads.PlayLanding()) // FUN_00448a20
+        SceneFlags[kRoomEntryScriptStarted] = 1;
 
     if (GfObjectShip() != nullptr && Room->GoodscartScript != nullptr &&
         RtcSlider::is_enabled(static_cast<unsigned long>(Room->GoodscartPriorityId)))
     {
-        FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Runtime, 0);
+        FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(this, 0);
         Csys Frame;
         Frame.set_identity();
         Sequence->AddScript(Room->GoodscartScript, 0, &Frame, nullptr);
@@ -1510,23 +1325,23 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
         Sequence->Priority = 0;
         Sequence->bTransition = 1;
         Sequence->Play();
-        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
+        SceneFlags[kRoomEntryScriptStarted] = 1;
     }
 
     // +0x515 is set after each character, even when no sequence could be made.
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Characters[Slot];
+        FCharacterObject* const Character = Characters[Slot];
         if (Character == nullptr)
             continue;
         if (Character->PlacementIndex == -1)
             continue;
         char const* const StartScript =
-            Runtime->Placements[Character->PlacementIndex].Info->StartScript;
+            Placements[Character->PlacementIndex].Info->StartScript;
         if (StartScript == nullptr || StartScript[0] == '\0')
             continue;
-        FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Runtime, 0);
+        FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(this, 0);
         if (Sequence != nullptr)
         {
             Csys Frame;
@@ -1535,7 +1350,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             Frame.Pos.z = 0.0f;
             MatrixSetIdentity(Frame.Orient);
             Sequence->AddScript(StartScript, 0, &Frame, nullptr);
-            Sequence->Mirror.Add(Runtime->Characters[Slot], nullptr);
+            Sequence->Mirror.Add(Characters[Slot], nullptr);
             Sequence->BindMode = 1;
             Sequence->bLetterbox = 1;
             Sequence->bApplySpatial = 1;
@@ -1547,33 +1362,33 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             Sequence->bTransition = 1;
             Sequence->Play();
         }
-        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
+        SceneFlags[kRoomEntryScriptStarted] = 1;
     }
 
     RoomControlSetLandingPending(0);
 }
 
-void RoomControlPlayScenes(FRoomRuntime* Runtime)
+void FRoomRuntime::PlayScenes()
 {
     // FUN_0044aca0.
-    RoomControlStartScenes(Runtime);
-    if (Runtime->SceneFlags[kRoomEntryScriptStarted] != 0)
+    StartScenes();
+    if (SceneFlags[kRoomEntryScriptStarted] != 0)
         return;
-    if (Runtime->SceneFlags[kRoomStartScriptChecked] != 0)
+    if (SceneFlags[kRoomStartScriptChecked] != 0)
         return;
     int CharacterKey = 0;
     int BehaviorKey = -1;
-    if (RoomControlFindStartScript(Runtime, &CharacterKey, &BehaviorKey))
-        RoomControlRunStartScript(Runtime, CharacterKey, BehaviorKey);
-    Runtime->SceneFlags[kRoomStartScriptChecked] = 1;
+    if (FindStartScript(&CharacterKey, &BehaviorKey))
+        RoomControlRunStartScript(this, CharacterKey, BehaviorKey);
+    SceneFlags[kRoomStartScriptChecked] = 1;
 }
 
 // FUN_0044d200 -- the count is re-read each pass and the entries are not null-tested.
-static void RoomControlUpdateButtons(FRoomRuntime* Runtime, float Delta)
+void FRoomRuntime::UpdateButtons(float Delta)
 {
     int Index = 0;
-    for (Index = 0; Index < Runtime->ControllerCount; ++Index)
-        Runtime->Controllers[Index]->Update(Delta);
+    for (Index = 0; Index < ControllerCount; ++Index)
+        Controllers[Index]->Update(Delta);
 }
 
 void FRoomRuntime::Update(double DeltaSeconds)
@@ -1582,7 +1397,7 @@ void FRoomRuntime::Update(double DeltaSeconds)
     // FUN_00558ac0. The double is narrowed to float once and every callee receives that float.
     float const Delta = static_cast<float>(DeltaSeconds);
 
-    RoomControlUpdateCameraMove(this, Delta);
+    UpdateCameraMove(Delta);
 
     // A restarted character start script (+0x516, FUN_0044ad70).
     if (SceneFlags[kRoomStartScriptRequested] != 0)
@@ -1591,7 +1406,7 @@ void FRoomRuntime::Update(double DeltaSeconds)
         {
             int CharacterKey = 0;
             int BehaviorKey = -1;
-            if (RoomControlFindStartScript(this, &CharacterKey, &BehaviorKey))
+            if (FindStartScript(&CharacterKey, &BehaviorKey))
                 RoomControlRunStartScript(this, CharacterKey, BehaviorKey);
             SceneFlags[kRoomStartScriptChecked] = 1;
         }
@@ -1606,7 +1421,7 @@ void FRoomRuntime::Update(double DeltaSeconds)
             Flashlights[Index]->Update(Delta);
     }
 
-    RoomControlUpdateButtons(this, Delta);
+    UpdateButtons(Delta);
 }
 
 namespace
@@ -1786,10 +1601,10 @@ bool FRoomShipPadTable::PlayLanding()
     return true;
 }
 
-bool RoomControlHasLandingScript(FRoomRuntime* Runtime)
+bool FRoomRuntime::HasLandingScript()
 {
     // FUN_0044ab60, a thunk to FUN_00448a00.
-    return Runtime->ShipPads.HasLandingScript();
+    return ShipPads.HasLandingScript();
 }
 
 void ClearRoomObjectList()
@@ -1801,22 +1616,22 @@ void ClearRoomObjectList()
 // FUN_004498b0 (thiscall, no arguments) -- start every RoomData animation found in the room's
 // main script: play it on the main instance into +0x64 and evaluate it at -2 (looped with
 // flag 2 when RoomData+0x94 marks it); FDUMP an error for a name the script does not have.
-static void RoomControlStartAnimations(FRoomRuntime* Runtime)
+void FRoomRuntime::StartAnimations()
 {
-    RoomData* Room = Runtime->Room;
+    RoomData* Room = this->Room;
     int Index = 0;
     for (Index = 0; Index < Room->AnimationCount; ++Index)
     {
         char const* Name = Room->Animations[Index];
-        int const Script = Runtime->Scripts.Find(Name); // FUN_00555b20
+        int const Script = Scripts.Find(Name); // FUN_00555b20
         if (Script == -1)
         {
             FDUMP(kFdumpError, "%s(%d) : *** ERROR: animation name %s is not present in room mesh",
                   kRoomControlCpp, 0xed, Name);
             continue;
         }
-        unsigned long const Playback = Runtime->Scripts.Play(Runtime->MainInstance, Script);
-        Runtime->Handles64[Index] = Playback;
+        unsigned long const Playback = Scripts.Play(MainInstance, Script);
+        Handles64[Index] = Playback;
         unsigned long const Flags = Room->AnimationLoop[Index] ? 2u : 0u;
         DALib::Anim->EvalPlayback(Playback, Flags, -2.0f, 1.0f, AsOpaqueDword(0),
                                   AsOpaqueDword(1.0f), AsOpaqueDword(1.0f), nullptr);
@@ -1834,19 +1649,19 @@ namespace
 // its size re-read every pass) by the hotspot's behavior, appended at +0x1134 with its location
 // (FUN_0043a4f0 = MakeLocationID(+0x34, room_switch), 0 without a room_switch) and behavior
 // (FUN_0044d310). No bound on the 0x80 slots, as in retail. Caller: FUN_004496b0.
-static void RoomControlBuildButtons(FRoomRuntime* Runtime)
+void FRoomRuntime::BuildButtons()
 {
-    Runtime->Field_0x13a8 = 0;
-    Runtime->ControllerCount = 0;
+    Field_0x13a8 = 0;
+    ControllerCount = 0;
 
-    RoomData* const Room = Runtime->Room;
+    RoomData* const Room = this->Room;
     size_t Index = 0;
     for (Index = 0; Index < Room->Hotspots.size(); ++Index)
     {
         RoomButtonInfo const* const Info = Room->Hotspots[Index];
         int const Behavior = Info->Behavior;
         // The next slot is cleared before the type test.
-        Runtime->Controllers[Runtime->ControllerCount] = nullptr;
+        Controllers[ControllerCount] = nullptr;
 
         RoomButton* Button = nullptr;
         switch (Behavior)
@@ -1885,27 +1700,27 @@ static void RoomControlBuildButtons(FRoomRuntime* Runtime)
                   kRoomControlHotspotCpp, 0x5b, Behavior);
             continue;
         }
-        Runtime->Controllers[Runtime->ControllerCount] = Button;
+        Controllers[ControllerCount] = Button;
 
         unsigned Location = 0;
         if (Info->RoomSwitch != nullptr)
-            Location = MakeLocationID(Runtime->BaseId, Info->RoomSwitch);
-        Runtime->Controllers[Runtime->ControllerCount]->Set(Location, Behavior);
-        ++Runtime->ControllerCount;
+            Location = MakeLocationID(BaseId, Info->RoomSwitch);
+        Controllers[ControllerCount]->Set(Location, Behavior);
+        ++ControllerCount;
     }
 }
 
 // FUN_0044a3a0 (thiscall, no arguments) -- one FlashLight per resolved frame of every RoomData
 // FlashLightSet record (RoomData+0x1a4), appended to +0x81c / +0x101c with no bound check. The
 // lights of one set share a period and are staggered by "gap" along it.
-static void RoomControlLoadFlashlights(FRoomRuntime* Runtime)
+void FRoomRuntime::LoadFlashlights()
 {
     // The size is re-read every iteration.
     int SetIndex = 0;
-    for (SetIndex = 0; SetIndex < static_cast<int>(Runtime->Room->FlashLightSets.size());
+    for (SetIndex = 0; SetIndex < static_cast<int>(Room->FlashLightSets.size());
          ++SetIndex)
     {
-        FlashLightSetInfo* Set = Runtime->Room->FlashLightSets[SetIndex];
+        FlashLightSetInfo* Set = Room->FlashLightSets[SetIndex];
         // The resolved frame count (+0xe28).
         int const Count = static_cast<int>(Set->Cursor);
         if (Count <= 0)
@@ -1934,9 +1749,9 @@ static void RoomControlLoadFlashlights(FRoomRuntime* Runtime)
                                                  &Black, Period, Phase, Set->Blink, BulbSize,
                                                  Set->Scale);
             // FUN_00557810 on the set's resolved frame (+0xe2c + LightIndex * 0x30).
-            Runtime->Flashlights[Runtime->FlashlightCount] = Light;
-            Runtime->Flashlights[Runtime->FlashlightCount]->SetFrame(Set->FinalFrames[LightIndex]);
-            ++Runtime->FlashlightCount;
+            Flashlights[FlashlightCount] = Light;
+            Flashlights[FlashlightCount]->SetFrame(Set->FinalFrames[LightIndex]);
+            ++FlashlightCount;
         }
     }
 }
@@ -1957,11 +1772,11 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
     Runtime->Room = Room;
     Runtime->MainInstance = kRoomObjectNoInstance;
     Runtime->MainScript = 0xffffffffu;
-    RoomControlLoadProps(Runtime);
+    Runtime->LoadProps();
     Room->fixup(reinterpret_cast<long>(Runtime->MainInstance));
     if (Runtime->MainScript != 0xffffffffu)
         Runtime->Scripts.Load(Runtime->MainScript); // FUN_00555bf0
-    RoomControlStartAnimations(Runtime);
+    Runtime->StartAnimations();
 
     // One FUN_00556fd0 wrapper per RoomData+0x144 light, no bound check.
     int LightIndex = 0;
@@ -1980,12 +1795,12 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
 
     BuildCharacterPlacements(Runtime->Placements, Room->CharacterPlacements);
 
-    RoomControlLoadFlashlights(Runtime);
+    Runtime->LoadFlashlights();
 
     // The base's market (FUN_0043a510) is not null-tested.
     Runtime->ShipPads.Build(Runtime, GetClientLocationBaseMarket(Runtime->BaseId));
 
-    RoomControlBuildButtons(Runtime);
+    Runtime->BuildButtons();
 
     // The fade opened at the speed of its current duration (DAT_0061650c); DAT_005c89b8 is 1.0.
     SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
@@ -2025,36 +1840,36 @@ unsigned GetRoomRuntimeByteSize()
 
 // FUN_0044b450 (the camera argument is never read). Rebuilds the per-frame
 // light list at +0x2e8 when the LIGHTING option is on.
-static void CollectRoomLights(FRoomRuntime* Runtime, ICamera* /*Camera*/)
+void FRoomRuntime::CollectLights(ICamera* /*Camera*/)
 {
     if (GetGameOption(kGameOptLighting) == 0)
         return;
 
-    if (Runtime->bSingleLight != 0)
+    if (bSingleLight != 0)
     {
-        Runtime->FrameAmbient[0] = 0.0f;
-        Runtime->FrameAmbient[1] = 0.0f;
-        Runtime->FrameAmbient[2] = 0.0f;
-        Runtime->FrameLights[0] = Runtime->RoomLights[Runtime->SingleLightIndex];
-        Runtime->FrameLightCount = 1;
+        FrameAmbient[0] = 0.0f;
+        FrameAmbient[1] = 0.0f;
+        FrameAmbient[2] = 0.0f;
+        FrameLights[0] = RoomLights[SingleLightIndex];
+        FrameLightCount = 1;
         return;
     }
 
-    Runtime->FrameAmbient[0] = Runtime->Room->AmbientColor.x;
-    Runtime->FrameAmbient[1] = Runtime->Room->AmbientColor.y;
-    Runtime->FrameAmbient[2] = Runtime->Room->AmbientColor.z;
-    Runtime->FrameLightCount = 0;
+    FrameAmbient[0] = Room->AmbientColor.x;
+    FrameAmbient[1] = Room->AmbientColor.y;
+    FrameAmbient[2] = Room->AmbientColor.z;
+    FrameLightCount = 0;
 
     int Index = 0;
-    for (Index = 0; Index < Runtime->RoomLightCount; ++Index)
+    for (Index = 0; Index < RoomLightCount; ++Index)
     {
-        FGfLightWrapper* Wrapper = Runtime->RoomLights[Index];
+        FGfLightWrapper* Wrapper = RoomLights[Index];
         if (Wrapper == nullptr || Wrapper->Light == nullptr)
             continue;
-        if (Runtime->FrameLightCount >= 0x80)
+        if (FrameLightCount >= 0x80)
             continue;
-        Runtime->FrameLights[Runtime->FrameLightCount] = Wrapper;
-        ++Runtime->FrameLightCount;
+        FrameLights[FrameLightCount] = Wrapper;
+        ++FrameLightCount;
     }
 
     // Then every enabled script light (DAT_0066d130), same filter.
@@ -2064,10 +1879,10 @@ static void CollectRoomLights(FRoomRuntime* Runtime, ICamera* /*Camera*/)
         FGfLightWrapper* Wrapper = GfLightRegistryGet(Index);
         if (Wrapper == nullptr || Wrapper->Light == nullptr)
             continue;
-        if (Runtime->FrameLightCount >= 0x80)
+        if (FrameLightCount >= 0x80)
             continue;
-        Runtime->FrameLights[Runtime->FrameLightCount] = Wrapper;
-        ++Runtime->FrameLightCount;
+        FrameLights[FrameLightCount] = Wrapper;
+        ++FrameLightCount;
     }
 }
 
@@ -2268,17 +2083,17 @@ namespace
     }
 }
 
-void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
+void FRoomRuntime::DrawObject(FRoomObject* Object)
 {
     // FUN_0044af60.
     const InstanceIndex Instance = Object->GetEngineInstance();
     if (Instance == kRoomObjectNoInstance)
         return;
 
-    ApplyObjectLighting(Room, Object);
+    ApplyObjectLighting(this, Object);
 
     // The glare light is RoomData +0x10c; appearance slot 6, otherwise slot 7(0).
-    RoomData* Data = Room->Room;
+    RoomData* Data = this->Room;
     if (RtcSlider::is_enabled("shadow_glare") && Data->bGlareLight)
     {
         // Engine slot 36 (+0x90): the instance position.
@@ -2351,7 +2166,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
             }
         }
         // Renderer slot 7.
-        DALib::Renderer->RenderInstance(Room->Camera, Instance, 1.0f, kDrawPickSwitch, nullptr, EnvValue);
+        DALib::Renderer->RenderInstance(Camera, Instance, 1.0f, kDrawPickSwitch, nullptr, EnvValue);
     }
     else if (Mode == kRoomRenderStarsphere)
     {
@@ -2359,7 +2174,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
         IFLAppearance* Appearance = nullptr;
         if (DALib::Engine->QueryInterface(Iids::FLAppearance,
                                           reinterpret_cast<void**>(&Appearance)) == 0)
-            Appearance->DrawStarsphere(Room->Camera, Instance);
+            Appearance->DrawStarsphere(Camera, Instance);
         if (Appearance != nullptr)
             Appearance->Release();
     }
@@ -2369,7 +2184,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
         IFLAppearance* Appearance = nullptr;
         if (DALib::Engine->QueryInterface(Iids::FLAppearance,
                                           reinterpret_cast<void**>(&Appearance)) == 0)
-            Appearance->DrawBackdrop(Room->Camera, Instance);
+            Appearance->DrawBackdrop(Camera, Instance);
         if (Appearance != nullptr)
             Appearance->Release();
     }
@@ -2388,15 +2203,14 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
         Appearance->Release();
 }
 
-void RoomControlDrawShadow(FRoomRuntime* Room, unsigned long A, unsigned long B,
-                           unsigned char bFlag)
+void FRoomRuntime::DrawShadow(unsigned long A, unsigned long B, unsigned char bFlag)
 {
     // FUN_0044b370. The shadow light is RoomData +0xe4.
     if (GetGameOption(kGameOptShadows) == 0)
         return;
     if (!RtcSlider::is_enabled("shadow_glare"))
         return;
-    if (!Room->Room->bShadowLight)
+    if (!Room->bShadowLight)
         return;
     IFLAppearance* Appearance = nullptr;
     if (DALib::Engine->QueryInterface(Iids::FLAppearance,
@@ -2405,30 +2219,30 @@ void RoomControlDrawShadow(FRoomRuntime* Room, unsigned long A, unsigned long B,
         // Appearance slot 12 with bFlag, else slot 11.
         unsigned long Pair[2] = {A, B};
         if (bFlag != 0)
-            Appearance->DrawFixedShadows(Room->Camera, Pair, reinterpret_cast<void*>(1),
+            Appearance->DrawFixedShadows(Camera, Pair, reinterpret_cast<void*>(1),
                                reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
         else
-            Appearance->DrawFadingShadows(Room->Camera, Pair, reinterpret_cast<void*>(1),
+            Appearance->DrawFadingShadows(Camera, Pair, reinterpret_cast<void*>(1),
                                reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
     }
     if (Appearance != nullptr)
         Appearance->Release();
 }
 
-void RoomControlLightObject(FRoomRuntime* Room, FRoomObject* Object)
+void FRoomRuntime::LightObject(FRoomObject* Object)
 {
     // FUN_0044ae80 (the body is ApplyObjectLighting above).
-    ApplyObjectLighting(Room, Object);
+    ApplyObjectLighting(this, Object);
 }
 
-void RoomControlDraw(FRoomRuntime* Runtime)
+void FRoomRuntime::Draw()
 {
     // FUN_0044b570.
     RoomBatcherBegin();
 
     // The camera is applied through FUN_00422950.
-    Win3DSetViewport(Runtime->Camera, kRoomControlCpp, 0x748);
-    Win3DApplyCamera(Runtime->Camera);
+    Win3DSetViewport(Camera, kRoomControlCpp, 0x748);
+    Win3DApplyCamera(Camera);
     Win3DSetDepthFunc(2);
     Win3DEnable(kWin3DDepthTest);
     Win3DSetDepthWrite(1);
@@ -2436,7 +2250,7 @@ void RoomControlDraw(FRoomRuntime* Runtime)
     Win3DEnable(kWin3DBlend);
     Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
 
-    CollectRoomLights(Runtime, Runtime->Camera);
+    CollectLights(Camera);
     GfFogApply(); // FUN_00454760
 
     // The layer set's compare FUN_0044c520 is signed, so negative background layers precede
@@ -2445,7 +2259,7 @@ void RoomControlDraw(FRoomRuntime* Runtime)
     std::list<FRoomObject*>::iterator It = G_RoomObjects.begin();
     for (; It != G_RoomObjects.end(); ++It)
     {
-        if ((*It)->Owner == Runtime)
+        if ((*It)->Owner == this)
             Layers.insert(static_cast<signed char>((*It)->Layer));
     }
 
@@ -2453,9 +2267,9 @@ void RoomControlDraw(FRoomRuntime* Runtime)
     std::set<signed char>::iterator LayerIt = Layers.begin();
     for (; LayerIt != Layers.end(); ++LayerIt)
     {
-        ForEachRoomObjectInLayer(Runtime, static_cast<unsigned char>(*LayerIt), [Runtime](FRoomObject* Object) {
-            RoomBatcherTagObject(Runtime, Object);
-            Object->DrawOpaque(Runtime->Camera);
+        ForEachRoomObjectInLayer(this, static_cast<unsigned char>(*LayerIt), [this](FRoomObject* Object) {
+            RoomBatcherTagObject(this, Object);
+            Object->DrawOpaque(Camera);
             RoomBatcherUntagObject();
         });
     }
@@ -2464,14 +2278,14 @@ void RoomControlDraw(FRoomRuntime* Runtime)
     // Slot 8.
     for (LayerIt = Layers.begin(); LayerIt != Layers.end(); ++LayerIt)
     {
-        ForEachRoomObjectInLayer(Runtime, static_cast<unsigned char>(*LayerIt), [Runtime](FRoomObject* Object) {
-            Object->DrawTranslucent(Runtime->Camera);
+        ForEachRoomObjectInLayer(this, static_cast<unsigned char>(*LayerIt), [this](FRoomObject* Object) {
+            Object->DrawTranslucent(Camera);
         });
     }
 
     // FUN_00558000.
     if (GetGameOption(kGameOptEffectsGroup) != 0 && GetGameOption(kGameOptFlashlights) > 0)
-        DrawFlashlightFlares(Runtime->Flashlights, Runtime->FlashlightCount, Runtime->Camera);
+        DrawFlashlightFlares(Flashlights, FlashlightCount, Camera);
 
     // The same states again; FUN_00556f20 ambient, thunk FUN_004101e0.
     Win3DSetDepthFunc(2);
@@ -2493,11 +2307,11 @@ void RoomControlDraw(FRoomRuntime* Runtime)
     {
         for (LayerIt = Layers.begin(); LayerIt != Layers.end(); ++LayerIt)
         {
-            ForEachRoomObjectInLayer(Runtime, static_cast<unsigned char>(*LayerIt), [Runtime](FRoomObject* Object) {
-                Object->DrawEffects(Runtime->Camera);
+            ForEachRoomObjectInLayer(this, static_cast<unsigned char>(*LayerIt), [this](FRoomObject* Object) {
+                Object->DrawEffects(Camera);
             });
         }
-        G_GfScriptManager.DrawEffects(Runtime, Runtime->Camera); // FUN_00456740
+        G_GfScriptManager.DrawEffects(this, Camera); // FUN_00456740
         DALib::Alchemy->EndDraw();
     }
 

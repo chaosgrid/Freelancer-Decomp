@@ -581,14 +581,14 @@ void RpcRelationListPushBack(FRpcRelationList* List, const FRpcRelation& Value) 
         static_cast<FRpcRelation*>(::operator new(sizeof(FRpcRelation), std::nothrow));
     Block->GroupId = Value.GroupId;
     Block->FeelingBits = Value.FeelingBits;
-    RpcRelationListLink(List, Block);
+    List->Link(Block);
 }
 
-void RpcRelationListLink(FRpcRelationList* List, FRpcRelation* Block) {
+void FRpcRelationList::Link(FRpcRelation* Block) {
     // FUN_06d8cad0. The dummy is read untested: every list this reaches was built by its
     // packet's constructor (06d9d30c for 0x29, 06d9c59f for 0x2b). The node's allocation is
     // untested as well.
-    FRpcRelationNode* Dummy = List->Head;
+    FRpcRelationNode* Dummy = Head;
     FRpcRelationNode* Tail = Dummy->Prev;
     FRpcRelationNode* New =
         static_cast<FRpcRelationNode*>(::operator new(sizeof(FRpcRelationNode),
@@ -601,7 +601,7 @@ void RpcRelationListLink(FRpcRelationList* List, FRpcRelation* Block) {
     Dummy->Prev = New;
     New->Prev->Next = New;
     New->Value = Block;
-    ++List->Size;
+    ++Size;
 }
 
 // ===========================================================================
@@ -929,13 +929,13 @@ static void RpcIdBlockToWire(FRpcIdArrayBlockWire** Out, const Costume& Source) 
     Block->Count = static_cast<int>(Source.AccessoryCount);   // <- src+0x2a4
     // The count is UNSIGNED and the copy is not bounded by the eight-slot array -- it walks
     // on from src+0x284.
-    if ((unsigned int)Block->Count != 0) {
-        Block->Ids = static_cast<unsigned int*>(
-            ::operator new((unsigned int)Block->Count << 2, std::nothrow));
-        const unsigned int* SourceIds = &Source.AccessoryIds[0];
-        for (unsigned int i = 0; i < (unsigned int)Block->Count; ++i) {
-            Block->Ids[i] = SourceIds[i];
-        }
+    if ((unsigned int)Block->Count == 0)
+        return;
+    Block->Ids = static_cast<unsigned int*>(
+        ::operator new((unsigned int)Block->Count << 2, std::nothrow));
+    const unsigned int* SourceIds = &Source.AccessoryIds[0];
+    for (unsigned int i = 0; i < (unsigned int)Block->Count; ++i) {
+        Block->Ids[i] = SourceIds[i];
     }
 }
 
@@ -1231,12 +1231,12 @@ static void RpcIdBlockWireCopy(FRpcIdArrayBlockWire** Out, const FRpcIdArrayBloc
     Block->RightHand = Source->RightHand;
     Block->LeftHand = Source->LeftHand;
     Block->Count = Source->Count;
-    if ((unsigned int)Block->Count != 0) {
-        Block->Ids = static_cast<unsigned int*>(
-            ::operator new((unsigned int)Block->Count << 2, std::nothrow));
-        for (unsigned int i = 0; i < (unsigned int)Block->Count; ++i) {
-            Block->Ids[i] = Source->Ids[i];
-        }
+    if ((unsigned int)Block->Count == 0)
+        return;
+    Block->Ids = static_cast<unsigned int*>(
+        ::operator new((unsigned int)Block->Count << 2, std::nothrow));
+    for (unsigned int i = 0; i < (unsigned int)Block->Count; ++i) {
+        Block->Ids[i] = Source->Ids[i];
     }
 }
 

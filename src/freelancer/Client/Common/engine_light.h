@@ -60,7 +60,7 @@ struct FD3dLight8
 // Flag bits of FEngineLight::Flags (+0xB4).
 enum EEngineLightFlags
 {
-    kLightFlagDynamic = 0x01,    // EngineLightSetType's bDynamic; the nearby-light collect skips it
+    kLightFlagDynamic = 0x01,    // FEngineLight::SetType's bDynamic; the nearby-light collect skips it
                                  // unless asked for dynamic lights
     kLightFlagHasCurve = 0x02,   // an ambient / zone / colour curve is set
     kLightFlagRegistered = 0x04, // the D3DLIGHT8 is registered with the pipeline
@@ -78,14 +78,14 @@ struct FEngineLight
 
     unsigned RegListNext;     // +0x04 intrusive light-list Next (retail DAT_006164e0 = list head)
     unsigned RegListPrev;     // +0x08 intrusive light-list Prev (DAT_006164e4 = tail,
-                           // DAT_006164e8 = count). Linked (Flags bit 4) by EngineLightApplyNearby
+                           // DAT_006164e8 = count). Linked (Flags bit 4) by FEngineLight::ApplyNearby
                            // (FUN_004104e0), unlinked by the dtor / Unregister / ClearList.
     FD3dLight8 D3d;       // +0x0C
     Matrix Orient;        // +0x74 3x3, identity from the ctor
     Vector Position;      // +0x98
     float Color[3];       // +0xA4 mirror of D3d.Diffuse rgb, 1.0 from the ctor
     int Type;             // +0xB0 1/2/3 kept, -2 kept, anything else becomes -1
-    unsigned char Flags;  // +0xB4 bit 0 = dynamic light (EngineLightSetType; the nearby-light
+    unsigned char Flags;  // +0xB4 bit 0 = dynamic light (FEngineLight::SetType; the nearby-light
                            // collect FUN_00537f40 passes it over unless asked for dynamic lights),
                            // bit 1 = has a curve, bit 2 = registered, bit 3 = enabled,
                            // bit 4 = linked into the global light list, bit 5 = has a D3DLIGHT8
@@ -96,6 +96,96 @@ struct FEngineLight
     IGraph* ColorCurve;   // +0xC0 "color_curve" (FUN_00411e90): tints the colour over time
     float ColorCurvePeriod; // +0xC4 FUN_00411e90's second argument: the Max of the wrapping
                            // range ColorCurve is evaluated with (FUN_00410850)
+
+    // FUN_00411120 — copy a D3DLIGHT8 in. Position and Direction are deliberately not copied:
+    // retail skips src[0x0D..0x12], because FUN_00410ef0 / FUN_00410f60 own those.
+    void SetLight(FD3dLight8 const* Source);
+
+    // FUN_00410ef0 — world position. Also writes the D3DLIGHT8 Position with a negated Z for
+    // every type but directional.
+    void SetPosition(Vector const* Pos3);
+
+    // FUN_00410f60 — 3x3 orientation.
+    void SetOrientation(float const* Orient9);
+
+    // FUN_00410ec0 — the PushLightUpdate tail every setter below already runs inline; retail also
+    // calls it out of line (e.g. from the [LightSource] reader FUN_00411690).
+    void PushUpdate();
+
+    // FUN_004110c0 — set Flags bit 0 to bDynamic and the light type via the same switch as
+    // EngineLightInit/FEngineLight::SetLight (StoreType, always touching D3d.Type). Retail callers pass
+    // 1 for the lights of effects, explosions, equipment and projectile flashes, 0 for the
+    // [LightSource] type key and the scene / HUD / nebula / tunnel lights.
+    void SetType(int LightType, bool bDynamic);
+
+    // FUN_004112f0 — raw D3d.Range write, no attenuation recompute and no pipeline push (unlike
+    // FEngineLight::SetRadius below). Retail callers: the nebula directional light (cli_nebula.cpp)
+    // and the gate tunnel light (gate_tunnel.cpp), both with 500000.
+    void SetRangeRaw(float Range);
+
+    // FUN_00411300 — "SetRadius": Range=Radius, Attenuation0=1, Attenuation1=0,
+    // Attenuation2=16/Radius^2, then pushes the update.
+    void SetRadius(float Radius);
+
+    // FUN_00411470 — set the light from a direction vector instead of a full orientation matrix:
+    // derives D3d.Direction (non-point lights) and back-fills Orient's look column (Orient[2],
+    // Orient[5], Orient[8]) from it, then pushes the update.
+    void SetDirection(Vector const* Dir3);
+
+    // FUN_004114f0 and FUN_004115b0 — byte-triplet colour setters. Retail's two functions have
+    // byte-identical bodies (Color + D3d.Diffuse.rgb from RGB/255, Diffuse.a=1, then push); kept as
+    // two entry points since they're genuinely separate retail symbols/call sites.
+    void SetColorBytes(unsigned char const RGB[3]);
+    void SetColorBytesAlt(unsigned char const RGB[3]);
+
+    // FUN_00411670 — "SetConeAngleDegrees": Falloff=1, Phi=degrees in radians, Theta=Phi/2. Notably
+    // does NOT push the update (retail has no pipeline call here, unlike every other setter).
+    void SetConeAngle(float DegreesFullAngle);
+
+    // FUN_00411d90 — "atten_curve": an ambient light (Type -2) takes the graph as AmbientCurve,
+    // any other light as ZoneCurve (FDUMP "Invalid dynamic light type" unless the type is 1..3).
+    // Releases the previous curve first; MessageBox "Error: unknown graph name" when the graph is
+    // missing.
+    void SetAttenCurve(char const* GraphName);
+
+    // FUN_00411e90 — "color_curve": ColorCurve = the graph, ColorCurvePeriod = Period.
+    void SetColorCurve(char const* GraphName, float Period);
+
+    // FUN_00411690 — one [LightSource] key: pos, range, color, type, attenuation, direction,
+    // ambient_curve, atten_curve, color_curve. Returns false for any other key.
+    bool ReadValue(char const* Name, char const* Value);
+
+    // FUN_00410a40 — light range/distance test ("does this light reach that point"). A
+    // directional light (Type 3) without flag bit 0x2 always affects every point; everything
+    // else is a plain squared-distance check against D3d.Range padded by ExtraRadius. Requires
+    // the enabled bit (Flags & 8); returns false otherwise.
+    bool AffectsPoint(float const* Point3, float ExtraRadius) const;
+
+    // FUN_00410850 (__thiscall, RET 8) — effective RGB colour: starts from Color, then optionally
+    // modulates it through two GraphLibrary curves: ColorCurve (+0xC0, slot 7, at the client
+    // elapsed time over the wrapping range [0, ColorCurvePeriod], packed 0x00RRGGBB) and ZoneCurve
+    // (+0xBC, slot 6, at Dist over the clamped range [0, D3d.Range], a scalar that dims all three
+    // channels). Dist is passed by value -- both retail callers push the distance FUN_00411370
+    // wrote. Returns true if either modifier applied.
+    bool GetEffectiveColor(float Dist, float* OutColor3);
+
+    // FUN_00411370 — unit direction toward Point (point/spot with flag bit1), else −Orient col2.
+    // Optional OutDist receives |Point − Position| when Point != null.
+    Vector* ComputeDirection(Vector* OutDir3, float const* Point, float* OutDist);
+
+    // FUN_00410960 (__thiscall, RET 0x10) -- sample the light at Point. False, with nothing written,
+    // when the light is not enabled (Flags bit 3). Otherwise OutDir3 = the FUN_00411370 direction,
+    // OutColor3 = the FUN_00410850 colour at the distance FUN_00411370 wrote, and for an ambient
+    // light (Type -2) InOutAmbient3 += Scale * OutColor3, Scale being the AmbientCurve at that
+    // distance over {clamp, 0, D3d.Range}, or 1.0 without a curve. Returns true. Caller:
+    // SpaceTerrainRenderComp's billboard lighting FUN_0054e130 (asteroid_billboard.cpp).
+    bool Sample(float const* Point, float* OutDir3, float* InOutAmbient3, float* OutColor3);
+
+    // FUN_004104e0 — per-object dynamic light for the nearby-collect path. Camera is used
+    // when DAT_00610588 != 0 (soft path: camera slot +0x40 → TransformXform/Rotate via
+    // Acquire3DMathEngine / DAT_006164ec, then SetLight). HW path (state 0) skips that arm.
+    // Returns whether the light stayed lit.
+    bool ApplyNearby(ICamera* Camera, float const* Pos3, float* InOutAmbient);
 };
 
 #include <stddef.h>
@@ -113,53 +203,11 @@ static_assert(sizeof(FEngineLight) == 0xC8, "retail operator new(200)");
 
 // FUN_00410ca0 — construct in place. LightType 1/2/3 and -2 are kept, anything else is -1.
 void EngineLightInit(FEngineLight* Light, int LightType);
-// FUN_00411120 — copy a D3DLIGHT8 in. Position and Direction are deliberately not copied:
-// retail skips src[0x0D..0x12], because FUN_00410ef0 / FUN_00410f60 own those.
-void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source);
-// FUN_00410ef0 — world position. Also writes the D3DLIGHT8 Position with a negated Z for
-// every type but directional.
-void EngineLightSetPosition(FEngineLight* Light, Vector const* Pos3);
-// FUN_00410f60 — 3x3 orientation.
-void EngineLightSetOrientation(FEngineLight* Light, float const* Orient9);
-// FUN_00410dd0 — register with DALib::Pipeline (slot 73) and raise the enabled bit.
-bool EngineLightRegister(FEngineLight* Light);
 
-// FUN_00410e20 — vtable slot 2 ("Unregister"): drop the enabled bit and, if linked into the
-// global light list, unlink it and tell the pipeline to drop the light (slot 41). Distinct from
-// EngineLightDestroy: this clears Flags bit 3 (enabled), the destructor clears bit 2
-// (registered).
-void EngineLightUnregister(FEngineLight* Light);
-// FUN_00410ec0 — the PushLightUpdate tail every setter below already runs inline; retail also
-// calls it out of line (e.g. from the [LightSource] reader FUN_00411690).
-void EngineLightPushUpdate(FEngineLight* Light);
 // FUN_00410fe0 — combined "set orientation + position" from one {Orient[9], Pos[3]} block, in
 // that order (position first, then orientation) with the pipeline pushed after each half,
-// exactly like calling EngineLightSetPosition then EngineLightSetOrientation back to back.
+// exactly like calling FEngineLight::SetPosition then FEngineLight::SetOrientation back to back.
 void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, Vector const* Pos3);
-// FUN_004110c0 — set Flags bit 0 to bDynamic and the light type via the same switch as
-// EngineLightInit/EngineLightSetLight (StoreType, always touching D3d.Type). Retail callers pass
-// 1 for the lights of effects, explosions, equipment and projectile flashes, 0 for the
-// [LightSource] type key and the scene / HUD / nebula / tunnel lights.
-void EngineLightSetType(FEngineLight* Light, int LightType, bool bDynamic);
-// FUN_004112f0 — raw D3d.Range write, no attenuation recompute and no pipeline push (unlike
-// EngineLightSetRadius below). Retail callers: the nebula directional light (cli_nebula.cpp)
-// and the gate tunnel light (gate_tunnel.cpp), both with 500000.
-void EngineLightSetRangeRaw(FEngineLight* Light, float Range);
-// FUN_00411300 — "SetRadius": Range=Radius, Attenuation0=1, Attenuation1=0,
-// Attenuation2=16/Radius^2, then pushes the update.
-void EngineLightSetRadius(FEngineLight* Light, float Radius);
-// FUN_00411470 — set the light from a direction vector instead of a full orientation matrix:
-// derives D3d.Direction (non-point lights) and back-fills Orient's look column (Orient[2],
-// Orient[5], Orient[8]) from it, then pushes the update.
-void EngineLightSetDirection(FEngineLight* Light, Vector const* Dir3);
-// FUN_004114f0 and FUN_004115b0 — byte-triplet colour setters. Retail's two functions have
-// byte-identical bodies (Color + D3d.Diffuse.rgb from RGB/255, Diffuse.a=1, then push); kept as
-// two entry points since they're genuinely separate retail symbols/call sites.
-void EngineLightSetColorBytes(FEngineLight* Light, unsigned char const RGB[3]);
-void EngineLightSetColorBytesAlt(FEngineLight* Light, unsigned char const RGB[3]);
-// FUN_00411670 — "SetConeAngleDegrees": Falloff=1, Phi=degrees in radians, Theta=Phi/2. Notably
-// does NOT push the update (retail has no pipeline call here, unlike every other setter).
-void EngineLightSetConeAngle(FEngineLight* Light, float DegreesFullAngle);
 
 // FUN_00411350 — generic 3-float negate. Lives in EngineLight.cpp in retail (most callers are
 // outside this subsystem).
@@ -189,20 +237,10 @@ struct FLightCurveName
 {
     unsigned Len;
     char Text[0x80];
-};
-// FUN_00411f00.
-FLightCurveName* LightCurveNameInit(FLightCurveName* Name, char const* Source);
 
-// FUN_00411d90 — "atten_curve": an ambient light (Type -2) takes the graph as AmbientCurve,
-// any other light as ZoneCurve (FDUMP "Invalid dynamic light type" unless the type is 1..3).
-// Releases the previous curve first; MessageBox "Error: unknown graph name" when the graph is
-// missing.
-void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName);
-// FUN_00411e90 — "color_curve": ColorCurve = the graph, ColorCurvePeriod = Period.
-void EngineLightSetColorCurve(FEngineLight* Light, char const* GraphName, float Period);
-// FUN_00411690 — one [LightSource] key: pos, range, color, type, attenuation, direction,
-// ambient_curve, atten_curve, color_curve. Returns false for any other key.
-bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Value);
+    // FUN_00411f00.
+    FLightCurveName* Init(char const* Source);
+};
 
 // FUN_00556fd0(Csys const* Frame, D3DLIGHT8 const* Src, Vector const* Direction, byte Group),
 // the light part. Frame12 is a position followed by a 3x3 orientation (a Csys: RoomLightInfo
@@ -226,44 +264,9 @@ void EngineLightDestroy(FEngineLight* Light);
 // ShipViewControl's three.
 void EngineLightDelete(FEngineLight* Light);
 
-// FUN_00410a40 — light range/distance test ("does this light reach that point"). A
-// directional light (Type 3) without flag bit 0x2 always affects every point; everything
-// else is a plain squared-distance check against D3d.Range padded by ExtraRadius. Requires
-// the enabled bit (Flags & 8); returns false otherwise.
-bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, float ExtraRadius);
-
-// FUN_00410850 (__thiscall, RET 8) — effective RGB colour: starts from Color, then optionally
-// modulates it through two GraphLibrary curves: ColorCurve (+0xC0, slot 7, at the client
-// elapsed time over the wrapping range [0, ColorCurvePeriod], packed 0x00RRGGBB) and ZoneCurve
-// (+0xBC, slot 6, at Dist over the clamped range [0, D3d.Range], a scalar that dims all three
-// channels). Dist is passed by value -- both retail callers push the distance FUN_00411370
-// wrote. Returns true if either modifier applied.
-bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutColor3);
-
-// FUN_00411370 — unit direction toward Point (point/spot with flag bit1), else −Orient col2.
-// Optional OutDist receives |Point − Position| when Point != null.
-Vector* EngineLightComputeDirection(FEngineLight* Light, Vector* OutDir3, float const* Point,
-                                   float* OutDist);
-
-// FUN_00410960 (__thiscall, RET 0x10) -- sample the light at Point. False, with nothing written,
-// when the light is not enabled (Flags bit 3). Otherwise OutDir3 = the FUN_00411370 direction,
-// OutColor3 = the FUN_00410850 colour at the distance FUN_00411370 wrote, and for an ambient
-// light (Type -2) InOutAmbient3 += Scale * OutColor3, Scale being the AmbientCurve at that
-// distance over {clamp, 0, D3d.Range}, or 1.0 without a curve. Returns true. Caller:
-// SpaceTerrainRenderComp's billboard lighting FUN_0054e130 (asteroid_billboard.cpp).
-bool EngineLightSample(FEngineLight* Light, float const* Point, float* OutDir3,
-                       float* InOutAmbient3, float* OutColor3);
-
 // FUN_00410280 (cdecl) -- D3DRS_AMBIENT (0x8b) read back into OutRgb: [0] = bits 16..23,
 // [1] = bits 8..15, [2] = bits 0..7. Nothing when OutRgb is null.
 void EngineLightGetAmbientRgbBytes(unsigned char* OutRgb);
-
-// FUN_004104e0 — per-object dynamic light for the nearby-collect path. Camera is used
-// when DAT_00610588 != 0 (soft path: camera slot +0x40 → TransformXform/Rotate via
-// Acquire3DMathEngine / DAT_006164ec, then SetLight). HW path (state 0) skips that arm.
-// Returns whether the light stayed lit.
-bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* Pos3,
-                            float* InOutAmbient);
 
 // FUN_004101e0 — walk DAT_006164e0, SetLightEnable(D3d,0), clear Flags bit4, zero head/tail/count.
 void EngineLightClearRegisteredList();
@@ -281,13 +284,6 @@ void EngineLightApplyList(FEngineLight* const* Lights, unsigned Count, ICamera* 
 // Only GameLights (0x12C, or the 0x130 CliEquipLight light) are ever on it.
 FEngineLight* EngineLightGameListHead();
 FEngineLight* EngineLightGameListNext(FEngineLight* Light);
-// FUN_00537690 — GameLight vtable +0x4, thiscall on a GameLight: already lit (Flags bit 3) ->
-// true; else FUN_00410dd0 (register), and on success append to DAT_00675570/74 (+0xCC = old
-// tail, +0xC8 = 0), ++DAT_0067556c, ++RefCount (+0xD0). Light must be a GameLight's Eng.
-bool GameLightEnable(FEngineLight* Light);
-// FUN_005376f0 — GameLight vtable +0x8: lit only -> FUN_00410e20 (unregister), unlink from
-// DAT_00675570/74, clear +0xC8/+0xCC, --DAT_0067556c, --RefCount and vtable slot 0 (1) at <= 0.
-void GameLightDisable(FEngineLight* Light);
 
 // FUN_00410240 — pack RGB bytes to D3DCOLOR-ish dword and Pipeline SetRenderState(0x8b, packed).
 // Memory order: R at [0], G at [1], B at [2].
@@ -358,6 +354,8 @@ void LightAnimationLoad(char const* Path);
 // from the space teardown FUN_0054aec0.
 void LightAnimationFreeAll();
 
+struct FGameLight;
+
 struct FGameLightAnimSlot
 {
     Light::AnimFrame* Keys;      // +0x00 / Light+0xD4 private copy of Def's frames
@@ -366,9 +364,22 @@ struct FGameLightAnimSlot
     int CurrentIndex;            // +0x0C / +0xE0  (-1 = past end)
     float Elapsed;               // +0x10 / +0xE4
     float RangeScale;            // +0x14 / +0xE8  light Range at bind
+
+    // FUN_005388e0 — __thiscall on Anim slot at Light+0xD4, RET 0x14
+    //   Anim, RangeScale, IntensityScale, TimeScale, StartTime
+    // Hands any previous key copy back to its AnimationArch, then takes Anim's first spare
+    // KeyBuffers entry (or mallocs count * 0x10), copies the frames in with Time *= TimeScale and
+    // Intensity *= IntensityScale, and seeds CurrentIndex from StartTime.
+    void BindAnimKeys(Light::AnimationArch* Anim, float RangeScale, float IntensityScale,
+                      float TimeScale, float StartTime);
+
+    // FUN_005386d0 — advance Slot by Dt and push colour/radius onto Light.
+    void TickAnim(float Dt, FGameLight* Light);
 };
 
 static_assert(sizeof(FGameLightAnimSlot) == 0x18, "anim slot 0x18");
+
+class INI_Reader;
 
 struct FGameLight : FEngineLight
 {
@@ -386,9 +397,33 @@ struct FGameLight : FEngineLight
     unsigned EngineIndex;       // +0xEC  -1 none
     Transform LocalXform;       // +0xF0
     float VelocityX;             // +0x120 free-motion velocity: FUN_005377a0 sets it,
-                                 // GameLightTick adds Dt * it while EngineIndex is -1
+                                 // FGameLight::Tick adds Dt * it while EngineIndex is -1
     float VelocityY;             // +0x124
     float VelocityZ;             // +0x128
+
+    // FUN_00537960 — __thiscall on GameLight, RET 0x10
+    // FGameLightAnimSlot::BindAnimKeys(slot, Anim, Light->D3d.Range, IntensityScale, TimeScale, StartTime);
+    // then RefCount++ and true when the slot holds keys.
+    bool AttachAnim(Light::AnimationArch* Anim, float IntensityScale, float TimeScale,
+                    float StartTime);
+
+    // FUN_00537ac0 — RefCount++ at +0xD0.
+    void AddRef();
+
+    // FUN_00537ad0 — drop one ref; destroy at 0.
+    int Release();
+
+    // FUN_00537a40 — __thiscall(INI_Reader*): feed every value of the current section to
+    // FEngineLight::ReadValue, then vtable slot 1 (enable). Retail caller: the [LightSource] branch of
+    // the system loader.
+    void Load(INI_Reader* Reader);
+
+    // FUN_005379b0 — if Anim.Keys is set: hand the keys back to Def->KeyBuffers (when Def is set),
+    // then vtable slot 2 (disable), RefCount--, and the deleting destructor (slot 0) at <= 0.
+    void AnimDetach();
+
+    // FUN_005377a0 — copy velocity/offset float[3] into GameLight+0x120.
+    void SetFreeMotionOffset(float const* Offset3);
 };
 
 static_assert(offsetof(FGameLight, RefCount) == 0xD0, "GameLight RefCount +0xD0");
@@ -405,7 +440,7 @@ inline void GameLightVirtualDisable(FGameLight* Light)
 
 // DAT_006789c0 -- the game light unit's lazily filled I3DMathEngine (FUN_005b73e0 on first
 // use). Its only readers are FUN_005377c0 (CliExplosionAttachLocalXform) and FUN_00537860
-// (GameLightTick).
+// (FGameLight::Tick).
 struct I3DMathEngine;
 extern I3DMathEngine* G_GameLightMath;
 
@@ -418,28 +453,8 @@ FGameLight* GameLightCreatePoint(Vector const* Pos3, unsigned char const Rgb[3],
 // FUN_00538e80 — __cdecl; the first AnimationArch whose Name stricmps equal, else null.
 Light::AnimationArch* GameLightFindAnimByName(char const* Name);
 
-// FUN_005388e0 — __thiscall on Anim slot at Light+0xD4, RET 0x14
-//   Anim, RangeScale, IntensityScale, TimeScale, StartTime
-// Hands any previous key copy back to its AnimationArch, then takes Anim's first spare
-// KeyBuffers entry (or mallocs count * 0x10), copies the frames in with Time *= TimeScale and
-// Intensity *= IntensityScale, and seeds CurrentIndex from StartTime.
-void GameLightBindAnimKeys(FGameLightAnimSlot* Slot, Light::AnimationArch* Anim, float RangeScale,
-                           float IntensityScale, float TimeScale, float StartTime);
 
-// FUN_00537960 — __thiscall on GameLight, RET 0x10
-// GameLightBindAnimKeys(slot, Anim, Light->D3d.Range, IntensityScale, TimeScale, StartTime);
-// then RefCount++ and true when the slot holds keys.
-bool GameLightAttachAnim(FGameLight* Light, Light::AnimationArch* Anim, float IntensityScale,
-                         float TimeScale, float StartTime);
-
-// FUN_005386d0 — advance Slot by Dt and push colour/radius onto Light.
-void GameLightTickAnim(FGameLightAnimSlot* Slot, float Dt, FGameLight* Light);
-
-// FUN_00537860 — per-frame: free-motion (EngineIndex==-1) or MulTransform attach
-// (GetInstanceTransform × LocalXform@+0xf0 → SetTransform); then TickAnim when Keys != null.
-void GameLightTick(FGameLight* Light, float Dt);
-
-// FUN_00538390 — walk DAT_00675570, vtable+0xc(Dt) = GameLightTick. Retail call site
+// FUN_00538390 — walk DAT_00675570, vtable+0xc(Dt) = FGameLight::Tick. Retail call site
 // LAB_0054b000 (space ClientObj Update) immediately before LightGridRebuild, gated by
 // GetGameOption(LIGHTING=0x18).
 void GameLightTickAll(float Dt);
@@ -460,21 +475,5 @@ void GameLightReleaseAll();
 void* GameLightHeapAlloc(size_t Size);
 
 // FUN_00537ab0 — Heap::Shrink on the GameLight pool. Retail calls it from the space teardown
-// FUN_0054aec0 (DestroySpaceState), right before FUN_00538ab0.
+// FUN_0054aec0 (SpaceApp::Destroy), right before FUN_00538ab0.
 void GameLightHeapShrink();
-
-// FUN_00537ac0 — RefCount++ at +0xD0.
-void GameLightAddRef(FGameLight* Light);
-
-// FUN_00537ad0 — drop one ref; destroy at 0.
-int GameLightRelease(FGameLight* Light);
-
-class INI_Reader;
-// FUN_00537a40 — __thiscall(INI_Reader*): feed every value of the current section to
-// EngineLightReadValue, then vtable slot 1 (enable). Retail caller: the [LightSource] branch of
-// the system loader.
-void GameLightLoad(FGameLight* Light, INI_Reader* Reader);
-
-// FUN_005379b0 — if Anim.Keys is set: hand the keys back to Def->KeyBuffers (when Def is set),
-// then vtable slot 2 (disable), RefCount--, and the deleting destructor (slot 0) at <= 0.
-void GameLightAnimDetach(FGameLight* Light);

@@ -106,37 +106,20 @@ void BeamEffectConstruct(FBeamEffect* This, unsigned TypeId)
 }
 
 
-void BeamEffectAddRef(FBeamEffect* This)
-{
-    // FUN_004f7a80.
-    This->RefCount = This->RefCount + 1;
-}
-
-int BeamEffectRelease(FBeamEffect* This)
-{
-    return This->Release();
-}
-
 // FUN_004f9510 (slot +0x20) around FUN_004f9450.
 FBeamEffect::~FBeamEffect()
 {
     G_BeamEffectLiveCount = G_BeamEffectLiveCount - 1;
 }
 
-void BeamEffectDestroy(FBeamEffect* This, int FreeMemory)
+void FBeamEffect::Destroy(int FreeMemory)
 {
     if ((FreeMemory & 1) != 0)
-        delete This;
+        delete this;
     else
-        This->~FBeamEffect();
+        this->~FBeamEffect();
 }
 
-
-void BeamEffectAttach(FBeamEffect* This, void* WatchableOwner, int EngineIndex,
-                      Transform const* LocalXform)
-{
-    This->Attach(WatchableOwner, EngineIndex, LocalXform);
-}
 
 // LAB_004f9600 — vtable[0] start(EffectArch*).
 unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
@@ -177,14 +160,9 @@ unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
 
     // Texture miss: frozen and marked dead.
     EffectTypeListLink(This);
-    EffectFreezeToWorld(AsEffect(This));
+    AsEffect(This)->FreezeToWorld();
     This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
     return 0;
-}
-
-unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch)
-{
-    return This->FBeamEffect::Start(EffectArch);
 }
 
 // Beams are created by FUN_0053f340 (cli_projectile_fx.cpp) through FUN_004f79a0(0x84).
@@ -195,16 +173,11 @@ float FBeamEffect::GetWorldPos(Vector* Out)
 {
     FBeamEffect* const This = this;
     Transform World;
-    EffectGetWorldTransform(AsEffect(This), &World);
+    AsEffect(This)->GetWorldTransform(&World);
     Out->x = World.Translation.x;
     Out->y = World.Translation.y;
     Out->z = World.Translation.z;
     return This->CullRadius;
-}
-
-float BeamEffectGetWorldPos(FBeamEffect* This, Vector* Out)
-{
-    return This->FBeamEffect::GetWorldPos(Out);
 }
 
 // LAB_004f97a0 — vtable[+0x04].
@@ -216,7 +189,7 @@ void FBeamEffect::Kill()
     if ((This->Flags70 & kBeamFlagHit) != 0u)
     {
         EffectTypeListLink(This);
-        EffectFreezeToWorld(Base);
+        Base->FreezeToWorld();
         This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return;
     }
@@ -227,13 +200,13 @@ void FBeamEffect::Kill()
         if (EffectWatchedObject(Base) == nullptr)
         {
             EffectTypeListLink(This);
-            EffectFreezeToWorld(Base);
+            Base->FreezeToWorld();
             This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         }
         else
         {
             // FUN_004f7db0's body inlined; not marked dead.
-            EffectFreezeToWorld(Base);
+            Base->FreezeToWorld();
         }
     }
 
@@ -241,11 +214,6 @@ void FBeamEffect::Kill()
     // alone.
     if (This->FadeTimeLeft < 0.0f || This->FadeTimeLeft > kLifetimeIntensityCap)
         This->FadeTimeLeft = kLifetimeIntensityCap;
-}
-
-void BeamEffectArmDeath(FBeamEffect* This)
-{
-    This->FBeamEffect::Kill();
 }
 
 // LAB_004f9980 — vtable[+0x14].
@@ -260,7 +228,10 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     float const Perf = GetPerfGenericEffectPerf();
     if (!(This->Priority >= Perf))
     {
-        EffectKill(AsEffect(This));
+// FUN_004f7bd0 — Effect's own vtable slot +4 (kill / stop), shared by the base table
+// 0x005d9aac, 0x005d9d84 and 0x005da3f8. Link if needed, then the FUN_004f7db0 body inlined
+// (except that the empty-watcher branch calls FUN_004f7bd0 itself), then Flags08 |= 2.
+        AsEffect(This)->FEffectBase::Kill();
         return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
     }
 
@@ -304,11 +275,6 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     return static_cast<unsigned char>(This->Flags70 & kBeamFlagVisible);
 }
 
-unsigned char BeamEffectUpdateVisibility(FBeamEffect* This, float Dt, FSpaceCamera* Cam)
-{
-    return This->FBeamEffect::UpdateVisibility(Dt, Cam);
-}
-
 // LAB_004f9c20 — vtable[+0x18].
 unsigned char FBeamEffect::TickDraw(float Dt, FSpaceCamera* Cam)
 {
@@ -335,14 +301,9 @@ unsigned char FBeamEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         return 1;
 
     // FUN_004f7bd0 inlined, then the dead bit retail sets again (already set by the kill).
-    EffectKill(AsEffect(This));
+    AsEffect(This)->FEffectBase::Kill();
     This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
     return 0;
-}
-
-unsigned char BeamEffectTickDraw(FBeamEffect* This, float Dt, FSpaceCamera* Cam)
-{
-    return This->FBeamEffect::TickDraw(Dt, Cam);
 }
 
 // LAB_004fa0a0.
@@ -389,36 +350,30 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
 
     if ((This->Flags70 & kBeamFlagHit) != 0u)
     {
-        BeamEffectBuildSingleSegment(This, UseXform, 0.0f, Intensity);
+        This->BuildSingleSegment(UseXform, 0.0f, Intensity);
         return 1;
     }
     if (T == 0.0f)
     {
-        BeamEffectBuildSingleSegment(This, UseXform, 0.0f, Intensity);
+        This->BuildSingleSegment(UseXform, 0.0f, Intensity);
         return 1;
     }
 
     if (Arch->SegmentMode == 0)
-        BeamEffectBuildSingleSegment(This, UseXform, T, Intensity);
+        This->BuildSingleSegment(UseXform, T, Intensity);
     else if (Arch->SegmentMode == 1)
-        BeamEffectBuildMultiSegment(This, UseXform, T, Intensity);
+        This->BuildMultiSegment(UseXform, T, Intensity);
     return 1;
 }
 
-unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam)
-{
-    return This->FBeamEffect::BuildGeometry(Cam);
-}
-
 // FUN_004fa270 (returns 1).
-int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform, float T,
-                                 float Intensity)
+int FBeamEffect::BuildSingleSegment(Transform const* WorldXform, float T, float Intensity)
 {
-    FBeamEffectArch* const Arch = This->Arch;
+    FBeamEffectArch* const Arch = this->Arch;
     FEffectVertexBatch* const Batch = &G_EffectVertexBatch;
 
     float NearR = Arch->RadiusNear;
-    if (T == 0.0f && (This->Flags70 & kBeamFlagUseLookDir) != 0u)
+    if (T == 0.0f && (Flags70 & kBeamFlagUseLookDir) != 0u)
     {
         if (!IsFirstPersonCameraCurrent())
             NearR = Arch->RadiusNearAlt;
@@ -520,26 +475,26 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform,
     Batch->U = kUvCore;
     Batch->V = UvVMid;
     unsigned short const I0 =
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
+        static_cast<unsigned short>(Batch->Append(WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale0, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kHalf;
     Batch->V = UvV0;
     unsigned short const I1 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
+        Batch->Append(XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
 
     Batch->V = UvV1;
     unsigned short const I2 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
+        Batch->Append(XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
 
     Batch->U = kOne;
     Batch->V = UvV1;
     unsigned short const I3 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
+        Batch->Append(XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
 
     Batch->V = UvV0;
     unsigned short const I4 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
+        Batch->Append(XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
 
     // Second structure (NOT a tip-radius mirror): NearR XY arms + local-Z Start/End, Scale1,
     // UVs from Arch+0xc. The tip fan's indices are pushed AFTER these vertices.
@@ -552,56 +507,56 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform,
     Batch->U = 0.0f;
     Batch->V = UvU0;
     unsigned short const A0 =
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
+        static_cast<unsigned short>(Batch->Append(WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorCoreR, Arch->ColorCoreG, Arch->ColorCoreB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A1 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfStart.x, XfStart.y, XfStart.z));
+        Batch->Append(XfStart.x, XfStart.y, XfStart.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorMidR, Arch->ColorMidG, Arch->ColorMidB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A2 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfEnd.x, XfEnd.y, XfEnd.z));
+        Batch->Append(XfEnd.x, XfEnd.y, XfEnd.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kUvMid;
     Batch->V = UvU0;
     unsigned short const A3 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfPosX.x, XfPosX.y, XfPosX.z));
+        Batch->Append(XfPosX.x, XfPosX.y, XfPosX.z));
 
     unsigned short const A4 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfNegX.x, XfNegX.y, XfNegX.z));
+        Batch->Append(XfNegX.x, XfNegX.y, XfNegX.z));
     unsigned short const A5 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfPosY.x, XfPosY.y, XfPosY.z));
+        Batch->Append(XfPosY.x, XfPosY.y, XfPosY.z));
     unsigned short const A6 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfNegY.x, XfNegY.y, XfNegY.z));
+        Batch->Append(XfNegY.x, XfNegY.y, XfNegY.z));
 
     // All indices (tip, then second).
-    EffectVertexBatchEnsureIndices(Batch, 3);
+    Batch->EnsureIndices(3);
     Batch->Indices[Batch->IndexCount] = I0;
     Batch->IndexCount = Batch->IndexCount + 1;
     Batch->Indices[Batch->IndexCount] = I1;
     Batch->IndexCount = Batch->IndexCount + 1;
     Batch->Indices[Batch->IndexCount] = I2;
     Batch->IndexCount = Batch->IndexCount + 1;
-    EffectVertexBatchPushTriangle(Batch, I0, I3, I2);
-    EffectVertexBatchPushTriangle(Batch, I0, I3, I4);
-    EffectVertexBatchPushTriangle(Batch, I0, I1, I4);
+    Batch->PushTriangle(I0, I3, I2);
+    Batch->PushTriangle(I0, I3, I4);
+    Batch->PushTriangle(I0, I1, I4);
 
-    EffectVertexBatchPushTriangle(Batch, A0, A1, A3);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, A4);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, A5);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, A6);
-    EffectVertexBatchPushTriangle(Batch, A0, A2, A3);
-    EffectVertexBatchPushTriangle(Batch, A0, A2, A4);
+    Batch->PushTriangle(A0, A1, A3);
+    Batch->PushTriangle(A0, A1, A4);
+    Batch->PushTriangle(A0, A1, A5);
+    Batch->PushTriangle(A0, A1, A6);
+    Batch->PushTriangle(A0, A2, A3);
+    Batch->PushTriangle(A0, A2, A4);
     // Third index A5, as retail: 0x004fb1ae reads frame +0x3c, A0's slot until 0x004fb16d
     // stored the MOVZX'd A5 over it (MOV [ESP+0x48],EAX with three arguments pushed); A0
     // itself stays in ESI.
-    EffectVertexBatchPushTriangle(Batch, A0, A2, A5);
-    EffectVertexBatchPushTriangle(Batch, A0, A2, A6);
+    Batch->PushTriangle(A0, A2, A5);
+    Batch->PushTriangle(A0, A2, A6);
     return 1;
 }
 
@@ -625,10 +580,9 @@ static void VecNegate(Vector* Out, Vector const* In)
 // fanned from the origin, then a tube: origin -> Start behind it, the NearR ring around the
 // origin, the ring pushed forward to Mid, and Mid -> Mid+End in front. The trailing `+0x..`
 // comments on locals are retail's ESP-relative frame slots.
-int BeamEffectBuildMultiSegment(FBeamEffect* This, Transform const* WorldXform, float T,
-                                float Intensity)
+int FBeamEffect::BuildMultiSegment(Transform const* WorldXform, float T, float Intensity)
 {
-    FBeamEffectArch* const Arch = This->Arch;
+    FBeamEffectArch* const Arch = this->Arch;
     FEffectVertexBatch* const Batch = &G_EffectVertexBatch;
 
     // NearR = +0x6c, or flash_size +0x78 when T == 0; TipR = +0x74, raised to NearR.
@@ -756,100 +710,100 @@ int BeamEffectBuildMultiSegment(FBeamEffect* This, Transform const* WorldXform, 
     Batch->U = kUvCore;
     Batch->V = UvVMid;
     unsigned short const I0 =                              // +0x90
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
+        static_cast<unsigned short>(Batch->Append(WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale0, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kHalf;
     Batch->V = UvV0;
     unsigned short const I1 = static_cast<unsigned short>( // +0x98
-        EffectVertexBatchAppend(Batch, XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
+        Batch->Append(XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
     // V is read from +0x24 before that slot is reused for the position -- still V0.
     Batch->U = kOne;
     Batch->V = UvV0;
     unsigned short const I2 = static_cast<unsigned short>( // +0x2c
-        EffectVertexBatchAppend(Batch, XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
+        Batch->Append(XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
     Batch->U = kOne;
     Batch->V = UvV1;
     unsigned short const I3 = static_cast<unsigned short>( // EBP
-        EffectVertexBatchAppend(Batch, XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
+        Batch->Append(XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
     Batch->U = kHalf;
     Batch->V = UvV1;
     unsigned short const I4 = static_cast<unsigned short>( // +0x84
-        EffectVertexBatchAppend(Batch, XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
+        Batch->Append(XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
 
     // Tube, trail_brightness.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorOuterR, Arch->ColorOuterG, Arch->ColorOuterB);
     Batch->U = 0.0f;
     Batch->V = UvU1;
     unsigned short const A0 =                              // +0x8c
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
+        static_cast<unsigned short>(Batch->Append(WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorCoreR, Arch->ColorCoreG, Arch->ColorCoreB);
     Batch->U = kUvMid;
     Batch->V = UvU0;
     unsigned short const A1 = static_cast<unsigned short>( // +0x88
-        EffectVertexBatchAppend(Batch, XfStart.x, XfStart.y, XfStart.z));
+        Batch->Append(XfStart.x, XfStart.y, XfStart.z));
 
     // outter_color, U 0.25, the second trail V: the NearR ring.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A2 = static_cast<unsigned short>( // +0x1c
-        EffectVertexBatchAppend(Batch, XfNearPosX.x, XfNearPosX.y, XfNearPosX.z));
+        Batch->Append(XfNearPosX.x, XfNearPosX.y, XfNearPosX.z));
     unsigned short const B0 = static_cast<unsigned short>( // +0x18
-        EffectVertexBatchAppend(Batch, XfNearNegX.x, XfNearNegX.y, XfNearNegX.z));
+        Batch->Append(XfNearNegX.x, XfNearNegX.y, XfNearNegX.z));
     unsigned short const B1 = static_cast<unsigned short>( // +0x14
-        EffectVertexBatchAppend(Batch, XfNearPosY.x, XfNearPosY.y, XfNearPosY.z));
+        Batch->Append(XfNearPosY.x, XfNearPosY.y, XfNearPosY.z));
     unsigned short const B2 = static_cast<unsigned short>( // +0x24
-        EffectVertexBatchAppend(Batch, XfNearNegY.x, XfNearNegY.y, XfNearNegY.z));
+        Batch->Append(XfNearNegY.x, XfNearNegY.y, XfNearNegY.z));
 
     // sec_core_color, U 0, the first trail V: Mid.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorBand1R, Arch->ColorBand1G, Arch->ColorBand1B);
     Batch->U = 0.0f;
     Batch->V = UvU0;
     unsigned short const B3 = static_cast<unsigned short>( // +0xa0
-        EffectVertexBatchAppend(Batch, XfMid.x, XfMid.y, XfMid.z));
+        Batch->Append(XfMid.x, XfMid.y, XfMid.z));
 
     // tail_color, U 0.25, the second trail V: Mid + End.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorMidR, Arch->ColorMidG, Arch->ColorMidB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const B4 = static_cast<unsigned short>( // +0x94 (stored after SUB ESP,0xc)
-        EffectVertexBatchAppend(Batch, XfEndMid.x, XfEndMid.y, XfEndMid.z));
+        Batch->Append(XfEndMid.x, XfEndMid.y, XfEndMid.z));
 
     // FUN_004fc950 with the float-rounded products trail_brightness * sec_outter_color, U 0.25,
     // the first trail V: the ring pushed forward to Mid.
-    EffectVertexBatchSetColor(Batch, Scale1 * Arch->ColorBand2R, Scale1 * Arch->ColorBand2G,
-                              Scale1 * Arch->ColorBand2B);
+    Batch->SetColor(Scale1 * Arch->ColorBand2R, Scale1 * Arch->ColorBand2G,
+                    Scale1 * Arch->ColorBand2B);
     Batch->V = UvU0;
     Batch->U = kUvMid;
     unsigned short const C0 = static_cast<unsigned short>( // +0x20
-        EffectVertexBatchAppend(Batch, XfNearPosXMid.x, XfNearPosXMid.y, XfNearPosXMid.z));
+        Batch->Append(XfNearPosXMid.x, XfNearPosXMid.y, XfNearPosXMid.z));
     unsigned short const C1 = static_cast<unsigned short>( // +0x10
-        EffectVertexBatchAppend(Batch, XfNearNegXMid.x, XfNearNegXMid.y, XfNearNegXMid.z));
+        Batch->Append(XfNearNegXMid.x, XfNearNegXMid.y, XfNearNegXMid.z));
     unsigned short const C2 = static_cast<unsigned short>( // +0x9c
-        EffectVertexBatchAppend(Batch, XfNearPosYMid.x, XfNearPosYMid.y, XfNearPosYMid.z));
+        Batch->Append(XfNearPosYMid.x, XfNearPosYMid.y, XfNearPosYMid.z));
     unsigned short const C3 = static_cast<unsigned short>( // +0x28 (stored after three PUSHes)
-        EffectVertexBatchAppend(Batch, XfNearNegYMid.x, XfNearNegYMid.y, XfNearNegYMid.z));
+        Batch->Append(XfNearNegYMid.x, XfNearNegYMid.y, XfNearNegYMid.z));
 
-    EffectVertexBatchPushTriangle(Batch, I0, I1, I2);
-    EffectVertexBatchPushTriangle(Batch, I0, I3, I2);
-    EffectVertexBatchPushTriangle(Batch, I0, I3, I4);
-    EffectVertexBatchPushTriangle(Batch, I0, I1, I4);
+    Batch->PushTriangle(I0, I1, I2);
+    Batch->PushTriangle(I0, I3, I2);
+    Batch->PushTriangle(I0, I3, I4);
+    Batch->PushTriangle(I0, I1, I4);
 
-    EffectVertexBatchPushTriangle(Batch, A0, A1, A2);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, B0);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, B1);
-    EffectVertexBatchPushTriangle(Batch, A0, A1, B2);
+    Batch->PushTriangle(A0, A1, A2);
+    Batch->PushTriangle(A0, A1, B0);
+    Batch->PushTriangle(A0, A1, B1);
+    Batch->PushTriangle(A0, A1, B2);
 
-    EffectVertexBatchPushQuad(Batch, A0, B3, C0, A2);
-    EffectVertexBatchPushQuad(Batch, A0, B3, C1, B0);
-    EffectVertexBatchPushQuad(Batch, A0, B3, C2, B1);
-    EffectVertexBatchPushQuad(Batch, A0, B3, C3, B2);
+    Batch->PushQuad(A0, B3, C0, A2);
+    Batch->PushQuad(A0, B3, C1, B0);
+    Batch->PushQuad(A0, B3, C2, B1);
+    Batch->PushQuad(A0, B3, C3, B2);
 
-    EffectVertexBatchPushTriangle(Batch, B3, B4, C0);
-    EffectVertexBatchPushTriangle(Batch, B3, B4, C1);
-    EffectVertexBatchPushTriangle(Batch, B3, B4, C2);
-    EffectVertexBatchPushTriangle(Batch, B3, B4, C3);
+    Batch->PushTriangle(B3, B4, C0);
+    Batch->PushTriangle(B3, B4, C1);
+    Batch->PushTriangle(B3, B4, C2);
+    Batch->PushTriangle(B3, B4, C3);
     return 1;
 }

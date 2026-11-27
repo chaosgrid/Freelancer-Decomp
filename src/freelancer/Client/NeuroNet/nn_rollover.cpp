@@ -45,7 +45,7 @@ namespace
     // (0x004b6319): FUN_004963a0 inlined, then Ids = IdsAlt = the argument.
     void BuildIdsRecord(FToolTipHoverInfo* Record, int Ids)
     {
-        ToolTipHoverReset(Record);
+        Record->Reset();
         Record->Ids = Ids;
         Record->IdsAlt = Ids;
     }
@@ -65,7 +65,7 @@ NnRolloverControl::NnRolloverControl()
 {
     // Inlined into FUN_004b6630 (0x004b66cd). Retail leaves the anchor (+0x16c) unset until
     // Create; the port zeroes it.
-    ToolTipHoverReset(&Entry);
+    Entry.Reset();
     Anchor.x = 0.0f;
     Anchor.y = 0.0f;
     Anchor.z = 0.0f;
@@ -270,7 +270,7 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
         return;
 
     FToolTipHoverInfo Record;   // dtor FUN_00444ee0
-    ToolTipHoverReset(&Record);
+    Record.Reset();
     Record.IdsAlt = Found->second;
     Record.Ids = Info->Ids;
     if (Info->CaptionW != nullptr)
@@ -404,9 +404,9 @@ void NnRolloverControl::Draw()
     Win3DDisable(kWin3DDepthTest);   // FUN_00421ed0(0xb71)
     Win3DDisable(kWin3DCullFace);    // FUN_00421ed0(0xb44)
 
-    FontStringSetScale(&Text, 0.29f, Position.z); // FUN_004145d0(0x3e947ae1, +0x68)
+    Text.SetScale(0.29f, Position.z); // FUN_004145d0(0x3e947ae1, +0x68)
     int Extent[2];
-    FontStringGetExtent(&Text, Extent); // FUN_00414570
+    Text.GetExtent(Extent); // FUN_00414570
     // Both extents are widened as unsigned.
     float const ExtentW = static_cast<float>(static_cast<unsigned>(Extent[0]));
     float const ExtentH = static_cast<float>(static_cast<unsigned>(Extent[1]));
@@ -463,7 +463,7 @@ void NnRolloverControl::Draw()
     Origin.Height = ExtentH;
     Origin.HAlign = 0;
     Origin.VAlign = 0;
-    FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
+    Origin.DrawChildren(&Text, nullptr, nullptr);
 
     Win3DEnable(kWin3DDepthTest); // FUN_00421dd0(0xb71)
     Win3DSetDepthWrite(1);        // FUN_00422190(1)

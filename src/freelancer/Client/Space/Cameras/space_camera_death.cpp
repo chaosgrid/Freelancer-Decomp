@@ -98,7 +98,7 @@ namespace
 void DeathCameraConstruct(FDeathCamera* Cam)
 {
     // Inlined into the controller ctor on ESI + 0x60c (0x00549364): no null test in retail.
-    GameCameraConstruct((FGameCamera*)Cam);
+    Cam->FGameCamera::Construct();
 
     // Four floats and nothing else; the header says what stays uninitialised.
     Cam->DriftSpeed = kDeathDriftSpeed;
@@ -109,7 +109,7 @@ void DeathCameraConstruct(FDeathCamera* Cam)
     // Retail then sets the vptr to PTR_LAB_005e061c.
 }
 
-void DeathCameraAttach(FDeathCamera* Cam, void* Object)
+void FDeathCamera::Attach(void* Object)
 {
     // No null test on `this` in retail.
     Watchable const* const Target =
@@ -118,22 +118,22 @@ void DeathCameraAttach(FDeathCamera* Cam, void* Object)
                                                  kWatchableOffset)
             : nullptr;
 
-    if (Target != Cam->Watched.target())
-        Cam->Watched.set(Target);
+    if (Target != this->Watched.target())
+        this->Watched.set(Target);
 
     // With nothing watched, everything is zeroed and the drift points along -X. Retail tests the
     // stored pointer AND the pointer minus eight (inlined Watchable::get()).
     unsigned char* const Watched =
         const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Cam->Watched.target()));
+            reinterpret_cast<const unsigned char*>(this->Watched.target()));
     if (Watched == nullptr || (Watched - kWatchableOffset) == nullptr)
     {
-        Cam->BasePosition[0] = 0.0f;
-        Cam->BasePosition[1] = 0.0f;
-        Cam->BasePosition[2] = 0.0f;
-        Cam->DriftDirection[0] = kDeathFallbackDirectionX;
-        Cam->DriftDirection[1] = 0.0f;
-        Cam->DriftDirection[2] = 0.0f;
+        BasePosition[0] = 0.0f;
+        BasePosition[1] = 0.0f;
+        BasePosition[2] = 0.0f;
+        DriftDirection[0] = kDeathFallbackDirectionX;
+        DriftDirection[1] = 0.0f;
+        DriftDirection[2] = 0.0f;
         return;
     }
 
@@ -150,67 +150,67 @@ void DeathCameraAttach(FDeathCamera* Cam, void* Object)
         const void* const Field218 = *reinterpret_cast<void* const*>(EqObj + 0x218);
         if ((TypeWord & kEqObjShipTypeMask) == kEqObjShipTypeMask && Field218 != nullptr)
         {
-            Cam->MaxDriftSpeed = kDeathShipMaxDriftSpeed;
-            Cam->DriftDamping = kDeathDriftDamping;
+            MaxDriftSpeed = kDeathShipMaxDriftSpeed;
+            DriftDamping = kDeathDriftDamping;
         }
     }
 
     IObjInspect* const Inspect = static_cast<IObjInspect*>(Watchee);
     const Vector& World = Inspect->get_position();
-    Cam->BasePosition[0] = World.x;
-    Cam->BasePosition[1] = World.y;
-    Cam->BasePosition[2] = World.z;
+    BasePosition[0] = World.x;
+    BasePosition[1] = World.y;
+    BasePosition[2] = World.z;
 
     const Vector Velocity = Inspect->get_velocity();
-    Cam->DriftDirection[0] = Velocity.x;
-    Cam->DriftDirection[1] = Velocity.y;
-    Cam->DriftDirection[2] = Velocity.z;
+    DriftDirection[0] = Velocity.x;
+    DriftDirection[1] = Velocity.y;
+    DriftDirection[2] = Velocity.z;
 
     // The drift is CLAMPED, not normalised: a slow wreck drifts slowly, a fast one is capped.
     // The length stays double; only strictly above the cap is clamped (equal/unordered are not).
-    const double X = Cam->DriftDirection[0];
-    const double Y = Cam->DriftDirection[1];
-    const double Z = Cam->DriftDirection[2];
+    const double X = DriftDirection[0];
+    const double Y = DriftDirection[1];
+    const double Z = DriftDirection[2];
     const double Length = sqrt((X * X + Y * Y) + Z * Z);
-    if (Length > static_cast<double>(Cam->MaxDriftSpeed))
+    if (Length > static_cast<double>(MaxDriftSpeed))
     {
         // inv*y and inv*z are rounded through float temporaries; inv*x is not.
         const double Inv = 1.0 / Length;
-        const double Cap = Cam->MaxDriftSpeed;
+        const double Cap = MaxDriftSpeed;
         const float InvY = static_cast<float>(Inv * Y);
         const float InvZ = static_cast<float>(Inv * Z);
-        Cam->DriftDirection[0] = static_cast<float>(Inv * X * Cap);
-        Cam->DriftDirection[1] = static_cast<float>(static_cast<double>(InvY) * Cap);
-        Cam->DriftDirection[2] = static_cast<float>(static_cast<double>(InvZ) * Cap);
+        DriftDirection[0] = static_cast<float>(Inv * X * Cap);
+        DriftDirection[1] = static_cast<float>(static_cast<double>(InvY) * Cap);
+        DriftDirection[2] = static_cast<float>(static_cast<double>(InvZ) * Cap);
     }
 }
 
-bool DeathCameraIsFinished(const FDeathCamera* Cam)
+bool FDeathCamera::IsFinished()
 {
     // No null test on `this`. Exact equality with 0.0 only (NaN is false).
-    return Cam->ShakeTimer == 0.0f;
+    return ShakeTimer == 0.0f;
 }
 
-void DeathCameraUpdate(FDeathCamera* Cam, float DeltaSeconds)
+void FDeathCamera::Update(float DeltaSeconds)
 {
     // No null test on `this`. Retail asks its own slot 0x60 first; a finished camera does
     // nothing, not even copy its orientation out.
-    if (DeathCameraIsFinished(Cam))
+    if (FDeathCamera::IsFinished())
         return;
 
     // The timer runs down and is clamped at zero, which keeps the equality test above
     // reachable. The UNROUNDED difference is what is compared with zero.
-    if (Cam->ShakeTimer > 0.0f)
+    if (ShakeTimer > 0.0f)
     {
-        const double Left = static_cast<double>(Cam->ShakeTimer) - static_cast<double>(DeltaSeconds);
-        Cam->ShakeTimer = static_cast<float>(Left);
+        const double Left = static_cast<double>(ShakeTimer) - static_cast<double>(DeltaSeconds);
+        ShakeTimer = static_cast<float>(Left);
         if (Left < 0.0)
-            Cam->ShakeTimer = 0.0f;
+            ShakeTimer = 0.0f;
     }
 
     // Elapsed death time, kept double. The shake only happens while it is strictly below 2s.
     const double Elapsed =
-        static_cast<double>(Cam->ShakeDuration) - static_cast<double>(Cam->ShakeTimer);
+        static_cast<double>(ShakeDuration) - static_cast<double>(ShakeTimer);
     if (Elapsed < static_cast<double>(kShakeWindowSeconds))
     {
         // Amplitude falls off with the SQUARE of the time left in the window; rounded to float
@@ -221,54 +221,39 @@ void DeathCameraUpdate(FDeathCamera* Cam, float DeltaSeconds)
 
         // Two rand() draws in this order: the second happens after the first rotation is applied.
         const double AngleY = RandomShakeAngle(Amplitude);
-        RotateRowsAboutY(Cam->ShakeOrientation, static_cast<float>(cos(AngleY)), sin(AngleY));
+        RotateRowsAboutY(ShakeOrientation, static_cast<float>(cos(AngleY)), sin(AngleY));
 
         const double AngleZ = RandomShakeAngle(Amplitude);
-        RotateRowsAboutZ(Cam->ShakeOrientation, static_cast<float>(cos(AngleZ)), sin(AngleZ));
+        RotateRowsAboutZ(ShakeOrientation, static_cast<float>(cos(AngleZ)), sin(AngleZ));
     }
 
-    FSpaceCamera* const Base = (FSpaceCamera*)Cam;
+    FSpaceCamera* const Base = (FSpaceCamera*)this;
 
-    memcpy(&Base->World, Cam->ShakeOrientation, 9 * sizeof(float));
+    memcpy(&Base->World, ShakeOrientation, 9 * sizeof(float));
 
     // The drift decays; the UNROUNDED result is compared with zero.
-    const double Speed = static_cast<double>(Cam->DriftSpeed) -
-                         static_cast<double>(DeltaSeconds) * static_cast<double>(Cam->DriftDamping);
-    Cam->DriftSpeed = static_cast<float>(Speed);
+    const double Speed = static_cast<double>(DriftSpeed) -
+                         static_cast<double>(DeltaSeconds) * static_cast<double>(DriftDamping);
+    DriftSpeed = static_cast<float>(Speed);
     Base->bViewDirty = 1;
     if (Speed < 0.0)
-        Cam->DriftSpeed = 0.0f;
+        DriftSpeed = 0.0f;
 
     // One step along the drift direction with the speed AFTER the decay (reloaded from memory).
     // step*dir.y and step*dir.z are rounded through float temporaries, step*dir.x is not. The
     // accumulator -- not the base position -- becomes the world position.
-    const double Step = static_cast<double>(DeltaSeconds) * static_cast<double>(Cam->DriftSpeed);
-    const float StepY = static_cast<float>(Step * static_cast<double>(Cam->DriftDirection[1]));
-    const float StepZ = static_cast<float>(Step * static_cast<double>(Cam->DriftDirection[2]));
-    Cam->DriftPosition[0] = static_cast<float>(Step * static_cast<double>(Cam->DriftDirection[0]) +
-                                               static_cast<double>(Cam->DriftPosition[0]));
-    Cam->DriftPosition[1] = static_cast<float>(static_cast<double>(StepY) +
-                                               static_cast<double>(Cam->DriftPosition[1]));
-    Cam->DriftPosition[2] = static_cast<float>(static_cast<double>(StepZ) +
-                                               static_cast<double>(Cam->DriftPosition[2]));
+    const double Step = static_cast<double>(DeltaSeconds) * static_cast<double>(DriftSpeed);
+    const float StepY = static_cast<float>(Step * static_cast<double>(DriftDirection[1]));
+    const float StepZ = static_cast<float>(Step * static_cast<double>(DriftDirection[2]));
+    DriftPosition[0] = static_cast<float>(Step * static_cast<double>(DriftDirection[0]) +
+                                               static_cast<double>(DriftPosition[0]));
+    DriftPosition[1] = static_cast<float>(static_cast<double>(StepY) +
+                                               static_cast<double>(DriftPosition[1]));
+    DriftPosition[2] = static_cast<float>(static_cast<double>(StepZ) +
+                                               static_cast<double>(DriftPosition[2]));
 
-    Base->WorldPos.x = Cam->DriftPosition[0];
-    Base->WorldPos.y = Cam->DriftPosition[1];
-    Base->WorldPos.z = Cam->DriftPosition[2];
+    Base->WorldPos.x = DriftPosition[0];
+    Base->WorldPos.y = DriftPosition[1];
+    Base->WorldPos.z = DriftPosition[2];
     Base->bViewDirty = 1;
-}
-
-void FDeathCamera::Attach(void* Object)
-{
-    DeathCameraAttach(this, Object);
-}
-
-bool FDeathCamera::IsFinished()
-{
-    return DeathCameraIsFinished(this);
-}
-
-void FDeathCamera::Update(float DeltaSeconds)
-{
-    DeathCameraUpdate(this, DeltaSeconds);
 }

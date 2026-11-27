@@ -732,7 +732,7 @@ void HudTarget::DrawViewObject()
             // and a 16 x 16 sphere of the hierarchy radius in the object's transform (slot 4,
             // ICF-folded with get_transform).
             Win3DDisable(kWin3DDepthTest);
-            SpaceCameraSetFovY(&ViewCamera, 45.0f);
+            ViewCamera.SetFovY(45.0f);
             Win3DApplyCameraPerspective(AsCamera(&ViewCamera));
             unsigned char const* const Chrome = G_HudChromeColorRgba; // DAT_00679bb4
             unsigned char Colour[4];
@@ -762,8 +762,8 @@ void HudTarget::DrawViewObject()
             // The part cache (FUN_00406510) in the object's transform (slot 4).
             ColourViewParts();
             IObjRW* const Viewed = WatchedObjRw(ViewObject);
-            PartCacheDraw(&PartCache, AsCamera(&ViewCamera),
-                          &Viewed->get_transform());
+            PartCache.Draw(AsCamera(&ViewCamera),
+                           &Viewed->get_transform());
         }
         DrawScanSweep();
     }
@@ -1952,17 +1952,17 @@ void HudTarget::UpdateTradeButton()
         WithdrawTrade();
     }
 
-    if (TradeButton != nullptr)
+    if (TradeButton == nullptr)
+        return;
+
+    // NnTradeIsOpen reads DAT_006724b4, the open NN_Trade window.
+    bool bEnable = false;
+    if (!NnTradeIsOpen() && Distance <= kTradeRange && ViewShip != nullptr &&
+        ViewShip->OwnerPlayer != 0 && ViewShip->OwnerPlayer != GetPlayerConnectionId())
     {
-        // NnTradeIsOpen reads DAT_006724b4, the open NN_Trade window.
-        bool bEnable = false;
-        if (!NnTradeIsOpen() && Distance <= kTradeRange && ViewShip != nullptr &&
-            ViewShip->OwnerPlayer != 0 && ViewShip->OwnerPlayer != GetPlayerConnectionId())
-        {
-            bEnable = true;
-        }
-        TradeButton->SetProperty(kWinPropHide, bEnable ? 0 : 1, 0);
+        bEnable = true;
     }
+    TradeButton->SetProperty(kWinPropHide, bEnable ? 0 : 1, 0);
 }
 
 IObjRW* HudTarget::SyncPlayerTarget()

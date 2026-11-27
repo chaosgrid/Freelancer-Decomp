@@ -106,15 +106,15 @@ void DamageList::add_damage_entry(unsigned short SubObjId, float HitPts, DamageE
     bool Found = false;
     for (DamageEntry& Entry : Entries)
     {
-        if (Entry.SubObjId == SubObjId)
-        {
-            // The old value is kept only when strictly less; equal or unordered stores the new.
-            Entry.HitPts = (Entry.HitPts < HitPts) ? Entry.HitPts : HitPts;
-            if (static_cast<int>(Fate) > static_cast<int>(Entry.Fate))
-                Entry.Fate = Fate;
-            Found = true;
-            break;
-        }
+        if (Entry.SubObjId != SubObjId)
+            continue;
+
+        // The old value is kept only when strictly less; equal or unordered stores the new.
+        Entry.HitPts = (Entry.HitPts < HitPts) ? Entry.HitPts : HitPts;
+        if (static_cast<int>(Fate) > static_cast<int>(Entry.Fate))
+            Entry.Fate = Fate;
+        Found = true;
+        break;
     }
     if (!Found)
     {

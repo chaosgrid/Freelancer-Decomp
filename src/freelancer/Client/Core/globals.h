@@ -28,6 +28,8 @@ struct FClientPathString
 };
 static_assert(sizeof(FClientPathString) == 0x108, "FClientPathString stride is 0x108");
 
+struct FClientCommandLine;
+
 // The options object at DAT_00679bc0 (this of FUN_005621a0). Its first 0x28 bytes are the
 // ten-dword render mode FUN_004249c0 hands to RP8 create_buffers as the out-blob (RP8 FRp8Mode:
 // Field00, Field04, Width, Height, Format, WantedZ, WantedStencil, Interval, BufferCount,
@@ -60,6 +62,13 @@ struct DisplaySettings
                                       //         windowed single-player session presenting with it
     char quick_flag;                  // +0x879  "+Q"/"-Q": set to 1, never read anywhere in the PE
     char pad87a[2];
+
+    // FUN_005621a0 -- thiscall on the options object at DAT_00679bc0, argument WinMain's command line.
+    void LoadStartupConfig(const FClientCommandLine* CommandLine);
+
+    // FUN_004242e0 -- thiscall on a render mode block (the first 0x28 bytes of the DisplaySettings
+    // layout): applies "+B/-B", "+F/-F", "+W", "+M<size>". True if any of those letters was seen.
+    bool ApplyCmdlineOverrides(const FClientCommandLine* CommandLine);
 };
 static_assert(sizeof(DisplaySettings) == 0x87c, "options object ends after +0x879");
 
@@ -102,12 +111,6 @@ extern bool G_bFpExceptionTrap;
 // in retail.
 struct Win3D;
 extern Win3D* G_WinDebugRoot;
-
-// FUN_005621a0 -- thiscall on the options object at DAT_00679bc0, argument WinMain's command line.
-void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* CommandLine);
-// FUN_004242e0 -- thiscall on a render mode block (the first 0x28 bytes of the DisplaySettings
-// layout): applies "+B/-B", "+F/-F", "+W", "+M<size>". True if any of those letters was seen.
-bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLine* CommandLine);
 
 HWND CreateGameWindow(const char* class_name, DisplaySettings* display, const char* title);
 // FUN_00424870 -- record the surface size/mode and restyle + resize the window for it.

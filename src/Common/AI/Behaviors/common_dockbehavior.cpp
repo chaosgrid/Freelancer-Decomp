@@ -454,7 +454,7 @@ void DockBehavior::Disengage()
     if (GotoDirective.NavPilotPtr != nullptr)
     {
         static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(GotoDirective.NavPilotPtr);  // FUN_062d21c0
+        GotoDirective.NavPilotPtr->ReleaseDirectiveTarget();  // FUN_062d21c0
         GotoDirective.NavPilotPtr = nullptr;
     }
 
@@ -644,17 +644,17 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         return;
     }
 
-    if (TypeCode == FBehaviorManagerEvent::kEventObjectLeftSystem)
-    {
-        // A null payload is ignored; no Flag399 store on this path.
-        if (Payload == nullptr)
-            return;
-        SystemManager* const Sys = SysMgr;
-        if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
-            Sys->SelfTarget.Iface->get_id())
-            return;
-        EnterState(kDockStateDone);
-    }
+    if (TypeCode != FBehaviorManagerEvent::kEventObjectLeftSystem)
+        return;
+
+    // A null payload is ignored; no Flag399 store on this path.
+    if (Payload == nullptr)
+        return;
+    SystemManager* const Sys = SysMgr;
+    if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
+        Sys->SelfTarget.Iface->get_id())
+        return;
+    EnterState(kDockStateDone);
 }
 
 // FUN_062c3d10, the dock state machine's state-entry function. Non-virtual; called with an
@@ -667,7 +667,7 @@ void DockBehavior::EnterState(int NewState)
     {
         // No null test on the pilot in retail.
         static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(GotoDirective.NavPilotPtr);   // FUN_062d21c0
+        GotoDirective.NavPilotPtr->ReleaseDirectiveTarget();   // FUN_062d21c0
         GotoDirective.NavPilotPtr = nullptr;
         SysMgr->Thrust.engage_cruise(false);
         GotoDirective.Idea.Commit();   // AfterburnerIdea at +0x2dc
@@ -996,16 +996,16 @@ void DockBehavior::RefreshApproachState()
         }
     }
 
-    if ((StateFlags32c & OBJ_JUMP_GATE) != 0)
-    {
-        Vector D3;
-        D3.x = SavedPosition3fc.x - DestPoint3cc.x;
-        D3.y = SavedPosition3fc.y - DestPoint3cc.y;
-        D3.z = SavedPosition3fc.z - DestPoint3cc.z;
-        Vector N3;
-        VecNormalize3(&D3, &N3);
-        Facing38c = N3;
-    }
+    if ((StateFlags32c & OBJ_JUMP_GATE) == 0)
+        return;
+
+    Vector D3;
+    D3.x = SavedPosition3fc.x - DestPoint3cc.x;
+    D3.y = SavedPosition3fc.y - DestPoint3cc.y;
+    D3.z = SavedPosition3fc.z - DestPoint3cc.z;
+    Vector N3;
+    VecNormalize3(&D3, &N3);
+    Facing38c = N3;
 }
 
 // ----------------------------------------------------------------------------

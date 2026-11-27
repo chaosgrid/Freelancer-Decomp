@@ -24,7 +24,7 @@ void NnModalResumeGame(unsigned char bCursorDrawFlag);
 
 // DAT_0067dcc8 -- a byte the NeuroNet windows raise while one of them holds the screen (written
 // 1 at 0x0045c921, 0x0048a537, 0x004a6a31, 0x004a98fe; 0 at 0x0045c914, 0x0048a13b,
-// 0x0048b005.., 0x004af057, and the space teardown 0x0054af3c = DestroySpaceState) and readers test (0x0043e748.., 0x0045a297 in FUN_0045a270,
+// 0x0048b005.., 0x004af057, and the space teardown 0x0054af3c = SpaceApp::Destroy) and readers test (0x0043e748.., 0x0045a297 in FUN_0045a270,
 // 0x0045a740, 0x0046fcf3, NN_Pause 0x004a75c0). The Ship's jump states also write it (1 at
 // 0x005438ce entering state 1, 0 at 0x00543851 leaving state 5 -- FClientShipGameobj::
 // SetJumpState).

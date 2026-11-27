@@ -767,7 +767,7 @@ namespace
         FRenderStateSave AlphaTest;
         RenderStateSaveAndSet(&AlphaTest, kRsAlphaTestEnable, 0);
 
-        Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0)); // FUN_00425640 / FUN_004220a0
+        Win3DBindTexture(Shape->GetGpuHandle(0)); // FUN_00425640 / FUN_004220a0
         unsigned char FilterToken = 0;                    // the ECX both filter calls get
         Win3DSetTextureFilterLinear(&FilterToken);         // FUN_004223d0
         Win3DSetTextureFilterPoint();                      // FUN_00422410

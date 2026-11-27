@@ -9,11 +9,11 @@
 #include "NeuroNet/Economy/client_base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510),
                                     // ClientMarketCollectCategory (FUN_00437f70),
                                     // ClientMarketGetPrice (FUN_00438060)
-#include "Common/Fonts/font_string.h"            // FontStringChildCount (FUN_004145a0)
+#include "Common/Fonts/font_string.h"            // FFontString::ChildCount (FUN_004145a0)
 #include "Core/widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
 #include "Core/globals.h"                // GetClientFrameTimeCapped (FUN_0042d680),
                                     // G_RenderSurfaceWidth (DAT_00610850)
-#include "Space/HUD/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
+#include "Space/HUD/hud_command_dispatch.h"   // EventHandler::PushCancelHandler (FUN_00576360)
 #include "Common/Fonts/ids_rdl.h"                // AppendTextMaybeXmlRdl (FUN_0057e2c0), RdlAppendNode
 #include "Common/Fonts/ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "NeuroNet/Economy/knowledge_map.h"          // KnowledgeMapRevealFmtStr (FUN_00459950)
@@ -335,7 +335,7 @@ bool NnNews::Create(Win3D* NewParent, void* Data)
     RevealSelected();
 
     // The open sound is stopped if it is still going, then (re)started.
-    HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
+    PushCancelHandler(0); // FUN_00576360
     if (bOpenSoundPlaying != 0)
         StopClientSoundArch(LookupClientSoundArch(&OpenSound));
     OpenSound.Id = CreateID("news_vendor_open");
@@ -430,7 +430,7 @@ void NnNews::RefreshRows()
         Vector const* const Stored = &HeadlinePositions[Row];
         Vector Moved = {Stored->x, Stored->y, Stored->z};
         unsigned const Lines = static_cast<unsigned>(
-            FontStringChildCount(static_cast<NnTextControl*>(Headlines[Row])->GetFontString()));
+            (static_cast<NnTextControl*>(Headlines[Row])->GetFontString())->ChildCount());
         if (Lines < 2)
             Moved.y = static_cast<float>(static_cast<double>(Stored->y) - 0.016);
         Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(&Moved), 0);

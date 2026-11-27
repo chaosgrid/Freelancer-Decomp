@@ -155,7 +155,7 @@ void IVP_Sphere_Object_Query::collect_objects_in_node(IVP_OV_Node* Node, const I
         IVP_NarrowPhaseCacheSlot* const Slot = Object->ResolveNarrowPhaseCacheSlot();
 
         IVP_U_Point Local;                                   // local_30
-        IVP_TransformWorldToSlotSpace(Slot, &Center, &Local);
+        Slot->transform_world_to_slot_space(&Center, &Local);
 
         G_bLedgeTreeSphereHit = 0;
         const int32_t Type = Object->object_type;

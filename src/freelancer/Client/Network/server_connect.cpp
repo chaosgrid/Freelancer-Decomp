@@ -76,13 +76,13 @@ void* GetLoadedChatServer()
 // FUN_005b6fd0 (the pushed argument is not read).
 void FreeServerModule()
 {
-    if (G_ServerModule != nullptr)
-    {
-        FreeLibrary(G_ServerModule);
-        G_ServerModule = nullptr;
-        G_LoadedChatServer = nullptr;
-        G_LoadedServer = nullptr;
-    }
+    if (G_ServerModule == nullptr)
+        return;
+
+    FreeLibrary(G_ServerModule);
+    G_ServerModule = nullptr;
+    G_LoadedChatServer = nullptr;
+    G_LoadedServer = nullptr;
 }
 
 // FUN_005a8260. The same block is inlined at the head of FUN_005a8080 and in the failure

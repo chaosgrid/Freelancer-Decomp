@@ -53,8 +53,8 @@ namespace
         explicit FClientTickOverlay(IFont* Font)
         {
 #if FREELANCER_BETA_LABEL
-            FontStringSetFont(&Beta, Font);
-            FontStringSetText(&Beta, L"Beta 2");
+            Beta.SetFont(Font);
+            Beta.SetText(L"Beta 2");
 #endif
 #if FREELANCER_ENABLE_TICK_PROFILE
             // PlayerName uses readable Arial digits instead of the narrow HUD face.
@@ -75,19 +75,19 @@ namespace
             };
             static_assert(sizeof(Names) / sizeof(Names[0]) == G_SectionCount,
                           "one label per profiling section");
-            FontStringSetFont(&Units, SmallFont);
-            FontStringSetText(&Units, L"ms.");
+            Units.SetFont(SmallFont);
+            Units.SetText(L"ms.");
             for (int Index = 0; Index < G_SectionCount; ++Index)
             {
-                FontStringSetFont(&Labels[Index], SmallFont);
-                FontStringSetText(&Labels[Index], Names[Index]);
+                Labels[Index].SetFont(SmallFont);
+                Labels[Index].SetText(Names[Index]);
             }
             wchar_t const Characters[] = L"0123456789.-";
             for (int Index = 0; Index < 12; ++Index)
             {
                 wchar_t const Glyph[] = {Characters[Index], L'\0'};
-                FontStringSetFont(&Digits[Index], SmallFont);
-                FontStringSetText(&Digits[Index], Glyph);
+                Digits[Index].SetFont(SmallFont);
+                Digits[Index].SetText(Glyph);
             }
 #endif
         }
@@ -226,20 +226,20 @@ void DrawClientTickProfile()
     Origin.Scale = static_cast<float>(G_RenderSurfaceWidth) - 24.0f;
     Origin.Height = static_cast<float>(G_RenderSurfaceHeight) - 24.0f;
 #if FREELANCER_BETA_LABEL
-    FontStringDrawChildren(&Origin, &G_TickOverlay->Beta, nullptr, nullptr);
+    Origin.DrawChildren(&G_TickOverlay->Beta, nullptr, nullptr);
 #endif
 #if FREELANCER_ENABLE_TICK_PROFILE
     int Size[2] = {};
     float RowY = 12.0f;
 #if FREELANCER_BETA_LABEL
-    FontStringGetExtent(&G_TickOverlay->Beta, Size);
+    G_TickOverlay->Beta.GetExtent(Size);
     RowY += static_cast<float>(Size[1]) + 4.0f;
 #endif
 
     int LabelWidth = 0;
     for (int Index = 0; Index < G_SectionCount; ++Index)
     {
-        FontStringGetExtent(&G_TickOverlay->Labels[Index], Size);
+        G_TickOverlay->Labels[Index].GetExtent(Size);
         if (Size[0] > LabelWidth)
             LabelWidth = Size[0];
     }
@@ -247,7 +247,7 @@ void DrawClientTickProfile()
     int RowHeight = 0;
     for (int Index = 0; Index < 12; ++Index)
     {
-        FontStringGetExtent(&G_TickOverlay->Digits[Index], Size);
+        G_TickOverlay->Digits[Index].GetExtent(Size);
         if (Size[0] > CellWidth)
             CellWidth = Size[0];
         if (Size[1] > RowHeight)
@@ -257,7 +257,7 @@ void DrawClientTickProfile()
     {
         Origin.X = 12.0f;
         Origin.Y = RowY;
-        FontStringDrawChildren(&Origin, &G_TickOverlay->Labels[Index], nullptr, nullptr);
+        Origin.DrawChildren(&G_TickOverlay->Labels[Index], nullptr, nullptr);
         char Value[32] = {};
         // Locale-independent decimal point; QPC's int64 range fits this buffer.
         std::to_chars(Value, Value + sizeof(Value) - 1, G_CompletedMilliseconds[Index],
@@ -269,12 +269,12 @@ void DrawClientTickProfile()
             int const GlyphIndex = Character == '.' ? 10 :
                                    Character == '-' ? 11 : Character - '0';
             Origin.Y = RowY;
-            FontStringDrawChildren(&Origin, &G_TickOverlay->Digits[GlyphIndex], nullptr, nullptr);
+            Origin.DrawChildren(&G_TickOverlay->Digits[GlyphIndex], nullptr, nullptr);
             Origin.X += static_cast<float>(CellWidth);
         }
         Origin.X += 4.0f;
         Origin.Y = RowY;
-        FontStringDrawChildren(&Origin, &G_TickOverlay->Units, nullptr, nullptr);
+        Origin.DrawChildren(&G_TickOverlay->Units, nullptr, nullptr);
         RowY += static_cast<float>(RowHeight) + 2.0f;
     }
 

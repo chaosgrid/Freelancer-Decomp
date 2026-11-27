@@ -37,14 +37,14 @@ UiWinDeform::UiWinDeform()
     , PoseHeight(-1.0f)
 {
     // FUN_0059aca0.
-    SpaceCameraConstruct(&Camera);
+    Camera.Construct();
 
     // The preview camera takes the Win3D scene camera's viewport, near / far and half
     // horizontal fov.
     FSpaceCamera* const Scene = Win3DGetCamera();
-    SpaceCameraSetViewport(&Camera, Scene->Viewport);
-    SpaceCameraSetNearFar(&Camera, Scene->ZNear, Scene->ZFar);
-    SpaceCameraSetHalfFovX(&Camera, Scene->HalfFovXDeg);
+    Camera.SetViewport(Scene->Viewport);
+    Camera.SetNearFar(Scene->ZNear, Scene->ZFar);
+    Camera.SetHalfFovX(Scene->HalfFovXDeg);
 }
 
 UiWinDeform::~UiWinDeform()
@@ -123,7 +123,7 @@ void UiWinDeform::SetTransform(Transform const* NewXform)
     Rect[1] = static_cast<int>(Y1);
     Rect[2] = static_cast<int>(X2);
     Rect[3] = static_cast<int>(Y2);
-    SpaceCameraSetViewportEx(&Camera, Rect, 1);
+    Camera.SetViewportEx(Rect, 1);
 }
 
 bool UiWinDeform::Create(Win3D* NewParent, void* Payload)

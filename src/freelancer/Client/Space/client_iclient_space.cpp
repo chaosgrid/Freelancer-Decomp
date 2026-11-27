@@ -17,7 +17,7 @@
 #include "Interface/Pages/character_select_equip.h"   // player equip / collision / health setters (0x004c4xxx)
 #include "Space/Effects/cli_projectile_fx.h"        // FCliLauncherFx::FireDirect (the dropper tails, slots 49..51)
 #include "Common/client_cliobj.h"            // Archetype::LoadMountedEquipmentCompanions (FUN_004252d0)
-#include "Space/Effects/client_equip_fx.h"          // EquippedObjFindEquipFx / CliTractorEquipFxDropLoot (slot 64)
+#include "Space/Effects/client_equip_fx.h"          // FClientGameobj::FindEquipFx / CliTractorEquipFxDropLoot (slot 64)
 #include "Space/client_gameobj.h"           // FClientGameobj family
 #include "Space/client_objdb.h"             // ClientObjDb_FindObject (FUN_005416c0)
 #include "common_archetype.h"
@@ -642,7 +642,7 @@ namespace
         {
             return nullptr;
         }
-        FClientEquip* const Wrapper = EquippedObjFindEquipFx(Owner, SubObjId);
+        FClientEquip* const Wrapper = Owner->FindEquipFx(SubObjId);
         if (Wrapper == nullptr || Wrapper->Equip == nullptr)
         {
             return nullptr;
@@ -786,13 +786,13 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
 
     // Retail calls FUN_00543f50 on whatever gameobj the owner id finds; its body narrows to the
     // CShip itself.
-    if (Info.Kind == 1)
+    if (Info.Kind != 1)
+        return;
+
+    FClientGameobj* const Owner = ClientObjDb_FindObject(Info.OwnerId, 0);
+    if (Owner != nullptr)
     {
-        FClientGameobj* const Owner = ClientObjDb_FindObject(Info.OwnerId, 0);
-        if (Owner != nullptr)
-        {
-            static_cast<FClientShipGameobj*>(Owner)->PlayCargoJettisonSound();
-        }
+        static_cast<FClientShipGameobj*>(Owner)->PlayCargoJettisonSound();
     }
 }
 
@@ -1254,7 +1254,7 @@ void IClientImpl::SendServerItemTractored(unsigned int /*ClientId*/, const FPayl
     FClientGameobj* const Tractoring = ClientObjDb_FindObject(Info.ShipId, 0);
     if (Tractoring != nullptr)
     {
-        FClientEquip* const Wrapper = EquippedObjFindEquipFx(Tractoring, Info.TractorEquipId);
+        FClientEquip* const Wrapper = Tractoring->FindEquipFx(Info.TractorEquipId);
         if (Wrapper != nullptr)
         {
             CliTractorEquipFxDropLoot(Wrapper, Info.LootId,

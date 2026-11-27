@@ -132,7 +132,7 @@ static_assert(offsetof(IVP_Controller_Golem, Field_0xcc) == 0xcc, "golem+0xcc");
 
 // FUN_06348f50 (IVP_Controller_Manager::ensure_core_to_be_in_simulation) and FUN_0634bb90
 // (IVP_Environment::add_revive_core) are IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation
-// / IVP_Environment_Enqueue_Core in src/IVP/ivp_physics/ivp_environment.cpp.
+// / IVP_Environment::add_revive_core in src/IVP/ivp_physics/ivp_environment.cpp.
 
 // FUN_06343050. Both arguments go unchanged to the IVP_Controller_Motion constructor
 // FUN_06342c80; this level then fills +0x60..+0xcc.
@@ -193,15 +193,15 @@ void IVP_Controller_Golem::reset_time(IVP_Time Delta)
         TargetPositionTime[1] = (float)Offset;
     }
 
-    if (!(TargetPositionTime[1] >= 0.0f))   // the stored float
+    if (TargetPositionTime[1] >= 0.0f) // the stored float
+        return;
+
+    do
     {
-        do
-        {
-            TargetPositionTime[0] -= 1.0f;
-            Offset = (double)TargetPositionTime[1] + 1.0;
-            TargetPositionTime[1] = (float)Offset;
-        } while (!(Offset >= 0.0));
-    }
+        TargetPositionTime[0] -= 1.0f;
+        Offset = (double)TargetPositionTime[1] + 1.0;
+        TargetPositionTime[1] = (float)Offset;
+    } while (!(Offset >= 0.0));
 }
 
 // FUN_06343580 (__thiscall). Argument order from the call sites (FUN_06288e60 at 0628909c,

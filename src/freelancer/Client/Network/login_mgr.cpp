@@ -618,47 +618,47 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
     for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
     {
         FServerInfo& Server = Servers[ServerIndex];
-        if (Server.ServerSig == Info.ServerSig && Server.Id == Info.Id)
+        if (Server.ServerSig != Info.ServerSig || Server.Id != Info.Id)
+            continue;
+
+        // Refresh the known entry. Address, Port, +0x10, +0x64 and Id are left as they are.
+        Server.bAllowPvp = Info.bAllowPvp;
+        Server.bAllowNewPlayers = Info.bAllowNewPlayers;
+        Server.bPassword = Info.bPassword;
+        Server.Description = Info.Description;
+        Server.Name = Info.Name;
+        Server.PlayerCount = Info.PlayerCount;
+        Server.MaxPlayers = Info.MaxPlayers;
+        Server.ResponseCount = Server.ResponseCount + 1;
+        // Unsigned minimum.
+        if (static_cast<unsigned int>(Info.Ping) < static_cast<unsigned int>(Server.Ping))
         {
-            // Refresh the known entry. Address, Port, +0x10, +0x64 and Id are left as they are.
-            Server.bAllowPvp = Info.bAllowPvp;
-            Server.bAllowNewPlayers = Info.bAllowNewPlayers;
-            Server.bPassword = Info.bPassword;
-            Server.Description = Info.Description;
-            Server.Name = Info.Name;
-            Server.PlayerCount = Info.PlayerCount;
-            Server.MaxPlayers = Info.MaxPlayers;
-            Server.ResponseCount = Server.ResponseCount + 1;
-            // Unsigned minimum.
-            if (static_cast<unsigned int>(Info.Ping) < static_cast<unsigned int>(Server.Ping))
-            {
-                Server.Ping = Info.Ping;
-            }
-            Server.MissedPingCount = 0;
-            Server.LastResponseTime = Info.LastResponseTime;
-            Server.Version = Info.Version;
-            Server.bLan = Info.bLan;
-            bServerListChanged = 1;
-            Server.bEnumInFlight = 0;
-            return;
+            Server.Ping = Info.Ping;
         }
+        Server.MissedPingCount = 0;
+        Server.LastResponseTime = Info.LastResponseTime;
+        Server.Version = Info.Version;
+        Server.bLan = Info.bLan;
+        bServerListChanged = 1;
+        Server.bEnumInFlight = 0;
+        return;
     }
 
     // Always true here, tested all the same; the second search, with the terms the other way
     // round, cannot find what the first one missed.
-    if (Info.bAddressValid != 0 && Info.bSessionValid != 0)
+    if (Info.bAddressValid == 0 || Info.bSessionValid == 0)
+        return;
+
+    for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
     {
-        for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
+        FServerInfo const& Server = Servers[ServerIndex];
+        if (Server.Id == Info.Id && Server.ServerSig == Info.ServerSig)
         {
-            FServerInfo const& Server = Servers[ServerIndex];
-            if (Server.Id == Info.Id && Server.ServerSig == Info.ServerSig)
-            {
-                return;
-            }
+            return;
         }
-        Servers.push_back(Info);                                       // FUN_005ad6a0
-        bServerListChanged = 1;
     }
+    Servers.push_back(Info);                                       // FUN_005ad6a0
+    bServerListChanged = 1;
 }
 
 // .text:005a9990

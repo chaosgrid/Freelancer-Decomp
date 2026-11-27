@@ -136,10 +136,6 @@ int TradeLaneRingLiveCount();
 // the node of the ring's lane direction.
 void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool bActivate);
 
-// FUN_005484c0 (on the solar gameobj) -- a lane ring runs FUN_00516060, then, out
-// of single player, CSolar::activate.
-void TradeLaneClientSolarActivate(FClientGameobj* SolarGo, bool bActivate, unsigned ShipId);
-
 // FUN_0053d940 -- IClient SPObjActivate: FindById(ObjectId); ManagerKind 2 -> 005484c0.
 void TradeLaneSPObjActivate(unsigned ObjectId, bool bActivate, unsigned ShipId);
 

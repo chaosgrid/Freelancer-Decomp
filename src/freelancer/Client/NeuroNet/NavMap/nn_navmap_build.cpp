@@ -178,9 +178,8 @@ void NeuroNetNavMap::AddPlayerMarker()
         char Path[0x200];
         sprintf(Path, "Interface\\NeuroNet\\NavMap\\NewNavMap\\waypoint%d.3db", Index);
         FClientMeshHolder* const Holder = &DigitMeshes[Index];
-        ClientMeshLoadFromPath(Holder, Path, 0, true); // FUN_0059ec80(path, 0, 1)
-        ClientMeshHolderSetColor(Holder,
-                                 reinterpret_cast<unsigned char const*>(&G_NnPaletteAmber));
+        Holder->LoadFromPath(Path, 0, true); // FUN_0059ec80(path, 0, 1)
+        Holder->SetColor(reinterpret_cast<unsigned char const*>(&G_NnPaletteAmber));
         NavMapScaleMeshRotation(Holder, kNavMapWaypointScale);
     }
 }

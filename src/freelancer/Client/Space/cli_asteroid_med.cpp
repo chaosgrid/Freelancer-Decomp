@@ -207,11 +207,11 @@ FCliAsteroidCubeMap& CliAsteroidCubeMap(FCliAsteroid* Field)
     return *reinterpret_cast<FCliAsteroidCubeMap*>(Field->CubeMapStorage);
 }
 
-void CliAsteroidCubeMapConstruct(FCliAsteroid* Field)
+void FCliAsteroid::CubeMapConstruct()
 {
     // Retail's allocator bytes (+0x08, +0x09), the byte at +0x14 and the head node -- one
     // std::map here.
-    new (Field->CubeMapStorage) FCliAsteroidCubeMap();
+    new (CubeMapStorage) FCliAsteroidCubeMap();
 }
 
 void CliAsteroidCubeMapDestruct(FCliAsteroid* Field)

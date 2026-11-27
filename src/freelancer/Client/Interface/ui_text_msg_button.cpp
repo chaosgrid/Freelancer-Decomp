@@ -81,7 +81,7 @@ void UiTextMsgButton::SetOrientation(Matrix const* NewOrientation)
     // LAB_00599e00 (RET 4): with a style mesh bound, the instance is reset to the identity
     // orientation and updated.
     WinControl::SetOrientation(NewOrientation);
-    if (!ClientMeshHolderHasInstance(&MeshHolder))
+    if (!MeshHolder.HasInstance())
         return;
     Matrix Identity;
     Identity.E[0][0] = 1.0f;

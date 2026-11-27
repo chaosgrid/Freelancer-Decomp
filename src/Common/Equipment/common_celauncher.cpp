@@ -165,18 +165,18 @@ void CELauncher::GetStatus(EquipStatus& OutStatus) const
 {
     // RVA 0x39410. EquipFlags: 4 out of ammo (and stop), 8 power met, 2 refire elapsed.
     CEquip::GetStatus(OutStatus);
-    if ((OutStatus.Flags & (EquipStatusFlagDestroyed | EquipStatusFlagDisabled)) == 0)
+    if ((OutStatus.Flags & (EquipStatusFlagDestroyed | EquipStatusFlagDisabled)) != 0)
+        return;
+
+    if (GetAmmoCount() == 0)
     {
-        if (GetAmmoCount() == 0)
-        {
-            OutStatus.EquipFlags |= LauncherStatusInsufficientAmmo;
-            return;
-        }
-        if (PowerNeedsMet())
-            OutStatus.EquipFlags |= LauncherStatusPowerNeedsMet;
-        if (RefireDelayElapsed())
-            OutStatus.EquipFlags |= LauncherStatusRefireElapsed;
+        OutStatus.EquipFlags |= LauncherStatusInsufficientAmmo;
+        return;
     }
+    if (PowerNeedsMet())
+        OutStatus.EquipFlags |= LauncherStatusPowerNeedsMet;
+    if (RefireDelayElapsed())
+        OutStatus.EquipFlags |= LauncherStatusRefireElapsed;
 }
 
 bool CELauncher::Connect(char const* HpName)

@@ -302,7 +302,7 @@ namespace
         FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
         if (Runtime == nullptr)
             return;
-        if (RoomControlIsCameraMoving(Runtime) != 0)
+        if (Runtime->IsCameraMoving() != 0)
             return;
         if (GetClientMouseCursorDrawFlag() != 0)
             return;
@@ -698,7 +698,7 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     bool const bShowCaption = !bFromIntro;
     if ((Runtime == nullptr || RoomControlStartScriptRan(Runtime) == 0) && bShowCaption)
     {
-        if (Runtime != nullptr && !RoomControlHasLandingScript(Runtime))
+        if (Runtime != nullptr && !Runtime->HasLandingScript())
             G_GameflowArrivalDelayMs = 0;
         // The delay is loaded unsigned and multiplied by the float 0.001f.
         float const DelaySeconds = static_cast<float>(

@@ -52,7 +52,7 @@ namespace NebulaVolume
     // RenderEx::Shutdown: destroys the programs, the render target and the noise volume.
     void Shutdown();
 
-    // SpaceObjDrawPass, right after the field controller is picked: chooses the nebulae the
+    // FGameCamera::DrawScene, right after the field controller is picked: chooses the nebulae the
     // volume draws this frame -- every registered nebula the camera is inside, and with
     // [Nebula] exterior those within exterior_max_distance of their surface, nearest first, at
     // most max_nebulae. Controller / Enclosure are DAT_00675244 / DAT_0067524c; bNebulaOption:
@@ -86,18 +86,18 @@ namespace NebulaVolume
     bool ReplacesObjectFog(FNebulaEffect const* Nebula);
     bool ReplacesFogOverlay(FNebulaEffect const* Nebula);
     bool ReplacesClouds(FNebulaEffect const* Nebula);
-    // FNebulaEffect::DrawExteriorBitsPass -> NebulaDrawExteriorBits (the exterior billboards, FUN_00507ed0) and
-    // FNebulaEffect::DrawFogShell -> NebulaDrawFillSheets (the two crossing fill sheets,
+    // FNebulaEffect::DrawExteriorBitsPass -> FNebulaEffect::DrawExteriorBits (the exterior billboards, FUN_00507ed0) and
+    // FNebulaEffect::DrawFogShell -> FNebulaEffect::DrawFillSheets (the two crossing fill sheets,
     // FUN_005074e0), both for the controller and for the far-bucket ZItemNebula nodes.
     bool ReplacesExteriorBits(FNebulaEffect const* Nebula);
     bool ReplacesFillSheets(FNebulaEffect const* Nebula);
     // [Nebula] real_background: while the volume draws the field controller from inside, also
-    // fully inside, SpaceObjDrawPass draws the star sphere and clears to the system's space
+    // fully inside, FGameCamera::DrawScene draws the star sphere and clears to the system's space
     // colour instead of the fog colour -- the volume's haze provides the fog. True from
     // BeginFrame through the end of the frame (the clear colour is set after Draw); false when
     // the controller's draw failed.
     bool ShowsRealBackground();
-    // SpaceObjDrawPass's far plane fully inside a field (retail: FogFarClamp, about [Fog] far
+    // FGameCamera::DrawScene's far plane fully inside a field (retail: FogFarClamp, about [Fog] far
     // + 500): with [Nebula] extend_far_plane, pushed out to 1.5 march caps (the haze has hidden
     // everything there; the thinner haze would otherwise show objects popping in at retail's
     // plane) and at least past the extended asteroid spawn distance, at most MaxFar. RetailFar
@@ -131,7 +131,7 @@ namespace NebulaVolume
     // the volume draws whose surface lies beyond the opaque scene's far plane is drawn here, in
     // painter order with the far solars, rings and asteroid bands, without a depth test.
     void DrawBackground(FNebulaEffect* Nebula, ICamera* Camera);
-    // SpaceObjDrawPass, after the opaque scene (DrainMeshAndAsteroids) and before the effects:
+    // FGameCamera::DrawScene, after the opaque scene (DrainMeshAndAsteroids) and before the effects:
     // ray-marches every nebula not drawn yet (farthest first) against the scene depth and
     // composites each over the back buffer. Near / Far are the planes the scene was drawn with.
     // Ends the frame (IsActive() false).

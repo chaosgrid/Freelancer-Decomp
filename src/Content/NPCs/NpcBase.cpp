@@ -75,13 +75,13 @@ void FContentSpaceObj::SendPendingComm(unsigned int Unused1, unsigned int Key, u
     for (std::vector<FSpaceObjPendingComm>::iterator It = PendingComms.begin();
          It != PendingComms.end(); ++It)
     {
-        if (It->Key == Key)
-        {
-            // SendComm = FUN_06f72930.
-            System->SendComm(SpaceObjId, It->TargetId, It->TextId, 0, 0, nullptr, 0.5f);
-            PendingComms.erase(It);
-            return;
-        }
+        if (It->Key != Key)
+            continue;
+
+        // SendComm = FUN_06f72930.
+        System->SendComm(SpaceObjId, It->TargetId, It->TextId, 0, 0, nullptr, 0.5f);
+        PendingComms.erase(It);
+        return;
     }
 }
 

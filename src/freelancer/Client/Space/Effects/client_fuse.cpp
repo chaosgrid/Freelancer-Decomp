@@ -16,7 +16,7 @@
 #include "common_goods.h"     // FindHardpoint_OS / _PS / HardpointToWorld / HardpointInfo
 #include "common_physys.h"    // PhySys::LinearImpulse
 #include "Space/Effects/particle_effect.h"  // CliCreateEffectOneShot / CliCreateEffectWorldOneShot(On)
-#include "Common/Graphics/vis_effect_arch.h"  // FindEffectArch / EffectArchAddRef / EffectArchRelease
+#include "Common/Graphics/vis_effect_arch.h"  // FindEffectArch / FEffectArch::AddRef / FEffectArch::Release
 #include "common_ini.h"
 #include "DALib.h"
 #include "engine/engbase.h"   // IEngine::GetInstanceTransform (vt+0xa0)
@@ -320,7 +320,7 @@ int StartCameraParticlesAction::Load()
     // FUN_0052b4a0.
     EffectArch = FindEffectArch(&Effect.Id);
     if (EffectArch != nullptr)
-        EffectArchAddRef(EffectArch, 0);
+        EffectArch->AddRef(0);
     return FuseAction::Load();
 }
 
@@ -328,7 +328,7 @@ int StartCameraParticlesAction::UnLoad()
 {
     // FUN_0052b4d0: the pointer is not cleared after the release.
     if (EffectArch != nullptr)
-        EffectArchRelease(EffectArch);
+        EffectArch->Release();
     return FuseAction::UnLoad();
 }
 
@@ -346,10 +346,9 @@ void StartCameraParticlesAction::Trigger(unsigned SourceId, unsigned short SubOb
         // companion out.
         if (!Effect.IsEmpty())
         {
-            CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryCameraParticles,
-                                          FindEffectArch(&Effect.Id),
-                                          reinterpret_cast<Transform const*>(&HostOrient), Pos3,
-                                          nullptr);
+            G_CliEffectFactoryCameraParticles.CreateEffectWorldOneShotOn(FindEffectArch(&Effect.Id),
+                                                                         reinterpret_cast<Transform const*>(&HostOrient), Pos3,
+                                                                         nullptr);
         }
     }
 
@@ -487,7 +486,7 @@ int StartEffectAction::Load()
     // FUN_0052bf40.
     EffectArch = FindEffectArch(&Effect.Id);
     if (EffectArch != nullptr)
-        EffectArchAddRef(EffectArch, 0);
+        EffectArch->AddRef(0);
     return FuseAction::Load();
 }
 
@@ -495,7 +494,7 @@ int StartEffectAction::UnLoad()
 {
     // FUN_0052bf70: the pointer is not cleared after the release.
     if (EffectArch != nullptr)
-        EffectArchRelease(EffectArch);
+        EffectArch->Release();
     return FuseAction::UnLoad();
 }
 

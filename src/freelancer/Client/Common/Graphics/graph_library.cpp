@@ -74,29 +74,29 @@ namespace
 }
 
 // FUN_00419460.
-double GraphRangeWrap(FGraphRange const* Range, float T)
+double FGraphRange::Wrap(float T) const
 {
-    if (Range->bClamp != 0)
+    if (bClamp != 0)
     {
-        if (!(Range->Min < T))
-            T = Range->Min;
+        if (!(Min < T))
+            T = Min;
         // Max - 0.001 stays on the FPU stack; unordered returns the limit.
-        double const Limit = static_cast<double>(Range->Max) - kGraphClampMargin;
+        double const Limit = static_cast<double>(Max) - kGraphClampMargin;
         if (static_cast<double>(T) < Limit)
             return T;
         return Limit;
     }
 
-    float const Span = Range->Max - Range->Min;
-    double const Frac = (static_cast<double>(T) - Range->Min) / Span;
+    float const Span = Max - Min;
+    double const Frac = (static_cast<double>(T) - Min) / Span;
     return fabs(Frac - floor(Frac)) * Span;
 }
 
 // FUN_004194e0.
-double GraphRangeNormalize(FGraphRange const* Range, float T)
+double FGraphRange::Normalize(float T) const
 {
-    return (static_cast<double>(T) - Range->Min) /
-           (static_cast<double>(Range->Max) - Range->Min);
+    return (static_cast<double>(T) - Min) /
+           (static_cast<double>(Max) - Min);
 }
 
 FGraphData::FGraphData()
@@ -201,14 +201,14 @@ double FGraphData::Evaluate(float T, FGraphRange const* Caller)
     {
         // FUN_00419460 inlined with the result stored as a float, then mapped from the caller's
         // range onto this curve's X extent.
-        float const Wrapped = static_cast<float>(GraphRangeWrap(Caller, T));
-        X = GraphRangeNormalize(Caller, Wrapped) *
+        float const Wrapped = static_cast<float>(Caller->Wrap(T));
+        X = Caller->Normalize(Wrapped) *
                 (static_cast<double>(Range.Max) - Range.Min) +
             Range.Min;
     }
     else
     {
-        X = GraphRangeWrap(&Range, T);
+        X = Range.Wrap(T);
     }
 
     int Lo;
@@ -233,14 +233,14 @@ unsigned FGraphData::EvaluateColor(float T, FGraphRange const* Caller)
     double X;
     if (Caller != nullptr)
     {
-        float const Wrapped = static_cast<float>(GraphRangeWrap(Caller, T));
-        X = GraphRangeNormalize(Caller, Wrapped) *
+        float const Wrapped = static_cast<float>(Caller->Wrap(T));
+        X = Caller->Normalize(Wrapped) *
                 (static_cast<double>(Range.Max) - Range.Min) +
             Range.Min;
     }
     else
     {
-        X = GraphRangeWrap(&Range, T);
+        X = Range.Wrap(T);
     }
 
     int Lo;

@@ -398,13 +398,13 @@ void ClientObjDb_RegisterGameobj(FClientGameobj* Go, bool bRemotePhysics)
             LinkGameobj(List, Go);
     }
 
-    if (bRemotePhysics)
-    {
-        FRemotePhysBlock* const Block = new FRemotePhysBlock;
-        Block->ElapsedTime = 0.0;
-        Block->Ship = NarrowShip(Go);
-        G_RemotePhysBlocks.push_back(Block);
-    }
+    if (!bRemotePhysics)
+        return;
+
+    FRemotePhysBlock* const Block = new FRemotePhysBlock;
+    Block->ElapsedTime = 0.0;
+    Block->Ship = NarrowShip(Go);
+    G_RemotePhysBlocks.push_back(Block);
 }
 
 void ClientObjDb_Unregister(FClientGameobj* Go)

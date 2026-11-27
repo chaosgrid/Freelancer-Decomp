@@ -260,8 +260,7 @@ bool LoadEffectLodSection(INI_Reader* Reader)
     return true;
 }
 
-bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance, float Radius,
-                       float* OutBlend)
+bool FEffectLodSizes::RowBlend(ICamera* Cam, float Distance, float Radius, float* OutBlend) const
 {
     // FUN_0042da00. Only a distance strictly below the double 1e-5 gives 1.0 straight away.
     if (static_cast<double>(Distance) < 1e-05)
@@ -277,15 +276,15 @@ bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance,
         (static_cast<double>(Radius) / Distance) * (ZNear * static_cast<double>(XScale));
 
     // At or below min_screen_size (or NaN) the effect is not drawn.
-    if (!(ScreenSize > Row->MinScreenSize))
+    if (!(ScreenSize > MinScreenSize))
     {
         *OutBlend = 0.0f;
         return false;
     }
 
     // Clamped to [0, 1].
-    double Blend = (ScreenSize - Row->MinLodScreenSize) /
-                   (static_cast<double>(Row->MaxLodScreenSize) - Row->MinLodScreenSize);
+    double Blend = (ScreenSize - MinLodScreenSize) /
+                   (static_cast<double>(MaxLodScreenSize) - MinLodScreenSize);
     if (Blend > 1.0)
     {
         *OutBlend = 1.0f;
@@ -302,8 +301,8 @@ bool EffectTypeLodBlend(int TypeIndex, ICamera* Cam, float Distance, float* OutB
     // FUN_0042dcd0. Retail's own null test; lod_type must be 1..6 (signed).
     FEffectTypeInfo const* const Info = EffectTypeInfoByIndex(TypeIndex);
     if (Info != nullptr && Info->LodType > 0 && Info->LodType < kEffectLodTypeCount)
-        return EffectLodRowBlend(&G_EffectLodTable[Info->LodType], Cam, Distance, Info->Radius,
-                                 OutBlend);
+        return G_EffectLodTable[Info->LodType].RowBlend(Cam, Distance, Info->Radius,
+                                                        OutBlend);
     *OutBlend = 1.0f;
     return true;
 }

@@ -34,24 +34,24 @@ namespace
     }
 }
 
-void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node)
+void FEffectTypeBucket::PushFront(void* Node)
 {
     // FUN_004fc920 (on the bucket): only the node is tested.
     if (Node == nullptr)
         return;
 
-    *NodeNext(Node) = Bucket->Head;
+    *NodeNext(Node) = Head;
     *NodePrev(Node) = nullptr;
-    if (Bucket->Head != nullptr)
+    if (Head != nullptr)
     {
-        *NodePrev(Bucket->Head) = Node;
-        Bucket->Head = Node;
-        ++Bucket->Count;
+        *NodePrev(Head) = Node;
+        Head = Node;
+        ++Count;
         return;
     }
-    Bucket->Tail = Node;
-    Bucket->Head = Node;
-    ++Bucket->Count;
+    Tail = Node;
+    Head = Node;
+    ++Count;
 }
 
 void EffectTypeListLink(void* EffectPtr)
@@ -67,7 +67,7 @@ void EffectTypeListLink(void* EffectPtr)
 
     void* const Node = EffectLinkNode(Effect);
     Effect->LinkSelf = Effect;
-    EffectTypeBucketPushFront(&G_EffectTypeBuckets[TypeId], Node);
+    G_EffectTypeBuckets[TypeId].PushFront(Node);
     Effect->RefCount += 1;
 }
 

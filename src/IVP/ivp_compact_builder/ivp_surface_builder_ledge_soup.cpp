@@ -341,17 +341,17 @@ void IVP_SurfaceBuilder_Ledge_Soup::BuildLeafNodes()
     scratch[ScratchIndex - 1].NextIndexOrCount = 0;
 
     // :0636a5be: the loop counter (n, or 0 if the loop never ran) against 1.
-    if (LoopIndex > 1)
-    {
-        const double ExtentX = (double)(m_BBoxMax.X) - m_BBoxMin.X;                  // stays on the stack
-        const float ExtentY = (float)((double)(m_BBoxMax.Y) - m_BBoxMin.Y); // local_3c
-        const float ExtentZ = (float)((double)(m_BBoxMax.Z) - m_BBoxMin.Z); // local_40
+    if (LoopIndex <= 1)
+        return;
 
-        if (!(ExtentX >= ExtentY))
-            m_SplitAxis = !(ExtentY >= ExtentZ) ? 2 : 1;
-        else
-            m_SplitAxis = !(ExtentX >= ExtentZ) ? 2 : 0;
-    }
+    const double ExtentX = (double)(m_BBoxMax.X) - m_BBoxMin.X;                  // stays on the stack
+    const float ExtentY = (float)((double)(m_BBoxMax.Y) - m_BBoxMin.Y); // local_3c
+    const float ExtentZ = (float)((double)(m_BBoxMax.Z) - m_BBoxMin.Z); // local_40
+
+    if (!(ExtentX >= ExtentY))
+        m_SplitAxis = !(ExtentY >= ExtentZ) ? 2 : 1;
+    else
+        m_SplitAxis = !(ExtentX >= ExtentZ) ? 2 : 0;
 }
 
 void IVP_SurfaceBuilder_Ledge_Soup::InsertLedge(IVP_Compact_Ledge* ledge)

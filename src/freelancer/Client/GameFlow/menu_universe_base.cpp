@@ -400,7 +400,7 @@ namespace
                 }
             }
         }
-        RoomControlPlayScenes(Entry->Runtime);
+        Entry->Runtime->PlayScenes();
         NavBarEnsure();
     }
 
@@ -690,7 +690,7 @@ void UpsertClientLocationRoomCharacter(CharacterProperties const& Character)
         State->Characters.Upsert(Character);
     FLocationRoomEntry* const Entry = FindLocationRoomEntry(Character.RoomId);
     if (Entry->Runtime != nullptr)
-        RoomControlUpdateCharacter(Entry->Runtime, Character);
+        Entry->Runtime->UpdateCharacter(Character);
 }
 
 void SetClientLocationRoomCharactersComplete(unsigned LocationId)
@@ -1117,13 +1117,13 @@ void LeaveClientLocationBase()
 
 void DrawClientLocation()
 {
-    // FUN_0043bbc0 (thiscall). RoomControlDraw is FUN_0044b570.
+    // FUN_0043bbc0 (thiscall). FRoomRuntime::Draw is FUN_0044b570.
     if (G_LocationCurrentRoomEntry == nullptr)
         return;
     FRoomRuntime* const Runtime = G_LocationCurrentRoomEntry->Runtime;
     if (Runtime == nullptr)
         return;
-    RoomControlDraw(Runtime);
+    Runtime->Draw();
 }
 
 unsigned GetClientLocationCurrentBase()

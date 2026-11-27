@@ -43,7 +43,8 @@ void FDeformPart::Reset()
     Ib.Capacity = 0;
 
     // FUN_065f17e0 on +0 with no null test.
-    ReleaseLodHolder(Lod);
+    if (Lod != nullptr)
+        Lod->Release();
     // The counted mesh array (header at -4), last to first.
     if (Meshes != nullptr)
     {
@@ -65,7 +66,7 @@ void FDeformPart::Reset()
     // double free.
     if (Lod != nullptr)
     {
-        ReleaseLodHolder(Lod);
+        Lod->Release();
         Lod = nullptr;
     }
 }
@@ -77,12 +78,12 @@ unsigned char FDeformPart::BindMeshes(FLodHolder* Holder, FDeformMesh** InMeshes
     {
         if (Lod != nullptr)
         {
-            ReleaseLodHolder(Lod);
+            Lod->Release();
             Lod = nullptr;
         }
         Lod = Holder;
         if (Holder != nullptr)
-            AddRefLodHolder(Holder);
+            Holder->AddRef();
     }
 
     MeshCount = Count;

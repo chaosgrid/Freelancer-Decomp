@@ -62,8 +62,8 @@ static_assert(sizeof(FBeamEffectArch) == 0x80, "BeamEffectArch 0x80");
 enum EBeamEffectFlag
 {
     kBeamFlagVisible = 0x1,     // frustum / pbubble visibility (UpdateVisibility)
-    kBeamFlagHit = 0x2,         // BeamEffectSetHitFlags bHit
-    kBeamFlagHitPlayer = 0x4,   // BeamEffectSetHitFlags bHitPlayer
+    kBeamFlagHit = 0x2,         // FBeamEffect::SetHitFlags bHit
+    kBeamFlagHitPlayer = 0x4,   // FBeamEffect::SetHitFlags bHitPlayer
     kBeamFlagUseLookDir = 0x8   // the projectile effect's bUseLookDir
 };
 
@@ -87,6 +87,24 @@ struct FBeamEffect : FEffectBase
     float Age;                     // +0x78  = -1.0; restarts at 0, then grows by dt per tick
     float FadeTimeLeft;            // +0x7C  = -1.0 (none); the kill sets 0.3, intensity / 0.3
     float ExtendTime;              // +0x80  = 0.1; the beam reaches full length at Age == this
+
+    // FUN_004f9510 (slot +0x20) around FUN_004f9450 — live count--, BaseWatcher::set(nullptr),
+    // FreeMemory&1 → Heap::Free on the 0x84 pool (EffectFree). No unlink: the bucket walk does it.
+    void Destroy(int FreeMemory);
+
+    // FUN_004fa270 — single-segment cross-billboard builder.
+    int BuildSingleSegment(Transform const* WorldXform, float T, float Intensity);
+
+    // FUN_004fb1e0 — multi-segment builder. Retail reuses frame slots: B4 lands at ESP+0x94 through
+    // a SUB ESP alias, and C3 over UvU1's slot once UvU1 is dead.
+    int BuildMultiSegment(Transform const* WorldXform, float T, float Intensity);
+
+    // FUN_004fc8b0
+    void SetProgressFromSpeed(float Speed);
+
+    // FUN_004fc8f0 -- Flags70 bit 1 = bHit, bit 2 = bHitPlayer (the other bits kept). Caller: Beam
+    // slot 101 LAB_0053f690 with (1, Other == player).
+    void SetHitFlags(bool bHit, bool bHitPlayer);
 };
 
 static_assert(sizeof(FBeamEffect) == 0x84, "BeamEffect 0x84");
@@ -103,45 +121,6 @@ struct FSpaceCamera; // space_camera.h
 
 // FUN_004f9540 — construct; increments DAT_00674f58.
 void BeamEffectConstruct(FBeamEffect* This, unsigned TypeId);
-
-// FUN_004f9510 (slot +0x20) around FUN_004f9450 — live count--, BaseWatcher::set(nullptr),
-// FreeMemory&1 → Heap::Free on the 0x84 pool (EffectFree). No unlink: the bucket walk does it.
-void BeamEffectDestroy(FBeamEffect* This, int FreeMemory);
-
-// LAB_004f9600 — vtable[0] start(EffectArch*): VisBeam → Arch, type=0x2c, EffectTypeListLink.
-unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch);
-
-// LAB_004f97a0 — vtable[+0x04]: arm death / freeze + FadeTimeLeft clamp to DAT_006129cc.
-void BeamEffectArmDeath(FBeamEffect* This);
-
-// LAB_004f9480 — vtable[+0x08]: world translation → Out; returns CullRadius.
-float BeamEffectGetWorldPos(FBeamEffect* This, Vector* Out);
-
-// LAB_004f9980 — vtable[+0x14]: frustum / pbubble visibility → Flags70 bit0.
-unsigned char BeamEffectUpdateVisibility(FBeamEffect* This, float Dt, FSpaceCamera* Cam);
-
-// LAB_004f9c20 — vtable[+0x18]: Age / FadeTimeLeft lifetime; 0 → death (Flags08 bit1).
-unsigned char BeamEffectTickDraw(FBeamEffect* This, float Dt, FSpaceCamera* Cam);
-
-// FUN_004f7d20 — attach Watchable (+8) + EngineIndex + local transform copy.
-void BeamEffectAttach(FBeamEffect* This, void* WatchableOwner, int EngineIndex,
-                      Transform const* LocalXform);
-
-// FUN_004f7a80 / FUN_004f7a90
-void BeamEffectAddRef(FBeamEffect* This);
-int BeamEffectRelease(FBeamEffect* This);
-
-// LAB_004fa0a0 — vtable slot 7 (+0x1c). Stack arg is Cam (unused for T/Intensity).
-unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam);
-
-// FUN_004fa270 — single-segment cross-billboard builder.
-int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform, float T,
-                                 float Intensity);
-
-// FUN_004fb1e0 — multi-segment builder. Retail reuses frame slots: B4 lands at ESP+0x94 through
-// a SUB ESP alias, and C3 over UvU1's slot once UvU1 is dead.
-int BeamEffectBuildMultiSegment(FBeamEffect* This, Transform const* WorldXform, float T,
-                                float Intensity);
 
 extern int G_BeamEffectLiveCount; // DAT_00674f58
 extern void* G_BeamEffectTexture; // DAT_00674f54 — FTexShape* from G_EffectShapeDB.Find("code_beam")

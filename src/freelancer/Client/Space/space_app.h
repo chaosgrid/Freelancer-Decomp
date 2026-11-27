@@ -70,12 +70,12 @@ struct SpaceApp : public IEnvironment
     void Slot06(unsigned A) override;
     int GetEnvironmentType() override;
     void PreInit() override;
-    void Shutdown() override;          // FUN_0054ab20 -- ShutdownSpaceState (space_state.cpp)
+    void Shutdown() override;          // FUN_0054ab20 -- SpaceApp::Shutdown (space_state.cpp)
     void Slot10() override;
     void Resize(int Width, int Height) override; // LAB_0054a540
-    bool Init(int Param) override;     // FUN_0054ab40 -- InitSpaceState
-    void Destroy() override;           // FUN_0054aec0 -- DestroySpaceState
-    int Update(float DeltaSeconds) override;     // LAB_0054b000 -- UpdateSpaceState
+    bool Init(int Param) override;     // FUN_0054ab40 -- SpaceApp::Init
+    void Destroy() override;           // FUN_0054aec0 -- SpaceApp::Destroy
+    int Update(float DeltaSeconds) override;     // LAB_0054b000 -- SpaceApp::Update
 
     //                                      +0x000  vptr .rdata 0x005e0554 (IEnvironment)
     FSpaceAppEventFace Events;              // +0x004  .rdata 0x005e0548

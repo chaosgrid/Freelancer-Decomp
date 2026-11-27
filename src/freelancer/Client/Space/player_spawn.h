@@ -59,7 +59,7 @@ unsigned GetPlayerShipArchetypeId();   // retail DAT_0067337c
 float GetPlayerShipHoldSizeRetail();    // retail FUN_004c4610 (0 if no ship archetype yet)
 unsigned GetPlayerCharacterId();       // retail DAT_00673378
 // IClient slot 61 (LAB_0053d920, REQUESTCREATESHIPRESP): DAT_00678b95 = 1, DAT_00678b94 = Result,
-// DAT_00673378 = CharacterId. The waiter on +0x95 is FUN_0054ab40 (InitSpaceState).
+// DAT_00673378 = CharacterId. The waiter on +0x95 is FUN_0054ab40 (SpaceApp::Init).
 void SetPlayerCreateShipResponse(unsigned char Result, unsigned CharacterId);
 bool IsPlayerCreateShipAnswered();             // DAT_00678b95
 unsigned char GetPlayerCreateShipResult();     // DAT_00678b94

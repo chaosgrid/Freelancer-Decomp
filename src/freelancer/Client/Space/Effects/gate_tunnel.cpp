@@ -97,7 +97,7 @@ namespace
         double IntPart = 0.0;
         float const Frac =
             static_cast<float>(modf(static_cast<double>(Count) * static_cast<double>(T), &IntPart));
-        return GateTunnelCoeffEval(Curve->Coeffs.data() + static_cast<int>(IntPart), Frac);
+        return (Curve->Coeffs.data() + static_cast<int>(IntPart))->Eval(Frac);
     }
 
     // The normalise the light code inlines twice.
@@ -127,10 +127,10 @@ FGateTunnelList::~FGateTunnelList()
 // ---------------------------------------------------------------------------------------------
 // The spline
 
-double GateTunnelCoeffEval(FGateTunnelCoeff const* Coeff, float T)
+double FGateTunnelCoeff::Eval(float T) const
 {
     // FUN_00501c40: Horner form, unrounded.
-    return ((static_cast<double>(T) * Coeff->C3 + Coeff->C2) * T + Coeff->C1) * T + Coeff->C0;
+    return ((static_cast<double>(T) * C3 + C2) * T + C1) * T + C0;
 }
 
 void GateTunnelSolveSpline(float const* Y, int N, std::vector<FGateTunnelCoeff>* Out)
@@ -321,13 +321,13 @@ FGateTunnel::~FGateTunnel()
     }
 
     // The tunnel light, disabled when enabled, then released.
-    if (Light != nullptr)
-    {
-        if ((Light->Flags & kLightFlagEnabled) != 0)
-            GameLightVirtualDisable(Light);
-        GameLightRelease(Light);
-        Light = nullptr;
-    }
+    if (Light == nullptr)
+        return;
+
+    if ((Light->Flags & kLightFlagEnabled) != 0)
+        GameLightVirtualDisable(Light);
+    Light->Release();
+    Light = nullptr;
     // The nine curves and the two layers' FTextureRef destructors (FUN_00426de0) follow as
     // member destruction.
 }
@@ -357,12 +357,12 @@ void FGateTunnel::EnterState1()
     Light = Memory != nullptr ? GameLightConstruct(static_cast<FGameLight*>(Memory)) : nullptr;
 
     // Directional, at the origin, white, range 500000.
-    EngineLightSetType(Light, kLightDirectional, false);
+    Light->SetType(kLightDirectional, false);
     Vector const Origin = {0.0f, 0.0f, 0.0f};
-    EngineLightSetPosition(Light, &Origin);
+    Light->SetPosition(&Origin);
     unsigned char const White[3] = {0xff, 0xff, 0xff};
-    EngineLightSetColorBytesAlt(Light, White);
-    EngineLightSetRangeRaw(Light, 500000.0f);
+    Light->SetColorBytesAlt(White);
+    Light->SetRangeRaw(500000.0f);
 
     // The first rand() is kept as a double for z; the second becomes x.
     double const RandZ = static_cast<double>(rand()) * kRandHalfUnit;
@@ -373,12 +373,12 @@ void FGateTunnel::EnterState1()
                      static_cast<double>(LightDirection.y) * LightDirection.y +
                          static_cast<double>(LightDirection.z) * LightDirection.z +
                          static_cast<double>(LightDirection.x) * LightDirection.x);
-    EngineLightSetDirection(Light, &LightDirection);
+    Light->SetDirection(&LightDirection);
 
     // A refused enable releases it; an accepted light is switched off again until Draw needs it.
-    if (!GameLightEnable(Light))
+    if (!Light->FGameLight::Enable())
     {
-        GameLightRelease(Light);
+        Light->Release();
         Light = nullptr;
         return;
     }
@@ -395,13 +395,13 @@ void FGateTunnel::EnterState2()
 void FGateTunnel::EnterState3()
 {
     // FUN_005012a0.
-    if (Light != nullptr)
-    {
-        if ((Light->Flags & kLightFlagEnabled) != 0)
-            GameLightVirtualDisable(Light);
-        GameLightRelease(Light);
-        Light = nullptr;
-    }
+    if (Light == nullptr)
+        return;
+
+    if ((Light->Flags & kLightFlagEnabled) != 0)
+        GameLightVirtualDisable(Light);
+    Light->Release();
+    Light = nullptr;
 }
 
 void FGateTunnel::SetState(int NewState)
@@ -654,7 +654,7 @@ void FGateTunnel::Update(float Dt)
         unsigned char const Packed[4] = {static_cast<unsigned char>(Red),
                                          static_cast<unsigned char>(Green),
                                          static_cast<unsigned char>(Blue), 0xff};
-        EngineLightSetColorBytes(Light, Packed);
+        Light->SetColorBytes(Packed);
 
         // Direction weighted by kLightDirWeight plus three fresh
         // [-1, 1) draws (the first goes to z, rounded to a float, the second to y, the third
@@ -674,7 +674,7 @@ void FGateTunnel::Update(float Dt)
                          static_cast<double>(LightDirection.x) * LightDirection.x +
                              static_cast<double>(LightDirection.y) * LightDirection.y +
                              static_cast<double>(LightDirection.z) * LightDirection.z);
-        EngineLightSetDirection(Light, &LightDirection);
+        Light->SetDirection(&LightDirection);
     }
 
     // Every layer's texture scrolls.
@@ -695,7 +695,7 @@ void FGateTunnel::Draw(FSpaceCamera* Camera)
 
     // A light that is off is switched on for the draw.
     if (Light != nullptr && (Light->Flags & kLightFlagEnabled) == 0)
-        GameLightEnable(Light);
+        Light->FGameLight::Enable();
 
     Win3DApplyCamera(AsCamera(Camera));
     Win3DDisable(kWin3DCullFace);
@@ -1007,10 +1007,10 @@ FGateTunnel* GateTunnelFind(ID_String const* Id)
     return nullptr;
 }
 
-void GateTunnelSetShip(FGateTunnel* Tunnel, FClientShipGameobj* Ship)
+void FGateTunnel::SetShip(FClientShipGameobj* Ship)
 {
     // FUN_004ff3b0.
-    Tunnel->Ship = Ship;
+    this->Ship = Ship;
 }
 
 void GateTunnelsClear()
@@ -1180,7 +1180,7 @@ void GateTunnelIniLoad(char const* Path)
                     // The ShapeDB lookup warns on a miss itself, and this file warns too.
                     FTexShape* const Shape = G_EffectShapeDB.Find(Reader.get_value_string());
                     if (Shape != nullptr)
-                        TexShapeSetTexture(&Layer->Texture, Shape->Texture);
+                        Layer->Texture.SetTexture(Shape->Texture);
                     else
                     {
                         FDUMP(kFdumpWarning,

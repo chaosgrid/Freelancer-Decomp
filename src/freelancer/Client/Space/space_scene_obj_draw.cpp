@@ -257,7 +257,7 @@ namespace
     bool CameraHasWatchedObject(FSpaceCamera* Cam)
     {
         // FUN_0051b250's head: the watcher at +0xc0 set, and the object it yields (watcher - 8)
-        // non-null. There is no test of `this`; the caller test lives in UpdateSpaceState.
+        // non-null. There is no test of `this`; the caller test lives in SpaceApp::Update.
         FGameCamera* Gc = reinterpret_cast<FGameCamera*>(Cam);
         const void* Watched = Gc->Watched.target();
         if (Watched == nullptr)
@@ -822,7 +822,7 @@ namespace
         for (int I = 0; I < FilterCount; ++I)
         {
             FEngineLight* const Light = static_cast<FEngineLight*>(OutSlots[I]);
-            if (EngineLightAffectsPoint(Light, Pos3, Radius))
+            if (Light->AffectsPoint(Pos3, Radius))
             {
                 OutSlots[OutCount] = Light;
                 ++OutCount;
@@ -1403,7 +1403,7 @@ namespace
     // FUN_004ffab0 / FUN_004ffbb0 / FUN_004ffe50 (GateTunnel draw, frame, layer strips) are
     // FGateTunnel::Draw / BuildFrame / EmitLayer in gate_tunnel.cpp.
 
-    // FUN_004f7db0 lives in effect_base.cpp as EffectFreezeToWorld.
+    // FUN_004f7db0 lives in effect_base.cpp as FEffectBase::FreezeToWorld.
 
     // FUN_004f7810 — walk DAT_00674ce4[Type] with death/LOD arms.
     void EffectTypeBucketWalk(FSpaceCamera* Cam, float Dt, int TypeIndex)
@@ -1449,7 +1449,7 @@ namespace
             {
                 // The inlined FUN_004f7af0 link.
                 EffectTypeListLink(Effect);
-                EffectFreezeToWorld(static_cast<FEffectBase*>(Effect));
+                static_cast<FEffectBase*>(Effect)->FreezeToWorld();
                 *reinterpret_cast<unsigned char*>(E + 8) =
                     static_cast<unsigned char>(*reinterpret_cast<unsigned char*>(E + 8) | 2u);
             }
@@ -1554,8 +1554,8 @@ namespace
                 G_EffectVertexBatch.bCloseLoop = 0;
                 G_EffectVertexBatch.StripCounter = 0;
                 G_EffectVertexBatch.IndexCount = 0;
-                EffectVertexBatchGrowVertices(&G_EffectVertexBatch);
-                EffectVertexBatchEnsureIndices(&G_EffectVertexBatch, 1);
+                G_EffectVertexBatch.GrowVertices();
+                G_EffectVertexBatch.EnsureIndices(1);
             }
             for (int T = EFT_CODE_PROJ_EFFECT; T < kEffectTypeCount; ++T)
                 EffectTypeBucketWalk(Cam, ClampedDt, T);
@@ -1618,7 +1618,7 @@ namespace
 
     void FZItemAsteroidField::Draw(FSpaceCamera* Cam)
     {
-        CliAsteroidDrawFarPiece(static_cast<FCliAsteroid*>(Object), Cam, static_cast<int>(LodWord));
+        (static_cast<FCliAsteroid*>(Object))->DrawFarPiece(Cam, static_cast<int>(LodWord));
     }
 
     void FZItemPlanetRing::Draw(FSpaceCamera* Cam)
@@ -1780,7 +1780,7 @@ namespace
                 // No test of the zone.
                 Universe::IZone* const Zone = Field->Zone;
 
-                int const Pieces = CliAsteroidPieceCount(Field); // FUN_00524730
+                int const Pieces = Field->PieceCount(); // FUN_00524730
                 if (Pieces == 1)
                 {
                     // The difference built as a float Vector (FUN_00422b80).
@@ -1845,7 +1845,7 @@ namespace
                 {
                     // FUN_00524740; the result is not tested.
                     float World[3] = {};
-                    CliAsteroidGetPiecePos(Field, Piece, World);
+                    Field->GetPiecePos(Piece, World);
 
                     if (G_PanelPieceMath == nullptr)
                         G_PanelPieceMath = Acquire3DMathEngine();
@@ -1855,7 +1855,7 @@ namespace
                     float ViewPoint3[3] = {ViewPoint.x, ViewPoint.y, ViewPoint.z};
 
                     // FUN_005247f0 radius; a sphere class below 3 skips the piece.
-                    float const Radius = CliAsteroidGetPieceRadius(Field, Piece);
+                    float const Radius = Field->GetPieceRadius(Piece);
                     unsigned short const Class =
                         static_cast<unsigned short>(LocalCam->ClassifySphere((const Vector*)ViewPoint3, Radius));
                     if (Class < 3)
@@ -2021,16 +2021,17 @@ I3DMathEngine* GameobjMathEngine()
     return G_GameobjMathEngine;
 }
 
-void GameobjSweepEffectListRetail(FGameobjEffectList* List)
+void FGameobjEffectList::Sweep()
 {
     // FUN_004fd040 -- the body is GameobjSweepEffectList above.
-    GameobjSweepEffectList(List);
+    GameobjSweepEffectList(this);
 }
 
-void GameobjUpdateDrawLightingRetail(FClientGameobj* Self, void* Camera)
+// FUN_00539b40 -- the body is FClientGameobj::UpdateDrawLighting (space_scene_obj_draw.cpp).
+void FClientGameobj::UpdateDrawLighting(void* Camera)
 {
     // FUN_00539b40 -- the body is GameobjUpdateDrawLighting above.
-    GameobjUpdateDrawLighting(Self, Camera);
+    GameobjUpdateDrawLighting(this, Camera);
 }
 
 double SpaceEffectPerfOneMinus()
@@ -2046,14 +2047,14 @@ void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, uns
     StarSysApplyObjectLighting(Pos3, Radius, Camera, NebulaBits, FogFactorBits, Flag);
 }
 
-void SpaceCameraSetNearFar(FSpaceCamera* Cam, float ZNear, float ZFar)
+void FSpaceCamera::SetNearFar(float ZNear, float ZFar)
 {
     // FUN_0040fb60 -- the body is CameraSetNearFar above.
-    CameraSetNearFar(Cam, ZNear, ZFar);
+    CameraSetNearFar(this, ZNear, ZFar);
 }
 
-unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
-                               unsigned const* CachedLod)
+// FUN_00539820 -- the body is FClientGameobj::PickLod (space_scene_obj_draw.cpp), which
+unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
 {
     // FUN_00539820. A cached LOD whose low word is non-zero is the answer.
     if (CachedLod != nullptr && static_cast<unsigned short>(*CachedLod) != 0)
@@ -2063,7 +2064,7 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
     }
 
     Vector Center;
-    const float Radius = Self->GetPhysicalRadius(Center);
+    const float Radius = GetPhysicalRadius(Center);
 
     // Center into view space through DAT_006789d0.
     ICamera* const Cam = static_cast<ICamera*>(Camera);
@@ -2089,9 +2090,9 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
         // The archetype's companion, or 0 without an object or an archetype; its +0x08 / +0x0c
         // are read with no further test.
         unsigned char const* Companion = nullptr;
-        if (Self->Object != nullptr && Self->Object->get_archetype() != nullptr)
+        if (Object != nullptr && Object->get_archetype() != nullptr)
             Companion = reinterpret_cast<unsigned char const*>(
-                Self->Object->get_archetype()->Companion);
+                Object->get_archetype()->Companion);
         const float DistRender = *reinterpret_cast<float const*>(Companion + 0x08);
         const float DistLod = *reinterpret_cast<float const*>(Companion + 0x0c);
 
@@ -2119,15 +2120,16 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
     return OutLod;
 }
 
-unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
-                                  unsigned CachedLod, Transform const* Xform, void* Extra)
+// FUN_00539980 -- the body is FClientGameobj::SubmitDraw (space_scene_obj_draw.cpp).
+unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+                                  Transform const* Xform, void* Extra)
 {
     // FUN_00539980
-    Self->PreSubmitDraw();
+    PreSubmitDraw();
 
     // The pick is written back over the CachedLod argument, which every later read uses.
     unsigned PickedLod = 0;
-    CachedLod = *Self->PickLod(&PickedLod, Camera, &CachedLod);
+    CachedLod = *PickLod(&PickedLod, Camera, &CachedLod);
     unsigned short const Lo = static_cast<unsigned short>(CachedLod);
     short const Hi = static_cast<short>(CachedLod >> 16);
 
@@ -2139,14 +2141,14 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     }
 
     if (Hi < 1)
-        GameobjSweepEffectList(&Self->EffectList);
+        GameobjSweepEffectList(&EffectList);
 
-    Self->UpdateDrawLighting(Camera);
+    UpdateDrawLighting(Camera);
 
     // 8 unless this object is the player's IObjRW. For the player, FUN_004022d0 (DAT_006101d4)
     // above 0.75 (or unordered) -> 0; otherwise FUN_00402580 with its result unused, and 0x80.
     unsigned long Flags = 0;
-    if (static_cast<void*>(static_cast<IObjRW*>(Self)) != GetPlayerObjRW())
+    if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
     {
         Flags = 8u;
     }
@@ -2160,7 +2162,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         }
         else
         {
-            BindRendererLods(static_cast<intptr_t>(Self->get_index()), 1,
+            BindRendererLods(static_cast<intptr_t>(get_index()), 1,
                              nullptr);
             Flags = 0x80u;
         }
@@ -2176,21 +2178,21 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         Flags |= 0x120u;
     }
 
-    long const Inst = Self->get_index();
+    long const Inst = get_index();
 
     // FUN_005b3510(0) above 0 (NaN skips).
     if (GetPerfOptionSlot(kPerfSlotUseEnvironmentMaps) > 0.0f && Hi < 1 && Extra == nullptr)
     {
         // The companion's envmap name is read with no test; an empty name skips.
         Archetype::ICliObj* Companion = nullptr;
-        if (Self->Object != nullptr && Self->Object->get_archetype() != nullptr)
-            Companion = Self->Object->get_archetype()->Companion;
+        if (Object != nullptr && Object->get_archetype() != nullptr)
+            Companion = Object->get_archetype()->Companion;
         if (Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0')
         {
             // The same lookup again for the name that is passed on.
             Archetype::ICliObj* NameCompanion = nullptr;
-            if (Self->Object != nullptr && Self->Object->get_archetype() != nullptr)
-                NameCompanion = Self->Object->get_archetype()->Companion;
+            if (Object != nullptr && Object->get_archetype() != nullptr)
+                NameCompanion = Object->get_archetype()->Companion;
             char const* const Envmap = Archetype::CliObjEnvmapMaterial(NameCompanion);
 
             if (GetAppearanceOverrideMaterial(4u, &Extra))
@@ -2223,26 +2225,27 @@ namespace
     }
 }
 
-unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod, void* Camera,
-                                      unsigned CachedLod, Transform const* Xform, void* Extra)
+// FUN_00533780 -- the body is FClientEquippedObj::SubmitDraw (space_scene_obj_draw.cpp).
+unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+                                      Transform const* Xform, void* Extra)
 {
     // FUN_00533780. Retail also tests `this` for null; a virtual call cannot arrive with a null
     // `this`. The CEqObj's +0x140 is read with no test; not above 0 (NaN included) takes the
     // else branch.
-    CEqObj* const EqObj = EquippedObjEqObj(Self);
+    CEqObj* const EqObj = EquippedObjEqObj(this);
     float const Fade = EqObj->CloakPercent;
     if (Fade > 0.0f)
     {
         // FUN_00533880 with the float's bits.
         float const Opacity = static_cast<float>(1.0 - static_cast<double>(Fade));
-        Self->bCloakOverrideActive = 1;
-        long const Inst = Self->get_index();
+        bCloakOverrideActive = 1;
+        long const Inst = get_index();
         void* OpacityBits = nullptr;
         memcpy(&OpacityBits, &Opacity, sizeof(float));
         SetAppearanceInstanceValue(static_cast<intptr_t>(Inst), OpacityBits);
 
         // A non-nomad archetype -> FUN_00533930(3, &Extra), the result ignored.
-        CEqObj* const Again = EquippedObjEqObj(Self);
+        CEqObj* const Again = EquippedObjEqObj(this);
         if (Again != nullptr)
         {
             Archetype::EqObj* const Arch = Again->eqobjarch();
@@ -2250,16 +2253,16 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
                 GetAppearanceOverrideMaterial(3u, &Extra);
         }
     }
-    else if (Self->bCloakOverrideActive != 0)
+    else if (bCloakOverrideActive != 0)
     {
-        Self->bCloakOverrideActive = 0;
-        long const Inst = Self->get_index();
+        bCloakOverrideActive = 0;
+        long const Inst = get_index();
         if (Inst != -1)
             RemoveAppearanceInstanceValue(static_cast<int>(Inst));
     }
 
     // FUN_00539980 called directly (not through the vtable), Extra as possibly rewritten above.
-    GameobjSubmitDrawRetail(Self, OutLod, Camera, CachedLod, Xform, Extra);
+    FClientGameobj::SubmitDraw(OutLod, Camera, CachedLod, Xform, Extra);
     return OutLod;
 }
 
@@ -2284,8 +2287,9 @@ namespace
     }
 }
 
-void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
+void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 {
+    FSpaceCamera* Cam = (FSpaceCamera*)this;
     // FUN_0051c200. No test of `this`: the callers -- GameCamera slot 0x78, FUN_0051b250 and
     // the first-person scene slot FUN_00518420 -- run on a live camera.
     FGameCamera* const Gc = reinterpret_cast<FGameCamera*>(Cam);
@@ -2306,7 +2310,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
 
             // Anything but equal (NaN included) re-applies the base through FUN_0040f8c0.
             if (Camera->GetHalfFovXDeg() != Gc->BaseHalfFovXDeg)
-                SpaceCameraSetHalfFovX(Cam, Gc->BaseHalfFovXDeg);
+                Cam->SetHalfFovX(Gc->BaseHalfFovXDeg);
 
             // The +0x188 object is used unchecked.
             JumpShipEffectDrawTunnel(Ship->JumpEffect, Cam);
@@ -2576,7 +2580,7 @@ void SpaceCameraRenderSlot78(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Pa
     if (!CameraHasWatchedObject(Cam))
         return;
 
-    SpaceObjDrawPass(Cam, LayerFlags, Param2);
+    static_cast<FGameCamera*>(Cam)->FGameCamera::DrawScene(LayerFlags, Param2);
 
 #ifdef FREELANCER_RP9
     // Port-only (no retail counterpart): the Direct3D 9 extension passes that need the finished
@@ -2589,11 +2593,10 @@ void SpaceCameraRenderSlot78(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Pa
 
     // A direct (non-virtual) call of FUN_0051daa0 -- HUDCamera's slot 0x78 body, which reads
     // only GameCamera fields. Its two stack arguments are never read.
-    (void)Param2;
-    HudCameraDraw(reinterpret_cast<FGameCamera*>(Cam));
+    static_cast<FHudCamera*>(Cam)->FHudCamera::DrawScene(LayerFlags, Param2);
 }
 
-void SpaceEnvFxBeginCockpitPass(FSpaceCamera* Cam)
+void FSpaceCamera::EnvFxBeginCockpitPass()
 {
     // FUN_0051c970 (thiscall on the camera). Only with options 0x25, 0x24 and 0x28 all on, in
     // that order, each result tested before the next is read.
@@ -2617,12 +2620,12 @@ void SpaceEnvFxBeginCockpitPass(FSpaceCamera* Cam)
         }
         else
         {
-            Item->Draw(Cam, 1.0f);
+            Item->Draw(this, 1.0f);
         }
     }
 }
 
-void SpaceEnvFxEndCockpitPass(FSpaceCamera* Cam)
+void FSpaceCamera::EnvFxEndCockpitPass()
 {
     // FUN_0051c9e0 (thiscall on the camera): the same three option tests, then slot 0x14 with
     // (camera, 1.0f) on every entry -- no field-quality branch here.
@@ -2637,7 +2640,7 @@ void SpaceEnvFxEndCockpitPass(FSpaceCamera* Cam)
     for (FStarSphereListNode* N = Sent->Next; N != Sent; N = N->Next)
     {
         FStarSphere* const Item = N->Sphere;
-        Item->DrawFlare(Cam, 1.0f);
+        Item->DrawFlare(this, 1.0f);
     }
 }
 

@@ -117,30 +117,30 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
 
         // The setpoint override.
         char const* const SetpointName = SetpointNames[Index];
-        if (SetpointName != nullptr)
-        {
-            // Every setpoint is compared; the last case-insensitive match wins.
-            SetpointInfo const* Found = nullptr;
-            for (unsigned SetpointIndex = 0; SetpointIndex < Room->Setpoints.size(); ++SetpointIndex)
-            {
-                // DACOM.DLL stricmp, not the CRT.
-                if (CallDacomStricmp(SetpointName, Room->Setpoints[SetpointIndex]->Name) == 0)
-                    Found = Room->Setpoints[SetpointIndex];
-            }
+        if (SetpointName == nullptr)
+            continue;
 
-            if (Found != nullptr)
-            {
-                LightFrames[Index] = Found->Frame;
-            }
-            else
-            {
-                // Two errors, the first with an empty script name (.rdata:063997b0).
-                FDUMP(kFdumpError,
-                      "%s(%d) : *** ERROR: script %s calls for setpoint %s which does not exist in room .ini = %s\n",
-                      kRoomDataFile, 0x5a8, "", SetpointName, Room->File);
-                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find setpoint %s\n",
-                      kRoomDataFile, 0x194, SetpointName);
-            }
+        // Every setpoint is compared; the last case-insensitive match wins.
+        SetpointInfo const* Found = nullptr;
+        for (unsigned SetpointIndex = 0; SetpointIndex < Room->Setpoints.size(); ++SetpointIndex)
+        {
+            // DACOM.DLL stricmp, not the CRT.
+            if (CallDacomStricmp(SetpointName, Room->Setpoints[SetpointIndex]->Name) == 0)
+                Found = Room->Setpoints[SetpointIndex];
+        }
+
+        if (Found != nullptr)
+        {
+            LightFrames[Index] = Found->Frame;
+        }
+        else
+        {
+            // Two errors, the first with an empty script name (.rdata:063997b0).
+            FDUMP(kFdumpError,
+                  "%s(%d) : *** ERROR: script %s calls for setpoint %s which does not exist in room .ini = %s\n",
+                  kRoomDataFile, 0x5a8, "", SetpointName, Room->File);
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find setpoint %s\n",
+                  kRoomDataFile, 0x194, SetpointName);
         }
     }
 

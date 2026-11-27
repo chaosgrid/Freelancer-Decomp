@@ -45,19 +45,19 @@ namespace
     // "never finished" `XOR AL,AL / RET`). Slot 0x54 stays GameCamera's (LAB_0051b3b0).
 }
 
-void DockingCameraConstruct(FDockingCamera* Cam)
+void FDockingCamera::Construct()
 {
     // No null test on `this`.
-    GameCameraConstruct((FGameCamera*)Cam);
+    FGameCamera::Construct();
 
-    Cam->bFadePending = 0;          // a BYTE
-    Cam->TotalSeconds = 0.0f;       // written as a zero dword
-    Cam->ElapsedSeconds = 0.0f;
+    bFadePending = 0;          // a BYTE
+    TotalSeconds = 0.0f;       // written as a zero dword
+    ElapsedSeconds = 0.0f;
 
     // Retail then sets the vptr to PTR_LAB_005dc2d4.
 }
 
-void DockingCameraAttach(FDockingCamera* Cam, void* Object)
+void FDockingCamera::Attach(void* Object)
 {
     // Before the watcher is touched, the player ship stops steering: behaviour direction reset
     // and strafe burst cancelled, both through IBehaviorManager on the player IObjRW.
@@ -70,19 +70,19 @@ void DockingCameraAttach(FDockingCamera* Cam, void* Object)
                                                  kWatchableOffset)
             : nullptr;
 
-    if (Target != Cam->Watched.target())
-        Cam->Watched.set(Target);
+    if (Target != Watched.target())
+        Watched.set(Target);
 }
 
-bool DockingCameraActivate(FDockingCamera* Cam, const int* ViewRect4)
+bool FDockingCamera::Activate(int const* ViewRect4)
 {
-    const bool bBaseResult = GameCameraActivate((FGameCamera*)Cam, ViewRect4);
+    const bool bBaseResult = FGameCamera::Activate(ViewRect4);
 
     SetLetterboxTarget(1.0f, kLetterboxSpeed);
 
     // Clears the FLAG only: the two floats keep whatever the last sequence left, and the arm
     // rewrites both.
-    Cam->bFadePending = 0;
+    bFadePending = 0;
 
     // Unlike the script and static cameras, this one does NOT notify the ship (the calls are
     // absent from 0x0051ea50).
@@ -90,15 +90,15 @@ bool DockingCameraActivate(FDockingCamera* Cam, const int* ViewRect4)
     return bBaseResult;
 }
 
-void DockingCameraDeactivate(FDockingCamera* Cam)
+void FDockingCamera::Deactivate()
 {
     // The base deactivate is the empty IDPMsgHandler::OnDisconnect.
     SetLetterboxTarget(0.0f, kLetterboxSpeed);
 
-    Cam->bFadePending = 0;
+    bFadePending = 0;
 }
 
-void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds)
+void FDockingCamera::Update(float DeltaSeconds)
 {
     // The aim half runs only while there is a ship; the countdown half runs either way.
     void* const Ship = GetPlayerShipObjRW();
@@ -109,7 +109,7 @@ void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds)
         const float Ship3[3] = {ShipPosition.x, ShipPosition.y, ShipPosition.z};
 
         // The camera's position comes through its slot 0x0c, not off the field.
-        FSpaceCamera* const Base = (FSpaceCamera*)Cam;
+        FSpaceCamera* const Base = (FSpaceCamera*)this;
         const Vector* const CameraPosition = AsCamera(Base)->GetPosition();
 
         Vector Direction;
@@ -131,54 +131,34 @@ void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds)
     }
 
     // The docking fade, once armed.
-    if (!Cam->bFadePending)
+    if (!bFadePending)
         return;
 
     // The subtraction below uses the unrounded sum (FST leaves it on the FPU).
     const double ElapsedSum =
-        static_cast<double>(DeltaSeconds) + static_cast<double>(Cam->ElapsedSeconds);
-    Cam->ElapsedSeconds = static_cast<float>(ElapsedSum);
+        static_cast<double>(DeltaSeconds) + static_cast<double>(ElapsedSeconds);
+    ElapsedSeconds = static_cast<float>(ElapsedSum);
 
     // Once the REMAINING time drops below the fade's own duration the fade starts, so it ends
     // with the docking sequence. Ordered "less" only.
-    const double Remaining = static_cast<double>(Cam->TotalSeconds) - ElapsedSum;
+    const double Remaining = static_cast<double>(TotalSeconds) - ElapsedSum;
     if (!(Remaining < static_cast<double>(GetFadeDuration())))
         return;
 
     // Disarmed first, so the fade is started exactly once.
-    Cam->bFadePending = 0;
+    bFadePending = 0;
     FadeOut();
 }
 
-void DockingCameraBeginSequence(FDockingCamera* Cam, float Seconds)
+void FDockingCamera::BeginSequence(float Seconds)
 {
     // FUN_0051ebd0.
-    Cam->bFadePending = 1;
-    Cam->TotalSeconds = Seconds;
-    Cam->ElapsedSeconds = kDockingElapsedSeed;
-}
-
-void FDockingCamera::Attach(void* Object)
-{
-    DockingCameraAttach(this, Object);
+    bFadePending = 1;
+    TotalSeconds = Seconds;
+    ElapsedSeconds = kDockingElapsedSeed;
 }
 
 bool FDockingCamera::IsFinished()
 {
     return false;   // FUN_0044fd00
-}
-
-bool FDockingCamera::Activate(int const* ViewRect4)
-{
-    return DockingCameraActivate(this, ViewRect4);
-}
-
-void FDockingCamera::Deactivate()
-{
-    DockingCameraDeactivate(this);
-}
-
-void FDockingCamera::Update(float DeltaSeconds)
-{
-    DockingCameraUpdate(this, DeltaSeconds);
 }

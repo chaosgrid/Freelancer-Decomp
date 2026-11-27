@@ -101,7 +101,7 @@ unsigned char FParticleTunnel::TickDraw(float Dt, FSpaceCamera* Cam)
     // LAB_00513510: the world orientation with the camera's position becomes the local
     // transform; then the particle's own tick, whose answer is returned.
     Transform World;
-    EffectGetWorldTransform(reinterpret_cast<FEffectBase const*>(Self), &World);
+    reinterpret_cast<FEffectBase const*>(Self)->GetWorldTransform(&World);
     const Vector* const CamPos = AsCamera(Cam)->GetPosition();
     Transform Local;
     Local.Rotation = World.Rotation;
@@ -109,7 +109,9 @@ unsigned char FParticleTunnel::TickDraw(float Dt, FSpaceCamera* Cam)
     Local.Translation.y = CamPos->y;
     Local.Translation.z = CamPos->z;
     Self->LocalXform = Local;
-    return ParticleEffectTickDraw(Self, Dt, Cam);
+// FUN_004f8a20 — vtable[+0x18]: run-time countdown / ale-finished test (dead on either), then
+// FUN_004f8360 and, with an IFxEffect, SetLod(+0x80), transform, update and tick by Dt.
+    return Self->FParticleEffect::TickDraw(Dt, Cam);
 }
 
 FParticleEffect::FParticleEffect(unsigned TypeId) : FEffectBase(TypeId)
@@ -135,87 +137,87 @@ FParticleEffectCruise::FParticleEffectCruise() : FParticleEffect(0)
 float FParticleEffect::GetWorldPos(Vector* Out)
 {
     Transform World;
-    EffectGetWorldTransform(this, &World);
+    GetWorldTransform(&World);
     *Out = World.Translation;
     return Radius74;
 }
 
 
-void ParticleEffectCleanupAlchemy(FParticleEffect* This)
+void FParticleEffect::CleanupAlchemy()
 {
     // FUN_004f8110. No test of DALib::Alchemy.
-    if (This->FxEffect != nullptr)
+    if (FxEffect != nullptr)
     {
-        This->FxEffect->DestroyNodes(reinterpret_cast<void*>(7));
-        static_cast<IDAComponent*>(This->FxEffect)->Release();
-        This->FxEffect = nullptr;
+        FxEffect->DestroyNodes(reinterpret_cast<void*>(7));
+        static_cast<IDAComponent*>(FxEffect)->Release();
+        FxEffect = nullptr;
     }
-    if (This->FxNode != nullptr)
+    if (FxNode != nullptr)
     {
-        DALib::Alchemy->DetachNode(This->FxNode);
-        This->FxNode->Release();
-        This->FxNode = nullptr;
+        DALib::Alchemy->DetachNode(FxNode);
+        FxNode->Release();
+        FxNode = nullptr;
     }
 }
 
-unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
+unsigned char FParticleEffect::CreateAlchemyNodes()
 {
     // FUN_004f8360. No null tests on `this`, the DALib globals or the VisEffect.
     // Already created -> 1; not started (bit 4 clear) -> 0.
-    if ((This->Flags7C & kParticleFlagFxCreated) != 0)
+    if ((Flags7C & kParticleFlagFxCreated) != 0)
         return 1;
-    if ((This->Flags7C & kParticleFlagStarted) == 0)
+    if ((Flags7C & kParticleFlagStarted) == 0)
         return 0;
 
     AGGDESC Desc = {8, "FxNode"};
     GENRESULT const NodeHr = DALib::Dacom->CreateInstance(
-        &Desc, reinterpret_cast<void**>(&This->FxNode));
+        &Desc, reinterpret_cast<void**>(&FxNode));
     if (NodeHr != GR_OK)
     {
         FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: ParticleEffect::start_effect: couldnt create ale.tree "
               "for %s",
-              "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3dc, This->Vis->Nickname);
-        This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagStarted);
+              "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3dc, Vis->Nickname);
+        Flags7C = static_cast<unsigned char>(Flags7C & ~kParticleFlagStarted);
         return 0;
     }
 
     // FUN_0042e080's answer is not read. Bit 3 records that this effect holds a reference
     // (released by the destructor).
-    VisEffectArchAddRef(This->Vis);
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagArchRef);
+    Vis->AddRef();
+    Flags7C = static_cast<unsigned char>(Flags7C | kParticleFlagArchRef);
 
     // The out pointer is the member itself.
-    unsigned long const Key = This->Vis->EffectCrc;
+    unsigned long const Key = Vis->EffectCrc;
     GENRESULT const Hr = DALib::FxEffectLibrary->CreateEffect(
-        This->FxNode, reinterpret_cast<void*>(Key), &This->FxEffect);
+        FxNode, reinterpret_cast<void*>(Key), &FxEffect);
     if (Hr != GR_OK)
     {
         if (Hr == static_cast<GENRESULT>(-8))
         {
             // No flag change.
             FDUMP(kFdumpError, "%s(%d) : *** ERROR: could not find alchemy effect (%s) in file (%s)",
-                  "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3eb, This->Vis->Nickname,
-                  This->Vis->AlchemyPath);
+                  "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3eb, Vis->Nickname,
+                  Vis->AlchemyPath);
             return 0;
         }
         FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: ParticleEffect::start_effect: couldnt create ale.eff "
               "(%s) in file (%s) ... Effect is most likely corrupted",
               "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3f0,
-              This->Vis->Nickname, This->Vis->AlchemyPath);
-        This->Flags7C = static_cast<unsigned char>(This->Flags7C & ~kParticleFlagStarted);
+              Vis->Nickname, Vis->AlchemyPath);
+        Flags7C = static_cast<unsigned char>(Flags7C & ~kParticleFlagStarted);
         return 0;
     }
 
     // No null test on the root.
     void* RootRaw = nullptr;
     DALib::Alchemy->GetRootNode(&RootRaw);
-    DALib::Alchemy->AttachNode(RootRaw, This->FxNode);
+    DALib::Alchemy->AttachNode(RootRaw, FxNode);
     reinterpret_cast<IDAComponent*>(RootRaw)->Release();
 
-    This->Flags7C = static_cast<unsigned char>(This->Flags7C | kParticleFlagFxCreated);
-    return static_cast<unsigned char>((This->Flags7C >> 2) & 1u);
+    Flags7C = static_cast<unsigned char>(Flags7C | kParticleFlagFxCreated);
+    return static_cast<unsigned char>((Flags7C >> 2) & 1u);
 }
 
 unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
@@ -303,11 +305,6 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
     return static_cast<unsigned char>((This->Flags7C >> 4) & 1u);
 }
 
-unsigned char ParticleEffectStart(FParticleEffect* This, FEffectArch* EffectArch)
-{
-    return This->FParticleEffect::Start(EffectArch);
-}
-
 void FParticleEffect::Kill()
 {
     FParticleEffect* const This = this;
@@ -317,7 +314,7 @@ void FParticleEffect::Kill()
     if (This->FxEffect == nullptr)
     {
         EffectTypeListLink(This);
-        EffectFreezeToWorld(Base);
+        Base->FreezeToWorld();
         This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return;
     }
@@ -331,13 +328,13 @@ void FParticleEffect::Kill()
             // The watched object is gone: dead, then on to the fade-out below. (The link is a
             // no-op by now.)
             EffectTypeListLink(This);
-            EffectFreezeToWorld(Base);
+            Base->FreezeToWorld();
             This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         }
         else
         {
             // Not marked dead: it keeps drawing while the alchemy effect winds down.
-            EffectFreezeToWorld(Base);
+            Base->FreezeToWorld();
         }
     }
 
@@ -347,11 +344,6 @@ void FParticleEffect::Kill()
 
     // Stop emitting, let the live particles finish.
     This->FxEffect->DestroyNodes(reinterpret_cast<void*>(1));
-}
-
-void ParticleEffectArmDeath(FParticleEffect* This)
-{
-    This->FParticleEffect::Kill();
 }
 
 void FParticleEffect::SetIntensity(float Intensity)
@@ -369,11 +361,6 @@ void FParticleEffect::SetIntensity(float Intensity)
     else if (Value > 1.0f)
         std::memcpy(&Value, &GEffectFloatOne, sizeof(Value));
     ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetOuterTime, Value);
-}
-
-void ParticleEffectSetIntensity(FParticleEffect* This, float Intensity)
-{
-    This->FParticleEffect::SetIntensity(Intensity);
 }
 
 unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
@@ -415,7 +402,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
                     return 0;
 
                 Transform World;
-                EffectGetWorldTransform(Base, &World);
+                Base->GetWorldTransform(&World);
                 const Vector* const CamPos = CamIface->GetPosition();
 
                 // Each difference is rounded to a float, the sum is unrounded; only strictly
@@ -487,11 +474,6 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 }
 
-unsigned char ParticleEffectUpdateVisibility(FParticleEffect* This, float Dt, FSpaceCamera* Cam)
-{
-    return This->FParticleEffect::UpdateVisibility(Dt, Cam);
-}
-
 unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
 {
     FParticleEffect* const This = this;
@@ -525,7 +507,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     if (bFinished)
     {
         EffectTypeListLink(This);
-        EffectFreezeToWorld(AsEffectBase(This));
+        AsEffectBase(This)->FreezeToWorld();
         This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
         return 0;
     }
@@ -543,7 +525,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     if (TypeInfo->UpdateOffscreen == 0 && (This->Flags7C & kParticleFlagVisible) == 0)
         return 0;
 
-    if (ParticleEffectCreateAlchemyNodes(This) == 0)
+    if (This->CreateAlchemyNodes() == 0)
     {
         CallKillSlot(This);
         return 0;
@@ -552,7 +534,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
     if (This->FxEffect != nullptr)
     {
         Transform World;
-        EffectGetWorldTransform(AsEffectBase(This), &World);
+        AsEffectBase(This)->GetWorldTransform(&World);
         This->SetLod(This->Float80);
         IFxEffect* const Fx = This->FxEffect;
         Fx->SetTransform(0, &World);
@@ -560,11 +542,6 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         Fx->Update(FloatArg(Dt));
     }
     return 1;
-}
-
-unsigned char ParticleEffectTickDraw(FParticleEffect* This, float Dt, FSpaceCamera* Cam)
-{
-    return This->FParticleEffect::TickDraw(Dt, Cam);
 }
 
 unsigned char FParticleEffect::BuildGeometry(FSpaceCamera* Cam)
@@ -577,11 +554,6 @@ unsigned char FParticleEffect::BuildGeometry(FSpaceCamera* Cam)
     if (This->FxEffect != nullptr)
         This->FxEffect->Draw(Cam);
     return 1;
-}
-
-unsigned char ParticleEffectBuildGeometry(FParticleEffect* This, FSpaceCamera* Cam)
-{
-    return This->FParticleEffect::BuildGeometry(Cam);
 }
 
 void FParticleEffect::SetLod(float Lod)
@@ -604,11 +576,6 @@ void FParticleEffect::SetLod(float Lod)
     ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetLodInput, Value);
 }
 
-void ParticleEffectSetLod(FParticleEffect* This, float Lod)
-{
-    This->FParticleEffect::SetLod(Lod);
-}
-
 float FParticleEffectCruise::GetWorldPos(Vector* Out)
 {
     FParticleEffectCruise* const This = this;
@@ -619,14 +586,9 @@ float FParticleEffectCruise::GetWorldPos(Vector* Out)
         Radius = 10.0f;
 
     Transform World;
-    EffectGetWorldTransform(AsEffectBase(This), &World);
+    AsEffectBase(This)->GetWorldTransform(&World);
     *Out = World.Translation;
     return Radius;
-}
-
-float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, Vector* Out)
-{
-    return This->FParticleEffectCruise::GetWorldPos(Out);
 }
 
 void FParticleEffectCruise::SetIntensity(float Scale)
@@ -646,18 +608,13 @@ void FParticleEffectCruise::SetIntensity(float Scale)
     ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetOuterTime, Value);
 }
 
-void ParticleEffectCruiseSetScale(FParticleEffectCruise* This, float Scale)
-{
-    This->FParticleEffectCruise::SetIntensity(Scale);
-}
-
 unsigned char FParticleEffectCruise::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 {
     FParticleEffectCruise* const This = this;
     // FUN_004f9270: +0x80 saved first, then the base visibility (a direct call). A hidden
     // effect whose saved +0x80 was above zero stays visible while +0x80 fades out, clamped at 0.
     float const SavedLod = This->Float80;
-    unsigned char const Visible = ParticleEffectUpdateVisibility(This, Dt, Cam);
+    unsigned char const Visible = This->FParticleEffect::UpdateVisibility(Dt, Cam);
     This->Flags7C = static_cast<unsigned char>((This->Flags7C & ~kParticleFlagVisible) | (Visible & 1u));
     if ((This->Flags7C & kParticleFlagVisible) == 0 && SavedLod > 0.0f)
     {
@@ -670,17 +627,12 @@ unsigned char FParticleEffectCruise::UpdateVisibility(float Dt, FSpaceCamera* Ca
     return static_cast<unsigned char>(This->Flags7C & kParticleFlagVisible);
 }
 
-unsigned char ParticleEffectCruiseUpdateVisibility(FParticleEffectCruise* This, float Dt, FSpaceCamera* Cam)
-{
-    return This->FParticleEffectCruise::UpdateVisibility(Dt, Cam);
-}
-
 FParticleEffect::~FParticleEffect()
 {
     if ((Flags7C & kParticleFlagFxCreated) != 0)
-        ParticleEffectCleanupAlchemy(this);
+        CleanupAlchemy();
     if ((Flags7C & kParticleFlagArchRef) != 0 && Vis != nullptr)
-        VisEffectArchRelease(Vis);
+        Vis->Release();
 }
 
 void ParticleEffectDestruct(FParticleEffect* This)
@@ -689,12 +641,12 @@ void ParticleEffectDestruct(FParticleEffect* This)
 }
 
 
-void ParticleEffectDestroy(FParticleEffect* This, int FreeMemory)
+void FParticleEffect::Destroy(int FreeMemory)
 {
     if ((FreeMemory & 1) != 0)
-        delete This;
+        delete this;
     else
-        This->FParticleEffect::~FParticleEffect();
+        this->FParticleEffect::~FParticleEffect();
 }
 
 
@@ -706,25 +658,6 @@ void ParticleEffectCruiseDestroy(FParticleEffect* This, int FreeMemory)
         ((FParticleEffectCruise*)This)->FParticleEffectCruise::~FParticleEffectCruise();
 }
 
-
-void ParticleEffectAddRef(FParticleEffect* This)
-{
-    // FUN_004f7a80.
-    This->RefCount = This->RefCount + 1;
-}
-
-int ParticleEffectRelease(FParticleEffect* This)
-{
-    return EffectRelease(This);
-}
-
-
-void ParticleEffectAttach(FParticleEffect* This, void* WatchableOwner, int EngineIndex,
-                          Transform const* LocalXform)
-{
-    // FUN_004f7d20, the shared Effect attach.
-    This->Attach(WatchableOwner, EngineIndex, LocalXform);
-}
 
 FParticleEffect* ParticleEffectCreate()
 {
@@ -788,7 +721,7 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     FCameraParticles* const Self = this;
     // LAB_004f8e10.
     Transform World;
-    EffectGetWorldTransform(Self, &World);
+    Self->GetWorldTransform(&World);
 
     // Stored before the test.
     void* const Camera = GetClientSoundListenerObject();
@@ -820,7 +753,7 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     FadeOutColoured(kCameraParticlesWhite, kCameraParticlesFadeTime);
 
     // LAB_004f7ab0's body inlined; returns 1.
-    return EffectBaseStart(Self, Arch);
+    return Self->FEffectBase::Start(Arch);
 }
 
 float FCameraParticles::GetWorldPos(Vector* Out)
@@ -856,7 +789,7 @@ unsigned char FCameraParticles::TickDraw(float Dt, FSpaceCamera* Cam)
     FadeInColoured(kCameraParticlesWhite, kCameraParticlesFadeTime, Self->bStartOpaque != 0);
 
     // FUN_004f7bd0's body inlined.
-    EffectKill(Self);
+    Self->FEffectBase::Kill();
     return 0;
 }
 
@@ -941,13 +874,13 @@ unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
                                      int EngineIndex, Transform const* LocalXform,
                                      void* CompanionOut)
 {
-    return CliCreateEffectOneShotOn(&G_CliEffectFactoryC60, EffectArch, ListOwner, EngineIndex,
-                                    LocalXform, CompanionOut);
+    return G_CliEffectFactoryC60.CreateEffectOneShotOn(EffectArch, ListOwner, EngineIndex,
+                                                       LocalXform, CompanionOut);
 }
 
-unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffectArch* EffectArch,
-                                       void* ListOwner, int EngineIndex,
-                                       Transform const* LocalXform, void* CompanionOut)
+unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, void* ListOwner,
+                                                       int EngineIndex, Transform const* LocalXform,
+                                                       void* CompanionOut) const
 {
     // FUN_00503070 (on the factory).
     if (GetGameOption(kGameOptEffectsGroup) == 0 || EffectArch == nullptr)
@@ -960,16 +893,16 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     if (GetGameOption(kGameOptParticles) != 0 && EffectArch->VisEffect != nullptr &&
         EffectArch->VisEffect->Nickname[0] != '\0')
     {
-        Particle = Factory->CreateParticle();
+        Particle = CreateParticle();
     }
     if (EffectArch->SndEffect != nullptr)
-        Sound = static_cast<ISoundSource*>(Factory->CreateSound());
+        Sound = static_cast<ISoundSource*>(CreateSound());
     if (EffectArch->LgtRadius > 0.0f)
-        Light = Factory->CreateLight();
+        Light = CreateLight();
 
     // ListOwner is a CliProjectile or a Gameobj.
     if (Particle != nullptr)
-        EffectAttach(Particle, ListOwner, EngineIndex, LocalXform);
+        Particle->Attach(ListOwner, EngineIndex, LocalXform);
     if (Sound != nullptr && LocalXform != nullptr)
         Sound->SetPose(EngineIndex, LocalXform);
     if (Light != nullptr && LocalXform != nullptr)
@@ -979,7 +912,7 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     {
         if (Particle->Start(EffectArch) == 0)
         {
-            EffectRelease(Particle);
+            Particle->Release();
             Particle = nullptr;
         }
     }
@@ -995,22 +928,22 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     }
     if (Light != nullptr)
     {
-        EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
+        ((FEngineLight*)Light)->SetType(kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
-        EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);
-        EngineLightSetRadius((FEngineLight*)Light, EffectArch->LgtRadius);
-        if (!GameLightEnable((FEngineLight*)Light))
+        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
+        ((FEngineLight*)Light)->SetRadius(EffectArch->LgtRadius);
+        if (!Light->FGameLight::Enable())
         {
-            GameLightRelease(Light);
+            Light->Release();
             Light = nullptr;
         }
         else if (EffectArch->LgtEffectLen != 0)
         {
             Light::AnimationArch* Anim = GameLightFindAnimByName(EffectArch->LgtEffect);
             if (Anim != nullptr)
-                GameLightAttachAnim(Light, Anim, EffectArch->LgtRangeScale,
-                                    EffectArch->LgtTimeScale, 0.0f);
+                Light->AttachAnim(Anim, EffectArch->LgtRangeScale,
+                                  EffectArch->LgtTimeScale, 0.0f);
         }
     }
 
@@ -1024,11 +957,11 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     if (CreateEffectCompanionAlive(LocalCompanion) == 0)
     {
         if (Particle != nullptr)
-            EffectRelease(Particle);
+            Particle->Release();
         if (Sound != nullptr)
             Sound->Release();
         if (Light != nullptr)
-            GameLightRelease(Light);
+            Light->Release();
         return 0;
     }
 
@@ -1042,35 +975,36 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
         *reinterpret_cast<FEffectBase**>(Out + 8) = Particle;
         *reinterpret_cast<FGameLight**>(Out + 0xc) = Light;
         if (Particle != nullptr)
-            EffectAddRef(Particle);
+            Particle->AddRef();
         if (Sound != nullptr)
             Sound->AddRef();
         if (Light != nullptr)
-            GameLightAddRef(Light);
+            Light->AddRef();
     }
 
     if (ListOwner != nullptr)
         CliEffectListInsert(static_cast<unsigned char*>(ListOwner) + 0x28, LocalCompanion);
 
     if (Particle != nullptr)
-        EffectRelease(Particle);
+        Particle->Release();
     if (Sound != nullptr)
         Sound->Release();
     if (Light != nullptr)
-        GameLightRelease(Light);
+        Light->Release();
     return 1;
 }
 
 unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
                                           float const* Pos3, void* CompanionOut)
 {
-    return CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryC60, EffectArch, LocalXform, Pos3,
-                                         CompanionOut);
+    return G_CliEffectFactoryC60.CreateEffectWorldOneShotOn(EffectArch, LocalXform, Pos3,
+                                                            CompanionOut);
 }
 
-unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
-                                            FEffectArch* EffectArch, Transform const* LocalXform,
-                                            float const* Pos3, void* CompanionOut)
+unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectArch,
+                                                            Transform const* LocalXform,
+                                                            float const* Pos3,
+                                                            void* CompanionOut) const
 {
     // FUN_00503f40. The effects option off and a null EffectArch return 0; neither pointer
     // argument is tested.
@@ -1084,12 +1018,12 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     if (GetGameOption(kGameOptParticles) != 0 && EffectArch->VisEffect != nullptr &&
         EffectArch->VisEffect->Nickname[0] != '\0')
     {
-        Particle = Factory->CreateParticle();
+        Particle = CreateParticle();
     }
     if (EffectArch->SndEffect != nullptr)
-        Sound = static_cast<ISoundSource*>(Factory->CreateSound());
+        Sound = static_cast<ISoundSource*>(CreateSound());
     if (EffectArch->LgtRadius > 0.0f)
-        Light = Factory->CreateLight();
+        Light = CreateLight();
 
     if (Particle != nullptr)
         std::memcpy(&Particle->LocalXform, LocalXform, sizeof(Transform));
@@ -1112,7 +1046,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
         {
             std::memcpy(&Light->LocalXform, LocalXform, sizeof(Transform));
         }
-        GameLightSetFreeMotionOffset(Light, Pos3);
+        Light->SetFreeMotionOffset(Pos3);
     }
 
     // Pos3 is the particle's frozen velocity (+0x4c).
@@ -1129,7 +1063,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     {
         if (Particle->Start(EffectArch) == 0)
         {
-            EffectRelease(Particle);
+            Particle->Release();
             Particle = nullptr;
         }
     }
@@ -1145,22 +1079,22 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     }
     if (Light != nullptr)
     {
-        EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
+        ((FEngineLight*)Light)->SetType(kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
-        EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);
-        EngineLightSetRadius((FEngineLight*)Light, EffectArch->LgtRadius);
-        if (!GameLightEnable((FEngineLight*)Light))
+        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
+        ((FEngineLight*)Light)->SetRadius(EffectArch->LgtRadius);
+        if (!Light->FGameLight::Enable())
         {
-            GameLightRelease(Light);
+            Light->Release();
             Light = nullptr;
         }
         else if (EffectArch->LgtEffectLen != 0)
         {
             Light::AnimationArch* Anim = GameLightFindAnimByName(EffectArch->LgtEffect);
             if (Anim != nullptr)
-                GameLightAttachAnim(Light, Anim, EffectArch->LgtRangeScale,
-                                    EffectArch->LgtTimeScale, 0.0f);
+                Light->AttachAnim(Anim, EffectArch->LgtRangeScale,
+                                  EffectArch->LgtTimeScale, 0.0f);
         }
     }
 
@@ -1174,11 +1108,11 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     if (CreateEffectCompanionAlive(LocalCompanion) == 0)
     {
         if (Particle != nullptr)
-            EffectRelease(Particle);
+            Particle->Release();
         if (Sound != nullptr)
             Sound->Release();
         if (Light != nullptr)
-            GameLightRelease(Light);
+            Light->Release();
         return 0;
     }
 
@@ -1191,19 +1125,19 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
         *reinterpret_cast<FEffectBase**>(Out + 8) = Particle;
         *reinterpret_cast<FGameLight**>(Out + 0xc) = Light;
         if (Particle != nullptr)
-            EffectAddRef(Particle);
+            Particle->AddRef();
         if (Sound != nullptr)
             Sound->AddRef();
         if (Light != nullptr)
-            GameLightAddRef(Light);
+            Light->AddRef();
     }
 
     // No list insert (unlike FUN_00503070).
     if (Particle != nullptr)
-        EffectRelease(Particle);
+        Particle->Release();
     if (Sound != nullptr)
         Sound->Release();
     if (Light != nullptr)
-        GameLightRelease(Light);
+        Light->Release();
     return 1;
 }

@@ -114,6 +114,26 @@ struct FScriptCamera : FGameCamera
     // copied in as one run of twelve floats.
     float                      Orientation[9];
     float                      Position[3];     // +0x238 .. +0x244
+
+    // 0x0051e100. Runs the FGameCamera ctor, then allocates the two transform sinks. Either
+    // allocation may fail and retail simply stores the null -- so may this.
+    void Construct();
+
+    // 0x0051dfc0. Releases the two sinks and unhooks both watchers. Retail's destructor does NOT
+    // release the script engine (slot 0x68 is expected to have); kept, see docs/re/deviations.md.
+    void Destruct();
+
+    // 0x0051e3b0. Points the camera at an object, under a script name, from a starting transform.
+    // Every argument is optional:
+    //
+    //   * a script already loaded is torn down first (both entity handles returned, engine released,
+    //     name cleared, object watcher unhooked) -- so this doubles as the reset;
+    //   * a null Object unbinds the watcher;
+    //   * a null ScriptName clears the name;
+    //   * a null Transform12 leaves the stored transform alone.
+    //
+    // Transform12 is twelve floats: nine of orientation then three of position.
+    void Setup(const char* ScriptName, void* Object, const float* Transform12);
 };
 
 // Offsets from the ctor (0x0051e100), dtor (0x0051dfc0) and setup (0x0051e3b0); sizes from
@@ -144,53 +164,10 @@ static_assert(offsetof(FScriptCamera, Orientation) == 0x214, "SC +0x214");
 static_assert(offsetof(FScriptCamera, Position) == 0x238, "SC +0x238");
 static_assert(sizeof(FScriptCamera) == 0x244, "ScriptCamera is 0x244");
 
-// 0x0051e100. Runs the FGameCamera ctor, then allocates the two transform sinks. Either
-// allocation may fail and retail simply stores the null -- so may this.
-void ScriptCameraConstruct(FScriptCamera* Cam);
-
-// 0x0051dfc0. Releases the two sinks and unhooks both watchers. Retail's destructor does NOT
-// release the script engine (slot 0x68 is expected to have); kept, see docs/re/deviations.md.
-void ScriptCameraDestruct(FScriptCamera* Cam);
-
-// 0x0051e3b0. Points the camera at an object, under a script name, from a starting transform.
-// Every argument is optional:
-//
-//   * a script already loaded is torn down first (both entity handles returned, engine released,
-//     name cleared, object watcher unhooked) -- so this doubles as the reset;
-//   * a null Object unbinds the watcher;
-//   * a null ScriptName clears the name;
-//   * a null Transform12 leaves the stored transform alone.
-//
-// Transform12 is twelve floats: nine of orientation then three of position.
-void ScriptCameraSetup(FScriptCamera* Cam, const char* ScriptName, void* Object,
-                       const float* Transform12);
-
-// Slot 0x64 (0x0051e4c0). Activate: create an IScriptEngine through DACOM, load the script whose
-// name the setup stored, walk its entities and bind the two transform sinks to the ones that
-// matter, start the script, hand the viewport to the FGameCamera layer and slide the cinematic
-// bars in.
-//
-// ViewRect4 is the viewport, four inclusive edges, exactly as FGameCamera's own activate slot
-// takes it. Returns false when the script failed to load -- and ONLY then; the base layer's
-// return value is always true.
-bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4);
-
-// Slot 0x68 (0x0051e660). Deactivate: hand both entities back, release the engine, clear the
-// name, unhook the object watcher and slide the bars back out.
-void ScriptCameraDeactivate(FScriptCamera* Cam);
-
-// Slot 0x6c (0x0051e740). Per-frame: tick the script by the frame time in MILLISECONDS, read the
-// camera transform the script has just written, compose it onto the stored starting transform and
-// put the result in the FSpaceCamera's world Csys.
-void ScriptCameraUpdate(FScriptCamera* Cam, float DeltaSeconds);
 
 // Slot 0x54 (0x0051e070): the literal "ScriptCamera".
 const char* ScriptCameraName();
 
-// Slot 0x60 (0x0051e810): true when there is no script at all, otherwise true only once the
-// script engine's own state (its slot 0x54) has reached 4. This is what lets the camera
-// controller take the view back when a cutscene ends.
-bool ScriptCameraIsFinished(const FScriptCamera* Cam);
 
 // The object the `main_object` sink currently watches, or null. Retail spells this
 // `watcher->Watched - 8` inline, the same idiom the other cameras use.

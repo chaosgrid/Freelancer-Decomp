@@ -28,6 +28,11 @@ class IVP_Universe_Manager;        // ivp_cluster_manager.h
 class IVP_Sim_Units_Manager;       // ivp_simulation_unit.h
 class IVP_Environment;
 class IVP_Collision_Delegator_Root;  // ivp_collision.h
+class IVP_Polygon;
+class IVP_Ball;
+class IVP_SurfaceManager;
+struct IVP_RealObjectConstructionTemplate;
+struct IVP_Environment_Create_Parms;
 
 // The IVP SDK's IVP_Controller_Manager: 4 bytes holding only the environment
 // (operator new(4) in the environment ctor). Its methods are the free
@@ -57,7 +62,7 @@ public:
 static_assert(sizeof(void*) != 4 || sizeof(IVP_Cache_Object_Manager) == 0xc, "retail operator new(0xc), :0634c44a");
 
 // IVP_Environment+0x8C: a 0x20-byte object without a vtable, set_time'd once
-// per IVP_Environment_SimulateDTime. Port-local name (nothing names it in the
+// per IVP_Environment::simulate_dtime. Port-local name (nothing names it in the
 // binary). Raises bWithinInterval while less than Threshold has passed since
 // the last time let through (file-static DAT_0658afdc). Nothing in Common.dll
 // reads the flag, Field_0x00 or the two vectors.
@@ -542,6 +547,57 @@ public:
 
     // FUN_0634d020: event_PSI to every psi_listeners entry, last to first.
     void fire_event_PSI();
+
+    // FUN_0634bb90: the IVP SDK's add_revive_core. Appends `core` to event_queue
+    // unless (core->Flags & 0x30) == 0x10, then sets Flags = (Flags & ~0x20) | 0x10.
+    // Drained by IVP_Environment::process_wake_queue. Callers: 06346170
+    // (IVP_Real_Object::EnsureInSimulation) and 06348f50 below.
+    void add_revive_core(IVP_Core* core);
+
+    // FUN_0634c6f0: ~IVP_Environment().
+    void destroy();
+
+    // FUN_0634ce60: append onto object_listeners.
+    void add_listener_object(void* listener);
+
+    // FUN_0634d050: append onto collision_listeners.
+    void add_listener_collision(void* listener);
+
+    // FUN_0634c6d0: IVP_Environment::set_delta_PSI_time. Callers: the env ctor
+    // and FUN_0628c900 (PhySys).
+    void set_delta_PSI_time(float dt);
+
+    // FUN_0634cc80: IVP_Environment::simulate_dtime. Feeds the target time to the
+    // interval gate (+0x8c), then runs the variable time step. PhySys calls it
+    // from its Update (0628caed / 0628cb63 / 0628cb9d).
+    void simulate_dtime(float DeltaTime);
+
+    // FUN_0634cb20: IVP_Environment::set_gravity: stores the vector and its length
+    // (+0xc4), then standard_gravity_controller->set_grav_vector. Callers: the env
+    // ctor and PhySys (0628ca2f).
+    void set_gravity(const IVP_U_Point* Gravity);
+
+    // FUN_0634cd80: IVP_Environment::create_polygon: new(0xa8) + FUN_06362280.
+    // Callers: PhySys 0628af7e / 0628b367 / 0628c838.
+    IVP_Polygon* create_polygon(IVP_SurfaceManager* SurfaceManager,
+                                const IVP_RealObjectConstructionTemplate* Template,
+                                const IVP_U_Quat* Rotation, const IVP_U_Point* Position);
+
+    // FUN_0634cdf0: IVP_Environment::create_ball: new(0xa8) + FUN_06362570.
+    // BallRadius is the library's IVP_Template_Ball*, of which only the radius at
+    // +0 is read. Callers: PhySys 0628c8f0 and the env ctor's static_object.
+    IVP_Ball* create_ball(const float* BallRadius,
+                          const IVP_RealObjectConstructionTemplate* Template,
+                          const IVP_U_Quat* Rotation, const IVP_U_Point* Position);
+
+    // FUN_0634bf50: IVP_Environment's constructor.
+    //
+    // `Registry` is retail's param_1: always &DAT_0658aa00, the process-wide
+    // IVP_Environment_Manager (see environment_manager above). `Parms` is param_2.
+    // `Name` is param_3, strdup'd into environment_name. `ClientData` is param_4.
+    IVP_Environment* construct(IVP_Environment_Manager* Registry,
+                               const IVP_Environment_Create_Parms* Parms, const char* Name,
+                               void* ClientData);
 };
 
 #pragma pack(pop)
@@ -560,12 +616,6 @@ static_assert(offsetof(IVP_Environment, long_term_solver_count) == 0x80, "IVP_En
 static_assert(offsetof(IVP_Environment, freeze_check_dtime) == 0x88, "IVP_Environment+0x88");
 static_assert(offsetof(IVP_Environment, inv_delta_time) == 0xB0, "IVP_Environment+0xB0");
 
-// FUN_0634bb90: the IVP SDK's add_revive_core. Appends `core` to event_queue
-// unless (core->Flags & 0x30) == 0x10, then sets Flags = (Flags & ~0x20) | 0x10.
-// Drained by IVP_Environment::process_wake_queue. Callers: 06346170
-// (IVP_Real_Object::EnsureInSimulation) and 06348f50 below.
-void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core);
-
 // FUN_06348f50: the IVP SDK's
 // IVP_Controller_Manager::ensure_core_to_be_in_simulation. Callers pass the
 // controller manager (+0x90) as `this`, but the body never reads it. Callers:
@@ -582,15 +632,6 @@ struct IVP_Environment_Object_Notify_Event
 };
 
 struct IVP_Event_Collision; // ivp_listener.h
-
-// FUN_0634c6f0: ~IVP_Environment().
-void IVP_Environment_Destructor(IVP_Environment* env);
-
-// FUN_0634ce60: append onto object_listeners.
-void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener);
-
-// FUN_0634d050: append onto collision_listeners.
-void IVP_Environment_Add_Listener_Collision(IVP_Environment* env, void* listener);
 
 
 // ============================================================================
@@ -639,37 +680,6 @@ void IVP_Freeze_Manager_Init(void* FreezeManager);
 // FUN_0634bf30: the +0x88 sub-object ctor; returns `this`.
 void* IVP_Freeze_Manager_Construct(void* FreezeManager);
 
-// FUN_0634c6d0: IVP_Environment::set_delta_PSI_time. Callers: the env ctor
-// and FUN_0628c900 (PhySys).
-void IVP_Environment_SetDeltaPsiTime(IVP_Environment* env, float dt);
-
-// FUN_0634cc80: IVP_Environment::simulate_dtime. Feeds the target time to the
-// interval gate (+0x8c), then runs the variable time step. PhySys calls it
-// from its Update (0628caed / 0628cb63 / 0628cb9d).
-void IVP_Environment_SimulateDTime(IVP_Environment* env, float DeltaTime);
-
-// FUN_0634cb20: IVP_Environment::set_gravity: stores the vector and its length
-// (+0xc4), then standard_gravity_controller->set_grav_vector. Callers: the env
-// ctor and PhySys (0628ca2f).
-void IVP_Environment_SetGravity(IVP_Environment* env, const IVP_U_Point* Gravity);
-
-// FUN_0634cd80: IVP_Environment::create_polygon: new(0xa8) + FUN_06362280.
-// Callers: PhySys 0628af7e / 0628b367 / 0628c838.
-class IVP_Polygon;
-class IVP_Ball;
-class IVP_SurfaceManager;
-struct IVP_RealObjectConstructionTemplate;
-IVP_Polygon* IVP_Environment_CreatePolygon(IVP_Environment* env, IVP_SurfaceManager* SurfaceManager,
-                                           const IVP_RealObjectConstructionTemplate* Template,
-                                           const IVP_U_Quat* Rotation, const IVP_U_Point* Position);
-
-// FUN_0634cdf0: IVP_Environment::create_ball: new(0xa8) + FUN_06362570.
-// BallRadius is the library's IVP_Template_Ball*, of which only the radius at
-// +0 is read. Callers: PhySys 0628c8f0 and the env ctor's static_object.
-IVP_Ball* IVP_Environment_CreateBall(IVP_Environment* env, const float* BallRadius,
-                                     const IVP_RealObjectConstructionTemplate* Template,
-                                     const IVP_U_Quat* Rotation, const IVP_U_Point* Position);
-
 // The constructor's default: 0x3c783e10 == 1.0f/66.0f, IVP's stock PSI rate.
 extern const float IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME;
 
@@ -681,17 +691,6 @@ void IVP_InitSimUnitDispatchTable(void);   // FUN_06360090 -> DAT_0658af9c
 
 // FUN_063608a0: constructor of IVP_Environment::sim_unit_manager (+0x04).
 void* IVP_SimUnitManager_Construct(void* self);
-
-// FUN_0634bf50: IVP_Environment's constructor.
-//
-// `Registry` is retail's param_1: always &DAT_0658aa00, the process-wide
-// IVP_Environment_Manager (see environment_manager above). `Parms` is param_2.
-// `Name` is param_3, strdup'd into environment_name. `ClientData` is param_4.
-IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
-                                           IVP_Environment_Manager* Registry,
-                                           const IVP_Environment_Create_Parms* Parms,
-                                           const char* Name,
-                                           void* ClientData);
 
 // ============================================================================
 // IVP_Environment_Manager: the 16-byte process-wide singleton DAT_0658aa00.

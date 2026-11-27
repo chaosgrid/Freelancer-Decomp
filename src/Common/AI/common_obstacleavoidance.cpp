@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll AI obstacle avoidance: ObstacleAvoidance (PathfindManager+0x268), the
-// obstacle-candidate / heading-blend helpers and FindClosestObstacleToAvoid (FUN_062e7a30).
+// obstacle-candidate / heading-blend helpers and SystemManagerTimerTable::FindClosestObstacleToAvoid (FUN_062e7a30).
 // See src/include/common_aisteer.h for the subsystem writeup.
 
 #include "common_aisteer.h"
@@ -662,7 +662,7 @@ Vector RotateTowardBySlerp(Vector const& From, Vector const& To, float Angle)
 // FUN_062dbfb0. See common_aisteer.h for the algorithm and field shapes.
 namespace
 {
-    // FUN_06347e60 in double; defined with FindClosestObstacleToAvoid's helpers below.
+    // FUN_06347e60 in double; defined with SystemManagerTimerTable::FindClosestObstacleToAvoid's helpers below.
     double VectorLengthX87(Vector const& V);
 
     // FUN_062dc3e0, cdecl, result left unrounded in ST0. Not the arithmetic of FUN_062df7f0
@@ -1306,7 +1306,7 @@ void PathfindManager::UpdateHeadingBlend(float Dt)
 
 namespace
 {
-    // .data:DAT_063ec6b0 == 1.0f. Never written; read only by FindClosestObstacleToAvoid,
+    // .data:DAT_063ec6b0 == 1.0f. Never written; read only by SystemManagerTimerTable::FindClosestObstacleToAvoid,
     // twice, to scale a radius before a collision test -- a tuning knob shipped at default.
     float const g_AiObstacleRadiusScale = 1.0f;
 
@@ -1320,14 +1320,14 @@ namespace
         return &Sys->SelfTarget;
     }
 
-    // FindClosestObstacleToAvoid re-derives this nine times (once per candidate in the loop)
+    // SystemManagerTimerTable::FindClosestObstacleToAvoid re-derives this nine times (once per candidate in the loop)
     // rather than caching it; reproduced, since the watcher target can go null in between.
     IObjRW* AiOwnerObjectOf(SystemManager* Sys)
     {
         return ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
     }
 
-    // Lazily cached type flags, inlined three times in FindClosestObstacleToAvoid. Unlike
+    // Lazily cached type flags, inlined three times in SystemManagerTimerTable::FindClosestObstacleToAvoid. Unlike
     // FAiTarget::RefreshPos, the guard is raised after the vcall (as in the copies in
     // common_largeshipbehavior.cpp and common_iustategraph.cpp). No null test on Iface.
     void RefreshAiTargetFlags(FAiTarget& Self)
@@ -1348,11 +1348,10 @@ namespace
 
 // FUN_062e7a30. See common_aisteer.h for the receiver identification, the inverted reject
 // tests and the swapped geometry arms.
-IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
-                                                   unsigned ExcludeId,
-                                                   unsigned TypeMask)
+IObjInspect* SystemManagerTimerTable::FindClosestObstacleToAvoid(unsigned ExcludeId,
+                                                                 unsigned TypeMask)
 {
-    SystemManager* const Sys = Self->Owner;
+    SystemManager* const Sys = Owner;
     FAiTarget* const OwnerElem = AiTargetOwnerElementOf(Sys);
 
     // ---- too slow to need to dodge anything ----
@@ -1431,16 +1430,16 @@ IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
 
     // FUN_062e8270 (EquipStatus's inlined ctor) only masks bitfields of an uninitialised
     // local; only bit 0x02 of Flags is read and that mask clears it, so zero-init is
-    // equivalent (as in BuildAiTargetList).
+    // equivalent (as in SystemManagerTimerTable::BuildAiTargetList).
     EquipStatus Status = {};
 
     ScanList const* List = nullptr;
-    Scanner->get_equipment_status(Status, Self->ScannerEquipId);
+    Scanner->get_equipment_status(Status, ScannerEquipId);
     if ((Status.Flags & EquipStatusFlagDestroyed) == 0)
     {
         // A destroyed scanner leaves List null: "no obstacle". No null test on the watcher
         // target, as in retail.
-        AiOwnerObjectOf(Sys)->get_scanlist(List, kAvoidScanTypeMask, Self->bKeepCache != 0);
+        AiOwnerObjectOf(Sys)->get_scanlist(List, kAvoidScanTypeMask, bKeepCache != 0);
     }
     if (List == nullptr)
         return nullptr;
@@ -1451,7 +1450,7 @@ IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
     float BestDistance = 1.0e12f;                   // 0x5368d4a5
 
     // Retail keeps one 0x88-byte scratch record on its frame and re-Init()s it per
-    // candidate; zero-filled once here, as BuildAiTargetList does.
+    // candidate; zero-filled once here, as SystemManagerTimerTable::BuildAiTargetList does.
     FAiTarget Candidate;
     std::memset(&Candidate, 0, sizeof(Candidate));
 

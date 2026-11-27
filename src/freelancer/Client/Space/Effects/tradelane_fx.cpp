@@ -281,8 +281,8 @@ namespace
     {
         if (Id->IsEmpty())
             return 0;
-        return CliCreateEffectOneShotOn(Factory, FindEffectArch(&Id->Id), ListOwner, EngineIndex,
-                                        Xform, CompanionOut);
+        return Factory->CreateEffectOneShotOn(FindEffectArch(&Id->Id), ListOwner, EngineIndex,
+                                              Xform, CompanionOut);
     }
 
     // FUN_00515dd0 (on the factory) -- the world-space twin of FUN_00514070:
@@ -293,8 +293,8 @@ namespace
     {
         if (Id->IsEmpty())
             return 0;
-        return CliCreateEffectWorldOneShotOn(Factory, FindEffectArch(&Id->Id), Xform, Pos3,
-                                             CompanionOut);
+        return Factory->CreateEffectWorldOneShotOn(FindEffectArch(&Id->Id), Xform, Pos3,
+                                                   CompanionOut);
     }
 
     void TlIdentityXform(Transform* Out)
@@ -520,8 +520,8 @@ namespace
         long const Index = Ship->get_index();
         if (Id->IsEmpty())
             return;
-        CliCreateEffectOneShotOn(&G_CliEffectFactoryC60, FindEffectArch(&Id->Id), Ship,
-                                 static_cast<int>(Index), &Xform, nullptr);
+        G_CliEffectFactoryC60.CreateEffectOneShotOn(FindEffectArch(&Id->Id), Ship,
+                                                    static_cast<int>(Index), &Xform, nullptr);
     }
 
     // FUN_00514750 -- the travel effect, once (+0x184 bit 0x20).
@@ -595,8 +595,8 @@ namespace
         ID_String const* const Id = TlCompanionId(Companion, kTlShipSplash);
         if (Id->IsEmpty())
             return;
-        CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryC60, FindEffectArch(&Id->Id), &Xform,
-                                      Velocity, nullptr);
+        G_CliEffectFactoryC60.CreateEffectWorldOneShotOn(FindEffectArch(&Id->Id), &Xform,
+                                                         Velocity, nullptr);
     }
 
     // FUN_00514bf0 -- the exit, once (+0x185 bit 2; bits 0 and 2
@@ -640,8 +640,8 @@ namespace
         ID_String const* const Id = TlCompanionId(Companion, kTlShipExit);
         if (Id->IsEmpty())
             return;
-        CliCreateEffectOneShotOn(&G_CliEffectFactoryC60, FindEffectArch(&Id->Id), Ship,
-                                 static_cast<int>(Index), &Xform, nullptr);
+        G_CliEffectFactoryC60.CreateEffectOneShotOn(FindEffectArch(&Id->Id), Ship,
+                                                    static_cast<int>(Index), &Xform, nullptr);
     }
 
     // FUN_00514f20 -- leaving a lane early, unless the exit already
@@ -682,8 +682,8 @@ namespace
             long const Index = Ship->get_index();
             ID_String const* const Id = TlCompanionId(Companion, kTlShipDisrupt);
             if (!Id->IsEmpty())
-                CliCreateEffectOneShotOn(&G_CliEffectFactoryC60, FindEffectArch(&Id->Id), Ship,
-                                         static_cast<int>(Index), &Xform, nullptr);
+                G_CliEffectFactoryC60.CreateEffectOneShotOn(FindEffectArch(&Id->Id), Ship,
+                                                            static_cast<int>(Index), &Xform, nullptr);
         }
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) | 5u);
     }
@@ -1368,17 +1368,17 @@ void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool
         TlAssignShipToRing(NewRing, Ship);
 }
 
-void TradeLaneClientSolarActivate(FClientGameobj* SolarGo, bool bActivate, unsigned ShipId)
+void FClientGameobj::TradeLaneSolarActivate(bool bActivate, unsigned ShipId)
 {
     // FUN_005484c0. The object is narrowed with a null test only on
     // the pointer; TypeBits (+0xe0) is then read with no test.
-    CObject* const Obj = SolarGo->GetObject();
+    CObject* const Obj = GetObject();
     CSolar* const Solar =
         (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             ? static_cast<CSolar*>(Obj)
             : nullptr;
     if (Solar->is_lane_ring())
-        TradeLaneRingSideCommand(SolarGo, ShipId, bActivate);
+        TradeLaneRingSideCommand(this, ShipId, bActivate);
     if (!SinglePlayer())
         Solar->activate(bActivate, ShipId);
 }
@@ -1446,7 +1446,7 @@ void TradeLaneSPObjActivate(unsigned ObjectId, bool bActivate, unsigned ShipId)
     }
     if (Go->ManagerKind == EClientGameobjKind::Solar)
     {
-        TradeLaneClientSolarActivate(Go, bActivate, ShipId);
+        Go->TradeLaneSolarActivate(bActivate, ShipId);
         return;
     }
     if (Go->ManagerKind == EClientGameobjKind::Ship)

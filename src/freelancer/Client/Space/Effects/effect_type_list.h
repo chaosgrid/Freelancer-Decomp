@@ -23,12 +23,12 @@ struct FEffectTypeBucket
     int Count;   // DAT_00674ce0[i]
     void* Head;  // DAT_00674ce4[i] — points at Effect+0x60 link node
     void* Tail;  // DAT_00674ce8[i]
+
+    // FUN_004fc920 — prepend Node into Bucket (Node = Effect+0x60).
+    void PushFront(void* Node);
 };
 
 extern FEffectTypeBucket G_EffectTypeBuckets[kEffectTypeBucketCount];
-
-// FUN_004fc920 — prepend Node into Bucket (Node = Effect+0x60).
-void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node);
 
 // FUN_004f7af0 — link Effect into G_EffectTypeBuckets[Effect+0x5C] if not yet linked
 // and flag bit1 at Effect+0x8 clear. Increments Effect+0x58.

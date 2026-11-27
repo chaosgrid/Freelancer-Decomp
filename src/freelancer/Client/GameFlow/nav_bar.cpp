@@ -15,7 +15,7 @@
 #include "GameFlow/Thorn/gf_script_object.h"       // G_GfScriptManager (DAT_0066d2d0), FGfScriptSequence
 #include "Core/globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
 #include "Space/HUD/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
-#include "Space/HUD/hud_maneuvers.h"          // FHudNamedValue, HudLookupNamedValue (FUN_004d9ca0)
+#include "Space/HUD/hud_maneuvers.h"          // FHudNamedValue, FHudNamedValue::Lookup (FUN_004d9ca0)
 #include "Space/HUD/hud_target.h"             // HudIsMousePickBlocked (FUN_0045a740)
 #include "Common/input_manager.h"          // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
 #include "Interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
@@ -738,17 +738,17 @@ void NavBar::Update()
             FRoomRuntime* const Room = CurrentRoomRuntime();
             if (_stricmp(VirtualRoom.c_str(), "Trader") == 0) // DACOM stricmp
             {
-                RoomControlSnapCamera(Room, "Camera_Trader_Desk");
+                Room->SnapCamera("Camera_Trader_Desk");
                 PlacePlayerAtSetpoint("Player_Trader");
             }
             if (_stricmp(VirtualRoom.c_str(), "Equipment") == 0)
             {
-                RoomControlSnapCamera(Room, "Camera_Equip_Desk");
+                Room->SnapCamera("Camera_Equip_Desk");
                 PlacePlayerAtSetpoint("Player_Equip");
             }
             if (_stricmp(VirtualRoom.c_str(), "ShipDealer") == 0)
             {
-                RoomControlSnapCamera(Room, "Camera_Ship_Desk");
+                Room->SnapCamera("Camera_Ship_Desk");
                 PlacePlayerAtSetpoint("Player_Ship");
             }
         }
@@ -840,7 +840,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
     if (IsAnimating())
         return 1;
     FRoomRuntime* const Room = CurrentRoomRuntime();
-    if (Room != nullptr && RoomControlIsCameraMoving(Room) != 0)
+    if (Room != nullptr && Room->IsCameraMoving() != 0)
         return 1;
 
     // The button whose control was clicked; none -> 0.
@@ -870,7 +870,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
         if (Role != kCharacterRoleNone)
         {
             FCharacterObject* const Character =
-                RoomControlFindCharacterByRole(CurrentRoomRuntime(), Role);
+                CurrentRoomRuntime()->FindCharacterByRole(Role);
             if (Character != nullptr)
             {
                 int const Point[2] = {0, 0}; // FUN_00415850
@@ -1070,7 +1070,7 @@ FNavBarButton* NavBar::AddButton(unsigned Type, int /*Unused*/, unsigned char bR
 
     // Its tooltip ids (DAT_00610c80), FDUMP when unknown.
     int Ids = 0;
-    if (!HudLookupNamedValue(kHotspotIds, Button->IdsName, &Ids, 0x13))
+    if (!kHotspotIds->Lookup(Button->IdsName, &Ids, 0x13))
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown HotspotName = '%s'\n", kNavBarCpp,
               0x530, Button->IdsName);
@@ -1122,7 +1122,7 @@ void NavBar::SelectRoomButton(FNavBarButton* Button)
         SetFadeTarget(1.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
         bFadingOut = 1;
         FadeTimer = 0.0f;
-        RoomControlClearCameraMoving(CurrentRoomRuntime());
+        CurrentRoomRuntime()->ClearCameraMoving();
         SetClientMouseCursorDrawFlag(0);
         NotifyServiceWindows();
         return;
@@ -1153,19 +1153,19 @@ void NavBar::CameraToDesk()
         char const* const Switch = Hotspot->RoomSwitch;
         if (_stricmp(Switch, "Trader") == 0)
         {
-            RoomControlSnapCamera(Room, "Camera_Trader_Desk");
+            Room->SnapCamera("Camera_Trader_Desk");
             PlacePlayerAtSetpoint("Player_Trader");
             bDefaultCamera = false;
         }
         else if (_stricmp(Switch, "Equipment") == 0)
         {
-            RoomControlSnapCamera(Room, "Camera_Equip_Desk");
+            Room->SnapCamera("Camera_Equip_Desk");
             PlacePlayerAtSetpoint("Player_Equip");
             bDefaultCamera = false;
         }
         else if (_stricmp(Switch, "ShipDealer") == 0)
         {
-            RoomControlSnapCamera(Room, "Camera_Ship_Desk");
+            Room->SnapCamera("Camera_Ship_Desk");
             PlacePlayerAtSetpoint("Player_Ship");
             bDefaultCamera = false;
         }
@@ -1176,7 +1176,7 @@ void NavBar::CameraToDesk()
         }
     }
     if (bDefaultCamera)
-        RoomControlSnapCamera(Room, "Camera_0");
+        Room->SnapCamera("Camera_0");
 
     // Fade back in.
     SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
@@ -1355,7 +1355,7 @@ void NavBar::OnScaleFinished()
             NnMainButtonOnModalOpen();
             FRoomRuntime* const Room = CurrentRoomRuntime();
             if (Room != nullptr)
-                RoomControlNotifyControllers(Room, -1, 3, static_cast<int>(Button.Type));
+                Room->NotifyControllers(-1, 3, static_cast<int>(Button.Type));
             return;
         }
         case kHotspotRepair:
@@ -1464,7 +1464,7 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
             bVirtualRoomPending = 1;
             VirtualRoomLocation = GetClientLocationCurrentRoom();
         }
-        RoomControlNotifyControllers(Room, -1, 3, static_cast<int>(Button->Type));
+        Room->NotifyControllers(-1, 3, static_cast<int>(Button->Type));
         NotifyServiceWindows();
         return;
     }
@@ -1621,13 +1621,13 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
             if (It->bRoomSwitch == 0)
                 continue;
             char const* const SetRoom = It->Hotspot->SetVirtualRoom;
-            if (SetRoom != nullptr && strcmp(SetRoom, "Equipment") == 0)
-            {
-                LayoutDelay = kLayoutDelay;
-                OnButtonClicked(&*It);
-                bRepairRedirect = 1;
-                return;
-            }
+            if (SetRoom == nullptr || strcmp(SetRoom, "Equipment") != 0)
+                continue;
+
+            LayoutDelay = kLayoutDelay;
+            OnButtonClicked(&*It);
+            bRepairRedirect = 1;
+            return;
         }
         return;
     }
@@ -1637,7 +1637,7 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
         // closed (command 0x6b), then the room's controllers told.
         if (IsShownWindow(Win3DFindByName("NN_Inventory")))
             HudPostCommand(USER_INVENTORY_CLOSE, 0);
-        RoomControlNotifyControllers(Room, -1, 3, static_cast<int>(Button->Type));
+        Room->NotifyControllers(-1, 3, static_cast<int>(Button->Type));
         return;
     }
     }
@@ -1681,7 +1681,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         NnMainButtonOnModalOpen();
         NotifyServiceWindows();
         RoomControlSetCameraMoveSkippable(Room, 1);
-        if (RoomControlTrackCamera(Room, "Camera_Track_1", &NavBar::ScriptDone, this, nullptr))
+        if (Room->TrackCamera("Camera_Track_1", &NavBar::ScriptDone, this, nullptr))
         {
             SetClientMouseCursorDrawFlag(0);
             ToggleDealerTabs(true);
@@ -1703,7 +1703,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         if (VirtualRoom.size() != 0 && To->Hotspot->Behavior == kHotspotStartDealer)
             Camera = "Camera_Trader_Wide";
         RoomControlSetCameraMoveSkippable(Room, 1);
-        if (!RoomControlTrackCamera(Room, Camera, &NavBar::ScriptDone, this, nullptr))
+        if (!Room->TrackCamera(Camera, &NavBar::ScriptDone, this, nullptr))
         {
             OnButtonClicked(Current);
             return;
@@ -1733,8 +1733,8 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
             HudPostCommand(USER_INVENTORY_CLOSE, 0);
         NotifyServiceWindow("NN_ShipTrader");
         RoomControlSetCameraMoveSkippable(Room, 1);
-        RoomControlClearCameraMoving(Room);
-        if (!RoomControlTrackCamera(Room, Camera, &NavBar::ScriptDone, this, nullptr))
+        Room->ClearCameraMoving();
+        if (!Room->TrackCamera(Camera, &NavBar::ScriptDone, this, nullptr))
         {
             OnButtonClicked(Current);
             return;
@@ -1749,7 +1749,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
     {
         // The scripted camera track.
         RoomControlSetCameraMoveSkippable(Room, 0);
-        if (RoomControlTrackScriptCamera(Room, 0, &NavBar::ScriptDone, this, nullptr, 1))
+        if (Room->TrackScriptCamera(0, &NavBar::ScriptDone, this, nullptr, 1))
             return;
         OnButtonClicked(Current);
         return;

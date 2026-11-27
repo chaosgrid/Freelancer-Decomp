@@ -16,7 +16,7 @@
 #include "NeuroNet/NavMap/nn_navmap.h"
 #include "NeuroNet/Economy/best_path.h"              // BestPathGetWaypointCount (FUN_004c4fb0), FUN_004c5040 / 5490
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830), visit flags
-#include "Common/Graphics/client_mesh_load.h"       // ClientMeshLoadFromPath, ClientMeshHolderRender / Position
+#include "Common/Graphics/client_mesh_load.h"       // FClientMeshHolder::LoadFromPath, FMeshHolder::Render / Position
 #include "Common/Fonts/font_atlas.h"             // FontAtlasSetDrawColor (FUN_00417780)
 #include "Common/Fonts/font_imp.h"               // FindMenuFontImp (FUN_004177b0)
 #include "Common/Fonts/font_string.h"            // Font::String (FUN_004144b0 ...)
@@ -35,7 +35,7 @@
 #include "Space/Cameras/space_camera.h"           // FSpaceCamera, AsCamera
 #include "Space/star_sphere.h"            // Win3DBindModelview (FUN_00422690)
 #include "Interface/text_win.h"               // TextWinProjectExtent / TextWinProjectPoint
-#include "Common/Graphics/texture_shapes.h"         // TexShapeGetGpuHandle (FUN_00425640)
+#include "Common/Graphics/texture_shapes.h"         // FTextureRef::GetGpuHandle (FUN_00425640)
 #include "Interface/ui_scroll.h"              // UiScroll : WinControl
 #include "Interface/win3d.h"                  // kWin3DVisible, Win3DGetCamera
 #include "Interface/win3d_immediate.h"        // Win3DBegin / Vertex / Color / Viewport ...
@@ -511,7 +511,7 @@ namespace
     // Flags, 0, 0) -- FUN_00421120's body, inlined at each retail site.
     void DrawHolder(FMeshHolder* Holder, FSpaceCamera* Camera, unsigned long Flags)
     {
-        ClientMeshHolderRender(Holder, Camera, Flags);
+        Holder->Render(Camera, Flags);
     }
 
     bool IsShown(WinControl const* Control)
@@ -896,7 +896,7 @@ void NeuroNetNavMap::Draw()
         {
             if (LegendMesh.EngineInstance == InvalidInstanceIndex)
             {
-                ClientMeshLoadFromPath(&LegendMesh, kNavMapLegendMesh, 0, false); // FUN_0059ec80
+                LegendMesh.LoadFromPath(kNavMapLegendMesh, 0, false); // FUN_0059ec80
                 Engine->SetInstancePosition(LegendMesh.EngineInstance, (const Vector*)MeshPosition);
                 Transform Legend;
                 memcpy(&Legend, Engine->GetInstanceTransform(LegendMesh.EngineInstance),
@@ -1095,9 +1095,9 @@ void NeuroNetNavMap::DrawJumpLinks()
         // Both ends' instance positions (FUN_00420fb0), From copied
         // before To is read.
         float From[3];
-        memcpy(From, ClientMeshHolderGetPosition(&Link->From->Mesh), sizeof(From));
+        memcpy(From, Link->From->Mesh.GetPosition(), sizeof(From));
         float To[3];
-        memcpy(To, ClientMeshHolderGetPosition(&Link->To->Mesh), sizeof(To));
+        memcpy(To, Link->To->Mesh.GetPosition(), sizeof(To));
         if (Link->Kind == kNavMapLinkPlain)
         {
             // A plain link, blue {00,40,80,ff} fading to {00,10,20,00}.
@@ -1128,7 +1128,7 @@ void NeuroNetNavMap::DrawRouteLines()
 
     // The line state, the waypath texture bound, white, one list.
     BeginMapLines(this, 0.0f);
-    Win3DBindTexture(TexShapeGetGpuHandle(WaypathShape, 0)); // FUN_004220a0(FUN_00425640)
+    Win3DBindTexture(WaypathShape->GetGpuHandle(0)); // FUN_004220a0(FUN_00425640)
     Win3DColor3ub(0xff, 0xff, 0xff);                         // FUN_00421a70
     Win3DBegin(kWin3DTriangles);
 
@@ -1164,9 +1164,9 @@ void NeuroNetNavMap::DrawRouteLines()
                 continue;
         }
         float FromPos[3];
-        memcpy(FromPos, ClientMeshHolderGetPosition(&From->Mesh), sizeof(FromPos));
+        memcpy(FromPos, From->Mesh.GetPosition(), sizeof(FromPos));
         float ToPos[3];
-        memcpy(ToPos, ClientMeshHolderGetPosition(&To->Mesh), sizeof(ToPos));
+        memcpy(ToPos, To->Mesh.GetPosition(), sizeof(ToPos));
         memcpy(Edge, &G_NnPaletteViolet, sizeof(Edge));
         Edge[3] = 0;
         NavMapDrawTexturedBand(FromPos, ToPos,
@@ -1200,9 +1200,9 @@ void NeuroNetNavMap::DrawRouteLines()
                 continue;
         }
         float FromPos[3];
-        memcpy(FromPos, ClientMeshHolderGetPosition(&From->Mesh), sizeof(FromPos));
+        memcpy(FromPos, From->Mesh.GetPosition(), sizeof(FromPos));
         float ToPos[3];
-        memcpy(ToPos, ClientMeshHolderGetPosition(&To->Mesh), sizeof(ToPos));
+        memcpy(ToPos, To->Mesh.GetPosition(), sizeof(ToPos));
         memcpy(Edge, &G_NnPaletteViolet, sizeof(Edge));
         Edge[3] = 0;
         NavMapDrawTexturedBand(FromPos, ToPos,
@@ -1301,13 +1301,13 @@ void NeuroNetNavMap::EnsureItemLabel(IFont* Font, FNavMapItem* Item)
         // A new Font::String in Font, scaled (1, the label depth).
         FFontString* const Label = new FFontString; // operator_new(0x34) + FUN_004144b0
         Item->Label = Label;
-        FontStringSetFont(Label, Font); // FUN_004ea670, inlined in retail
-        FontStringSetScale(Label, 1.0f, MapLabelOrigin[2]); // FUN_004145d0
+        Label->SetFont(Font); // FUN_004ea670, inlined in retail
+        Label->SetScale(1.0f, MapLabelOrigin[2]); // FUN_004145d0
 
         // The name (empty when the ids is missing), its width cached.
         if (GetIdsStringWWithRawFallback(static_cast<unsigned>(Item->StridName), Name, 0x80) == 0)
             Name[0] = 0;
-        FontStringSetText(Label, Name); // FUN_00415860
+        Label->SetText(Name); // FUN_00415860
         int Extent[2] = {0, 0};
         Font->MeasureString(Extent, Name, -1); // IFont slot 8
         Item->LabelWidth = static_cast<float>(static_cast<unsigned>(Extent[0])); // FILD qword
@@ -1330,7 +1330,7 @@ void NeuroNetNavMap::EnsureItemLabel(IFont* Font, FNavMapItem* Item)
     {
         wcscpy(G_NnTextScratchB, Name);
     }
-    FontStringSetText(Item->Label, G_NnTextScratchB);
+    Item->Label->SetText(G_NnTextScratchB);
     int Extent[2] = {0, 0};
     Font->MeasureString(Extent, G_NnTextScratchB, -1);
     Item->LabelWidth = static_cast<float>(static_cast<unsigned>(Extent[0]));
@@ -1480,7 +1480,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         Origin.X = PointX;
         Origin.Y = PointY;
     }
-    FontStringDrawChildren(&Origin, Item->Label, nullptr, nullptr); // FUN_004143c0
+    Origin.DrawChildren(Item->Label, nullptr, nullptr); // FUN_004143c0
 }
 
 bool NeuroNetNavMap::PlaceLabel(float* X, float* Y, float W, float H, FNavMapItem* Item)
@@ -1616,7 +1616,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
     // DAT_00679bac bytes / 255.
     if (GroupMarkerMesh.EngineInstance == InvalidInstanceIndex)
     {
-        ClientMeshLoadFromPath(&GroupMarkerMesh, kNavMapGroupMarkerMesh, 0, false); // FUN_0059ec80
+        GroupMarkerMesh.LoadFromPath(kNavMapGroupMarkerMesh, 0, false); // FUN_0059ec80
         unsigned char const* const Tint = reinterpret_cast<unsigned char const*>(&G_NnPaletteGreen);
         GroupMarkerMesh.UserFloats[0] = static_cast<float>(static_cast<double>(Tint[0]) * static_cast<double>(kNavMapInv255));
         GroupMarkerMesh.UserFloats[1] = static_cast<float>(static_cast<double>(Tint[1]) * static_cast<double>(kNavMapInv255));
@@ -2125,7 +2125,7 @@ void NeuroNetNavMap::DrawTerrainPatches()
     for (int Patch = 0; Patch < TerrainPatchCount; ++Patch)
     {
         Pipeline->SetTextureStageTexture(
-            0, TexShapeGetGpuHandle(TerrainShapes[TerrainPatchShape[Patch]], 0)); // +0x108
+            0, (TerrainShapes[TerrainPatchShape[Patch]])->GetGpuHandle(0)); // +0x108
         Pipeline->SetTextureStageState(0, 0xb, 0);
         ApplyStageStates(0, kNavMapTssTexture);
         ApplyStageStates(1, kNavMapTssDiffuse);
@@ -2395,7 +2395,7 @@ void NeuroNetNavMap::DrawTradeLanes()
     BeginMapLines(this, kNavMapZoneDepth);
     // The frame's texture on stage 0, the stage and render tables.
     IRenderPipeline* const Pipeline = DALib::Pipeline;
-    Pipeline->SetTextureStageTexture(0, TexShapeGetGpuHandle(TradeLaneShapes[TradeLaneFrame], 0));
+    Pipeline->SetTextureStageTexture(0, TradeLaneShapes[TradeLaneFrame]->GetGpuHandle(0));
     Pipeline->SetTextureStageState(0, 0xb, 0);
     ApplyStageStates(0, kNavMapTssTexture);
     ApplyStageStates(1, kNavMapTssDiffuse);

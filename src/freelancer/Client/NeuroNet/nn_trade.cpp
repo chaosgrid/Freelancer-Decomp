@@ -15,7 +15,7 @@
                                     // FindPlayerNonMissionEquipRetail (FUN_004c45d0),
                                     // GetPlayerCharacterNameRetail (DAT_006732f0)
 #include "Space/client_gameobj.h"         // FClientGameobj -> IObjRW
-#include "Common/Graphics/client_mesh_load.h"       // ClientMeshHolderHasInstance (FUN_00420d60)
+#include "Common/Graphics/client_mesh_load.h"       // FMeshHolder::HasInstance (FUN_00420d60)
 #include "Space/client_objdb.h"           // ClientObjDb_FindObject (FUN_005416c0)
 #include "Core/globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
 #include "Space/HUD/hud_status_core.h"        // GetHudStatus (DAT_00674aa0), G_HudTargetPanel (DAT_00674b04)
@@ -342,7 +342,7 @@ bool NnTrade::OnEvent(unsigned MsgId)
 bool NnTrade::GetHardpointTransform(char const* Name, Transform* OutXform)
 {
     // LAB_004bfe00 (RET 8).
-    if (ClientMeshHolderHasInstance(&MeshHolder)) // FUN_00420d60
+    if (MeshHolder.HasInstance()) // FUN_00420d60
     {
         const ArchetypeIndex Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
         DALib::Engine->ReleaseHandle(Archetype);
@@ -722,22 +722,22 @@ void NnTrade::Draw()
     }
 
     // The other player's bar.
-    if (TargetCargoFull != nullptr)
+    if (TargetCargoFull == nullptr)
+        return;
+
+    double Ratio;
+    if (TargetCargoUsed > 1e-5)
     {
-        double Ratio;
-        if (TargetCargoUsed > 1e-5)
-        {
-            Ratio = TargetCargoUsed / TargetHoldSize;
-            if (Ratio > 1.0)
-                Ratio = 1.0;
-        }
-        else
-        {
-            Ratio = 0.0;
-        }
-        AsStatic(TargetCargoFull)->bUseColours = 1;
-        DrawCargoFill(TargetCargoFull, CargoFillX(TargetCargoFull, Ratio));
+        Ratio = TargetCargoUsed / TargetHoldSize;
+        if (Ratio > 1.0)
+            Ratio = 1.0;
     }
+    else
+    {
+        Ratio = 0.0;
+    }
+    AsStatic(TargetCargoFull)->bUseColours = 1;
+    DrawCargoFill(TargetCargoFull, CargoFillX(TargetCargoFull, Ratio));
 }
 
 bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
@@ -815,14 +815,14 @@ void NnTrade::SetQuantity(int NewQuantity)
         ++Group;
         --In;
         *Out = Digit;
-        if (Group == 3)
-        {
-            if (Remaining == 0)
-                break;
-            --Out;
-            *Out = L',';
-            Group = 0;
-        }
+        if (Group != 3)
+            continue;
+
+        if (Remaining == 0)
+            break;
+        --Out;
+        *Out = L',';
+        Group = 0;
     }
 
     QuantityText->SetProperty(kTextPropSetText, PointerArg(Out), 0);

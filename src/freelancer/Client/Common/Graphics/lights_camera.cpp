@@ -26,7 +26,7 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
 
     bool bCreated = false;
     Vis = InVis;
-    VisEffectArchAddRef(Vis);
+    Vis->AddRef();
 
     void* Node = nullptr;
     AGGDESC Desc = {8, "FxNode"};
@@ -48,7 +48,7 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: ParticleEffect could not create Alchemy effect (%s)\n",
               GLightsCameraFile, 0x215, Vis->Nickname);
-        VisEffectArchRelease(Vis);
+        Vis->Release();
         Vis = nullptr;
     }
     if (Node != nullptr)
@@ -64,7 +64,7 @@ void FLightsCameraParticles::Destroy()
     Effect->DestroyNodes(reinterpret_cast<void*>(7));
     static_cast<IDAComponent*>(Effect)->Release();
     Effect = nullptr;
-    VisEffectArchRelease(Vis);
+    Vis->Release();
     Vis = nullptr;
 }
 

@@ -48,7 +48,7 @@ public:
     // Entry guard: Handle = Sys->Targeting.GetTarget() (FUN_062ed5a0); Handle is also the
     // second argument of the immediate-threat probe. Then two cooldown gates
     // (ThreatCooldown, AvoidanceScanCooldown) and the avoidance scan, which runs when
-    // AvoidanceScanCooldown < 0.0f and walks BuildAiTargetList's FAiTarget vector (stride
+    // AvoidanceScanCooldown < 0.0f and walks SystemManagerTimerTable::BuildAiTargetList's FAiTarget vector (stride
     // 0x88, `ADD ESI,0x88` at .text:062d0255 / 062d0459 / 062d088a); the ship's position comes
     // from SystemManager::Watcher -> -8 -> get_position (.text:062d0192-062d01b5):
     //   Pass 1 (.text:062d0200-062d025d) averages the world positions of every candidate whose

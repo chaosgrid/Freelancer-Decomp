@@ -41,30 +41,18 @@ struct FDockingCamera : FGameCamera
     unsigned char Pad0F9[3];
     float         TotalSeconds;      // +0x0fc  ctor writes 0
     float         ElapsedSeconds;    // +0x100  ctor writes 0
+
+    // FUN_0051ea20.
+    void Construct();
+
+    // FUN_0051ebd0 -- a non-virtual method, called from FUN_0054bc0a. Arms the countdown: the
+    // sequence is Seconds long, and the elapsed counter starts at 0.1 (0x3dcccccd) rather than zero.
+    void BeginSequence(float Seconds);
 };
 
 static_assert(sizeof(FDockingCamera) == 0x104, "FDockingCamera is 0x104");
 static_assert(offsetof(FDockingCamera, bFadePending) == 0x0f8, "DC +0x0f8");
 static_assert(offsetof(FDockingCamera, TotalSeconds) == 0x0fc, "DC +0x0fc");
 static_assert(offsetof(FDockingCamera, ElapsedSeconds) == 0x100, "DC +0x100");
-
-// FUN_0051ea20.
-void DockingCameraConstruct(FDockingCamera* Cam);
-
-// Slot 0x58 (FUN_0051eaa0).
-void DockingCameraAttach(FDockingCamera* Cam, void* Object);
-
-// Slot 0x64 (LAB_0051ea50).
-bool DockingCameraActivate(FDockingCamera* Cam, const int* ViewRect4);
-
-// Slot 0x68 (FUN_0051ea80).
-void DockingCameraDeactivate(FDockingCamera* Cam);
-
-// Slot 0x6c (LAB_0051eae0). Re-aims at the player ship and advances the fade countdown.
-void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds);
-
-// FUN_0051ebd0 -- a non-virtual method, called from FUN_0054bc0a. Arms the countdown: the
-// sequence is Seconds long, and the elapsed counter starts at 0.1 (0x3dcccccd) rather than zero.
-void DockingCameraBeginSequence(FDockingCamera* Cam, float Seconds);
 
 inline FSpaceCamera* SpaceCameraOf(FDockingCamera* Cam) { return Cam; }

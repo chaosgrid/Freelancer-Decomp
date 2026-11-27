@@ -149,9 +149,9 @@ bool RepairManager::enumerate(unsigned short const& Id, Archetype::Equipment con
 // Ghidra names the get_sys() call CPlayerTradeOffer::GetTargetPlayerID (an ICF fold).
 // Returns true on every path.
 // ============================================================================
-bool RefreshRepairManagerFromPersonality(RepairManager* Self)
+bool RepairManager::RefreshFromPersonality()
 {
-    SystemManager* const Owner = Self->Owner;
+    SystemManager* const Owner = this->Owner;
     if (Owner == nullptr)
         return true;
 
@@ -183,12 +183,12 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self)
 
     // Retail's copy order.
     pub::AI::Personality::RepairUseStruct const& R = Source->PersonalityData.RepairParams;
-    Self->Hull.PreUseDelay = R.UseHullRepairPreDelay;                // [EDI+0x16f4] -> [ESI+0x1c]
-    Self->Hull.PostUseDelay = R.UseHullRepairPostDelay;              // [EDI+0x16fc] -> [ESI+0x20]
-    Self->Hull.UseAtRatio = R.UseHullRepairAtDamagePercent;          // [EDI+0x16f8] -> [ESI+0x24]
-    Self->Shield.PreUseDelay = R.UseShieldRepairPreDelay;            // [EDI+0x16e8] -> [ESI+0x40]
-    Self->Shield.PostUseDelay = R.UseShieldRepairPostDelay;          // [EDI+0x16f0] -> [ESI+0x44]
-    Self->Shield.UseAtRatio = R.UseShieldRepairAtDamagePercent;      // [EDI+0x16ec] -> [ESI+0x48]
+    Hull.PreUseDelay = R.UseHullRepairPreDelay;                // [EDI+0x16f4] -> [ESI+0x1c]
+    Hull.PostUseDelay = R.UseHullRepairPostDelay;              // [EDI+0x16fc] -> [ESI+0x20]
+    Hull.UseAtRatio = R.UseHullRepairAtDamagePercent;          // [EDI+0x16f8] -> [ESI+0x24]
+    Shield.PreUseDelay = R.UseShieldRepairPreDelay;            // [EDI+0x16e8] -> [ESI+0x40]
+    Shield.PostUseDelay = R.UseShieldRepairPostDelay;          // [EDI+0x16f0] -> [ESI+0x44]
+    Shield.UseAtRatio = R.UseShieldRepairAtDamagePercent;      // [EDI+0x16ec] -> [ESI+0x48]
 
     return true;
 }

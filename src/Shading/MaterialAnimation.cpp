@@ -133,19 +133,19 @@ static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
     unsigned long KeyCount = Block->Count - 1;
     InitializeMaFileDesc(&Desc, "MAKeys");
     Handle = Fs->OpenByDesc(&Desc);
-    if (Handle != -1)
+    if (Handle == -1)
+        return;
+
+    if (KeyCount == 0)
+        KeyCount = Fs->GetSize(Handle, 0) >> 4;
+    const unsigned long KeyBytes = KeyCount << 4;
+    FMaKey* Keys = (FMaKey*)operator new(KeyBytes);
+    if (Keys != nullptr)
     {
-        if (KeyCount == 0)
-            KeyCount = Fs->GetSize(Handle, 0) >> 4;
-        const unsigned long KeyBytes = KeyCount << 4;
-        FMaKey* Keys = (FMaKey*)operator new(KeyBytes);
-        if (Keys != nullptr)
-        {
-            Block->Keys = Keys;
-            Fs->Read(Handle, Keys, KeyBytes, &BytesRead, 0);
-        }
-        Fs->CloseFile(Handle);
+        Block->Keys = Keys;
+        Fs->Read(Handle, Keys, KeyBytes, &BytesRead, 0);
     }
+    Fs->CloseFile(Handle);
 }
 
 FImaData::FImaData() : NameCrc(0), RefCount(1)

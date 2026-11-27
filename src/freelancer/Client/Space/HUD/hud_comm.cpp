@@ -26,7 +26,7 @@
 #include "Core/perf_options.h"     // GetPerfOptionSlot (FUN_005b3510)
 #include "Space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
 #include "Common/Audio/sound_config.h"     // the [CFG] comm ducking / dialogue pan values
-#include "Space/Cameras/space_camera.h"     // AsCamera, SpaceCameraSetHalfFovX, SpaceCameraSetViewportEx
+#include "Space/Cameras/space_camera.h"     // AsCamera, FSpaceCamera::SetHalfFovX, FSpaceCamera::SetViewportEx
 #include "Space/space_letterbox.h"  // IsLetterboxVisible (FUN_0041a3e0)
 #include "Space/star_sphere.h"      // Win3DBindModelview (FUN_00422690), Win3DIdentityRotation3x3
 #include "Common/Audio/voice_profiles.h"   // LookupClientVoice (FUN_00430ab0), FVoiceProfile, FVoiceMsg
@@ -259,23 +259,23 @@ void CommCopyCostume(Costume* To, Costume const* From)
     }
 }
 
-void CommCopyMessage(FCommMessage* To, FCommMessage const* From)
+void FCommMessage::CopyFrom(FCommMessage const* From)
 {
     // FUN_004ce810.
-    To->Sender = From->Sender;
-    To->Receiver = From->Receiver;
-    CommCopyCostume(&To->SenderCostume, &From->SenderCostume);
-    To->VoiceId = From->VoiceId;
-    To->CaptionIds = From->CaptionIds;
+    Sender = From->Sender;
+    Receiver = From->Receiver;
+    CommCopyCostume(&SenderCostume, &From->SenderCostume);
+    VoiceId = From->VoiceId;
+    CaptionIds = From->CaptionIds;
     for (int Index = 0; Index < 16; ++Index)
     {
-        To->TextIds[Index] = From->TextIds[Index];
+        TextIds[Index] = From->TextIds[Index];
     }
-    To->TextCount = From->TextCount;
-    To->PermutationIds = From->PermutationIds;
-    To->Attenuation = From->Attenuation;
-    To->Linger = From->Linger;
-    To->Result = From->Result;
+    TextCount = From->TextCount;
+    PermutationIds = From->PermutationIds;
+    Attenuation = From->Attenuation;
+    Linger = From->Linger;
+    Result = From->Result;
 }
 
 bool FCommInbox::Peek(FCommMessage* Out) const
@@ -285,7 +285,7 @@ bool FCommInbox::Peek(FCommMessage* Out) const
     {
         return false;
     }
-    CommCopyMessage(Out, &Records[0]);
+    Out->CopyFrom(&Records[0]);
     return true;
 }
 
@@ -296,10 +296,10 @@ bool FCommInbox::Pop(FCommMessage* Out)
     {
         return false;
     }
-    CommCopyMessage(Out, &Records[0]);
+    Out->CopyFrom(&Records[0]);
     for (unsigned Index = 1; Index < Count; ++Index)
     {
-        CommCopyMessage(&Records[Index - 1], &Records[Index]);
+        Records[Index - 1].CopyFrom(&Records[Index]);
     }
     --Count;
     return true;
@@ -731,9 +731,9 @@ FCommWindow::FCommWindow()
 FCommWindow::~FCommWindow()
 {
     // FUN_004cab70.
-    if (ClientMeshHolderHasInstance(&Corner))
+    if (Corner.HasInstance())
     {
-        ClientUiMeshHolderRelease(&Corner); // FUN_0059eee0
+        Corner.ReleaseWithAnim(); // FUN_0059eee0
     }
     // Then the holder's own dtor FUN_0059ef20 -- ~FClientMeshHolder.
 }
@@ -743,12 +743,12 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
     // FUN_004ccbd0.
     if (Reader.is_value("corner"))
     {
-        ClientMeshLoadFromPath(&Corner, Reader.get_value_string(), 0, false); // FUN_0059ec80(p, 0, 0)
+        Corner.LoadFromPath(Reader.get_value_string(), 0, false); // FUN_0059ec80(p, 0, 0)
         // The palette colour DAT_00679bb0 (FUN_004a1af0's body inlined).
         unsigned long const Palette = G_NnPaletteCyan;
         unsigned char Colour[4];
         memcpy(Colour, &Palette, sizeof(Colour));
-        ClientMeshHolderSetColor(&Corner, Colour);
+        Corner.SetColor(Colour);
         return true;
     }
     if (Reader.is_value("btn_pos"))
@@ -886,15 +886,15 @@ void FCommWindow::DrawCorners()
     EngineLightClearRegisteredList(); // FUN_004101e0
     unsigned char const White[3] = {0xff, 0xff, 0xff};
     EngineLightSetAmbientRgbBytes(White); // FUN_00410240
-    if (!ClientMeshHolderHasInstance(&Corner))
+    if (!Corner.HasInstance())
     {
         return;
     }
     Win3DApplyCamera(AsCamera(Win3DGetCamera()));
     for (int Index = 0; Index < 4; ++Index)
     {
-        ClientMeshHolderSetMatrix(&Corner, &CornerXform[Index]); // FUN_00421050
-        ClientMeshHolderRender(&Corner, Win3DGetCamera(), 0x100); // FUN_00421120
+        Corner.SetMatrix(&CornerXform[Index]); // FUN_00421050
+        Corner.Render(Win3DGetCamera(), 0x100); // FUN_00421120
     }
 }
 
@@ -1372,7 +1372,7 @@ void FCommChannel::WindowTick(float Dt, FGameCamera* Cam)
     int Projected[4];
     int const* const Screen = HudProjectScreenRect(Projected, &Upper, &Lower); // FUN_004c71b0
     int ViewRect[4] = {Screen[0], Screen[1], Screen[2], Screen[3]};
-    SpaceCameraSetViewportEx(Cam, ViewRect, 1); // FUN_0040fb80
+    Cam->SetViewportEx(ViewRect, 1); // FUN_0040fb80
 
     if (Window.bOpen == 0)
     {
@@ -1513,10 +1513,10 @@ void CommDrawStatic(int const* Rect)
     FTextureRef* const StaticTexture = GetHudStaticTexture(); // DAT_00673570
     if (StaticTexture->Texture == nullptr)
     {
-        TextureRefLoad(StaticTexture, "static");
+        StaticTexture->Load("static");
     }
     Win3DSetOrtho2D(); // FUN_004225e0
-    Win3DBindTexture(TexShapeGetGpuHandle(StaticTexture, 0));
+    Win3DBindTexture(StaticTexture->GetGpuHandle(0));
     Win3DDisable(kWin3DDepthTest);
     Win3DDisable(kWin3DCullFace);
     Win3DEnable(kWin3DBlend);
@@ -1584,7 +1584,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     memset(&SpeakerRotate, 0, sizeof(SpeakerRotate));
     memset(&MaleOffset, 0, sizeof(MaleOffset));
     memset(&FemaleOffset, 0, sizeof(FemaleOffset));
-    GameCameraConstruct(&Camera); // FUN_0051b2f0
+    Camera.Construct(); // FUN_0051b2f0
 
     Win3DReparent(this, nullptr); // FUN_0059dd00
     Win3DRegister(this);          // FUN_0059dbf0
@@ -1637,24 +1637,24 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
         }
         else if (Reader.is_value("video_fovx"))
         {
-            SpaceCameraSetHalfFovX(&Camera, Reader.get_value_float(0)); // FUN_0040f8c0
+            Camera.SetHalfFovX(Reader.get_value_float(0)); // FUN_0040f8c0
         }
         else if (Reader.is_value("backdrop"))
         {
-            TextureRefLoad(&Backdrop, Reader.get_value_string());
+            Backdrop.Load(Reader.get_value_string());
         }
     }
 
     // The portrait key light.
     FEngineLight* const NewLight = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
     EngineLightInit(NewLight, kLightNone);          // FUN_00410ca0
-    EngineLightSetType(NewLight, kLightPoint, false); // FUN_004110c0
+    NewLight->SetType(kLightPoint, false); // FUN_004110c0
     Vector const LightPos = {0.23f, 0.31f, -0.92f};
-    EngineLightSetPosition(NewLight, &LightPos); // FUN_00410ef0
+    NewLight->SetPosition(&LightPos); // FUN_00410ef0
     unsigned char const LightColour[3] = {0x80, 0x80, 0x80};
-    EngineLightSetColorBytesAlt(NewLight, LightColour); // FUN_004115b0
-    EngineLightSetRadius(NewLight, 1.0e9f);             // FUN_00411300
-    if (EngineLightRegister(NewLight))
+    NewLight->SetColorBytesAlt(LightColour); // FUN_004115b0
+    NewLight->SetRadius(1.0e9f);             // FUN_00411300
+    if (NewLight->FEngineLight::Enable())
     {
         Light = NewLight;
     }
@@ -1684,16 +1684,16 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
 
     // The low-detail comm button.
     LowEndCommButton = WinFactoryCreate("LowEndCommButton", "ButtonControl", this, nullptr);
-    if (LowEndCommButton != nullptr)
-    {
-        // ButtonControl::Init FUN_0055ac30.
-        Vector const CommButtonOffset = {-0.1617f, 0.0986f, -0.362f};
-        Vector const CommButtonHalfExtents = {0.0f, 0.0f, 0.0f};
-        static_cast<NnButtonControl*>(LowEndCommButton)
-            ->Init("interface\\HUD\\HUD_genericcomm.3db", nullptr, nullptr, nullptr,
-                   &CommButtonOffset, nullptr, &CommButtonHalfExtents, 0, 0, 0, 0, 0, 0, 0);
-        LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & ~(kWin3DActive | kWin3DVisible));
-    }
+    if (LowEndCommButton == nullptr)
+        return;
+
+    // ButtonControl::Init FUN_0055ac30.
+    Vector const CommButtonOffset = {-0.1617f, 0.0986f, -0.362f};
+    Vector const CommButtonHalfExtents = {0.0f, 0.0f, 0.0f};
+    static_cast<NnButtonControl*>(LowEndCommButton)
+        ->Init("interface\\HUD\\HUD_genericcomm.3db", nullptr, nullptr, nullptr,
+               &CommButtonOffset, nullptr, &CommButtonHalfExtents, 0, 0, 0, 0, 0, 0, 0);
+    LowEndCommButton->Flags = static_cast<unsigned char>(LowEndCommButton->Flags & ~(kWin3DActive | kWin3DVisible));
 }
 
 HUD_Receiver::~HUD_Receiver()
@@ -1793,7 +1793,7 @@ void HUD_Receiver::Draw()
     {
         return;
     }
-    void* const BackdropTexture = TexShapeGetGpuHandle(&Backdrop, 0);
+    void* const BackdropTexture = Backdrop.GetGpuHandle(0);
     FEngineLight* const PortraitLight = Light;
     if (ChannelA.Window.bOpen != 0)
     {
@@ -1819,7 +1819,7 @@ void HUD_Receiver::Draw()
         Win3DSetViewport(Win3DCam, kHudCommCpp, 0x6f5);
         Win3DApplyCamera(Win3DCam);
     }
-    Win3DDrawChildren(this); // tail jump FUN_0059e5c0
+    DrawChildren(); // tail jump FUN_0059e5c0
 }
 
 int HUD_Receiver::MaxVoicePriority(FCommMessage const* Msg)
@@ -1834,13 +1834,13 @@ int HUD_Receiver::MaxVoicePriority(FCommMessage const* Msg)
     for (int Index = 0; Index < Msg->TextCount; ++Index)
     {
         FVoiceMsg* const VoiceMsg = Profile->FindMessage(Msg->TextIds[Index]);
-        if (VoiceMsg != nullptr)
+        if (VoiceMsg == nullptr)
+            continue;
+
+        int const Priority = VoiceMsg->GetPriority();
+        if (Priority > Best)
         {
-            int const Priority = VoiceMsg->GetPriority();
-            if (Priority > Best)
-            {
-                Best = Priority;
-            }
+            Best = Priority;
         }
     }
     return Best;

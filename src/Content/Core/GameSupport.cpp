@@ -464,7 +464,7 @@ namespace
     {
         FContentPlayerState* State = ReplaceContentPlayerState(Message->PlayerId);
         Message->Reader->reset();
-        LoadContentPlayerState(State, Message->Reader);
+        State->Load(Message->Reader);
     }
 
     // GameSupport message 0x33: build the statistics block and send it with

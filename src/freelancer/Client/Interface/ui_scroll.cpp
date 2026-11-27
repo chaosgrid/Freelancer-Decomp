@@ -539,7 +539,7 @@ void UiScroll::BeginDraw()
 void UiScroll::DrawArrowVertical(FScrollHitRect const* Rect, bool bDraw, bool bUp)
 {
     // FUN_00596140 (RET 0xc).
-    Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollArrowShape, 0));
+    Win3DBindTexture(G_ScrollArrowShape->GetGpuHandle(0));
     if (bDraw)
     {
         if (Rect->bHot)
@@ -581,7 +581,7 @@ void UiScroll::DrawArrowVertical(FScrollHitRect const* Rect, bool bDraw, bool bU
 void UiScroll::DrawArrowHorizontal(FScrollHitRect const* Rect, bool bDraw, bool bLeft)
 {
     // FUN_005962c0 (RET 0xc).
-    Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollArrowShape, 0));
+    Win3DBindTexture(G_ScrollArrowShape->GetGpuHandle(0));
     if (bDraw)
     {
         if (Rect->bHot)
@@ -685,7 +685,7 @@ void UiScroll::Draw()
         float const Lead = static_cast<float>(static_cast<double>(Thumb.X0) + kScrollThumbCap);
         float const Tail = static_cast<float>(static_cast<double>(Thumb.X1) - kScrollThumbCap);
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollMidShape, 0));
+        Win3DBindTexture(G_ScrollMidShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(1.0f, 0.0f);
         Win3DVertex3f(Lead, Thumb.Y0, 0.0f);
@@ -697,7 +697,7 @@ void UiScroll::Draw()
         Win3DVertex3f(Lead, Thumb.Y1, 0.0f);
         Win3DEnd();
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollTopBottomShape, 0));
+        Win3DBindTexture(G_ScrollTopBottomShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(1.0f, 1.0f);
         Win3DVertex3f(Lead, Thumb.Y0, 0.0f);
@@ -709,7 +709,7 @@ void UiScroll::Draw()
         Win3DVertex3f(Lead, Thumb.Y1, 0.0f);
         Win3DEnd();
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollTopBottomShape, 0));
+        Win3DBindTexture(G_ScrollTopBottomShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(0.0f, 0.25f);
         Win3DVertex3f(Tail, Thumb.Y0, 0.0f);
@@ -736,7 +736,7 @@ void UiScroll::Draw()
         float const Lead = static_cast<float>(static_cast<double>(Thumb.Y0) - kScrollThumbCap);
         float const Tail = static_cast<float>(static_cast<double>(Thumb.Y1) + kScrollThumbCap);
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollMidShape, 0));
+        Win3DBindTexture(G_ScrollMidShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(0.0f, 0.0f);
         Win3DVertex3f(Thumb.X0, Lead, 0.0f);
@@ -748,7 +748,7 @@ void UiScroll::Draw()
         Win3DVertex3f(Thumb.X0, Tail, 0.0f);
         Win3DEnd();
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollTopBottomShape, 0));
+        Win3DBindTexture(G_ScrollTopBottomShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(1.0f, 1.0f);
         Win3DVertex3f(Thumb.X0, Lead, 0.0f);
@@ -760,7 +760,7 @@ void UiScroll::Draw()
         Win3DVertex3f(Thumb.X0, Thumb.Y0, 0.0f);
         Win3DEnd();
 
-        Win3DBindTexture(TexShapeGetGpuHandle(G_ScrollTopBottomShape, 0));
+        Win3DBindTexture(G_ScrollTopBottomShape->GetGpuHandle(0));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(0.0f, 0.25f);
         Win3DVertex3f(Thumb.X0, Thumb.Y1, 0.0f);

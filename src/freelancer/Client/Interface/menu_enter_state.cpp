@@ -194,11 +194,11 @@ void MenuEnterStateReleaseActivePage(FMenuNavState* Nav)
     ReleaseActivePageInternal(Nav);
 }
 
-bool MenuNavStartSinglePlayer(FMenuNavState* Nav)
+bool FMenuNavState::StartSinglePlayer()
 {
     // FUN_005739c0 (thiscall on the IntroFocus).
     SetMultiPlayer(false);
-    Nav->bFromMultiplayer = 0;
+    bFromMultiplayer = 0;
     ChatDestroyMsgWin();
     G_LoginMgr.LoginName = L"SinglePlayer";
     G_LoginMgr.LoginPassword = L"";
@@ -222,11 +222,11 @@ namespace
         if (Nav->bFromMultiplayer != 0)
         {
             // Back from multiplayer: restart the single-player session (retail inlines
-            // MenuNavStartSinglePlayer here).
+            // FMenuNavState::StartSinglePlayer here).
             ShutdownServerConnection();
             ResetMissionOfferAnswerRetail();
             G_LoginMgr.Reset();
-            if (!MenuNavStartSinglePlayer(Nav))
+            if (!Nav->StartSinglePlayer())
                 Nav->CurrentState = kMenuStateQuit;
         }
 
@@ -305,7 +305,7 @@ namespace
     }
 }
 
-void EnterMenuState(FMenuNavState* Nav, int State)
+void FMenuNavState::EnterState(int State)
 {
     // FUN_005743a0 (thiscall, RET 4). No test of `this`. Retail also sprintf()s
     // "EnterState %d\n" into a local nobody reads; not ported.
@@ -314,13 +314,13 @@ void EnterMenuState(FMenuNavState* Nav, int State)
     switch (State)
     {
     case kMenuStateMainMenu:
-        EnterCase1(Nav);
+        EnterCase1(this);
         break;
 
     case kMenuStateLogin:
         if (SinglePlayer())
         {
-            Nav->CurrentState = kMenuStateSingleCharacterSelect;
+            CurrentState = kMenuStateSingleCharacterSelect;
         }
         else
         {
@@ -330,7 +330,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             Account.LoadAccount();
             if (!Account.VerifyAccount())
             {
-                Nav->CurrentState = kMenuStateServerSelect;
+                CurrentState = kMenuStateServerSelect;
                 break;
             }
             // CLoginMgr +0x1a8 -- LoginToServer sends it.
@@ -343,17 +343,17 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (LoginToServer())
             {
                 G_LoginMgr.Reset();
-                Nav->CurrentState = kMenuStateCharacterSelect;
+                CurrentState = kMenuStateCharacterSelect;
             }
             else
             {
-                Nav->CurrentState = kMenuStateMultiplayer;
+                CurrentState = kMenuStateMultiplayer;
             }
         }
         break;
 
     case kMenuStateLoadGame:
-        Nav->CurrentState = kMenuStateLogin;
+        CurrentState = kMenuStateLogin;
         break;
 
     case kMenuStateMultiplayer:
@@ -362,14 +362,14 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         ResetMissionOfferAnswerRetail();
         G_LoginMgr.Reset();
         SetMultiPlayer(true);
-        Nav->bFromMultiplayer = 1;
+        bFromMultiplayer = 1;
         ChatCreateMsgWin();
-        Nav->CurrentState = kMenuStateServerSelect;
+        CurrentState = kMenuStateServerSelect;
         {
             // No account or a failed check -> state 6, the account page.
             CPlayerAccount Account;
             if (!Account.LoadAccount() || !Account.VerifyAccount())
-                Nav->CurrentState = kMenuStateAccountSelect;
+                CurrentState = kMenuStateAccountSelect;
         }
         LoadingScreenStart();
         break;
@@ -380,25 +380,25 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         LoadingScreenStart();
         ShutdownServerConnection();
         // The chat window is hidden in multiplayer.
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         SetClientMouseCursorDrawFlag(1);
         if (!SinglePlayer())
             ChatShowMsgWin(false);
         // Unless the server page is already active: lists reset, the Gun made, the page loaded.
         // A failed load goes back to state 1.
         PageServerSelect& ServerPage = GetPageServerSelect();
-        if (Nav->ActivePage == &ServerPage)
+        if (ActivePage == &ServerPage)
             break;
         G_LoginMgr.ResetServerLists();
         G_LoginMgr.CreateGun();
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         if (!ServerPage.Desc.LoadFromFile(GetFullFilename(kPageServerSelect)))
         {
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
             break;
         }
         ServerPage.Create(nullptr, nullptr);
-        Nav->ActivePage = &ServerPage;
+        ActivePage = &ServerPage;
         GServerSelectActive = 1;
         break;
     }
@@ -406,21 +406,21 @@ void EnterMenuState(FMenuNavState* Nav, int State)
     case kMenuStateAccountSelect:
     {
         // As case 5, for the account page.
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         SetClientMouseCursorDrawFlag(1);
         if (!SinglePlayer())
             ChatShowMsgWin(false);
         PageAccountSelect& AccountPage = GetPageAccountSelect();
-        if (Nav->ActivePage == &AccountPage)
+        if (ActivePage == &AccountPage)
             break;
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         if (!AccountPage.Desc.LoadFromFile(GetFullFilename(kPageAccountSelect)))
         {
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
             break;
         }
         AccountPage.Create(nullptr, nullptr);
-        Nav->ActivePage = &AccountPage;
+        ActivePage = &AccountPage;
         break;
     }
 
@@ -431,31 +431,31 @@ void EnterMenuState(FMenuNavState* Nav, int State)
 
     case 8:
     case 15:
-        Nav->CurrentState = kMenuStateCharacterSelect;
+        CurrentState = kMenuStateCharacterSelect;
         break;
 
     case kMenuStateCharacterSelect:
     {
         // A failed load goes back to state 1.
         PreConnectReset();
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         if (!SinglePlayer())
             ChatShowMsgWin(false);
         PageCharacterSelect& CharacterPage = GetPageCharacterSelect();
         if (!CharacterPage.Desc.LoadFromFile(GetFullFilename(kPageCharacterSelect)))
         {
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
             break;
         }
         CharacterPage.Create(nullptr, nullptr);
-        Nav->ActivePage = &CharacterPage;
+        ActivePage = &CharacterPage;
         break;
     }
 
     case kMenuStateOptions:
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         GetPageOptions().Create(nullptr, nullptr);
-        Nav->ActivePage = &GetPageOptions();
+        ActivePage = &GetPageOptions();
         break;
 
     case kMenuStateEnterGame:
@@ -468,9 +468,9 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (GetIntroConfigState()->bDrawScripts && GIntroModeLatch != 4)
                 LeaveIntroBase();
             bool bSelected = false;
-            if (Nav->bHasCharacterPick != 0)
+            if (bHasCharacterPick != 0)
             {
-                bSelected = G_LoginMgr.SelectCharacterById(Nav->CharacterId);
+                bSelected = G_LoginMgr.SelectCharacterById(CharacterId);
             }
             else
             {
@@ -487,25 +487,25 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (bSelected)
             {
                 G_LoginMgr.DestroyGun();
-                Nav->CurrentState = kMenuStateInGame;
+                CurrentState = kMenuStateInGame;
             }
             else
             {
-                Nav->CurrentState = kMenuStateServerSelect;
+                CurrentState = kMenuStateServerSelect;
             }
         }
         break;
 
     case kMenuStateCharacterCreate:
     {
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         PageCharacterCreate& CreatePage = GetPageCharacterCreate();
         if (!CreatePage.Load(GetFullFilename(kPageCharacterCreate)))
         {
-            Nav->CurrentState = kMenuStateCharacterSelect;
+            CurrentState = kMenuStateCharacterSelect;
             break;
         }
-        Nav->ActivePage = &CreatePage;
+        ActivePage = &CreatePage;
         break;
     }
 
@@ -518,13 +518,13 @@ void EnterMenuState(FMenuNavState* Nav, int State)
                 FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                       "E:\\FL\\Scratch\\Source\\Client\\Interface\\Intro.cpp", 0x1d95,
                       "New game character file not found\n");
-                Nav->CurrentState = kMenuStateMainMenu;
+                CurrentState = kMenuStateMainMenu;
             }
             else
             {
-                Nav->CharacterId = Restart->Id;
-                Nav->bHasCharacterPick = 1;
-                Nav->CurrentState = kMenuStateEnterGame;
+                CharacterId = Restart->Id;
+                bHasCharacterPick = 1;
+                CurrentState = kMenuStateEnterGame;
             }
         }
         break;
@@ -538,7 +538,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
 
     case kMenuStateSingleCharacterSelect:
     {
-        ReleaseActivePageInternal(Nav);
+        ReleaseActivePageInternal(this);
         // The path is computed before the statics are built.
         char const* const PagePath = GetFullFilename(kPageCharSelectSingle);
         PageCharacterSelectSingle& SinglePage = GetPageCharacterSelectSingle();
@@ -546,12 +546,12 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         if (SinglePage.Desc.LoadFromFile(PagePath))
         {
             SinglePage.Create(nullptr, nullptr);
-            Nav->ActivePage = &SinglePage;
+            ActivePage = &SinglePage;
         }
         else
         {
             SinglePage.SlideT = -2.0;
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
         }
         break;
     }
@@ -566,13 +566,13 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         }
         if (GIntroModeLatch == 2)
         {
-            Nav->CurrentState = kMenuStateCharacterSelect;
+            CurrentState = kMenuStateCharacterSelect;
             break;
         }
         if (G_LoginMgr.SelectCharacter(
                 G_LoginMgr.FindCharacterByName(GetPlayerCharacterNameRetail())))
         {
-            Nav->CurrentState = kMenuStateInGame;
+            CurrentState = kMenuStateInGame;
         }
         break;
 
@@ -582,18 +582,18 @@ void EnterMenuState(FMenuNavState* Nav, int State)
     RefreshLoadingProgress();
 }
 
-int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
+int FMenuNavState::Update(float DeltaSeconds)
 {
     // FUN_00573eb0 (thiscall, RET 4).
     int TransitionCode = 0;
     bool bDidEnter = false;
 
     // Leave the old state, enter the new one, until it settles.
-    while (Nav->CurrentState != Nav->PrevState)
+    while (CurrentState != PrevState)
     {
         bDidEnter = true;
         RefreshLoadingProgress();
-        int const Leaving = Nav->PrevState;
+        int const Leaving = PrevState;
         // Retail sprintf()s "ExitState %d\n" into a local nobody reads; not ported.
 
         if (Leaving == kMenuStateServerSelect)
@@ -604,7 +604,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         {
             if (GOptionsChild_67c20c == nullptr || (GOptionsChild_67c20c->Flags & kWin3DActive) == 0)
             {
-                Nav->CurrentState = kMenuStateMainMenu;
+                CurrentState = kMenuStateMainMenu;
                 if (GOptionsChild_67c20c != nullptr)
                     delete GOptionsChild_67c20c;
                 GOptionsChild_67c20c = nullptr;
@@ -612,8 +612,8 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         }
 
         RefreshLoadingProgress();
-        Nav->PrevState = Nav->CurrentState;
-        EnterMenuState(Nav, Nav->CurrentState);
+        PrevState = CurrentState;
+        EnterState(CurrentState);
         RefreshLoadingProgress();
     }
 
@@ -621,7 +621,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
     // nothing.
     static unsigned char const kPollIndex[20] = {0, 10, 10, 10, 1, 2, 10, 10, 3, 4,
                                                  10, 10, 5, 6, 10, 10, 7, 8, 10, 9};
-    unsigned const PollSlot = static_cast<unsigned>(Nav->CurrentState - 1);
+    unsigned const PollSlot = static_cast<unsigned>(CurrentState - 1);
     unsigned char const Poll = PollSlot < 20u ? kPollIndex[PollSlot] : 10;
     switch (Poll)
     {
@@ -631,7 +631,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         int const Next = GetTypeSelect().NextState;
         if (Next != 0)
         {
-            Nav->CurrentState = Next;
+            CurrentState = Next;
             if (Next == kMenuStateEnterGame)
                 RefreshLoadingProgress();
         }
@@ -643,7 +643,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         PageServerSelect& ServerPage = GetPageServerSelect();
         if (ServerPage.Result != 0)
         {
-            Nav->CurrentState = ServerPage.Result;
+            CurrentState = ServerPage.Result;
             ServerPage.Result = 0;
         }
         break;
@@ -654,7 +654,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         PageAccountSelect& AccountPage = GetPageAccountSelect();
         if (AccountPage.Result != 0)
         {
-            Nav->CurrentState = AccountPage.Result;
+            CurrentState = AccountPage.Result;
             AccountPage.Result = 0;
         }
         break;
@@ -674,9 +674,9 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         // The Result field is not cleared.
         if (CharacterPage.Result != 0)
         {
-            Nav->CurrentState = CharacterPage.Result;
-            Nav->CharacterId = CharacterPage.SelectedCharacter;
-            Nav->bHasCharacterPick = 1;
+            CurrentState = CharacterPage.Result;
+            CharacterId = CharacterPage.SelectedCharacter;
+            bHasCharacterPick = 1;
         }
         break;
     }
@@ -687,7 +687,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         WinControl* const Preferences = Options.Preferences;
         if (Preferences == nullptr)
         {
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
             Options.Result = 0;
             break;
         }
@@ -697,13 +697,13 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         {
             Win3DDeleteTree(Preferences);
             Options.Preferences = nullptr;
-            Nav->CurrentState = kMenuStateMainMenu;
+            CurrentState = kMenuStateMainMenu;
             Options.Result = 0;
             break;
         }
         if (Options.Result != 0)
         {
-            Nav->CurrentState = Options.Result;
+            CurrentState = Options.Result;
             Options.Result = 0;
         }
         break;
@@ -717,7 +717,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         // State 14. The field is not cleared.
         PageCharacterCreate& CreatePage = GetPageCharacterCreate();
         if (CreatePage.HasResult())
-            Nav->CurrentState = CreatePage.GetResult();
+            CurrentState = CreatePage.GetResult();
         break;
     }
     case 7:
@@ -736,9 +736,9 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         // The Result field is not cleared.
         if (SinglePage.Result != 0)
         {
-            Nav->CurrentState = SinglePage.Result;
-            Nav->CharacterId = SinglePage.SelectedCharacter;
-            Nav->bHasCharacterPick = 1;
+            CurrentState = SinglePage.Result;
+            CharacterId = SinglePage.SelectedCharacter;
+            bHasCharacterPick = 1;
         }
         break;
     }
@@ -769,10 +769,10 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         Dt = 0.2;
     // Whole milliseconds go to the script manager; the remainder is computed from the sum
     // rounded to float, while floor() takes the unrounded sum.
-    double const Sum = static_cast<double>(Nav->ScriptTimeRemainder) + Dt;
+    double const Sum = static_cast<double>(ScriptTimeRemainder) + Dt;
     float const SumAsFloat = static_cast<float>(Sum);
     double const Milliseconds = floor(Sum * 1000.0);
-    Nav->ScriptTimeRemainder =
+    ScriptTimeRemainder =
         static_cast<float>(static_cast<double>(SumAsFloat) - Milliseconds * 0.001);
     G_GfScriptManager.Update(static_cast<int>(Milliseconds));
 
@@ -805,10 +805,10 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         // Port-only: the logo sits in the top left of its 4:3 picture and goes with the main
         // menu column to the left edge (hud_widescreen.cpp).
         ImageSetWidescreenAlign(-1);
-        Nav->LogoImage.Draw();
+        LogoImage.Draw();
         ImageSetWidescreenAlign(0);
 #else
-        Nav->LogoImage.Draw();
+        LogoImage.Draw();
 #endif
         ClearWin3DBuffers(kWin3DClearDepth);
         Win3DDrawAll();
@@ -821,12 +821,12 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
 
     // Once: the loading screen gets its progress bar, drops the startup Image and stops
     // clearing.
-    if (Nav->bLoadingScreenSettled == 0)
+    if (bLoadingScreenSettled == 0)
     {
         LoadingScreenCreateProgressBar();
         LoadingScreenReleaseImage();
         LoadingScreenSetClear(0);
-        Nav->bLoadingScreenSettled = 1;
+        bLoadingScreenSettled = 1;
     }
 
     return TransitionCode;

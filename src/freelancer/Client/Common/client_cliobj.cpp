@@ -1419,7 +1419,7 @@ namespace Archetype
 
         // --- EffectArch registry (DAT_006164b0) — shared by distance-record + CliMunition ---
         // The lookup FUN_0040f080 (::FindEffectArch) and EffectArch AddRef/Release
-        // FUN_0040e960 / FUN_0040e990 (::EffectArchAddRef / ::EffectArchRelease) live with the
+        // FUN_0040e960 / FUN_0040e990 (::FEffectArch::AddRef / ::FEffectArch::Release) live with the
         // registry in vis_effect_arch.cpp.
 
         // FUN_00555810 — random pick from live EffectArch* vector.
@@ -1448,7 +1448,7 @@ namespace Archetype
             void** End = Record->LiveEnd;
             while (It != End)
             {
-                EffectArchRelease(static_cast<FEffectArch*>(*It));
+                (static_cast<FEffectArch*>(*It))->Release();
                 It += 1;
             }
             Record->LiveEnd = Record->LiveBegin;
@@ -1493,7 +1493,7 @@ namespace Archetype
                 FEffectArch* Arch = FindEffectArch(IdIt);
                 if (Arch != nullptr)
                 {
-                    EffectArchAddRef(Arch, Arg);
+                    Arch->AddRef(Arg);
                     *Record->LiveEnd = Arch;
                     Record->LiveEnd += 1;
                 }
@@ -3300,7 +3300,7 @@ namespace Archetype
             FEffectArch** It = LiveEffects.Begin;
             while (It != LiveEffects.End)
             {
-                EffectArchRelease(*It);
+                (*It)->Release();
                 It += 1;
             }
             LiveEffects.End = LiveEffects.Begin;
@@ -3342,7 +3342,7 @@ namespace Archetype
                 FEffectArch* Arch = FindEffectArch(IdIt);
                 if (Arch != nullptr)
                 {
-                    EffectArchAddRef(Arch, Arg);
+                    Arch->AddRef(Arg);
                     *LiveEffects.End = Arch;
                     LiveEffects.End += 1;
                 }
@@ -4159,7 +4159,7 @@ namespace Archetype
                         Effects[Slot] = Fx;
                     }
                     if (Effects[Slot] != nullptr)
-                        EffectArchAddRef(Effects[Slot], 0);
+                        Effects[Slot]->AddRef(0);
                     Slot += 1;
                 }
             }
@@ -4178,7 +4178,7 @@ namespace Archetype
                 {
                     if (Effects[Slot] != nullptr)
                     {
-                        EffectArchRelease(Effects[Slot]);
+                        Effects[Slot]->Release();
                         Effects[Slot] = nullptr;
                     }
                     Slot += 1;

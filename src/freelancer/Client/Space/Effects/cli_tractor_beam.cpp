@@ -80,7 +80,7 @@ unsigned char FCliTractorBeam::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 {
     FCliTractorBeam* const Self = this;
     // LAB_005133f0: FUN_004f7b50 with the camera only.
-    return EffectInCameraView(Self, Cam);
+    return Self->InCameraView(Cam);
 }
 
 unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
@@ -284,27 +284,27 @@ FCliTractorBeam* CliTractorBeamCreate()
     return Beam;
 }
 
-unsigned char CliTractorBeamInit(FCliTractorBeam* This, FClientEquip* Owner)
+unsigned char FCliTractorBeam::Init(FClientEquip* Owner)
 {
     // FUN_00512be0.
-    This->Owner = Owner;
+    this->Owner = Owner;
 
     // The CliEQTractor companion's colour bytes +0x54..+0x56 (no tests), scaled by 1/255.
     unsigned char const* const Comp =
         reinterpret_cast<unsigned char const*>(Owner->Equip->Arch->Companion);
-    This->Color[0] = static_cast<float>(Comp[0x54]) * kByteToUnit;
-    This->Color[1] = static_cast<float>(Comp[0x55]) * kByteToUnit;
-    This->Color[2] = static_cast<float>(Comp[0x56]) * kByteToUnit;
+    Color[0] = static_cast<float>(Comp[0x54]) * kByteToUnit;
+    Color[1] = static_cast<float>(Comp[0x55]) * kByteToUnit;
+    Color[2] = static_cast<float>(Comp[0x56]) * kByteToUnit;
 
     // The inlined ShapeDB find FDUMPs a miss (cmn\ShapeDB.h line 0xf2).
-    This->LineShape = G_EffectShapeDB.Find("line");
-    if (This->LineShape == nullptr)
+    LineShape = G_EffectShapeDB.Find("line");
+    if (LineShape == nullptr)
         return 0;
 
-    This->BulbShape = G_EffectShapeDB.Find("bulb");
-    if (This->BulbShape == nullptr)
+    BulbShape = G_EffectShapeDB.Find("bulb");
+    if (BulbShape == nullptr)
         return 0;
 
-    EffectTypeListLink(This);
+    EffectTypeListLink(this);
     return 1;
 }

@@ -10,7 +10,7 @@
 #include "Space/Cameras/space_camera_game.h"
 
 #include "Interface/Pages/character_select_equip.h" // Get/SetPlayerVisitFlagsRetail, GetPlayerStarSystemIdRetail
-#include "Space/Effects/cli_projectile_fx.h"  // FCliEquipFirePacket, CliShipHandleEquipUpdate (FUN_00544d70)
+#include "Space/Effects/cli_projectile_fx.h"  // FCliEquipFirePacket, FClientEquippedObj::ShipHandleEquipUpdate (FUN_00544d70)
 #include "Space/client_gameobj.h"     // FClientGameobj::ManagerKind (+0x1c)
 #include "Space/client_objdb.h"       // GetClientObjDb, ClientObjDb_GetKindHead (FUN_00540fc0)
 #include "common_misc.h"        // Geometry::Sphere
@@ -89,50 +89,50 @@ namespace
     float G_CameraShakeDecay = 0.001f;
 }
 
-void GameCameraConstruct(FGameCamera* Cam)
+void FGameCamera::Construct()
 {
     // FUN_0051b2f0, in retail's order.
-    SpaceCameraConstruct((FSpaceCamera*)Cam);
+    FSpaceCamera::Construct();
 
     // Retail installs vtable 0x005dbf5c here; a derived ctor overwrites it immediately after.
 
-    Cam->FieldF0 = 0;                        // +0xf0
-    Cam->FieldEC = 0;                        // +0xec
+    FieldF0 = 0;                        // +0xf0
+    FieldEC = 0;                        // +0xec
 
     // Retail re-tests the watcher it has just zeroed; it is never non-null.
-    if (Cam->Watched.target() != nullptr)
-        Cam->Watched.set(nullptr);
+    if (Watched.target() != nullptr)
+        Watched.set(nullptr);
 
-    Cam->Flags = static_cast<unsigned char>(Cam->Flags & ~(kGameCameraClearColour | kGameCameraClearDepth));
+    Flags = static_cast<unsigned char>(Flags & ~(kGameCameraClearColour | kGameCameraClearDepth));
 
-    Cam->bFlagF4 = 0;
-    Cam->bFlagF5 = 0;
-    Cam->bFlagF6 = 0;
+    bFlagF4 = 0;
+    bFlagF5 = 0;
+    bFlagF6 = 0;
 
     // The resting half-FOV is cached BEFORE it is applied, through the base's non-virtual
     // setter rather than the vtable.
-    Cam->BaseHalfFovXDeg = kGameCameraDefaultHalfFovXDeg;
-    SpaceCameraSetHalfFovX((FSpaceCamera*)Cam, kGameCameraDefaultHalfFovXDeg);
+    BaseHalfFovXDeg = kGameCameraDefaultHalfFovXDeg;
+    FSpaceCamera::SetHalfFovX(kGameCameraDefaultHalfFovXDeg);
 
     // Retail clears the two vectors downwards, +0xe4 first.
     for (int i = 0; i < 3; ++i)
     {
-        Cam->Velocity[i] = 0.0f;
-        Cam->LastPosition[i] = 0.0f;
+        Velocity[i] = 0.0f;
+        LastPosition[i] = 0.0f;
     }
 
     // +0xcc, the ClearColor bytes and +0xf7 are left as they are, as in retail.
 }
 
-void HudCameraConstruct(FHudCamera* Cam)
+void FHudCamera::Construct()
 {
     // FUN_0051ca80.
-    GameCameraConstruct((FGameCamera*)Cam);
+    FGameCamera::Construct();
 
     // The secondary base's abstract table (0x005cbed8, one _purecall thunk) is installed first
     // and replaced below; it is never callable.
-    Cam->bFlagFC = 0;        // +0xfc
-    Cam->bFlagFE = 1;        // +0xfe
+    bFlagFC = 0;        // +0xfc
+    bFlagFE = 1;        // +0xfe
     // +0xfd and +0xff are not written here (the FirstPerson ctor clears +0xfd itself); every
     // HUDCamera lives in G_SpaceApp's zeroed static storage.
 
@@ -150,45 +150,45 @@ const char* HudCameraGetName()
     return "HUDCamera";      // 0x0051cac0 -> .rdata 0x005dc10c
 }
 
-void GameCameraUpdate(FGameCamera* Cam, float DeltaSeconds)
+void FGameCamera::Update(float DeltaSeconds)
 {
     // FUN_0051b650 (slot 0x6c). The position comes through the camera's own slot 0x0c.
-    FSpaceCamera* const Space = SpaceCameraOf(Cam);
+    FSpaceCamera* const Space = SpaceCameraOf(this);
     const Vector* const Position =
         Space->GetPosition();
 
     // Only an exact zero dt skips (a NaN does not). The reciprocal is taken once.
     if (!(DeltaSeconds == 0.0f))
     {
-        const float DiffZ = Position->z - Cam->LastPosition[2];
-        const float DiffX = Position->x - Cam->LastPosition[0];
-        const float DiffY = Position->y - Cam->LastPosition[1];
+        const float DiffZ = Position->z - LastPosition[2];
+        const float DiffX = Position->x - LastPosition[0];
+        const float DiffY = Position->y - LastPosition[1];
         const float InvDt = 1.0f / DeltaSeconds;
-        Cam->Velocity[0] = InvDt * DiffX;
-        Cam->Velocity[1] = InvDt * DiffY;
-        Cam->Velocity[2] = InvDt * DiffZ;
+        Velocity[0] = InvDt * DiffX;
+        Velocity[1] = InvDt * DiffY;
+        Velocity[2] = InvDt * DiffZ;
     }
 
-    Cam->LastPosition[0] = Position->x;
-    Cam->LastPosition[1] = Position->y;
-    Cam->LastPosition[2] = Position->z;
+    LastPosition[0] = Position->x;
+    LastPosition[1] = Position->y;
+    LastPosition[2] = Position->z;
 }
 
-void GameCameraBeginFrame(FGameCamera* Cam)
+void FGameCamera::BeginFrame()
 {
     // FUN_0051b4b0. The letterbox advances and, when it moved, re-cuts this camera's viewport.
-    FSpaceCamera* const Space = SpaceCameraOf(Cam);
+    FSpaceCamera* const Space = SpaceCameraOf(this);
     const float DeltaSeconds = static_cast<float>(GetClientFrameTimeCapped());
     UpdateLetterbox(Space, DeltaSeconds);
 
-    if ((Cam->Flags & (kGameCameraClearColour | kGameCameraClearDepth)) != 0)
-        GameCameraClear(Cam);
+    if ((Flags & (kGameCameraClearColour | kGameCameraClearDepth)) != 0)
+        Clear();
 
     Win3DSetViewport(AsCamera(Space), kGamecamCpp, 0x85);
     Win3DApplyCamera(AsCamera(Space));
 }
 
-void GameCameraClear(FGameCamera* Cam)
+void FGameCamera::Clear()
 {
     // FUN_0051b500.
     unsigned ClearBits = 0;
@@ -197,17 +197,17 @@ void GameCameraClear(FGameCamera* Cam)
     float Green = 0.0f;
     float Blue = 0.0f;
 
-    if ((Cam->Flags & kGameCameraClearColour) != 0)
+    if ((Flags & kGameCameraClearColour) != 0)
     {
         // The colour bytes scaled by 1/255 (double 0x005c89c8).
-        Red = static_cast<float>(Cam->ClearColor[0] * (1.0 / 255.0));
-        Green = static_cast<float>(Cam->ClearColor[1] * (1.0 / 255.0));
-        Blue = static_cast<float>(Cam->ClearColor[2] * (1.0 / 255.0));
+        Red = static_cast<float>(ClearColor[0] * (1.0 / 255.0));
+        Green = static_cast<float>(ClearColor[1] * (1.0 / 255.0));
+        Blue = static_cast<float>(ClearColor[2] * (1.0 / 255.0));
 
         // With the letterbox showing and any colour byte non-zero, the whole surface is cleared
         // black first and the colour goes into the camera's own viewport afterwards.
         if (IsLetterboxVisible() &&
-            (Cam->ClearColor[0] != 0 || Cam->ClearColor[1] != 0 || Cam->ClearColor[2] != 0))
+            (ClearColor[0] != 0 || ClearColor[1] != 0 || ClearColor[2] != 0))
         {
             bBarsBlackened = true;
             Win3DSetPipelineClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -219,7 +219,7 @@ void GameCameraClear(FGameCamera* Cam)
         ClearBits = kWin3DClearColour;
     }
 
-    if ((Cam->Flags & kGameCameraClearDepth) != 0)
+    if ((Flags & kGameCameraClearDepth) != 0)
         ClearBits = ClearBits | kWin3DClearDepth;
 
     if (ClearBits == 0)
@@ -230,62 +230,29 @@ void GameCameraClear(FGameCamera* Cam)
     ClearWin3DBuffers(ClearBits);
 
     // After a black full-surface clear, the camera's own viewport gets the real colour.
-    if ((Cam->Flags & kGameCameraClearColour) != 0 && bBarsBlackened)
+    if ((Flags & kGameCameraClearColour) != 0 && bBarsBlackened)
     {
-        Win3DSetViewport(AsCamera(SpaceCameraOf(Cam)), kGamecamCpp, 0xc0);
+        Win3DSetViewport(AsCamera(SpaceCameraOf(this)), kGamecamCpp, 0xc0);
         Win3DSetPipelineClearColor(Red, Green, Blue, 1.0f);
         ClearWin3DBuffers(kWin3DClearColour);
     }
 }
 
-void GameCameraGetVelocity(const FGameCamera* Cam, Vector* OutVelocity)
+void FGameCamera::GetVelocity(Vector* OutVelocity)
 {
     // 0x0051b700. Replaces the base's zero-vector stub LAB_0040f5d0, so a camera bound to a
     // moving ship reports a velocity while a free camera reports standing still.
-    OutVelocity->x = Cam->Velocity[0];
-    OutVelocity->y = Cam->Velocity[1];
-    OutVelocity->z = Cam->Velocity[2];
+    OutVelocity->x = Velocity[0];
+    OutVelocity->y = Velocity[1];
+    OutVelocity->z = Velocity[2];
 }
 
-bool GameCameraSetProperty(FGameCamera* Cam, const char* Key, const char* Value)
-{
-    // 0x0051b3f0. The base (FUN_0040f5f0, called directly) decides whether the key is known.
-    if (SpaceCameraSetProperty((FSpaceCamera*)Cam, Key, Value) == 0)
-        return false;
-
-    // Only the two fov keys re-cache the resting angle, read back through slot 0x18 (which no
-    // concrete class overrides).
-    if (_stricmp(Key, "fovx") == 0 || _stricmp(Key, "fovy") == 0)
-    {
-        Cam->BaseHalfFovXDeg = AsCamera((FSpaceCamera*)Cam)->GetHalfFovXDeg();
-    }
-
-    return true;
-}
-
-bool GameCameraAttach(FGameCamera* Cam, void* Object)
-{
-    // 0x0051b3c0. Null unbinds; anything else is stored as its Watchable subobject.
-    Watchable const* const Target =
-        (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
-                                                 kWatchableOffset)
-            : nullptr;
-
-    // Re-attaching to the same object does not disturb the watcher chain.
-    if (Target == Cam->Watched.target())
-        return false;
-
-    Cam->Watched.set(Target);
-    return true;
-}
-
-bool GameCameraHasNoTarget(const FGameCamera* Cam)
+bool FHudCamera::IsFinished()
 {
     // 0x005172f0. Both a null watcher and one holding exactly 8 (an IObjRW at address 0)
     // report "empty".
     const unsigned char* const Raw =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (Raw == nullptr)
         return true;
     return (Raw - kWatchableOffset) == nullptr;
@@ -316,31 +283,31 @@ CEqObj* GameCameraWatchedShip(const FGameCamera* Cam)
     return GameCameraShipOf(static_cast<IObjRW*>(GameCameraGetTarget(Cam)));
 }
 
-bool GameCameraActivate(FGameCamera* Cam, const int* ViewRect4)
+bool FGameCamera::Activate(int const* ViewRect4)
 {
     // FUN_0051b450.
-    const bool bApplied = SpaceCameraSetViewport((FSpaceCamera*)Cam, ViewRect4);
+    const bool bApplied = FSpaceCamera::SetViewport(ViewRect4);
 
     // Guarded on that result (always true, see the header). Slot 0x5c is VIRTUAL: a HUDCamera
     // lands in FUN_0051cb90, which also hands the rectangle to every HUD element.
     if (bApplied)
-        Cam->ApplyViewport(ViewRect4);
+        ApplyViewport(ViewRect4);
 
     return bApplied;
 }
 
-void GameCameraApplyViewport(FGameCamera* Cam, const int* ViewRect4)
+void FGameCamera::ApplyViewport(int const* ViewRect4)
 {
     // FUN_0051b490: the viewport setter with the dead flag zero, then the letterbox forgets which
     // camera it last drew on -- this reset has just wiped the bars out of that viewport.
-    SpaceCameraSetViewportEx((FSpaceCamera*)Cam, ViewRect4, 0);
+    FSpaceCamera::SetViewportEx(ViewRect4, 0);
     ForgetLetterboxCamera();
 }
 
-void HudCameraAttach(FHudCamera* Cam, void* Object)
+void FHudCamera::Attach(void* Object)
 {
     // FUN_0051cbb0. GameCamera's watcher swap, inlined.
-    BaseWatcher& Watched = Cam->Watched;
+    BaseWatcher& Watched = this->Watched;
     Watchable const* const Target =
         (Object != nullptr)
             ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
@@ -363,10 +330,10 @@ void HudCameraAttach(FHudCamera* Cam, void* Object)
     HudElementListSetTarget(HudTarget);
 }
 
-void HudCameraApplyViewport(FHudCamera* Cam, const int* ViewRect4)
+void FHudCamera::ApplyViewport(int const* ViewRect4)
 {
     // FUN_0051cb90.
-    GameCameraApplyViewport((FGameCamera*)Cam, ViewRect4);
+    FGameCamera::ApplyViewport(ViewRect4);
     HudElementListSetViewport(ViewRect4);
 }
 
@@ -387,7 +354,7 @@ int HudCameraCommand74(void* Command)
     return HudElementListAnySlot8(Command) ? 1 : 0;
 }
 
-bool HudCameraActivate(FHudCamera* Cam, const int* ViewRect4)
+bool FHudCamera::Activate(int const* ViewRect4)
 {
     // FUN_0051cad0.
     SetCockpitResourceStringLoading(true);
@@ -396,33 +363,32 @@ bool HudCameraActivate(FHudCamera* Cam, const int* ViewRect4)
     // The nine ids in this order, each registered on the face at +0xf8.
     static const unsigned kCockpitEvents[9] = {USER_RADIO, USER_X_ROTATE, USER_X_UNROTATE, USER_Y_ROTATE, USER_Y_UNROTATE,
                                                USER_Z_ROTATE, USER_Z_UNROTATE, USER_FIRE_WEAPONS, USER_TURN_SHIP};
-    FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
+    FHudCmdHandler* const Face = AsHudCmdHandler();
     for (unsigned Index = 0; Index < 9; ++Index)
-        HudRegisterCommandHandler(Face, kCockpitEvents[Index]);
+        Face->RegisterEvent(kCockpitEvents[Index]);
 
-    return GameCameraActivate((FGameCamera*)Cam, ViewRect4);
+    return FGameCamera::Activate(ViewRect4);
 }
 
-void HudCameraDeactivate(FHudCamera* Cam)
+void FHudCamera::Deactivate()
 {
     // FUN_0051cb70. Retail tail-jumps the empty IDPMsgHandler::OnDisconnect.
-    (void)Cam;
     UnregisterAcceleratorGroup("IDR_COCKPIT");
     SetCockpitResourceStringLoading(false);
 }
 
-void HudCameraDerivedDeactivate(FHudCamera* Cam)
+void FHudCamera::DerivedDeactivate()
 {
     // FUN_0051b0b0: every command registration of the face at +0xf8 goes, then FUN_0051cb70.
-    HudUnregisterCommandHandler(Cam->AsHudCmdHandler());
-    HudCameraDeactivate(Cam);
+    UnregisterAllEvents();
+    FHudCamera::Deactivate();
 }
 
-void HudCameraDraw(FGameCamera* Cam)
+void FHudCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 {
     // FUN_0051daa0. A watched object (and not the degenerate 8).
     const unsigned char* const Held =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (Held == nullptr || Held - kWatchableOffset == nullptr)
         return;
 
@@ -431,13 +397,13 @@ void HudCameraDraw(FGameCamera* Cam)
     if (GetGameOption(kGameOptHud) == 0)
         return;
 
-    FSpaceCamera* const Space = SpaceCameraOf(Cam);
+    FSpaceCamera* const Space = SpaceCameraOf(this);
     Win3DApplyCamera(AsCamera(Space));
     const float DeltaSeconds = static_cast<float>(GetClientFrameTimeCapped());
     HudElementListRender(Space, DeltaSeconds);
 }
 
-bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
+bool FHudCamera::OnEvent(unsigned MsgId)
 {
     // FUN_0051d7f0 (slot 0 of the Event::Handler face).
     if (HudIsMousePickBlocked())
@@ -495,7 +461,7 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
     // dereferences, as the port does.
     FClientGameobj* Ship = nullptr;
     const unsigned char* const Held =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (Held != nullptr)
     {
         FClientGameobj* const Object = reinterpret_cast<FClientGameobj*>(
@@ -507,7 +473,7 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
     // Retail calls the object's slot 0x1cc, which for a ship is FUN_00544d70 (vtable 0x005dfd6c,
     // built by FUN_00543380). Port deviation: called directly, since the port's client objects
     // do not carry retail's slot numbering there.
-    CliShipHandleEquipUpdate((FClientEquippedObj*)Ship, &Record);
+    ((FClientEquippedObj*)Ship)->ShipHandleEquipUpdate(&Record);
     return true;
 }
 
@@ -689,11 +655,11 @@ namespace
     }
 }
 
-void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
+void FHudCamera::Update(float DeltaSeconds)
 {
     // FUN_0051d070 (slot 0x6c).
     //
-    CEqObj* const Ship = GameCameraWatchedShip(Cam);
+    CEqObj* const Ship = GameCameraWatchedShip(this);
 
     // With a ship, control exclusion 4 (cinematic) drives the cursor latch and the letterbox.
     // Excluded: unless the local server tick is held, cursor off and bars in. Not excluded:
@@ -749,7 +715,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
         // The watched object's +4 is the adjustor whose slot 0x34 fires (FUN_00534870), called
         // directly here as in cli_projectile_fx.
         unsigned char* const Held = const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Cam->Watched.target()));
+            reinterpret_cast<const unsigned char*>(Watched.target()));
         unsigned char* const Object = (Held != nullptr) ? Held - kWatchableOffset : nullptr;
 
         if (G_HudFireChanged != 0)
@@ -859,7 +825,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
         // s = 1.5 * (1 - dot^exp), clamped to [0.1, 1], dot = target direction . nose (minus the
         // third orientation column). The ramp is NOT applied on this path.
         unsigned char* const Held = const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Cam->Watched.target()));
+            reinterpret_cast<const unsigned char*>(Watched.target()));
         IObjRW* const Object =
             reinterpret_cast<IObjRW*>((Held != nullptr) ? Held - kWatchableOffset : nullptr);
         IObjRW* Target = nullptr;
@@ -918,7 +884,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
         LastSent = Steer;
     }
 
-    GameCameraUpdate((FGameCamera*)Cam, DeltaSeconds);
+    FGameCamera::Update(DeltaSeconds);
 }
 
 void ResetCameraShakeAmount()
@@ -927,7 +893,7 @@ void ResetCameraShakeAmount()
     G_CameraShakeAmount = 0.0f;
 }
 
-void HudCameraUpdateShake(FHudCamera* Cam)
+void FHudCamera::UpdateShake()
 {
     // FUN_0051db00. A positive amplitude decays per call and snaps to zero once under 1e-4f
     // (.rdata 0x005db098; compared unrounded).
@@ -940,7 +906,7 @@ void HudCameraUpdateShake(FHudCamera* Cam)
     }
 
     const unsigned char* const Held =
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target());
+        reinterpret_cast<const unsigned char*>(Watched.target());
     if (Held == nullptr)
         return;
     if (Held - 8 == nullptr)
@@ -977,11 +943,11 @@ void HudCameraUpdateShake(FHudCamera* Cam)
     }
 }
 
-void HudCameraApplyShake(FHudCamera* Cam, Matrix* Orientation)
+void FHudCamera::ApplyShake(Matrix* Orientation)
 {
     // FUN_0051dbd0 on a 3x3 row-major orientation. The same two-rotation shake as the death
     // camera.
-    HudCameraUpdateShake(Cam);
+    UpdateShake();
 
     if (!(G_CameraShakeAmount > 0.0f))
         return;
@@ -1084,14 +1050,23 @@ void CameraOrientFromForwardAndUp(Matrix* Out, Matrix const* M, const Vector* Up
     Out->E[2][2] = A8;
 }
 
-void FGameCamera::GetVelocity(Vector* OutVelocity)
-{
-    GameCameraGetVelocity(this, OutVelocity);
-}
-
+// Slot 0x4c (0x0051b3f0): forwards to the base setter and, when it accepted a "fovx" or "fovy",
+// re-caches the resulting half-angle into +0xc8. Returns 0 without doing anything else when
+// the base refused the key.
 int FGameCamera::SetProperty(char const* Key, char const* Value)
 {
-    return GameCameraSetProperty(this, Key, Value) ? 1 : 0;
+    // 0x0051b3f0. The base (FUN_0040f5f0, called directly) decides whether the key is known.
+    if (FSpaceCamera::SetProperty(Key, Value) == 0)
+        return 0;
+
+    // Only the two fov keys re-cache the resting angle, read back through slot 0x18 (which no
+    // concrete class overrides).
+    if (_stricmp(Key, "fovx") == 0 || _stricmp(Key, "fovy") == 0)
+    {
+        BaseHalfFovXDeg = AsCamera(this)->GetHalfFovXDeg();
+    }
+
+    return 1;
 }
 
 char const* FGameCamera::GetName()
@@ -1099,19 +1074,23 @@ char const* FGameCamera::GetName()
     return GameCameraGetName();
 }
 
+// Slot 0x58 (0x0051b3c0): binds the camera to an object. Object is an IObjRW*; retail stores it
+// PLUS 8 (its Watchable subobject) and skips the work entirely when that is already the value.
+// Passing null unbinds.
 void FGameCamera::Attach(void* Object)
 {
-    GameCameraAttach(this, Object);
-}
+    // 0x0051b3c0. Null unbinds; anything else is stored as its Watchable subobject.
+    Watchable const* const Target =
+        (Object != nullptr)
+            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
+                                                 kWatchableOffset)
+            : nullptr;
 
-void FGameCamera::ApplyViewport(int const* ViewRect4)
-{
-    GameCameraApplyViewport(this, ViewRect4);
-}
+    // Re-attaching to the same object does not disturb the watcher chain.
+    if (Target == Watched.target())
+        return;
 
-bool FGameCamera::Activate(int const* ViewRect4)
-{
-    return GameCameraActivate(this, ViewRect4);
+    Watched.set(Target);
 }
 
 bool FGameCamera::IsFinished()
@@ -1121,11 +1100,6 @@ bool FGameCamera::IsFinished()
 
 void FGameCamera::Deactivate()
 {
-}
-
-void FGameCamera::Update(float DeltaSeconds)
-{
-    GameCameraUpdate(this, DeltaSeconds);
 }
 
 int FGameCamera::HandleCommand70(void* Command)
@@ -1138,15 +1112,10 @@ int FGameCamera::HandleCommand74(void* Command)
     return 0;
 }
 
-void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
-{
-    SpaceObjDrawPass((FSpaceCamera*)this, LayerFlags, Param2);
-}
-
 void FGameCamera::ScaleEnvironmentEffects()
 {
-    SpaceEnvFxBeginCockpitPass((FSpaceCamera*)this);
-    SpaceEnvFxEndCockpitPass((FSpaceCamera*)this);
+    FSpaceCamera::EnvFxBeginCockpitPass();
+    FSpaceCamera::EnvFxEndCockpitPass();
 }
 
 int FGameCamera::GetSoundMode()
@@ -1159,36 +1128,6 @@ char const* FHudCamera::GetName()
     return HudCameraGetName();
 }
 
-void FHudCamera::Attach(void* Object)
-{
-    HudCameraAttach(this, Object);
-}
-
-void FHudCamera::ApplyViewport(int const* ViewRect4)
-{
-    HudCameraApplyViewport(this, ViewRect4);
-}
-
-bool FHudCamera::IsFinished()
-{
-    return GameCameraHasNoTarget((FGameCamera*)this);
-}
-
-bool FHudCamera::Activate(int const* ViewRect4)
-{
-    return HudCameraActivate(this, ViewRect4);
-}
-
-void FHudCamera::Deactivate()
-{
-    HudCameraDeactivate(this);
-}
-
-void FHudCamera::Update(float DeltaSeconds)
-{
-    HudCameraUpdate(this, DeltaSeconds);
-}
-
 int FHudCamera::HandleCommand70(void* Command)
 {
     return HudCameraCommand70(Command);
@@ -1199,17 +1138,7 @@ int FHudCamera::HandleCommand74(void* Command)
     return HudCameraCommand74(Command);
 }
 
-void FHudCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
-{
-    HudCameraDraw((FGameCamera*)this);
-}
-
 int FHudCamera::GetSoundMode()
 {
     return kClientAudioModeHud;
-}
-
-bool FHudCamera::OnEvent(unsigned MsgId)
-{
-    return HudCameraOnEvent(this, MsgId);
 }

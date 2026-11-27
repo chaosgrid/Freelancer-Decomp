@@ -100,7 +100,7 @@ NnTextControl::NnTextControl()
 
     // operator_new(0x34) + FUN_004144b0.
     FontString = static_cast<FFontString*>(::operator new(sizeof(FFontString)));
-    FontStringConstruct(FontString);
+    FontString->Construct();
     bCachedPlacementValid = 0;
     bUseCachedPlacement = 0;
     bInCaptureList = 0;
@@ -117,16 +117,16 @@ NnTextControl::~NnTextControl()
         if (G_TextControlTypingCount <= 0)
             StopUiSoundSlot(kUiSoundTypingCharacters);   // FUN_005646e0(0xb)
         wchar_t* const Text = PendingText;
-        FontStringSetScale(FontString, Width, TextDepth(this));
-        FontStringSetText(FontString, Text);
+        FontString->SetScale(Width, TextDepth(this));
+        FontString->SetText(Text);
     }
-    FontStringClearContents(FontString); // FUN_004144f0
+    FontString->ClearContents(); // FUN_004144f0
 
     // The Font::String's own destructor inlined (FUN_004144f0 again; the clear left no child).
     FFontString* const String = FontString;
     if (String != nullptr)
     {
-        FontStringClearContents(String);
+        String->ClearContents();
         operator delete[](String->ChildBegin);
         String->ChildBegin = nullptr;
         String->ChildEnd = nullptr;
@@ -213,7 +213,7 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
                 // Through FUN_004ea670, not SetFont FUN_0058a740.
                 IFont* const Font = FindMenuFontImp(Ini->get_value_string());
                 if (Font != nullptr)
-                    FontStringSetFont(FontString, Font);
+                    FontString->SetFont(Font);
             }
             else if (Ini->is_value("offset"))
             {
@@ -398,15 +398,15 @@ void NnTextControl::UpdateInactive()
             Child->UpdateInactive();
     }
     // The typewriter stops: the same flush as property 0x50.
-    if (bTyping != 0)
-    {
-        bTyping = 0;
-        G_TextControlTypingCount = G_TextControlTypingCount - 1;
-        if (G_TextControlTypingCount <= 0)
-            StopUiSoundSlot(kUiSoundTypingCharacters);           // FUN_005646e0(0xb)
-        FontStringSetScale(FontString, Width, TextDepth(this));
-        FontStringSetText(FontString, PendingText);             // FUN_00415860
-    }
+    if (bTyping == 0)
+        return;
+
+    bTyping = 0;
+    G_TextControlTypingCount = G_TextControlTypingCount - 1;
+    if (G_TextControlTypingCount <= 0)
+        StopUiSoundSlot(kUiSoundTypingCharacters);           // FUN_005646e0(0xb)
+    FontString->SetScale(Width, TextDepth(this));
+    FontString->SetText(PendingText);             // FUN_00415860
 }
 
 void NnTextControl::Update()
@@ -430,7 +430,7 @@ void NnTextControl::Update()
             {
                 unsigned const Len = static_cast<unsigned>(wcslen(Source));
                 FHudWideText Pending = {PendingText, PendingCapacity};
-                WideTextReserve(&Pending, Len + 1);
+                Pending.Reserve(Len + 1);
                 PendingText = Pending.Text;
                 PendingCapacity = Pending.Capacity;
                 wcsncpy(PendingText, Source, Len);
@@ -472,8 +472,8 @@ void NnTextControl::Update()
                         G_TextControlTypingCount = G_TextControlTypingCount - 1;
                         if (G_TextControlTypingCount <= 0)
                             StopUiSoundSlot(kUiSoundTypingCharacters);
-                        FontStringSetScale(FontString, Width, TextDepth(this));
-                        FontStringSetText(FontString, PendingText);
+                        FontString->SetScale(Width, TextDepth(this));
+                        FontString->SetText(PendingText);
                     }
                 }
             }
@@ -489,8 +489,8 @@ void NnTextControl::Update()
             G_TextControlTypingCount = G_TextControlTypingCount - 1;
             if (G_TextControlTypingCount <= 0)
                 StopUiSoundSlot(kUiSoundTypingCharacters);
-            FontStringSetScale(FontString, Width, TextDepth(this));
-            FontStringSetText(FontString, PendingText);
+            FontString->SetScale(Width, TextDepth(this));
+            FontString->SetText(PendingText);
         }
     }
 
@@ -531,26 +531,26 @@ void NnTextControl::SetIds(unsigned Ids)
             Temp.assign(L"IDS?");
         else
             Temp.assign(Buffer, Count);
-        FontStringSetScale(FontString, Width, TextDepth(this)); // FUN_004145d0
-        FontStringSetText(FontString, Temp.c_str());            // FUN_00415860
+        FontString->SetScale(Width, TextDepth(this)); // FUN_004145d0
+        FontString->SetText(Temp.c_str());            // FUN_00415860
         return;
     }
     // DAT_005c8ce0.
-    FontStringSetScale(FontString, Width, TextDepth(this));
-    FontStringSetText(FontString, L"");
+    FontString->SetScale(Width, TextDepth(this));
+    FontString->SetText(L"");
 }
 
 void NnTextControl::SetText(wchar_t const* Text)
 {
     // FUN_0058a530.
-    FontStringSetScale(FontString, Width, TextDepth(this));
-    FontStringSetText(FontString, Text);
+    FontString->SetScale(Width, TextDepth(this));
+    FontString->SetText(Text);
 }
 
 void NnTextControl::SetNumberText(char const* Format)
 {
     // FUN_0058a580.
-    FontStringSetScale(FontString, Width, TextDepth(this));
+    FontString->SetScale(Width, TextDepth(this));
     FontStringSetNumberText(FontString, Format);
 }
 
@@ -584,7 +584,7 @@ void NnTextControl::SetWidth(float NewWidth)
 {
     // FUN_0058b730.
     Width = NewWidth;
-    FontStringSetScale(FontString, Width, TextDepth(this));
+    FontString->SetScale(Width, TextDepth(this));
 }
 
 void NnTextControl::SetCachedDraw(unsigned char bCached, unsigned char bInvalidate)
@@ -618,7 +618,7 @@ void NnTextControl::SetPosition(Vector const* NewPosition)
     }
     WinControl::SetPosition(&Placed); // a direct base call
     if (Width > 0.0f)
-        FontStringSetScale(FontString, Width, TextDepth(this));
+        FontString->SetScale(Width, TextDepth(this));
 }
 
 void NnTextControl::Draw()
@@ -637,7 +637,7 @@ void NnTextControl::Draw()
         return;
 
     // FUN_0059e5c0: the children first (no visibility test of its own).
-    Win3DDrawChildren(this);
+    DrawChildren();
 
     if (bTypewriter != 0)
     {
@@ -645,7 +645,7 @@ void NnTextControl::Draw()
         if (PendingText == nullptr || PendingText[0] == L'\0')
         {
             FHudWideText Pending = {PendingText, PendingCapacity};
-            WideTextAssign(&Pending, FontString->Text, 0xffffffffu);
+            Pending.Assign(FontString->Text, 0xffffffffu);
             PendingText = Pending.Text;
             PendingCapacity = Pending.Capacity;
         }
@@ -666,8 +666,8 @@ void NnTextControl::Draw()
                     wchar_t* const Whole = PendingText;
                     Vector Sum;
                     Win3DVec3Add(&Sum, &Position, &Offset); // FUN_00423b30
-                    FontStringSetScale(FontString, Width, Sum.z);
-                    FontStringSetText(FontString, Whole);
+                    FontString->SetScale(Width, Sum.z);
+                    FontString->SetText(Whole);
                 }
             }
             // The first TypedCount characters become the text shown.
@@ -675,21 +675,21 @@ void NnTextControl::Draw()
             wcsncpy(Typed, PendingText, static_cast<size_t>(TypedCount));
             Typed[TypedCount] = L'\0';
             float const TypedDepth = Position.z + Offset.z; // FUN_00422b80
-            FontStringSetScale(FontString, Width, TypedDepth);
-            FontStringSetText(FontString, Typed);
+            FontString->SetScale(Width, TypedDepth);
+            FontString->SetText(Typed);
         }
     }
 
     // Each sum rounded to a float (FUN_00422b80).
     Vector const World = {Position.x + Offset.x, Position.y + Offset.y,
                           Position.z + Offset.z};
-    FontStringSetScale(FontString, Width, World.z);
+    FontString->SetScale(Width, World.z);
     // No line: nothing more, and no depth-test call.
-    if (FontStringChildCount(FontString) == 0) // FUN_004145a0
+    if (FontString->ChildCount() == 0) // FUN_004145a0
         return;
     // No font: "Normal", through FUN_004ea670's body inline.
     if (FontString->FontIface == nullptr)
-        FontStringSetFont(FontString, FindMenuFontImp("Normal"));
+        FontString->SetFont(FindMenuFontImp("Normal"));
     if (FontString->FontIface == nullptr)
     {
         Win3DDisable(kWin3DDepthTest);
@@ -757,7 +757,7 @@ void NnTextControl::Draw()
         }
     }
 
-    LineCount = FontStringChildCount(FontString); // the line count
+    LineCount = FontString->ChildCount(); // the line count
     // Scale / Height from FUN_004176c0.
     FFontStringDrawOrigin Origin;
     Origin.X = 0.0f;
@@ -781,7 +781,7 @@ void NnTextControl::Draw()
             bCachedPlacementValid = 1;
             TextWinProjectPoint(&World, &CachedX, &CachedY);
             int Extent[2] = {0, 0};
-            int const* const TextExtent = FontStringGetExtent(FontString, Extent);
+            int const* const TextExtent = FontString->GetExtent(Extent);
             double const TextWidth =
                 static_cast<double>(static_cast<unsigned>(TextExtent[0]));
             CachedX = static_cast<float>(
@@ -800,9 +800,9 @@ void NnTextControl::Draw()
         Origin.HAlign = static_cast<unsigned>(Justification);
         TextWinProjectPoint(&World, &Origin.X, &Origin.Y);
     }
-    FontStringDrawChildren(&Origin, FontString,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(Field34c)),
-                           reinterpret_cast<void*>(static_cast<intptr_t>(Field350)));
+    Origin.DrawChildren(FontString,
+                        reinterpret_cast<void*>(static_cast<intptr_t>(Field34c)),
+                        reinterpret_cast<void*>(static_cast<intptr_t>(Field350)));
     Win3DDisable(kWin3DDepthTest);
 }
 
@@ -844,8 +844,8 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         bHighlighted = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
     case kTextPropSetText:
-        FontStringSetScale(FontString, Width, TextDepth(this));
-        FontStringSetText(FontString, reinterpret_cast<wchar_t const*>(A));
+        FontString->SetScale(Width, TextDepth(this));
+        FontString->SetText(reinterpret_cast<wchar_t const*>(A));
         break;
     case kTextPropSetIds:
         SetIds(static_cast<unsigned>(A));
@@ -885,8 +885,8 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             // The pending text goes in whole; the depth is the z of FUN_00423b30.
             wchar_t* const Text = PendingText;
             float const Depth = Position.z + Offset.z;
-            FontStringSetScale(FontString, Width, Depth);
-            FontStringSetText(FontString, Text);
+            FontString->SetScale(Width, Depth);
+            FontString->SetText(Text);
         }
         bTypewriter = 0;
         TypedCount = 1;
@@ -941,11 +941,11 @@ namespace
     {
         if (Source == nullptr)
         {
-            WideTextClear(Copy);
+            Copy->Clear();
             return;
         }
         unsigned const Len = static_cast<unsigned>(wcslen(Source));
-        WideTextReserve(Copy, Len + 1);
+        Copy->Reserve(Len + 1);
         wcsncpy(Copy->Text, Source, Len);
         Copy->Text[Len] = L'\0';
     }
@@ -984,7 +984,7 @@ void NnEditControl::RemoveCursor()
         }
     }
     bCursorShown = 0;
-    WideTextFree(&Copy);
+    Copy.Free();
 }
 
 void NnEditControl::Update()
@@ -1010,12 +1010,12 @@ void NnEditControl::Update()
                 EditCopyText(&Copy, FontString->Text);
                 unsigned const Len =
                     Copy.Text != nullptr ? static_cast<unsigned>(wcslen(Copy.Text)) : 0;
-                WideTextReserve(&Copy, Len + 2);
+                Copy.Reserve(Len + 2);
                 wcsncpy(&Copy.Text[Len], kEditCursor, 1);
                 Copy.Text[Len + 1] = L'\0';
                 SetText(Copy.Text);
                 bCursorShown = 1;
-                WideTextFree(&Copy);
+                Copy.Free();
             }
             else
             {
@@ -1079,7 +1079,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
         {
             Owner->SetProperty(kWinNotifyEditChanged, 0, 0);
         }
-        WideTextFree(&Copy);
+        Copy.Free();
         return true;
     }
 
@@ -1100,7 +1100,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
         FHudWideText Copy = {nullptr, 0};
         EditCopyText(&Copy, FontString->Text);
         int const Len = static_cast<int>(wcslen(Copy.Text));
-        WideTextFree(&Copy);
+        Copy.Free();
         if (Len + 1 > MaxLength)
             return true;
     }
@@ -1118,7 +1118,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
     FHudWideText Copy = {nullptr, 0};
     EditCopyText(&Copy, FontString->Text);
     unsigned const Len = Copy.Text != nullptr ? static_cast<unsigned>(wcslen(Copy.Text)) : 0;
-    WideTextReserve(&Copy, Len + 2);
+    Copy.Reserve(Len + 2);
     wcsncpy(&Copy.Text[Len], Wide, 1);
     Copy.Text[Len + 1] = L'\0';
 
@@ -1127,7 +1127,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
     WinControl* const Owner = Parent->AsWinControl();
     if (Owner != nullptr)
         Owner->SetProperty(kWinNotifyEditChanged, reinterpret_cast<uintptr_t>(FontString->Text), 0);
-    WideTextFree(&Copy);
+    Copy.Free();
     return true;
 }
 

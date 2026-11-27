@@ -53,6 +53,21 @@ struct FFirstPersonCamera : FHudCamera
 
     unsigned char bJustAttached;     // +0x1a0  ctor and attach set 1, the update clears it
     unsigned char Pad1A1[3];
+
+    // FUN_00517180. Chains to the HUDCamera ctor, builds the mesh helper, then plants three
+    // identity transforms and clears the two HUDCamera flag bytes at +0xfc and +0xfd.
+    void Construct();
+
+    // FUN_00518410: FUN_00420f70 on +0x190 -- release the cockpit mesh holder (destroy the engine
+    // instance, drop both material-cache slots). Called by the space teardown FUN_0054aec0.
+    void ReleaseMesh();
+
+    // FUN_005173c0, taking the cockpit ini path. Reads [Cockpit] (mesh and
+    // material_library into 0x104-byte stack strings, head_turn into two globals), warns about the
+    // obsolete [Camera] header, loads the cockpit mesh, takes the head transform from its "cam"
+    // part and finishes with the same 4:3 sanity check the third-person loader runs. Returns
+    // nothing: a missing file and an odd aspect are FDUMP warnings only.
+    void Load(const char* CockpitIniPath);
 };
 
 // The third-person camera sits at controller + 0x1b0 and this one at + 0x00c.
@@ -76,44 +91,5 @@ extern float G_CockpitHeadTurnY;    // DAT_006135a4
 struct I3DMathEngine;
 extern I3DMathEngine* G_FirstPersonMathEngine;
 
-// FUN_00517180. Chains to the HUDCamera ctor, builds the mesh helper, then plants three
-// identity transforms and clears the two HUDCamera flag bytes at +0xfc and +0xfd.
-void FirstPersonCameraConstruct(FFirstPersonCamera* Cam);
-
 // Slot 0x54 (0x00517330): the class name, a plain .rdata literal.
 const char* FirstPersonCameraGetName();
-
-// Slot 0x58 (LAB_005178e0): HUDCamera attach (FUN_0051cbb0), then -- with an object watched --
-// the camera takes the object's transform, the "HpCockpit" hardpoint (FindHardpoint_PS; missing
-// -> (0,0,-4) + identity) into +0x100/+0x10c, and the eye point object + R*hp + (R*hpR)*head
-// into +0x160 and the world transform. Sets +0x1a0.
-void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object);
-
-// Slot 0x6c (LAB_00517ba0): with a watched client ship, place the cockpit mesh at the ship's
-// cockpit hardpoint, derive the head's acceleration lag (DAT_0067522c) and roll from the ship's
-// local velocity / angular velocity, set the camera's world transform (rigid while the "cockpit"
-// perf option's applied value is under 0.999) and shake it (FUN_0051dbd0); then HUDCamera's
-// update (FUN_0051d070) and +0x1a0 cleared.
-void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds);
-
-// Slot 0x78 (LAB_00518420): with an object watched, the scene pass
-// (FUN_0051c200), a depth clear (always when the "cockpit" option is applied above 0.999,
-// otherwise only with the HUD option), FUN_0051c970, the cockpit mesh pass (near / far 0.05 /
-// 500, the cockpit lighting or the jump ambient, the mesh drawn in depth range [0.75, 1]),
-// HUDCamera's draw (FUN_0051daa0) and FUN_0051c9e0.
-void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, unsigned Param2);
-
-// FUN_005183e0 -- slot 0 of the FirstPerson Event::Handler face (+0xf8, table 0x005db93c):
-// blocked mouse pick (FUN_0045a740) -> false, otherwise HUDCamera's FUN_0051d7f0.
-bool FirstPersonCameraOnEvent(FFirstPersonCamera* Cam, unsigned MsgId);
-
-// FUN_00518410: FUN_00420f70 on +0x190 -- release the cockpit mesh holder (destroy the engine
-// instance, drop both material-cache slots). Called by the space teardown FUN_0054aec0.
-void FirstPersonCameraReleaseMesh(FFirstPersonCamera* Cam);
-
-// FUN_005173c0, taking the cockpit ini path. Reads [Cockpit] (mesh and
-// material_library into 0x104-byte stack strings, head_turn into two globals), warns about the
-// obsolete [Camera] header, loads the cockpit mesh, takes the head transform from its "cam"
-// part and finishes with the same 4:3 sanity check the third-person loader runs. Returns
-// nothing: a missing file and an odd aspect are FDUMP warnings only.
-void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath);

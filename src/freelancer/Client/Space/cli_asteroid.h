@@ -24,6 +24,7 @@
 #include <cstddef>
 
 struct IMaterial;
+struct FSpaceCamera;
 
 // One billboard rock, 0x20 bytes: the array FUN_0054de10 allocates at block +0x0C (operator new
 // of RockCount << 5) and FUN_0054e900 / FUN_0054f9f0 walk.
@@ -89,6 +90,20 @@ struct FAsteroidBillboardBlock
     unsigned char bParsed;            // +0x7C (+0x218) FUN_0054dbe0; FUN_0054de10 builds no rocks
                                       //        while it is clear
     unsigned char Pad7D[3];
+
+    // FUN_0054e130 (thiscall on the billboard block): the ambient colour (D3DRS_AMBIENT *
+    // ambient_intensity / 255 * tinted ambient * color_shift) into all five outputs, then for up
+    // to MaxLights directional (type 3) lights within 100 of Pos, each light's ambient share and
+    // its tinted diffuse colour weighted by how far the light faces each of the five directions
+    // Forward + Right, Forward - Right, Forward + Up, Forward - Up and Forward; each output
+    // clamped to 1.0 per component.
+    void ComputeLighting(float const* Pos, float const* Forward, float const* Up,
+                         float const* Right, float* OutCenter, float* OutCorner0, float* OutCorner1,
+                         float* OutCorner2, float* OutCorner3);
+
+    // FUN_0054e900 (thiscall on the billboard block). The field tick passes the field's
+    // ExclusionMgr (+0xdc) and ExcludeType 2 (billboards).
+    void Draw(FSpaceCamera* Camera, Exclusion::AsteroidExclusionZoneMgr* Excl, int ExcludeType);
 };
 #pragma pack(pop)
 
@@ -117,7 +132,7 @@ struct FAsteroidBandParticle
 static_assert(sizeof(FAsteroidBandParticle) == 0x3c, "band particle stride 0x3c");
 
 // One band piece, 0x18 bytes: the render_parts table FUN_0054c8b0 allocates at band +0x60.
-// A piece is one far-draw unit (CliAsteroidDrawFarPiece).
+// A piece is one far-draw unit (FCliAsteroid::DrawFarPiece).
 #pragma pack(push, 1)
 struct FAsteroidBandPiece
 {
@@ -233,6 +248,41 @@ struct FCliAsteroid
     float FillDetailScale;                             // +0x230  FUN_00524880: (1 - d) * 0.65 + d
     unsigned char bDrawFarBands;                       // +0x234  1 from the constructor, no writer
     unsigned char Pad235[3];
+
+    // FUN_005201e0.
+    FCliAsteroid* Construct();
+
+    // FUN_005205d0 — the field destructor (only CliAsteroidDestroyAll calls it).
+    void Destruct();
+
+    // FUN_00520850. Resolves zones against the active system itself.
+    void LoadFieldIni(char const* FieldIniRel);
+
+    // FUN_00524730 — Band.RenderParts (+0x154) + ExclusionPieceCount (+0x194).
+    int PieceCount();
+
+    // FUN_00524740 — piece world position; returns OutXYZ (zeroed, with an FDUMP warning, for a
+    // piece no band holds).
+    float* GetPiecePos(int PieceIndex, float* OutXYZ);
+
+    // FUN_005247f0 — piece radius (1.0f, with an FDUMP warning, for a piece no band holds).
+    float GetPieceRadius(int PieceIndex);
+
+    // FUN_00522700 (thiscall on the field) — light the field around the point Scale along the
+    // camera's view axis (the dynamic asteroid draw calls it with 100.0f).
+    void LightAround(FSpaceCamera* Cam, float Scale);
+
+    // FUN_00522070 (thiscall on the field) -- the per-frame update: the nebula lookup once, the
+    // exclusion re-sort, the CmnAsteroid change events into the cube map (MedAsteroid gameobjs),
+    // empty cubes dropped, the dynamic asteroid managers, then the band fades.
+    void Update(FSpaceCamera* Cam, float Dt);
+
+    // FUN_00522850 (thiscall on the field, reached through LAB_0051bdf0) — the far band draw for
+    // one piece index from the deferred node.
+    void DrawFarPiece(FSpaceCamera* Cam, int PieceIndex);
+
+    // FUN_005274a0, inlined in the field constructor -- placement construction into CubeMapStorage.
+    void CubeMapConstruct();
 };
 #pragma pack(pop)
 
@@ -317,6 +367,38 @@ struct FCliDynamicAsteroid
     float ColorShift2;                           // +0xDC
     float DetailScale;                           // +0xE0
     float InvDetailScale;                        // +0xE4
+
+    // FUN_005256a0 -- the manager constructor over raw operator new(0xe8) memory: only the
+    // fields it names are written. Called from FCliAsteroid::LoadFieldIni.
+    FCliDynamicAsteroid* Construct(CmnAsteroid::CAsteroidField* CmnField);
+
+    // FUN_00525760 -- release the archetype, the slots (MarkForRemoval(true)), the slot array,
+    // the material and the mesh copy. The record itself is freed by the caller
+    // (FCliAsteroid::Destruct, FCliAsteroid::LoadFieldIni).
+    void Destroy();
+
+    // FUN_00525800 -- the [DynamicAsteroids] keys, the slot array rebuilt, the archetype's mesh
+    // copied (IMesh / IRenderableMesh), then the vertex source descriptor. Called from
+    // FCliAsteroid::LoadFieldIni.
+    void ParseIni(INI_Reader& Reader);
+
+    // FUN_005267b0 -- every live slot gets MarkForRemoval(true) and is cleared. Called from
+    // FCliDynamicAsteroid::ParseIni and (inlined) CliAsteroidApplyDetail.
+    void ReleaseSlots();
+
+    // FUN_00525c80 -- the per-frame spawn / recycle / fade of the slots around a point ahead of
+    // the camera. Called from FCliAsteroid::Update.
+    void Update(FSpaceCamera* Cam, float Dt, Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr);
+
+    // FUN_005261b0 -- the draw: the mesh copy into a locked vertex buffer, then every visible
+    // slot with its alpha, the field's ambient pass run once (*bAmbientDone). Called from the
+    // per-field tick.
+    void Draw(FSpaceCamera* Cam, unsigned char* bAmbientDone, FCliAsteroid* Field);
+
+    // FUN_00526650 -- a new DynamicAsteroid gameobj for this manager: created from the
+    // archetype, init'ed in the active system, collisions off, slot 92, into the ObjDB. Called
+    // from FCliDynamicAsteroid::Update.
+    FCliDynamicAsteroidGameobj* Spawn();
 };
 #pragma pack(pop)
 
@@ -342,18 +424,14 @@ static_assert(offsetof(FCliDynamicAsteroid, ColorShift0) == 0xD4, "Dyn ColorShif
 static_assert(offsetof(FCliDynamicAsteroid, DetailScale) == 0xE0, "Dyn DetailScale +0xE0");
 static_assert(offsetof(FCliDynamicAsteroid, InvDetailScale) == 0xE4, "Dyn InvDetailScale +0xE4");
 
-// FUN_005201e0.
-FCliAsteroid* CliAsteroidConstruct(FCliAsteroid* This);
 // FUN_0051ff50 — called from the [Asteroids] arm of the system INI load (FUN_00553740).
 bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname);
-// FUN_00520130 — StarSys tick: with ASTEROIDS on, CliAsteroidUpdate on every field. Camera is
+// FUN_00520130 — StarSys tick: with ASTEROIDS on, FCliAsteroid::Update on every field. Camera is
 // the FSpaceCamera FUN_0040f130 hands out.
 void CliAsteroidUpdateFields(void* Camera, float Dt);
 // FUN_005200b0 — every registered field destroyed and freed, then the list emptied. Called
 // from the StarSys system unload.
 void CliAsteroidDestroyAll();
-// FUN_005205d0 — the field destructor (only CliAsteroidDestroyAll calls it).
-void CliAsteroidDestruct(FCliAsteroid* This);
 // FUN_00521fa0 — each of the three floats not below 1.0 (NaN included) becomes 1.0; nothing
 // is clamped from below. Used for the dynamic asteroid tints and the billboard centre colour.
 void CliAsteroidClampColorToOne(float* Rgb);
@@ -368,18 +446,8 @@ I3DMathEngine* CliAsteroidMathEngine();
 // LAB_005267f0 — Asteroids perf option (IDS 0x57c): DAT_00613844 = Detail, the active camera's
 // cut flag raised, then CliAsteroidApplyDetail on every field.
 void CliAsteroidApplyGlobalDetail(float Detail);
-// FUN_00520850. Resolves zones against the active system itself.
-void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel);
 // FUN_005201c0.
 unsigned CliAsteroidRegistryCount();
-
-// FUN_00524730 — Band.RenderParts (+0x154) + ExclusionPieceCount (+0x194).
-int CliAsteroidPieceCount(FCliAsteroid* Field);
-// FUN_00524740 — piece world position; returns OutXYZ (zeroed, with an FDUMP warning, for a
-// piece no band holds).
-float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ);
-// FUN_005247f0 — piece radius (1.0f, with an FDUMP warning, for a piece no band holds).
-float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex);
 
 // DAT_005dc374: LIGHTING (0x89) on, SPECULARENABLE (0x1d) off, ALPHABLENDENABLE (0x1b) off
 // (the opaque asteroid draw state). DAT_005dc394: the same with ALPHABLENDENABLE on, SRCBLEND
@@ -392,20 +460,6 @@ typedef void (*FCliAsteroidVisitFn)(FCliAsteroid* Field, void* Ctx);
 // Walk of the DAT_006753c4 registry, as FUN_0051ba20 and FUN_00511b90 inline it.
 void CliAsteroidForEach(FCliAsteroidVisitFn Fn, void* Ctx);
 
-struct FSpaceCamera;
-
-// FUN_00522700 (thiscall on the field) — light the field around the point Scale along the
-// camera's view axis (the dynamic asteroid draw calls it with 100.0f).
-void CliAsteroidLightAround(FCliAsteroid* Field, FSpaceCamera* Cam, float Scale);
-
-// FUN_00522070 (thiscall on the field) -- the per-frame update: the nebula lookup once, the
-// exclusion re-sort, the CmnAsteroid change events into the cube map (MedAsteroid gameobjs),
-// empty cubes dropped, the dynamic asteroid managers, then the band fades.
-void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt);
-
 // FUN_00520170 — per-frame walk of DAT_006753c4, gated on ASTEROIDS: per field the billboards,
 // the near-field cube mesh draw (FUN_00522a60) and the dynamic asteroids.
 void CliAsteroidTickFields(FSpaceCamera* Cam);
-// FUN_00522850 (thiscall on the field, reached through LAB_0051bdf0) — the far band draw for
-// one piece index from the deferred node.
-void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIndex);

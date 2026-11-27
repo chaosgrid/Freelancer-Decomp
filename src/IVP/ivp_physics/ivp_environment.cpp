@@ -95,14 +95,14 @@ void IVP_Environment::dequeue_core(IVP_Core* core)
 // FUN_0634bb90: IVP_Environment::add_revive_core. (Flags & 0x30) == 0x10 means
 // already queued. No null test on either pointer.
 // ============================================================================
-void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core)
+void IVP_Environment::add_revive_core(IVP_Core* core)
 {
     if ((core->Flags & IVP_CORE_IS_IN_WAKEUP_VEC) == 0x10u)
     {
         return;
     }
 
-    env->event_queue.Add(core);
+    event_queue.Add(core);
     core->Flags = (core->Flags & ~0x20u) | 0x10u;
 }
 
@@ -112,7 +112,7 @@ void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core)
 // ============================================================================
 void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core)
 {
-    IVP_Environment_Enqueue_Core(core->Environment, core);
+    core->Environment->add_revive_core(core);
 }
 
 // FUN_0634cf60: top-down over the IVP_Listener_Collision vector, elems re-read
@@ -194,9 +194,9 @@ void IVP_Environment::free_buffer_node_list()
 // ============================================================================
 // FUN_0634ce60
 // ============================================================================
-void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener)
+void IVP_Environment::add_listener_object(void* listener)
 {
-    env->object_listeners.Add(static_cast<IVP_Listener_Object*>(listener));
+    object_listeners.Add(static_cast<IVP_Listener_Object*>(listener));
 }
 
 // ============================================================================
@@ -259,9 +259,9 @@ void IVP_Environment::notify_friction_deleted(void* arg)
 // ============================================================================
 // FUN_0634d050
 // ============================================================================
-void IVP_Environment_Add_Listener_Collision(IVP_Environment* env, void* listener)
+void IVP_Environment::add_listener_collision(void* listener)
 {
-    env->collision_listeners.Add(static_cast<IVP_Listener_Collision*>(listener));
+    collision_listeners.Add(static_cast<IVP_Listener_Collision*>(listener));
 }
 
 // ============================================================================
@@ -335,39 +335,39 @@ void IVP_Env_Interval_Gate::set_time(float Time)
 // FUN_0634c6f0: ~IVP_Environment. Order follows the disassembly, not the
 // Ghidra pseudocode (whose reordering would read already-nulled fields).
 // ============================================================================
-void IVP_Environment_Destructor(IVP_Environment* env)
+void IVP_Environment::destroy()
 {
-    if (env->state_magic == 0x1e240)
+    if (state_magic == 0x1e240)
     {
         // PSI listeners, last to first.
-        for (int i = static_cast<int>(env->psi_listeners.n_elems) - 1; i >= 0; --i)
+        for (int i = static_cast<int>(psi_listeners.n_elems) - 1; i >= 0; --i)
         {
-            static_cast<IVP_Listener_PSI*>(env->psi_listeners.elems[i])->environment_will_be_deleted(env);
+            static_cast<IVP_Listener_PSI*>(psi_listeners.elems[i])->environment_will_be_deleted(this);
         }
 
         // FUN_06345450: deleting destructor when set.
-        IVP_Real_Object* const StaticObject = env->static_object;
+        IVP_Real_Object* const StaticObject = static_object;
         if (StaticObject != nullptr)
         {
             delete StaticObject;
         }
-        env->static_object = nullptr;
+        static_object = nullptr;
 
-        IVP_Cluster_Manager* const ClusterManager = env->cluster_manager;
+        IVP_Cluster_Manager* const ClusterManager = cluster_manager;
         if (ClusterManager != nullptr)
         {
             delete ClusterManager;
         }
-        env->cluster_manager = nullptr;
+        cluster_manager = nullptr;
 
-        delete env->standard_gravity_controller; // slot 6, deleting destructor
-        env->standard_gravity_controller = nullptr;
+        delete standard_gravity_controller; // slot 6, deleting destructor
+        standard_gravity_controller = nullptr;
 
         // Plain operator delete, no null test, no destructor.
-        ::operator delete(env->controller_manager); // FUN_06391d5a
-        env->controller_manager = nullptr;
+        ::operator delete(controller_manager); // FUN_06391d5a
+        controller_manager = nullptr;
 
-        IVP_Sim_Unit_Manager* simUnitManager = env->sim_unit_manager;
+        IVP_Sim_Unit_Manager* simUnitManager = sim_unit_manager;
         if (simUnitManager != nullptr)
         {
             // Drains and frees every queued event payload, the +0x04 listener
@@ -375,81 +375,81 @@ void IVP_Environment_Destructor(IVP_Environment* env)
             simUnitManager->DestroyContents();   // FUN_06360960
             ::operator delete(simUnitManager);   // FUN_06391d5a (allocated with operator new(0x1c))
         }
-        env->sim_unit_manager = nullptr;
+        sim_unit_manager = nullptr;
 
         // Plain operator delete, no null test, no destructor.
-        ::operator delete(env->sim_units_manager); // FUN_06391d5a
-        env->sim_units_manager = nullptr;
+        ::operator delete(sim_units_manager); // FUN_06391d5a
+        sim_units_manager = nullptr;
 
-        IVP_Mindist_Manager* const MindistManager = env->mindist_manager;
+        IVP_Mindist_Manager* const MindistManager = mindist_manager;
         if (MindistManager != nullptr)
         {
             delete MindistManager;
         }
-        env->mindist_manager = nullptr;
+        mindist_manager = nullptr;
 
-        IVP_OV_Tree_Manager* const OvTreeManager = env->ov_tree_manager;
+        IVP_OV_Tree_Manager* const OvTreeManager = ov_tree_manager;
         if (OvTreeManager != nullptr)
         {
             delete OvTreeManager;
         }
-        env->ov_tree_manager = nullptr;
+        ov_tree_manager = nullptr;
 
-        IVP_Env_Interval_Gate* const IntervalGate = env->interval_gate;
+        IVP_Env_Interval_Gate* const IntervalGate = interval_gate;
         if (IntervalGate != nullptr)
         {
             delete IntervalGate;
         }
-        env->interval_gate = nullptr;
+        interval_gate = nullptr;
 
         // The next sub-objects are always set in a constructed environment;
         // retail calls through their vtables with no null test, and each
         // one's own method handles its teardown.
         // performance_counter slot 3; retail never nulls +0x28 afterwards.
-        env->performance_counter->environment_is_going_to_be_deleted(env);
-        env->collision_filter->environment_will_be_deleted(env);
-        env->collision_filter = nullptr;
+        performance_counter->environment_is_going_to_be_deleted(this);
+        collision_filter->environment_will_be_deleted(this);
+        collision_filter = nullptr;
         // Anomaly manager slot 4 and anomaly limits slot 0: each deletes itself
         // when created owned (the constructor passes 1).
-        env->anomaly_manager->EnvironmentWillBeDeleted(env);
-        env->anomaly_manager = nullptr;
-        env->anomaly_limits->EnvironmentWillBeDeleted(env);
-        env->anomaly_limits = nullptr;
+        anomaly_manager->EnvironmentWillBeDeleted(this);
+        anomaly_manager = nullptr;
+        anomaly_limits->EnvironmentWillBeDeleted(this);
+        anomaly_limits = nullptr;
         // Slot 1 (LAB_063616a0): deletes itself when created owned.
-        env->l_active_value_manager->EnvironmentWillBeDeleted(env);
-        env->l_active_value_manager = nullptr;
+        l_active_value_manager->EnvironmentWillBeDeleted(this);
+        l_active_value_manager = nullptr;
         // Slot 5 (LAB_0634bda0): deletes itself when created owned.
-        env->l_material_manager->environment_will_be_deleted(env);
-        env->l_material_manager = nullptr;
-        env->range_manager->environment_will_be_deleted(env); // slot 2
-        env->range_manager = nullptr;
+        l_material_manager->environment_will_be_deleted(this);
+        l_material_manager = nullptr;
+        range_manager->environment_will_be_deleted(this); // slot 2
+        range_manager = nullptr;
 
         // n_elems read once, elems re-read per pass; slot 6 with the environment.
-        for (int i = static_cast<int>(env->collision_delegator_roots.n_elems) - 1; i >= 0; --i)
+        for (int i = static_cast<int>(collision_delegator_roots.n_elems) - 1; i >= 0; --i)
         {
             IVP_Collision_Delegator_Root* Delegator =
-                static_cast<IVP_Collision_Delegator_Root*>(env->collision_delegator_roots.elems[i]);
-            Delegator->environment_is_going_to_be_deleted_event(env);
+                static_cast<IVP_Collision_Delegator_Root*>(collision_delegator_roots.elems[i]);
+            Delegator->environment_is_going_to_be_deleted_event(this);
         }
-        env->collision_delegator_roots.Clear();
+        collision_delegator_roots.Clear();
 
-        delete env->short_term_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
-        env->short_term_mem = nullptr;
+        delete short_term_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
+        short_term_mem = nullptr;
 
-        delete env->sim_unit_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
-        env->sim_unit_mem = nullptr;
+        delete sim_unit_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
+        sim_unit_mem = nullptr;
 
-        IVP_Cache_Object_Manager* const CacheObjectManager = env->cache_object_manager;
+        IVP_Cache_Object_Manager* const CacheObjectManager = cache_object_manager;
         if (CacheObjectManager != nullptr)
         {
             delete CacheObjectManager;
         }
-        env->cache_object_manager = nullptr;
+        cache_object_manager = nullptr;
 
-        if (env->environment_name != nullptr)
+        if (environment_name != nullptr)
         {
-            free(env->environment_name); // FUN_06343fb0
-            env->environment_name = nullptr;
+            free(environment_name); // FUN_06343fb0
+            environment_name = nullptr;
         }
 
         // Unregister from environment_manager->Environments. The constructor
@@ -457,13 +457,13 @@ void IVP_Environment_Destructor(IVP_Environment* env)
         // decremented unconditionally and the tail shifted from the found
         // index. No null test on environment_manager either.
         {
-            IVP_U_Vector<IVP_Environment>& Registry = env->environment_manager->Environments;
+            IVP_U_Vector<IVP_Environment>& Registry = environment_manager->Environments;
             unsigned short& regCount = Registry.n_elems;   // +0x6 of the manager
             IVP_Environment** regElems = Registry.elems;    // +0x8 of the manager
 
             const int32_t OldCount = static_cast<int32_t>(regCount);
             int32_t Idx = OldCount - 1;
-            while (Idx >= 0 && regElems[Idx] != env)
+            while (Idx >= 0 && regElems[Idx] != this)
             {
                 --Idx;
             }
@@ -476,17 +476,17 @@ void IVP_Environment_Destructor(IVP_Environment* env)
             }
         }
 
-        env->free_buffer_node_list(); // FUN_0634cd20
+        free_buffer_node_list(); // FUN_0634cd20
     }
 
     // Shared tail, also reached directly when state_magic does not match: the
     // member vectors release their heap buffers.
-    env->collision_delegator_roots.Clear();
-    env->object_listeners.Clear();
-    env->vector_e0.Clear();
-    env->event_queue.Clear();
-    env->psi_listeners.Clear();
-    env->collision_listeners.Clear();
+    collision_delegator_roots.Clear();
+    object_listeners.Clear();
+    vector_e0.Clear();
+    event_queue.Clear();
+    psi_listeners.Clear();
+    collision_listeners.Clear();
 }
 
 // ============================================================================
@@ -660,21 +660,21 @@ void IVP_Anomaly_Manager::solve_inter_penetration_simple(IVP_Real_Object* Object
         Object0->async_add_rot_speed_object_cs(&RotSpeed);
     }
 
-    if (static_cast<int8_t>(Core1->MovementState & 0xffu) < IVP_MT_NOT_SIM)
-    {
-        const double Factor = (double)(Core1->Mass) * Speed;
-        IVP_U_Point Impulse;
-        Impulse.k[0] = (float)(Factor * Dir.k[0]);
-        Impulse.k[1] = (float)(Factor * Dir.k[1]);
-        Impulse.k[2] = (float)(Factor * Dir.k[2]);
-        Object1->async_push_object_ws(Center0, &Impulse); // Core0's position, as retail
+    if (static_cast<int8_t>(Core1->MovementState & 0xffu) >= IVP_MT_NOT_SIM)
+        return;
 
-        IVP_U_Point RotSpeed;
-        RotSpeed.k[0] = DeltaTime;
-        RotSpeed.k[1] = 0.0f;
-        RotSpeed.k[2] = 0.0f;
-        Object1->async_add_rot_speed_object_cs(&RotSpeed);
-    }
+    const double Factor = (double)(Core1->Mass) * Speed;
+    IVP_U_Point Impulse;
+    Impulse.k[0] = (float)(Factor * Dir.k[0]);
+    Impulse.k[1] = (float)(Factor * Dir.k[1]);
+    Impulse.k[2] = (float)(Factor * Dir.k[2]);
+    Object1->async_push_object_ws(Center0, &Impulse); // Core0's position, as retail
+
+    IVP_U_Point RotSpeed;
+    RotSpeed.k[0] = DeltaTime;
+    RotSpeed.k[1] = 0.0f;
+    RotSpeed.k[2] = 0.0f;
+    Object1->async_add_rot_speed_object_cs(&RotSpeed);
 }
 
 // Slot 2, LAB_06361130: inter_penetration, called by
@@ -843,10 +843,10 @@ void* IVP_Freeze_Manager_Construct(void* FreezeManager)
 // ============================================================================
 const float IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME = 1.0f / 66.0f; // 0x3c783e10
 
-void IVP_Environment_SetDeltaPsiTime(IVP_Environment* env, float dt)
+void IVP_Environment::set_delta_PSI_time(float dt)
 {
-    env->delta_time = dt;
-    env->inv_delta_time = 1.0f / dt; // DAT_063a53d0 = 1.0f
+    delta_time = dt;
+    inv_delta_time = 1.0f / dt; // DAT_063a53d0 = 1.0f
 }
 
 // ============================================================================
@@ -1042,7 +1042,7 @@ void IVP_Event_Manager::simulate_variable_time_step(IVP_Sim_Unit_Manager* TimeMa
             ++PsiCount;
             if (PsiCount == 2)
                 return;
-            IVP_Environment_SetDeltaPsiTime(Environment, DeltaTime);            // FUN_0634c6d0
+            Environment->set_delta_PSI_time(DeltaTime);            // FUN_0634c6d0
         }
 
         TimeManager->LastEventRelTime = MinKey;
@@ -1109,14 +1109,14 @@ void IVP_Environment::set_current_time(float TimeHi, float TimeLo)
 
 
 // FUN_0634cc80
-void IVP_Environment_SimulateDTime(IVP_Environment* env, float DeltaTime)
+void IVP_Environment::simulate_dtime(float DeltaTime)
 {
     FPhysicsTickScope SimulateProfile(EPhysicsTickSection::Simulate);
     // x87: double until the single float store.
     const float Target = (float)(
-        ((double)(env->current_time.time_offset) + env->current_time.time_base) + DeltaTime);
-    env->interval_gate->set_time(Target);                                    // FUN_063605a0
-    env->sim_unit_manager->simulate_variable_time_step(env, DeltaTime);
+        ((double)(current_time.time_offset) + current_time.time_base) + DeltaTime);
+    interval_gate->set_time(Target);                                    // FUN_063605a0
+    sim_unit_manager->simulate_variable_time_step(this, DeltaTime);
 }
 
 // FUN_0634cb90
@@ -1127,33 +1127,34 @@ IVP_Cluster* IVP_Environment::get_root_cluster()
 
 // FUN_0634cd80: operator new(0xa8) + FUN_06362280. Retail's null result on a
 // failed allocation is unreachable with the throwing new.
-IVP_Polygon* IVP_Environment_CreatePolygon(IVP_Environment* env, IVP_SurfaceManager* SurfaceManager,
-                                           const IVP_RealObjectConstructionTemplate* Template,
-                                           const IVP_U_Quat* Rotation, const IVP_U_Point* Position)
+IVP_Polygon* IVP_Environment::create_polygon(IVP_SurfaceManager* SurfaceManager,
+                                             const IVP_RealObjectConstructionTemplate* Template,
+                                             const IVP_U_Quat* Rotation,
+                                             const IVP_U_Point* Position)
 {
-    return new IVP_Polygon(env->get_root_cluster(), SurfaceManager, Template, Rotation, Position);
+    return new IVP_Polygon(get_root_cluster(), SurfaceManager, Template, Rotation, Position);
 }
 
 // FUN_0634cdf0: as FUN_0634cd80 with FUN_06362570 (IVP_Ball).
-IVP_Ball* IVP_Environment_CreateBall(IVP_Environment* env, const float* BallRadius,
-                                     const IVP_RealObjectConstructionTemplate* Template,
-                                     const IVP_U_Quat* Rotation, const IVP_U_Point* Position)
+IVP_Ball* IVP_Environment::create_ball(const float* BallRadius,
+                                       const IVP_RealObjectConstructionTemplate* Template,
+                                       const IVP_U_Quat* Rotation, const IVP_U_Point* Position)
 {
-    return new IVP_Ball(env->get_root_cluster(), BallRadius, Template, Rotation, Position);
+    return new IVP_Ball(get_root_cluster(), BallRadius, Template, Rotation, Position);
 }
 
 // FUN_0634cb20
-void IVP_Environment_SetGravity(IVP_Environment* env, const IVP_U_Point* Gravity)
+void IVP_Environment::set_gravity(const IVP_U_Point* Gravity)
 {
-    env->gravity_x = Gravity->x;
-    env->gravity_z = Gravity->z;
-    env->gravity_y = Gravity->y;
+    gravity_x = Gravity->x;
+    gravity_z = Gravity->z;
+    gravity_y = Gravity->y;
     // FUN_06347e60: |g| on the x87 stack, rounded to float on store.
     const double X = Gravity->x;
     const double Y = Gravity->y;
     const double Z = Gravity->z;
-    env->gravity_length = (float)(std::sqrt(X * X + Y * Y + Z * Z));
-    env->standard_gravity_controller->set_grav_vector(Gravity);
+    gravity_length = (float)(std::sqrt(X * X + Y * Y + Z * Z));
+    standard_gravity_controller->set_grav_vector(Gravity);
 }
 
 // FUN_06349510
@@ -1386,64 +1387,62 @@ void IVP_PerformanceCounter_Simple::reset_and_print_performance_counters(float T
 // retail re-runs the +0x88 one but not the +0x34 one. Reproduced in that
 // order, redundant first pass included. SEH scope-index stores are omitted.
 // ============================================================================
-IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
-                                           IVP_Environment_Manager* Registry,
-                                           const IVP_Environment_Create_Parms* Parms,
-                                           const char* Name,
-                                           void* ClientData)
+IVP_Environment* IVP_Environment::construct(IVP_Environment_Manager* Registry,
+                                            const IVP_Environment_Create_Parms* Parms,
+                                            const char* Name, void* ClientData)
 {
     // ---- compiler-emitted member constructors, before the body -------------
-    IVP_Environment_Init_Block34(&env->statistics_owner);          // FUN_063505f0
-    IVP_Freeze_Manager_Construct(&env->freeze_check_dtime);          // FUN_0634bf30
+    IVP_Environment_Init_Block34(&statistics_owner);          // FUN_063505f0
+    IVP_Freeze_Manager_Construct(&freeze_check_dtime);          // FUN_0634bf30
 
-    new (&env->collision_listeners) IVP_U_Vector<IVP_Listener_Collision>();             // +0xC8
-    new (&env->psi_listeners) IVP_U_Vector<IVP_Listener_PSI>();                         // +0xD0
-    new (&env->event_queue) IVP_U_Vector<IVP_Core>();                                   // +0xD8
-    new (&env->vector_e0) IVP_U_Vector<void>();                                         // +0xE0
-    new (&env->object_listeners) IVP_U_Vector<IVP_Listener_Object>();                   // +0x124
-    new (&env->collision_delegator_roots) IVP_U_Vector<IVP_Collision_Delegator_Root>(); // +0x12C
+    new (&collision_listeners) IVP_U_Vector<IVP_Listener_Collision>();             // +0xC8
+    new (&psi_listeners) IVP_U_Vector<IVP_Listener_PSI>();                         // +0xD0
+    new (&event_queue) IVP_U_Vector<IVP_Core>();                                   // +0xD8
+    new (&vector_e0) IVP_U_Vector<void>();                                         // +0xE0
+    new (&object_listeners) IVP_U_Vector<IVP_Listener_Object>();                   // +0x124
+    new (&collision_delegator_roots) IVP_U_Vector<IVP_Collision_Delegator_Root>(); // +0x12C
 
     // ---- the constructor body proper ---------------------------------------
-    std::memset(env, 0, sizeof(IVP_Environment));
-    IVP_Freeze_Manager_Init(&env->freeze_check_dtime);  // FUN_0634bf40
+    std::memset(this, 0, sizeof(IVP_Environment));
+    IVP_Freeze_Manager_Init(&freeze_check_dtime);  // FUN_0634bf40
 
-    env->sim_substate = 5;
+    sim_substate = 5;
     // The +0x34 block's first dword is a back-pointer to the owner.
-    env->statistics_owner = env;
+    statistics_owner = this;
 
     // ---- adopt-or-construct, in retail's own order -------------------------
 
-    env->l_material_manager = Parms->MaterialManager;
-    if (env->l_material_manager == nullptr)
+    l_material_manager = Parms->MaterialManager;
+    if (l_material_manager == nullptr)
     {
-        env->l_material_manager = new IVP_Material_Manager(1);     // FUN_0634bd80
+        l_material_manager = new IVP_Material_Manager(1);     // FUN_0634bd80
     }
 
-    env->l_active_value_manager = Parms->ActiveValueManager;
-    if (env->l_active_value_manager == nullptr)
+    l_active_value_manager = Parms->ActiveValueManager;
+    if (l_active_value_manager == nullptr)
     {
-        env->l_active_value_manager = new IVP_U_Active_Value_Manager(1); // FUN_063615a0
+        l_active_value_manager = new IVP_U_Active_Value_Manager(1); // FUN_063615a0
     }
 
-    env->collision_filter = Parms->CollisionFilter;
-    if (env->collision_filter == nullptr)
+    collision_filter = Parms->CollisionFilter;
+    if (collision_filter == nullptr)
     {
         // operator new(8), FUN_0634bcb0(1), vtable 0639c3fc.
-        env->collision_filter = new IVP_Collision_Filter_Coll_Group_Ident(1);
+        collision_filter = new IVP_Collision_Filter_Coll_Group_Ident(1);
     }
 
-    env->anomaly_manager = static_cast<IVP_Anomaly_Manager*>(Parms->AnomalyManager);
-    if (env->anomaly_manager == nullptr)
+    anomaly_manager = static_cast<IVP_Anomaly_Manager*>(Parms->AnomalyManager);
+    if (anomaly_manager == nullptr)
     {
         // operator new(8), FUN_06360eb0(1), vtable 063a5784.
-        env->anomaly_manager = new IVP_Anomaly_Manager(1);
+        anomaly_manager = new IVP_Anomaly_Manager(1);
     }
 
-    env->anomaly_limits = static_cast<IVP_Anomaly_Limits*>(Parms->AnomalyLimits);
-    if (env->anomaly_limits == nullptr)
+    anomaly_limits = static_cast<IVP_Anomaly_Limits*>(Parms->AnomalyLimits);
+    if (anomaly_limits == nullptr)
     {
         // operator new(0x14), FUN_06360e30(1), vtable 063a577c.
-        env->anomaly_limits = new IVP_Anomaly_Limits(1);
+        anomaly_limits = new IVP_Anomaly_Limits(1);
     }
 
     // Same adopt-or-construct choice, but appended to collision_delegator_roots.
@@ -1453,110 +1452,110 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
         // operator new(4), FUN_06360df0: the default delegator (vtable 063a5760).
         CollisionDelegatorRoot = static_cast<IVP_Collision_Delegator_Root*>(new IVP_Collision_Delegator_Root_Mindist());
     }
-    env->collision_delegator_roots.Add(static_cast<IVP_Collision_Delegator_Root*>(CollisionDelegatorRoot));
+    collision_delegator_roots.Add(static_cast<IVP_Collision_Delegator_Root*>(CollisionDelegatorRoot));
 
     // Adopted verbatim, never constructed here.
-    env->universe_manager = Parms->UniverseManager;
+    universe_manager = Parms->UniverseManager;
 
     // ---- standard_gravity_controller (+0x00) and the gravity vector --------
     {
-        env->standard_gravity_controller = new IVP_Standard_Gravity_Controller(); // new(0x14), vptr 063a5570
+        standard_gravity_controller = new IVP_Standard_Gravity_Controller(); // new(0x14), vptr 063a5570
 
         // Y is the raw dword 0x411d47ae == 9.83f (not 9.81f, which is 0x411cf5c3).
         IVP_U_Point Gravity;
         Gravity.set(0.0f, 9.83f, 0.0f);
 
-        IVP_Environment_SetGravity(env, &Gravity);
+        set_gravity(&Gravity);
 
         // The inlined set_grav_vector of the library's ctor copies the same
         // values into grav_vec once more.
-        env->standard_gravity_controller->grav_vec.x = Gravity.x;
-        env->standard_gravity_controller->grav_vec.y = Gravity.y;
-        env->standard_gravity_controller->grav_vec.z = Gravity.z;
+        standard_gravity_controller->grav_vec.x = Gravity.x;
+        standard_gravity_controller->grav_vec.y = Gravity.y;
+        standard_gravity_controller->grav_vec.z = Gravity.z;
     }
 
     // Registers with Registry->Environments; the destructor removes it again.
-    Registry->Environments.Add(env);
+    Registry->Environments.Add(this);
 
     // ---- controller_manager (+0x90): 4 bytes holding `this` ----------------
     {
         IVP_Controller_Manager* const ControllerManager =
             static_cast<IVP_Controller_Manager*>(::operator new(4));
-        ControllerManager->environment = env;
-        env->controller_manager = ControllerManager;
+        ControllerManager->environment = this;
+        controller_manager = ControllerManager;
     }
 
-    IVP_Environment_SetDeltaPsiTime(env, IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME);
+    set_delta_PSI_time(IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME);
 
     // ---- unconditional sub-managers (no adopt path) ------------------------
 
-    env->cluster_manager = new IVP_Cluster_Manager(env);           // ctor 0634ad70
-    env->sim_units_manager = new IVP_Sim_Units_Manager(env);       // ctor 06349380
+    cluster_manager = new IVP_Cluster_Manager(this);           // ctor 0634ad70
+    sim_units_manager = new IVP_Sim_Units_Manager(this);       // ctor 06349380
     {
         void* p = ::operator new(0x1C);
         IVP_SimUnitManager_Construct(p);                           // FUN_063608a0
-        env->sim_unit_manager = static_cast<IVP_Sim_Unit_Manager*>(p);
+        sim_unit_manager = static_cast<IVP_Sim_Unit_Manager*>(p);
     }
-    env->mindist_manager = new IVP_Mindist_Manager(env);           // ctor 06350390
-    env->ov_tree_manager = new IVP_OV_Tree_Manager();              // ctor 0635c410
-    env->interval_gate = new IVP_Env_Interval_Gate();             // ctor 063605e0
+    mindist_manager = new IVP_Mindist_Manager(this);           // ctor 06350390
+    ov_tree_manager = new IVP_OV_Tree_Manager();              // ctor 0635c410
+    interval_gate = new IVP_Env_Interval_Gate();             // ctor 063605e0
 
     // ---- two more adopt-or-construct slots ---------------------------------
 
-    env->range_manager = Parms->RangeManager;
-    if (env->range_manager == nullptr)
+    range_manager = Parms->RangeManager;
+    if (range_manager == nullptr)
     {
-        env->range_manager = new IVP_Range_Manager(env, 1);        // FUN_06360360
+        range_manager = new IVP_Range_Manager(this, 1);        // FUN_06360360
     }
 
-    env->performance_counter = Parms->PerformanceCounter;
-    if (env->performance_counter == nullptr)
+    performance_counter = Parms->PerformanceCounter;
+    if (performance_counter == nullptr)
     {
-        env->performance_counter = new IVP_PerformanceCounter_Simple(); // FUN_063602a0
+        performance_counter = new IVP_PerformanceCounter_Simple(); // FUN_063602a0
     }
 
-    env->cache_object_manager = new IVP_Cache_Object_Manager(Parms->NumberOfCacheObjects); // ctor 0634d5c0
+    cache_object_manager = new IVP_Cache_Object_Manager(Parms->NumberOfCacheObjects); // ctor 0634d5c0
 
     // ---- time/step scalars -------------------------------------------------
     // +0x100/+0x104 get the integer (ftol) and fractional parts of delta_time:
     // {0.0f, 0.0151515f} with the default 1/66.
-    env->current_time = IVP_Time{};
-    env->environment_manager = Registry;
-    env->sim_step_count = 1;
+    current_time = IVP_Time{};
+    environment_manager = Registry;
+    sim_step_count = 1;
     {
-        const float Truncated = (float)(static_cast<long>(env->delta_time)); // ftol
-        env->next_psi_time_base = Truncated;
-        env->next_psi_time_offset = env->delta_time - Truncated;
+        const float Truncated = (float)(static_cast<long>(delta_time)); // ftol
+        next_psi_time_base = Truncated;
+        next_psi_time_offset = delta_time - Truncated;
     }
 
     // ---- the two scratch arenas (+0xA0 / +0xA4) ----------------------------
-    env->short_term_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
-    env->sim_unit_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
+    short_term_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
+    sim_unit_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
 
     // One caller-supplied block split in half. SAR (arithmetic shift), so a
     // negative size rounds toward negative infinity, unlike a division.
     {
         const int32_t HalfSize = Parms->MemoryBlockSize >> 1;
-        env->short_term_mem->init_mem(Parms->MemoryBlock, HalfSize);
-        env->sim_unit_mem->init_mem(Parms->MemoryBlock + HalfSize, HalfSize);
+        short_term_mem->init_mem(Parms->MemoryBlock, HalfSize);
+        sim_unit_mem->init_mem(Parms->MemoryBlock + HalfSize, HalfSize);
     }
 
     // ---- damping factor and the two global dispatch tables -----------------
-    env->next_movement_check = 10;
+    next_movement_check = 10;
 
     // pow(0.9, delta_time), open-coded in retail with FYL2X / F2XM1 / FSCALE.
     // DAT_063a5568 is (double)0.9f, not the double 0.9.
-    env->integrated_energy_damp = (float)(
-        std::pow((double)(0.9f), (double)(env->delta_time)));
+    integrated_energy_damp = (float)(
+        std::pow((double)(0.9f), (double)(delta_time)));
 
     IVP_Mindist_Minimize_Solver::init_mms_function_table();        // FUN_06353940
     IVP_InitSimUnitDispatchTable();                                // FUN_06360090
 
     // ---- name, client data -------------------------------------------------
     // FUN_06356920 (IVP's strdup) returns null for a null string itself.
-    env->environment_name = (Name != nullptr) ? _strdup(Name) : nullptr;
-    env->client_data = ClientData;
-    env->field_f0 = 10;
+    environment_name = (Name != nullptr) ? _strdup(Name) : nullptr;
+    client_data = ClientData;
+    field_f0 = 10;
 
     // ---- static_object (+0x30) ---------------------------------------------
     // Retail builds the 0x58-byte construction template on its stack (the
@@ -1593,13 +1592,13 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
         Position.k[2] = 0.0f;
 
         // Null orientation means identity.
-        env->static_object = IVP_Environment_CreateBall(env, &Bias, &Template, nullptr, &Position);
+        static_object = create_ball(&Bias, &Template, nullptr, &Position);
 
         // FUN_06348670: the template's destructor runs at scope exit.
     }
 
-    env->state_magic = 0x1E240;                                    // 123456
-    return env;
+    state_magic = 0x1E240;                                    // 123456
+    return this;
 }
 
 // ============================================================================
@@ -1622,6 +1621,6 @@ IVP_Environment* IVP_Environment_Manager::create_environment(IVP_Environment_Cre
                                                              const char* LicenseName, uint32_t LicenseKey)
 {
     IVP_Environment* Env = static_cast<IVP_Environment*>(::operator new(sizeof(IVP_Environment)));
-    return IVP_Environment_Construct(Env, this, Parms, LicenseName,
-                                     reinterpret_cast<void*>(static_cast<uintptr_t>(LicenseKey)));
+    return Env->construct(this, Parms, LicenseName,
+                          reinterpret_cast<void*>(static_cast<uintptr_t>(LicenseKey)));
 }

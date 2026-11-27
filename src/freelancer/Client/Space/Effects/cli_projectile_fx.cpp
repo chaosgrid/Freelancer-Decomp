@@ -55,7 +55,7 @@ namespace
     constexpr float kProgressFallback = 50.0f; // DAT_005d440c
 
     // Each retail translation unit keeps its own lazily filled I3DMathEngine cache.
-    // CliBeamActivateEffects reads IClientS.cpp's, DAT_00678a28 (no other reference);
+    // FClientBeamGameobj::ActivateEffects reads IClientS.cpp's, DAT_00678a28 (no other reference);
     // CliExplosionAttachLocalXform shares the game light unit's DAT_006789c0 (G_GameLightMath,
     // engine_light.h).
     I3DMathEngine* G_BeamActivateMath = nullptr; // DAT_00678a28
@@ -131,25 +131,25 @@ namespace
     static_assert(sizeof(FEffectListNode) == 0x18, "effect list node 0x18");
 }
 
-void BeamEffectSetProgressFromSpeed(FBeamEffect* This, float Speed)
+void FBeamEffect::SetProgressFromSpeed(float Speed)
 {
-    FBeamEffectArch* Arch = This->Arch;
+    FBeamEffectArch* Arch = this->Arch;
     if (Arch != nullptr)
     {
-        This->ExtendTime =
+        ExtendTime =
             (Arch->RadiusMid + Arch->Radius1 + kProgressLengthPad) / Speed;
         return;
     }
-    This->ExtendTime = kProgressFallback / Speed;
+    ExtendTime = kProgressFallback / Speed;
 }
 
-void BeamEffectSetHitFlags(FBeamEffect* This, bool bHit, bool bHitPlayer)
+void FBeamEffect::SetHitFlags(bool bHit, bool bHitPlayer)
 {
     // FUN_004fc8f0: ((arg1 << 1) ^ f) & 2 ^ f, then ((arg2 << 2) ^ that) & 4 ^ that.
-    unsigned char Flags = This->Flags70;
+    unsigned char Flags = Flags70;
     Flags = static_cast<unsigned char>(((((bHit ? 1u : 0u) << 1) ^ Flags) & kBeamFlagHit) ^ Flags);
     Flags = static_cast<unsigned char>(((((bHitPlayer ? 1u : 0u) << 2) ^ Flags) & kBeamFlagHitPlayer) ^ Flags);
-    This->Flags70 = Flags;
+    Flags70 = Flags;
 }
 
 void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle,
@@ -163,11 +163,11 @@ void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle
     Slots[2] = Particle;
     Slots[3] = Light;
     if (Particle != nullptr)
-        EffectAddRef(Particle);
+        Particle->AddRef();
     if (Sound != nullptr)
         Sound->AddRef();
     if (Light != nullptr)
-        GameLightAddRef(Light);
+        Light->AddRef();
 }
 
 void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots)
@@ -186,7 +186,7 @@ void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots)
 
     if (Dst[2] != nullptr)
     {
-        EffectAddRef(static_cast<FEffectBase*>(Dst[2]));
+        static_cast<FEffectBase*>(Dst[2])->AddRef();
     }
     if (Dst[1] != nullptr)
     {
@@ -194,16 +194,16 @@ void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots)
         static_cast<ISoundSource*>(Dst[1])->AddRef();
     }
     if (Dst[3] != nullptr)
-        GameLightAddRef(static_cast<FGameLight*>(Dst[3]));
+        static_cast<FGameLight*>(Dst[3])->AddRef();
 }
 
-void GameLightSetFreeMotionOffset(FGameLight* Light, float const* Offset3)
+void FGameLight::SetFreeMotionOffset(float const* Offset3)
 {
     // FUN_005377a0: Light+0x120, the free-motion velocity FUN_00537860 integrates. No null
     // tests.
-    Light->VelocityX = Offset3[0];
-    Light->VelocityY = Offset3[1];
-    Light->VelocityZ = Offset3[2];
+    VelocityX = Offset3[0];
+    VelocityY = Offset3[1];
+    VelocityZ = Offset3[2];
 }
 
 void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
@@ -234,7 +234,7 @@ void CliEffectCompanionClear(void* Companion16)
     void** const Slots = static_cast<void**>(Companion16);
     if (Slots[2] != nullptr)
     {
-        EffectRelease(static_cast<FEffectBase*>(Slots[2]));
+        static_cast<FEffectBase*>(Slots[2])->Release();
         Slots[2] = nullptr;
     }
     if (Slots[1] != nullptr)
@@ -245,7 +245,7 @@ void CliEffectCompanionClear(void* Companion16)
     }
     if (Slots[3] != nullptr)
     {
-        GameLightRelease(static_cast<FGameLight*>(Slots[3]));
+        static_cast<FGameLight*>(Slots[3])->Release();
         Slots[3] = nullptr;
     }
     Slots[0] = nullptr;
@@ -258,7 +258,7 @@ void CliEffectCompanionArmStop(void* Companion16)
     // pointer itself.
     void** const Slots = static_cast<void**>(Companion16);
     // The effect's own slot 1 (dispatched): the slot holds a particle, a beam or a
-    // CliEquipLight, whose slot 1 is FUN_004f7bd0 (EffectKill).
+    // CliEquipLight, whose slot 1 is FUN_004f7bd0 (FEffectBase::Kill).
     if (Slots[2] != nullptr)
     {
         ((FEffectBase*)Slots[2])->Kill();
@@ -287,7 +287,7 @@ void CliEffectCompanionArmStop(void* Companion16)
     if (Slots[3] != nullptr)
     {
         FGameLight* const Light = static_cast<FGameLight*>(Slots[3]);
-        GameLightAnimDetach(Light);
+        Light->AnimDetach();
         GameLightVirtualDisable((FGameLight*)Slots[3]);
     }
 }
@@ -311,7 +311,7 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
                               Cursor->Light};
         if (NodeSlots[2] != nullptr)
         {
-            EffectRelease(static_cast<FEffectBase*>(NodeSlots[2]));
+            static_cast<FEffectBase*>(NodeSlots[2])->Release();
             Cursor->Effect = nullptr;
         }
         if (NodeSlots[1] != nullptr)
@@ -321,7 +321,7 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
         }
         if (NodeSlots[3] != nullptr)
         {
-            GameLightRelease(static_cast<FGameLight*>(NodeSlots[3]));
+            static_cast<FGameLight*>(NodeSlots[3])->Release();
             Cursor->Light = nullptr;
         }
         Cursor->EffectArch = nullptr;
@@ -511,12 +511,11 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform 
     *reinterpret_cast<float*>(Base + 0x128) = 0.0f;
 }
 
-void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
-                            unsigned char bUseLookDir)
+void FClientBeamGameobj::ActivateEffects(Vector const* LookDir, unsigned char bUseLookDir)
 {
     // FUN_0053f340 (on the Beam gameobj). The class & 7 object's archetype companion (no null
     // test on the object); a null companion goes straight to Projectile's slot 92.
-    Archetype::ICliObj* const Companion = NarrowBeamObject(This, CObject::ClassProjectile)->Archetype->Companion;
+    Archetype::ICliObj* const Companion = NarrowBeamObject(this, CObject::ClassProjectile)->Archetype->Companion;
     if (Companion != nullptr)
     {
         Transform LocalXform;
@@ -529,7 +528,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
             // transpose(CBeam orientation, class & 0x67, no null test) x LookMatrix(*LookDir).
             Matrix const Look = LookMatrix(*LookDir);
             Matrix OwnerOri;
-            CopyOwnerOrientation(&OwnerOri, NarrowBeamObject(This, CObject::ClassBeam));
+            CopyOwnerOrientation(&OwnerOri, NarrowBeamObject(this, CObject::ClassBeam));
             Matrix OwnerT;
             MatrixStore9(&OwnerT, OwnerOri.E[0][0], OwnerOri.E[1][0], OwnerOri.E[2][0],
                          OwnerOri.E[0][1], OwnerOri.E[1][1], OwnerOri.E[2][1], OwnerOri.E[0][2],
@@ -561,53 +560,53 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
                     Beam = static_cast<FBeamEffect*>(Mem);
                     BeamEffectConstruct(Beam, 0);
                 }
-                This->BeamAlloc = Beam;
+                BeamAlloc = Beam;
                 // Flags70 bit 3 = bUseLookDir; no null test on the allocation.
                 Beam->Flags70 = static_cast<unsigned char>(
                     (((bUseLookDir << 3) ^ Beam->Flags70) & kBeamFlagUseLookDir) ^ Beam->Flags70);
-                This->Companion[2] = This->BeamAlloc;
-                BeamEffectAddRef(This->BeamAlloc);
+                this->Companion[2] = BeamAlloc;
+                BeamAlloc->AddRef();
             }
 
-            int const EngineIndex = static_cast<int>(This->get_index());
-            FBeamEffect* const LiveBeam = static_cast<FBeamEffect*>(This->Companion[2]);
+            int const EngineIndex = static_cast<int>(get_index());
+            FBeamEffect* const LiveBeam = static_cast<FBeamEffect*>(this->Companion[2]);
             if (LiveBeam != nullptr)
-                BeamEffectAttach(LiveBeam, This, EngineIndex, &LocalXform);
-            ISoundSource* const Sound = static_cast<ISoundSource*>(This->Companion[1]);
+                LiveBeam->Attach(this, EngineIndex, &LocalXform);
+            ISoundSource* const Sound = static_cast<ISoundSource*>(this->Companion[1]);
             if (Sound != nullptr)
                 Sound->SetPose(EngineIndex, &LocalXform);
-            if (This->Companion[3] != nullptr)
-                CliExplosionAttachLocalXform(This->Companion[3], EngineIndex, &LocalXform);
+            if (this->Companion[3] != nullptr)
+                CliExplosionAttachLocalXform(this->Companion[3], EngineIndex, &LocalXform);
 
             // Start the beam; on success its progress from the CBeam's speed (class & 0x67, no
             // null test); on failure release it and clear Companion[2].
-            if (This->Companion[2] != nullptr)
+            if (this->Companion[2] != nullptr)
             {
-                FBeamEffect* const StartBeam = static_cast<FBeamEffect*>(This->Companion[2]);
-                if (BeamEffectStart(StartBeam, EffectArch) != 0)
+                FBeamEffect* const StartBeam = static_cast<FBeamEffect*>(this->Companion[2]);
+                if (StartBeam->FBeamEffect::Start(EffectArch) != 0)
                 {
-                    float const Speed = OwnerVelocityLength(NarrowBeamObject(This, CObject::ClassBeam));
-                    BeamEffectSetProgressFromSpeed(This->BeamAlloc, Speed);
+                    float const Speed = OwnerVelocityLength(NarrowBeamObject(this, CObject::ClassBeam));
+                    BeamAlloc->SetProgressFromSpeed(Speed);
                 }
                 else
                 {
-                    BeamEffectRelease(StartBeam);
-                    This->Companion[2] = nullptr;
+                    StartBeam->Release();
+                    this->Companion[2] = nullptr;
                 }
             }
 
-            CliEffectListInsert(&This->EffectList, This->Companion);
+            CliEffectListInsert(&EffectList, this->Companion);
         }
     }
 
     // Projectile's slot 92 FUN_005426e0, called directly.
-    This->FClientProjectileGameobj::PostCreateInit();
+    FClientProjectileGameobj::PostCreateInit();
 }
 
-void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target)
+void FCliLauncherFx::FireProjectiles(Vector const* Target)
 {
     // FUN_0052dde0. No null test on the launcher equipment.
-    CELauncher* const Launch = Launcher->LaunchEquip();
+    CELauncher* const Launch = LaunchEquip();
     std::vector<ProjLaunchInfo> Infos;
     Launch->ComputeLaunchInfo(Infos, *Target);
     unsigned const BarrelCount = static_cast<unsigned>(Infos.size());
@@ -640,7 +639,7 @@ void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target)
         // velocity; any other along the launch velocity.
         Vector LookDir = Info.Velocity;
         unsigned char bUseLook = 0;
-        if (static_cast<void*>(Launcher->Host) == GetPlayerObjRW())
+        if (static_cast<void*>(Host) == GetPlayerObjRW())
         {
             Vector Pos;
             bUseLook = 1;
@@ -648,7 +647,7 @@ void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target)
                                                               static_cast<int>(Barrel), *Target);
         }
 
-        CliBeamActivateEffects(Beam, &LookDir, bUseLook);
+        Beam->ActivateEffects(&LookDir, bUseLook);
 
         ProjArch->Companion->Load(1);
         ClientObjDb_RegisterGameobj(Beam, false);
@@ -663,7 +662,7 @@ unsigned char FCliLauncherFx::TryFire(Vector const* Target)
     FireResult const Result = Launch->Fire(*Target);
     if (Result == FireOk)
     {
-        CliLauncherPlayMuzzleFx(this);
+        PlayMuzzleFx();
         Launch->ConsumeFireResources();
         // The player's ship firing a munition that requires ammo takes the per-fire rounds out
         // of its inventory item (count > per-fire is a signed compare).
@@ -714,7 +713,7 @@ unsigned char FCliGunFx::TryFire(Vector const* Target)
         // The Seeker is read without a null test on the munition; unguided -> launch.
         CEGun const* const Gun = static_cast<CEGun const*>(Equip);
         if (Gun->MunitionArch()->Seeker == 0)
-            CliLauncherFireProjectiles(this, Target);
+            FireProjectiles(Target);
     }
     return bFired;
 }
@@ -726,7 +725,7 @@ void FCliLauncherFx::FireDirect(Vector const* Target)
     if (Equip == nullptr)
         return;
     // Resources are consumed only outside single player.
-    CliLauncherPlayMuzzleFx(this);
+    PlayMuzzleFx();
     if (!SinglePlayer())
         LaunchEquip()->ConsumeFireResources();
     StarSysNoteTargetChange(Host->get_id());
@@ -737,7 +736,7 @@ void FCliGunFx::FireDirect(Vector const* Target)
     // FUN_0052dd40 -- slot 5 of the gun table; FUN_0052d510's body inlined.
     if (Equip == nullptr)
         return;
-    CliLauncherPlayMuzzleFx(this);
+    PlayMuzzleFx();
     if (!SinglePlayer())
         LaunchEquip()->ConsumeFireResources();
     StarSysNoteTargetChange(Host->get_id());
@@ -754,7 +753,7 @@ void FCliGunFx::FireDirect(Vector const* Target)
     if (Owner != 0)
         Gun->SetTargetPoint(*Target);
     if (Gun->MunitionArch()->Seeker == 0)
-        CliLauncherFireProjectiles(this, Target);
+        FireProjectiles(Target);
 }
 
 unsigned char FCliLauncherFx::FireBarrelAim()
@@ -992,10 +991,10 @@ namespace
         return 0;
     }
 
-void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
+void FCliLauncherFx::PlayMuzzleFx()
 {
     // FUN_0052cfd0. Callers: the fire slots FUN_0052d410, FUN_0052d510, FUN_0052dd40.
-    CELauncher* const Launch = Launcher->LaunchEquip();
+    CELauncher* const Launch = LaunchEquip();
 
     // Zero when the launcher or its archetype is null.
     FCliGunFxCompanion* const Companion = GunCompanionFx(Launch);
@@ -1006,12 +1005,12 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         return;
 
     // The use-animation, when there is one.
-    if (Launcher->AnimJointIndex.Value != -1)
+    if (AnimJointIndex.Value != -1)
     {
         DALib::Anim->EvalPlayback(
-            static_cast<unsigned long>(Launcher->AnimJointIndex.Value), 0, 0.0f, 1.0f, nullptr,
+            static_cast<unsigned long>(AnimJointIndex.Value), 0, 0.0f, 1.0f, nullptr,
             AsOpaqueDword(1.0f), AsOpaqueDword(1.0f), nullptr);
-        AnimDB::Add(Launcher->AnimJointIndex.Value);
+        AnimDB::Add(AnimJointIndex.Value);
     }
 
     // From the cockpit camera, on the player's own ship: a muzzle light instead of a particle.
@@ -1043,15 +1042,15 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         }
 
         // The light drifts with the host.
-        Vector const HostVelocity = Launcher->Host->get_velocity();
-        GameLightSetFreeMotionOffset(Light, &HostVelocity.x);
+        Vector const HostVelocity = Host->get_velocity();
+        Light->SetFreeMotionOffset(&HostVelocity.x);
 
         // A failed attach disables the light; the creation reference is dropped either way.
-        if (!GameLightAttachAnim(Light, Anim, 1.0f, 1.0f, 0.0f))
+        if (!Light->AttachAnim(Anim, 1.0f, 1.0f, 0.0f))
         {
             Light->Disable();
         }
-        GameLightRelease(Light);
+        Light->Release();
         return;
     }
 
@@ -1059,13 +1058,13 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         return;
 
     // The previous muzzle effect goes.
-    if (Launcher->MuzzleEffect != nullptr)
+    if (MuzzleEffect != nullptr)
     {
-        FParticleEffect* const Prior = static_cast<FParticleEffect*>(Launcher->MuzzleEffect);
-        ParticleEffectCleanupAlchemy(Prior);
-        ParticleEffectArmDeath(Prior);
-        ParticleEffectRelease(Prior);
-        Launcher->MuzzleEffect = nullptr;
+        FParticleEffect* const Prior = static_cast<FParticleEffect*>(MuzzleEffect);
+        Prior->CleanupAlchemy();
+        Prior->FParticleEffect::Kill();
+        Prior->Release();
+        MuzzleEffect = nullptr;
     }
 
     // Barrel info not tested; no engine part -> done.
@@ -1076,7 +1075,7 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
     // The arch is not tested; the effect is null when the pool is empty.
     FEffectArch* const EffectArch = FindEffectArch(&Companion->OneShotEffect.Id);
     FParticleEffect* const Effect = ParticleEffectCreate();
-    Launcher->MuzzleEffect = Effect;
+    MuzzleEffect = Effect;
 
     // The barrel's frame as the local transform, on the barrel's part.
     Transform BarrelXform;
@@ -1084,12 +1083,12 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
     BarrelXform.Translation.x = Barrel->Position.x;
     BarrelXform.Translation.y = Barrel->Position.y;
     BarrelXform.Translation.z = Barrel->Position.z;
-    ParticleEffectAttach(Effect, Launcher->Host, Barrel->EngineIndex, &BarrelXform);
+    Effect->Attach(Host, Barrel->EngineIndex, &BarrelXform);
 
-    if (ParticleEffectStart(Effect, EffectArch) == 0)
+    if (Effect->FParticleEffect::Start(EffectArch) == 0)
     {
-        ParticleEffectRelease(Effect);
-        Launcher->MuzzleEffect = nullptr;
+        Effect->Release();
+        MuzzleEffect = nullptr;
     }
 }
 
@@ -1358,8 +1357,8 @@ unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointI
     return 0;
 }
 
-unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
-                                        FCliEquipFirePacket const* Packet)
+// FUN_00534460 -- ported as FClientEquippedObj::HandleEquipMsg (cli_projectile_fx.cpp), which reads
+unsigned char FClientEquippedObj::HandleEquipMsg(FCliEquipFirePacket const* Packet)
 {
     // FUN_00534460. Neither `this` nor the packet is tested at entry.
     if (Packet->Op == USER_USE_ITEM)
@@ -1375,7 +1374,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
         }
         Vector Target = Packet->TargetPos;
         int const PlayerId = static_cast<int>(GetPlayerConnectionId());
-        CliShipFireWeapons(static_cast<IObjAffect*>(Host), Ids, Count, &Target, PlayerId);
+        CliShipFireWeapons(static_cast<IObjAffect*>(this), Ids, Count, &Target, PlayerId);
         return 1;
     }
 
@@ -1384,7 +1383,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
 
     // ActivateEquip arm, cases 0..4 (all return 0). FindByID is called with no test of the
     // class & 0x103 narrowing's result.
-    CEqObj* Ship = ResolveEqObjFromHost(Host);
+    CEqObj* Ship = ResolveEqObjFromHost(this);
 
     CEquip* Equip = Ship->EquipManager.FindByID(Packet->HardpointId);
     if (Equip == nullptr || Equip->IsDestroyed())
@@ -1397,15 +1396,15 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
     switch (Sub)
     {
     case kActivateSubOpDeactivate:
-        CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, 0, PlayerId);
+        CliShipActivateEquip(static_cast<IObjAffect*>(this), &HpId, 0, PlayerId);
         return 0;
     case kActivateSubOpActivate:
-        CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, 1, PlayerId);
+        CliShipActivateEquip(static_cast<IObjAffect*>(this), &HpId, 1, PlayerId);
         return 0;
     case kActivateSubOpToggle:
     {
         unsigned char const Active = Equip->IsActive() ? 1 : 0;
-        CliShipActivateEquip(static_cast<IObjAffect*>(Host), &HpId, static_cast<unsigned char>(1 - Active),
+        CliShipActivateEquip(static_cast<IObjAffect*>(this), &HpId, static_cast<unsigned char>(1 - Active),
                              PlayerId);
         return 0;
     }
@@ -1420,11 +1419,11 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
             if (Walk == Equip)
             {
                 if (!Walk->IsActive())
-                    CliShipActivateEquip(static_cast<IObjAffect*>(Host), &WalkId, 1, PlayerId);
+                    CliShipActivateEquip(static_cast<IObjAffect*>(this), &WalkId, 1, PlayerId);
             }
             else if (Walk->IsActive())
             {
-                CliShipActivateEquip(static_cast<IObjAffect*>(Host), &WalkId, 0, PlayerId);
+                CliShipActivateEquip(static_cast<IObjAffect*>(this), &WalkId, 0, PlayerId);
             }
             Walk = Ship->EquipManager.Traverse(Trav);
         }
@@ -1442,7 +1441,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
             if (Cur != Want)
             {
                 unsigned short WalkId = Walk->Id;
-                CliShipActivateEquip(static_cast<IObjAffect*>(Host), &WalkId, Want, PlayerId);
+                CliShipActivateEquip(static_cast<IObjAffect*>(this), &WalkId, Want, PlayerId);
             }
             Walk = Ship->EquipManager.Traverse(Trav);
         }
@@ -1453,18 +1452,18 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
     }
 }
 
-void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket* Packet)
+void FClientEquippedObj::ShipPreprocessEquipUpdate(FCliEquipFirePacket* Packet)
 {
     // FUN_00544e70. Ops 0x1a / 0x1b -> 0x19 + the next launcher. `this`, its +0xc face and the
     // object are tested; the packet is not. Retail's Op == 1 test (byte +0x25 AND 0x700 ==
     // 0x200) can never be true, so it is not ported.
-    if (Host == nullptr)
+    if (this == nullptr)
         return;
 
     CEqObj* Ship = nullptr;
-    if (Host->Object != nullptr &&
-        ((static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip))
-        Ship = static_cast<CEqObj*>(Host->Object);
+    if (Object != nullptr &&
+        ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip))
+        Ship = static_cast<CEqObj*>(Object);
     if (Ship == nullptr)
         return;
 
@@ -1524,11 +1523,11 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
     }
 }
 
-void CliShipLeadAimFire(FClientEquippedObj* Host)
+void FClientEquippedObj::ShipLeadAimFire()
 {
     // FUN_00544880. Nothing is null-tested except the CShip narrowing's own chain, whose result
     // is used untested.
-    IObjInspect const* const Inspect = static_cast<IObjInspect const*>(Host);
+    IObjInspect const* const Inspect = static_cast<IObjInspect const*>(this);
 
     // The nose (minus column 2).
     Transform const& Xform = Inspect->get_transform();
@@ -1545,7 +1544,7 @@ void CliShipLeadAimFire(FClientEquippedObj* Host)
     DirZ = static_cast<float>(DirZ * InvLen);
 
     // get_tgt_lead_fire_pos on the CShip narrowing, untested.
-    CObject* const Obj = Host->Object;
+    CObject* const Obj = Object;
     CShip* const Ship = (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                             ? static_cast<CShip*>(Obj)
                             : nullptr;
@@ -1577,19 +1576,18 @@ void CliShipLeadAimFire(FClientEquippedObj* Host)
     Aim.y = static_cast<float>(static_cast<double>(DirY) + Pos.y);
     Aim.x = static_cast<float>(static_cast<double>(DirX) + Pos.x);
     int const PlayerId = static_cast<int>(GetPlayerConnectionId());
-    CliShipFireWeapons(static_cast<IObjAffect*>(Host), nullptr, 0, &Aim, PlayerId);
+    CliShipFireWeapons(static_cast<IObjAffect*>(this), nullptr, 0, &Aim, PlayerId);
 }
 
-unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
-                                       FCliEquipFirePacket const* Packet)
+unsigned char FClientEquippedObj::ShipHandleEquipUpdate(FCliEquipFirePacket const* Packet)
 {
     // FUN_00544d70. Neither `this` nor the packet is tested.
     if (ShouldSkipLocalServerTick())
         return 1;
 
     FCliEquipFirePacket Local = *Packet;
-    CliShipPreprocessEquipUpdate(Host, &Local);
-    unsigned char const Handled = EquippedObjHandleEquipMsg(Host, &Local);
+    ShipPreprocessEquipUpdate(&Local);
+    unsigned char const Handled = FClientEquippedObj::HandleEquipMsg(&Local);
     if (Handled != 0)
         return 1;
 
@@ -1606,14 +1604,14 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
             int const PlayerId = static_cast<int>(GetPlayerConnectionId());
 
             // Host+4 vt+0x48 = LAB_005468e0 (CShip set_target + net).
-            CliShipSetTarget(static_cast<IObjAffect*>(Host), TargetRw, SubId, PlayerId);
+            CliShipSetTarget(static_cast<IObjAffect*>(this), TargetRw, SubId, PlayerId);
 
             // Every gun gets the target too; each pass re-narrows the object (class & 0x503)
             // and walks its manager with no test of the result.
             CEquipTraverser Trav(EquipTypeGun);
             while (true)
             {
-                CObject* const Obj = Host->Object;
+                CObject* const Obj = Object;
                 CEqObj* const Ship =
                     (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                         ? static_cast<CEqObj*>(Obj)
@@ -1622,13 +1620,13 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
                 if (Equip == nullptr)
                     break;
                 unsigned short HpId = Equip->Id;
-                CliEquippedObjSetGunTarget(static_cast<IObjAffect*>(Host), &HpId, TargetRw, SubId, PlayerId);
+                CliEquippedObjSetGunTarget(static_cast<IObjAffect*>(this), &HpId, TargetRw, SubId, PlayerId);
             }
         }
     }
     else if (Local.Op == USER_FIRE_FORWARD)
     {
-        CliShipLeadAimFire(Host);
+        ShipLeadAimFire();
     }
     return 1;
 }
@@ -1636,13 +1634,13 @@ FLauncherAnimHandle::~FLauncherAnimHandle()
 {
     // FUN_0052ca50 (on +0x10). Reached from the ctor/dtor unwind funclets and inlined at the end
     // of FUN_0052caa0.
-    if (Value != -1)
-    {
-        DALib::Anim->StopPlayback(static_cast<unsigned long>(Value));        // vt+0x38
-        DALib::Anim->DestroyScript(reinterpret_cast<void*>(
-            static_cast<uintptr_t>(static_cast<unsigned long>(Value))));    // vt+0x28
-        Value = -1;
-    }
+    if (Value == -1)
+        return;
+
+    DALib::Anim->StopPlayback(static_cast<unsigned long>(Value));        // vt+0x38
+    DALib::Anim->DestroyScript(reinterpret_cast<void*>(
+        static_cast<uintptr_t>(static_cast<unsigned long>(Value))));    // vt+0x28
+    Value = -1;
 }
 
 FLauncherEffectCompanion::~FLauncherEffectCompanion()
@@ -1739,16 +1737,16 @@ FCliLauncherFx::~FCliLauncherFx()
     {
         FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
         Transform const Identity = IdentityTransform();
-        EffectAttach(Effect, nullptr, -1, &Identity);
+        Effect->Attach(nullptr, -1, &Identity);
         Effect->Kill();
-        EffectRelease(Effect);
+        Effect->Release();
         MuzzleEffect = nullptr;
     }
     // Each only when set; none of the pointers is cleared.
     if (MunitionExplosion != nullptr)
         ExplosionArchRelease(MunitionExplosion);
     if (ConstEffectArch != nullptr)
-        EffectArchRelease(ConstEffectArch);
+        ConstEffectArch->Release();
     if (OneShotSoundArch != nullptr)
         ReleaseClientSoundArch(OneShotSoundArch);
     if (DryFireSoundArch != nullptr)
@@ -1764,7 +1762,7 @@ FCliLauncherFx::~FCliLauncherFx()
     }
     // The multi_sparks02 arch.
     if (DefaultEffectArch != nullptr)
-        EffectArchRelease(DefaultEffectArch);
+        DefaultEffectArch->Release();
     // The +0x30 companion released by hand; the member destructors then run (the companion's
     // second pass finds it null, the +0x10 handle's finds -1).
     CliEffectCompanionClear(Companion.Slots);
@@ -1782,13 +1780,13 @@ void FCliLauncherFx::DropOnDestroying()
         AnimJointIndex.Value = -1;
     }
     CliEffectListRemove(&Host->EffectList, Companion.Slots);
-    if (MuzzleEffect != nullptr)
-    {
-        FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
-        Effect->Kill();
-        EffectRelease(Effect);
-        MuzzleEffect = nullptr;
-    }
+    if (MuzzleEffect == nullptr)
+        return;
+
+    FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
+    Effect->Kill();
+    Effect->Release();
+    MuzzleEffect = nullptr;
 }
 
 void FCliLauncherFx::notify(Event Code, void* Param)
@@ -1956,7 +1954,7 @@ namespace
     void CliLauncherFxBaseFill(FCliLauncherFx* Wrapper, CEquip* Equip, void* Host)
     {
         // FUN_00531a30 (connect, separation explosion).
-        ClientEquipBaseFill(Wrapper, Equip, static_cast<FClientGameobj*>(Host));
+        Wrapper->BaseFill(Equip, static_cast<FClientGameobj*>(Host));
 
         // A non-empty use_animation (arch +0x9c, no null test) plays on the equipment's root
         // into +0x10.
@@ -2009,7 +2007,7 @@ namespace
             Wrapper->ConstEffectArch = FindEffectArch(&ConstEffect->Id);
             if (Wrapper->ConstEffectArch != nullptr)
             {
-                EffectArchAddRef(Wrapper->ConstEffectArch, 1);
+                Wrapper->ConstEffectArch->AddRef(1);
             }
             else
             {
@@ -2032,7 +2030,7 @@ namespace
         // multi_sparks02 into +0x2c, referenced when found.
         Wrapper->DefaultEffectArch = FindEffectArch(&G_MultiSparks02Id);
         if (Wrapper->DefaultEffectArch != nullptr)
-            EffectArchAddRef(Wrapper->DefaultEffectArch, 1);
+            Wrapper->DefaultEffectArch->AddRef(1);
     }
 }
 

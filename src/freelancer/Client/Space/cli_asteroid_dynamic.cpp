@@ -20,7 +20,7 @@
 #include "dacom.h"                  // FDUMP
 #include "dacom_iids.h"
 #include "engine/engbase.h"         // IEngine::QueryEngineComponent
-#include "Common/engine_light.h"           // FGameLight, GameLightRelease (FUN_00537ad0)
+#include "Common/engine_light.h"           // FGameLight, FGameLight::Release (FUN_00537ad0)
 #include "Core/game_options.h"           // GetGameOption (FUN_005792b0)
 #include "Space/Effects/particle_effect.h"        // FParticleEffect, CliCreateEffectOneShot (FUN_00503070)
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
@@ -33,7 +33,7 @@
 #include "Network/server_connect.h"         // GetLocalServerInterface (DAT_0067ecd0)
 #include "soundmanager.h"           // ISoundSource
 #include "Space/Cameras/space_camera.h"           // AsCamera
-#include "Space/space_scene_obj_draw.h"   // GameobjSweepEffectListRetail (FUN_004fd040)
+#include "Space/space_scene_obj_draw.h"   // FGameobjEffectList::Sweep (FUN_004fd040)
 #include "Space/star_sys.h"               // StarSysGetActiveSystemId (FUN_00554e90)
 #include "Common/Graphics/vis_effect_arch.h"        // FindEffectArch (FUN_0040f080)
 #include "x86math.h"                // I3DMathEngine::MulTransform, Transform
@@ -110,7 +110,7 @@ FCliDynamicAsteroidGameobj::~FCliDynamicAsteroidGameobj()
     // gameobj's +0xc0 / +0xbc / +0xc4 / +0xb8.
     if (Companion[2] != nullptr)
     {
-        ParticleEffectRelease(static_cast<FParticleEffect*>(Companion[2]));
+        static_cast<FParticleEffect*>(Companion[2])->Release();
         Companion[2] = nullptr;
     }
     if (Companion[1] != nullptr)
@@ -120,7 +120,7 @@ FCliDynamicAsteroidGameobj::~FCliDynamicAsteroidGameobj()
     }
     if (Companion[3] != nullptr)
     {
-        GameLightRelease(static_cast<FGameLight*>(Companion[3]));
+        static_cast<FGameLight*>(Companion[3])->Release();
         Companion[3] = nullptr;
     }
     Companion[0] = nullptr;
@@ -134,7 +134,7 @@ int FCliDynamicAsteroidGameobj::get_type(uint& OutType) const
 
 void FCliDynamicAsteroidGameobj::create(Archetype::Root* Arch)
 {
-    GameobjCreateOfClass(this, CObject::ClassDynamicAsteroid, Arch);
+    CreateOfClass(CObject::ClassDynamicAsteroid, Arch);
     Object->open(Arch);
     Nickname = Arch->Nickname;
 }
@@ -305,85 +305,84 @@ void FCliDynamicAsteroidGameobj::SetOwner(FCliDynamicAsteroid* Owner)
 // The [DynamicAsteroids] manager
 // ===========================================================================
 
-FCliDynamicAsteroid* CliDynamicAsteroidConstruct(FCliDynamicAsteroid* This,
-                                                 CmnAsteroid::CAsteroidField* CmnField)
+FCliDynamicAsteroid* FCliDynamicAsteroid::Construct(CmnAsteroid::CAsteroidField* CmnField)
 {
     // In retail store order. SlotCount (+0x14), CameraPos (+0x28), MeshDesc (+0x38),
     // PrimitiveType (+0xac), the two totals (+0xb4 / +0xb8) and InvDetailScale (+0xe4) are not
-    // written; CliAsteroidLoadFieldIni sets InvDetailScale right after.
-    This->CmnField = CmnField;
-    This->TintedDiffuse0 = 1.0f;
-    This->TintedDiffuse1 = 1.0f;
-    This->TintedDiffuse2 = 1.0f;
-    This->TintedAmbient0 = 1.0f;
-    This->TintedAmbient1 = 1.0f;
-    This->TintedAmbient2 = 1.0f;
-    This->ColorShift0 = 1.0f;
-    This->ColorShift1 = 1.0f;
-    This->ColorShift2 = 1.0f;
-    This->DetailScale = 1.0f;
-    This->MaxVelocity = 50.0f;
-    This->MaxAngularVelocity = 5.0f;
-    This->CountIni = 10;
-    This->PlacementRadius = 150.0f;
-    This->PlacementRadiusInner = 75.0f;
-    This->Arch = nullptr;
-    This->SlotPtrs = nullptr;
-    This->bSpawnAllowed = 0;
-    This->bAnyVisible = 0;
-    This->Zone = nullptr;
-    This->Material = nullptr;
-    This->Mesh = nullptr;
-    if (This->CmnField == nullptr)
+    // written; FCliAsteroid::LoadFieldIni sets InvDetailScale right after.
+    this->CmnField = CmnField;
+    TintedDiffuse0 = 1.0f;
+    TintedDiffuse1 = 1.0f;
+    TintedDiffuse2 = 1.0f;
+    TintedAmbient0 = 1.0f;
+    TintedAmbient1 = 1.0f;
+    TintedAmbient2 = 1.0f;
+    ColorShift0 = 1.0f;
+    ColorShift1 = 1.0f;
+    ColorShift2 = 1.0f;
+    DetailScale = 1.0f;
+    MaxVelocity = 50.0f;
+    MaxAngularVelocity = 5.0f;
+    CountIni = 10;
+    PlacementRadius = 150.0f;
+    PlacementRadiusInner = 75.0f;
+    Arch = nullptr;
+    SlotPtrs = nullptr;
+    bSpawnAllowed = 0;
+    bAnyVisible = 0;
+    Zone = nullptr;
+    Material = nullptr;
+    Mesh = nullptr;
+    if (this->CmnField == nullptr)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kCliAsteroidSourceFile, 0x8ab,
               "NULL common field passed to dynamic asteroid manager");
     }
-    return This;
+    return this;
 }
 
-void CliDynamicAsteroidReleaseSlots(FCliDynamicAsteroid* This)
+void FCliDynamicAsteroid::ReleaseSlots()
 {
-    if (This->SlotPtrs == nullptr)
+    if (SlotPtrs == nullptr)
         return;
-    for (int Index = 0; Index < This->SlotCount; ++Index)
+    for (int Index = 0; Index < SlotCount; ++Index)
     {
-        if (This->SlotPtrs[Index] == nullptr)
+        if (SlotPtrs[Index] == nullptr)
             continue;
-        This->SlotPtrs[Index]->MarkForRemoval(true);
-        This->SlotPtrs[Index] = nullptr;
+        SlotPtrs[Index]->MarkForRemoval(true);
+        SlotPtrs[Index] = nullptr;
     }
 }
 
-void CliDynamicAsteroidDestroy(FCliDynamicAsteroid* This)
+void FCliDynamicAsteroid::Destroy()
 {
     // Arch (+8) is left as it is after the release.
-    if (This->Arch != nullptr)
-        This->Arch->Release();
+    if (Arch != nullptr)
+        Arch->Release();
     // Retail inlines the slot loop.
-    CliDynamicAsteroidReleaseSlots(This);
-    ::operator delete(This->SlotPtrs);
-    This->SlotPtrs = nullptr;
-    if (This->Material != nullptr)
+    ReleaseSlots();
+    ::operator delete(SlotPtrs);
+    SlotPtrs = nullptr;
+    if (Material != nullptr)
     {
-        This->Material->Release();
-        This->Material = nullptr;
+        Material->Release();
+        Material = nullptr;
     }
     // Mesh (+0xb0) is not cleared, as retail.
-    FCliDynamicAsteroidMesh* const Mesh = This->Mesh;
-    if (Mesh != nullptr)
-    {
-        ::operator delete(Mesh->Verts);
-        Mesh->Verts = nullptr;
-        Mesh->VertCount = 0;
-        ::operator delete(Mesh->Indices);
-        Mesh->Indices = nullptr;
-        Mesh->IndexCount = 0;
-        ::operator delete(Mesh);
-    }
+    FCliDynamicAsteroidMesh* const Mesh = this->Mesh;
+    if (Mesh == nullptr)
+        return;
+
+    ::operator delete(Mesh->Verts);
+    Mesh->Verts = nullptr;
+    Mesh->VertCount = 0;
+    ::operator delete(Mesh->Indices);
+    Mesh->Indices = nullptr;
+    Mesh->IndexCount = 0;
+    ::operator delete(Mesh);
 }
 
-void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
+void FCliDynamicAsteroid::ParseIni(INI_Reader& Reader)
 {
     if (Reader.read_value())
     {
@@ -394,38 +393,38 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
                 char const* const Name = Reader.get_value_string(0);
                 ID_String Id;
                 Id.Id = CreateID(Name);
-                This->Arch = Archetype::GetDynamicAsteroid(Archetype::GetDynamicAsteroidID(Id));
-                if (This->Arch == nullptr)
+                Arch = Archetype::GetDynamicAsteroid(Archetype::GetDynamicAsteroidID(Id));
+                if (Arch == nullptr)
                 {
                     FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: dynamic asteroid archetype (%s) not found",
                           kCliAsteroidSourceFile, 0x8cb, Name);
                 }
-                if (This->Arch != nullptr)
+                if (Arch != nullptr)
                 {
-                    This->Arch->load();
-                    if (This->Arch->Companion != nullptr)
-                        This->Arch->Companion->Load(0);
+                    Arch->load();
+                    if (Arch->Companion != nullptr)
+                        Arch->Companion->Load(0);
                 }
             }
             else if (Reader.is_value("count"))
             {
-                This->CountIni = static_cast<int>(Reader.get_value_float(0));
+                CountIni = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("placement_radius"))
             {
                 // 0.7 is a double (DAT_005cf0f8).
                 float const Radius = Reader.get_value_float(0);
-                This->PlacementRadius = Radius;
-                This->PlacementRadiusInner = static_cast<float>(Radius * 0.7);
+                PlacementRadius = Radius;
+                PlacementRadiusInner = static_cast<float>(Radius * 0.7);
             }
             else if (Reader.is_value("max_velocity"))
             {
-                This->MaxVelocity = Reader.get_value_float(0);
+                MaxVelocity = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_angular_velocity"))
             {
-                This->MaxAngularVelocity = Reader.get_value_float(0);
+                MaxAngularVelocity = Reader.get_value_float(0);
             }
             else if (Reader.is_value("color_shift"))
             {
@@ -433,41 +432,41 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
                 float const R = Reader.get_value_float(0);
                 float const G = Reader.get_value_float(1);
                 float const B = Reader.get_value_float(2);
-                This->ColorShift0 = R;
-                This->ColorShift1 = G;
-                This->ColorShift2 = B;
+                ColorShift0 = R;
+                ColorShift1 = G;
+                ColorShift2 = B;
             }
         } while (Reader.read_value());
     }
 
-    CliDynamicAsteroidReleaseSlots(This);
-    ::operator delete(This->SlotPtrs);
-    This->SlotPtrs = nullptr;
-    This->SlotCount = static_cast<int>(
-        static_cast<double>(This->CountIni) * This->DetailScale + 0.5f);
-    This->SlotPtrs = static_cast<FCliDynamicAsteroidGameobj**>(::operator new(
-        static_cast<unsigned>(This->SlotCount) * sizeof(FCliDynamicAsteroidGameobj*)));
-    for (int Index = 0; Index < This->SlotCount; ++Index)
-        This->SlotPtrs[Index] = nullptr;
+    ReleaseSlots();
+    ::operator delete(SlotPtrs);
+    SlotPtrs = nullptr;
+    SlotCount = static_cast<int>(
+        static_cast<double>(CountIni) * DetailScale + 0.5f);
+    SlotPtrs = static_cast<FCliDynamicAsteroidGameobj**>(::operator new(
+        static_cast<unsigned>(SlotCount) * sizeof(FCliDynamicAsteroidGameobj*)));
+    for (int Index = 0; Index < SlotCount; ++Index)
+        SlotPtrs[Index] = nullptr;
 
-    if (This->Material != nullptr)
+    if (Material != nullptr)
     {
-        This->Material->Release();
-        This->Material = nullptr;
+        Material->Release();
+        Material = nullptr;
     }
-    This->MeshVertTotal = 0;
-    This->MeshIndexTotal = 0;
+    MeshVertTotal = 0;
+    MeshIndexTotal = 0;
 
-    if (This->Arch != nullptr)
+    if (Arch != nullptr)
     {
         IMesh* Mesh = nullptr;
         IRenderableMesh* RMesh = nullptr;
-        int const EngineIndex = static_cast<int>(This->Arch->EngineIndex);
+        int const EngineIndex = static_cast<int>(Arch->EngineIndex);
         if (DALib::Engine->QueryEngineComponent(EngineIndex, Iids::Mesh,
                                                 reinterpret_cast<void**>(&Mesh)) < 0)
         {
             // No mesh block and no vertex source descriptor.
-            This->Mesh = nullptr;
+            this->Mesh = nullptr;
             if (RMesh != nullptr)
                 RMesh->Release();
             if (Mesh != nullptr)
@@ -475,9 +474,9 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
             return;
         }
         Mesh->OpenFaceGroup(0, kMeshOpenRead);
-        if (This->Material == nullptr)
-            Mesh->GetFaceGroupMaterial(&This->Material);
-        Mesh->GetFaceGroupPrimitiveType(&This->PrimitiveType);
+        if (Material == nullptr)
+            Mesh->GetFaceGroupMaterial(&Material);
+        Mesh->GetFaceGroupPrimitiveType(&PrimitiveType);
         Mesh->CloseFaceGroup();
         DALib::Renderer->SetArchetypeLod(static_cast<intptr_t>(EngineIndex), 0);
         // The result is not tested, as retail.
@@ -490,19 +489,19 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
         Block->Indices = nullptr;
         Block->IndexCount = 0;
         Block->VertCount = 0;
-        This->Mesh = Block;
+        this->Mesh = Block;
         // Retail's per-vertex texcoord constructors (FUN_0043d950) write nothing.
         RMesh->GetVertexCount(&Block->VertCount);
         Block->Verts = static_cast<unsigned char*>(
             ::operator new(static_cast<unsigned>(Block->VertCount) * 0x2c));
-        This->MeshVertTotal += static_cast<unsigned>(Block->VertCount);
+        MeshVertTotal += static_cast<unsigned>(Block->VertCount);
         RMesh->CopyVertexData(Block->Verts, D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2,
                      0, Block->VertCount);
         RMesh->GetIndexCount(&Block->IndexCount);
         Block->Indices = static_cast<unsigned short*>(
             ::operator new(static_cast<unsigned>(Block->IndexCount) * 2));
         RMesh->CopyIndices(&Block->Indices, Block->IndexCount);
-        This->MeshIndexTotal += static_cast<unsigned>(Block->IndexCount);
+        MeshIndexTotal += static_cast<unsigned>(Block->IndexCount);
         if (RMesh != nullptr)
             RMesh->Release();
         if (Mesh != nullptr)
@@ -510,14 +509,14 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
     }
 
     // With no archetype too, through whatever +0xb0 holds (no null test, as retail).
-    CliAsteroidFillVertexSource(&This->MeshDesc, This->Mesh->Verts,
-                                static_cast<unsigned short>(This->MeshVertTotal));
+    CliAsteroidFillVertexSource(&MeshDesc, this->Mesh->Verts,
+                                static_cast<unsigned short>(MeshVertTotal));
 }
 
-FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This)
+FCliDynamicAsteroidGameobj* FCliDynamicAsteroid::Spawn()
 {
-    FCliDynamicAsteroidGameobj* const Go = new FCliDynamicAsteroidGameobj(This);
-    Go->create(This->Arch);
+    FCliDynamicAsteroidGameobj* const Go = new FCliDynamicAsteroidGameobj(this);
+    Go->create(Arch);
     // The object narrowed by class & 0x4001 (null otherwise, not tested).
     CObject* const Obj = Go->GetObject();
     CDynamicAsteroid* const Dynamic =
@@ -545,43 +544,43 @@ FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This)
     return Go;
 }
 
-void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, float Dt,
-                              Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr)
+void FCliDynamicAsteroid::Update(FSpaceCamera* Cam, float Dt,
+                                 Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr)
 {
     // Dt is not read.
     (void)Dt;
 
     if (GetGameOption(kGameOptDynAsteroids) == 0)
     {
-        if (This->SlotPtrs == nullptr)
+        if (SlotPtrs == nullptr)
             return;
-        for (int Index = 0; Index < This->SlotCount; ++Index)
+        for (int Index = 0; Index < SlotCount; ++Index)
         {
-            if (This->SlotPtrs[Index] == nullptr)
+            if (SlotPtrs[Index] == nullptr)
                 continue;
-            This->SlotPtrs[Index]->MarkForRemoval(true);
-            This->SlotPtrs[Index] = nullptr;
+            SlotPtrs[Index]->MarkForRemoval(true);
+            SlotPtrs[Index] = nullptr;
         }
-        ::operator delete(This->SlotPtrs);
-        This->SlotPtrs = nullptr;
+        ::operator delete(SlotPtrs);
+        SlotPtrs = nullptr;
         return;
     }
 
-    if (This->SlotPtrs == nullptr)
+    if (SlotPtrs == nullptr)
     {
-        This->SlotCount = static_cast<int>(
-            static_cast<double>(This->CountIni) * This->DetailScale + 0.5f);
-        This->SlotPtrs = static_cast<FCliDynamicAsteroidGameobj**>(::operator new(
-            static_cast<unsigned>(This->SlotCount) * sizeof(FCliDynamicAsteroidGameobj*)));
-        for (int Index = 0; Index < This->SlotCount; ++Index)
-            This->SlotPtrs[Index] = nullptr;
+        SlotCount = static_cast<int>(
+            static_cast<double>(CountIni) * DetailScale + 0.5f);
+        SlotPtrs = static_cast<FCliDynamicAsteroidGameobj**>(::operator new(
+            static_cast<unsigned>(SlotCount) * sizeof(FCliDynamicAsteroidGameobj*)));
+        for (int Index = 0; Index < SlotCount; ++Index)
+            SlotPtrs[Index] = nullptr;
     }
 
     // The spawn centre: the camera position plus the view axis (the orientation's third
     // column) times -PlacementRadiusInner.
     ICamera* const Camera = AsCamera(Cam);
     const Matrix* const Orient = Camera->GetOrientation();
-    float const NegInner = -This->PlacementRadiusInner;
+    float const NegInner = -PlacementRadiusInner;
     float const OffsetX = Orient->E[0][2] * NegInner;
     float const OffsetY = Orient->E[1][2] * NegInner;
     float const OffsetZ = Orient->E[2][2] * NegInner;
@@ -600,34 +599,34 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
         (static_cast<unsigned>(PlayerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
         static_cast<CShip*>(PlayerObj)->is_using_tradelane())
     {
-        This->bSpawnAllowed = 0;
+        bSpawnAllowed = 0;
     }
-    else if (This->Zone != nullptr && !(This->Zone->GetImmersion(Centre) > kSpawnImmersion))
+    else if (Zone != nullptr && !(Zone->GetImmersion(Centre) > kSpawnImmersion))
     {
-        This->bSpawnAllowed = 0;
+        bSpawnAllowed = 0;
     }
     else
     {
-        This->bSpawnAllowed = 1;
+        bSpawnAllowed = 1;
     }
     // An excluded centre blocks it too.
-    if (This->bSpawnAllowed != 0 && ExclusionMgr != nullptr)
+    if (bSpawnAllowed != 0 && ExclusionMgr != nullptr)
     {
-        This->bSpawnAllowed =
+        bSpawnAllowed =
             ExclusionMgr->is_excluded(Centre, Exclusion::EOT_DynamicAsteroid, nullptr) ? 0 : 1;
     }
 
     // The recycle distance and the fade band are kept as doubles.
-    float const Radius = This->PlacementRadius;
+    float const Radius = PlacementRadius;
     double const RadiusSq = static_cast<double>(Radius) * Radius;
     double const FarSq = kFarFactor * RadiusSq;
     double const FadeSq = RadiusSq * kFadeFactor;
     double const BandStart = FarSq - FadeSq;
-    This->bAnyVisible = 0;
+    bAnyVisible = 0;
 
-    for (int Index = 0; Index < This->SlotCount; ++Index)
+    for (int Index = 0; Index < SlotCount; ++Index)
     {
-        FCliDynamicAsteroidGameobj* Go = This->SlotPtrs[Index];
+        FCliDynamicAsteroidGameobj* Go = SlotPtrs[Index];
         float DistSq = 0.0f;
         bool bFade = false;
         if (Go != nullptr && Go->bPlaced != 0)
@@ -646,61 +645,61 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
 
         if (bFade)
         {
-            if (This->SlotPtrs[Index]->bActive == 0)
+            if (SlotPtrs[Index]->bActive == 0)
                 continue;
             double Alpha = 1.0;
             if (DistSq > BandStart)
                 Alpha = (FarSq - DistSq) / FadeSq;
-            This->SlotPtrs[Index]->Alpha = static_cast<float>(Alpha);
+            SlotPtrs[Index]->Alpha = static_cast<float>(Alpha);
             if (Alpha > kVisibleAlpha)
-                This->bAnyVisible = 1;
+                bAnyVisible = 1;
             continue;
         }
 
-        if (This->bSpawnAllowed == 0)
+        if (bSpawnAllowed == 0)
         {
             // Out of range with spawning blocked -- released.
-            if (This->SlotPtrs[Index] != nullptr)
+            if (SlotPtrs[Index] != nullptr)
             {
-                This->SlotPtrs[Index]->MarkForRemoval(true);
-                This->SlotPtrs[Index] = nullptr;
+                SlotPtrs[Index]->MarkForRemoval(true);
+                SlotPtrs[Index] = nullptr;
             }
             continue;
         }
 
         // Both conditions below only warn.
-        if (This->SlotPtrs[Index] == nullptr)
-            This->SlotPtrs[Index] = CliDynamicAsteroidSpawn(This);
-        if (This->SlotPtrs[Index] == nullptr)
+        if (SlotPtrs[Index] == nullptr)
+            SlotPtrs[Index] = Spawn();
+        if (SlotPtrs[Index] == nullptr)
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x986,
                   "dynamic asteroid not created");
         }
-        if (This->SlotPtrs[Index]->bPlaced != 0)
+        if (SlotPtrs[Index]->bPlaced != 0)
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x988,
                   "dynamic asteroid should be flagged as !valid_pos");
         }
 
-        float const PlaceRadius = This->PlacementRadius;
+        float const PlaceRadius = PlacementRadius;
         Vector const Unit = random_on_unit_sphere();
         Vector Place;
         Place.x = PlaceRadius * Unit.x + Centre.x;
         Place.y = PlaceRadius * Unit.y + Centre.y;
         Place.z = PlaceRadius * Unit.z + Centre.z;
 
-        Go = This->SlotPtrs[Index];
+        Go = SlotPtrs[Index];
         CliEffectListRemove(&Go->EffectList, Go->Companion);
-        if (This->SlotPtrs[Index]->GetObject() != nullptr)
-            PhySys::SetCollisionState(This->SlotPtrs[Index]->GetObject(), false);
-        This->SlotPtrs[Index]->Place(&Place, This->MaxVelocity, This->MaxAngularVelocity);
-        if (This->SlotPtrs[Index]->GetObject() != nullptr)
-            PhySys::SetCollisionState(This->SlotPtrs[Index]->GetObject(), true);
+        if (SlotPtrs[Index]->GetObject() != nullptr)
+            PhySys::SetCollisionState(SlotPtrs[Index]->GetObject(), false);
+        SlotPtrs[Index]->Place(&Place, MaxVelocity, MaxAngularVelocity);
+        if (SlotPtrs[Index]->GetObject() != nullptr)
+            PhySys::SetCollisionState(SlotPtrs[Index]->GetObject(), true);
 
-        // An effect that is still alive (the keep tests of GameobjSweepEffectListRetail) warns
+        // An effect that is still alive (the keep tests of FGameobjEffectList::Sweep) warns
         // and is dropped.
-        Go = This->SlotPtrs[Index];
-        Archetype::DynamicAsteroid* const Arch = This->Arch;
+        Go = SlotPtrs[Index];
+        Archetype::DynamicAsteroid* const Arch = this->Arch;
         FParticleEffect* const Particle = static_cast<FParticleEffect*>(Go->Companion[2]);
         ISoundSource* const Sound = static_cast<ISoundSource*>(Go->Companion[1]);
         FGameLight* const Light = static_cast<FGameLight*>(Go->Companion[3]);
@@ -745,18 +744,17 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
             }
         }
 
-        This->SlotPtrs[Index]->bPlaced = 1;
-        This->SlotPtrs[Index]->bActive = 1;
-        This->bAnyVisible = 1;
+        SlotPtrs[Index]->bPlaced = 1;
+        SlotPtrs[Index]->bActive = 1;
+        bAnyVisible = 1;
     }
 }
 
-void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
-                            unsigned char* bAmbientDone, FCliAsteroid* Field)
+void FCliDynamicAsteroid::Draw(FSpaceCamera* Cam, unsigned char* bAmbientDone, FCliAsteroid* Field)
 {
     if (GetGameOption(kGameOptDynAsteroids) == 0)
         return;
-    if (This->SlotPtrs == nullptr)
+    if (SlotPtrs == nullptr)
         return;
     if (Cam == nullptr)
         return;
@@ -764,26 +762,26 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
     // The camera position into +0x28 (read by the loot roll).
     ICamera* const Camera = AsCamera(Cam);
     const Vector* const CamPos = Camera->GetPosition();
-    This->CameraPos.x = CamPos->x;
-    This->CameraPos.y = CamPos->y;
-    This->CameraPos.z = CamPos->z;
-    if (This->bAnyVisible == 0)
+    CameraPos.x = CamPos->x;
+    CameraPos.y = CamPos->y;
+    CameraPos.z = CamPos->z;
+    if (bAnyVisible == 0)
         return;
 
     IVertexBufferManager* const VbMgr = DALib::VertexBuffer;
     FVertexMemoryLock Lock;
-    if (VbMgr->LockVertexMemory(static_cast<unsigned int>(This->MeshDesc.SrcFvf),
-                                static_cast<unsigned int>(This->MeshDesc.SrcCount), &Lock) < 0)
+    if (VbMgr->LockVertexMemory(static_cast<unsigned int>(MeshDesc.SrcFvf),
+                                static_cast<unsigned int>(MeshDesc.SrcCount), &Lock) < 0)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x9bd,
               "could not lock the vertex buffer for dynamic asteroids");
         return;
     }
-    VbMgr->CopyVertexData(Lock.Vertices, Lock.Listing.Fvf, &This->MeshDesc, 0, This->MeshDesc.SrcCount);
+    VbMgr->CopyVertexData(Lock.Vertices, Lock.Listing.Fvf, &MeshDesc, 0, MeshDesc.SrcCount);
     VbMgr->UnlockVertexMemory(&Lock);
 
-    if (This->Material != nullptr)
-        This->Material->Bind(nullptr);
+    if (Material != nullptr)
+        Material->Bind(nullptr);
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
     ApplyRsTable(Pipe, kRsAsteroidOpaque);
@@ -796,14 +794,14 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
     unsigned char bBlending = 0;
     float MaterialBlock[0x11] = {};
     int const bLighting = GetGameOption(kGameOptLighting);
-    MaterialBlock[0] = This->TintedDiffuse0;
-    MaterialBlock[1] = This->TintedDiffuse1;
-    MaterialBlock[2] = This->TintedDiffuse2;
+    MaterialBlock[0] = TintedDiffuse0;
+    MaterialBlock[1] = TintedDiffuse1;
+    MaterialBlock[2] = TintedDiffuse2;
     if (bLighting != 0)
     {
-        MaterialBlock[4] = This->TintedAmbient0;
-        MaterialBlock[5] = This->TintedAmbient1;
-        MaterialBlock[6] = This->TintedAmbient2;
+        MaterialBlock[4] = TintedAmbient0;
+        MaterialBlock[5] = TintedAmbient1;
+        MaterialBlock[6] = TintedAmbient2;
     }
     else
     {
@@ -816,9 +814,9 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
     Transform View;
     std::memcpy(&View, Camera->GetViewTransform(), sizeof(View));
 
-    for (int Index = 0; Index < This->SlotCount; ++Index)
+    for (int Index = 0; Index < SlotCount; ++Index)
     {
-        FCliDynamicAsteroidGameobj* const Go = This->SlotPtrs[Index];
+        FCliDynamicAsteroidGameobj* const Go = SlotPtrs[Index];
         if (Go == nullptr || Go->bActive == 0)
             continue;
         if (Go->Alpha <= kVisibleAlpha)
@@ -827,13 +825,13 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         // The field's ambient pass once per frame.
         if (*bAmbientDone == 0)
         {
-            CliAsteroidLightAround(Field, Cam, 100.0f);
+            Field->LightAround(Cam, 100.0f);
             *bAmbientDone = 1;
         }
 
         // Pipeline state 7 set -> the combined modelview; otherwise world and view apart.
         Transform World;
-        std::memcpy(&World, &This->SlotPtrs[Index]->get_transform(), sizeof(World));
+        std::memcpy(&World, &SlotPtrs[Index]->get_transform(), sizeof(World));
         int bModelview = 1;
         Pipe->GetPipelineState(Render::PipelineStateViewspaceLights, &bModelview);
         if (bModelview != 0)
@@ -851,7 +849,7 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
 
         // Not below 1.0 (NaN included) -> the opaque states every time; below 1.0 -> the blend
         // states, once until an opaque slot resets the flag.
-        MaterialBlock[3] = This->SlotPtrs[Index]->Alpha;
+        MaterialBlock[3] = SlotPtrs[Index]->Alpha;
         if (!(MaterialBlock[3] < 1.0f))
         {
             ApplyRsTable(Pipe, kRsAsteroidOpaque);
@@ -866,19 +864,19 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         }
 
         Pipe->SetMaterial((const D3DMATERIAL8*)MaterialBlock);
-        Pipe->DrawIndexedPrimitiveVb(This->PrimitiveType, Lock.Listing.VertexBuffer,
+        Pipe->DrawIndexedPrimitiveVb(PrimitiveType, Lock.Listing.VertexBuffer,
                                      static_cast<unsigned int>(Lock.Listing.BaseVertex),
-                                     static_cast<unsigned int>(This->MeshDesc.SrcCount),
-                                     This->Mesh->Indices,
-                                     static_cast<unsigned int>(This->Mesh->IndexCount), 0);
+                                     static_cast<unsigned int>(MeshDesc.SrcCount),
+                                     Mesh->Indices,
+                                     static_cast<unsigned int>(Mesh->IndexCount), 0);
 
         // The particle's intensity follows the alpha.
-        if (This->SlotPtrs[Index]->Companion[2] != nullptr)
+        if (SlotPtrs[Index]->Companion[2] != nullptr)
         {
-            ParticleSetIntensity(static_cast<FParticleEffect*>(This->SlotPtrs[Index]->Companion[2]),
+            ParticleSetIntensity(static_cast<FParticleEffect*>(SlotPtrs[Index]->Companion[2]),
                                  MaterialBlock[3]);
         }
-        GameobjSweepEffectListRetail(&This->SlotPtrs[Index]->EffectList);
+        SlotPtrs[Index]->EffectList.Sweep();
     }
 
     Pipe->SetRenderState(D3DRS_ALPHAREF, SavedAlphaBlend);

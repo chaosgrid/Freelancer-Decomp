@@ -1927,15 +1927,15 @@ void CShip::stop_tradelane()
 {
     // FUN_062b17e0. The 0x10 test is the null-LaneAction check, as in get_tradelane_*.
     IAction* Lane = Actions.find("LaneAction");
-    if (Lane != nullptr && Lane != (IAction*)0x10)
-    {
-        // IAction is LaneAction's second base, after the 0x10-byte PhySys::Controller.
-        LaneAction* LaneAct = static_cast<LaneAction*>(Lane);
-        bUsingTradelane = 0;
-        // FUN_062c2350(1): param 1 skips the behaviour dispatch (vtable slot 26) that
-        // stop(0) makes on the tradelane target.
-        LaneAct->stop(1);
-    }
+    if (Lane == nullptr || Lane == (IAction*)0x10)
+        return;
+
+    // IAction is LaneAction's second base, after the 0x10-byte PhySys::Controller.
+    LaneAction* LaneAct = static_cast<LaneAction*>(Lane);
+    bUsingTradelane = 0;
+    // FUN_062c2350(1): param 1 skips the behaviour dispatch (vtable slot 26) that
+    // stop(0) makes on the tradelane target.
+    LaneAct->stop(1);
 }
 
 extern COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj);

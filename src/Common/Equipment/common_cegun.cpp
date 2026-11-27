@@ -157,14 +157,14 @@ void CEGun::JointChannel::Bind(CEGun* NewOwner, long Instance)
         if (fabs((double)Rel->Min - Rel->Max) >= 6.2831854820251465)
             bLimited = 0;
     }
-    if (DALib::Engine->GetJointParams(EngineIndex, 0, &Current) == 0)
-    {
-        // No null guards on the owner chain.
-        FDUMP(kFdumpError,
-              "%s(%d) : *** ERROR: ID(0x%X) Failed to get_joint_state() for gun.  Get Scott. ARCH(%s) FILE(%s)",
-              kCEGunSource, 0x336, Owner->Owner->Id, Owner->Arch->Nickname.get_string(),
-              Owner->Arch->DaArchetype.Value);
-    }
+    if (DALib::Engine->GetJointParams(EngineIndex, 0, &Current) != 0)
+        return;
+
+    // No null guards on the owner chain.
+    FDUMP(kFdumpError,
+          "%s(%d) : *** ERROR: ID(0x%X) Failed to get_joint_state() for gun.  Get Scott. ARCH(%s) FILE(%s)",
+          kCEGunSource, 0x336, Owner->Owner->Id, Owner->Arch->Nickname.get_string(),
+          Owner->Arch->DaArchetype.Value);
 }
 
 // FUN_06299130. Values kept on the x87 stack (Delta, the unrounded Step) are doubles here.

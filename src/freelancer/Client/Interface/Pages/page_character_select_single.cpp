@@ -6,7 +6,7 @@
 
 #include "Interface/Pages/page_character_select_single.h"
 
-#include "Common/Fonts/font_string.h"       // FHudWideText, WideTextAssign (FUN_00413df0)
+#include "Common/Fonts/font_string.h"       // FHudWideText, FHudWideText::Assign (FUN_00413df0)
 #include "Core/globals.h"           // GetClientFrameTimeCapped (FUN_0042d680)
 #include "Common/Fonts/ids_rdl.h"           // AppendTextAsRdl (FUN_0057db50), AppendTextMaybeXmlRdl (FUN_0057e2c0)
 #include "Common/Fonts/ids_strings.h"       // GetIdsStringWWithRawFallback (FUN_004347e0)
@@ -436,9 +436,9 @@ void PageCharacterSelectSingle::ShowDetails(CCharacterSet::CharacterInfo const* 
         unsigned const Length = GetIdsStringWWithRawFallback(
             (unsigned)System->GetStridName(), Buffer, 0x1000);
         if (Length == 0)
-            WideTextAssign(&SystemName, L"IDS?", 0xffffffffu);
+            SystemName.Assign(L"IDS?", 0xffffffffu);
         else
-            WideTextAssign(&SystemName, Buffer, Length);
+            SystemName.Assign(Buffer, Length);
         AppendStyle(CharacterLocation, 0x5724);
         RenderDisplayList LocationText;
         AppendTextAsRdl(SystemName.Text, static_cast<unsigned>(wcslen(SystemName.Text)),

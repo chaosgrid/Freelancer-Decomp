@@ -6,7 +6,7 @@
 
 // Common.dll -- SystemManager (the per-ship AI system block behind IBehaviorManager::Sys):
 // ctor/dtor, the +0x1364 record's destructor, the SystemManager-level helpers, the personality
-// hook, InitSystemManager and UpdateSystemManager. The timer table, gun groups, RepairManager
+// hook, SystemManager::Init and SystemManager::Update. The timer table, gun groups, RepairManager
 // and ThrustManager live in their own common_sysmgr_* / common_repairmanager.cpp /
 // common_thrustmanager.cpp files.
 
@@ -17,10 +17,10 @@
 #include "common_misc.h"      // SUBOBJ_ID_NONE
 #include "common_iface.h"     // IBehaviorManager::Pathfind, IObjInspect, ObjRwFromWatchable
 #include "common_pathfind.h"  // PathfindManager::IsCruiseUnobstructed (FUN_062de160)
-#include "common_iustategraph.h" // ClearAiTargetVector, BuildAiTargetList (ScanGunGroupTargets)
+#include "common_iustategraph.h" // ClearAiTargetVector, SystemManagerTimerTable::BuildAiTargetList (ScanGunGroupTargets)
 #include "common_cobject.h"    // CEqObj::EquipManager / get_behavior_interface (ScanGunGroupTargets)
 #include "common_cequip.h"     // CELauncher::cast / GetBarrelPosWS (ScanGunGroupTargets)
-#include "common_cobjdb.h"     // IObjDB::FindById (AppendSystemManagerTimerListEntry)
+#include "common_cobjdb.h"     // IObjDB::FindById (SystemManagerTimerTable::AppendTimerListEntry)
 #include "dacom.h"             // DACOM_API
 
 #include <cmath>
@@ -52,7 +52,7 @@ SystemManager::SystemManager()
     // GunGroups (FUN_062e9330), FormationLeaders (FUN_062ebbc0), Targeting
     // (FUN_062ed570), the +0x1498 tractor record's watcher and id, the RepairManager,
     // SelfTarget's guards and interface pointers, Personality, then Owner/ObjectDb/bLeaderParamsBorrowed
-    // zeroed last. Owner gets its real value from InitSystemManager (FUN_062e6490), called by
+    // zeroed last. Owner gets its real value from SystemManager::Init (FUN_062e6490), called by
     // IBehaviorManager's ctor right after this one.
     //
     // Deviation (determinism only): OwnerObjectId, Pad15, the rest of the ThrustManager after its
@@ -61,8 +61,8 @@ SystemManager::SystemManager()
     std::memset(Pad15, 0, sizeof(Pad15));
     std::memset(&Thrust, 0, sizeof(Thrust));
 
-    ConstructSystemManagerTimerTable(&Timers);
-    ConstructSystemManagerGunGroupManager(&GunGroups);
+    Timers.Construct();
+    GunGroups.Construct();
     // FormationLeaders (+0x1364) and Targeting (+0x142C) are built as member
     // initializers.
 
@@ -92,12 +92,12 @@ FFormationLeaderState::~FFormationLeaderState()
 
 // FUN_062e6990, thiscall on the SystemManager, RET 4: drops either leader watcher
 // (Sys+0x1370 / +0x1378) that watches TargetId.
-void ClearFormationLeaderWatcherIfTarget(SystemManager* Self, int TargetId)
+void SystemManager::ClearFormationLeaderWatcherIfTarget(int TargetId)
 {
     BaseWatcher* const Watchers[2] =
     {
-        &Self->FormationLeaders.FormationLeaderWatcher, // Sys + 0x1370
-        &Self->FormationLeaders.FollowLeaderWatcher,    // Sys + 0x1378
+        &FormationLeaders.FormationLeaderWatcher, // Sys + 0x1370
+        &FormationLeaders.FollowLeaderWatcher,    // Sys + 0x1378
     };
 
     for (int Index = 0; Index < 2; ++Index)
@@ -113,21 +113,21 @@ void ClearFormationLeaderWatcherIfTarget(SystemManager* Self, int TargetId)
 }
 
 // FUN_062e68e0
-void SetSystemManagerSharedListHead(SystemManager* Self, void* NewHead)
+void SystemManager::SetSharedListHead(void* NewHead)
 {
-    Self->ObjectDb = static_cast<IObjDB*>(NewHead);
-    Self->Timers.ObjectDb = static_cast<IObjDB*>(NewHead);
+    ObjectDb = static_cast<IObjDB*>(NewHead);
+    Timers.ObjectDb = static_cast<IObjDB*>(NewHead);
 
     // Timers.Owner is dereferenced with no null test, as in retail.
-    SystemManager* Owner = Self->Timers.Owner;
+    SystemManager* Owner = Timers.Owner;
     Watchable const* WatcherTarget = Owner->Watcher.target();
-    if (WatcherTarget != nullptr && reinterpret_cast<std::uintptr_t>(WatcherTarget) != 8 && NewHead != nullptr)
-    {
-        // Empty the cached AI target list so the next BuildAiTargetList rebuilds it (retail
-        // inlines a zero-iteration vector::erase(begin, end)).
-        Self->Timers.bBuilt = 0;
-        Self->Timers.Targets.End = Self->Timers.Targets.Begin;
-    }
+    if (WatcherTarget == nullptr || reinterpret_cast<std::uintptr_t>(WatcherTarget) == 8 || NewHead == nullptr)
+        return;
+
+    // Empty the cached AI target list so the next SystemManagerTimerTable::BuildAiTargetList rebuilds it (retail
+    // inlines a zero-iteration vector::erase(begin, end)).
+    Timers.bBuilt = 0;
+    Timers.Targets.End = Timers.Targets.Begin;
 
     // Retail then tail-jumps to a TargetManager member (0x062ed730) whose body is an
     // ICF-folded `RET 4`; it writes nothing.
@@ -137,55 +137,55 @@ void SetSystemManagerSharedListHead(SystemManager* Self, void* NewHead)
 // FUN_062e6950 -- SystemManager's "personality changed" hook. Sole caller is
 // IBehaviorManager::set_personality.
 // ============================================================================
-void NotifySystemManagerPersonalityChanged(SystemManager* Self)
+void SystemManager::NotifyPersonalityChanged()
 {
     // FUN_062eb6c0
-    (void)Self->GunGroups.RefreshFromPersonality();
+    (void)GunGroups.RefreshFromPersonality();
 
     // FUN_062e72d0
-    (void)RefreshSystemManagerTimerThresholdsFromPersonality(&Self->Timers);
+    (void)Timers.RefreshTimerThresholdsFromPersonality();
 
     // FUN_062ecfb0
-    (void)RefreshRepairManagerFromPersonality(&Self->Repair);
+    (void)Repair.RefreshFromPersonality();
 
-    // JobParams.bForceAttackFormation (+0x1958) copied to Sys+0x1427; UpdateSystemManager
+    // JobParams.bForceAttackFormation (+0x1958) copied to Sys+0x1427; SystemManager::Update
     // makes the same copy.
-    SystemManager* const StateOwner = Self->FormationLeaders.Owner;
+    SystemManager* const StateOwner = FormationLeaders.Owner;
     if (StateOwner != nullptr)
-        Self->FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
+        FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
 }
 
 // ============================================================================
 // SystemManager initialisation and per-tick update.
 // ============================================================================
 // FUN_062e6490, RET 8. Every "if live" below is its own re-read of the watcher in retail.
-bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Manager)
+bool SystemManager::Init(IObjRW* Object, IBehaviorManager* Manager)
 {
-    Self->Watcher.set(Object != nullptr ? static_cast<Watchable const*>(Object) : nullptr);
+    Watcher.set(Object != nullptr ? static_cast<Watchable const*>(Object) : nullptr);
 
-    Self->Owner = Manager;
+    Owner = Manager;
 
     // The object is dereferenced without a test.
-    Self->OwnerObjectId = static_cast<int>(static_cast<IObjInspect*>(WatchedObject(Self->Watcher))->get_id());
+    OwnerObjectId = static_cast<int>(static_cast<IObjInspect*>(WatchedObject(Watcher))->get_id());
 
-    (void)ArmSystemManagerTimerTable(&Self->Timers, Self);
+    (void)Timers.Arm(this);
 
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        // FAiTarget::Init inlined. Timers.Owner (just set by ArmSystemManagerTimerTable, which
+        // FAiTarget::Init inlined. Timers.Owner (just set by SystemManagerTimerTable::Arm, which
         // succeeds on this branch) is dereferenced blind.
-        IObjRW* const Own = WatchedObject(Self->Watcher);
-        IObjRW* const TimersOwnerObject = WatchedObject(Self->Timers.Owner->Watcher);
-        Self->SelfTarget.Init(TimersOwnerObject, Own);
+        IObjRW* const Own = WatchedObject(Watcher);
+        IObjRW* const TimersOwnerObject = WatchedObject(Timers.Owner->Watcher);
+        SelfTarget.Init(TimersOwnerObject, Own);
     }
 
-    if (IsWatcherLive(Self->Watcher))
-        InitThrustManager(&Self->Thrust, Self);
+    if (IsWatcherLive(Watcher))
+        InitThrustManager(&Thrust, this);
 
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        SystemManagerGunGroupManager& G = Self->GunGroups;
-        G.Owner = Self;
+        SystemManagerGunGroupManager& G = GunGroups;
+        G.Owner = this;
         G.GunCount = 0;
         G.Field_0x834 = -1;
         (void)G.ResolveHardpoints();
@@ -197,68 +197,68 @@ bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Ma
         G.ScanTimer = (float)rand() * (1.0f / 32768.0f) * Period;
     }
 
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        Self->FormationLeaders.Owner = Self;
+        FormationLeaders.Owner = this;
     }
 
-    (void)Self->Targeting.Attach(Self);
+    (void)Targeting.Attach(this);
 
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        Self->TractorOwner = Self;
-        (void)static_cast<IObjInspect*>(WatchedObject(Self->Watcher))
-            ->find_equipment(&Self->TractorEquipId, 1, EquipTypeTractor);
+        TractorOwner = this;
+        (void)static_cast<IObjInspect*>(WatchedObject(Watcher))
+            ->find_equipment(&TractorEquipId, 1, EquipTypeTractor);
     }
 
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        Self->Repair.Owner = Self;
-        Self->Repair.CheckTimer = 0.0f;
-        Self->Repair.Hull.Count = 0;
-        Self->Repair.Shield.Count = 0;
-        (void)static_cast<IObjInspect*>(WatchedObject(Self->Watcher))->enumerate_cargo(&Self->Repair);
+        Repair.Owner = this;
+        Repair.CheckTimer = 0.0f;
+        Repair.Hull.Count = 0;
+        Repair.Shield.Count = 0;
+        (void)static_cast<IObjInspect*>(WatchedObject(Watcher))->enumerate_cargo(&Repair);
     }
 
     // FUN_062eb9d0 on Sys+0x1344.
-    (void)Self->GunGroups.CmDroppers.Bind(Self);
+    (void)GunGroups.CmDroppers.Bind(this);
 
     return true;
 }
 
 // FUN_062e66c0, RET 4.
-void UpdateSystemManager(SystemManager* Self, float Dt)
+void SystemManager::Update(float Dt)
 {
     // Clear the per-tick cache latches while the watcher is live; Timers.Owner is
     // dereferenced blind.
-    if (IsWatcherLive(Self->Watcher))
+    if (IsWatcherLive(Watcher))
     {
-        IObjRW* const Own = WatchedObject(Self->Watcher);
-        IObjRW* const TimersOwnerObject = WatchedObject(Self->Timers.Owner->Watcher);
-        Self->SelfTarget.Init(TimersOwnerObject, Own);          // FAiTarget::Init inlined
+        IObjRW* const Own = WatchedObject(Watcher);
+        IObjRW* const TimersOwnerObject = WatchedObject(Timers.Owner->Watcher);
+        SelfTarget.Init(TimersOwnerObject, Own);          // FAiTarget::Init inlined
     }
 
     // Retail inlines bBuilt = 0 and a vector::erase(begin, end) that is ClearAiTargetVector.
-    Self->Timers.bBuilt = 0;
-    ClearAiTargetVector(&Self->Timers.Targets);
+    Timers.bBuilt = 0;
+    ClearAiTargetVector(&Timers.Targets);
 
-    Self->Targeting.UpdateCommitTimer(Dt);
-    Self->GunGroups.UpdateTimers(Dt);
-    Self->GunGroups.CmDroppers.Update(Dt);
+    Targeting.UpdateCommitTimer(Dt);
+    GunGroups.UpdateTimers(Dt);
+    GunGroups.CmDroppers.Update(Dt);
 
     // FUN_062de160 -- the cruise gate engage_cruise reads.
-    Self->Thrust.bCruiseUnobstructed =Self->Thrust.Owner->Owner->Pathfind->IsCruiseUnobstructed() ? 1 : 0;
+    Thrust.bCruiseUnobstructed =Thrust.Owner->Owner->Pathfind->IsCruiseUnobstructed() ? 1 : 0;
 
     // In cruise with the gate closed: disengage. The watched object is dereferenced blind.
     bool bCruise = false;
-    (void)static_cast<IObjInspect*>(WatchedObject(Self->Thrust.Owner->Watcher))->is_cruise_active(bCruise);
-    if (bCruise && Self->Thrust.bCruiseUnobstructed == 0)
-        Self->Thrust.engage_cruise(false);
+    (void)static_cast<IObjInspect*>(WatchedObject(Thrust.Owner->Watcher))->is_cruise_active(bCruise);
+    if (bCruise && Thrust.bCruiseUnobstructed == 0)
+        Thrust.engage_cruise(false);
 
-    UpdateSystemManagerTimerTable(&Self->Timers, Dt);
+    Timers.Update(Dt);
 
     // Every three seconds (strictly past 3.0f, DAT_063a07b0) the cargo is re-tallied.
-    RepairManager& Repair = Self->Repair;
+    RepairManager& Repair = this->Repair;
     double const CheckTimer = static_cast<double>(Dt) + static_cast<double>(Repair.CheckTimer);
     Repair.CheckTimer = static_cast<float>(CheckTimer);
     if (CheckTimer > 3.0)
@@ -271,33 +271,33 @@ void UpdateSystemManager(SystemManager* Self, float Dt)
     Repair.Hull.Update(Dt, WatchedObject(Repair.Owner->Watcher));
     Repair.Shield.Update(Dt, WatchedObject(Repair.Owner->Watcher));
 
-    Self->FormationLeaders.Update(Dt);
+    FormationLeaders.Update(Dt);
 
     // The personality-refresh latch. bLeaderParamsBorrowed is set by
-    // RefreshRepairManagerFromPersonality / RefreshWeaponFireControlConfig when they copied
+    // RepairManager::RefreshFromPersonality / RefreshWeaponFireControlConfig when they copied
     // another ship's parameters; it is consumed here once that borrowing no longer applies.
-    if (Self->bLeaderParamsBorrowed == 0)
+    if (bLeaderParamsBorrowed == 0)
         return;
-    if (Self->SelfTarget.Iface->is_player())
+    if (SelfTarget.Iface->is_player())
         return;
-    if (Self->PersonalityData.FormationParams.bLeaderMakesMeTougher == 0)   // byte +0x1820
+    if (PersonalityData.FormationParams.bLeaderMakesMeTougher == 0)   // byte +0x1820
         return;
-    if (Self->FormationLeaders.bLeaderSuppressed == 0)
+    if (FormationLeaders.bLeaderSuppressed == 0)
     {
         // A live formation leader keeps the borrowed parameters.
-        Watchable const* const Node = Self->FormationLeaders.FormationLeaderWatcher.target();
+        Watchable const* const Node = FormationLeaders.FormationLeaderWatcher.target();
         if (Node != nullptr && Node != (Watchable const*)8)
             return;
     }
 
-    Self->bLeaderParamsBorrowed = 0;
-    Self->PersonalityData.FormationParams.bLeaderMakesMeTougher = 0;
-    (void)Self->GunGroups.RefreshFromPersonality();
-    (void)RefreshSystemManagerTimerThresholdsFromPersonality(&Self->Timers);
-    (void)RefreshRepairManagerFromPersonality(&Self->Repair);
+    bLeaderParamsBorrowed = 0;
+    PersonalityData.FormationParams.bLeaderMakesMeTougher = 0;
+    (void)GunGroups.RefreshFromPersonality();
+    (void)Timers.RefreshTimerThresholdsFromPersonality();
+    (void)this->Repair.RefreshFromPersonality();
 
-    // The same copy NotifySystemManagerPersonalityChanged makes.
-    SystemManager* const StateOwner = Self->FormationLeaders.Owner;
+    // The same copy SystemManager::NotifyPersonalityChanged makes.
+    SystemManager* const StateOwner = FormationLeaders.Owner;
     if (StateOwner != nullptr)
-        Self->FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
+        FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
 }

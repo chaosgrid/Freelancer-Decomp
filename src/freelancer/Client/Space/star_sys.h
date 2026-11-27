@@ -147,10 +147,10 @@ void StarSysNoteTargetChange(unsigned ShipId);
 void StarSysSuppressPlayerCollisions(double Seconds);
 
 // FUN_00554ab0 -- leave the current system (FUN_00554e80 passes a null player). Retail callers:
-// the system-switch step FUN_0054a940 and the space teardown FUN_0054aec0 (DestroySpaceState),
+// the system-switch step FUN_0054a940 and the space teardown FUN_0054aec0 (SpaceApp::Destroy),
 // both in space_state.cpp.
 void StarSysLeave(IObjRW* Player);
-// FUN_00554e80 -- StarSysLeave(nullptr). Retail caller: ShutdownSpaceState (space_state.cpp).
+// FUN_00554e80 -- StarSysLeave(nullptr). Retail caller: SpaceApp::Shutdown (space_state.cpp).
 void StarSysLeaveWithoutPlayer();
 
 // FUN_0045a490(param_1 = Target, param_2 = Viewer) -- Viewer's attitude towards Target

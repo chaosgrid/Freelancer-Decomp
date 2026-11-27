@@ -2289,17 +2289,17 @@ GENRESULT DACOM_API FMaterialImpl::SaveProperties(void* FileSystem)
         unsigned char* Entry = (unsigned char*)(Base) + Index * kFlmParamDescSize;
         if ((*Entry & 1) != 0)
             continue;
-        if (!FlmSaveParameterToFileSystem(this, FileSystem, Entry, Index))
-        {
-            const char* Instance = InstanceName_ != nullptr ? InstanceName_ : "(Unnamed)";
-            const char* Class = ClassName();
-            const char* Description = *(const char* const*)(Entry + 8);
-            char Message[0x2000];
-            FlmFormatMessage(Message, "Unable to save parameter '%s' for '%s' (%s)\n",
-                      Description, Instance, Class);
-            FDUMP(kFdumpTrace1, "%s(%d) : TRACE_1:General:%s", kImplFile, 0x119, Message);
-            Result = (GENRESULT)(-1);
-        }
+        if (FlmSaveParameterToFileSystem(this, FileSystem, Entry, Index))
+            continue;
+
+        const char* Instance = InstanceName_ != nullptr ? InstanceName_ : "(Unnamed)";
+        const char* Class = ClassName();
+        const char* Description = *(const char* const*)(Entry + 8);
+        char Message[0x2000];
+        FlmFormatMessage(Message, "Unable to save parameter '%s' for '%s' (%s)\n",
+                  Description, Instance, Class);
+        FDUMP(kFdumpTrace1, "%s(%d) : TRACE_1:General:%s", kImplFile, 0x119, Message);
+        Result = (GENRESULT)(-1);
     }
     return Result;
 }
@@ -3042,16 +3042,16 @@ GENRESULT __thiscall FMaterialImpl::Setup()
         }
         if (OldPlaybackGroupId != -1)
             Library->DecRefById(OldPlaybackGroupId);
-        if (!bVerified)
-        {
-            char Message[0x2000];
-            Name = *(const char* const*)(
-                (const unsigned char*)(TextureBlock_) +
-                Index * kFlmTextureVerifyEntrySize);
-            FlmFormatMessage(Message, "texture verify failed: %s: %s",
-                         InstanceName_, Name);
-            FlmFdump(kFdumpNotice, kImplFile, 0x23F, "NOTICE", Message);
-        }
+        if (bVerified)
+            continue;
+
+        char Message[0x2000];
+        Name = *(const char* const*)(
+            (const unsigned char*)(TextureBlock_) +
+            Index * kFlmTextureVerifyEntrySize);
+        FlmFormatMessage(Message, "texture verify failed: %s: %s",
+                     InstanceName_, Name);
+        FlmFdump(kFdumpNotice, kImplFile, 0x23F, "NOTICE", Message);
     }
     // The zero-count branch also reaches this tail; it uses threshold 1.0.
     RecomputeOpacityFlags();

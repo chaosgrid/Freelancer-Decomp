@@ -35,25 +35,19 @@ struct FRearViewCamera : FHudCamera
     void DrawScene(unsigned LayerFlags, unsigned Param2) override;
 
     Vector ViewPosition;  // +0x100  [RearViewCamera] view_position, default (0, 5, 20)
+
+    // FUN_0051ad30. Chains to the HUDCamera ctor and then plants the default view position (0, 5, 20).
+    void Construct();
+
+    // FUN_0051ad80, taking the cockpit ini path. Reads the single key
+    // [RearViewCamera] view_position and warns about the obsolete [RearView] section. Returns false
+    // when the file could not be opened, which is the one case retail also reports.
+    bool Load(const char* CockpitIniPath);
 };
 
 // The death camera sits at controller + 0x60c and this one at + 0x500.
 static_assert(sizeof(FRearViewCamera) == 0x10c, "FRearViewCamera must be 0x10c");
 static_assert(offsetof(FRearViewCamera, ViewPosition) == 0x100, "RV +0x100");
 
-// FUN_0051ad30. Chains to the HUDCamera ctor and then plants the default view position (0, 5, 20).
-void RearViewCameraConstruct(FRearViewCamera* Cam);
-
 // Slot 0x54 (0x0051ad70): the class name, a plain .rdata literal.
 const char* RearViewCameraGetName();
-
-// Slot 0x6c (LAB_0051b0d0): with a watched client ship, the ship's orientation turned by the
-// yaw at 0x005dbf48 ((double)(float)pi), shaken (FUN_0051dbd0), and the eye at ship position +
-// that orientation x +0x100 -- the camera's world transform; then HUDCamera's update
-// (FUN_0051d070).
-void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds);
-
-// FUN_0051ad80, taking the cockpit ini path. Reads the single key
-// [RearViewCamera] view_position and warns about the obsolete [RearView] section. Returns false
-// when the file could not be opened, which is the one case retail also reports.
-bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath);

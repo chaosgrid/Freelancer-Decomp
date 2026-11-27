@@ -131,7 +131,7 @@ namespace
             Batch.ColorB = kChatBgColor[2];
             Batch.ColorA = kChatBgColor[3];
         }
-        ~FChatBgBatch() { EffectVertexBatchDestroy(&Batch); } // FUN_0046e9c0
+        ~FChatBgBatch() { Batch.Destroy(); } // FUN_0046e9c0
 
         FEffectVertexBatch Batch;
 
@@ -201,7 +201,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
 
     FChatBgBatch Local;
     FEffectVertexBatch* const Batch = &Local.Batch;
-    EffectVertexBatchReset(Batch);                                  // FUN_0046ebc0
+    Batch->Reset();                                  // FUN_0046ebc0
 
     // A triangle list (type 4) in quad mode -- FUN_0046eab0 turns the fourth vertex into two
     // triangles. UV repeats the tile over the box from (0, 0) to (Width, -Height).
@@ -211,20 +211,20 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     Batch->bStripMode = 1;
     Batch->U = 0.0f;
     Batch->V = V1;
-    EffectVertexBatchAppend(Batch, 0.0f, 0.0f, 0.0f);
+    Batch->Append(0.0f, 0.0f, 0.0f);
 
     Batch->U = Width / TileWidth;
     Batch->V = V1;
-    EffectVertexBatchAppend(Batch, Width, 0.0f, 0.0f);
+    Batch->Append(Width, 0.0f, 0.0f);
 
     Batch->V = 0.0f;
     Batch->U = Width / TileWidth;
     float const Bottom = -Height;
-    EffectVertexBatchAppend(Batch, Width, Bottom, 0.0f);
+    Batch->Append(Width, Bottom, 0.0f);
 
     Batch->U = 0.0f;
     Batch->V = 0.0f;
-    EffectVertexBatchAppend(Batch, 0.0f, Bottom, 0.0f);
+    Batch->Append(0.0f, Bottom, 0.0f);
 
     // A closed batch (+0x28) repeats its first vertex at the end.
     int Count = Batch->VertCount;

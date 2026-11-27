@@ -167,7 +167,7 @@ public:
     //   1. FUN_06350050 (above) adds +0x10 after `dt * OuterGradient` and
     //      differences +0x10 against +0x14 -- an absolute base value, not a
     //      delta.
-    //   2. IVP_InitCoreRestStateAndDamping's per-object hull edit (ivp_core.cpp,
+    //   2. IVP_Real_Object::init_core_rest_state_and_damping's per-object hull edit (ivp_core.cpp,
     //      .text:06351da2-06351dc9) zeroes both gradients and then does
     //      `OuterValueAtLastEdit = AccumulatedDeltaA + ExtraMargin` (a plain
     //      assignment of a running absolute total) and
@@ -260,21 +260,21 @@ static_assert(offsetof(IVP_Hull_Manager, PoolCount) == 0x30, "IVP_Hull_Manager+0
 
 // One narrow-phase cache slot (public because the ray solver reads it: 0634a600 reads
 // slot->WorldTransform.vv at +0x4c). +0x0/+0x4/+0x8 from FUN_0634d530 / FUN_06353510;
-// +0xc on is written by the refresh step FUN_0634d640 (IVP_RefreshNarrowPhaseCacheSlot).
+// +0xc on is written by the refresh step FUN_0634d640 (IVP_NarrowPhaseCacheSlot::refresh).
 struct IVP_NarrowPhaseCacheSlot
 {
     int32_t          LastRefreshTick; // +0x0: IVP_Environment::sim_step_count, stamped by FUN_0634d640 (`MOV [EDI],EAX` at .text:0634d669).
     int32_t          RefCount;        // +0x4: 0 == free (FUN_0634d530's claim scan); bumped by FUN_06353510 / ResolveNarrowPhaseCacheSlot, decremented by IVP_Real_Object::ReleaseNarrowPhaseCacheSlot.
     IVP_Real_Object* Owner;           // +0x8: back-pointer to the cached object.
     // +0xc..+0x1b: an IVP_U_Quat -- this slot's cached/interpolated orientation,
-    // written by IVP_RefreshNarrowPhaseCacheSlot below (either copied
+    // written by IVP_NarrowPhaseCacheSlot::refresh below (either copied
     // verbatim from Core->QWorldFCore when DTime==0, or slerped from
     // Core->QWorldFCore/QWorldFCoreNext otherwise) and then immediately
     // consumed by set_matrix() to build WorldTransform's rotation rows below.
     IVP_U_Quat       Quat;              // +0xc..+0x1b (16 bytes)
     // +0x1c..+0x5b: the slot's cached world transform (an embedded
     // IVP_U_Matrix: rows at +0x1c / +0x2c / +0x3c, vv at +0x4c). Built by
-    // IVP_RefreshNarrowPhaseCacheSlot below from Quat; read through the slot
+    // IVP_NarrowPhaseCacheSlot::refresh below from Quat; read through the slot
     // transforms 0634d860 / 0634d8d0 / 0634d970 / 0634d9d0 by the
     // IVP_Compact_Ledge_Solver helpers (e.g. calc_pos_other_space 0635ae60,
     // which reaches it as IVP_Cache_Ledge_Point::cache_object + 0x1c) and by
@@ -288,6 +288,25 @@ struct IVP_NarrowPhaseCacheSlot
     // 06363620 :06363774). No retail name recovered.
     Vector           Secondary;        // +0x5c..+0x67 (12 bytes)
     char             _pad68[0x70 - 0x68]; // +0x68..+0x6f: unknown.
+
+    // Slot transforms (ECX = slot, RET 8): retail's out-of-line copies of the
+    // IVP_U_Matrix operations on the slot's WorldTransform (+0x1c); each body is the
+    // same x87 sequence as the matrix method it forwards to. See ivp_real_object.cpp.
+    // FUN_0634d860 == vimult4 (06348470): world position -> slot space.
+    void transform_world_to_slot_space(const IVP_U_Point* WorldPos, IVP_U_Point* OutLocalPos);
+
+    // FUN_0634d9d0 == vmult (06348580): slot direction -> world.
+    void rotate_slot_to_world_space(const IVP_U_Point* LocalDir, IVP_U_Point* OutWorldDir);
+
+    // FUN_0634d970 == vimult (06366010): world direction -> slot space.
+    void rotate_world_to_slot_space(const IVP_U_Point* WorldDir, IVP_U_Point* OutLocalDir);
+
+    // FUN_0634d8d0 == vmult4 (063484e0): slot position -> world (called by
+    // give_world_coords_AT 0635bda0).
+    void transform_slot_to_world_space(const IVP_U_Point* LocalPos, IVP_U_Point* OutWorldPos);
+
+    // Defined in ivp_real_object.cpp.
+    void refresh();
 };
 static_assert(sizeof(IVP_NarrowPhaseCacheSlot) == 0x70, "IVP_NarrowPhaseCacheSlot size mismatch");
 static_assert(offsetof(IVP_NarrowPhaseCacheSlot, WorldTransform) == 0x1c, "WorldTransform offset mismatch");
@@ -323,7 +342,7 @@ struct IVP_RealObjectConstructionTemplate
 
     IVP_Material* Material; // +0x18: -> IVP_Real_Object::material (+0x8C), .text:06345227-0634522a.
 
-    // +0x1c..+0x34: RotInertia / Mass inputs of IVP_InitCoreRestStateAndDamping
+    // +0x1c..+0x34: RotInertia / Mass inputs of IVP_Real_Object::init_core_rest_state_and_damping
     // (FUN_06345b20, ivp_real_object.cpp). Its `[ESP+0x1c]` shape selector is
     // Self->object_type, stashed at entry (`MOV [ESP+0x1c],EBP`, .text:06345b6e) because
     // EBP later points at &Core->RotInertia (.text:06345c67).
@@ -572,7 +591,7 @@ class IVP_Real_Object : public IVP_Real_Object_Fast_Static
 public:
     // FUN_06345100 (.text:06345100-06345259, RET 0x14). Father is the cluster
     // the object is created into (IVP_Polygon / IVP_Ball pass it through from
-    // IVP_Environment_CreatePolygon / CreateBall, the root cluster).
+    // IVP_Environment::create_polygon / CreateBall, the root cluster).
     IVP_Real_Object(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager,
                     const IVP_RealObjectConstructionTemplate* Parms,
                     const IVP_U_Quat* InitialOrientationOrNull,
@@ -761,7 +780,7 @@ public:
     void ReleaseNarrowPhaseCacheSlot(struct IVP_NarrowPhaseCacheSlot* Slot);
 
     // LAB_06344de0 (100 instructions), vtable slot 2, called unconditionally as
-    // `Self->vtable[2](&LocalCsys)` by IVP_InitCoreRestStateAndDamping. "Apply a
+    // `Self->vtable[2](&LocalCsys)` by IVP_Real_Object::init_core_rest_state_and_damping. "Apply a
     // new LOCAL (object-to-core) coordinate system": recomputes
     // q_core_f_object/shift_core_f_object (this object's fixed offset from its
     // physical IVP_Core, e.g. a turret mounted off-center on a ship's core),
@@ -782,6 +801,19 @@ public:
     // the port asserts on a stuck head), calls unlink_contact_points(true), then dispatches
     // vtable slot 4 on every node of synapse_list_head (+0x20), again self-unlinking.
     void TeardownMindistListenersAndCandidates();
+
+    // FUN_06345b20 (.text:06345b20-06345e2f): thiscall on Self, stack (Environment, Template),
+    // RET 8. The second phase of IVP_Real_Object construction -- rest state (RotSpeed/Speed),
+    // damping, LocalCsys/ApplyLocalCsys, RotInertia/Mass and the DeltaTime/InvDeltaTime
+    // world-transform snapshot. Runs after the constructor (Self->environment must be set).
+    // Called by IVP_Ball::IVP_Ball and the IVP_Environment constructor (FUN_0634cdf0).
+    void init_core_rest_state_and_damping(IVP_Environment* Environment,
+                                          const IVP_RealObjectConstructionTemplate* Template);
+
+    // FUN_06345e40: IVP_Real_Object method -- -1 when the object has no OV element
+    // (+0x90), else the element's collision count (word at element+0x2a, the
+    // n_elems of collision_fvector).
+    int32_t get_collision_check_count() const;
 };
 
 // ============================================================================
@@ -839,14 +871,6 @@ public:
 };
 static_assert(sizeof(IVP_Ball) == 0xA8, "IVP_Ball must not change IVP_Real_Object's layout");
 
-// FUN_06345b20 (.text:06345b20-06345e2f): thiscall on Self, stack (Environment, Template),
-// RET 8. The second phase of IVP_Real_Object construction -- rest state (RotSpeed/Speed),
-// damping, LocalCsys/ApplyLocalCsys, RotInertia/Mass and the DeltaTime/InvDeltaTime
-// world-transform snapshot. Runs after the constructor (Self->environment must be set).
-// Called by IVP_Ball::IVP_Ball and the IVP_Environment constructor (FUN_0634cdf0).
-void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Environment,
-                                     const IVP_RealObjectConstructionTemplate* Template);
-
 // ---- Core merge / split, both cdecl free functions in retail. Port-local names. ----
 
 // FUN_06343700 (.text:06343700-0634393c): weld Object into Host's core.
@@ -876,22 +900,6 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
 // Port-only accessor: retail has no getter and takes the instance's address directly.
 // ============================================================================
 IVP_SurfaceManager* IVP_GetDefaultSurfaceManager();
-
-// Slot transforms (ECX = slot, RET 8): retail's out-of-line copies of the
-// IVP_U_Matrix operations on the slot's WorldTransform (+0x1c); each body is the
-// same x87 sequence as the matrix method it forwards to. See ivp_real_object.cpp.
-// FUN_0634d860 == vimult4 (06348470): world position -> slot space.
-void IVP_TransformWorldToSlotSpace(struct IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* WorldPos, IVP_U_Point* OutLocalPos);
-
-// FUN_0634d9d0 == vmult (06348580): slot direction -> world.
-void IVP_RotateSlotToWorldSpace(struct IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* LocalDir, IVP_U_Point* OutWorldDir);
-
-// FUN_0634d970 == vimult (06366010): world direction -> slot space.
-void IVP_RotateWorldToSlotSpace(struct IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* WorldDir, IVP_U_Point* OutLocalDir);
-
-// FUN_0634d8d0 == vmult4 (063484e0): slot position -> world (called by
-// give_world_coords_AT 0635bda0).
-void IVP_TransformSlotToWorldSpace(struct IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* LocalPos, IVP_U_Point* OutWorldPos);
 
 #pragma pack(pop)
 

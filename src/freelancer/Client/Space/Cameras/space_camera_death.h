@@ -67,14 +67,5 @@ static_assert(offsetof(FDeathCamera, MaxDriftSpeed) == 0x150, "DthC +0x150");
 // sequence; the port zeroes nothing extra.
 void DeathCameraConstruct(FDeathCamera* Cam);
 
-// Slot 0x58 (LAB_00549470). Points the watcher at Object and seeds the drift from it.
-void DeathCameraAttach(FDeathCamera* Cam, void* Object);
-
-// Slot 0x60 (LAB_00549450). True when the shake timer is EXACTLY zero (equality, not "<= 0");
-// the update clamps the timer at zero so a negative one never occurs.
-bool DeathCameraIsFinished(const FDeathCamera* Cam);
-
-// Slot 0x6c (LAB_00549620). Shake, then drift. Does nothing at all once finished.
-void DeathCameraUpdate(FDeathCamera* Cam, float DeltaSeconds);
 
 inline FSpaceCamera* SpaceCameraOf(FDeathCamera* Cam) { return Cam; }

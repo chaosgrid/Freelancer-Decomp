@@ -1492,7 +1492,7 @@ template class COMMON_API std::vector<IObjInspect*>;
 // InitEquipStatusBits -- FUN_062e8270, EquipStatus's out-of-line default constructor: clears
 // the low 3 bits of the flag byte and the low 29 bits of the next dword. Inlined in
 // HasReadyWeaponSlot and SetWatcherActive, where the port zero-initialises instead. No port
-// caller: its one retail caller, FUN_062e7a30 (FindClosestObstacleToAvoid,
+// caller: its one retail caller, FUN_062e7a30 (SystemManagerTimerTable::FindClosestObstacleToAvoid,
 // common_obstacleavoidance.cpp), does not call it in the port. A free function, not a ctor, so
 // those zero-init sites stay unchanged.
 // ---------------------------------------------------------------------------

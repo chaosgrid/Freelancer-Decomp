@@ -21,7 +21,7 @@
 #include "common_systemmanager.h" // SystemManager, SystemManagerGunGroupManager
 #include "common_cobjdb.h"        // IObjDB::GetZoneDb
 #include "common_universe.h"      // Universe::ISystem
-#include "common_iustategraph.h"  // BuildAiTargetList (HasTargetInForwardArc)
+#include "common_iustategraph.h"  // SystemManagerTimerTable::BuildAiTargetList (HasTargetInForwardArc)
 #include "x87_trig.h"             // X87Tan (062eabf0 FPTAN)
 
 #include <cmath>
@@ -643,7 +643,7 @@ namespace
 bool SystemManagerTimerTable::HasTargetInForwardArc(float MaxAngle, float MaxRange)
 {
     // The loop re-reads End on every pass.
-    FAiTargetVector* const List = BuildAiTargetList(this);
+    FAiTargetVector* const List = BuildAiTargetList();
     for (FAiTarget* Elem = List->Begin; Elem != List->End; ++Elem)
     {
         // Lazily cached type (flag raised after the call).
@@ -697,7 +697,7 @@ bool SystemManagerTimerTable::HasTargetInForwardArc(float MaxAngle, float MaxRan
         // FUN_062e6a80: only a hostile attitude (<= -0.6f, DAT_063a0790) goes on.
         float Attitude;
         float ReverseAttitude;
-        GetCachedRange(Elem, &Attitude, &ReverseAttitude);
+        Elem->GetCachedRange(&Attitude, &ReverseAttitude);
         if (!(Attitude <= -0.6f))
             continue;
 
@@ -827,7 +827,7 @@ bool SystemManagerGunGroupManager::ComputeGunRangeStats(float* OutAverage, float
 
 // FUN_062eb6c0. The call at 062eb740 is IBehaviorManager::get_sys (Ghidra names the ICF
 // fold CPlayerTradeOffer::GetTargetPlayerID). Structural twin:
-// RefreshRepairManagerFromPersonality.
+// RepairManager::RefreshFromPersonality.
 bool SystemManagerGunGroupManager::RefreshFromPersonality()
 {
     SystemManager* const Sys = Owner;

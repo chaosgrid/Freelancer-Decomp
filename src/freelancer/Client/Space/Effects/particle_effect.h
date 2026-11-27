@@ -52,6 +52,16 @@ struct FParticleEffect : FEffectBase
     unsigned char Flags7C;         // +0x7C  bit2=ale.eff, bit3=ale loaded, bit4=start
     unsigned char Pad7D[3];
     float Float80;                 // +0x80  = 1.0; the ALCHEMY_LOD blend (FUN_0042dcd0)
+
+    // FUN_004f8110 — destroy and release the IFxEffect, detach and release the FxNode.
+    void CleanupAlchemy();
+
+    // FUN_004f8360 — CreateInstance FxNode + LoadAle + CreateEffect + AttachNode(root).
+    unsigned char CreateAlchemyNodes();
+
+    // FUN_004f8030 — slot +0x20 of PTR_FUN_005d9ad4: destruct; FreeMemory&1 → Heap::Free on the
+    // 0x84 pool (EffectFree).
+    void Destroy(int FreeMemory);
 };
 
 static_assert(sizeof(FParticleEffect) == 0x84, "ParticleEffect 0x84");
@@ -92,71 +102,14 @@ struct FParticleTunnel : FParticleEffect
 // FUN_004f8060 — construct; param = initial EffectTypeId (0 from factory).
 void ParticleEffectConstruct(FParticleEffect* This, unsigned TypeId);
 
-// FUN_004f8110 — destroy and release the IFxEffect, detach and release the FxNode.
-void ParticleEffectCleanupAlchemy(FParticleEffect* This);
-
-// FUN_004f8360 — CreateInstance FxNode + LoadAle + CreateEffect + AttachNode(root).
-unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This);
-
-// FUN_004f8160 — vtable[0] start(EffectArch*).
-unsigned char ParticleEffectStart(FParticleEffect* This, FEffectArch* EffectArch);
-
-// LAB_004f84d0 — vtable slot +4 (stop). Without an IFxEffect: link, FUN_004f7db0, dead.
-// With one: link, freeze to world (dead too when the watched object is gone), pin the run time
-// at +0x78 into [0, 1] (NaN kept), then the IFxEffect is told to wind down.
-void ParticleEffectArmDeath(FParticleEffect* This);
-
-// LAB_004f8c20 — vtable[3] (+0x0c): intensity clamped to [0, 1] into the IFxEffect;
-// no-op without an IFxEffect. SpaceDust (FUN_0054beb0) drives its dust effects through it.
-void ParticleEffectSetIntensity(FParticleEffect* This, float Intensity);
-
 struct FSpaceCamera;
-
-// FUN_004f86c0 — vtable[+0x14]: particles option, the watched ship/solar gates (cloaked
-// CEqObj, field controller DAT_00675244 and its radius), perf priority, near plane, pbubble,
-// ALCHEMY_LOD blend into +0x80 (FUN_0042dcd0), side planes -> bit 0 of +0x7c, returned.
-unsigned char ParticleEffectUpdateVisibility(FParticleEffect* This, float Dt, FSpaceCamera* Cam);
-
-// FUN_004f8a20 — vtable[+0x18]: run-time countdown / ale-finished test (dead on either), then
-// FUN_004f8360 and, with an IFxEffect, SetLod(+0x80), transform, update and tick by Dt.
-unsigned char ParticleEffectTickDraw(FParticleEffect* This, float Dt, FSpaceCamera* Cam);
-
-// FUN_004f8be0 — vtable[+0x1c]: clear the visibility bit; IFxEffect +0x24(Cam) (the draw).
-unsigned char ParticleEffectBuildGeometry(FParticleEffect* This, FSpaceCamera* Cam);
-
-// LAB_004f8c80 — vtable[+0x24]: LOD clamped to [0, 1] into IFxEffect +0x38; warns without one.
-void ParticleEffectSetLod(FParticleEffect* This, float Lod);
-
-// FUN_004f91c0 — cruise vtable[+0x08]: radius = +0x84 * +0x74, at least 10; world position.
-float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, Vector* Out);
-
-// FUN_004f92f0 — cruise vtable[+0x0c]: +0x84 = Scale, then the SetIntensity clamp into
-// IFxEffect +0x18. Tradelane rings drive it (FUN_00514050).
-void ParticleEffectCruiseSetScale(FParticleEffectCruise* This, float Scale);
-
-// FUN_004f9270 — cruise vtable[+0x14]: FUN_004f86c0, then a hidden effect fades +0x80 by
-// Dt * 0.5 while staying visible.
-unsigned char ParticleEffectCruiseUpdateVisibility(FParticleEffectCruise* This, float Dt,
-                                                   FSpaceCamera* Cam);
 
 // FUN_004f7f70 — destructor body (alchemy cleanup, base vptr, watcher cleared).
 void ParticleEffectDestruct(FParticleEffect* This);
 
-// FUN_004f8030 — slot +0x20 of PTR_FUN_005d9ad4: destruct; FreeMemory&1 → Heap::Free on the
-// 0x84 pool (EffectFree).
-void ParticleEffectDestroy(FParticleEffect* This, int FreeMemory);
-
 // FUN_00528cc0 — slot +0x20 of PTR_FUN_005dd144 (cruise): destruct; FreeMemory&1 →
 // FUN_004f79c0(this, 0x90), i.e. free().
 void ParticleEffectCruiseDestroy(FParticleEffect* This, int FreeMemory);
-
-// FUN_004f7a80 / FUN_004f7a90 (Release deletes through the object's own slot +0x20).
-void ParticleEffectAddRef(FParticleEffect* This);
-int ParticleEffectRelease(FParticleEffect* This);
-
-// Shared attach FUN_004f7d20 (same layout as BeamEffect).
-void ParticleEffectAttach(FParticleEffect* This, void* WatchableOwner, int EngineIndex,
-                          Transform const* LocalXform);
 
 // LAB_004f6e70 — EffectAlloc(0x84) (Heap pool) + Construct(0).
 FParticleEffect* ParticleEffectCreate();
@@ -224,11 +177,6 @@ unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
                                      void* CompanionOut);
 
 struct FCliEffectFactory;
-// FUN_00503070 with its `this` factory explicit. Callers on another factory: FUN_00514750
-// (DAT_006751cc) and FUN_00514070, which forwards its own factory (DAT_006751cc or DAT_00674c60).
-unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffectArch* EffectArch,
-                                       void* ListOwner, int EngineIndex,
-                                       Transform const* LocalXform, void* CompanionOut);
 
 // The effect factories FUN_00503f40 / FUN_00503070 are called on: .data objects holding only
 // a vptr, stamped by static initializers, whose three slots make the particle (+0), the sound
@@ -248,6 +196,18 @@ struct FCliEffectFactory
     virtual FEffectBase* CreateParticle() const = 0;
     virtual ISoundSource* CreateSound() const = 0;
     virtual FGameLight* CreateLight() const = 0;
+
+    // FUN_00503070 with its `this` factory explicit. Callers on another factory: FUN_00514750
+    // (DAT_006751cc) and FUN_00514070, which forwards its own factory (DAT_006751cc or DAT_00674c60).
+    unsigned char CreateEffectOneShotOn(FEffectArch* EffectArch, void* ListOwner, int EngineIndex,
+                                        Transform const* LocalXform, void* CompanionOut) const;
+
+    // FUN_00503f40 (on Factory) — world-space one-shot (no ListOwner attach).
+    // Copies 0x30 LocalXform into particle+0x10 / light+0xf0 (or EngineLightSetTransform when
+    // light EngIndex==-1); Pos3 → particle+0x4c / sound SetVelocity / GameLight+0x120.
+    // CompanionOut may be null (tradelane player leave/approach). No FUN_004fcea0.
+    unsigned char CreateEffectWorldOneShotOn(FEffectArch* EffectArch, Transform const* LocalXform,
+                                             float const* Pos3, void* CompanionOut) const;
 };
 
 struct FStandardCliEffectFactory : FCliEffectFactory
@@ -283,15 +243,7 @@ extern FJumpCliEffectFactory const G_CliEffectFactoryJump;
 extern FCameraCliEffectFactory const G_CliEffectFactoryCameraParticles;
 extern FTunnelCliEffectFactory const G_CliEffectFactoryTunnel;
 
-// FUN_00503f40 (on Factory) — world-space one-shot (no ListOwner attach).
-// Copies 0x30 LocalXform into particle+0x10 / light+0xf0 (or EngineLightSetTransform when
-// light EngIndex==-1); Pos3 → particle+0x4c / sound SetVelocity / GameLight+0x120.
-// CompanionOut may be null (tradelane player leave/approach). No FUN_004fcea0.
-unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
-                                            FEffectArch* EffectArch, Transform const* LocalXform,
-                                            float const* Pos3, void* CompanionOut);
-
 // FUN_00503f40 on DAT_00674c60 (the explosion's factory, among others). The DAT_00674c5c
-// callers go through CliCreateEffectWorldOneShotOn with G_CliEffectFactoryCameraParticles.
+// callers go through FCliEffectFactory::CreateEffectWorldOneShotOn with G_CliEffectFactoryCameraParticles.
 unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
                                           float const* Pos3, void* CompanionOut);

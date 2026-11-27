@@ -21,9 +21,9 @@
 #include "NeuroNet/nn_button_control.h"
 #include "NeuroNet/nn_modal.h"              // G_bNnScreenUp (DAT_0067dcc8), NnModalResumeGame, NnFloatBits
 #include "Interface/cargo_bar_control.h"
-#include "Common/Fonts/font_string.h"           // FontStringConstruct (FUN_004144b0)
+#include "Common/Fonts/font_string.h"           // FFontString::Construct (FUN_004144b0)
 #include "NeuroNet/nn_rollover.h"           // NnRolloverShowIdsAtGlobal / NnRolloverShowHoverAtGlobal
-#include "Interface/tooltip_hover.h"         // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
+#include "Interface/tooltip_hover.h"         // FToolTipHoverInfo, FToolTipHoverInfo::Reset (FUN_004963a0)
 #include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_ui_pulse.h"           // G_NnPaletteCyan / 679ba4 / 679b94
 #include "Core/perf_options.h"          // SavePerfOptions (FUN_005b3ec0), FindPerfOption*, ProbeMachineGraphicsLevel
@@ -330,20 +330,20 @@ void NnPreferences::Update()
     }
 
     // The video-mode confirm countdown.
-    if (bVideoConfirm != 0)
+    if (bVideoConfirm == 0)
+        return;
+
+    ConfirmCountdown -= Dt;
+    Dt = ConfirmCountdown;
+    // Less or equal cancels; greater (and unordered) formats.
+    if (ConfirmCountdown <= 0.0)
     {
-        ConfirmCountdown -= Dt;
-        Dt = ConfirmCountdown;
-        // Less or equal cancels; greater (and unordered) formats.
-        if (ConfirmCountdown <= 0.0)
-        {
-            CancelChanges();
-            return;
-        }
-        wchar_t Buffer[0x40];
-        swprintf(Buffer, 0x40, L"%1.0f", Dt); // 0x005d5048
-        DialogText[2]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Buffer), 0);
+        CancelChanges();
+        return;
     }
+    wchar_t Buffer[0x40];
+    swprintf(Buffer, 0x40, L"%1.0f", Dt); // 0x005d5048
+    DialogText[2]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Buffer), 0);
 }
 
 void NnPreferences::SetRowsHidden(bool bHide)
@@ -1600,32 +1600,32 @@ void NnPreferences::LoadKeyList(char const* Path)
                 KeyGroups[1].push_back(Caption);
             }
         }
-        if (Reader.is_header("Key"))
+        if (!Reader.is_header("Key"))
+            continue;
+
+        int CommandId = -1;
+        while (Reader.read_value())
         {
-            int CommandId = -1;
-            while (Reader.read_value())
+            if (Reader.is_value("id"))
             {
-                if (Reader.is_value("id"))
+                char const* const Nickname = Reader.get_value_string();
+                if (MsvcrtAtoi(Nickname) == -1)
                 {
-                    char const* const Nickname = Reader.get_value_string();
-                    if (MsvcrtAtoi(Nickname) == -1)
-                    {
-                        CommandId = -1;
-                    }
-                    else
-                    {
-                        FKeyCmd* const Cmd = FindKeyCmdByNickname(Nickname);
-                        if (Cmd != nullptr)
-                            CommandId = static_cast<int>(Cmd->NicknameId);
-                    }
+                    CommandId = -1;
                 }
-                else if (Reader.is_value("name"))
+                else
                 {
-                    Reader.get_value_int(0);
+                    FKeyCmd* const Cmd = FindKeyCmdByNickname(Nickname);
+                    if (Cmd != nullptr)
+                        CommandId = static_cast<int>(Cmd->NicknameId);
                 }
             }
-            AddKeyRow(CommandId, Group);
+            else if (Reader.is_value("name"))
+            {
+                Reader.get_value_int(0);
+            }
         }
+        AddKeyRow(CommandId, Group);
     }
     Reader.close();
 }
@@ -2444,7 +2444,7 @@ namespace
     void ShowRowTipRecord(int InfoIds)
     {
         FToolTipHoverInfo Record; // dtor FUN_00444ee0
-        ToolTipHoverReset(&Record);
+        Record.Reset();
         Record.Ids = InfoIds;
         Record.IdsAlt = InfoIds;
         NnRolloverShowHoverAtGlobal(&Record, 0.0f, 0.2f); // 0x3e4ccccd

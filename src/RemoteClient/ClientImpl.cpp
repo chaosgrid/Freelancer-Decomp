@@ -29,87 +29,87 @@ IClient& IClient::operator=(const IClient& Other) { return *this; }
 
 void CClientImpl::SendCommonFireWeapon(unsigned int ClientId, const XFireWeaponInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON), &Packet) == 0)
-    {
-        FRpcFireWeaponPacket* TypedPacket = static_cast<FRpcFireWeaponPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->TargetPos = Info.TargetPos;
-        TypedPacket->Hardpoints = Info.Hardpoints;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON), &Packet) != 0)
+        return;
+
+    FRpcFireWeaponPacket* TypedPacket = static_cast<FRpcFireWeaponPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->TargetPos = Info.TargetPos;
+    TypedPacket->Hardpoints = Info.Hardpoints;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonActivateEquip(unsigned int ClientId, const XActivateEquip& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP), &Packet) == 0)
-    {
-        FRpcActivateEquipPacket* TypedPacket = static_cast<FRpcActivateEquipPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->EquipId = Info.EquipId;
-        TypedPacket->bActive = Info.bActivate;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP), &Packet) != 0)
+        return;
+
+    FRpcActivateEquipPacket* TypedPacket = static_cast<FRpcActivateEquipPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->EquipId = Info.EquipId;
+    TypedPacket->bActive = Info.bActivate;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonActivateCruise(unsigned int ClientId, const XActivateCruise& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE), &Packet) == 0)
-    {
-        FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->bActive = Info.bActivate;
-        TypedPacket->bDisruptCruise = Info.bDisruptCruise;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE), &Packet) != 0)
+        return;
+
+    FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->bActive = Info.bActivate;
+    TypedPacket->bDisruptCruise = Info.bDisruptCruise;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonActivateThrusters(unsigned int ClientId, const XActivateThrusters& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS), &Packet) == 0)
-    {
-        FRpcActivateThrustersPacket* TypedPacket = static_cast<FRpcActivateThrustersPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->bActive = Info.bActivate;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS), &Packet) != 0)
+        return;
+
+    FRpcActivateThrustersPacket* TypedPacket = static_cast<FRpcActivateThrustersPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->bActive = Info.bActivate;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonSetTarget(unsigned int ClientId, const XSetTarget& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SETTARGET), &Packet) == 0)
-    {
-        FRpcSetTargetPacket* TypedPacket = static_cast<FRpcSetTargetPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->TargetId = Info.TargetObjectId;
-        TypedPacket->SubObjId = Info.SubObjId;
-        TypedPacket->TargetSubObjId = Info.TargetSubObjId;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SETTARGET), &Packet) != 0)
+        return;
+
+    FRpcSetTargetPacket* TypedPacket = static_cast<FRpcSetTargetPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->TargetId = Info.TargetObjectId;
+    TypedPacket->SubObjId = Info.SubObjId;
+    TypedPacket->TargetSubObjId = Info.TargetSubObjId;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonTractorObjects(unsigned int ClientId, const XTractorObjects& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS), &Packet) == 0)
-    {
-        FRpcTractorObjectsPacket* TypedPacket = static_cast<FRpcTractorObjectsPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->TractorEquipId = Info.TractorEquipId;
-        TypedPacket->TargetIds = Info.TargetIds;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS), &Packet) != 0)
+        return;
+
+    FRpcTractorObjectsPacket* TypedPacket = static_cast<FRpcTractorObjectsPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->TractorEquipId = Info.TractorEquipId;
+    TypedPacket->TargetIds = Info.TargetIds;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonGoTradeLane(unsigned int ClientId, const XGoTradelane& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE), &Packet) == 0)
-    {
-        FRpcGoTradeLanePacket* TypedPacket = static_cast<FRpcGoTradeLanePacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->TradelaneRing1 = Info.TradelaneRing1;
-        TypedPacket->TradelaneRing2 = Info.TradelaneRing2;
-        TypedPacket->bMidLane = Info.bMidLane;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE), &Packet) != 0)
+        return;
+
+    FRpcGoTradeLanePacket* TypedPacket = static_cast<FRpcGoTradeLanePacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->TradelaneRing1 = Info.TradelaneRing1;
+    TypedPacket->TradelaneRing2 = Info.TradelaneRing2;
+    TypedPacket->bMidLane = Info.bMidLane;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonStopTradeLane(unsigned int ClientId, unsigned int ShipId,
@@ -125,14 +125,14 @@ void CClientImpl::SendCommonStopTradeLane(unsigned int ClientId, unsigned int Sh
 
 void CClientImpl::SendCommonJettisonCargo(unsigned int ClientId, const XJettisonCargo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO), &Packet) == 0)
-    {
-        FRpcJettisonCargoPacket* TypedPacket = static_cast<FRpcJettisonCargoPacket*>(Packet);
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->ItemId = Info.ItemId;
-        TypedPacket->Count = Info.Count;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO), &Packet) != 0)
+        return;
+
+    FRpcJettisonCargoPacket* TypedPacket = static_cast<FRpcJettisonCargoPacket*>(Packet);
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->ItemId = Info.ItemId;
+    TypedPacket->Count = Info.Count;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::OnConnect(unsigned int ClientId) {
@@ -140,29 +140,29 @@ void CClientImpl::OnConnect(unsigned int ClientId) {
 
 void CClientImpl::SendCommonUpdateObject(unsigned int ClientId, const FCommonUpdateObjectInfo& Info) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT), &Packet) == 0)
-    {
-        FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
-        TypedPacket->State = Info.State;
-        TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Position = Info.Position;
-        TypedPacket->Orientation = Info.Orientation;
-        memcpy(&TypedPacket->UpdateTime, &Info.Timestamp, sizeof(float));
-        memcpy(&TypedPacket->Throttle, &Info.Throttle, sizeof(float));
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT), &Packet) != 0)
+        return;
+
+    FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
+    TypedPacket->State = Info.State;
+    TypedPacket->ObjectId = Info.ObjectId;
+    TypedPacket->Position = Info.Position;
+    TypedPacket->Orientation = Info.Orientation;
+    memcpy(&TypedPacket->UpdateTime, &Info.Timestamp, sizeof(float));
+    memcpy(&TypedPacket->Throttle, &Info.Throttle, sizeof(float));
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonSetWeaponGroup(unsigned int ClientId, const unsigned char* Data, unsigned int Size) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP), &Packet) == 0)
-    {
-        FRpcSetWeaponGroupPacket* TypedPacket = static_cast<FRpcSetWeaponGroupPacket*>(Packet);
-        // BorrowData keeps the caller's block with the ownership byte 0 (never writes or
-        // frees it); its parameter is non-const only because the packet field is.
-        TypedPacket->BorrowData(const_cast<unsigned char*>(Data), Size);
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP), &Packet) != 0)
+        return;
+
+    FRpcSetWeaponGroupPacket* TypedPacket = static_cast<FRpcSetWeaponGroupPacket*>(Packet);
+    // BorrowData keeps the caller's block with the ownership byte 0 (never writes or
+    // frees it); its parameter is non-const only because the packet field is.
+    TypedPacket->BorrowData(const_cast<unsigned char*>(Data), Size);
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonSetVisitedState(unsigned int ClientId, unsigned char* Data, unsigned int Size) {
@@ -254,106 +254,106 @@ void CClientImpl::SendCommonRequestRankLevel(unsigned int ClientId, unsigned cha
 
 void CClientImpl::SendCommonPlayerTradeInitiateTrade(unsigned int ClientId, unsigned int ShipId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeInitiateTrade;
-        TypedPacket->TargetPlayer = ShipId;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeInitiateTrade;
+    TypedPacket->TargetPlayer = ShipId;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeTerminateTrade(unsigned int ClientId, int Reason) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeTerminateTrade;
-        TypedPacket->Reason = Reason;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeTerminateTrade;
+    TypedPacket->Reason = Reason;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeAcceptTrade(unsigned int ClientId, unsigned int ShipId, bool bAccepted) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeAcceptTrade;
-        TypedPacket->TargetPlayer = ShipId;
-        TypedPacket->bAccepted = static_cast<unsigned char>(bAccepted);
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeAcceptTrade;
+    TypedPacket->TargetPlayer = ShipId;
+    TypedPacket->bAccepted = static_cast<unsigned char>(bAccepted);
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeSetTradeMoney(unsigned int ClientId, unsigned int ShipId, unsigned long Money) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeSetTradeMoney;
-        TypedPacket->Money = static_cast<int>(Money);
-        TypedPacket->TargetPlayer = ShipId;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeSetTradeMoney;
+    TypedPacket->Money = static_cast<int>(Money);
+    TypedPacket->TargetPlayer = ShipId;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeAddTradeEquip(unsigned int ClientId, unsigned int ShipId, const EquipDesc& Item) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeAddTradeEquip;
-        TypedPacket->EquipArchId = Item.ArchId;
-        TypedPacket->EquipCount = Item.Count;
-        const float* SourceHealth = &Item.Health;
-        float* DestinationHealth = &TypedPacket->EquipHealth;
-        __asm {
-            mov eax, SourceHealth
-            mov edx, DestinationHealth
-            fld dword ptr [eax]
-            fstp dword ptr [edx]
-        }
-        TypedPacket->TargetPlayer = ShipId;
-        TypedPacket->EquipId = Item.Id;
-        PushToClient(ClientId, Packet->AsRaw());
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeAddTradeEquip;
+    TypedPacket->EquipArchId = Item.ArchId;
+    TypedPacket->EquipCount = Item.Count;
+    const float* SourceHealth = &Item.Health;
+    float* DestinationHealth = &TypedPacket->EquipHealth;
+    __asm {
+        mov eax, SourceHealth
+        mov edx, DestinationHealth
+        fld dword ptr [eax]
+        fstp dword ptr [edx]
     }
+    TypedPacket->TargetPlayer = ShipId;
+    TypedPacket->EquipId = Item.Id;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeDelTradeEquip(unsigned int ClientId, unsigned int ShipId, const EquipDesc& Item) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeDelTradeEquip;
-        TypedPacket->EquipArchId = Item.ArchId;
-        TypedPacket->EquipCount = Item.Count;
-        TypedPacket->TargetPlayer = ShipId;
-        TypedPacket->EquipId = Item.Id;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeDelTradeEquip;
+    TypedPacket->EquipArchId = Item.ArchId;
+    TypedPacket->EquipCount = Item.Count;
+    TypedPacket->TargetPlayer = ShipId;
+    TypedPacket->EquipId = Item.Id;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeRequestTrade(unsigned int ClientId, unsigned int ShipId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeRequestTrade;
-        TypedPacket->TargetPlayer = ShipId;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeRequestTrade;
+    TypedPacket->TargetPlayer = ShipId;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::SendCommonPlayerTradeStopTradeRequest(unsigned int ClientId, unsigned int ShipId) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) == 0)
-    {
-        FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
-        TypedPacket->Action = kPlayerTradeStopTradeRequest;
-        TypedPacket->TargetPlayer = ShipId;
-        PushToClient(ClientId, Packet->AsRaw());
-    }
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE), &Packet) != 0)
+        return;
+
+    FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
+    TypedPacket->Action = kPlayerTradeStopTradeRequest;
+    TypedPacket->TargetPlayer = ShipId;
+    PushToClient(ClientId, Packet->AsRaw());
 }
 
 void CClientImpl::DumpPacketStats(const char* Name) {
@@ -362,24 +362,24 @@ void CClientImpl::DumpPacketStats(const char* Name) {
 
 void CClientImpl::SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, unsigned long Size, const void* Data) {
     FPacketBase* Packet = nullptr;
-    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_CHATMSG), &Packet) == 0)
+    if (Serializer->Allocate(kPacketChannelCommon, FlPacketOpcode(FLPACKET_COMMON_CHATMSG), &Packet) != 0)
+        return;
+
+    FRpcChatMsgPacket* TypedPacket = static_cast<FRpcChatMsgPacket*>(Packet);
+    if (Data != nullptr && Size != 0)
     {
-        FRpcChatMsgPacket* TypedPacket = static_cast<FRpcChatMsgPacket*>(Packet);
-        if (Data != nullptr && Size != 0)
-        {
-            TypedPacket->DataSize = Size;
-            TypedPacket->Data = static_cast<unsigned char*>(::operator new(Size, std::nothrow));
-            memcpy(TypedPacket->Data, Data, Size);
-        }
-        else
-        {
-            TypedPacket->DataSize = 0;
-            TypedPacket->Data = nullptr;
-        }
-        TypedPacket->TargetId = TargetId.Id;
-        TypedPacket->SenderId = SenderId.Id;
-        // The client id is the CHAT_ID's low word (.text:06d8c4ed).
-        PushToClient(static_cast<unsigned short>(TargetId.Id), Packet->AsRaw());
+        TypedPacket->DataSize = Size;
+        TypedPacket->Data = static_cast<unsigned char*>(::operator new(Size, std::nothrow));
+        memcpy(TypedPacket->Data, Data, Size);
     }
+    else
+    {
+        TypedPacket->DataSize = 0;
+        TypedPacket->Data = nullptr;
+    }
+    TypedPacket->TargetId = TargetId.Id;
+    TypedPacket->SenderId = SenderId.Id;
+    // The client id is the CHAT_ID's low word (.text:06d8c4ed).
+    PushToClient(static_cast<unsigned short>(TargetId.Id), Packet->AsRaw());
 }
 

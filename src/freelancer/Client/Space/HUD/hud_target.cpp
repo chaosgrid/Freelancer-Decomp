@@ -654,10 +654,10 @@ namespace
     unsigned G_CaptionOwnerIdsName = 0;
 
     // The copy every FUN_004e8100 / FUN_005472d0 exit ends with. The reserve is FUN_004142a0
-    // (WideTextReserve, font_string.cpp), which retail inlines.
+    // (FHudWideText::Reserve, font_string.cpp), which retail inlines.
     void HudWideTextAssign(FHudWideText* Out, wchar_t const* Source, size_t Length)
     {
-        WideTextReserve(Out, static_cast<unsigned>(Length + 1));
+        Out->Reserve(static_cast<unsigned>(Length + 1));
         wcsncpy(Out->Text, Source, Length);
         Out->Text[Length] = 0;
     }
@@ -1304,7 +1304,7 @@ HudTargetBase::HudTargetBase()
     , bExpanded(0)
 {
     // FUN_004e6020; the GameCamera ctor is FUN_0051b2f0.
-    GameCameraConstruct(&ViewCamera);
+    ViewCamera.Construct();
     SubTargetId = SUBOBJ_ID_NONE;
 }
 
@@ -1315,7 +1315,7 @@ HudTargetBase::~HudTargetBase()
     // protected in Common, and the same test-and-call is the body of Common's public
     // BaseWatcher::set, which the port calls.
     ViewCamera.Watched.set(nullptr);
-    PartCacheClear(&PartCache);
+    PartCache.Clear();
 }
 
 void HudTargetBase::SetViewObject(IObjRW* Target)
@@ -1350,7 +1350,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     IObjRW* const Viewed = ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target()));
     if (Viewed == nullptr)
     {
-        PartCacheClear(&PartCache);
+        PartCache.Clear();
         return;
     }
 
@@ -1392,7 +1392,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     const InstanceIndex BuildInstance = Viewed->get_index();
     FRendererLodMap SavedLods;
     BindRendererLods(BuildInstance, 3, &SavedLods);
-    PartCacheBuild(&PartCache, BuildInstance, Tag);
+    PartCache.Build(BuildInstance, Tag);
     ApplyRendererDetailQueue(BuildInstance, &SavedLods);
     HideGroupAndEquipParts();
 }
@@ -1446,7 +1446,7 @@ void HudTargetBase::HideGroupAndEquipParts()
     CArchGroup* Group = EqObj->ArchGroups.Traverse(GroupWalk);
     while (Group != nullptr)
     {
-        PartCacheMarkHidden(&PartCache, Group->GetRootIndex(), false);
+        PartCache.MarkHidden(Group->GetRootIndex(), false);
         Group = EqObj->ArchGroups.Traverse(GroupWalk);
     }
 
@@ -1459,7 +1459,7 @@ void HudTargetBase::HideGroupAndEquipParts()
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
-            PartCacheMarkHidden(&PartCache, Root, true);
+            PartCache.MarkHidden(Root, true);
         }
         Equip = EqObj->EquipManager.Traverse(EquipWalk);
     }
@@ -1524,13 +1524,13 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
     Viewport[1] = static_cast<int>(HeightInset + static_cast<double>(Top));
     Viewport[2] = static_cast<int>(static_cast<double>(ShiftedRight) - WidthInset);
     Viewport[3] = static_cast<int>(static_cast<double>(Bottom) - WidthInset);
-    SpaceCameraSetViewportEx(&ViewCamera, Viewport, 1);
+    ViewCamera.SetViewportEx(Viewport, 1);
 
     // DAT_00674b08 -- 1 / tan(35 degrees), computed once (bit 0 of DAT_00674b0c); the degree
     // factor 0.0174533f is DAT_005c77f4.
     static float const InvTanHalfFov = static_cast<float>(
         1.0 / tan(static_cast<double>(kViewHalfFovX) * static_cast<double>(0.0174533f)));
-    SpaceCameraSetHalfFovX(&ViewCamera, kViewHalfFovX);
+    ViewCamera.SetHalfFovX(kViewHalfFovX);
 
     IObjRW* const Viewed = ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target()));
     Transform Xform;
@@ -1624,7 +1624,7 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
 void HudTargetBase::ColourViewParts()
 {
     // FUN_004e7070.
-    PartCacheClearHiddenActive(&PartCache);
+    PartCache.ClearHiddenActive();
     ColourGroupParts();
     ColourEquipParts();
 }
@@ -1675,8 +1675,8 @@ void HudTargetBase::ColourGroupParts()
         }
 
         // Re-activated without recursion; the root index is not tested against -1.
-        PartCacheActivatePart(&PartCache, Group->GetRootIndex(), false,
-                              PackPartTag(Colour));
+        PartCache.ActivatePart(Group->GetRootIndex(), false,
+                               PackPartTag(Colour));
         Group = EqObj->ArchGroups.Traverse(GroupWalk);
     }
 }
@@ -1736,7 +1736,7 @@ void HudTargetBase::ColourEquipParts()
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
-            PartCacheActivatePart(&PartCache, Root, true, PackPartTag(Colour));
+            PartCache.ActivatePart(Root, true, PackPartTag(Colour));
         }
         Equip = EqObj->EquipManager.Traverse(EquipWalk);
     }

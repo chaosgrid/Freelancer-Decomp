@@ -473,15 +473,15 @@ bool TextFile32::read_line(LineParser32& Line)
             for (unsigned int Index = 0; Index < Window; Index += 1)
             {
                 char const Ch = Src[Index];
-                if (Ch == '\r' || Ch == '\n')
-                {
-                    TextLength = Index;
-                    unsigned int Next = Index + 1u;
-                    if (Next < Window && Src[Next] == (char)(Ch ^ 7))
-                        Next += 1u;
-                    Consumed = Next;
-                    break;
-                }
+                if (Ch != '\r' && Ch != '\n')
+                    continue;
+
+                TextLength = Index;
+                unsigned int Next = Index + 1u;
+                if (Next < Window && Src[Next] == (char)(Ch ^ 7))
+                    Next += 1u;
+                Consumed = Next;
+                break;
             }
 
             memcpy(Line.Buffer, Src, TextLength);

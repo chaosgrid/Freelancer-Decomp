@@ -1392,26 +1392,26 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
 
     for (std::vector<FBaseNpcBribe>::const_iterator It = Bribes.begin(); It != Bribes.end(); ++It)
     {
-        if (It->IsOffered(Player))
-        {
-            FBarOfferChoice Choice;
-            Choice.Kind = BAR_OFFER_BRIBE;
-            Choice.Weight = 20.0f;
-            Choices.push_back(Choice);
-            break;
-        }
+        if (!It->IsOffered(Player))
+            continue;
+
+        FBarOfferChoice Choice;
+        Choice.Kind = BAR_OFFER_BRIBE;
+        Choice.Weight = 20.0f;
+        Choices.push_back(Choice);
+        break;
     }
 
     for (std::vector<FBaseNpcKnow>::const_iterator It = Knows.begin(); It != Knows.end(); ++It)
     {
-        if (It->IsOffered(Player, Feeling))
-        {
-            FBarOfferChoice Choice;
-            Choice.Kind = BAR_OFFER_KNOW;
-            Choice.Weight = 15.0f;
-            Choices.push_back(Choice);
-            break;
-        }
+        if (!It->IsOffered(Player, Feeling))
+            continue;
+
+        FBarOfferChoice Choice;
+        Choice.Kind = BAR_OFFER_KNOW;
+        Choice.Weight = 15.0f;
+        Choices.push_back(Choice);
+        break;
     }
 
     unsigned int BestRumor = 0;
@@ -1523,13 +1523,13 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
              ++It)
         {
             int Weight = It->GetWeight(Player, Feeling);
-            if (Weight != 0)
-            {
-                FBarRumorChoice Choice;
-                Choice.Rumor = &*It;
-                Choice.Weight = static_cast<float>(static_cast<double>(static_cast<unsigned int>(Weight)));
-                RumorChoices.insert(RumorChoices.end(), Choice);    // FUN_06f537a0
-            }
+            if (Weight == 0)
+                continue;
+
+            FBarRumorChoice Choice;
+            Choice.Rumor = &*It;
+            Choice.Weight = static_cast<float>(static_cast<double>(static_cast<unsigned int>(Weight)));
+            RumorChoices.insert(RumorChoices.end(), Choice);    // FUN_06f537a0
         }
         std::vector<FBarRumorChoice>::const_iterator Rumor = PickWeighted(RumorChoices);
         Out->Rumor = (Rumor != RumorChoices.end()) ? Rumor->Rumor : nullptr;

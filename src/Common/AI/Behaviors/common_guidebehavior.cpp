@@ -99,12 +99,12 @@ void GuideBehavior::OnDisengage()
     if (GotoDelegate != nullptr)
     {
         GotoDelegate->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(GotoDelegate);               // FUN_062d21c0
+        GotoDelegate->ReleaseDirectiveTarget();               // FUN_062d21c0
     }
     if (FollowDelegate != nullptr)
     {
         FollowDelegate->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(FollowDelegate);
+        FollowDelegate->ReleaseDirectiveTarget();
     }
     Behavior::OnDisengage();
 }

@@ -120,7 +120,7 @@ bool InitPlayerCockpitSlice()
 
     LoadHudElementsFromIni(); // FUN_004c73d0
 
-    // The rest of FUN_0054ab40 continues in space_state.cpp InitSpaceState.
+    // The rest of FUN_0054ab40 continues in space_state.cpp SpaceApp::Init.
     return true;
 }
 

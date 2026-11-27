@@ -334,19 +334,19 @@ int GetClientStats(FClientStats* Stats, int* Count)
     for (unsigned int Index = 0; Index < 128; ++Index)
     {
         CDPClientProxy* Proxy = Client.ClientProxies[Index];
-        if (Proxy != nullptr)
-        {
-            DPN_CONNECTION_INFO Info;
-            if (Proxy->GetConnectionStats(&Info))
-            {
-                Stats[Written].BytesSentGuaranteed = Info.dwBytesSentGuaranteed;
-                Stats[Written].BytesReceivedGuaranteed = Info.dwBytesReceivedGuaranteed;
-                Stats[Written].PacketsSentGuaranteed = Info.dwPacketsSentGuaranteed;
-                Stats[Written].PacketsReceivedGuaranteed = Info.dwPacketsReceivedGuaranteed;
-                Stats[Written].ThroughputBps = Info.dwThroughputBPS;
-                ++Written;
-            }
-        }
+        if (Proxy == nullptr)
+            continue;
+
+        DPN_CONNECTION_INFO Info;
+        if (!Proxy->GetConnectionStats(&Info))
+            continue;
+
+        Stats[Written].BytesSentGuaranteed = Info.dwBytesSentGuaranteed;
+        Stats[Written].BytesReceivedGuaranteed = Info.dwBytesReceivedGuaranteed;
+        Stats[Written].PacketsSentGuaranteed = Info.dwPacketsSentGuaranteed;
+        Stats[Written].PacketsReceivedGuaranteed = Info.dwPacketsReceivedGuaranteed;
+        Stats[Written].ThroughputBps = Info.dwThroughputBPS;
+        ++Written;
     }
     *Count = Written;
     return Written;

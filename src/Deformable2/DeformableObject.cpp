@@ -62,13 +62,13 @@ static void __cdecl HardpointConnectCallback(InstanceIndex BoneInst, char const*
     FHardpointKey KeyB;
     KeyB.Name = Name;
     KeyB.Crc = DACOM_CRC::GetCRC32(Name);
-    if (Ctx->Hardpoint->ConnectHardpoints(Pair->First, &KeyA, Pair->Second, &KeyB) != 0)
-    {
-        char Message[0x2000];
-        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", G_FdumpFileDeformableObject, 0x53,
-              FormatDeformMessage(Message, "Deformable: create: cannot connect parts %s<->%s",
-                                  Name, Name));
-    }
+    if (Ctx->Hardpoint->ConnectHardpoints(Pair->First, &KeyA, Pair->Second, &KeyB) == 0)
+        return;
+
+    char Message[0x2000];
+    FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", G_FdumpFileDeformableObject, 0x53,
+          FormatDeformMessage(Message, "Deformable: create: cannot connect parts %s<->%s",
+                              Name, Name));
 }
 
 static const float G_RandToUnit = 3.051851e-05f;
@@ -283,7 +283,7 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
             }
         }
         // The skeleton reference taken by the ctor, then RootFs.
-        ReleaseSkeleton(Skel);
+        Skel->Release();
         if (RootFs != nullptr)
         {
             RootFs->Release();
@@ -1040,7 +1040,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     Event->Damping = Aim->Damping;
     Event->LockCount = Aim->LockCount;
 
-    if (!SetIkJointCount(Event, (unsigned int)Count))
+    if (!Event->SetJointCount((unsigned int)Count))
     {
         StopAimNode(Node);
         return (FIkListNode*)((ptrdiff_t)-1);

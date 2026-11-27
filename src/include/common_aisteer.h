@@ -26,7 +26,7 @@
 // and the timer table are in common_systemmanager.h.
 //
 // Definitions (src/Common/AI/): common_obstacleavoidance.cpp (ObstacleAvoidance, obstacle
-// candidates / heading blend, FindClosestObstacleToAvoid), common_crspline.cpp
+// candidates / heading blend, SystemManagerTimerTable::FindClosestObstacleToAvoid), common_crspline.cpp
 // (ICRSplineSegment), common_aiintercept.cpp (intercept / clearance / heading cones /
 // GetIfacePositionOrZero), common_aifirecontrol.cpp (SustainedThresholdTimer, weapon fire
 // control, the CM-dropper watcher), common_airaycast.cpp (ray / box / capsule tests,
@@ -614,18 +614,7 @@ double GetSignedRadialClearanceToPoint(FAiTarget* Elem, Vector const& Point); //
 // get_physical_radius idiom before step 2.
 bool IsTargetCoAlignedAndAhead(FAiTarget* Target, FAiTarget* Reference, float CosThreshold); // FUN_062e4f60
 
-// FUN_062e6a80. Its seven callers are in the IUStateGraph cluster; it lives here beside
-// the other FAiTarget accessors.
-//
-// Lazily-caches a {Low, High} float pair (Elem+0x00/+0x04) behind a RangeValid
-// guard (Elem+0x7C), refreshed through a SECOND, independent vtable pointer
-// (Elem+0x80, distinct from the Intercept-clearance cluster's Elem+0x84
-// Iface) at slot 0x6C: `bool __thiscall RangeIface->vt[0x6C](RangeIface,
-// float* OutLow, void* Iface, float* OutHigh)` -- Iface (Elem+0x84) is passed
-// through unchanged as the query's own middle argument. If RangeIface or
-// Iface is null, or the vtable call returns false, CachedLow/CachedHigh are
-// forced to 0.0f/0.0f instead.
-void GetCachedRange(FAiTarget* Elem, float* OutLow, float* OutHigh); // FUN_062e6a80
+ // FUN_062e6a80
 
 // FUN_062e6070, __cdecl. Ghidra's unaff_ESI / unaff_retaddr are the CachedRadius local
 // and the Target argument slot, which retail reuses as get_atmosphere_range's out-param.
@@ -646,26 +635,7 @@ float GetAiTargetEffectiveRadius(FAiTarget* Target); // FUN_062e6070
 // the dependency must not be closed in the other direction either.
 struct SystemManagerTimerTable;
 
-// FUN_062e7a30. "Pick the obstacle worth dodging": the owner sweeps its own bounding volume
-// forward along its heading for a look-ahead time T and returns the NEAREST
-// scanner contact that volume would run into. The result feeds straight into
-// ComputeShapeBiasedAvoidDirection (FUN_062e55b0) as its `Target`.
-//
-// Retail is __thiscall (RET 8) on SystemManagerTimerTable (sole caller .text:062de098
-// passes EBX+0x34), exposed here as a free function taking the receiver explicitly.
-// It reads this+0x04 Owner (the SystemManager; +0x14FC its FAiTarget, +0x08 its
-// Watcher), +0x08 ScannerEquipId and +0x1D bKeepCache (get_scanlist's bFlag).
-//
-// ExcludeId is compared against each candidate's get_id() and rejects on a
-// match; TypeMask is ANDed with the candidate's cached get_type() flags.
-// Returns the winning candidate's IObjInspect*, or null.
-//
-// Reject chain keeps candidates with heading dot >= 0 (ahead), LenSq <= Reach*Reach
-// and CachedRadius <= 1000.0f. Type flag bit 29 set selects TransformedBoxesIntersect,
-// clear selects SweptSphereCollisionTime.
-IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
-                                                   unsigned ExcludeId,
-                                                   unsigned TypeMask); // FUN_062e7a30
+ // FUN_062e7a30
 
 // FUN_062e6150. Negated direction/basis-row vector fetched through
 // Iface's vtable slot 0xc; zero-fills on null Iface.
@@ -694,7 +664,7 @@ void TransformBoundingBoxCorners(Transform const& Xform, Vector const& Min,
 // FUN_062e55b0, __cdecl (Out is the hidden struct return). Ghidra recovered one of three
 // parameters: unaff_EBP is Elem (used only as *(Elem+0x84)), unaff_ESI is Target, and
 // unaff_retaddr is Target's slot reused as scratch. Sole caller passes
-// SystemManager+0x14FC as Elem and FindClosestObstacleToAvoid's result as Target.
+// SystemManager+0x14FC as Elem and SystemManagerTimerTable::FindClosestObstacleToAvoid's result as Target.
 //
 // What it computes -- a lateral dodge direction, in world space:
 //   1. Target->get_physical_radius(Radius, Centre) [+0x2c]. The radius is never

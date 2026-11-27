@@ -114,7 +114,7 @@ void OnMouseFlightRawMessage(unsigned Msg);
 // the ship's current behavior index is 0x12. The name is identical-code folding: the target is
 // 0x0053e4a0, an empty function, and DAT_00674a58 is the HUD_Maneuvers singleton passed as
 // `this`. The call does nothing, so nothing is missing.
-// Caller: the space frame LAB_0054b000 (space_state.cpp UpdateSpaceState).
+// Caller: the space frame LAB_0054b000 (space_state.cpp SpaceApp::Update).
 void UpdateMouseFlightDirection();
 
 // FUN_004c7c60 -- true once UpdateMouseFlightDirection's hold timer (.data:00673550) has reached

@@ -189,20 +189,19 @@ unsigned BestPathWaypointHash(int Index)
     return Hash;
 }
 
-IObjRW* BestPathWaypointResolveObject(FBestPathWaypoint const* Waypoint)
+IObjRW* FBestPathWaypoint::ResolveObject() const
 {
     // FUN_004c5110.
-    FmtStr::Val const* const Token = FindObjectToken(Waypoint);
+    FmtStr::Val const* const Token = FindObjectToken(this);
     if (Token == nullptr)
         return nullptr;
     return ResolveObjectToken(Token);
 }
 
-bool BestPathWaypointResolvePosition(FBestPathWaypoint const* Waypoint, Vector* OutPos,
-                                     unsigned* OutSystem)
+bool FBestPathWaypoint::ResolvePosition(Vector* OutPos, unsigned* OutSystem) const
 {
     // FUN_004c52d0.
-    FmtStr::Val const* const ObjectToken = FindObjectToken(Waypoint);
+    FmtStr::Val const* const ObjectToken = FindObjectToken(this);
     if (ObjectToken != nullptr)
     {
         IObjRW* const Object = ResolveObjectToken(ObjectToken);
@@ -215,15 +214,15 @@ bool BestPathWaypointResolvePosition(FBestPathWaypoint const* Waypoint, Vector* 
     }
 
     // Otherwise the first 'N' (0x4e) token's data block {+0x00 system, +0x08 position}.
-    for (FmtStr::Val const* Token = Waypoint->Marker.Head; Token != nullptr; Token = Token->Next)
+    for (FmtStr::Val const* Token = Marker.Head; Token != nullptr; Token = Token->Next)
     {
-        if (Token->TypeTag == FmtStr::TagNavMarker)
-        {
-            FmtStr::NavMarker const* const Block = Token->Marker;
-            *OutSystem = Block->Data[0];
-            std::memcpy(OutPos, &Block->Data[2], sizeof(Vector)); // words 2..4: the float triple
-            return true;
-        }
+        if (Token->TypeTag != FmtStr::TagNavMarker)
+            continue;
+
+        FmtStr::NavMarker const* const Block = Token->Marker;
+        *OutSystem = Block->Data[0];
+        std::memcpy(OutPos, &Block->Data[2], sizeof(Vector)); // words 2..4: the float triple
+        return true;
     }
     return false;
 }

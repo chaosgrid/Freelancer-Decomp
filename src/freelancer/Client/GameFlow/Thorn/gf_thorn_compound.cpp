@@ -390,13 +390,13 @@ void FThornCompound::Stop()
         bPlaying[Slot] = 0;
     }
     ResetMotionSlots();
-    if (Object != nullptr)
-    {
-        Object->LightGroup = 3;
-        Object->Layer = 0;
-        Object->RenderMode = 0;
-        Object->bRunningLights = 0;
-    }
+    if (Object == nullptr)
+        return;
+
+    Object->LightGroup = 3;
+    Object->Layer = 0;
+    Object->RenderMode = 0;
+    Object->bRunningLights = 0;
 }
 
 // LAB_00451360 -- +0x70. (ShipObject's slot 6, 0x005cbe08, is the same folded body.)

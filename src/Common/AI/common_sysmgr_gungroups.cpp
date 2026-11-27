@@ -10,10 +10,10 @@
 
 #include "common_systemmanager.h"
 #include "AI/common_systemmanager_internal.h" // CmnSysMgr::IsWatcherLive / WatchedObject
-#include "common_aisteer.h"   // FAiTarget, GetCachedRange
+#include "common_aisteer.h"   // FAiTarget, FAiTarget::GetCachedRange
 #include "common_misc.h"      // SUBOBJ_ID_NONE
 #include "common_iface.h"     // IObjInspect, IObjRW, ObjRwFromWatchable
-#include "common_iustategraph.h" // BuildAiTargetList, GetAiTargetList (ScanAutoTurretTargets)
+#include "common_iustategraph.h" // SystemManagerTimerTable::BuildAiTargetList, GetAiTargetList (ScanAutoTurretTargets)
 #include "common_cobject.h"    // CEqObj::EquipManager / get_behavior_interface (ScanAutoTurretTargets)
 #include "common_cequip.h"     // CELauncher::cast / GetBarrelPosWS (ScanAutoTurretTargets)
 
@@ -48,21 +48,21 @@ namespace
     }
 }
 
-void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self)
+void SystemManagerGunGroupManager::Construct()
 {
-    std::memset(Self, 0, sizeof(*Self));
+    std::memset(this, 0, sizeof(*this));
 
     // The target watcher at +0x08/+0x0C (zeroed), +0x28 = 0, ScanPeriod = 1.0f.
-    Self->ScanPeriod = 1.0f;
+    ScanPeriod = 1.0f;
 
-    InitGunGroupArray(Self->Guns);
-    InitGunGroupArray(Self->MineDroppers);
+    InitGunGroupArray(Guns);
+    InitGunGroupArray(MineDroppers);
 
     // LineOfFireCache[16]: {InUse=0, TargetId=0, HardpointId=0, Age=0, RefreshTimer=0,
     // NeedsRefresh=1, bBlocked=0}.
     for (int i = 0; i < 0x10; ++i)
     {
-        FLauncherFireCacheSlot& Slot = Self->LineOfFireCache[i];
+        FLauncherFireCacheSlot& Slot = LineOfFireCache[i];
         Slot.InUse = 0;
         Slot.TargetId = 0;
         Slot.HardpointId = 0;
@@ -72,40 +72,40 @@ void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self)
         Slot.bBlocked = 0;
     }
 
-    Self->Owner = nullptr;
-    Self->bEnabled = 1;
+    Owner = nullptr;
+    bEnabled = 1;
 
-    Self->GunFireIntervalTime = 0.5f;
-    Self->AutoTurretIntervalTime = 0.5f;
-    Self->MissileLaunchIntervalVariance = 0.5f;
-    Self->GunFireNoBurstIntervalTime = 2.0f;
-    Self->AutoTurretNoBurstIntervalTime = 2.0f;
+    GunFireIntervalTime = 0.5f;
+    AutoTurretIntervalTime = 0.5f;
+    MissileLaunchIntervalVariance = 0.5f;
+    GunFireNoBurstIntervalTime = 2.0f;
+    AutoTurretNoBurstIntervalTime = 2.0f;
 
-    Self->Field_0x10 = 0;
-    Self->CruiseHeldTime = 0.0f;
-    Self->GunCount = 0;
-    Self->bFireAllGuns = 0;
+    Field_0x10 = 0;
+    CruiseHeldTime = 0.0f;
+    GunCount = 0;
+    bFireAllGuns = 0;
 
-    Self->Field_0x108C = 0.09817477f;                         // 0x3dc90fdb == PI/32
-    Self->GunFireBurstIntervalVariance = 0.3f;
-    Self->AutoTurretBurstIntervalVariance = 0.3f;
-    Self->Field_0x107C = 0.0f;
-    Self->MissileLaunchAllowOutOfRange = 0.0f;
-    Self->WideConeAngle = 0.09817477f;
+    Field_0x108C = 0.09817477f;                         // 0x3dc90fdb == PI/32
+    GunFireBurstIntervalVariance = 0.3f;
+    AutoTurretBurstIntervalVariance = 0.3f;
+    Field_0x107C = 0.0f;
+    MissileLaunchAllowOutOfRange = 0.0f;
+    WideConeAngle = 0.09817477f;
 
-    Self->AimRefreshTimer = 0.0f;
-    Self->Field_0x834 = -1;
+    AimRefreshTimer = 0.0f;
+    Field_0x834 = -1;
 
-    Self->GunFireIntervalVariance = 0.2f;
-    Self->GunFireBurstIntervalTime = 4.0f;
-    Self->AutoTurretBurstIntervalTime = 4.0f;
-    Self->MissileLaunchIntervalTime = 3.0f;
-    Self->MissileLaunchConeAngle = 3.14159274f;
-    Self->MineLaunchInterval = 5.0f;
-    Self->MineLaunchConeAngle = 0.3926991f;
-    Self->GunFireAccuracyConeAngle = 0.05f;
-    Self->GunRange = 1100.0f;
-    Self->MissileLaunchRange = 800.0f;
+    GunFireIntervalVariance = 0.2f;
+    GunFireBurstIntervalTime = 4.0f;
+    AutoTurretBurstIntervalTime = 4.0f;
+    MissileLaunchIntervalTime = 3.0f;
+    MissileLaunchConeAngle = 3.14159274f;
+    MineLaunchInterval = 5.0f;
+    MineLaunchConeAngle = 0.3926991f;
+    GunFireAccuracyConeAngle = 0.05f;
+    GunRange = 1100.0f;
+    MissileLaunchRange = 800.0f;
 }
 
 namespace
@@ -424,7 +424,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
         float BestDistSq = 3.40282347e+38f;
         IObjInspect* BestIface = nullptr;
 
-        FAiTargetVector* const List = BuildAiTargetList(GetAiTargetList(Sys));
+        FAiTargetVector* const List = GetAiTargetList(Sys)->BuildAiTargetList();
         for (FAiTarget* Elem = List->Begin; Elem != List->End; ++Elem)
         {
             // FUN_062ee530: the candidate must match the job attack order.
@@ -462,7 +462,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
             // hostile.
             float Attitude = 0.0f;
             float Reverse = 0.0f;
-            GetCachedRange(Elem, &Attitude, &Reverse);
+            Elem->GetCachedRange(&Attitude, &Reverse);
             if (!(Attitude <= -0.6f))
                 continue;
 

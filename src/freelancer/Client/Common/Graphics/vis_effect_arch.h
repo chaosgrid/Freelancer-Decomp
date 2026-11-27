@@ -47,16 +47,17 @@ struct FVisEffectArch
     // Only ever built in place in G_VisEffects; a copy would release the same slots twice.
     FVisEffectArch(FVisEffectArch const&) = delete;
     FVisEffectArch& operator=(FVisEffectArch const&) = delete;
-};
 
-// FUN_0042e080 (thiscall) -- VisEffectArch AddRef. On the first reference (RefCount <= 0) the
-// texture libraries are (re)resolved when their count differs from the texture names, and the
-// .ale is loaded through FUN_00401160. The count goes up on every path. True only when this call
-// loaded the .ale successfully.
-bool VisEffectArchAddRef(FVisEffectArch* Vis);
-// FUN_0042e160 (thiscall) -- VisEffectArch Release. At zero: release every texture slot
-// (FUN_0041b030) and the .ale (FUN_00401300), handle back to -1; true only then.
-bool VisEffectArchRelease(FVisEffectArch* Vis);
+    // FUN_0042e080 (thiscall) -- VisEffectArch AddRef. On the first reference (RefCount <= 0) the
+    // texture libraries are (re)resolved when their count differs from the texture names, and the
+    // .ale is loaded through FUN_00401160. The count goes up on every path. True only when this call
+    // loaded the .ale successfully.
+    bool AddRef();
+
+    // FUN_0042e160 (thiscall) -- VisEffectArch Release. At zero: release every texture slot
+    // (FUN_0041b030) and the .ale (FUN_00401300), handle back to -1; true only then.
+    bool Release();
+};
 
 // Client\cmn\ALELib.cpp: .ale files by name (map DAT_00616440, compared with stricmp), each
 // with a use count and the handle handed out from DAT_006101d0 (starts at 1).
@@ -95,6 +96,23 @@ struct FEffectArch
                                          // kEffectArchFlagLooping is the only bit set
     unsigned char FlagsHigh[3];          // +0x51  the flags dword's upper bytes, always 0
     int RefCount;                        // +0x54
+
+    // FUN_0040e250 (thiscall) -- EffectArch's constructor (also inlined in FUN_0040eac0): only
+    // the fields below are written; +0x21..+0x3f stay as they were.
+    void Construct();
+
+    // FUN_0040e2a0 (thiscall) -- EffectArch's destructor (inlined in FUN_0040eac0 and
+    // FUN_0040ef30): with references still out, a warning, then every one of them dropped.
+    void Destruct();
+
+    // FUN_0040e960 (thiscall, RET 4; the stack argument is never read) -- EffectArch::AddRef:
+    // VisEffect +0x08 through FUN_0042e080, SoundArch +0x18 through its slot 3 (+0x0c), then
+    // ++RefCount (+0x54).
+    void AddRef(unsigned UnusedArg);
+
+    // FUN_0040e990 (thiscall) -- EffectArch::Release: VisEffect through FUN_0042e160, SoundArch
+    // through slot 4 (+0x10), then --RefCount.
+    void Release();
 };
 static_assert(sizeof(FEffectArch) == 0x58, "EffectArch 0x58");
 
@@ -110,12 +128,6 @@ static unsigned char const kEffectArchFlagLooping = 1u;
 // EffectArchs the registry gained.
 int EffectArchLoadIni(char const* Path, bool bReload);
 
-// FUN_0040e250 (thiscall) -- EffectArch's constructor (also inlined in FUN_0040eac0): only
-// the fields below are written; +0x21..+0x3f stay as they were.
-void EffectArchConstruct(FEffectArch* Arch);
-// FUN_0040e2a0 (thiscall) -- EffectArch's destructor (inlined in FUN_0040eac0 and
-// FUN_0040ef30): with references still out, a warning, then every one of them dropped.
-void EffectArchDestruct(FEffectArch* Arch);
 // FUN_0040ef30 (WinMain teardown) -- every registered EffectArch destroyed and
 // freed, the registry emptied, then FUN_0042e2f0 unbinds the FxRuntime.
 void EffectArchShutdown();
@@ -128,10 +140,3 @@ FBeamEffectArch* FindBeamEffectArchByNickname(char const* Nickname);
 FEffectArch* FindEffectArch(unsigned const* NicknameId);
 FEffectArch* FindEffectArchByNickname(char const* Nickname);
 
-// FUN_0040e960 (thiscall, RET 4; the stack argument is never read) -- EffectArch::AddRef:
-// VisEffect +0x08 through FUN_0042e080, SoundArch +0x18 through its slot 3 (+0x0c), then
-// ++RefCount (+0x54).
-void EffectArchAddRef(FEffectArch* Arch, unsigned UnusedArg);
-// FUN_0040e990 (thiscall) -- EffectArch::Release: VisEffect through FUN_0042e160, SoundArch
-// through slot 4 (+0x10), then --RefCount.
-void EffectArchRelease(FEffectArch* Arch);

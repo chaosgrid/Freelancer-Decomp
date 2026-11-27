@@ -86,26 +86,19 @@ void FEffectBase::operator delete(void* Memory, size_t Size)
 
 FEffectBase::FEffectBase(unsigned TypeId)
 {
-    EffectBaseConstruct(this, TypeId);
-}
-
-void EffectBaseConstruct(FEffectBase* This, unsigned TypeId)
-{
     // FUN_004f79f0 — every dword through +0x68.
-    if (This == nullptr)
-        return;
-    std::memset((unsigned char*)This + sizeof(void*), 0, sizeof(FEffectBase) - sizeof(void*));
-    This->Priority = 1.0f;
+    std::memset((unsigned char*)this + sizeof(void*), 0, sizeof(FEffectBase) - sizeof(void*));
+    Priority = 1.0f;
     // Identity rotation.
-    This->LocalXform.Rotation.E[0][0] = 1.0f;
-    This->LocalXform.Rotation.E[1][1] = 1.0f;
-    This->LocalXform.Rotation.E[2][2] = 1.0f;
-    This->EngineIndex = -1;
-    This->RefCount = 1;
-    This->EffectTypeId = TypeId;
-    This->LinkPrev = nullptr;
-    This->LinkNext = nullptr;
-    This->LinkSelf = nullptr;
+    LocalXform.Rotation.E[0][0] = 1.0f;
+    LocalXform.Rotation.E[1][1] = 1.0f;
+    LocalXform.Rotation.E[2][2] = 1.0f;
+    EngineIndex = -1;
+    RefCount = 1;
+    EffectTypeId = TypeId;
+    LinkPrev = nullptr;
+    LinkNext = nullptr;
+    LinkSelf = nullptr;
 }
 
 void FEffectBase::AddRef()
@@ -113,11 +106,6 @@ void FEffectBase::AddRef()
     FEffectBase* const This = this;
     // FUN_004f7a80.
     This->RefCount = This->RefCount + 1;
-}
-
-void EffectAddRef(FEffectBase* This)
-{
-    This->AddRef();
 }
 
 int FEffectBase::Release()
@@ -131,11 +119,6 @@ int FEffectBase::Release()
         delete This;
     }
     return Next;
-}
-
-int EffectRelease(FEffectBase* This)
-{
-    return This->Release();
 }
 
 unsigned char FEffectBase::Start(FEffectArch* Arch)
@@ -156,21 +139,11 @@ unsigned char FEffectBase::Start(FEffectArch* Arch)
     return 1;
 }
 
-unsigned char EffectBaseStart(FEffectBase* This, FEffectArch* Arch)
-{
-    return This->FEffectBase::Start(Arch);
-}
-
-void EffectBaseDestruct(FEffectBase* This)
-{
-    // FUN_004f8dd0: only a non-empty watcher is reset.
-    if (This->Watcher.target() != nullptr)
-        This->Watcher.set(nullptr);
-}
-
 FEffectBase::~FEffectBase()
 {
-    EffectBaseDestruct(this);
+    // FUN_004f8dd0: only a non-empty watcher is reset.
+    if (Watcher.target() != nullptr)
+        Watcher.set(nullptr);
 }
 
 void FEffectBase::SetIntensity(float /*Intensity*/)
@@ -192,12 +165,6 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, Transform const*
     This->LocalXform = *LocalXform;
     // The frozen velocity +0x4c..+0x54.
     std::memset(This->FrozenVelocity, 0, sizeof(This->FrozenVelocity));
-}
-
-void EffectAttach(FEffectBase* This, void* WatchableOwner, int EngineIndex,
-                  Transform const* LocalXform)
-{
-    This->Attach(WatchableOwner, EngineIndex, LocalXform);
 }
 
 void* EffectWatchedObject(FEffectBase const* This)
@@ -262,24 +229,24 @@ namespace
     }
 }
 
-void EffectFreezeToWorld(FEffectBase* This)
+void FEffectBase::FreezeToWorld()
 {
     // FUN_004f7db0.
-    if (This->EngineIndex == -1)
+    if (EngineIndex == -1)
         return;
 
-    if (EffectWatchedObject(This) == nullptr)
+    if (EffectWatchedObject(this) == nullptr)
     {
         // FUN_004f7af0 inlined.
-        EffectTypeListLink(This);
+        EffectTypeListLink(this);
         // Retail quirk kept: it calls itself with the index still set and the watcher still
         // empty, so it recurses until the stack runs out if this is reached.
-        EffectFreezeToWorld(This);
-        This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
+        FreezeToWorld();
+        Flags08 = static_cast<unsigned char>(Flags08 | kEffectFlagDeactivated);
         return;
     }
 
-    EffectBakeInstance(This);
+    EffectBakeInstance(this);
 }
 
 void FEffectBase::Kill()
@@ -293,7 +260,7 @@ void FEffectBase::Kill()
         if (EffectWatchedObject(This) == nullptr)
         {
             // The same unbounded self-recursion as FUN_004f7db0's; kept as retail.
-            EffectKill(This);
+            This->FEffectBase::Kill();
             This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
             return;
         }
@@ -303,31 +270,26 @@ void FEffectBase::Kill()
     This->Flags08 = static_cast<unsigned char>(This->Flags08 | kEffectFlagDeactivated);
 }
 
-void EffectKill(FEffectBase* This)
-{
-    This->FEffectBase::Kill();
-}
-
-void EffectGetWorldTransform(FEffectBase const* This, Transform* Out)
+void FEffectBase::GetWorldTransform(Transform* Out) const
 {
     // FUN_004f7ef0.
-    if (EffectWatchedObject(This) != nullptr && This->EngineIndex != -1)
+    if (EffectWatchedObject(this) != nullptr && EngineIndex != -1)
     {
         Transform const* const InstanceXform = DALib::Engine->GetInstanceTransform(
-                This->EngineIndex);
+                EngineIndex);
         Transform Product;
-        EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
+        EffectMathEngine()->MulTransform(Product, *InstanceXform, LocalXform);
         *Out = Product;
         return;
     }
-    *Out = This->LocalXform;
+    *Out = LocalXform;
 }
 
-unsigned char EffectInCameraView(FEffectBase* This, FSpaceCamera* Cam)
+unsigned char FEffectBase::InCameraView(FSpaceCamera* Cam)
 {
     // FUN_004f7b50. The effect's own slot +8 gives the world position and radius.
     Vector WorldPos;
-    float const Radius = This->GetWorldPos(&WorldPos);
+    float const Radius = GetWorldPos(&WorldPos);
 
     ICamera* const CamIface = AsCamera(Cam);
     Transform const* const ViewXform =

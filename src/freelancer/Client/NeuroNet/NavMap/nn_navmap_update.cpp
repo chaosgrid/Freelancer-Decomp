@@ -11,7 +11,7 @@
 #include "NeuroNet/Economy/best_path.h"              // BestPath* (FUN_004c4fb0 / 4ff0 / 5530 / 52d0 / 58e0)
 #include "Interface/cargo_bar_control.h"      // ToolTipHoverInit / SetCaption
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail / BaseId / LastPosition
-#include "Common/Graphics/client_mesh_load.h"       // ClientMeshLoadFromPath (FUN_0059ec80)
+#include "Common/Graphics/client_mesh_load.h"       // FClientMeshHolder::LoadFromPath (FUN_0059ec80)
 #include "Core/globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
 #include "Space/HUD/hud_element_list.h"       // HudVectorAngle (FUN_0053eb10)
 #include "Common/Fonts/ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
@@ -123,7 +123,7 @@ namespace
     // exists).
     void NavMapReloadItemMesh(FNavMapItem* Item, char const* Name)
     {
-        ClientUiMeshHolderRelease(&Item->Mesh); // FUN_0059eee0
+        Item->Mesh.ReleaseWithAnim(); // FUN_0059eee0
         char Path[0x104];
         strcpy(Path, kNavMapSpaceObjectsDir);
         strcat(Path, Name);
@@ -132,7 +132,7 @@ namespace
         GetFileSysPath(FullPath, Path, DALib::Data);
         if (_access(FullPath, 0) == -1)
             return;
-        ClientMeshLoadFromPath(&Item->Mesh, Path, kNavMapSpaceObjectsMat, true);
+        Item->Mesh.LoadFromPath(Path, kNavMapSpaceObjectsMat, true);
     }
 
     // The hover tip Update feeds (inlined four times there): the cursor's
@@ -156,7 +156,7 @@ namespace
     void NavMapSubmitHover(FToolTipHoverInfo* Record)
     {
         FToolTipHoverInfo Current;          // caption null + FUN_004144b0
-        ToolTipHoverReset(&Current);        // FUN_004963a0
+        Current.Reset();        // FUN_004963a0
         if (NnToolTipReadHover(&Current) && Current.IdsAlt == Record->IdsAlt)
         {
             Record->WorldPos[0] = Current.WorldPos[0];
@@ -527,7 +527,7 @@ void NeuroNetNavMap::AnimateItems()
         {
             // {tint, tint, tint, alpha} (FUN_004a1ab0) through FUN_004a1af0.
             unsigned char const Rgba[4] = {TintByte, TintByte, TintByte, AlphaByte};
-            ClientMeshHolderSetColor(&Item->Mesh, Rgba);
+            Item->Mesh.SetColor(Rgba);
             break;
         }
         default:
@@ -1042,7 +1042,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         // The record's own position (FUN_004c52d0), else FUN_004a0800.
         Vector Pos;
         unsigned SystemId = 0;
-        bool bResolved = BestPathWaypointResolvePosition(Waypoint, &Pos, &SystemId);
+        bool bResolved = Waypoint->ResolvePosition(&Pos, &SystemId);
         if (!bResolved)
         {
             float Resolved[3];
@@ -1297,15 +1297,15 @@ void NeuroNetNavMap::PlaceItems()
 
         // An object with an id takes the visit map's flags; bit 0 shows it
         // (or bDebugShowAll every one).
-        if (Item->Id != 0)
-        {
-            unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
-            Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
-            Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
-            if (bDebugShowAll != 0)
-                Item->bShown = 1;
-        }
+        if (Item->Id == 0)
+            continue;
+
+        unsigned char VisitFlags = 0;
+        GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
+        Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
+        Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
+        if (bDebugShowAll != 0)
+            Item->bShown = 1;
     }
 }
 
@@ -1688,8 +1688,8 @@ void NeuroNetNavMap::Update()
                                    static_cast<double>(ScreenRectMin[1]));
     Camera.ZNear = SceneCamera->ZNear; // FUN_0040fb60: the two stores
     Camera.ZFar = SceneCamera->ZFar;
-    SpaceCameraSetHalfFovX(&Camera, SceneCamera->HalfFovXDeg); // FUN_0040f8c0
-    SpaceCameraSetViewportEx(&Camera, Viewport, 1);           // FUN_0040fb80
+    Camera.SetHalfFovX(SceneCamera->HalfFovXDeg); // FUN_0040f8c0
+    Camera.SetViewportEx(Viewport, 1);           // FUN_0040fb80
 
     // The system view follows the player (marker position / heading) and
     // the waypoints; the universe view pulses its stars.

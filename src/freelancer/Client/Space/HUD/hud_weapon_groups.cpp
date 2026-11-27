@@ -490,13 +490,13 @@ void FWeaponGroups::RemoveHardpoint(char const* Hardpoint)
         int NameCount = static_cast<int>(Group->Hardpoints.size());
         for (int NameIndex = 0; NameIndex < NameCount; ++NameIndex)
         {
-            if (_stricmp(Group->Hardpoints[NameIndex].c_str(), Hardpoint) == 0) // DACOM stricmp
-            {
-                // The same index is looked at again.
-                Group->Hardpoints.erase(Group->Hardpoints.begin() + NameIndex);
-                --NameCount;
-                --NameIndex;
-            }
+            if (_stricmp(Group->Hardpoints[NameIndex].c_str(), Hardpoint) != 0) // DACOM stricmp
+                continue;
+
+            // The same index is looked at again.
+            Group->Hardpoints.erase(Group->Hardpoints.begin() + NameIndex);
+            --NameCount;
+            --NameIndex;
         }
     }
     SendToServer();

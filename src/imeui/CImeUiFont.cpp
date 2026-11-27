@@ -56,17 +56,17 @@ CImeUiFont::~CImeUiFont()
 
 void CImeUiFont::UpdateFont()
 {
-    if (m_bDirty)
-    {
-        if (m_hFont != nullptr)
-            DeleteObject(m_hFont);
-        if (m_hDC != nullptr)
-            DeleteObject(m_hDC);
-        m_hDC = CreateCompatibleDC(nullptr);
-        m_hFont = CreateFontIndirectA(&m_LogFont);
-        SelectObject(m_hDC, m_hFont);
-        m_bDirty = false;
-    }
+    if (!m_bDirty)
+        return;
+
+    if (m_hFont != nullptr)
+        DeleteObject(m_hFont);
+    if (m_hDC != nullptr)
+        DeleteObject(m_hDC);
+    m_hDC = CreateCompatibleDC(nullptr);
+    m_hFont = CreateFontIndirectA(&m_LogFont);
+    SelectObject(m_hDC, m_hFont);
+    m_bDirty = false;
 }
 
 void CImeUiFont::SetLogFont(const LOGFONTA* Font)
@@ -106,14 +106,14 @@ void CImeUiFont::GetTextExtent(const wchar_t* Text, int* Width, int* Height)
     if (Text == nullptr || *Text == 0)
         return;
     UpdateFont();
-    if (m_hDC != nullptr && m_hFont != nullptr)
+    if (m_hDC == nullptr || m_hFont == nullptr)
+        return;
+
+    SIZE Size;
+    if (ImeUi_GetTextExtent(m_hDC, Text, lstrlenW(Text), &Size))
     {
-        SIZE Size;
-        if (ImeUi_GetTextExtent(m_hDC, Text, lstrlenW(Text), &Size))
-        {
-            *Width = Size.cx;
-            *Height = Size.cy;
-        }
+        *Width = Size.cx;
+        *Height = Size.cy;
     }
 }
 

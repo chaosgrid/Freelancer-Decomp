@@ -113,22 +113,22 @@ static bool StarSysNebulaSegmentHits(float const* From3, float const* To3)
 // The star_glow / star_center record's inline constructor, as the StarSphere ctor and Load's
 // star_center arm both write it (the empty name through FUN_00420750 / FUN_00417c50). The name
 // bytes after the terminator and +0x4d..+0x4f are not written.
-static void InitGlowDescDefaults(FStarGlowDesc* Desc, unsigned char OwnerTag)
+void FStarGlowDesc::InitDefaults(unsigned char OwnerTag)
     {
         (void)OwnerTag;
-        Desc->ShapeLen = 0;
-        Desc->ShapeName[0] = 0;
-        Desc->InnerColor[0] = 1.0f;
-        Desc->InnerColor[1] = 1.0f;
-        Desc->InnerColor[2] = 1.0f;
-        Desc->OuterColor[0] = 1.0f;
-        Desc->OuterColor[1] = 1.0f;
-        Desc->OuterColor[2] = 1.0f;
-        Desc->Scale = 1.0f;
-        Desc->Alpha = 1.0f;
-        Desc->Field44 = 0;
-        Desc->bShapeAlpha = 0;
-        Desc->Shape = nullptr;
+        ShapeLen = 0;
+        ShapeName[0] = 0;
+        InnerColor[0] = 1.0f;
+        InnerColor[1] = 1.0f;
+        InnerColor[2] = 1.0f;
+        OuterColor[0] = 1.0f;
+        OuterColor[1] = 1.0f;
+        OuterColor[2] = 1.0f;
+        Scale = 1.0f;
+        Alpha = 1.0f;
+        Field44 = 0;
+        bShapeAlpha = 0;
+        Shape = nullptr;
     }
 
 // The lens-flare / spines 0x40 shell, inlined twice in the StarSphere ctor. The allocator byte
@@ -156,7 +156,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     void* ResolveShapeTextureHandle(FTexShape const* Shape)
     {
         // FUN_00425640 — Slot22(Shape->Texture, frame, out); return out[0] GPU handle.
-        return TexShapeGetGpuHandle(Shape, 0);
+        return Shape->GetGpuHandle(0);
     }
 
     // The alpha flag both probe sites write (FUN_0050e6f0 into +0x2e4, LAB_00511690 into the
@@ -310,7 +310,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
  Center * 0.1f + Sum * (1.0f / 24.0f) * 0.9f;
     }
 
-    // FUN_00512620 is StarSphereMaxGlowScale below (public; its caller is the Solar slot 94).
+    // FUN_00512620 is FStarSphere::MaxGlowScale below (public; its caller is the Solar slot 94).
 
     float const* OwnerGetWorldPos(IObjInspect* Owner);
 
@@ -1510,7 +1510,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
                     {
                         // FUN_0050c950; loaded when it returns 0.
                         bStarGlow = static_cast<unsigned char>(
-                            StarGlowLoadFromIni(this->StarGlow, IniPath, Reader.get_value_string()) == 0);
+                            this->StarGlow->LoadFromIni(IniPath, Reader.get_value_string()) == 0);
                     }
                     else if (Reader.is_value("star_center"))
                     {
@@ -1521,9 +1521,9 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
                             operator delete(this->StarCenter);
                         FStarGlowDesc* Center = static_cast<FStarGlowDesc*>(operator new(0x50));
                         if (Center != nullptr)
-                            InitGlowDescDefaults(Center, 0);
+                            Center->InitDefaults(0);
                         this->StarCenter = Center;
-                        if (StarGlowLoadFromIni(this->StarCenter, IniPath, Reader.get_value_string()) != 0)
+                        if (this->StarCenter->LoadFromIni(IniPath, Reader.get_value_string()) != 0)
                         {
                             operator delete(this->StarCenter);
                             this->StarCenter = nullptr;
@@ -1533,19 +1533,19 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
                     {
                         // FUN_0050f3a0
                         bLensFlare = static_cast<unsigned char>(
-                            LensFlareLoadFromIni(this->LensFlare, IniPath, Reader.get_value_string()) == 0);
+                            this->LensFlare->LensFlareLoadFromIni(IniPath, Reader.get_value_string()) == 0);
                     }
                     else if (bLensGlow == 0 && Reader.is_value("lens_glow"))
                     {
                         // FUN_0050d420
                         bLensGlow = static_cast<unsigned char>(
-                            LensGlowLoadFromIni(this->SunBody, IniPath, Reader.get_value_string()) == 0);
+                            this->SunBody->LensGlowLoadFromIni(IniPath, Reader.get_value_string()) == 0);
                     }
                     else if (bSpines == 0 && Reader.is_value("spines"))
                     {
                         // FUN_0050fba0
                         bSpines = static_cast<unsigned char>(
-                            SpinesLoadFromIni(this->Spines, IniPath, Reader.get_value_string()) == 0);
+                            this->Spines->SpinesLoadFromIni(IniPath, Reader.get_value_string()) == 0);
                     }
                     else if (Reader.is_value("intensity_fade_in"))
                     {
@@ -1581,7 +1581,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         }
 
         // FUN_0050d930 on every path.
-        SunBodyBakeCorona(this->SunBody);
+        this->SunBody->BakeCorona();
         return Result;
     }
 
@@ -2047,15 +2047,13 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
 
 // -------------------------------------------------------------------- FUN_0050d300
 
-FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body)
+FSunEffectBody* FSunEffectBody::Init()
 {
-    if (Body == nullptr)
-        return nullptr;
     // The 13 rim slots (retail walks a pointer at +8 of each), then the 12 interior slots:
     // position and UV 0, alpha 1.0f; the touched bytes are left alone.
     for (int I = 0; I < 13; ++I)
     {
-        FSunCoronaSlot* const Slot = &Body->Slots[I];
+        FSunCoronaSlot* const Slot = &Slots[I];
         Slot->V = 0.0f;
         Slot->U = 0.0f;
         Slot->Y = 0.0f;
@@ -2064,7 +2062,7 @@ FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body)
     }
     for (int I = 0; I < 12; ++I)
     {
-        FSunCoronaSlot* const Slot = &Body->InteriorSlots[I];
+        FSunCoronaSlot* const Slot = &InteriorSlots[I];
         Slot->V = 0.0f;
         Slot->U = 0.0f;
         Slot->Y = 0.0f;
@@ -2072,42 +2070,42 @@ FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body)
         Slot->Alpha = 1.0f;
     }
     for (int I = 0; I < 12; ++I)
-        Body->EdgeFlags[I] = 1;
-    Body->ShapeLen = 0;
-    Body->ShapeName[0] = 0;
-    Body->InnerColor[0] = 1.0f;
-    Body->InnerColor[1] = 1.0f;
-    Body->InnerColor[2] = 1.0f;
-    Body->InteriorColor[0] = 1.0f;
-    Body->InteriorColor[1] = 1.0f;
-    Body->InteriorColor[2] = 1.0f;
-    Body->OuterColor[0] = 1.0f;
-    Body->OuterColor[1] = 1.0f;
-    Body->OuterColor[2] = 1.0f;
-    Body->InteriorRayTween = 1.0f;
-    Body->GlowFadeIn = 0.25f; // 0x3e800000
-    Body->GlowFadeOut = 0.25f;
-    Body->bShapeAlpha = 0;
-    Body->Shape = nullptr;
-    Body->Lod = 0;
-    Body->LodReduction = 0;
-    Body->InteriorTween = 0.5f; // 0x3f000000
-    Body->RadiusScale = 2.0f;  // 0x40000000
-    Body->MaxLod = 5;
-    Body->LodPixelThresholds[0] = 8;
-    Body->LodPixelThresholds[1] = 15;
-    Body->LodPixelThresholds[2] = 25;
-    Body->LodPixelThresholds[3] = 40;
-    Body->LodPixelThresholds[4] = 60;
+        EdgeFlags[I] = 1;
+    ShapeLen = 0;
+    ShapeName[0] = 0;
+    InnerColor[0] = 1.0f;
+    InnerColor[1] = 1.0f;
+    InnerColor[2] = 1.0f;
+    InteriorColor[0] = 1.0f;
+    InteriorColor[1] = 1.0f;
+    InteriorColor[2] = 1.0f;
+    OuterColor[0] = 1.0f;
+    OuterColor[1] = 1.0f;
+    OuterColor[2] = 1.0f;
+    InteriorRayTween = 1.0f;
+    GlowFadeIn = 0.25f; // 0x3e800000
+    GlowFadeOut = 0.25f;
+    bShapeAlpha = 0;
+    Shape = nullptr;
+    Lod = 0;
+    LodReduction = 0;
+    InteriorTween = 0.5f; // 0x3f000000
+    RadiusScale = 2.0f;  // 0x40000000
+    MaxLod = 5;
+    LodPixelThresholds[0] = 8;
+    LodPixelThresholds[1] = 15;
+    LodPixelThresholds[2] = 25;
+    LodPixelThresholds[3] = 40;
+    LodPixelThresholds[4] = 60;
 
-    return Body;
+    return this;
 }
 
 // -------------------------------------------------------------------- FUN_0050c950
 
-int StarGlowLoadFromIni(FStarGlowDesc* Desc, char const* IniPath, char const* Nickname)
+int FStarGlowDesc::LoadFromIni(char const* IniPath, char const* Nickname)
 {
-    if (Desc == nullptr || IniPath == nullptr || Nickname == nullptr)
+    if (IniPath == nullptr || Nickname == nullptr)
         return 1;
 
     INI_Reader Reader;
@@ -2139,39 +2137,39 @@ int StarGlowLoadFromIni(FStarGlowDesc* Desc, char const* IniPath, char const* Ni
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    Desc->ShapeLen = 0;
-                    Desc->ShapeName[0] = '\0';
+                    ShapeLen = 0;
+                    ShapeName[0] = '\0';
                 }
                 else
                 {
-                    Desc->ShapeLen = CopyBoundedString(Desc->ShapeName, 0x20, Shape);
+                    ShapeLen = CopyBoundedString(ShapeName, 0x20, Shape);
                 }
             }
             else if (Reader.is_value("scale"))
             {
-                Desc->Scale = Reader.get_value_float(0);
+                Scale = Reader.get_value_float(0);
             }
             else if (Reader.is_value("inner_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                Desc->InnerColor[0] = R;
-                Desc->InnerColor[1] = G;
-                Desc->InnerColor[2] = B;
+                InnerColor[0] = R;
+                InnerColor[1] = G;
+                InnerColor[2] = B;
             }
             else if (Reader.is_value("outer_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                Desc->OuterColor[0] = R;
-                Desc->OuterColor[1] = G;
-                Desc->OuterColor[2] = B;
+                OuterColor[0] = R;
+                OuterColor[1] = G;
+                OuterColor[2] = B;
             }
             else if (Reader.is_value("alpha"))
             {
-                Desc->Alpha = Reader.get_value_float(0);
+                Alpha = Reader.get_value_float(0);
             }
         }
         break;
@@ -2182,9 +2180,9 @@ int StarGlowLoadFromIni(FStarGlowDesc* Desc, char const* IniPath, char const* Ni
 
 // -------------------------------------------------------------------- FUN_0050d420
 
-int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* Nickname)
+int FSunEffectBody::LensGlowLoadFromIni(char const* IniPath, char const* Nickname)
 {
-    if (Body == nullptr || IniPath == nullptr || Nickname == nullptr)
+    if (IniPath == nullptr || Nickname == nullptr)
         return 1;
 
     INI_Reader Reader;
@@ -2216,58 +2214,58 @@ int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* N
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    Body->ShapeLen = 0;
-                    Body->ShapeName[0] = 0;
+                    ShapeLen = 0;
+                    ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_00417c50 into +0x2c0; length at +0x2bc.
                     unsigned const Len =
-                        CopyBoundedString(Body->ShapeName, 0x20, Shape);
-                    Body->ShapeLen = Len;
+                        CopyBoundedString(ShapeName, 0x20, Shape);
+                    ShapeLen = Len;
                 }
             }
             else if (Reader.is_value("radius_scale"))
             {
-                Body->RadiusScale = Reader.get_value_float(0);
+                RadiusScale = Reader.get_value_float(0);
             }
             else if (Reader.is_value("inner_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                Body->InnerColor[0] = R;
-                Body->InnerColor[1] = G;
-                Body->InnerColor[2] = B;
+                InnerColor[0] = R;
+                InnerColor[1] = G;
+                InnerColor[2] = B;
             }
             else if (Reader.is_value("outer_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                Body->OuterColor[0] = R;
-                Body->OuterColor[1] = G;
-                Body->OuterColor[2] = B;
+                OuterColor[0] = R;
+                OuterColor[1] = G;
+                OuterColor[2] = B;
             }
             else if (Reader.is_value("glow_fade_in_seconds"))
             {
-                Body->GlowFadeIn = Reader.get_value_float(0);
+                GlowFadeIn = Reader.get_value_float(0);
             }
             else if (Reader.is_value("glow_fade_out_seconds"))
             {
-                Body->GlowFadeOut = Reader.get_value_float(0);
+                GlowFadeOut = Reader.get_value_float(0);
             }
             else if (Reader.is_value("interior_tween"))
             {
-                Body->InteriorTween = Reader.get_value_float(0);
+                InteriorTween = Reader.get_value_float(0);
             }
             else if (Reader.is_value("interior_ray_tween"))
             {
-                Body->InteriorRayTween = Reader.get_value_float(0);
+                InteriorRayTween = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_LOD"))
             {
-                Body->MaxLod =
+                MaxLod =
                     static_cast<unsigned>(Reader.get_value_float(0));
             }
         }
@@ -2278,30 +2276,28 @@ int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* N
     if (bFound)
     {
         // Post-parse lerp of blended colour at +0x294..+0x29c.
-        float const T = Body->InteriorTween;
+        float const T = InteriorTween;
         float const OneMinus = 1.0f - T;
-        Body->InteriorColor[0] =
-            OneMinus * Body->InnerColor[0] +
-            T * Body->OuterColor[0];
-        Body->InteriorColor[1] =
-            OneMinus * Body->InnerColor[1] +
-            T * Body->OuterColor[1];
-        Body->InteriorColor[2] =
-            OneMinus * Body->InnerColor[2] +
-            T * Body->OuterColor[2];
+        InteriorColor[0] =
+            OneMinus * InnerColor[0] +
+            T * OuterColor[0];
+        InteriorColor[1] =
+            OneMinus * InnerColor[1] +
+            T * OuterColor[1];
+        InteriorColor[2] =
+            OneMinus * InnerColor[2] +
+            T * OuterColor[2];
     }
     return bFound ? 0 : 1;
 }
 
 // -------------------------------------------------------------------- FUN_0050f340 / 0050fb50
 
-static void LensFlareFree(FStarFxChild40* Flare)
+void FStarFxChild40::LensFlareFree()
 {
     // FUN_0050f340 — free bead pointers then the pointer array.
-    if (Flare == nullptr)
-        return;
-    float** Begin = Flare->BeadBegin;
-    float** End = Flare->BeadEnd;
+    float** Begin = BeadBegin;
+    float** End = BeadEnd;
     if (Begin != nullptr)
     {
         for (float** It = Begin; It != End; ++It)
@@ -2311,27 +2307,25 @@ static void LensFlareFree(FStarFxChild40* Flare)
         }
         operator delete(Begin);
     }
-    Flare->BeadBegin = nullptr;
-    Flare->BeadEnd = nullptr;
-    Flare->BeadCapacity = nullptr;
-    Flare->Shape = nullptr;
+    BeadBegin = nullptr;
+    BeadEnd = nullptr;
+    BeadCapacity = nullptr;
+    Shape = nullptr;
 }
 
-static void SpinesFree(FStarFxChild40* Spines)
+void FStarFxChild40::SpinesFree()
 {
     // FUN_0050fb50 — contiguous 0x2c array; reset end=begin, clear shape.
-    if (Spines == nullptr)
-        return;
-    Spines->SpineEnd = Spines->SpineBegin;
-    Spines->Shape = nullptr;
-    Spines->ShapeLen = 0;
-    Spines->ShapeName[0] = 0;
-    void* const Begin = Spines->SpineBegin;
+    SpineEnd = SpineBegin;
+    Shape = nullptr;
+    ShapeLen = 0;
+    ShapeName[0] = 0;
+    void* const Begin = SpineBegin;
     if (Begin != nullptr)
         operator delete(Begin);
-    Spines->SpineBegin = nullptr;
-    Spines->SpineEnd = nullptr;
-    Spines->SpineCapacity = nullptr;
+    SpineBegin = nullptr;
+    SpineEnd = nullptr;
+    SpineCapacity = nullptr;
 }
 
 static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
@@ -2400,12 +2394,12 @@ static void SpinesPushElem(FStarFxChild40* Spines, float const Elem[11])
 
 // -------------------------------------------------------------------- FUN_0050f3a0
 
-int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const* Nickname)
+int FStarFxChild40::LensFlareLoadFromIni(char const* IniPath, char const* Nickname)
 {
-    if (Flare == nullptr || IniPath == nullptr || Nickname == nullptr)
+    if (IniPath == nullptr || Nickname == nullptr)
         return 1;
 
-    LensFlareFree(Flare);
+    LensFlareFree();
 
     INI_Reader Reader;
     if (!Reader.open(IniPath, false))
@@ -2436,30 +2430,30 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
                 float Values[6];
                 for (int I = 0; I < 6; ++I)
                     Values[I] = Reader.get_value_float(I);
-                FlarePushBead(Flare, Values);
+                FlarePushBead(this, Values);
             }
             else if (Reader.is_value("min_radius"))
             {
-                Flare->MinRadius = Reader.get_value_float(0);
+                MinRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_radius"))
             {
-                Flare->MaxRadius = Reader.get_value_float(0);
+                MaxRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("shape"))
             {
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    Flare->ShapeLen = 0;
-                    Flare->ShapeName[0] = 0;
+                    ShapeLen = 0;
+                    ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_0050f3a0 inlines FUN_00417c50 here - same semantics.
                     unsigned const Len =
-                        CopyBoundedString(Flare->ShapeName, 0x20, Shape);
-                    Flare->ShapeLen = Len;
+                        CopyBoundedString(ShapeName, 0x20, Shape);
+                    ShapeLen = Len;
                 }
             }
         }
@@ -2469,8 +2463,8 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
     // FUN_00512b00 / 00512a40 / 00512b70 — sort bead pointer vector by pointer address
     // (MSVC insertion/introsort on uint*). Count ≤16 → insertion; else introsort-equivalent.
     {
-        float** Begin = Flare->BeadBegin;
-        float** End = Flare->BeadEnd;
+        float** Begin = BeadBegin;
+        float** End = BeadEnd;
         if (Begin != nullptr && End != nullptr && End > Begin)
         {
             int const Count = static_cast<int>(End - Begin);
@@ -2487,12 +2481,12 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
 
 // -------------------------------------------------------------------- FUN_0050fba0
 
-int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* Nickname)
+int FStarFxChild40::SpinesLoadFromIni(char const* IniPath, char const* Nickname)
 {
-    if (Spines == nullptr || IniPath == nullptr || Nickname == nullptr)
+    if (IniPath == nullptr || Nickname == nullptr)
         return 1;
 
-    SpinesFree(Spines);
+    SpinesFree();
     float RadiusScale = 1.0f;
 
     INI_Reader Reader;
@@ -2528,24 +2522,24 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    Spines->ShapeLen = 0;
-                    Spines->ShapeName[0] = 0;
+                    ShapeLen = 0;
+                    ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_00417c50(this+0x14, 0x20, value).
                     unsigned const Len =
-                        CopyBoundedString(Spines->ShapeName, 0x20, Shape);
-                    Spines->ShapeLen = Len;
+                        CopyBoundedString(ShapeName, 0x20, Shape);
+                    ShapeLen = Len;
                 }
             }
             else if (Reader.is_value("min_radius"))
             {
-                Spines->MinRadius = Reader.get_value_float(0);
+                MinRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_radius"))
             {
-                Spines->MaxRadius = Reader.get_value_float(0);
+                MaxRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("spine"))
             {
@@ -2554,15 +2548,15 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
                 memset(Elem, 0, sizeof(Elem));
                 for (int I = 0; I < 9; ++I)
                     Elem[2 + I] = Reader.get_value_float(I);
-                SpinesPushElem(Spines, Elem);
+                SpinesPushElem(this, Elem);
             }
         }
         break;
     }
     Reader.close();
 
-    unsigned char* Begin = Spines->SpineBegin;
-    unsigned char* End = Spines->SpineEnd;
+    unsigned char* Begin = SpineBegin;
+    unsigned char* End = SpineEnd;
     int Count = 0;
     if (Begin != nullptr)
         Count = static_cast<int>(End - Begin) / 0x2c;
@@ -2589,11 +2583,11 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
 
 // -------------------------------------------------------------------- FUN_0050d930
 
-int SunBodyBakeCorona(FSunEffectBody* Body)
+int FSunEffectBody::BakeCorona()
 {
-    if (Body == nullptr)
+    if (this == nullptr)
         return 0;
-    FSunCoronaSlot* const Centre = &Body->Slots[0];
+    FSunCoronaSlot* const Centre = &Slots[0];
     Centre->U = 0.5f;
     Centre->V = 0.5f;
     Centre->X = 0.0f;
@@ -2603,19 +2597,19 @@ int SunBodyBakeCorona(FSunEffectBody* Body)
         float const Angle = static_cast<float>(I - 1) * 0.5235987901687622f; // pi/6
         float const C = cosf(Angle);
         float const S = sinf(Angle);
-        FSunCoronaSlot* const Rim = &Body->Slots[I];
+        FSunCoronaSlot* const Rim = &Slots[I];
         Rim->X = C;
         Rim->Y = -S;
         Rim->U = (C + 1.0f) * 0.5f;
         Rim->V = 0.5f - S * 0.5f;
     }
     // Each interior slot sits interior_tween of the way from the centre to rim slot I + 1.
-    float const Tween = Body->InteriorTween;
+    float const Tween = InteriorTween;
     float const OneMinus = 1.0f - Tween;
     for (int I = 0; I < 12; ++I)
     {
-        FSunCoronaSlot* const Interior = &Body->InteriorSlots[I];
-        FSunCoronaSlot const* const Rim = &Body->Slots[I + 1];
+        FSunCoronaSlot* const Interior = &InteriorSlots[I];
+        FSunCoronaSlot const* const Rim = &Slots[I + 1];
         Interior->X = OneMinus * Centre->X + Tween * Rim->X;
         Interior->Y = OneMinus * Centre->Y + Tween * Rim->Y;
         Interior->U = OneMinus * Centre->U + Tween * Rim->U;
@@ -2670,7 +2664,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
 
     FSunEffectBody* Body = static_cast<FSunEffectBody*>(operator new(0x30c));
     if (Body != nullptr)
-        SunEffectBodyInit(Body);
+        Body->Init();
     SunBody = Body;
 
     // Ctor allocates two 0x40 children (lens_flare defaults 5/800, spines 1/1000).
@@ -2685,7 +2679,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
 
     FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(0x50));
     if (Glow != nullptr)
-        InitGlowDescDefaults(Glow, 0);
+        Glow->InitDefaults(0);
     // In retail's order.
     StarGlow = Glow;
     StarCenter = nullptr;
@@ -2725,13 +2719,13 @@ FStarSphere::~FStarSphere()
     }
     if (LensFlare != nullptr)
     {
-        LensFlareFree(LensFlare); // FUN_0050f340
+        LensFlare->LensFlareFree(); // FUN_0050f340
         operator delete(LensFlare);
         LensFlare = nullptr;
     }
     if (Spines != nullptr)
     {
-        SpinesFree(Spines); // FUN_0050fb50
+        Spines->SpinesFree(); // FUN_0050fb50
         operator delete(Spines);
         Spines = nullptr;
     }
@@ -2796,25 +2790,25 @@ FStarSphereList* StarSphereList()
     return &G_StarSphereListOwner.List;
 }
 
-Vector* StarSphereGetOwnerPosition(FStarSphere const* Sphere, Vector* Out)
+Vector* FStarSphere::GetOwnerPosition(Vector* Out) const
 {
     // FUN_005125f0
-    Vector const& Pos = static_cast<IObjInspect const*>(Sphere->Owner)->get_position();
+    Vector const& Pos = static_cast<IObjInspect const*>(Owner)->get_position();
     *Out = Pos;
     return Out;
 }
 
-float StarSphereMaxGlowScale(FStarSphere const* Sphere)
+float FStarSphere::MaxGlowScale() const
 {
     // FUN_00512620: the glow's scale (+0x10 -> +0x24, no test of the glow); the centre's scale
     // (+0x0c -> +0x24) or 0 without a centre; the centre's when it is strictly greater; times
     // the radius (+0x08).
-    float const Glow = Sphere->StarGlow->Scale;
+    float const Glow = StarGlow->Scale;
     float Center = 0.0f;
-    if (Sphere->StarCenter != nullptr)
-        Center = Sphere->StarCenter->Scale;
+    if (StarCenter != nullptr)
+        Center = StarCenter->Scale;
     float const Scale = (Center > Glow) ? Center : Glow;
-    return Scale * Sphere->Radius;
+    return Scale * Radius;
 }
 
 FStarSphere* StarSphereCreateListed(IObjInspect* Owner)

@@ -29,7 +29,7 @@ TextWin::TextWin()
 TextWin::~TextWin()
 {
     // FUN_005a1af0: the text cleared and the Win3D Destroy body inlined.
-    FontStringClearContents(&Text);
+    Text.ClearContents();
     Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
@@ -70,7 +70,7 @@ bool TextWin::Create(Win3D* NewParent, void* /*Data*/)
 void TextWin::Destroy()
 {
     // FUN_005a1c10.
-    FontStringClearContents(&Text);
+    Text.ClearContents();
     Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
@@ -114,13 +114,13 @@ void TextWin::Draw()
     Origin.Height = ScreenHeight;
     Origin.HAlign = HAlign;
     Origin.VAlign = 0;
-    FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
+    Origin.DrawChildren(&Text, nullptr, nullptr);
 }
 
 void TextWin::SetText(wchar_t const* NewText)
 {
     // LAB_005a1cb0.
-    FontStringSetText(&Text, NewText);
+    Text.SetText(NewText);
 }
 
 void TextWin::InitTextDefaults()

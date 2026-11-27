@@ -27,7 +27,7 @@
 #include "Space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
 #include "Space/HUD/hud_target.h"       // HudIsMousePickBlocked (FUN_0045a740)
 #include "Core/perf_options.h"     // FindPerfOption (FUN_005b36b0)
-#include "Space/space_scene_obj_draw.h" // SpaceObjDrawPass (FUN_0051c200), FUN_0051c970 / FUN_0051c9e0
+#include "Space/space_scene_obj_draw.h" // FGameCamera::DrawScene (FUN_0051c200), FUN_0051c970 / FUN_0051c9e0
 #include "Interface/win3d_render.h"     // ClearWin3DBuffers (FUN_004215e0)
 #include "x86math.h"
 
@@ -109,37 +109,37 @@ namespace
     }
 }
 
-void FirstPersonCameraConstruct(FFirstPersonCamera* Cam)
+void FFirstPersonCamera::Construct()
 {
     // FUN_00517180.
-    HudCameraConstruct((FHudCamera*)Cam);
+    FHudCamera::Construct();
 
     // FUN_00420d40 constructs the cockpit mesh holder in place at +0x190.
-    MeshHolderConstruct(&Cam->Mesh);
+    Mesh.Construct();
 
     // Three transforms, each a zero position and an identity matrix (retail stores them in a
     // different order, same result).
-    Cam->CockpitHpPosition.x = 0.0f;
-    Cam->CockpitHpPosition.y = 0.0f;
-    Cam->CockpitHpPosition.z = 0.0f;
-    SetIdentity(&Cam->CockpitHpOrientation.E[0][0]);
+    CockpitHpPosition.x = 0.0f;
+    CockpitHpPosition.y = 0.0f;
+    CockpitHpPosition.z = 0.0f;
+    SetIdentity(&CockpitHpOrientation.E[0][0]);
 
-    Cam->HeadPosition.x = 0.0f;
-    Cam->HeadPosition.y = 0.0f;
-    Cam->HeadPosition.z = 0.0f;
-    SetIdentity(&Cam->HeadOrientation.E[0][0]);
+    HeadPosition.x = 0.0f;
+    HeadPosition.y = 0.0f;
+    HeadPosition.z = 0.0f;
+    SetIdentity(&HeadOrientation.E[0][0]);
 
-    Cam->EyePosition.x = 0.0f;
-    Cam->EyePosition.y = 0.0f;
-    Cam->EyePosition.z = 0.0f;
-    SetIdentity(Cam->EyeOrientation);
+    EyePosition.x = 0.0f;
+    EyePosition.y = 0.0f;
+    EyePosition.z = 0.0f;
+    SetIdentity(EyeOrientation);
 
     // Clears BOTH HUDCamera bytes +0xfc and +0xfd -- the only evidence +0xfd is a field rather
     // than padding. +0xfe keeps the 1 the HUDCamera ctor put there.
-    Cam->bFlagFC = 0;
-    Cam->bFlagFD = 0;
+    bFlagFC = 0;
+    bFlagFD = 0;
 
-    Cam->bJustAttached = 1;
+    bJustAttached = 1;
 }
 
 const char* FirstPersonCameraGetName()
@@ -147,29 +147,29 @@ const char* FirstPersonCameraGetName()
     return "FirstPerson";       // 0x00517330 -> .rdata
 }
 
-bool FirstPersonCameraOnEvent(FFirstPersonCamera* Cam, unsigned MsgId)
+bool FFirstPersonCamera::OnEvent(unsigned MsgId)
 {
     // FUN_005183e0 (on the face): FUN_0045a740 -> false; otherwise HUDCamera's FUN_0051d7f0 on
     // the same face, its answer normalised to 0 / 1.
     if (HudIsMousePickBlocked())
         return false;
-    return HudCameraOnEvent((FHudCamera*)Cam, MsgId) != false;
+    return FHudCamera::OnEvent(MsgId) != false;
 }
 
-void FirstPersonCameraReleaseMesh(FFirstPersonCamera* Cam)
+void FFirstPersonCamera::ReleaseMesh()
 {
     // FUN_00518410: a tail jump to FUN_00420f70 on +0x190.
-    ClientMeshHolderRelease(&Cam->Mesh);
+    Mesh.Release();
 }
 
-void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
+void FFirstPersonCamera::Attach(void* Object)
 {
     // LAB_005178e0 (slot 0x58).
-    HudCameraAttach((FHudCamera*)Cam, Object);
+    FHudCamera::Attach(Object);
 
-    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
+    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
 
-    IObjRW* const Watched = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Cam));
+    IObjRW* const Watched = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)this));
     if (Watched != nullptr)
     {
         IObjInspect* const Inspect = Watched;
@@ -184,38 +184,38 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         HardpointInfo Info;
         if (FindHardpoint_PS(Inspect->get_index(), "HpCockpit", Handle, Info))
         {
-            Cam->CockpitHpPosition.x = Info.Position.x;                           // +0x100
-            Cam->CockpitHpPosition.y = Info.Position.y;
-            Cam->CockpitHpPosition.z = Info.Position.z;
-            memcpy(&Cam->CockpitHpOrientation, &Info.Orient, 9 * sizeof(float));   // +0x10c
+            CockpitHpPosition.x = Info.Position.x;                           // +0x100
+            CockpitHpPosition.y = Info.Position.y;
+            CockpitHpPosition.z = Info.Position.z;
+            memcpy(&CockpitHpOrientation, &Info.Orient, 9 * sizeof(float));   // +0x10c
         }
         else
         {
             // No cockpit hardpoint: four units behind the origin, identity.
-            Cam->CockpitHpPosition.x = 0.0f;
-            Cam->CockpitHpPosition.y = 0.0f;
-            Cam->CockpitHpPosition.z = -4.0f;                                     // 0xc0800000
-            Cam->CockpitHpOrientation.E[2][2] = 1.0f;
-            Cam->CockpitHpOrientation.E[1][1] = 1.0f;
-            Cam->CockpitHpOrientation.E[0][0] = 1.0f;
-            Cam->CockpitHpOrientation.E[2][1] = 0.0f;
-            Cam->CockpitHpOrientation.E[2][0] = 0.0f;
-            Cam->CockpitHpOrientation.E[1][2] = 0.0f;
-            Cam->CockpitHpOrientation.E[1][0] = 0.0f;
-            Cam->CockpitHpOrientation.E[0][2] = 0.0f;
-            Cam->CockpitHpOrientation.E[0][1] = 0.0f;
+            CockpitHpPosition.x = 0.0f;
+            CockpitHpPosition.y = 0.0f;
+            CockpitHpPosition.z = -4.0f;                                     // 0xc0800000
+            CockpitHpOrientation.E[2][2] = 1.0f;
+            CockpitHpOrientation.E[1][1] = 1.0f;
+            CockpitHpOrientation.E[0][0] = 1.0f;
+            CockpitHpOrientation.E[2][1] = 0.0f;
+            CockpitHpOrientation.E[2][0] = 0.0f;
+            CockpitHpOrientation.E[1][2] = 0.0f;
+            CockpitHpOrientation.E[1][0] = 0.0f;
+            CockpitHpOrientation.E[0][2] = 0.0f;
+            CockpitHpOrientation.E[0][1] = 0.0f;
         }
     }
 
     // Retail tests the watcher again.
-    IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Cam));
+    IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)this));
     if (Again != nullptr)
     {
         I3DMathEngine* const Math = FirstPersonMathEngine();
 
         // The head's base orientation in world space; kept in a second stack copy.
         Matrix Product;
-        Math->MulMatrix(Product, Space->World, Cam->CockpitHpOrientation);
+        Math->MulMatrix(Product, Space->World, CockpitHpOrientation);
         Matrix const Head = Product;
 
         Vector const& ObjectPosition = static_cast<IObjInspect*>(Again)->get_position();
@@ -224,21 +224,21 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         // + world rotation x hardpoint position.
         Vector Offset;
         FirstPersonMathEngine()->TransformMatrix(Offset, Space->World,
-                                                 Cam->CockpitHpPosition);
+                                                 CockpitHpPosition);
         Position[0] = Offset.x + Position[0];
         Position[1] = Offset.y + Position[1];
         Position[2] = Offset.z + Position[2];
 
         // + head orientation x the cockpit mesh's camera-part position (+0x130).
-        FirstPersonMathEngine()->TransformMatrix(Offset, Head, Cam->HeadPosition);
+        FirstPersonMathEngine()->TransformMatrix(Offset, Head, HeadPosition);
         Position[0] = Offset.x + Position[0];
         Position[1] = Offset.y + Position[1];
         Position[2] = Offset.z + Position[2];
 
         // +0x160 keeps the eye point; world = {head orientation, eye point}.
-        Cam->EyePosition.x = Position[0];
-        Cam->EyePosition.y = Position[1];
-        Cam->EyePosition.z = Position[2];
+        EyePosition.x = Position[0];
+        EyePosition.y = Position[1];
+        EyePosition.z = Position[2];
         Space->bViewDirty = 1;
         memcpy(&Space->World, &Head, 9 * sizeof(float));
         Space->WorldPos.x = Position[0];
@@ -246,13 +246,13 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         Space->WorldPos.z = Position[2];
     }
 
-    Cam->bJustAttached = 1;
+    bJustAttached = 1;
 }
 
-void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
+void FFirstPersonCamera::Update(float DeltaSeconds)
 {
     // LAB_00517ba0 (slot 0x6c).
-    FHudCamera* const Hud = (FHudCamera*)Cam;
+    FHudCamera* const Hud = (FHudCamera*)this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // Only with a watched client ship.
@@ -266,7 +266,7 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
 
         // Ship rotation x cockpit hardpoint orientation (+0x10c) -> this frame's mesh rotation.
         Matrix CockpitRot;
-        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, Cam->CockpitHpOrientation);
+        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, CockpitHpOrientation);
         Matrix MeshRot = CockpitRot;
 
         Vector const& ShipPos = Object->get_position();
@@ -274,23 +274,23 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
 
         // On the first update after an attach (+0x1a0), back to the normal camera mode.
         IBehaviorManager* const Manager = GetBehaviorManager(Object);
-        if (Cam->bJustAttached != 0 && Manager != nullptr)
+        if (bJustAttached != 0 && Manager != nullptr)
             Manager->set_camera_mode(IBehaviorManager::CameraModeNormal);
 
         // + ship rotation x cockpit hardpoint position (+0x100), kept in +0x160.
         Vector Offset;
-        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, Cam->CockpitHpPosition);
+        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, CockpitHpPosition);
         Eye.x = Offset.x + Eye.x;
-        Cam->EyePosition.x = Eye.x;
+        EyePosition.x = Eye.x;
         Eye.y = Offset.y + Eye.y;
-        Cam->EyePosition.y = Eye.y;
+        EyePosition.y = Eye.y;
         Eye.z = Offset.z + Eye.z;
-        Cam->EyePosition.z = Eye.z;
+        EyePosition.z = Eye.z;
 
         // The cockpit mesh follows.
-        ClientMeshHolderSetPosition(&Cam->Mesh, &Eye);
-        ClientMeshHolderSetOrientation(&Cam->Mesh, &MeshRot.E[0][0]);
-        ClientMeshHolderUpdate(&Cam->Mesh);
+        Mesh.SetPosition(&Eye);
+        Mesh.SetOrientation(&MeshRot.E[0][0]);
+        Mesh.Update();
 
         // Velocity into ship space.
         const Vector Velocity = Object->get_velocity();
@@ -326,13 +326,13 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         const float Lag = G_CockpitHeadLag;
 
         // The mesh's orientation back from the engine.
-        memcpy(&MeshRot, ClientMeshHolderGetOrientation(&Cam->Mesh), sizeof(MeshRot));
+        memcpy(&MeshRot, Mesh.GetOrientation(), sizeof(MeshRot));
 
         // The rigid eye: mesh position + mesh rotation x the camera part's position (+0x130).
         Vector HeadOffset;
-        FirstPersonMathEngine()->TransformMatrix(HeadOffset, MeshRot, Cam->HeadPosition);
+        FirstPersonMathEngine()->TransformMatrix(HeadOffset, MeshRot, HeadPosition);
         {
-            const float* const MeshPos = (const float*)ClientMeshHolderGetPosition(&Cam->Mesh);
+            const float* const MeshPos = (const float*)Mesh.GetPosition();
             Eye.x = MeshPos[0] + HeadOffset.x;
             Eye.y = MeshPos[1] + HeadOffset.y;
             Eye.z = MeshPos[2] + HeadOffset.z;
@@ -369,12 +369,12 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         Pivot.y = G_CockpitHeadPivot;
         Pivot.z = 0.0f;
         Vector PivotOffset;
-        FirstPersonMathEngine()->TransformMatrix(PivotOffset, Cam->HeadOrientation,
+        FirstPersonMathEngine()->TransformMatrix(PivotOffset, HeadOrientation,
                                                  Pivot);
         float Base[3];
-        Base[0] = Cam->HeadPosition.x - PivotOffset.x;
-        Base[1] = Cam->HeadPosition.y - PivotOffset.y;
-        Base[2] = Cam->HeadPosition.z - PivotOffset.z;
+        Base[0] = HeadPosition.x - PivotOffset.x;
+        Base[1] = HeadPosition.y - PivotOffset.y;
+        Base[2] = HeadPosition.z - PivotOffset.z;
 
         // The pivot pushed back by the lag, rolled, put back on the base.
         Vector Swing;
@@ -393,10 +393,10 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         Vector Moved;
         FirstPersonMathEngine()->TransformMatrix(Moved, MeshRot, AsVector(&Local));
         {
-            const Vector* const MeshPos = ClientMeshHolderGetPosition(&Cam->Mesh);
-            Cam->EyePosition.x = Moved.x + MeshPos->x;
-            Cam->EyePosition.y = Moved.y + MeshPos->y;
-            Cam->EyePosition.z = Moved.z + MeshPos->z;
+            const Vector* const MeshPos = Mesh.GetPosition();
+            EyePosition.x = Moved.x + MeshPos->x;
+            EyePosition.y = Moved.y + MeshPos->y;
+            EyePosition.z = Moved.z + MeshPos->z;
         }
 
         // The "cockpit" perf option (no null test) under 0.999 keeps the head rigid; otherwise
@@ -405,44 +405,44 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         if (FindPerfOption("cockpit")->Applied < 0.999)
         {
             // The eye back to the rigid point; mesh x part (+0x13c) x +0x16c.
-            Cam->EyePosition.x = Eye.x;
-            Cam->EyePosition.y = Eye.y;
-            Cam->EyePosition.z = Eye.z;
+            EyePosition.x = Eye.x;
+            EyePosition.y = Eye.y;
+            EyePosition.z = Eye.z;
             Matrix Head;
-            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, Cam->HeadOrientation);
+            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, HeadOrientation);
             const Matrix HeadCopy = Head;
-            FirstPersonMathEngine()->MulMatrix(Final, HeadCopy, AsMatrix(Cam->EyeOrientation));
+            FirstPersonMathEngine()->MulMatrix(Final, HeadCopy, AsMatrix(EyeOrientation));
         }
         else
         {
             // The same product, then x the roll.
             Matrix Head;
-            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, Cam->HeadOrientation);
+            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, HeadOrientation);
             const Matrix HeadCopy = Head;
             Matrix Offsetted;
-            FirstPersonMathEngine()->MulMatrix(Offsetted, HeadCopy, AsMatrix(Cam->EyeOrientation));
+            FirstPersonMathEngine()->MulMatrix(Offsetted, HeadCopy, AsMatrix(EyeOrientation));
             const Matrix OffsettedCopy = Offsetted;
             FirstPersonMathEngine()->MulMatrix(Final, OffsettedCopy, RollMatrix);
         }
 
-        HudCameraApplyShake(Hud, &Final);
+        Hud->ApplyShake(&Final);
 
         memcpy(&Space->World, &Final, 9 * sizeof(float));
-        Space->WorldPos.x = Cam->EyePosition.x;
-        Space->WorldPos.y = Cam->EyePosition.y;
-        Space->WorldPos.z = Cam->EyePosition.z;
+        Space->WorldPos.x = EyePosition.x;
+        Space->WorldPos.y = EyePosition.y;
+        Space->WorldPos.z = EyePosition.z;
         Space->bViewDirty = 1;
     }
 
     // HUDCamera's update, then the attach flag drops.
-    HudCameraUpdate(Hud, DeltaSeconds);
-    Cam->bJustAttached = 0;
+    Hud->FHudCamera::Update(DeltaSeconds);
+    bJustAttached = 0;
 }
 
-void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, unsigned Param2)
+void FFirstPersonCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 {
     // LAB_00518420 (slot 0x78).
-    FHudCamera* const Hud = (FHudCamera*)Cam;
+    FHudCamera* const Hud = (FHudCamera*)this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // The watcher at +0xc0 set, and the object (watcher - 8) non-null.
@@ -453,7 +453,7 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
     if (Held - 8 == nullptr)
         return;
 
-    SpaceObjDrawPass(Space, LayerFlags, Param2);
+    Hud->FGameCamera::DrawScene(LayerFlags, Param2);
 
     // The "cockpit" perf option's applied value (no null test), read once for both compares.
     const float Applied = FindPerfOption("cockpit")->Applied;
@@ -462,7 +462,7 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
     if (static_cast<double>(Applied) > 0.999 || GetGameOption(kGameOptHud) != 0)
         ClearWin3DBuffers(kWin3DClearDepth);
 
-    SpaceEnvFxBeginCockpitPass(Space);
+    Space->EnvFxBeginCockpitPass();
 
     if (static_cast<double>(Applied) > 0.999)
     {
@@ -470,7 +470,7 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
         ICamera* const Camera = AsCamera(Space);
         const float SavedNear = Camera->GetZNear();
         const float SavedFar = Camera->GetZFar();
-        SpaceCameraSetNearFar(Space, 0.05f, 500.0f);
+        Space->SetNearFar(0.05f, 500.0f);
         Win3DApplyCamera(Camera);
 
         // The player in the jump arm (+0x158 == 2 or 3, read without a class test): registered
@@ -491,7 +491,7 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
             // draw state (0.999: DAT_005c8b68). A missing player reaches the slot call through
             // null, as in retail.
             float Center[3];
-            const float Radius = ClientMeshHolderGetBoundingSphere(&Cam->Mesh, Center);
+            const float Radius = Mesh.GetBoundingSphere(Center);
             unsigned char Flag = 1;
             if (SpaceEffectPerfOneMinus() < 0.999)
                 Flag = 0;
@@ -502,19 +502,19 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
 
         // The cockpit draws in depth range [0.75, 1], the world in [0, 0.75].
         DALib::Pipeline->SetDepthRange(0.75f, 1.0f);
-        if (ClientMeshHolderHasInstance(&Cam->Mesh))
-            ClientMeshHolderRender(&Cam->Mesh, Space, 0x100);
+        if (Mesh.HasInstance())
+            Mesh.Render(Space, 0x100);
         DALib::Pipeline->SetDepthRange(0.0f, 0.75f);
-        SpaceCameraSetNearFar(Space, SavedNear, SavedFar);
+        Space->SetNearFar(SavedNear, SavedFar);
     }
 
     // HUDCamera's slot 0x78 body, called directly.
-    HudCameraDraw((FGameCamera*)Hud);
+    Hud->FHudCamera::DrawScene(LayerFlags, Param2);
 
-    SpaceEnvFxEndCockpitPass(Space);
+    Space->EnvFxEndCockpitPass();
 }
 
-void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
+void FFirstPersonCamera::Load(const char* CockpitIniPath)
 {
     // FUN_005173c0.
 
@@ -578,44 +578,44 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
             continue;
         }
 
-        if (Reader.is_header("Camera"))
-        {
-            // Client\space\Cockpit.cpp:0xf9
-            FDUMP(kFdumpWarning,
-                  "%s(%d) : *** WARNING: header [Camera] is no longer supported, found in file (%s)\n",
-                  kCockpitCpp, 0xf9, CockpitIniPath);
-        }
+        if (!Reader.is_header("Camera"))
+            continue;
+
+        // Client\space\Cockpit.cpp:0xf9
+        FDUMP(kFdumpWarning,
+              "%s(%d) : *** WARNING: header [Camera] is no longer supported, found in file (%s)\n",
+              kCockpitCpp, 0xf9, CockpitIniPath);
     }
     (void)MaterialLibraryLength;
 
     // Loaded only when the stored LENGTH is non-zero; the material library is passed as an
     // empty string, never null, when not given.
     if (MeshLength != 0)
-        ClientMeshHolderLoad(&Cam->Mesh, MeshName, MaterialLibrary);
+        Mesh.Load(MeshName, MaterialLibrary);
 
     // Placed at the origin and updated, unconditionally.
     const Vector Origin = {0.0f, 0.0f, 0.0f};
-    ClientMeshHolderSetPosition(&Cam->Mesh, &Origin);    // FUN_00420fd0
-    ClientMeshHolderUpdate(&Cam->Mesh);                 // FUN_00421070
+    Mesh.SetPosition(&Origin);    // FUN_00420fd0
+    Mesh.Update();                 // FUN_00421070
 
     // The head transform comes from the part whose name contains "cam", if any: IEngine slot
     // 0x98 into +0x13c and slot 0x90 into +0x130.
     long CameraPart = -1;
-    CompoundInstanceAnalyze(reinterpret_cast<long>(Cam->Mesh.EngineInstance),
+    CompoundInstanceAnalyze(reinterpret_cast<long>(Mesh.EngineInstance),
                             &FindCockpitCameraPart, &CameraPart);
     if (CameraPart != -1)
     {
         const InstanceIndex Part = CameraPart;
-        memcpy(&Cam->HeadOrientation, DALib::Engine->GetInstanceOrientation(Part),
+        memcpy(&HeadOrientation, DALib::Engine->GetInstanceOrientation(Part),
                9 * sizeof(float));
         const Vector* Position = DALib::Engine->GetInstancePosition(Part);
-        Cam->HeadPosition.x = Position->x;
-        Cam->HeadPosition.y = Position->y;
-        Cam->HeadPosition.z = Position->z;
+        HeadPosition.x = Position->x;
+        HeadPosition.y = Position->y;
+        HeadPosition.z = Position->z;
     }
 
     // The closing 4:3 check, read through the vtable as the third-person loader does.
-    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)Cam));
+    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)this));
 
     const double TanX = tan(static_cast<double>(Space->GetHalfFovXDeg()) *
                             static_cast<double>(kDegreesToRadians));
@@ -641,27 +641,7 @@ void FFirstPersonCamera::ScaleEnvironmentEffects()
 {
 }
 
-void FFirstPersonCamera::Attach(void* Object)
-{
-    FirstPersonCameraAttach(this, Object);
-}
-
-void FFirstPersonCamera::Update(float DeltaSeconds)
-{
-    FirstPersonCameraUpdate(this, DeltaSeconds);
-}
-
-void FFirstPersonCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
-{
-    FirstPersonCameraSceneDraw(this, LayerFlags, Param2);
-}
-
-bool FFirstPersonCamera::OnEvent(unsigned MsgId)
-{
-    return FirstPersonCameraOnEvent(this, MsgId);
-}
-
 void FFirstPersonCamera::Deactivate()
 {
-    HudCameraDerivedDeactivate(this);
+    DerivedDeactivate();
 }

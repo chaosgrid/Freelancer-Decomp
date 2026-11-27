@@ -25,16 +25,16 @@ struct IObjInspect;     // common_iface.h -- FAiTarget's two interface pointers
 // FAiTarget -- the 0x88-byte AI-target cache record. One instance is embedded in
 // SystemManager at +0x14FC (SelfTarget, the own ship); the timer table's
 // std::vector<FAiTarget> (SystemManagerTimerTable::Targets, 0x88 stride, built by
-// BuildAiTargetList FUN_062e7580) holds the others. Every cached slice is filled
+// SystemManagerTimerTable::BuildAiTargetList FUN_062e7580) holds the others. Every cached slice is filled
 // lazily from Iface on first use and guarded by its own byte (+0x7C..+0x7F); the
-// owner clears all four guards once per tick (InitSystemManager / UpdateSystemManager,
+// owner clears all four guards once per tick (SystemManager::Init / SystemManager::Update,
 // FAiTarget::Init for vector elements).
 // ============================================================================
 struct FAiTarget
 {
     // +0x00/+0x04, guarded by bAttitudeValid: AttitudeRefIface->
     // get_attitude_towards_symmetrical(CachedAttitude, Iface, CachedReverseAttitude)
-    // (GetCachedRange, FUN_062e6a80). Both 0.0f when either interface is null or the
+    // (FAiTarget::GetCachedRange, FUN_062e6a80). Both 0.0f when either interface is null or the
     // call fails. Consumers gate on `<= -0.6f` / `<= -0.2f` (hostile enough).
     float CachedAttitude;
     float CachedReverseAttitude;
@@ -70,6 +70,19 @@ struct FAiTarget
 
     // FUN_062c47c0. The guard is raised before the vcall. Most retail call sites inline it.
     void RefreshPos();
+
+    // FUN_062e6a80. Its seven callers are in the IUStateGraph cluster; it lives here beside
+    // the other FAiTarget accessors.
+    //
+    // Lazily-caches a {Low, High} float pair (Elem+0x00/+0x04) behind a RangeValid
+    // guard (Elem+0x7C), refreshed through a SECOND, independent vtable pointer
+    // (Elem+0x80, distinct from the Intercept-clearance cluster's Elem+0x84
+    // Iface) at slot 0x6C: `bool __thiscall RangeIface->vt[0x6C](RangeIface,
+    // float* OutLow, void* Iface, float* OutHigh)` -- Iface (Elem+0x84) is passed
+    // through unchanged as the query's own middle argument. If RangeIface or
+    // Iface is null, or the vtable call returns false, CachedLow/CachedHigh are
+    // forced to 0.0f/0.0f instead.
+    void GetCachedRange(float* OutLow, float* OutHigh);
 };
 static_assert(sizeof(FAiTarget) == 0x88, "FAiTarget must match retail's 0x88-byte AI-target cache record");
 static_assert(offsetof(FAiTarget, CachedFlags) == 0x08, "FAiTarget+0x08 CachedFlags");
@@ -90,13 +103,13 @@ static_assert(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //
 //   +0x00           int    OwnerObjectId  -- never written by the ctor
 //   +0x04  IBehaviorManager* Owner         -- zeroed at the end of the ctor; set by
-//                     InitSystemManager (FUN_062e6490). ThrustManager::CheckSteeringGate
+//                     SystemManager::Init (FUN_062e6490). ThrustManager::CheckSteeringGate
 //                     reads it through ThrustManager::Owner.
 //   +0x08  (0x08)   BaseWatcher Watcher    -- zeroed
 //   +0x10           IObjDB* ObjectDb       -- zeroed at the end
 //   +0x14           byte   bLeaderParamsBorrowed (+pad) -- zeroed at the end
 //   +0x18  (0x1C)   ThrustManager Thrust   -- the ctor zeroes only its first dword;
-//                     InitSystemManager initialises the rest (see ThrustManager below).
+//                     SystemManager::Init initialises the rest (see ThrustManager below).
 //   +0x34  (0xF8)   SystemManagerTimerTable Timers -- ctor FUN_062e6af0; embeds 11x
 //                     SustainedThresholdTimer.
 //   +0x12C (0x1238) SystemManagerGunGroupManager GunGroups -- ctor FUN_062e9330. Two
@@ -106,14 +119,14 @@ static_assert(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //   +0x142C (0x6C)  TargetManager Targeting (common_iface.h) -- ctor FUN_062ed570; vftable
 //                     .rdata:063a0888 (base IObjInspect::SubtargetEnumerator).
 //   +0x1498         SystemManager* TractorOwner -- not written by the ctor; the loot tractor
-//                     record's first dword (InitSystemManager stores the SystemManager into it).
+//                     record's first dword (SystemManager::Init stores the SystemManager into it).
 //   +0x149C (0x08)  BaseWatcher TractorTargetWatcher -- zeroed
 //   +0x14A4         short  TractorEquipId (+pad) -- SUBOBJ_ID_NONE (0)
 //   +0x14A8 (0x54)  RepairManager Repair -- ctor inline in FUN_062e6260; its +0x50
 //                     CheckTimer (absolute +0x14F8) is not written by the ctor.
 //   +0x14FC (0x88)  FAiTarget SelfTarget -- the own ship's AI-target record (every
 //                     intercept-clearance helper's "Elem"). The ctor writes only its
-//                     guards and interface pointers; InitSystemManager and the tick fill
+//                     guards and interface pointers; SystemManager::Init and the tick fill
 //                     AttitudeRefIface and Iface (the own ship's IObjInspect).
 //   +0x1584 (0x3D8) pub::AI::Personality PersonalityData -- the last member.
 //
@@ -131,7 +144,7 @@ enum EThrottleMode
 // ---------------------------------------------------------------------------
 // ThrustManager — SystemManager+0x18, 0x1C bytes. A retail class: Common.dll exports
 // ?engage_cruise@ThrustManager@@QAEX_N@Z (ordinal 2476, .text:062e90a0) and nothing else of
-// it. Layout from InitSystemManager's (FUN_062e6490) initialiser block plus the methods;
+// it. Layout from SystemManager::Init's (FUN_062e6490) initialiser block plus the methods;
 // +0x19..+0x1B are never touched, so the record pads to 0x1C, where Timers begins.
 // SystemManager+0x18 holds the SystemManager itself because it is ThrustManager::Owner.
 // Every method is __thiscall on the ThrustManager in retail (callers form
@@ -247,7 +260,7 @@ static_assert(offsetof(ThrustManager, bEngineActive) == 0x16, "ThrustManager+0x1
 static_assert(offsetof(ThrustManager, bAutoLevel) == 0x17, "ThrustManager+0x17 bAutoLevel");
 static_assert(offsetof(ThrustManager, bAutoAvoidance) == 0x18, "ThrustManager+0x18 bAutoAvoidance");
 
-// InitSystemManager's (FUN_062e6490) ThrustManager initialiser block. Separate from any
+// SystemManager::Init's (FUN_062e6490) ThrustManager initialiser block. Separate from any
 // constructor because retail runs it late, once the owner's Watcher has a live target;
 // SystemManager's ctor leaves this range alone.
 void InitThrustManager(ThrustManager* Self, SystemManager* Owner);
@@ -264,6 +277,17 @@ struct FAiTargetVector
     FAiTarget* Begin;   // +0x04  _First
     FAiTarget* End;     // +0x08  _Last  (one past the live range)
     FAiTarget* Cap;     // +0x0C  _End   (one past the allocated range)
+
+    // FUN_062ed140, __thiscall(this=the
+    // vector) + 3 stack args (RET 0xc): MSVC 7.0's
+    // `std::vector<FAiTarget>::insert(iterator Where, size_type Count, const
+    // FAiTarget& Value)` / `_Insert_n`, all three branches. Growth, when needed,
+    // is `NewCapacity = size() + max(size(), Count)`, allocated with a raw
+    // `operator new` and released with `operator delete` (0x06391d5a) -- no
+    // element destructors run because the element type has none. The only live
+    // call site (FUN_062e7580) always uses Where == End and Count == 1, i.e.
+    // push_back; the other two branches are ported too.
+    void InsertAiTargets(FAiTarget* Where, unsigned Count, FAiTarget const& Value);
 };
 static_assert(sizeof(FAiTargetVector) == 0x10, "FAiTargetVector must be 0x10 bytes");
 static_assert(offsetof(FAiTargetVector, Begin) == 0x04, "FAiTargetVector+0x04 Begin");
@@ -296,18 +320,18 @@ static_assert(sizeof(SustainedThresholdTimer) == 0x10, "SustainedThresholdTimer 
 // ---------------------------------------------------------------------------
 struct SystemManagerTimerTable
 {
-    // +0x00: not written by the ctor; SetSystemManagerSharedListHead (FUN_062e68e0) stores
-    // its IObjDB* here as well as in SystemManager::ObjectDb. AppendSystemManagerTimerListEntry
+    // +0x00: not written by the ctor; SystemManager::SetSharedListHead (FUN_062e68e0) stores
+    // its IObjDB* here as well as in SystemManager::ObjectDb. SystemManagerTimerTable::AppendTimerListEntry
     // (FUN_062e8720) calls its FindById.
     IObjDB* ObjectDb;
 
-    // +0x04: back-pointer to the owning SystemManager, set by ArmSystemManagerTimerTable
+    // +0x04: back-pointer to the owning SystemManager, set by SystemManagerTimerTable::Arm
     // (not by the ctor) and read directly, with no -8 adjustment.
     SystemManager* Owner;
 
     // +0x08: the scanner's equipment id, whose status gates the whole list rebuild.
-    // ArmSystemManagerTimerTable fills it via find_equipment(&ScannerEquipId, 1, 0x80000);
-    // BuildAiTargetList passes it to get_equipment_status as `unsigned short const&`.
+    // SystemManagerTimerTable::Arm fills it via find_equipment(&ScannerEquipId, 1, 0x80000);
+    // SystemManagerTimerTable::BuildAiTargetList passes it to get_equipment_status as `unsigned short const&`.
     unsigned short ScannerEquipId;
     unsigned char Pad_0x0A[2];
 
@@ -315,7 +339,7 @@ struct SystemManagerTimerTable
     FAiTargetVector Targets;
 
     // +0x1C: set once the list has been built at least once. Not written by the ctor;
-    // cleared by SetSystemManagerSharedListHead and ArmSystemManagerTimerTable.
+    // cleared by SystemManager::SetSharedListHead and SystemManagerTimerTable::Arm.
     unsigned char bBuilt;
     // +0x1D: when clear, the list is dropped and rebuilt on every call; when
     // set (together with bBuilt) the cached list is returned untouched. Also
@@ -324,18 +348,18 @@ struct SystemManagerTimerTable
     unsigned char bKeepCache;
     unsigned char Pad_0x1E[2];
 
-    // +0x20: per-tick multiplier for Level's passive decay (UpdateSystemManagerTimerTable:
+    // +0x20: per-tick multiplier for Level's passive decay (SystemManagerTimerTable::Update:
     // `Level -= DecayRate * DecayScale * DeltaTime`).
     float DecayRate;
 
     // +0x24: shared "signal level" compared against every SustainedThresholdTimer's
-    // TriggerThreshold each tick (UpdateSystemManagerTimerTable) and accumulated into by
-    // AccumulateSystemManagerTimerLevel when a matching, in-range candidate is found.
+    // TriggerThreshold each tick (SystemManagerTimerTable::Update) and accumulated into by
+    // SystemManagerTimerTable::AccumulateTimerLevel when a matching, in-range candidate is found.
     float Level;
 
     // +0x28..+0xD8: 11 SustainedThresholdTimer records, each constructed to {Active=0,
     // TriggerThreshold=100.0f, Duration=1.0f, Accumulator=0.0f}. Thresholds and durations are
-    // loaded in RefreshSystemManagerTimerThresholdsFromPersonality (common_sysmgr_timertable.cpp).
+    // loaded in SystemManagerTimerTable::RefreshTimerThresholdsFromPersonality (common_sysmgr_timertable.cpp).
     enum ETimerChannel : int
     {
         TimerEvadeBreakDamage = 0,
@@ -361,7 +385,7 @@ struct SystemManagerTimerTable
     int ListCount;                 // +0xE4 = 0
     // +0xE8: a BaseWatcher (FUN_062e6d40 calls set / set_pointer on it) holding the
     // current best missile-reaction candidate. Raw bytes so
-    // ConstructSystemManagerTimerTable's whole-struct memset stays valid.
+    // SystemManagerTimerTable::Construct's whole-struct memset stays valid.
     unsigned char BestCandidateWatcherBytes[0x08]; // +0xE8..+0xF0
     int Gap0xF0;                   // +0xF0 genuine gap, never written by the ctor
     float BestValueSoFar;          // +0xF4 = FLT_MAX sentinel
@@ -389,7 +413,7 @@ struct SystemManagerTimerTable
     // null otherwise. Defined in common_aiintercept.cpp.
     IObjRW* FindObjectDockingAtBase(IObjInspect const* BaseIface) const;
 
-    // FUN_062e8400. True when some target of BuildAiTargetList with a type in 0x7f0000 lies
+    // FUN_062e8400. True when some target of SystemManagerTimerTable::BuildAiTargetList with a type in 0x7f0000 lies
     // ahead of the own ship (Owner's +0x14FC record) within MaxRange, moves faster than 10,
     // heads the same way (forward dot > 0.95f), is hostile (attitude <= -0.6f) and lies within
     // MaxAngle radians of the own forward axis. Definition: common_aifirecontrol.cpp.
@@ -400,6 +424,148 @@ struct SystemManagerTimerTable
     // get_scanlist(FilterMask, bKeepCache); true when that answered 0. Callers test OutList.
     // Definition: common_obstacleavoidance.cpp.
     bool GetOwnScanList(ScanList const*& OutList, unsigned FilterMask);
+
+    void Construct();
+
+    // FUN_062e8720. Source is an id block {OwnerId, missile id}
+    // (IBehaviorManager::Slot00 event 6, sent by Server StarSystem::create_guided).
+    // Looks the missile up with Self->ObjectDb->FindById(&Source[1]) and appends a
+    // node watching it onto the circular sentinel list at
+    // Self->ListHeadNode/Self->ListCount.
+    void AppendTimerListEntry(void* Source);
+
+    // FUN_062e86d0. If Candidate's id (its own +8 field) matches the
+    // owning SystemManager's current ExternalIface id, and Candidate's state
+    // (+0x14) is in the open range (1,8), accumulates Candidate's value (+0x18)
+    // into Self->Level.
+    void AccumulateTimerLevel(void* Candidate);
+
+    // FUN_062e8870. True if the current best-candidate distance
+    // (Self->BestValueSoFar) falls under any of the owning SystemManager's
+    // pub::AI::Personality::MissileReaction range thresholds.
+    bool HasMissileReactionTarget() const;
+
+    // FUN_062e6c60. Arms the timer table for a newly attached Owner: stores Self->Owner once
+    // Owner->Watcher holds a live object, looks up the object's scanner
+    // (find_equipment(&ScannerEquipId, 1, 0x80000)) and on success sets DecayRate = MaxHitPts +
+    // MaxShield (the second out-params of get_status and get_shield_status).
+    bool Arm(SystemManager* Owner);
+
+    // FUN_062e72d0, thiscall on &SystemManager::Timers. Rebuilds all eleven
+    // SustainedThresholdTimer slots' TriggerThreshold/Duration pairs from the owning
+    // SystemManager's Personality, scaling every threshold by Timers::DecayRate. Returns true.
+    bool RefreshTimerThresholdsFromPersonality();
+
+    // FUN_062e6d40, thiscall on &Timers. Walks the candidate list
+    // SystemManagerTimerTable::AppendTimerListEntry builds, garbage-collecting dead nodes, and picks the
+    // nearest candidate that is (a) in front of the owner (positive dot of owner-to-candidate
+    // against the candidate's velocity), (b) inside Personality.MissileReaction
+    // .EvadeMissileDistance of the owner's cached centre and (c) nearer than anything so far;
+    // leaves it in BestCandidateWatcher and a closing-rate estimate in BestValueSoFar
+    // (FLT_MAX when nothing qualified). UnusedArg is retail's unread stack argument; the
+    // caller passes its DeltaTime.
+    void UpdateCandidateScan(float UnusedArg);
+
+    // FUN_062e7010, thiscall on &Timers. Runs the candidate scan above,
+    // advances all eleven SustainedThresholdTimer slots against Timers::Level, then
+    // decays Level by DecayRate * DecayScale * DeltaTime, clamped at zero.
+    void Update(float DeltaTime);
+
+    // FUN_062e7a30. "Pick the obstacle worth dodging": the owner sweeps its own bounding volume
+    // forward along its heading for a look-ahead time T and returns the NEAREST
+    // scanner contact that volume would run into. The result feeds straight into
+    // ComputeShapeBiasedAvoidDirection (FUN_062e55b0) as its `Target`.
+    //
+    // Retail is __thiscall (RET 8) on SystemManagerTimerTable (sole caller .text:062de098
+    // passes EBX+0x34), exposed here as a free function taking the receiver explicitly.
+    // It reads this+0x04 Owner (the SystemManager; +0x14FC its FAiTarget, +0x08 its
+    // Watcher), +0x08 ScannerEquipId and +0x1D bKeepCache (get_scanlist's bFlag).
+    //
+    // ExcludeId is compared against each candidate's get_id() and rejects on a
+    // match; TypeMask is ANDed with the candidate's cached get_type() flags.
+    // Returns the winning candidate's IObjInspect*, or null.
+    //
+    // Reject chain keeps candidates with heading dot >= 0 (ahead), LenSq <= Reach*Reach
+    // and CachedRadius <= 1000.0f. Type flag bit 29 set selects TransformedBoxesIntersect,
+    // clear selects SweptSphereCollisionTime.
+    IObjInspect* FindClosestObstacleToAvoid(unsigned ExcludeId, unsigned TypeMask);
+
+    bool MissileWithinReaction00() const;
+    bool MissileWithinReaction04() const;
+    bool MissileWithinReaction08() const;
+
+    // FUN_062e77e0, __thiscall(this = the list), no
+    // arguments. `bBuilt = 0; Targets.End = Targets.Begin` -- the same inlined, never-iterating
+    // erase(begin(), end()) shape, but without ClearAiTargetVector's destroy-range call. Sole
+    // caller TargetManager::GetScanResponse (FUN_062eeb70, .text:062eeb89).
+    void ResetAiTargetList();
+
+    // FUN_062e7580 (194 instructions), __thiscall, no stack args, returns a pointer to
+    // Self->Targets.
+    //
+    // Rebuilds the list of nearby objects the owner's scanner can see, unless a
+    // cached list is still considered good:
+    //   1. If bKeepCache is clear, ClearAiTargetVector first (0x062e7595; its shift loop is
+    //      seeded from End, `MOV EAX,EDX` at 0x062e75a0, so it never runs).
+    //   2. If bBuilt AND bKeepCache are both set, return the cached vector
+    //      untouched (0x062e75d3-0x062e75df).
+    //   3. Set bBuilt, then recover the owner's own IObjRW from
+    //      SystemManager::Watcher (+0x08) by the "-8 Watchable adjustment": the
+    //      watcher stores the target's Watchable sub-object, which IObjRW places
+    //      at its own +0x08 (IObjRW : IObjInspect, IObjAffect, Watchable), so
+    //      subtracting 8 recovers the object. Bail out returning the vector
+    //      as-is if nothing is watched.
+    //   4. IObjInspect::get_equipment_status(Status, ScannerEquipId) -- bail if
+    //      Status.Flags has EquipStatusFlagDestroyed (0x02).
+    //   5. IObjInspect::get_scanlist(List, 0x7FFDFF, bKeepCache) -- bail unless
+    //      it returns 0. The 0x7FFDFF mask is the object-type set to scan for.
+    //   6. Reserve exactly List->Count elements if the CURRENT CAPACITY (not the
+    //      size) is smaller, by hand: operator new, CopyElemRange the live range
+    //      into the new buffer, DestroyAiTargetRange the old range, operator
+    //      delete the old buffer, then Cap/End/Begin.
+    //   7. For each of List->Count entries, take the watched Watchable, apply the
+    //      same -8 adjustment, build a fresh FAiTarget whose AttitudeRefIface is
+    //      the OWNER's object and whose Iface is the candidate, prime
+    //      CachedFlags via get_type, and append it if
+    //      `(CachedFlags & 0x7FFDFF) != 0`.
+    FAiTargetVector* BuildAiTargetList();
+
+    // FUN_062e7820 (163 instructions), __thiscall, no stack args, returns float: the body of
+    // the exported IBehaviorManager::get_closest_trailing_ship.
+    //
+    // Walks SystemManagerTimerTable::BuildAiTargetList's result and returns the distance to the nearest
+    // candidate that passes every gate, or FLT_MAX when none does:
+    //   * CachedFlags & 0x7F0000 (a ship-ish object type)
+    //   * !is_player()                                        (slot +0x0BC)
+    //   * get_target(Other) yields a non-null target          (slot +0x074)
+    //   * that target's get_id() equals the owner's get_id()  (slot +0x020)
+    //     -- i.e. the candidate is currently targeting US
+    //   * IsTargetCoAlignedAndAhead(Candidate, OwnerElem, 0.0f)
+    //   * CachedAttitude <= -0.2f (.rdata:063a0794) -- hostile enough
+    // Distance uses retail's FastInvSqrt idiom (`FastInvSqrt(d2) * d2`), not a
+    // real sqrt, and both endpoints come from the cached-position idiom. The
+    // "owner element" is `SystemManager + 0x14FC`, the single embedded FAiTarget
+    // the Intercept-clearance cluster already documents.
+    float GetClosestTrailingShipDistance();
+
+    // FUN_062e8280 (129 instructions), __thiscall + one float stack arg (RET 0x4), returns
+    // IObjInspect* or null.
+    //
+    // Returns the interface of the physically nearest candidate that is hostile
+    // and (optionally) close enough, or null:
+    //   * CachedFlags & 0x7F0000
+    //   * CachedAttitude <= -0.6f (.rdata:063a0790)
+    //   * when MaxClearance >= 0.0f, also
+    //     GetInterceptClearance(OwnerElem, Candidate) < MaxClearance. A negative
+    //     MaxClearance skips this gate entirely (retail's own
+    //     `FCOMP 0.0f; JNP` at 0x062e835b), which is how callers ask for
+    //     "nearest hostile at any range".
+    //   * among the survivors, minimum Distance3(OwnerPosition, CachedPos),
+    //     seeded at 100000.0f (.rdata:0x47C35000) -- so a candidate farther than
+    //     100km is never returned even if it is the only one.
+    // OwnerPosition comes from GetIfacePositionOrZero on the owner's
+    // own object, resolved through the same -8 Watchable adjustment.
+    IObjInspect* FindClosestHostileTarget(float MaxClearance);
 };
 static_assert(sizeof(SystemManagerTimerTable) == 0xF8,
     "SystemManagerTimerTable must match retail's 0xF8-byte sub-object (SystemManager+0x34)");
@@ -417,33 +583,7 @@ static_assert(offsetof(SystemManagerTimerTable, BestCandidateWatcherBytes) == 0x
     "SystemManagerTimerTable+0xE8 BestCandidateWatcher (a real BaseWatcher)");
 static_assert(offsetof(SystemManagerTimerTable, BestValueSoFar) == 0xF4, "SystemManagerTimerTable+0xF4 BestValueSoFar");
 
-void ConstructSystemManagerTimerTable(SystemManagerTimerTable* Self);
-
 // SystemManagerTimerTable-scoped free functions (common_sysmgr_timertable.cpp).
-
-// FUN_062e8720. Source is an id block {OwnerId, missile id}
-// (IBehaviorManager::Slot00 event 6, sent by Server StarSystem::create_guided).
-// Looks the missile up with Self->ObjectDb->FindById(&Source[1]) and appends a
-// node watching it onto the circular sentinel list at
-// Self->ListHeadNode/Self->ListCount.
-void AppendSystemManagerTimerListEntry(SystemManagerTimerTable* Self, void* Source);
-
-// FUN_062e86d0. If Candidate's id (its own +8 field) matches the
-// owning SystemManager's current ExternalIface id, and Candidate's state
-// (+0x14) is in the open range (1,8), accumulates Candidate's value (+0x18)
-// into Self->Level.
-void AccumulateSystemManagerTimerLevel(SystemManagerTimerTable* Self, void* Candidate);
-
-// FUN_062e8870. True if the current best-candidate distance
-// (Self->BestValueSoFar) falls under any of the owning SystemManager's
-// pub::AI::Personality::MissileReaction range thresholds.
-bool SystemManagerTimerTableHasMissileReactionTarget(SystemManagerTimerTable const* Self);
-
-// FUN_062e6c60. Arms the timer table for a newly attached Owner: stores Self->Owner once
-// Owner->Watcher holds a live object, looks up the object's scanner
-// (find_equipment(&ScannerEquipId, 1, 0x80000)) and on success sets DecayRate = MaxHitPts +
-// MaxShield (the second out-params of get_status and get_shield_status).
-bool ArmSystemManagerTimerTable(SystemManagerTimerTable* Self, SystemManager* Owner);
 
 // ---------------------------------------------------------------------------
 // SystemManagerGunGroupManager -- SystemManager+0x12C, 0x1238 bytes; ctor FUN_062e9330.
@@ -554,7 +694,7 @@ static_assert(offsetof(FCmDropperWatcher, Ids) == 0x10, "FCmDropperWatcher+0x10 
 struct SystemManagerGunGroupManager
 {
     int LastGunFireResult;              // +0x00 RunFireControlTick stores UpdateGunFireState's result
-    SystemManager* Owner;               // +0x04 InitSystemManager (FUN_062e6490) writes it
+    SystemManager* Owner;               // +0x04 SystemManager::Init (FUN_062e6490) writes it
     // +0x08: a BaseWatcher on the current target. Raw bytes because the ctor memsets the whole
     // block; TargetWatcher() is the typed view.
     unsigned char TargetWatcherBytes[8];
@@ -566,7 +706,7 @@ struct SystemManagerGunGroupManager
     float ScanPeriod;                   // +0x2C 1.0f
     FGunGroupSlot Guns[0x40];           // +0x30
     int GunCount;                       // +0x830
-    int Field_0x834;                    // +0x834 written -1 by the ctor and InitSystemManager; never read
+    int Field_0x834;                    // +0x834 written -1 by the ctor and SystemManager::Init; never read
     FGunGroupSlot MineDroppers[0x40];   // +0x838
     int MineDropperCount;               // +0x1038
 
@@ -699,6 +839,9 @@ struct SystemManagerGunGroupManager
 
     // FUN_062eb670 (two arguments unread). Retarget(Target), then the gun, missile and mine passes.
     bool RunFireControlTick(IObjRW* Target);
+
+    // FUN_062e9330: the gun groups' constructor, run by SystemManager's ctor.
+    void Construct();
 };
 static_assert(sizeof(SystemManagerGunGroupManager) == 0x1238,
     "SystemManagerGunGroupManager must match retail's 0x1238-byte sub-object (SystemManager+0x12C)");
@@ -725,9 +868,6 @@ static_assert(offsetof(SystemManagerGunGroupManager, bEnabled) == 0x1094, "GunGr
 static_assert(offsetof(SystemManagerGunGroupManager, LineOfFireCache) == 0x1098, "GunGroups+0x1098 LineOfFireCache");
 static_assert(offsetof(SystemManagerGunGroupManager, CmDroppers) == 0x1218, "GunGroups+0x1218 CmDroppers");
 
-// FUN_062e9330: the gun groups' constructor, run by SystemManager's ctor.
-void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self);
-
 // ---------------------------------------------------------------------------
 // RepairManager / PotionHelper / HullHelper / ShieldHelper -- SystemManager+0x14A8,
 // 0x54 bytes. Retail classes (RTTI):
@@ -745,11 +885,11 @@ void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self);
 // ratio GetRatio() returns falls to UseAtRatio or below, wait PreUseDelay, use the item
 // through IObjAffect slot 0x58 (EquipId, 1, -1), then wait PostUseDelay before re-arming.
 // The three thresholds of each helper are refreshed from Personality::RepairParams by
-// RefreshRepairManagerFromPersonality (FUN_062ecfb0).
+// RepairManager::RefreshFromPersonality (FUN_062ecfb0).
 //
-// Layout from SystemManager's ctor and InitSystemManager (FUN_062e6490): Owner and
+// Layout from SystemManager's ctor and SystemManager::Init (FUN_062e6490): Owner and
 // CheckTimer (SystemManager+0x14F8; advanced by FUN_062e66c0) are written only by
-// InitSystemManager.
+// SystemManager::Init.
 // ---------------------------------------------------------------------------
 
 // The values of PotionHelper::State (PotionHelper::Update, FUN_062eceb0).
@@ -814,7 +954,7 @@ struct ShieldHelper : PotionHelper
 // RepairManager, vtable 063a07b8, base IObjInspect::CargoEnumerator.
 struct RepairManager : IObjInspect::CargoEnumerator
 {
-    // Retail's ctor leaves Owner and CheckTimer alone (InitSystemManager writes them); the
+    // Retail's ctor leaves Owner and CheckTimer alone (SystemManager::Init writes them); the
     // port zeroes both.
     RepairManager();
 
@@ -825,21 +965,21 @@ struct RepairManager : IObjInspect::CargoEnumerator
     HullHelper Hull;            // +0x08
     ShieldHelper Shield;        // +0x2C
     float CheckTimer;           // +0x50
+
+    // FUN_062ecfb0, thiscall on the RepairManager. Re-seeds both helpers'
+    // PreUseDelay / PostUseDelay / UseAtRatio from a pub::AI::Personality's RepairParams --
+    // normally the owning SystemManager's own, but, when the owner is not player-controlled, its
+    // FormationParams.bLeaderMakesMeTougher byte is set, FormationLeaders.bLeaderSuppressed is clear and the
+    // FormationLeaderWatcher's object resolves to a CEqObj with a behavior
+    // manager, that object's SystemManager instead (and the owner's bLeaderParamsBorrowed latch is set).
+    // Always returns true.
+    bool RefreshFromPersonality();
 };
 static_assert(sizeof(RepairManager) == 0x54, "RepairManager sizeof 0x54 (SystemManager+0x14A8..+0x14FB)");
 static_assert(offsetof(RepairManager, Owner) == 0x04, "RepairManager+0x04 Owner");
 static_assert(offsetof(RepairManager, Hull) == 0x08, "RepairManager+0x08 Hull");
 static_assert(offsetof(RepairManager, Shield) == 0x2C, "RepairManager+0x2C Shield");
 static_assert(offsetof(RepairManager, CheckTimer) == 0x50, "RepairManager+0x50 CheckTimer");
-
-// FUN_062ecfb0, thiscall on the RepairManager. Re-seeds both helpers'
-// PreUseDelay / PostUseDelay / UseAtRatio from a pub::AI::Personality's RepairParams --
-// normally the owning SystemManager's own, but, when the owner is not player-controlled, its
-// FormationParams.bLeaderMakesMeTougher byte is set, FormationLeaders.bLeaderSuppressed is clear and the
-// FormationLeaderWatcher's object resolves to a CEqObj with a behavior
-// manager, that object's SystemManager instead (and the owner's bLeaderParamsBorrowed latch is set).
-// Always returns true.
-bool RefreshRepairManagerFromPersonality(RepairManager* Self);
 
 // ---------------------------------------------------------------------------
 // SystemManager+0x1364, the 0xC8-byte formation / follow-leader record (its ctor is
@@ -861,7 +1001,7 @@ struct FFormationLeaderState
     // +0x04: += Dt every Update while bBreakingFormation, else 0. Gates A / B compare it
     // with FormationParams.FormationExitMaxTime.
     float BreakFormationTimer;
-    // +0x08: the owning SystemManager (set by InitSystemManager).
+    // +0x08: the owning SystemManager (set by SystemManager::Init).
     SystemManager* Owner;
     BaseWatcher FormationLeaderWatcher;   // +0x0C SetFormationLeader
     BaseWatcher FollowLeaderWatcher;      // +0x14 SetFollowLeader
@@ -897,7 +1037,7 @@ struct FFormationLeaderState
     FFormationLeaderState();
     ~FFormationLeaderState();
 
-    // FUN_062ebcb0; called from UpdateSystemManager.
+    // FUN_062ebcb0; called from SystemManager::Update.
     void Update(float Dt);
 
     // FUN_062ec870 / FUN_062ec970 / FUN_062ec6b0.
@@ -989,17 +1129,17 @@ public:
     SystemManager();
     ~SystemManager();
 
-    int OwnerObjectId;                                 // +0x00 the owner's get_id, cached by InitSystemManager
+    int OwnerObjectId;                                 // +0x00 the owner's get_id, cached by SystemManager::Init
     // +0x04: back-pointer to the owning IBehaviorManager; zeroed by the ctor, set by
-    // InitSystemManager (FUN_062e6490).
+    // SystemManager::Init (FUN_062e6490).
     IBehaviorManager* Owner;                           // +0x04
     BaseWatcher Watcher;                               // +0x08
     // +0x10: the object database the owner is connected to, written only by
-    // SetSystemManagerSharedListHead (FUN_062e68e0). TargetManager::GetScanResponse calls its
+    // SystemManager::SetSharedListHead (FUN_062e68e0). TargetManager::GetScanResponse calls its
     // FindById.
     IObjDB* ObjectDb;                                  // +0x10
-    // +0x14: set when RefreshRepairManagerFromPersonality / RefreshWeaponFireControlConfig took
-    // the formation leader's parameters; UpdateSystemManager clears it (and re-reads the own
+    // +0x14: set when RepairManager::RefreshFromPersonality / RefreshWeaponFireControlConfig took
+    // the formation leader's parameters; SystemManager::Update clears it (and re-reads the own
     // personality) once no live leader is left.
     unsigned char bLeaderParamsBorrowed;               // +0x14
     unsigned char Pad15[3];
@@ -1013,9 +1153,9 @@ public:
     TargetManager Targeting;                           // +0x142C (FUN_062ed570, common_iface.h)
     // +0x1498..+0x14A7: the loot tractor record LootBehavior hands to FUN_062ecd90 /
     // FUN_062ece40 as Sys+0x1498. TractorOwner is a SystemManager back-pointer written only by
-    // InitSystemManager; TractorTargetWatcher (zeroed by the ctor, cleared first by the owning
+    // SystemManager::Init; TractorTargetWatcher (zeroed by the ctor, cleared first by the owning
     // IBehaviorManager's dtor) watches the object being tractored; TractorEquipId is
-    // SUBOBJ_ID_NONE from the ctor and filled by InitSystemManager through
+    // SUBOBJ_ID_NONE from the ctor and filled by SystemManager::Init through
     // find_equipment(&Id, 1, 0x100000).
     SystemManager* TractorOwner;                       // +0x1498 not written by the ctor
     BaseWatcher TractorTargetWatcher;                  // +0x149C
@@ -1026,11 +1166,42 @@ public:
     RepairManager Repair;                              // +0x14A8
 
     // +0x14FC..+0x1583: the own ship's FAiTarget record, every intercept-clearance helper's
-    // Elem. InitSystemManager and the tick store the owner's object into AttitudeRefIface
+    // Elem. SystemManager::Init and the tick store the owner's object into AttitudeRefIface
     // and Iface and clear the guards; the ctor zeroes only the guards and the two pointers.
     FAiTarget SelfTarget;                              // +0x14FC
 
     pub::AI::Personality PersonalityData;               // +0x1584
+
+    // FUN_062e68e0. Stores NewHead into Self->ObjectDb and Timers::ObjectDb; its tail jump into
+    // a TargetManager member lands on an ICF-folded `RET 4` and writes nothing. If
+    // Timers::Owner names a live SystemManager whose Watcher has a target and NewHead is
+    // non-null, also empties the cached AI target list (bBuilt = 0, End = Begin).
+    void SetSharedListHead(void* NewHead);
+
+    // FUN_062e6990. Clears either of FormationLeaders' two BaseWatchers
+    // (SystemManager+0x1370 / +0x1378) if its watched target's id matches TargetId.
+    void ClearFormationLeaderWatcherIfTarget(int TargetId);
+
+    // FUN_062e6950. The "personality changed" notification
+    // IBehaviorManager::set_personality fires: refresh the weapon fire-control
+    // config, rebuild the timer thresholds above, refresh the RepairManager's
+    // thresholds (RepairManager::RefreshFromPersonality), then mirror one status byte off the formation-leader
+    // state's watched object.
+    void NotifyPersonalityChanged();
+
+    // FUN_062e6490, thiscall on the SystemManager, called once from IBehaviorManager's ctor
+    // right after SystemManager::SystemManager. Binds Watcher to Object, stores Manager in
+    // Owner, caches the object's id in OwnerObjectId, arms the timer table and -- only when Watcher
+    // then holds a live object -- initialises the ThrustManager, the gun groups, the
+    // formation-leader state, the +0x1498 tractor record (owner + the first equipment id of type mask
+    // 0x100000) and the RepairManager, and binds the
+    // hardpoint-id watcher at +0x1344. TargetManager::Attach runs unconditionally. Returns
+    // true (the caller ignores it).
+    bool Init(IObjRW* Object, IBehaviorManager* Manager);
+
+    // FUN_062e66c0, thiscall on the SystemManager: its per-tick update, called from
+    // IBehaviorManager::UpdateBehaviorTick.
+    void Update(float Dt);
 };
 
 static_assert(sizeof(SystemManager) == 0x195C,
@@ -1052,56 +1223,6 @@ static_assert(offsetof(SystemManager, PersonalityData) == 0x1584, "SystemManager
 
 // SystemManager-scoped free functions (common_systemmanager.cpp).
 
-// FUN_062e68e0. Stores NewHead into Self->ObjectDb and Timers::ObjectDb; its tail jump into
-// a TargetManager member lands on an ICF-folded `RET 4` and writes nothing. If
-// Timers::Owner names a live SystemManager whose Watcher has a target and NewHead is
-// non-null, also empties the cached AI target list (bBuilt = 0, End = Begin).
-void SetSystemManagerSharedListHead(SystemManager* Self, void* NewHead);
-
-// FUN_062e6990. Clears either of FormationLeaders' two BaseWatchers
-// (SystemManager+0x1370 / +0x1378) if its watched target's id matches TargetId.
-void ClearFormationLeaderWatcherIfTarget(SystemManager* Self, int TargetId);
-
 // FUN_062e92d0 / FUN_062e92e0 are ThrustManager::SetSteeringFallbackFlag /
 // CheckSteeringGate (declared on the struct above).
 
-// FUN_062e72d0, thiscall on &SystemManager::Timers. Rebuilds all eleven
-// SustainedThresholdTimer slots' TriggerThreshold/Duration pairs from the owning
-// SystemManager's Personality, scaling every threshold by Timers::DecayRate. Returns true.
-bool RefreshSystemManagerTimerThresholdsFromPersonality(SystemManagerTimerTable* Self);
-
-// FUN_062e6950. The "personality changed" notification
-// IBehaviorManager::set_personality fires: refresh the weapon fire-control
-// config, rebuild the timer thresholds above, refresh the RepairManager's
-// thresholds (RefreshRepairManagerFromPersonality), then mirror one status byte off the formation-leader
-// state's watched object.
-void NotifySystemManagerPersonalityChanged(SystemManager* Self);
-
-// FUN_062e6d40, thiscall on &Timers. Walks the candidate list
-// AppendSystemManagerTimerListEntry builds, garbage-collecting dead nodes, and picks the
-// nearest candidate that is (a) in front of the owner (positive dot of owner-to-candidate
-// against the candidate's velocity), (b) inside Personality.MissileReaction
-// .EvadeMissileDistance of the owner's cached centre and (c) nearer than anything so far;
-// leaves it in BestCandidateWatcher and a closing-rate estimate in BestValueSoFar
-// (FLT_MAX when nothing qualified). UnusedArg is retail's unread stack argument; the
-// caller passes its DeltaTime.
-void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float UnusedArg);
-
-// FUN_062e7010, thiscall on &Timers. Runs the candidate scan above,
-// advances all eleven SustainedThresholdTimer slots against Timers::Level, then
-// decays Level by DecayRate * DecayScale * DeltaTime, clamped at zero.
-void UpdateSystemManagerTimerTable(SystemManagerTimerTable* Self, float DeltaTime);
-
-// FUN_062e6490, thiscall on the SystemManager, called once from IBehaviorManager's ctor
-// right after SystemManager::SystemManager. Binds Watcher to Object, stores Manager in
-// Owner, caches the object's id in OwnerObjectId, arms the timer table and -- only when Watcher
-// then holds a live object -- initialises the ThrustManager, the gun groups, the
-// formation-leader state, the +0x1498 tractor record (owner + the first equipment id of type mask
-// 0x100000) and the RepairManager, and binds the
-// hardpoint-id watcher at +0x1344. TargetManager::Attach runs unconditionally. Returns
-// true (the caller ignores it).
-bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Manager);
-
-// FUN_062e66c0, thiscall on the SystemManager: its per-tick update, called from
-// IBehaviorManager::UpdateBehaviorTick.
-void UpdateSystemManager(SystemManager* Self, float Dt);

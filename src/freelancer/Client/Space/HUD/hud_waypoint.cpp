@@ -236,7 +236,7 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                     FBestPathWaypoint* const Record = BestPathGetWaypoint(i);
                     Vector RecordPos;
                     unsigned RecordSystem = 0;
-                    if (!BestPathWaypointResolvePosition(Record, &RecordPos, &RecordSystem))
+                    if (!Record->ResolvePosition(&RecordPos, &RecordSystem))
                         continue;
                     if (GetPlayerStarSystemIdRetail() != RecordSystem)
                         continue;
@@ -573,7 +573,7 @@ void HudWaypointSelectBestPath(int PointIndex)
     FBestPathWaypoint* const Record = BestPathGetWaypoint(PointIndex);
 
     // A record that names an object -- target it.
-    IObjRW* const Obj = BestPathWaypointResolveObject(Record);
+    IObjRW* const Obj = Record->ResolveObject();
     if (Obj != nullptr)
     {
         SendTargetCommand(Obj->get_id());
@@ -584,7 +584,7 @@ void HudWaypointSelectBestPath(int PointIndex)
     // tested).
     Vector Pos;
     unsigned System = 0;
-    if (BestPathWaypointResolvePosition(Record, &Pos, &System))
+    if (Record->ResolvePosition(&Pos, &System))
         G_HudWaypoint->SetWaypoint(&Pos, false, PointIndex, PointIndex);
 }
 

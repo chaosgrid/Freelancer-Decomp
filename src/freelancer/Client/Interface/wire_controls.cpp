@@ -59,7 +59,7 @@ namespace
     void WireBatchAddLine(Vector const* From, Vector const* To, unsigned long Argb,
                           unsigned long Rgb, float Width)
     {
-        ImmedBatchAddLine(&G_ImmedBatchA, From, To, Argb, Rgb, Width);
+        G_ImmedBatchA.AddLine(From, To, Argb, Rgb, Width);
     }
 
     void SetIdentity9(Matrix* Out)
@@ -263,7 +263,7 @@ void WireStaticControl::Draw()
     if (bBlink != 0 && bBlinkPhase != 0)
         return;
 
-    Win3DDrawChildren(this); // FUN_0059e5c0
+    DrawChildren(); // FUN_0059e5c0
 
     unsigned char const SavedLit = static_cast<unsigned char>((WireState >> 4) & 1);
     unsigned char Rgba[4];
@@ -564,7 +564,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
         Vector Local;
-        Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
+        Cam->ScreenToNearPlane(Local, static_cast<float>(CursorX),
                                static_cast<float>(CursorY));
         Matrix CamOrientation;
         memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));

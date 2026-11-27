@@ -943,13 +943,13 @@ bool FRp9LightManager::Remove(unsigned long Handle)
     const int Count = (int)(G_DirtyLights.size());
     for (int Index = 0; Index < Count; ++Index)
     {
-        if (G_DirtyLights[Index] == Record)
-        {
-            if (Record->bEnabled != 0)
-                --EnabledCount;
-            G_DirtyLights[Index] = nullptr;
-            break;
-        }
+        if (G_DirtyLights[Index] != Record)
+            continue;
+
+        if (Record->bEnabled != 0)
+            --EnabledCount;
+        G_DirtyLights[Index] = nullptr;
+        break;
     }
     G_LightRecords.erase(It);
     return true;
@@ -1044,13 +1044,13 @@ HRESULT FRp9LightManager::Flush(IDirect3DDevice9* Device)
         Result = Hr;
         if (Result < 0)
             break;
-        if (bWasEnabled != Record->bEnabled)
-        {
-            if (Record->bEnabled != 0)
-                ++EnabledCount;
-            else
-                --EnabledCount;
-        }
+        if (bWasEnabled == Record->bEnabled)
+            continue;
+
+        if (Record->bEnabled != 0)
+            ++EnabledCount;
+        else
+            --EnabledCount;
     }
     G_DirtyLights.clear();
     ++Generation;
@@ -1982,17 +1982,17 @@ void FDirectX9::PopulateFormatCatalog()
                         *Cursor = '\0';
                         ++Cursor;
                     }
-                    if (ValueStart != Cursor)
-                    {
-                        int Bpp = 0, R = 0, G = 0, B = 0, A = 0;
-                        sscanf(ValueStart, "%d:%d:%d:%d:%d", &Bpp, &R, &G, &B, &A);
-                        AppendFormatCandidate(
-                            OverrideNode,
-                            ResolvePixelFormatByComponents(
-                                (unsigned int)(Bpp), (unsigned int)(R),
-                                (unsigned int)(G), (unsigned int)(B),
-                                (unsigned int)(A)));
-                    }
+                    if (ValueStart == Cursor)
+                        continue;
+
+                    int Bpp = 0, R = 0, G = 0, B = 0, A = 0;
+                    sscanf(ValueStart, "%d:%d:%d:%d:%d", &Bpp, &R, &G, &B, &A);
+                    AppendFormatCandidate(
+                        OverrideNode,
+                        ResolvePixelFormatByComponents(
+                            (unsigned int)(Bpp), (unsigned int)(R),
+                            (unsigned int)(G), (unsigned int)(B),
+                            (unsigned int)(A)));
                 }
             }
             Parser->CloseSection(Section);
@@ -2754,16 +2754,16 @@ void FDirectX9::UnbindTextureHandle(void* Handle)
             Cache.bValid = 1;
             Cache.Handle = nullptr;
         }
-        if (Cache.Handle == Handle)
+        if (Cache.Handle != Handle)
+            continue;
+
+        if (Cache.bValid != 0 && Cache.Handle == nullptr)
+            continue;
+        const HRESULT Hr = Device_->SetTexture(Stage, nullptr);
+        if (Hr >= 0)
         {
-            if (Cache.bValid != 0 && Cache.Handle == nullptr)
-                continue;
-            const HRESULT Hr = Device_->SetTexture(Stage, nullptr);
-            if (Hr >= 0)
-            {
-                Cache.Handle = nullptr;
-                Cache.bValid = 1;
-            }
+            Cache.Handle = nullptr;
+            Cache.bValid = 1;
         }
     }
 }

@@ -1151,7 +1151,7 @@ static_assert(sizeof(BreakAwayIdea) == 0x9c, "BreakAwayIdea size (BuzzBehavior's
 
 // DodgeMissileIdea::Mode1c (+0x1c), set by EvadeBehavior::OnUpdate's mode 4 from which of the
 // Personality MissileReaction EvadeBreak / EvadeSlide / EvadeAfterburn reaction times the
-// incoming missile is inside (TimerTableMissileWithinReaction00 / 04 / 08).
+// incoming missile is inside (SystemManagerTimerTable::MissileWithinReaction00 / 04 / 08).
 enum EDodgeMissileMode
 {
     kDodgeMissileAfterburn = 0,   // zero steering command, thrusters on

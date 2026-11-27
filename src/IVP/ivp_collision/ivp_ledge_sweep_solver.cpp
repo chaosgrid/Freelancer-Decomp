@@ -2254,8 +2254,8 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
 // ObjectA is unused; kept because the dispatcher pushes the same four
 // arguments as for FUN_0635ec90.
 //
-// FUN_0634d8d0 / FUN_0634d9d0 / FUN_0634d970 (IVP_TransformSlotToWorldSpace,
-// IVP_RotateSlotToWorldSpace, IVP_RotateWorldToSlotSpace in
+// FUN_0634d8d0 / FUN_0634d9d0 / FUN_0634d970 (IVP_NarrowPhaseCacheSlot::transform_slot_to_world_space,
+// IVP_NarrowPhaseCacheSlot::rotate_slot_to_world_space, IVP_NarrowPhaseCacheSlot::rotate_world_to_slot_space in
 // ivp_real_object.h) take the cache source and read the matrix at +0x1c;
 // spelled here as Source->WorldTransform.vmult4/vmult/vimult.
 // ============================================================================

@@ -304,11 +304,11 @@ void Win3DImmedBatchFlushAll()
     FlushImmedBatchers();
 }
 
-void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
-                       unsigned long Color, unsigned long EdgeColor, float Width)
+void FImmedBatcher::AddLine(Vector const* A, Vector const* B, unsigned long Color,
+                            unsigned long EdgeColor, float Width)
 {
     // FUN_005a2a40. Signed compares; the reset is inlined.
-    if (Batch->IndexCount + 12 >= 0x1800 || Batch->VertCount + 8 >= 0xc00)
+    if (IndexCount + 12 >= 0x1800 || VertCount + 8 >= 0xc00)
     {
         FlushImmedBatch(&G_ImmedBatchA);
         FlushImmedBatch(&G_ImmedBatchB);
@@ -317,15 +317,15 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
 
     // The index count first, then twelve indices on the current vertex count (16-bit adds),
     // then the vertex count.
-    Batch->IndexCount += 12;
+    IndexCount += 12;
     static unsigned short const kLineIndexOffsets[12] = {0, 1, 2, 2, 3, 1, 4, 5, 6, 6, 7, 5};
     for (int Index = 0; Index < 12; ++Index)
     {
-        *Batch->IndexCursor = static_cast<unsigned short>(
-            static_cast<unsigned short>(Batch->VertCount) + kLineIndexOffsets[Index]);
-        ++Batch->IndexCursor;
+        *IndexCursor = static_cast<unsigned short>(
+            static_cast<unsigned short>(VertCount) + kLineIndexOffsets[Index]);
+        ++IndexCursor;
     }
-    Batch->VertCount += 8;
+    VertCount += 8;
 
     // atan2(dx, dy) -- the arguments in that order -- plus DAT_005d3e88. x87: the cosine is
     // rounded to float before the multiply; the sine * Width stays double.
@@ -352,8 +352,8 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, Vector const* A, Vector const* B,
                    static_cast<float>(static_cast<double>(B->y) - CosW), B->z, EdgeColor};
     for (int Index = 0; Index < 8; ++Index)
     {
-        *Batch->VertCursor = Vertices[Index];
-        ++Batch->VertCursor;
+        *VertCursor = Vertices[Index];
+        ++VertCursor;
     }
 }
 
@@ -376,7 +376,7 @@ void Win3DImmedDrawLine(Vector const* A, Vector const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width)
 {
     // FUN_005a2940
-    ImmedBatchAddLine(&G_ImmedBatchB, A, B, Color, EdgeColor, Width);
+    G_ImmedBatchB.AddLine(A, B, Color, EdgeColor, Width);
 }
 
 void ButtonMontageEnsure()

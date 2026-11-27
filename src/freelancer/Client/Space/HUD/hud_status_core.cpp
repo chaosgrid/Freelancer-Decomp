@@ -938,13 +938,13 @@ void HUD_Status::RebuildWeaponList()
             {
                 bSwap = true;
             }
-            if (bSwap)
-            {
-                int const Swap = Order[Index];
-                Order[Index] = Order[Index + 1];
-                Order[Index + 1] = Swap;
-                bSorted = false;
-            }
+            if (!bSwap)
+                continue;
+
+            int const Swap = Order[Index];
+            Order[Index] = Order[Index + 1];
+            Order[Index + 1] = Swap;
+            bSorted = false;
         }
     } while (!bSorted);
 
@@ -1944,13 +1944,13 @@ void HUD_Status::FireSeekerGuns(int Mode)
                     int const NameCount = static_cast<int>(Legal.Hardpoints.size());
                     for (int NameIndex = 0; NameIndex < NameCount; ++NameIndex)
                     {
-                        if (_stricmp(Legal.Hardpoints[NameIndex].Value, HpName.Value) == 0)
+                        if (_stricmp(Legal.Hardpoints[NameIndex].Value, HpName.Value) != 0)
+                            continue;
+
+                        unsigned const Type = static_cast<unsigned>(Legal.Type);
+                        if (Type == HpTypeTorpedo || Type == HpTypeTorpedoSpecial1 || Type == HpTypeTorpedoSpecial2)
                         {
-                            unsigned const Type = static_cast<unsigned>(Legal.Type);
-                            if (Type == HpTypeTorpedo || Type == HpTypeTorpedoSpecial1 || Type == HpTypeTorpedoSpecial2)
-                            {
-                                bTorpedo = true;
-                            }
+                            bTorpedo = true;
                         }
                     }
                 }

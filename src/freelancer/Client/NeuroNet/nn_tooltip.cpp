@@ -19,7 +19,7 @@
 #include "Core/perf_options.h"
 #include "Space/Cameras/space_camera.h"
 #include "Space/space_letterbox.h"
-#include "Interface/win3d.h"              // Win3DGetMouseRay / Win3DScreenToNearPlane / Win3DTransformByMatrix
+#include "Interface/win3d.h"              // Win3DGetMouseRay / Win3DTransformByMatrix
 #include "Interface/win3d_engine_submit.h"
 
 #include "common_csys.h"        // Acquire3DMathEngine (FUN_005b73e0)
@@ -76,7 +76,7 @@ NnToolTipControl::NnToolTipControl()
     // Inlined into FUN_004be420 (the +0xf4 record at 0x004be4cc: FUN_004963a0's body). Retail
     // leaves the world position and half extents as operator new returned them; the port
     // zeroes them.
-    ToolTipHoverReset(&Hover_);
+    Hover_.Reset();
     InitToolTipDefaults();
 }
 
@@ -142,7 +142,7 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
 
     // The viewport's top-left corner on the near plane (FUN_004bdd40).
     Vector TopLeftLocal;
-    Win3DScreenToNearPlane(Cam, TopLeftLocal, static_cast<float>(Cam->Viewport[0]),
+    Cam->ScreenToNearPlane(TopLeftLocal, static_cast<float>(Cam->Viewport[0]),
                            static_cast<float>(Cam->Viewport[1]));
 
     // Through this file's own engine (DAT_00672448).
@@ -195,9 +195,9 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     }
 
     // The caption's font scale at the CURRENT depth, then its extent.
-    FontStringSetScale(&Text, 0.35f, Position.z);
+    Text.SetScale(0.35f, Position.z);
     int Extent[2] = {0, 0};
-    FontStringGetExtent(&Text, Extent);
+    Text.GetExtent(Extent);
 
     // (width + 4), widened as unsigned, over (near/near)*xscale.
     double const ExtentW = static_cast<unsigned>(Extent[0]) + 4u;
@@ -242,13 +242,13 @@ void NnToolTipControl::Draw()
     Win3DDisable(kWin3DDepthTest);
     Win3DDisable(kWin3DCullFace);
 
-    FontStringSetScale(&Text, 0.35f, Position.z);
+    Text.SetScale(0.35f, Position.z);
     Bounds[3] = -Height;
     Bounds[2] = Width;
     Bounds[0] = 0.0f;
     Bounds[1] = 0.0f;
     int Extent[2];
-    FontStringGetExtent(&Text, Extent);
+    Text.GetExtent(Extent);
     Width = static_cast<float>(static_cast<unsigned>(Extent[0]));
     Height = static_cast<float>(static_cast<unsigned>(Extent[1]));
 
@@ -300,7 +300,7 @@ void NnToolTipControl::Draw()
     Origin.Height = Height;
     Origin.HAlign = 1;
     Origin.VAlign = 0;
-    FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
+    Origin.DrawChildren(&Text, nullptr, nullptr);
 
     Win3DEnable(kWin3DDepthTest);
     Win3DSetDepthWrite(1);
@@ -518,15 +518,15 @@ bool NnToolTipReadHover(FToolTipHoverInfo* Out)
     return true;
 }
 
-void ToolTipHoverReset(FToolTipHoverInfo* Info)
+void FToolTipHoverInfo::Reset()
 {
     // FUN_004963a0. No null test on Info.
-    Info->IdsAlt = 0;
-    Info->Ids = -1;
-    Info->AuxField = 0;
-    if (Info->CaptionW != nullptr && Info->CaptionW[0] != L'\0')
-        Info->CaptionW[0] = L'\0';
-    Info->bLive = 0;
+    IdsAlt = 0;
+    Ids = -1;
+    AuxField = 0;
+    if (CaptionW != nullptr && CaptionW[0] != L'\0')
+        CaptionW[0] = L'\0';
+    bLive = 0;
 }
 
 void NnToolTipTickGlobal(double DeltaSeconds)

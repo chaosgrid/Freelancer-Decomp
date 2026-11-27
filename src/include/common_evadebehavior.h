@@ -91,7 +91,7 @@ public:
     void PostUpdate() override;
 
     // Slot 10, LAB_062c8630 (RET 4): watch the op's target (FUN_062e74a0 on Sys+0x34) or,
-    // with no op, the closest hostile (FindClosestHostileTarget); Flags28 |= 2; true.
+    // with no op, the closest hostile (SystemManagerTimerTable::FindClosestHostileTarget); Flags28 |= 2; true.
     bool OnApplyDirective(void* DirectiveOp) override;
 
     // Slot 21, LAB_062c7870 (RET 4): drop the watched object when its id is Id.

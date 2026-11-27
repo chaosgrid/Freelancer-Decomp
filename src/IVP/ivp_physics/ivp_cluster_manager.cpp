@@ -205,9 +205,9 @@ void IVP_Cluster_Manager::remove_object(IVP_Real_Object* Object)
 // ============================================================================
 // FUN_06345e40.
 // ============================================================================
-int32_t IVP_Real_Object_Get_Collision_Check_Count(const IVP_Real_Object* Object)
+int32_t IVP_Real_Object::get_collision_check_count() const
 {
-    const IVP_OV_Element* Element = Object->ov_element; // +0x90
+    const IVP_OV_Element* Element = ov_element; // +0x90
     if (Element == nullptr)
     {
         return -1;
@@ -329,13 +329,13 @@ void IVP_Cluster_Manager::check_for_unused_objects(IVP_Universe_Manager* Univers
             return;
         }
 
-        if (IVP_Real_Object_Get_Collision_Check_Count(static_cast<IVP_Real_Object*>(Candidate)) == 0)
+        if ((static_cast<IVP_Real_Object*>(Candidate))->get_collision_check_count() != 0)
+            continue;
+
+        UniverseManager->object_no_longer_needed(Candidate);
+        if (number_of_real_objects < Settings->num_objects_in_environment_threshold_0)
         {
-            UniverseManager->object_no_longer_needed(Candidate);
-            if (number_of_real_objects < Settings->num_objects_in_environment_threshold_0)
-            {
-                return;
-            }
+            return;
         }
     }
 
@@ -356,13 +356,13 @@ void IVP_Cluster_Manager::check_for_unused_objects(IVP_Universe_Manager* Univers
         }
         an_object_to_be_checked = get_next_real_object_in_cluster_tree(Candidate);
 
-        if (IVP_Real_Object_Get_Collision_Check_Count(static_cast<IVP_Real_Object*>(Candidate)) == 1)
+        if ((static_cast<IVP_Real_Object*>(Candidate))->get_collision_check_count() != 1)
+            continue;
+
+        UniverseManager->object_no_longer_needed(Candidate);
+        if (number_of_real_objects < Settings->num_objects_in_environment_threshold_1)
         {
-            UniverseManager->object_no_longer_needed(Candidate);
-            if (number_of_real_objects < Settings->num_objects_in_environment_threshold_1)
-            {
-                return;
-            }
+            return;
         }
     }
 }

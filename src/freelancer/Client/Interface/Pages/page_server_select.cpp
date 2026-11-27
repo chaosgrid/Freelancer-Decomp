@@ -1121,15 +1121,15 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
         ParagraphNode const Paragraph;
         ServerDetails->AppendNode(Paragraph);
     }
-    if (Server->bPassword != 0)
+    if (Server->bPassword == 0)
+        return;
+
     {
-        {
-            RDLRefNode const Ref(DetailsPassword);
-            ServerDetails->AppendNode(Ref);
-        }
-        ParagraphNode const Paragraph;
-        ServerDetails->AppendNode(Paragraph);
+        RDLRefNode const Ref(DetailsPassword);
+        ServerDetails->AppendNode(Ref);
     }
+    ParagraphNode const Paragraph;
+    ServerDetails->AppendNode(Paragraph);
 }
 
 void PageServerSelect::SetToolTipsEnabled(bool bEnabled)

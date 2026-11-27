@@ -147,18 +147,18 @@ FEngineCharacterBodyDesc::FEngineCharacterBodyDesc(Costume const& Source)
     // PartIds[3] as type 3, appended.
     unsigned long const Id3 = Source.PartIds[3];
     Descs = GetCostumeDescriptions();
-    if (Id3 != 0)
+    if (Id3 == 0)
+        return;
+
+    char const* Path = nullptr;
+    bodypart const* const Found = Descs->find_bodypart(3, Id3);
+    if (Found != nullptr)
+        Path = CStrOrEmpty(Found->Mesh);
+    int const Old = Count;
+    if (Old < 8)
     {
-        char const* Path = nullptr;
-        bodypart const* const Found = Descs->find_bodypart(3, Id3);
-        if (Found != nullptr)
-            Path = CStrOrEmpty(Found->Mesh);
-        int const Old = Count;
-        if (Old < 8)
-        {
-            Count = Old + 1;
-            SetPart(Old, 3, Path);
-        }
+        Count = Old + 1;
+        SetPart(Old, 3, Path);
     }
 }
 
@@ -348,7 +348,7 @@ void FEngineCharacterBody::Reset()
     // FUN_004ca4b0.
     StopAnimations();
     for (int Index = 0; Index < 4; ++Index)
-        ClientMeshHolderRelease(&Accessories[Index]); // FUN_00420f70
+        Accessories[Index].Release(); // FUN_00420f70
     if (Deformable != nullptr)
     {
         DALib::Deform->Destroy(Deformable);
@@ -399,13 +399,13 @@ void FEngineCharacterBody::Advance(float Dt)
     // No playback left -> every slot emptied (no id test here, unlike StopAnimations).
     int Running = 0;
     DALib::Deform->GetListCount(Deformable, &Running);
-    if (Running == 0)
+    if (Running != 0)
+        return;
+
+    for (int Index = 0; Index < 4; ++Index)
     {
-        for (int Index = 0; Index < 4; ++Index)
-        {
-            EmptyName(AnimNames[Index]);
-            AnimIds[Index] = -1;
-        }
+        EmptyName(AnimNames[Index]);
+        AnimIds[Index] = -1;
     }
 }
 
@@ -447,7 +447,7 @@ bool FEngineCharacterBody::Build(Costume const& Key)
             CacheString Material;
             Material.clear();
             Material.Value = StringAlloc(First, true);
-            ClientMeshHolderSetMaterials(Holder, Material.Value, nullptr);
+            Holder->SetMaterials(Material.Value, nullptr);
         }
     } // Link destroyed (FUN_004de730)
 
@@ -588,7 +588,7 @@ FEngineCharacterBody* FEngineCharacterCache::FindOrCreate(Costume const& Key)
             CacheString Material;
             Material.clear();
             Material.Value = StringAlloc(First, true);
-            ClientMeshHolderSetMaterials(Holder, Material.Value, nullptr);
+            Holder->SetMaterials(Material.Value, nullptr);
         }
     }
 

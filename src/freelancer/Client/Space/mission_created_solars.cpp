@@ -62,19 +62,19 @@ void LoadMissionCreatedSolars()
             }
 
             // All three seen -> push the record, start over (tested after every key).
-            if (bHasBase && bHasInfo && bHasPos)
-            {
-                FMissionCreatedSolar Record;
-                Record.BaseId = BaseId;
-                Record.Pos[0] = Pos[0];
-                Record.Pos[1] = Pos[1];
-                Record.Pos[2] = Pos[2];
-                Record.IdsInfo = IdsInfo;
-                G_MissionCreatedSolars.push_back(Record);
-                bHasBase = false;
-                bHasInfo = false;
-                bHasPos = false;
-            }
+            if (!bHasBase || !bHasInfo || !bHasPos)
+                continue;
+
+            FMissionCreatedSolar Record;
+            Record.BaseId = BaseId;
+            Record.Pos[0] = Pos[0];
+            Record.Pos[1] = Pos[1];
+            Record.Pos[2] = Pos[2];
+            Record.IdsInfo = IdsInfo;
+            G_MissionCreatedSolars.push_back(Record);
+            bHasBase = false;
+            bHasInfo = false;
+            bHasPos = false;
         }
     }
 }

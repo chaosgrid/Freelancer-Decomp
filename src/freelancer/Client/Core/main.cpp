@@ -735,7 +735,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
         FClientCommandLine CommandLine;
         CommandLine.Parse(cmd);
         ApplyClientCommandLineFlags(&CommandLine);
-        LoadStartupConfig(&g_display, &CommandLine);
+        g_display.LoadStartupConfig(&CommandLine);
         ErrorHandler::activate(g_display.ini_path.c_str(), ClientAssertHandler);
         OpenSpewLog();
         // FUN_005a82d0(&CommandLine, ini path): [Freelancer] local_server / AppGUID, [ListServer]

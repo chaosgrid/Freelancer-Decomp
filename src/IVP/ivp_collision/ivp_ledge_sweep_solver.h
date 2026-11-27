@@ -43,7 +43,7 @@
 //   FUN_06347e60 == real_length()
 //   FUN_0634d8d0 / FUN_0634d9d0 / FUN_0634d970 == vmult4 / vmult / vimult on
 //                   the matrix at this+0x1c of an IVP_NarrowPhaseCacheSlot
-//                   (IVP_TransformSlotToWorldSpace etc.); spelled here as
+//                   (IVP_NarrowPhaseCacheSlot::transform_slot_to_world_space etc.); spelled here as
 //                   Source->WorldTransform.<op>()
 //
 // Edge stepping: the `(uint)ptr & 0xc` -> DAT_063ee4e0 / DAT_063ee4f0 idiom is

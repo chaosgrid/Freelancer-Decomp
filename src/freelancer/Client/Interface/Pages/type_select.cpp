@@ -391,7 +391,7 @@ void TypeSelect::Update()
 void TypeSelect::Draw()
 {
     // FUN_00566500.
-    Win3DDrawChildren(this);
+    DrawChildren();
 }
 
 bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)

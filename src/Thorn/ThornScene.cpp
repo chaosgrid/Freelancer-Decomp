@@ -5075,13 +5075,13 @@ void FThornEvent::DispatchSubtitleControl(FThornScene* Scene, bool bShow)
 {
     FThornEntity* Primary = Scene->EntityAt(PrimaryIndex);
     ISubtitleControl* Control = SubtitleOf(Primary);
-    if (Control != nullptr)
-    {
-        if (bShow)
-            Control->ShowSubtitle(Strid);
-        else
-            Control->HideSubtitle(Strid);
-    }
+    if (Control == nullptr)
+        return;
+
+    if (bShow)
+        Control->ShowSubtitle(Strid);
+    else
+        Control->HideSubtitle(Strid);
 }
 
 unsigned char FThornEvent::Stop(FThornScene* Scene)
@@ -6320,24 +6320,24 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
         std::memcpy(&Snap.FloorHeight, &SnapIn->FloorHeight, sizeof(Snap.FloorHeight));
     }
 
-    if (DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor)
+    if (DescriptorOwnerType != kThornEntityCamera && DescriptorOwnerType != kThornEntityMonitor)
+        return;
+
+    // The input flags/type/tail are read only after the unlink.
+    UnbindMonitorChildren(this);
+    if ((SnapIn->Flags & kThornEntityFlagReference) != 0 || SnapIn->Type != kThornEntityCamera)
+        return;
+
+    // Raw stores in Near/Far/Fov/Aspect order.
+    const int StoreOrder[4] = {1, 2, 0, 3};
+    for (int Index = 0; Index < 4; ++Index)
     {
-        // The input flags/type/tail are read only after the unlink.
-        UnbindMonitorChildren(this);
-        if ((SnapIn->Flags & kThornEntityFlagReference) == 0 && SnapIn->Type == kThornEntityCamera)
-        {
-            // Raw stores in Near/Far/Fov/Aspect order.
-            const int StoreOrder[4] = {1, 2, 0, 3};
-            for (int Index = 0; Index < 4; ++Index)
-            {
-                const int Field = StoreOrder[Index];
-                unsigned int Word;
-                std::memcpy(&Word, reinterpret_cast<const unsigned char*>(&SnapIn->Fovh) +
-                                   Field * sizeof(Word), sizeof(Word));
-                std::memcpy(reinterpret_cast<unsigned char*>(&Snap.Fovh) +
-                            Field * sizeof(Word), &Word, sizeof(Word));
-            }
-        }
+        const int Field = StoreOrder[Index];
+        unsigned int Word;
+        std::memcpy(&Word, reinterpret_cast<const unsigned char*>(&SnapIn->Fovh) +
+                           Field * sizeof(Word), sizeof(Word));
+        std::memcpy(reinterpret_cast<unsigned char*>(&Snap.Fovh) +
+                    Field * sizeof(Word), &Word, sizeof(Word));
     }
 }
 
@@ -7025,18 +7025,18 @@ void FThornScene::PushBoundGeoFromScene(const Transform& OldInverse, bool bOrien
         std::memcpy(&PositionWords, &PositionResult, sizeof(PositionWords));
         Entity->InnerSetPos(&PositionWords);
 
-        if (bOrient)
-        {
-            // The math engine is reacquired after InnerSetPos; the orientation
-            // was captured before it.
-            Math = AcquireSceneCsysMathEngine();
-            Matrix Orientation;
-            Matrix OrientationResult;
-            std::memcpy(&Orientation, &OrientationWords, sizeof(Orientation));
-            Math->MulMatrix(OrientationResult, OldInverse.Rotation, Orientation);
-            std::memcpy(&OrientationWords, &OrientationResult, sizeof(OrientationWords));
-            Entity->InnerSetOrient(&OrientationWords);
-        }
+        if (!bOrient)
+            continue;
+
+        // The math engine is reacquired after InnerSetPos; the orientation
+        // was captured before it.
+        Math = AcquireSceneCsysMathEngine();
+        Matrix Orientation;
+        Matrix OrientationResult;
+        std::memcpy(&Orientation, &OrientationWords, sizeof(Orientation));
+        Math->MulMatrix(OrientationResult, OldInverse.Rotation, Orientation);
+        std::memcpy(&OrientationWords, &OrientationResult, sizeof(OrientationWords));
+        Entity->InnerSetOrient(&OrientationWords);
     }
 }
 
@@ -7567,28 +7567,28 @@ void FThornScene::FrameUpdateEntities(int TimeMs)
 void FThornScene::UpdateActive(int TimeMs)
 {
     FrameUpdateEntities(TimeMs);
-    if (ActiveCount_ != 0)
+    if (ActiveCount_ == 0)
+        return;
+
+    FThornEvent** ActiveSlot = Active_;
+    FThornEvent** Successor = ActiveSlot + 1;
+    do
     {
-        FThornEvent** ActiveSlot = Active_;
-        FThornEvent** Successor = ActiveSlot + 1;
-        do
+        if ((*ActiveSlot)->StillRunning(TimeMs, this) != 0)
         {
-            if ((*ActiveSlot)->StillRunning(TimeMs, this) != 0)
-            {
-                ++ActiveSlot;
-                ++Successor;
-            }
-            else
-            {
-                // The slot is reread after StillRunning.
-                (*ActiveSlot)->Stop(this);
-                FThornEvent** ActiveEnd = Active_ + ActiveCount_;
-                for (FThornEvent** Read = Successor; Read != ActiveEnd; ++Read)
-                    *(Read - 1) = *Read;
-                ActiveCount_ = ActiveCount_ - 1;
-            }
-        } while (ActiveSlot != Active_ + ActiveCount_);
-    }
+            ++ActiveSlot;
+            ++Successor;
+        }
+        else
+        {
+            // The slot is reread after StillRunning.
+            (*ActiveSlot)->Stop(this);
+            FThornEvent** ActiveEnd = Active_ + ActiveCount_;
+            for (FThornEvent** Read = Successor; Read != ActiveEnd; ++Read)
+                *(Read - 1) = *Read;
+            ActiveCount_ = ActiveCount_ - 1;
+        }
+    } while (ActiveSlot != Active_ + ActiveCount_);
 }
 
 GENRESULT FThornScene::StartPlayback(int Arg)

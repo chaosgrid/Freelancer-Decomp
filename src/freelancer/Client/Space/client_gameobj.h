@@ -122,6 +122,11 @@ struct FGameobjEffectList : public FGameobjEffectListStorage
     }
     // FUN_005393e0
     ~FGameobjEffectList();
+
+    // FUN_004fd040 (thiscall on GameObject+0x28) -- sweep the effect list: dead companions are
+    // cleared and their nodes freed, live particles re-armed. Callers: the gameobj draw submit
+    // (in this file) and the dynamic asteroid draw FUN_005261b0.
+    void Sweep();
 };
 static_assert(sizeof(FGameobjEffectList) == 0x0c, "GameObject effect list 0xc");
 
@@ -179,6 +184,8 @@ struct FEquipSubTarget
     unsigned short TargetSubObj;  // +0x04 (node +0x14)
 };
 
+struct FClientEquip;
+
 class FClientGameobj : public IObjInspectImpl
 {
 public:
@@ -228,13 +235,13 @@ public:
     // 96 +0x180 LAB_00401e90: empty (EquippedObj overrides).
     virtual void PreSubmitDraw();
     // 97 +0x184 FUN_00539b40: per-object lighting (FUN_005554d0). Body: the free function
-    // GameobjUpdateDrawLightingRetail in space_scene_obj_draw.cpp.
+    // FClientGameobj::UpdateDrawLighting in space_scene_obj_draw.cpp.
     virtual void UpdateDrawLighting(void* Camera);
     // 98 +0x188 FUN_00539980: draw submit -- PreSubmitDraw, PickLod, the LOD gate (a failed gate
     // writes the LOD to *OutLod and returns), the effect-list sweep, UpdateDrawLighting, the
     // player flags, get_index, the envmap arm, IRenderer2::Slot7(Camera, Inst, 1.0f, Flags,
     // Xform, Extra). A non-null Xform ors 0x120 into the flags; Extra is the IFLAppearance
-    // Slot8 out-param when it was null. Body: GameobjSubmitDrawRetail in
+    // Slot8 out-param when it was null. Body: FClientGameobj::SubmitDraw in
     // space_scene_obj_draw.cpp; the draw drain calls this slot through the node LAB_0051f7a0.
     virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
                               void* Extra);
@@ -380,6 +387,32 @@ public:
     // (0x80000000), so `this` is a Simple there.
     unsigned char bWatchListed;        // +0xa8
     unsigned char Pada9[3];
+
+    // FUN_00533100 (on the EquippedObj) -- the equipment EquipId of the host's
+    // CEqObj (narrowed by 0x103, CEquipManager::FindByID with no test of the object), then the
+    // first wrapper on the +0xb8 list whose Equip is it; null when none is.
+    FClientEquip* FindEquipFx(unsigned short EquipId);
+
+    // FUN_00533080 — destroy every wrapper in Host+0xb8 and free list nodes.
+    void ClearEquipFx();
+
+    // FUN_00533160 — find equip by id, dispatch on its EEquipType (14 arms), insert the wrapper at
+    // Host+0xb8.
+    void CreateEquipFx(unsigned short EquipId);
+
+    // FUN_00533e10 — clear, a wrapper per equipment, the fuse threshold walks (through the host's
+    // Ignite slot, FUN_00534240 / FClientEquippedObj::LightFuse) and the explosion arch.
+    void RebuildEquipFx();
+
+    // FUN_005484c0 (on the solar gameobj) -- a lane ring runs FUN_00516060, then, out
+    // of single player, CSolar::activate.
+    void TradeLaneSolarActivate(bool bActivate, unsigned ShipId);
+
+    // FUN_00539bc0 -- CObject::Alloc(Class) into Self->Object, Arch->create_instance,
+    // DALib::Engine UpdateInstance(Object+4, 0, 0), CBase::advise(true). The caller opens the
+    // object afterwards. Callers: GameObject create (LAB_005396f0 inlines it), the ship / solar
+    // create tails, Beam FUN_0053f2f0, Debris FUN_005304b0.
+    void CreateOfClass(CObject::Class ObjectClass, Archetype::Root* Arch);
 };
 
 static_assert(offsetof(FClientGameobj, ListNext) == 0x14, "Gameobj ListNext +0x14");
@@ -493,7 +526,7 @@ public:
     // spent (Fuse::IsSpent).
     virtual bool IsDeathFuseBurning();
     // 115 +0x1cc FUN_00534460: the equipment message -- 0x18 fire, 0x19 activate.
-    // Port: EquippedObjHandleEquipMsg (cli_projectile_fx.cpp).
+    // Port: FClientEquippedObj::HandleEquipMsg (cli_projectile_fx.cpp).
     virtual unsigned char HandleEquipMsg(FCliEquipFirePacket const* Packet);
 
     // FUN_00533d10: a part that came off becomes a Debris gameobj (its [Debris] record by
@@ -530,6 +563,16 @@ public:
     unsigned char PadSubTargets[0x14 - sizeof(std::map<unsigned short, FEquipSubTarget>)];
     unsigned char bCloakOverrideActive;          // +0xe0
     unsigned char Pade1[3];
+
+    // FUN_00544e70 — preprocess: op 0x1a/0x1b → 0x19 + next launcher hardpoint (subop 3).
+    void ShipPreprocessEquipUpdate(FCliEquipFirePacket* Packet);
+
+    // FUN_00544880 — lead-aim → Host+4 vt+0x34 (CliShipFireWeapons).
+    void ShipLeadAimFire();
+
+    // FUN_00544d70 — CShip equip-update: gate + copy + preprocess + FClientEquippedObj::HandleEquipMsg.
+    // 0x1c → FindById + Host+4 vt+0x48 (LAB_005468e0) + FUN_005351d0 walk; 0xbb → LeadAimFire.
+    unsigned char ShipHandleEquipUpdate(FCliEquipFirePacket const* Packet);
 };
 static_assert(offsetof(FClientEquippedObj, EquipFlags) == 0xb0, "EquippedObj +0xb0");
 static_assert(offsetof(FClientEquippedObj, EquipFx) == 0xb4, "EquippedObj equip-FX list +0xb4");
@@ -653,7 +696,7 @@ public:
     // player drops this ship as its target.
     bool LightFuse(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId, float AtT,
                  float Lifetime) override;
-    // 115 +0x1cc FUN_00544d70. Port: CliShipHandleEquipUpdate (cli_projectile_fx.cpp).
+    // 115 +0x1cc FUN_00544d70. Port: FClientEquippedObj::ShipHandleEquipUpdate (cli_projectile_fx.cpp).
     unsigned char HandleEquipMsg(FCliEquipFirePacket const* Packet) override;
     // 116 +0x1d0 LAB_00545cc0: empty.
     virtual void PlayFireFailedSound();
@@ -913,6 +956,11 @@ public:
 
     void* Companion[4];       // +0xc0  FUN_005154a0; the effect list gets a copy
     FBeamEffect* BeamAlloc;   // +0xd0  FUN_0053f340's beam effect
+
+    // FUN_0053f340 (on the Beam, non-virtual) -- the Beam's activate: beam effect
+    // + light into the +0xc0 companion, insert it into the effect list, then Projectile slot 92
+    // FUN_005426e0 called directly. Caller: CliLauncher fire FUN_0052dde0.
+    void ActivateEffects(Vector const* LookDir, unsigned char bUseLookDir);
 };
 static_assert(offsetof(FClientBeamGameobj, Companion) == 0xc0, "Beam +0xc0");
 static_assert(offsetof(FClientBeamGameobj, BeamAlloc) == 0xd0, "Beam +0xd0");
@@ -1048,13 +1096,6 @@ void CloseRearAndTurretViewsForDocking();
 
 // operator new + the Solar constructor FUN_005475b0 (space_solar_world.cpp's solar build).
 FClientGameobj* ClientGameobj_CreateSolar();
-
-// FUN_00539bc0 -- CObject::Alloc(Class) into Self->Object, Arch->create_instance,
-// DALib::Engine UpdateInstance(Object+4, 0, 0), CBase::advise(true). The caller opens the
-// object afterwards. Callers: GameObject create (LAB_005396f0 inlines it), the ship / solar
-// create tails, Beam FUN_0053f2f0, Debris FUN_005304b0.
-void GameobjCreateOfClass(FClientGameobj* Self, CObject::Class ObjectClass,
-                          Archetype::Root* Arch);
 
 // FUN_00536100 -- take a reference on everything an explosion archetype will spawn: each
 // effect's EffectArch (FUN_0040e960) and each innards debris simple (Root vt+0x0c, load).

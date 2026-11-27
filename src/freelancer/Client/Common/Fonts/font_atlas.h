@@ -54,7 +54,6 @@ void FontAtlasFreePages(FFontAtlasPage*& Head);
 // face callers pass 0; FUN_004152e0 passes its own argument.
 // Returns 1 when the grid is current or every tile was drawn, 0 otherwise.
 class FontStringChild;
-unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeCheck);
 
 // Material key for ScreenQuadSetMaterialKey during FontString paint (DAT_00616670).
 unsigned FontAtlasMaterialKey();

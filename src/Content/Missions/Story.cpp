@@ -108,7 +108,7 @@ namespace
         MissionNum = 0;
         FContentPlayerState* PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState != nullptr)
-            SetContentPlayerMissionNumber(PlayerState, 0, 0);
+            PlayerState->SetMissionNumber(0, 0);
 
         DeltaWorth = -1.0f;
         bShipBought = false;
@@ -126,7 +126,7 @@ namespace
         MissionNum = static_cast<int>(Chapter);
         FContentPlayerState* PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState != nullptr)
-            SetContentPlayerMissionNumber(PlayerState, Chapter, bAdvanceRank);
+            PlayerState->SetMissionNumber(Chapter, bAdvanceRank);
     }
 
     // Shared tail of FUN_06ea6c70 and the chapter 4/8/11/14/17 arms of LAB_06ea6280
@@ -354,7 +354,7 @@ namespace
         MissionNum = 0;
         FContentPlayerState* PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState != nullptr)
-            SetContentPlayerMissionNumber(PlayerState, 0, 0);
+            PlayerState->SetMissionNumber(0, 0);
 
         while (Reader->read_header())
         {
@@ -382,8 +382,7 @@ namespace
                     FContentPlayerState* MissionPlayerState = FindContentPlayerState(PlayerId);
                     if (MissionPlayerState != nullptr)
                     {
-                        SetContentPlayerMissionNumber(
-                            MissionPlayerState, static_cast<unsigned int>(MissionNum), 0);
+                        MissionPlayerState->SetMissionNumber(static_cast<unsigned int>(MissionNum), 0);
                     }
                     if ((GStoryMissionController & GIdValueMask) != 0)
                     {

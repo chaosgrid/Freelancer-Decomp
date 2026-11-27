@@ -396,7 +396,7 @@ void UiTable::Draw()
     if (bHovered != 0)
         UiTableDrawRowQuad(this, HoveredRgba, HoveredRow);
 
-    Win3DDrawChildren(this);
+    DrawChildren();
 
     Win3DBindModelview(nullptr, &Placement);
     UiTableSetDrawStates();

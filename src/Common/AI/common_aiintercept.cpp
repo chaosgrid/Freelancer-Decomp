@@ -458,34 +458,34 @@ bool IsTargetCoAlignedAndAhead(FAiTarget* Target, FAiTarget* Reference, float Co
 
 // FUN_062e6a80. Catalogued with the IUStateGraph cluster (see common_aisteer.h), but
 // it is a lazily cached accessor on the same Elem record, so it lives here.
-void GetCachedRange(FAiTarget* Elem, float* OutLow, float* OutHigh)
+void FAiTarget::GetCachedRange(float* OutLow, float* OutHigh)
 {
-    if (Elem->bAttitudeValid == 0)
+    if (bAttitudeValid == 0)
     {
-        IObjInspect* const RefIface = Elem->AttitudeRefIface;
-        IObjInspect* const OtherIface = Elem->Iface;
+        IObjInspect* const RefIface = AttitudeRefIface;
+        IObjInspect* const OtherIface = Iface;
 
-        Elem->CachedAttitude = 0.0f;
-        Elem->CachedReverseAttitude = 0.0f;
+        CachedAttitude = 0.0f;
+        CachedReverseAttitude = 0.0f;
 
         if (RefIface != nullptr && OtherIface != nullptr)
         {
             // Slot 27; 0 on success.
             int const Result = RefIface->get_attitude_towards_symmetrical(
-                Elem->CachedAttitude, OtherIface, Elem->CachedReverseAttitude);
+                CachedAttitude, OtherIface, CachedReverseAttitude);
             if (Result != 0)
             {
                 // Retail re-zeroes both on failure (redundant, kept).
-                Elem->CachedAttitude = 0.0f;
-                Elem->CachedReverseAttitude = 0.0f;
+                CachedAttitude = 0.0f;
+                CachedReverseAttitude = 0.0f;
             }
         }
 
-        Elem->bAttitudeValid = 1; // regardless of success/failure
+        bAttitudeValid = 1; // regardless of success/failure
     }
 
-    *OutLow = Elem->CachedAttitude;
-    *OutHigh = Elem->CachedReverseAttitude;
+    *OutLow = CachedAttitude;
+    *OutHigh = CachedReverseAttitude;
 }
 
 // FUN_062e6150. Minus column 2 (the forward axis) of the iface's transform; zero on

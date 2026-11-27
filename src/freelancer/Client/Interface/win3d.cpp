@@ -454,21 +454,21 @@ void Win3D::UpdateInactive()
     // LAB_004682f0: the next sibling is read after each call.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
-        if ((Child->Flags & kWin3DActive) == 0)
-        {
+        if ((Child->Flags & kWin3DActive) != 0)
+            continue;
+
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
-            UpdateWidescreen(Child);
+        UpdateWidescreen(Child);
 #else
-            Child->UpdateInactive();
+        Child->UpdateInactive();
 #endif
-        }
     }
 }
 
 void Win3D::Draw()
 {
     // FUN_0059e5c0.
-    Win3DDrawChildren(this);
+    DrawChildren();
 }
 
 void Win3D::MouseOver(Vector const* /*Ray*/)
@@ -726,7 +726,7 @@ void Win3DSetViewportSize(int Width, int Height)
     ViewRect[1] = 0;
     ViewRect[2] = Width - 1;
     ViewRect[3] = Height - 1;
-    SpaceCameraSetViewportEx(Win3DGetCamera(), ViewRect, 1);
+    Win3DGetCamera()->SetViewportEx(ViewRect, 1);
 }
 
 Win3D* Win3DGetHover()
@@ -1180,10 +1180,10 @@ void Win3DDrawAll()
     DALib::MaterialBatcher->SetBinOrder(1, 1);
 }
 
-void Win3DDrawChildren(Win3D* Parent)
+void Win3D::DrawChildren()
 {
     // FUN_0059e5c0.
-    DrawChildrenSorted(Parent);
+    DrawChildrenSorted(this);
 }
 
 void Win3DDrawChildrenOf(Win3D* Parent)
@@ -1236,13 +1236,13 @@ void Win3DStartupManager(int Width, int Height)
     ViewRect[1] = 0;
     ViewRect[2] = Width - 1;
     ViewRect[3] = Height - 1;
-    SpaceCameraSetViewport(WinCamera, ViewRect);
-    SpaceCameraSetNearFar(WinCamera, 0.1f, 1000.0f);
+    WinCamera->SetViewport(ViewRect);
+    WinCamera->SetNearFar(0.1f, 1000.0f);
     {
         unsigned int const kHalfFovBits = 0x41d9ba5eu;
         float HalfFovX;
         memcpy(&HalfFovX, &kHalfFovBits, sizeof(HalfFovX));
-        SpaceCameraSetHalfFovX(WinCamera, HalfFovX);
+        WinCamera->SetHalfFovX(HalfFovX);
     }
     // mouse.ini shapes and cursors.
     MouseInitCursors();
@@ -1388,17 +1388,6 @@ namespace
         Out = Result;
     }
 
-    // FUN_004bdd40 (thiscall on the camera). Each product is rounded to float.
-    void ScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY)
-    {
-        double const ZNear = static_cast<double>(Cam->ZNear);
-        Out.x = static_cast<float>((static_cast<double>(ScreenX) - Cam->ScreenCenterX) *
-                                   (ZNear / Cam->XScale));
-        Out.y = static_cast<float>((static_cast<double>(ScreenY) - Cam->ScreenCenterY) *
-                                   (ZNear / Cam->YScale));
-        Out.z = static_cast<float>(-ZNear);
-    }
-
     // FUN_0041a390 (thiscall on the vector): scale by 1 / |v|. There is no zero test: a zero
     // vector divides by zero exactly as retail does.
     void NormalizeInPlace(Vector& V)
@@ -1503,8 +1492,7 @@ namespace
             GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
             FSpaceCamera* const Cam = Win3DGetCamera();
             Vector Local;
-            ScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
-                              static_cast<float>(CursorY));
+            Cam->ScreenToNearPlane(Local, static_cast<float>(CursorX), static_cast<float>(CursorY));
             Matrix Orientation;
             memcpy(&Orientation, &Cam->World, sizeof(Orientation));
             Vector World;
@@ -1602,8 +1590,11 @@ I3DMathEngine* Win3DTransformMathEngine()
     return G_TransformMathEngine;
 }
 
-void Win3DScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY)
+void FSpaceCamera::ScreenToNearPlane(Vector& Out, float ScreenX, float ScreenY) const
 {
-    // FUN_004bdd40.
-    ScreenToNearPlane(Cam, Out, ScreenX, ScreenY);
+    // FUN_004bdd40 (thiscall on the camera). Each product is rounded to float.
+    double const Near = static_cast<double>(ZNear);
+    Out.x = static_cast<float>((static_cast<double>(ScreenX) - ScreenCenterX) * (Near / XScale));
+    Out.y = static_cast<float>((static_cast<double>(ScreenY) - ScreenCenterY) * (Near / YScale));
+    Out.z = static_cast<float>(-Near);
 }

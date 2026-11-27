@@ -329,7 +329,7 @@ unsigned int FPacket_FLPACKET_SERVER_SETGROUPFEELINGS::Decode(const unsigned cha
             return Stream.GetError();
         }
         // operator new(0xc) node; bumps the size at packet+0x30.
-        RpcRelationListLink(&Wire.Relations, Relation);
+        Wire.Relations.Link(Relation);
     }
     if (Stream.Failed()) {
         return Stream.GetError();

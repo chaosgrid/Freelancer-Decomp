@@ -12,7 +12,7 @@
 #include "Interface/Pages/character_select_equip.h"   // GetPlayerRepVibeRetail (FUN_004c4670)
 #include "NeuroNet/Chat/chat_msg_win.h"
 #include "NeuroNet/Chat/chat_text_input.h"          // ChatTextInputDisplay ("CTID")
-#include "Space/HUD/hud_command_dispatch.h"     // HudRegisterCommandHandler / HudDestroyEventHandler
+#include "Space/HUD/hud_command_dispatch.h"     // EventHandler::RegisterEvent / ~EventHandler
 #include "Common/Fonts/ids_rdl.h"
 #include "Common/Fonts/ids_strings.h"              // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Interface/menu_ui_widgets.h"
@@ -969,13 +969,13 @@ void MsgWin::Update()
                     Name[0] = 0;
                 ChatPostLostAffiliation(Name);   // FUN_0046a4d0
             }
-            if (Current != 0xffffffffu)
-            {
-                wchar_t Name[0x80];
-                if (GetIdsStringWWithRawFallback(Reputation::get_name(Current), Name, 0x80) == 0)
-                    Name[0] = 0;
-                ChatPostNewAffiliation(Name);    // FUN_0046a770
-            }
+            if (Current == 0xffffffffu)
+                continue;
+
+            wchar_t Name[0x80];
+            if (GetIdsStringWWithRawFallback(Reputation::get_name(Current), Name, 0x80) == 0)
+                Name[0] = 0;
+            ChatPostNewAffiliation(Name);    // FUN_0046a770
         }
         // Common never clears this map.
         Changed->clear();

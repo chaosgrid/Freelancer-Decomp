@@ -153,7 +153,7 @@ FNavMapItem::~FNavMapItem()
 NeuroNetNavMap::NeuroNetNavMap()
 {
     // FUN_0048de20. Retail stores are interleaved; the order here follows them roughly.
-    SpaceCameraConstruct(&Camera);   // FUN_0040f150
+    Camera.Construct();   // FUN_0040f150
 
     ShipMarkerSize = 5000.0f;
     WaypointMarkerSize = 4500.0f;
@@ -333,19 +333,19 @@ NeuroNetNavMap::~NeuroNetNavMap()
     TradeLaneIndices = nullptr;
 
     if (ZoomedMapMesh.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&ZoomedMapMesh);
+        ZoomedMapMesh.ReleaseWithAnim();
     if (ZoomedMapMesh2.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&ZoomedMapMesh2);
+        ZoomedMapMesh2.ReleaseWithAnim();
     if (PrettyMapMesh.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&PrettyMapMesh);
+        PrettyMapMesh.ReleaseWithAnim();
     if (GroupMarkerMesh.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&GroupMarkerMesh);
+        GroupMarkerMesh.ReleaseWithAnim();
     if (LegendMesh.EngineInstance != InvalidInstanceIndex)
-        ClientUiMeshHolderRelease(&LegendMesh);
+        LegendMesh.ReleaseWithAnim();
 
     // The digit holders are released unconditionally.
     for (int Index = 0; Index < 10; ++Index)
-        ClientUiMeshHolderRelease(&DigitMeshes[Index]);
+        DigitMeshes[Index].ReleaseWithAnim();
 
     // Here (and only here) the jump link records are freed.
     while (!JumpLinks.empty())
@@ -409,7 +409,7 @@ bool NeuroNetNavMap::HitTest(Vector const* Ray)
         return false;
 
     Transform Xform = {Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f), {0.0f, 0.0f, 0.0f}};
-    if (ClientMeshHolderHasInstance(&MeshHolder))
+    if (MeshHolder.HasInstance())
         memcpy(&Xform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
                sizeof(Xform));
 
@@ -1015,14 +1015,11 @@ void NeuroNetNavMap::LoadMapResources()
         return;
     bResourcesLoaded = 1;
 
-    ClientMeshLoadFromPath(&ZoomedMapMesh,
-                           "Interface\\NeuroNet\\NavMap\\NewNavMap\\zoomedmap_liberty.3db", 0,
-                           true);
-    ClientMeshLoadFromPath(&ZoomedMapMesh2,
-                           "Interface\\NeuroNet\\NavMap\\NewNavMap\\zoomedmap_liberty.3db", 0,
-                           true);
-    ClientMeshLoadFromPath(&PrettyMapMesh,
-                           "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_prettymap.3db", 0, true);
+    ZoomedMapMesh.LoadFromPath("Interface\\NeuroNet\\NavMap\\NewNavMap\\zoomedmap_liberty.3db", 0,
+                               true);
+    ZoomedMapMesh2.LoadFromPath("Interface\\NeuroNet\\NavMap\\NewNavMap\\zoomedmap_liberty.3db", 0,
+                                true);
+    PrettyMapMesh.LoadFromPath("Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_prettymap.3db", 0, true);
 
     IEngine* const Engine = DALib::Engine;
     float Transform[12];
@@ -1206,15 +1203,15 @@ void NeuroNetNavMap::BuildUniverseItems()
 
         // The visit map's flags for the system join the item's; bit 0
         // shows it (or +0x87e forces every one).
-        if (Item->Id != 0)
-        {
-            unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
-            Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
-            Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
-            if (bDebugShowAll != 0)
-                Item->bShown = 1;
-        }
+        if (Item->Id == 0)
+            continue;
+
+        unsigned char VisitFlags = 0;
+        GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
+        Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
+        Item->bShown = static_cast<unsigned char>(Item->Visit & kVisitShown);
+        if (bDebugShowAll != 0)
+            Item->bShown = 1;
     }
 
     BuildJumpLinks();
@@ -1258,7 +1255,7 @@ FNavMapItem* NeuroNetNavMap::AddItem(int Kind, int Type, float X, float Y, float
     }
 
     // The material path goes to FUN_00420f30 (holder +0x0c) on a FindArchetype miss.
-    ClientMeshLoadFromPath(&Item->Mesh, Path, kNavMapSpaceObjectsMat, true);
+    Item->Mesh.LoadFromPath(Path, kNavMapSpaceObjectsMat, true);
 
     Items.push_back(Item);
     return Item;

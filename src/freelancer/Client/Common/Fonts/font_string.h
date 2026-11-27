@@ -27,18 +27,21 @@ struct FHudWideText
 {
     wchar_t* Text;          // +0x00
     unsigned Capacity;      // +0x04
-};
 
-// FUN_004142a0 (thiscall, RET 4) -- grow to Need wide chars when Capacity is smaller: realloc
-// an existing buffer (Capacity = Need), else malloc Need * 2 bytes, Text[0] = 0, Capacity = Need.
-void WideTextReserve(FHudWideText* Self, unsigned Need);
-// FUN_00414280 (thiscall) -- a non-null, non-empty Text gets Text[0] = 0.
-void WideTextClear(FHudWideText* Self);
-// FUN_00444e20 (thiscall) -- a non-null Text is freed and both words zeroed.
-void WideTextFree(FHudWideText* Self);
-// FUN_00413df0 (thiscall, RET 8) -- a null Source clears a non-empty Text; otherwise Len
-// (0xffffffff: wcslen) characters copied after growing the buffer to Len + 1, and [Len] = 0.
-void WideTextAssign(FHudWideText* Self, wchar_t const* Source, unsigned Len);
+    // FUN_004142a0 (thiscall, RET 4) -- grow to Need wide chars when Capacity is smaller: realloc
+    // an existing buffer (Capacity = Need), else malloc Need * 2 bytes, Text[0] = 0, Capacity = Need.
+    void Reserve(unsigned Need);
+
+    // FUN_00414280 (thiscall) -- a non-null, non-empty Text gets Text[0] = 0.
+    void Clear();
+
+    // FUN_00444e20 (thiscall) -- a non-null Text is freed and both words zeroed.
+    void Free();
+
+    // FUN_00413df0 (thiscall, RET 8) -- a null Source clears a non-empty Text; otherwise Len
+    // (0xffffffff: wcslen) characters copied after growing the buffer to Len + 1, and [Len] = 0.
+    void Assign(wchar_t const* Source, unsigned Len);
+};
 
 // Retail `.?AUString@Font@@` -- the abstract element both concrete strings derive from (RTTI:
 // FontString's hierarchy DAT_005e7e94 = {FontString, Font::String}; FontNumberString's
@@ -129,6 +132,11 @@ public:
     unsigned Color_;    // +0x24  shadow colour, 0xff080808
     unsigned char bShadow_; // +0x28 draw the shadow quad
     unsigned char Pad29_[3];
+
+    unsigned char Rasterize(unsigned char bSkipSizeCheck);
+
+    // Defined in font_string.cpp.
+    FFontAtlasPage* EnsurePages(unsigned char bSkipSizeCheck);
 };
 
 static_assert(sizeof(FontStringChild) == 0x2c, "FontString child 0x2c");
@@ -217,6 +225,9 @@ struct FNumberFace
     FNumberGlyphUv Uv[17];    // +0x4c
     IFont* FontKey;           // +0x15c
     int RefCount;             // +0x160
+
+    // Defined in font_string.cpp.
+    void Rebuild();
 };
 static_assert(offsetof(FNumberFace, Advance) == 0x08, "face advances +0x08");
 static_assert(offsetof(FNumberFace, Uv) == 0x4c, "face uv +0x4c");
@@ -231,10 +242,6 @@ void NumberFaceRelease(FNumberFace* Face);
 void NumberFaceResetAll();
 
 struct FFontString;
-void FontStringConstruct(FFontString* Self);
-// FUN_00444e50 -- Font::String's destructor (~FFontString): FUN_004144f0, the child vector's
-// destructor, the text buffer freed. It leaves the string empty, so running it again is a no-op.
-void FontStringDestroy(FFontString* Self);
 
 // Font::String owns its text buffer and its child slots, so it is a RAII holder: retail
 // constructs it with FUN_004144b0 and tears it down with FUN_00444e50 on both the normal and the
@@ -244,9 +251,9 @@ void FontStringDestroy(FFontString* Self);
 struct FFontString
 {
     // FUN_004144b0
-    FFontString() { FontStringConstruct(this); }
+    FFontString() { Construct(); }
     // FUN_00444e50
-    ~FFontString() { FontStringDestroy(this); }
+    ~FFontString() { Destroy(); }
     FFontString(FFontString const&) = delete;
     FFontString& operator=(FFontString const&) = delete;
 
@@ -265,30 +272,45 @@ struct FFontString
     int ScaleKey;               // +0x2c
     unsigned char bMultiLine;   // +0x30
     unsigned char Pad31[3];
+
+    void Construct();
+
+    // FUN_00444e50 -- Font::String's destructor (~FFontString): FUN_004144f0, the child vector's
+    // destructor, the text buffer freed. It leaves the string empty, so running it again is a no-op.
+    void Destroy();
+    void ClearContents();
+
+    // FUN_00445d70 -- the child vector's destructor: children released, buffer freed, zeroed.
+    void ChildVectorDestroy();
+    void SetText(wchar_t const* Text);
+    void SetScale(float WorldSize, float ViewDepth);
+    // FUN_004ea670
+    void SetFont(IFont* Font);
+    // FUN_00414570
+    int* GetExtent(int* OutWH);
+
+    // FUN_004145a0 -- the child (line) count after a stale layout is rebuilt; 0 without children.
+    // Caller: NN_News RefreshRows, which moves a one-line headline down.
+    int ChildCount();
+
+    // FUN_00414640 — find-or-create child at Index (Kind 0 = FontString).
+    FontStringElement* EnsureChild(unsigned Index, unsigned char Kind);
+
+    // FUN_004155c0 (thiscall; the retail function starts with a stack probe).
+    void Rebuild();
 };
 
 static_assert(offsetof(FFontString, FontIface) == 0x1c, "Font::String +0x1c");
 static_assert(sizeof(FFontString) == 0x34, "Font::String size 0x34");
 
-void FontStringClearContents(FFontString* Self);
 // FUN_00445dc0 -- Release on every non-null child in [First, Last); the slots stay as they are.
 void FontStringChildSlotsDestroy(FFontStringChildSlot* First, FFontStringChildSlot* Last);
-// FUN_00445d70 -- the child vector's destructor: children released, buffer freed, zeroed.
-void FontStringChildVectorDestroy(FFontString* Self);
-void FontStringSetText(FFontString* Self, wchar_t const* Text);
-void FontStringSetScale(FFontString* Self, float WorldSize, float ViewDepth);
-void FontStringSetFont(FFontString* Self, IFont* Font); // FUN_004ea670
 // FUN_004159a0 (thiscall, RET 8; the first argument is always 0 and never read) — when the
 // wide text is non-empty it is freed and every child released (the FUN_004144f0 body, gated);
 // then the NumberString child at 0 (FUN_00414640(0, 1)) gets Format through slot 12 (so it
 // is a printf format), and ExtentW / ExtentH are rebuilt as max width / summed height over the
 // children's slot 6. Sole caller: TextControl FUN_0058a580.
 void FontStringSetNumberText(FFontString* Self, char const* Format);
-void FontStringRebuild(FFontString* Self);              // FUN_004155c0
-int* FontStringGetExtent(FFontString* Self, int* OutWH); // FUN_00414570
-// FUN_004145a0 -- the child (line) count after a stale layout is rebuilt; 0 without children.
-// Caller: NN_News RefreshRows, which moves a one-line headline down.
-int FontStringChildCount(FFontString* Self);
 
 // FUN_004143c0 thiscall: ECX = draw origin (not Font::String).
 struct FFontStringDrawOrigin
@@ -299,13 +321,13 @@ struct FFontStringDrawOrigin
     float Height; // +0x0c box height; FUN_004142f0 aligns Y in it
     unsigned HAlign; // +0x10 horizontal mode (FUN_004142f0): 1 centre, 2 right, else left
     unsigned VAlign; // +0x14 vertical mode: 1 centre, 2 bottom, else top
+
+    void DrawChildren(FFontString* Self, void* DrawCtx, void* DrawArg);
+
+    // Defined in font_string.cpp.
+    void DrawChildAligned(FontStringElement* Child, void* DrawCtx, void* DrawArg) const;
 };
 
-void FontStringDrawChildren(FFontStringDrawOrigin* Origin, FFontString* Self, void* DrawCtx,
-                            void* DrawArg);
-
-// FUN_00414640 — find-or-create child at Index (Kind 0 = FontString).
-FontStringElement* FontStringEnsureChild(FFontString* Self, unsigned Index, unsigned char Kind);
 NumberStringChild* FontStringEnsureNumberChild(FFontString* Self, unsigned Index);
 
 extern int G_FontLayoutGeneration;

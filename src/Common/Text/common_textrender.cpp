@@ -403,25 +403,25 @@ DeviceTRC::WinFont::~WinFont()
 
 // FUN_063277f0 (thiscall on the WinFont) -- FontDesc to LOGFONTA. lfHeight is the UNSCALED
 // size (+0x3C); the caller rescales it. No null guard on Desc.Name.
-static void BuildRichTextLogFont(DeviceTRC::WinFont& Entry, TextRenderContext::FontDesc const& Desc)
+void DeviceTRC::WinFont::BuildRichTextLogFont(TextRenderContext::FontDesc const& Desc)
 {
-    Entry.UnscaledSize = (int)Desc.Size;
-    memset(&Entry.LogFont, 0, sizeof(Entry.LogFont));
-    Entry.LogFont.lfHeight = Entry.UnscaledSize;
-    Entry.LogFont.lfWidth = 0;
-    Entry.LogFont.lfEscapement = 0;
-    Entry.LogFont.lfOrientation = 0;
-    Entry.LogFont.lfCharSet = 1;
-    Entry.LogFont.lfOutPrecision = 4;
-    Entry.LogFont.lfClipPrecision = 0;
-    Entry.LogFont.lfQuality = 4;
-    Entry.LogFont.lfPitchAndFamily = 0;
-    Entry.LogFont.lfWeight = Desc.bBold != 0 ? 700 : 400;
-    strncpy(Entry.LogFont.lfFaceName, Desc.Name, 0x1f);
-    Entry.LogFont.lfFaceName[0x1f] = '\0';
-    Entry.LogFont.lfItalic = Desc.bItalic != 0 ? 1 : 0;
-    Entry.LogFont.lfStrikeOut = 0;
-    Entry.LogFont.lfUnderline = Desc.bUnderline != 0 ? 1 : 0;
+    UnscaledSize = (int)Desc.Size;
+    memset(&LogFont, 0, sizeof(LogFont));
+    LogFont.lfHeight = UnscaledSize;
+    LogFont.lfWidth = 0;
+    LogFont.lfEscapement = 0;
+    LogFont.lfOrientation = 0;
+    LogFont.lfCharSet = 1;
+    LogFont.lfOutPrecision = 4;
+    LogFont.lfClipPrecision = 0;
+    LogFont.lfQuality = 4;
+    LogFont.lfPitchAndFamily = 0;
+    LogFont.lfWeight = Desc.bBold != 0 ? 700 : 400;
+    strncpy(LogFont.lfFaceName, Desc.Name, 0x1f);
+    LogFont.lfFaceName[0x1f] = '\0';
+    LogFont.lfItalic = Desc.bItalic != 0 ? 1 : 0;
+    LogFont.lfStrikeOut = 0;
+    LogFont.lfUnderline = Desc.bUnderline != 0 ? 1 : 0;
 }
 
 // The delete sweep over all 256 entries that InitializeRichText and ShutdownRichText inline.
@@ -454,7 +454,7 @@ static void RebuildRichTextStyleFonts(DeviceTRC::WinFont* StyleFonts,
         Desc.bUnderline = GFontCombinations[Sub].bUnderline;
 
         DeviceTRC::WinFont& Entry = StyleFonts[Sub];
-        BuildRichTextLogFont(Entry, Desc);
+        Entry.BuildRichTextLogFont(Desc);
 
         if (Entry.FontHandle != nullptr)
         {

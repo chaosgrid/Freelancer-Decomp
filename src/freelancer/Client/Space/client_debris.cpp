@@ -224,7 +224,7 @@ int FClientDebrisGameobj::get_type(uint& OutType) const
 void FClientDebrisGameobj::create(Archetype::Root* Arch)
 {
     // FUN_005304b0: no narrowing, no null test on the new object.
-    GameobjCreateOfClass(this, CObject::ClassObject, Arch);
+    CreateOfClass(CObject::ClassObject, Arch);
     Object->open(Arch);
 }
 

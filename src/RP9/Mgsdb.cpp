@@ -523,13 +523,13 @@ const char* FMgsdbDatabase::EvaluateIf()
         bool bFound = false;
         for (size_t Index = 0; Index < sizeof(kMgsdbCapsKeys) / sizeof(kMgsdbCapsKeys[0]); ++Index)
         {
-            if (Match(kMgsdbCapsKeys[Index].Name))
-            {
-                Current = *(const unsigned long*)((const unsigned char*)&Caps_ + kMgsdbCapsKeys[Index].CapsOffset);
-                Cursor_ += strlen(kMgsdbCapsKeys[Index].Name);
-                bFound = true;
-                break;
-            }
+            if (!Match(kMgsdbCapsKeys[Index].Name))
+                continue;
+
+            Current = *(const unsigned long*)((const unsigned char*)&Caps_ + kMgsdbCapsKeys[Index].CapsOffset);
+            Cursor_ += strlen(kMgsdbCapsKeys[Index].Name);
+            bFound = true;
+            break;
         }
         if (!bFound)
         {

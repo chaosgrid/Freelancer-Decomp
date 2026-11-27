@@ -23,11 +23,6 @@ extern I3DMathEngine* G_Win3DObjectMath;
 // FUN_0059da60
 FSpaceCamera* GetWin3DSceneCamera();
 
-// FUN_0059efa0 — thiscall on the holder (its instance at +0x04). bDepthTested non-zero: ZFUNC
-// LESSEQUAL with z write off; zero: ZFUNC ALWAYS with z write on (RS 0x17 / 0x0e, not restored).
-void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
-                               unsigned char bDepthTested, float Scale, unsigned long Flags);
-
 // FUN_00434310 (cdecl, 7 args) — tinted submit (RGBA bytes). MaterialSelector goes to
 // IFLAppearance::GetOverrideMaterial; bDepthTested picks the depth func / z-write states as
 // above, restored afterwards. Both callers pass 1 for the selector.

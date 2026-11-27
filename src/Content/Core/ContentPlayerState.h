@@ -22,6 +22,7 @@
 // (no retail ABI).
 
 struct ID_String;   // common_id.h
+class INI_Reader;
 
 // FVnpcRecord::MissionState: the outcome of the mission a bar character gave
 // (JoinMissionAsGroup sets ACTIVE; EndLiveMission turns ACTIVE into the callers' 2 on
@@ -356,9 +357,13 @@ struct FContentPlayerState : FContentPlayerStateBase
     // FUN_06ef00d0 (TU27, thiscall on the player state): the state has a ship object (+0x10).
     // Callers in DestroyMission and TU61.
     bool HasShip() const;
-};
 
-class INI_Reader;
+    // FUN_06f483d0 (RET 4): read the [mPlayer] section (the counterpart of Save).
+    void Load(INI_Reader* Reader);
+    // FUN_06f47a30 (RET 8): store +0xdc; with bAdvanceRank, the chapters that finish a rank
+    // step the player rank first.
+    void SetMissionNumber(unsigned int MissionNumber, unsigned int bAdvanceRank);
+};
 
 FContentPlayerState* FindContentPlayerState(unsigned int PlayerId);
 // FUN_06f49c30: the first player state in key order, or null (Act_DockRequest).
@@ -380,9 +385,6 @@ FContentPlayerState* ReplaceContentPlayerState(unsigned int PlayerId);
 void RemoveContentPlayerState(unsigned int PlayerId);
 // Walk of DAT_06fd0bbc in key order (GameSupport heartbeat).
 void UpdateAllContentPlayerTimes(float DeltaTime);
-void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader);
-void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int MissionNumber,
-                                   unsigned int bAdvanceRank);
 
 // Content.dll FUN_06f49c50 — load [PlayerToughnessScale] / ptough_graph_pt.
 void LoadPlayerToughnessScale(INI_Reader* Reader);

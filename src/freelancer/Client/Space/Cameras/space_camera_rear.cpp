@@ -32,14 +32,14 @@ namespace
     const double kRearViewYaw = 3.1415927410125732;
 }
 
-void RearViewCameraConstruct(FRearViewCamera* Cam)
+void FRearViewCamera::Construct()
 {
     // FUN_0051ad30.
-    HudCameraConstruct((FHudCamera*)Cam);
+    FHudCamera::Construct();
 
-    Cam->ViewPosition.x = 0.0f;
-    Cam->ViewPosition.y = 5.0f;
-    Cam->ViewPosition.z = 20.0f;
+    ViewPosition.x = 0.0f;
+    ViewPosition.y = 5.0f;
+    ViewPosition.z = 20.0f;
 
     // Retail's face table 0x005dbe18 has the same one slot as HUDCamera's 0x005dc084
     // (FUN_0051d7f0); the port shares it.
@@ -51,10 +51,10 @@ const char* RearViewCameraGetName()
     return "RearView";
 }
 
-void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
+void FRearViewCamera::Update(float DeltaSeconds)
 {
     // LAB_0051b0d0 (slot 0x6c).
-    FHudCamera* const Hud = (FHudCamera*)Cam;
+    FHudCamera* const Hud = (FHudCamera*)this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // Only with a watched client ship (CObject mask 0x503); HUDCamera's update runs either way.
@@ -78,7 +78,7 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
                 static_cast<float>(X * Sin + Cos * static_cast<double>(Orientation.E[Row][2]));
         }
 
-        HudCameraApplyShake(Hud, &Orientation);
+        Hud->ApplyShake(&Orientation);
 
         // The view position (+0x100) through the shaken orientation, using Cockpit.cpp's shared
         // math engine cache DAT_00675220.
@@ -87,7 +87,7 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
         Vector Offset;
         G_FirstPersonMathEngine->TransformMatrix(
             Offset, Orientation,
-            Cam->ViewPosition);
+            ViewPosition);
 
         Vector const& ShipPos = Object->get_position();
         float Position[3];
@@ -102,10 +102,10 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
         Space->bViewDirty = 1;
     }
 
-    HudCameraUpdate(Hud, DeltaSeconds);
+    Hud->FHudCamera::Update(DeltaSeconds);
 }
 
-bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath)
+bool FRearViewCamera::Load(const char* CockpitIniPath)
 {
     // FUN_0051ad80, in retail's order. The warnings carry retail's Cockpit.cpp line numbers.
     bool bOk = true;
@@ -142,9 +142,9 @@ bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath)
             const float Y = Reader.get_value_float(1);
             const float Z = Reader.get_value_float(2);
 
-            Cam->ViewPosition.x = X;
-            Cam->ViewPosition.y = Y;
-            Cam->ViewPosition.z = Z;
+            ViewPosition.x = X;
+            ViewPosition.y = Y;
+            ViewPosition.z = Z;
         }
     }
 
@@ -156,14 +156,9 @@ char const* FRearViewCamera::GetName()
     return RearViewCameraGetName();
 }
 
-void FRearViewCamera::Update(float DeltaSeconds)
-{
-    RearViewCameraUpdate(this, DeltaSeconds);
-}
-
 void FRearViewCamera::Deactivate()
 {
-    HudCameraDerivedDeactivate(this);
+    DerivedDeactivate();
 }
 
 void FRearViewCamera::DrawScene(unsigned LayerFlags, unsigned Param2)

@@ -182,7 +182,7 @@ unsigned long DACOM_API FScriptCamSink::Release()
         return static_cast<unsigned long>(RefCount);
 
     // The count is put back to 1 before the free, so a re-entrant release cannot free twice;
-    // zero comes back. The port's sinks are malloc'd (see ScriptCameraConstruct).
+    // zero comes back. The port's sinks are malloc'd (see FScriptCamera::Construct).
     RefCount = 1;
     free(this);
     return 0;
@@ -299,41 +299,41 @@ GENRESULT DACOM_API FScriptCamObjectTransform::GetOrientation(Matrix* OutOrienta
 //   0x68  0x0051e660  (GameCamera 0x0051b480)   deactivate
 //   0x6c  0x0051e740  (GameCamera 0x0051b650)   update
 
-void ScriptCameraConstruct(FScriptCamera* Cam)
+void FScriptCamera::Construct()
 {
     // ScriptCamera skips HUDCamera entirely. No null test on `this` (the one caller passes a
     // static).
-    GameCameraConstruct((FGameCamera*)Cam);
+    FGameCamera::Construct();
 
-    Cam->NameLength = 0;
-    Cam->Name[0] = '\0';
+    NameLength = 0;
+    Name[0] = '\0';
 
-    SetIdentity(Cam->Orientation, Cam->Position);
+    SetIdentity(Orientation, Position);
 
     // Retail installs the ScriptCamera vptr here.
 
-    Cam->Script = nullptr;
+    Script = nullptr;
 
     // operator new(0x38); retail stores null on failure rather than throwing. Port: malloc +
     // placement new, because Release() frees with free(). Retail leaves the Csys uninitialised
     // (the script writes it before the camera reads it); the port does not zero it either.
-    Cam->CameraTransform = static_cast<FScriptCamTransform*>(malloc(sizeof(FScriptCamTransform)));
-    if (Cam->CameraTransform != nullptr)
-        new (Cam->CameraTransform) FScriptCamTransform();
+    CameraTransform = static_cast<FScriptCamTransform*>(malloc(sizeof(FScriptCamTransform)));
+    if (CameraTransform != nullptr)
+        new (CameraTransform) FScriptCamTransform();
 
     // operator new(0x70).
-    Cam->ObjectTransform =
+    ObjectTransform =
         static_cast<FScriptCamObjectTransform*>(malloc(sizeof(FScriptCamObjectTransform)));
-    if (Cam->ObjectTransform != nullptr)
-        new (Cam->ObjectTransform) FScriptCamObjectTransform();
+    if (ObjectTransform != nullptr)
+        new (ObjectTransform) FScriptCamObjectTransform();
 
-    Cam->CameraEntity = -1;
-    Cam->ObjectEntity = -1;
+    CameraEntity = -1;
+    ObjectEntity = -1;
 }
 
-void ScriptCameraDestruct(FScriptCamera* Cam)
+void FScriptCamera::Destruct()
 {
-    Cam->~FScriptCamera();
+    this->~FScriptCamera();
 }
 
 FScriptCamera::~FScriptCamera()
@@ -360,28 +360,27 @@ FScriptCamera::~FScriptCamera()
     // keeps that asymmetry deliberately; see docs/re/deviations.md.
 }
 
-void ScriptCameraSetup(FScriptCamera* Cam, const char* ScriptName, void* Object,
-                       const float* Transform12)
+void FScriptCamera::Setup(const char* ScriptName, void* Object, const float* Transform12)
 {
     // FUN_0051e3b0. No null test on `this` or on the +0x100 sink.
 
     // An already-loaded script is torn down first, so this doubles as the reset.
-    TearDownScript(Cam);
+    TearDownScript(this);
 
-    // The object sink watches the new object (same short-circuit as GameCameraAttach).
+    // The object sink watches the new object (same short-circuit as FGameCamera::Attach).
     Watchable const* const Target =
         (Object != nullptr)
             ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
                                                  kWatchableOffset)
             : nullptr;
 
-    if (Target != Cam->ObjectTransform->Watched.target())
-        Cam->ObjectTransform->Watched.set(Target);
+    if (Target != ObjectTransform->Watched.target())
+        ObjectTransform->Watched.set(Target);
 
     if (ScriptName == nullptr)
     {
-        Cam->NameLength = 0;
-        Cam->Name[0] = '\0';
+        NameLength = 0;
+        Name[0] = '\0';
     }
     else
     {
@@ -390,16 +389,16 @@ void ScriptCameraSetup(FScriptCamera* Cam, const char* ScriptName, void* Object,
         if (Length > static_cast<size_t>(kScriptCameraNameMax))
             Length = static_cast<size_t>(kScriptCameraNameMax);
 
-        memcpy(Cam->Name, ScriptName, Length);
-        Cam->Name[Length] = '\0';
-        Cam->NameLength = static_cast<unsigned>(Length);
+        memcpy(Name, ScriptName, Length);
+        Name[Length] = '\0';
+        NameLength = static_cast<unsigned>(Length);
     }
 
     // Nine floats of orientation then three of position; null leaves the transform untouched.
     if (Transform12 != nullptr)
     {
-        memcpy(Cam->Orientation, Transform12, 9 * sizeof(float));
-        memcpy(Cam->Position, Transform12 + 9, 3 * sizeof(float));
+        memcpy(Orientation, Transform12, 9 * sizeof(float));
+        memcpy(Position, Transform12 + 9, 3 * sizeof(float));
     }
 }
 
@@ -408,14 +407,14 @@ const char* ScriptCameraName()
     return kScriptCameraClassName;
 }
 
-bool ScriptCameraIsFinished(const FScriptCamera* Cam)
+bool FScriptCamera::IsFinished()
 {
     // 0x0051e810. No script counts as finished.
-    if (Cam->Script == nullptr)
+    if (Script == nullptr)
         return true;
 
     // Lets the camera controller take the view back when a cutscene ends.
-    const GENRESULT State = ScriptOf(Cam->Script)->GetPlayState();
+    const GENRESULT State = ScriptOf(Script)->GetPlayState();
     return State == kScriptStateFinished;
 }
 
@@ -426,7 +425,7 @@ void* ScriptCameraWatchedObject(const FScriptCamera* Cam)
     return WatchedObjectOf(Cam->ObjectTransform->Watched);
 }
 
-bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
+bool FScriptCamera::Activate(int const* ViewRect4)
 {
     // 0x0051e4c0. Retail's descriptor is 0x14 bytes, not dacom.h's 0xC AGGDESC (the same shape
     // ThornScriptLoad uses), so it is declared locally at the retail size.
@@ -455,20 +454,20 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);
 
     IDAComponent* const Component = reinterpret_cast<IDAComponent*>(Instance);
-    Component->QueryInterface(Iids::ScriptEngine, &Cam->Script);
+    Component->QueryInterface(Iids::ScriptEngine, &Script);
 
     // Only the queried interface is kept.
     Component->Release();
 
     // The starting transform goes into the OBJECT sink's first Csys before the script loads, so
     // the script sees the frame `main_object` is placed relative to. Sink pointer not tested.
-    memcpy(Cam->ObjectTransform->OrientationA, Cam->Orientation, 9 * sizeof(float));
-    memcpy(Cam->ObjectTransform->PositionA, Cam->Position, 3 * sizeof(float));
+    memcpy(ObjectTransform->OrientationA, Orientation, 9 * sizeof(float));
+    memcpy(ObjectTransform->PositionA, Position, 3 * sizeof(float));
 
     // The stored name is a DATA-relative path.
-    const char* const FullPath = GetFullFilename(Cam->Name);
+    const char* const FullPath = GetFullFilename(this->Name);
 
-    const GENRESULT LoadResult = ScriptOf(Cam->Script)->LoadFromPath(FullPath);
+    const GENRESULT LoadResult = ScriptOf(Script)->LoadFromPath(FullPath);
     if (LoadResult != GR_OK)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ScriptCamera load failed: %s\n",
@@ -479,36 +478,36 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     }
 
     // Walk every entity once and bind the two sinks.
-    const unsigned long EntityCount = ScriptOf(Cam->Script)->GetEntityCount();
+    const unsigned long EntityCount = ScriptOf(Script)->GetEntityCount();
 
     for (int Index = 0; Index < static_cast<int>(EntityCount); ++Index)
     {
         // The FIRST dword is the entity type; dereferenced without a test.
         const int* const Entity =
-            static_cast<const int*>(ScriptOf(Cam->Script)->GetEntityDescInOrder(Index));
+            static_cast<const int*>(ScriptOf(Script)->GetEntityDescInOrder(Index));
 
         if (*Entity == kScriptEntityTypeCamera)
         {
-            ScriptOf(Cam->Script)->AttachEntity(Index, Cam->CameraTransform);
-            Cam->CameraEntity = Index;
+            ScriptOf(Script)->AttachEntity(Index, CameraTransform);
+            CameraEntity = Index;
         }
 
         // INDEPENDENTLY of the type (no `else`), an entity carrying `main_object` drives the
         // object sink; the last matching index wins in each case.
         const char* const MainObject = ThornGetUserString(
-            reinterpret_cast<IScriptEngine*>(Cam->Script), Index, kMainObjectProperty);
+            reinterpret_cast<IScriptEngine*>(Script), Index, kMainObjectProperty);
         if (MainObject != nullptr)
         {
-            ScriptOf(Cam->Script)->AttachEntity(Index, Cam->ObjectTransform);
-            Cam->ObjectEntity = Index;
+            ScriptOf(Script)->AttachEntity(Index, ObjectTransform);
+            ObjectEntity = Index;
         }
     }
 
     // The script starts at time zero.
-    ScriptOf(Cam->Script)->StartPlayback(0);
+    ScriptOf(Script)->StartPlayback(0);
 
     // FGameCamera's activate (FUN_0051b450), which also runs the slot-0x5c viewport reset.
-    const bool bBaseResult = GameCameraActivate((FGameCamera*)Cam, ViewRect4);
+    const bool bBaseResult = FGameCamera::Activate(ViewRect4);
 
     SetLetterboxTarget(1.0f, kLetterboxSpeed);
 
@@ -518,10 +517,10 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     return bBaseResult;
 }
 
-void ScriptCameraDeactivate(FScriptCamera* Cam)
+void FScriptCamera::Deactivate()
 {
     // 0x0051e660. The rest runs whether or not there was a script.
-    TearDownScript(Cam);
+    TearDownScript(this);
 
     // The base deactivate is the empty IDPMsgHandler::OnDisconnect.
 
@@ -530,21 +529,21 @@ void ScriptCameraDeactivate(FScriptCamera* Cam)
     SetLetterboxTarget(0.0f, kLetterboxSpeed);
 }
 
-void ScriptCameraUpdate(FScriptCamera* Cam, float DeltaSeconds)
+void FScriptCamera::Update(float DeltaSeconds)
 {
     // 0x0051e740. No script: the camera keeps its last world transform.
-    if (Cam->Script == nullptr)
+    if (Script == nullptr)
         return;
 
     // Whole milliseconds, truncated.
     const int DeltaMs = static_cast<int>(static_cast<double>(DeltaSeconds) * kSecondsToMilliseconds);
-    ScriptOf(Cam->Script)->TickPlayback(DeltaMs);
+    ScriptOf(Script)->TickPlayback(DeltaMs);
 
     // The camera sink (+0xfc, no null test) is read back through its slots, not off the fields.
     float LocalPosition[3];
     float LocalOrientation[9];
-    Cam->CameraTransform->GetPosition((Vector*)LocalPosition);        // 0x14
-    Cam->CameraTransform->GetOrientation((Matrix*)LocalOrientation);  // 0x18
+    CameraTransform->GetPosition((Vector*)LocalPosition);        // 0x14
+    CameraTransform->GetOrientation((Matrix*)LocalOrientation);  // 0x18
 
     // The script's transform is composed ONTO the stored starting one, so a script written
     // around the origin lands wherever the setup put the camera.
@@ -552,9 +551,9 @@ void ScriptCameraUpdate(FScriptCamera* Cam, float DeltaSeconds)
     memcpy(&Local.Rotation, LocalOrientation, 9 * sizeof(float));
     memcpy(&Local.Translation, LocalPosition, 3 * sizeof(float));
     Transform World;
-    ScriptCameraMathEngine()->MulTransform(World, AsTransform(Cam->Orientation), Local);
+    ScriptCameraMathEngine()->MulTransform(World, AsTransform(Orientation), Local);
 
-    FSpaceCamera* const Base = (FSpaceCamera*)Cam;
+    FSpaceCamera* const Base = (FSpaceCamera*)this;
     memcpy(&Base->World, &World.Rotation, 9 * sizeof(float));
     memcpy(&Base->WorldPos, &World.Translation, 3 * sizeof(float));
     Base->bViewDirty = 1;
@@ -564,24 +563,4 @@ char const* FScriptCamera::GetName()
 {
     // 0x0051e070.
     return ScriptCameraName();
-}
-
-bool FScriptCamera::IsFinished()
-{
-    return ScriptCameraIsFinished(this);
-}
-
-bool FScriptCamera::Activate(int const* ViewRect4)
-{
-    return ScriptCameraActivate(this, ViewRect4);
-}
-
-void FScriptCamera::Deactivate()
-{
-    ScriptCameraDeactivate(this);
-}
-
-void FScriptCamera::Update(float DeltaSeconds)
-{
-    ScriptCameraUpdate(this, DeltaSeconds);
 }

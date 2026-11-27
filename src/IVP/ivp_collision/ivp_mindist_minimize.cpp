@@ -333,9 +333,9 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PF(IVP_Compact_Edge* 
     IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(F, CacheF->compact_ledge, &HesseF);
     HesseF.normize();
     IVP_U_Point HesseWorld;
-    IVP_RotateSlotToWorldSpace(CacheF->cache_object, &HesseF, &HesseWorld); // 0634d9d0
+    CacheF->cache_object->rotate_slot_to_world_space(&HesseF, &HesseWorld); // 0634d9d0
     IVP_U_Point HesseP;
-    IVP_RotateWorldToSlotSpace(CacheP->cache_object, &HesseWorld, &HesseP); // 0634d970
+    CacheP->cache_object->rotate_world_to_slot_space(&HesseWorld, &HesseP); // 0634d970
 
     IVP_Ledge_Mindist* const Mindist = mindist;
     const IVP_U_Float_Point* const PointOfF = CacheF->compact_poly_points + F->GetStartPointIndex();
@@ -508,8 +508,8 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PP(IVP_Compact_Edge* P0, IV
     // [0]: P1 in cache0's space (local_10), [1]: P0 in cache1's space (local_20); side i
     // compares the OTHER point against its own vertex fan.
     IVP_U_Point PosOther[2];
-    IVP_TransformWorldToSlotSpace(Cache1->cache_object, &World0, &PosOther[1]);
-    IVP_TransformWorldToSlotSpace(Cache0->cache_object, &World1, &PosOther[0]);
+    Cache1->cache_object->transform_world_to_slot_space(&World0, &PosOther[1]);
+    Cache0->cache_object->transform_world_to_slot_space(&World1, &PosOther[0]);
 
     const double Dx = (double)(World0.k[0]) - World1.k[0];
     const double Dy = (double)(World0.k[1]) - World1.k[1];
@@ -718,7 +718,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
         const float InvDist = (float)(IVP_InvSqrtFloat(QuadDist)); // local_11c
         Mindist->SeparationGap = (float)((double)(InvDist) * QuadDist - Mindist->CombinedRadius);
         Perpendicular.calc_cross_product(&EdgeVec, &Perpendicular);
-        IVP_RotateSlotToWorldSpace(CacheK->cache_object, &Perpendicular, &Perpendicular); // 0634d9d0, in place
+        CacheK->cache_object->rotate_slot_to_world_space(&Perpendicular, &Perpendicular); // 0634d9d0, in place
         const double Scale = -((double)(InvDist) * InvQuadEdge);
         Mindist->SeparatingNormal.y = (float)(Perpendicular.k[1] * Scale);
         Mindist->SeparatingNormal.z = (float)(Perpendicular.k[2] * Scale);
@@ -745,7 +745,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
                                                          Sx * Mindist->SeparatingNormal.x);
     }
 
-    IVP_RotateWorldToSlotSpace(CacheP->cache_object, &Perpendicular, &Perpendicular); // 0634d970, in place
+    CacheP->cache_object->rotate_world_to_slot_space(&Perpendicular, &Perpendicular); // 0634d970, in place
 
     float MaxValue = (float)((double)(QuadDist) * 1.0e-6f); // DAT_063a5610, local_120
     const IVP_U_Float_Point* const V = CacheP->compact_poly_points + P->GetStartPointIndex();
@@ -935,9 +935,9 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_KK(IVP_Compact_Edge* 
     CrossCopy.k[1] = Cross->k[1];
     CrossCopy.k[2] = Cross->k[2];
     IVP_U_Point NormalWorld; // local_e0
-    IVP_RotateSlotToWorldSpace(CacheL->cache_object, &CrossCopy, &NormalWorld); // 0634d9d0
+    CacheL->cache_object->rotate_slot_to_world_space(&CrossCopy, &NormalWorld); // 0634d9d0
     IVP_U_Point NormalK; // local_d0
-    IVP_RotateWorldToSlotSpace(CacheK->cache_object, &NormalWorld, &NormalK); // 0634d970
+    CacheK->cache_object->rotate_world_to_slot_space(&NormalWorld, &NormalK); // 0634d970
 
     IVP_Ledge_Mindist* const Mindist = mindist;
     Mindist->SeparationGap = (float)(std::fabs((double)(InvLength) * Dist));
@@ -1299,7 +1299,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BP(IVP_Cache_Ball* Ball, IV
     IVP_Compact_Ledge_Solver::give_world_coords_AT(P, CacheP, &WorldP);
     const IVP_U_Point* const BallCenter = &Ball->cache_object->WorldTransform.vv;
     IVP_U_Point BallInP; // local_20
-    IVP_TransformWorldToSlotSpace(CacheP->cache_object, BallCenter, &BallInP);
+    CacheP->cache_object->transform_world_to_slot_space(BallCenter, &BallInP);
 
     IVP_U_Point Normal; // local_30
     Normal.k[1] = (float)((double)(BallCenter->k[1]) - WorldP.k[1]);
@@ -1382,7 +1382,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BP(IVP_Cache_Ball* Ball, IV
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BK(IVP_Cache_Ball* Ball, IVP_Compact_Edge* K, IVP_Cache_Ledge_Point* CacheK)
 {
     IVP_U_Point BallInK; // local_10
-    IVP_TransformWorldToSlotSpace(CacheK->cache_object, &Ball->cache_object->WorldTransform.vv, &BallInK);
+    CacheK->cache_object->transform_world_to_slot_space(&Ball->cache_object->WorldTransform.vv, &BallInK);
     IVP_Unscaled_S_Result S; // local_18
     IVP_Compact_Ledge_Solver::calc_unscaled_s_val_K_space(CacheK->compact_ledge, K, &BallInK, &S);
     if (!(S.Checks[0] >= 0.0f))
@@ -1410,7 +1410,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
     }
 
     IVP_U_Point BallInK; // local_70
-    IVP_TransformWorldToSlotSpace(CacheK->cache_object, &Ball->cache_object->WorldTransform.vv, &BallInK);
+    CacheK->cache_object->transform_world_to_slot_space(&Ball->cache_object->WorldTransform.vv, &BallInK);
 
     const IVP_U_Float_Point* const PointsK = CacheK->compact_poly_points;
     IVP_Compact_Edge* const OppositeK = K->GetOppositeEdge();
@@ -1486,7 +1486,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
     IVP_Ledge_Mindist* const Mindist = mindist;
     Mindist->SeparationGap = (float)((double)(InvDist) * QuadDist - Mindist->CombinedRadius);
     Perpendicular.calc_cross_product(&EdgeVec, &Perpendicular);
-    IVP_RotateSlotToWorldSpace(CacheK->cache_object, &Perpendicular, &Perpendicular); // 0634d9d0, in place
+    CacheK->cache_object->rotate_slot_to_world_space(&Perpendicular, &Perpendicular); // 0634d9d0, in place
     const double Scale = -((double)(InvDist) * InvQuadEdge);
     Mindist->SeparatingNormal.y = (float)(Perpendicular.k[1] * Scale);
     Mindist->SeparatingNormal.z = (float)(Perpendicular.k[2] * Scale);
@@ -1516,7 +1516,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BF(IVP_Cache_Ball* Ball, IVP_Compact_Edge* F, IVP_Cache_Ledge_Point* CacheF)
 {
     IVP_U_Point BallInF; // local_30
-    IVP_TransformWorldToSlotSpace(CacheF->cache_object, &Ball->cache_object->WorldTransform.vv, &BallInF);
+    CacheF->cache_object->transform_world_to_slot_space(&Ball->cache_object->WorldTransform.vv, &BallInF);
     IVP_Unscaled_QR_Result QR; // local_20
     IVP_Compact_Ledge_Solver::calc_unscaled_qr_vals_F_space(CacheF->compact_ledge, F, &BallInF, &QR);
 
@@ -1528,7 +1528,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BF(IVP_Cache_Ball* Ball, IV
         IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(F, CacheF->compact_ledge, &Hesse);
         Hesse.normize();
         IVP_U_Point HesseWorld; // local_10
-        IVP_RotateSlotToWorldSpace(CacheF->cache_object, &Hesse, &HesseWorld); // 0634d9d0
+        CacheF->cache_object->rotate_slot_to_world_space(&Hesse, &HesseWorld); // 0634d9d0
 
         IVP_Ledge_Mindist* const Mindist = mindist;
         Mindist->SeparatingNormal.x = HesseWorld.k[0];

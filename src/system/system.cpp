@@ -199,19 +199,19 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
 
     for (unsigned int Index = 0; Table[Index].Iid != nullptr; ++Index)
     {
-        if (strcmp(Table[Index].Iid, Iid) == 0)
-        {
-            unsigned char* Base = (unsigned char*)(Outer);
-            unsigned long Offset = Table[Index].ByteOffset;
-            IDAComponent* Face = nullptr;
-            if ((Offset & FQiEntry::kIndirect) != 0)
-                Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
-            else
-                Face = (IDAComponent*)(Base + Offset);
-            Face->AddRef();
-            *Out = Face;
-            return GR_OK;
-        }
+        if (strcmp(Table[Index].Iid, Iid) != 0)
+            continue;
+
+        unsigned char* Base = (unsigned char*)(Outer);
+        unsigned long Offset = Table[Index].ByteOffset;
+        IDAComponent* Face = nullptr;
+        if ((Offset & FQiEntry::kIndirect) != 0)
+            Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
+        else
+            Face = (IDAComponent*)(Base + Offset);
+        Face->AddRef();
+        *Out = Face;
+        return GR_OK;
     }
 
     *Out = nullptr;

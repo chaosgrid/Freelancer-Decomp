@@ -485,10 +485,10 @@ void FObjectShip::DrawOpaque(ICamera* Camera)
         float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
-                              HeightBits, 0);
+        Owner->DrawShadow(static_cast<unsigned long>(Instance),
+                          HeightBits, 0);
     }
-    RoomControlDrawObject(Owner, this);
+    Owner->DrawObject(this);
 }
 
 void FObjectShip::DrawTranslucent(ICamera* Camera)
@@ -853,10 +853,10 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
         float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
-                              HeightBits, 0);
+        Owner->DrawShadow(static_cast<unsigned long>(Instance),
+                          HeightBits, 0);
     }
-    RoomControlDrawObject(Owner, this);
+    Owner->DrawObject(this);
 }
 
 // ---------------------------------------------------------------------------------------

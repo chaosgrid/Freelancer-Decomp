@@ -17,12 +17,9 @@
 #include <map>
 #include <new>
 
-static FEngineInstance* EngineInstanceInit(FEngineInstance* This, FArchetypeHandle* Handle);
 static void ReplaceSearchPath(FEngineObject* This, IDAComponent* NewPath);
 static void EngineComposeAncestors(FEngineInstance* Instance);
 
-static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetypeHandle* Handle,
-                                                IEngineInstance* Callbacks);
 
 static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, unsigned long* Count);
 static void InsertRootInstance(FEngineObject* Engine, FEngineInstance* Instance);
@@ -126,7 +123,7 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 {
     FEngineInstance* Instance = (FEngineInstance*)(G_InstancePool.Alloc());
     if (Instance != nullptr)
-        EngineInstanceInit(Instance, Handle);
+        Instance->Init(Handle);
     return Instance;
 }
 
@@ -145,18 +142,16 @@ static void InitInstanceMatrix(FEngineInstance* Instance)
 }
 
 // FUN_0661eb80.
-static FEngineInstance* EngineInstanceInit(FEngineInstance* This, FArchetypeHandle* Handle)
+FEngineInstance* FEngineInstance::Init(FArchetypeHandle* Handle)
 {
-    if (This == nullptr)
-        return nullptr;
-    std::memset(This, 0, sizeof(FEngineInstance));
-    This->Archetype = Handle;
-    This->Extent = -1.0f;
-    This->bWorldDirty = 1;
-    This->JointState[3] = 1.0f;
-    This->Relative[0] = 0xFFFFFFFF;
-    InitInstanceMatrix(This);
-    return This;
+    std::memset(this, 0, sizeof(FEngineInstance));
+    Archetype = Handle;
+    Extent = -1.0f;
+    bWorldDirty = 1;
+    JointState[3] = 1.0f;
+    Relative[0] = 0xFFFFFFFF;
+    InitInstanceMatrix(this);
+    return this;
 }
 
 // FUN_0661ec30 (thiscall, this = PARENT).
@@ -1014,8 +1009,9 @@ static bool ReadPartNameField(IFileSystem* Fs, const char* Field, char* Buffer)
 }
 
 // FUN_066201b0. Retries CreateFileSystem without the parent FS when the first attempt fails.
-static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, void* CmpndFs,
-                                    unsigned long FindHandle, IFileSystem* ParentFs, FArchetypeChild* Child)
+GENRESULT FEngineObject::LinkCmpndPartHandle(const char* Name, void* CmpndFs,
+                                             unsigned long FindHandle, IFileSystem* ParentFs,
+                                             FArchetypeChild* Child)
 {
     FEngBaseFileSystemDesc PartDesc;
     FillFileSystemDesc(&PartDesc, Name, nullptr);
@@ -1039,14 +1035,14 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
     if (ObjectResult < 0 || FileResult < 0)
         return GR_E_FAIL;
 
-    if (Engine->CreateFileSystem(FileName, &FileFs, ParentFs) != 0) // +0x28
+    if (CreateFileSystem(FileName, &FileFs, ParentFs) != 0) // +0x28
     {
         if (FileFs != nullptr)
         {
             ((IDAComponent*)FileFs)->Release();
             FileFs = nullptr;
         }
-        if (Engine->CreateFileSystem(FileName, &FileFs, nullptr) != 0) // +0x28
+        if (CreateFileSystem(FileName, &FileFs, nullptr) != 0) // +0x28
         {
             if (FileFs != nullptr)
                 ((IDAComponent*)FileFs)->Release();
@@ -1057,7 +1053,7 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
     FArchetypeName Nested;
     Nested.Text = FileName;
     Nested.Crc = DACOM_CRC::GetCRC32(FileName);
-    ArchetypeIndex PartHandle = Engine->CreateArchetypeHandle(&Nested, FileFs); // +0x30
+    ArchetypeIndex PartHandle = CreateArchetypeHandle(&Nested, FileFs); // +0x30
     if (PartHandle == (ArchetypeIndex)G_InvalidArchetype)
     {
         if (FileFs != nullptr)
@@ -1226,8 +1222,8 @@ static const char* const G_CmpndPartFailText =
     "Engine: create_compound_archetype: unable to create part archetype, ignoring...";
 
 // FUN_06620500.
-static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Handle, void* CmpndFs,
-                                   IFileSystem* ParentFs)
+GENRESULT FEngineObject::ParseCmpndChildren(FArchetypeHandle* Handle, void* CmpndFs,
+                                            IFileSystem* ParentFs)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return GR_E_FAIL;
@@ -1235,7 +1231,7 @@ static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Han
 
     std::size_t Count = Handle->Children.size();
     FArchetypeChild* Child = AppendArchetypeChild(Handle);
-    if (LinkCmpndPartHandle(Engine, G_NameRoot, CmpndFs, 0xFFFFFFFF, ParentFs, Child) < 0)
+    if (LinkCmpndPartHandle(G_NameRoot, CmpndFs, 0xFFFFFFFF, ParentFs, Child) < 0)
     {
         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x331, "WARNING", G_CmpndPartFailText);
         ShrinkArchetypeChildren(Handle, Count);
@@ -1250,7 +1246,7 @@ static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Han
         {
             Count = Handle->Children.size();
             Child = AppendArchetypeChild(Handle);
-            if (LinkCmpndPartHandle(Engine, FindData.cFileName, CmpndFs,
+            if (LinkCmpndPartHandle(FindData.cFileName, CmpndFs,
                                     (unsigned long)FindHandle, ParentFs, Child) < 0)
             {
                 ShrinkArchetypeChildren(Handle, Count);
@@ -1299,7 +1295,7 @@ static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* Th
         return G_InvalidArchetype;
 
     if (AsFileSystem(FileSystem)->CreateInstance((AGGDESC*)(&Desc), &CmpndFs) < 0 ||
-        ParseCmpndChildren(This, Handle, CmpndFs, FileSystem) < 0)
+        This->ParseCmpndChildren(Handle, CmpndFs, FileSystem) < 0)
         FanoutIecCreateArchetype(This, Handle, FileSystem);
 
     if (CmpndFs != nullptr)
@@ -1455,7 +1451,7 @@ static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
     IEngineInstance* Xf = (IEngineInstance*)Transform;
     if (Handle->Children.size() != 0)
     {
-        FEngineInstance* Root = EngineCreateInstanceTree(This, Handle, Xf);
+        FEngineInstance* Root = This->CreateInstanceTree(Handle, Xf);
         if (Root == G_InvalidInstance)
             return Root;
         Root->Callbacks->create_instance((long)Root);
@@ -2189,8 +2185,8 @@ unsigned long DACOM_API FEngineObject::SetJointParams(InstanceIndex InInstance, 
 }
 
 // FUN_06622860, called only from FUN_06621630 for compound archetypes.
-static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetypeHandle* Handle,
-                                                IEngineInstance* Callbacks)
+FEngineInstance* FEngineObject::CreateInstanceTree(FArchetypeHandle* Handle,
+                                                   IEngineInstance* Callbacks)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
@@ -2205,14 +2201,14 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
     {
         // No filtering: slot 23 itself answers -1 for a -1/null handle.
         FEngineInstance* ChildInst =
-            (FEngineInstance*)(This->CreateInstance((ArchetypeIndex)Child->Handle, ChildTransform));
+            (FEngineInstance*)(CreateInstance((ArchetypeIndex)Child->Handle, ChildTransform));
         if (ChildInst != G_InvalidInstance)
         {
             ChildInst->ParentArchetype = Handle; // +0xC
             ChildInst->PartChild = Child;        // +0xE8
             // Overwrites an existing entry with the same CRC, as operator[] does.
             Parts[Child->Crc] = ChildInst;
-            This->AddRefHandle((ArchetypeIndex)Handle);
+            AddRefHandle((ArchetypeIndex)Handle);
             ChildTransform = nullptr;
         }
         Child += 1;
@@ -2230,7 +2226,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
             if (ChildIt == Parts.end())
             {
                 FEngineName ArchName;
-                const char* ArchText = This->GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
+                const char* ArchText = GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
                 if (ArchText == nullptr)
                     ArchText = "";               // DAT_0662ace4
                 char Message[0x2000];
@@ -2247,7 +2243,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
                 if (ParentIt == Parts.end())
                 {
                     FEngineName ArchName;
-                    const char* ArchText = This->GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
+                    const char* ArchText = GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
                     if (ArchText == nullptr)
                         ArchText = "";           // DAT_0662ace4
                     char Message[0x2000];
@@ -2284,7 +2280,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
     }
 
     // Instance-root map at +0x10, cache at +0x28 / byte +0x2C.
-    InsertRootInstance(This, Root);
+    InsertRootInstance(this, Root);
     return Root;
 }
 

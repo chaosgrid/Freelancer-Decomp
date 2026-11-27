@@ -127,12 +127,12 @@ void CopyTransform12(Transform* Dest, Transform const* Source)
 }
 
 // FUN_004058b0 (thiscall, no test of the entry): free +4, clear it, free +0xc, clear it.
-void PartCacheEntryDestroy(FPartCacheEntry* Entry)
+void FPartCacheEntry::Destroy()
 {
-    operator delete(Entry->Vertices);
-    Entry->Vertices = nullptr;
-    operator delete(Entry->Indices);
-    Entry->Indices = nullptr;
+    operator delete(Vertices);
+    Vertices = nullptr;
+    operator delete(Indices);
+    Indices = nullptr;
 }
 
 // LAB_00405f80
@@ -151,28 +151,28 @@ void PartCacheEntryConstruct(FPartCacheEntry* Entry)
 
 // FUN_004058e0 (thiscall, no test of the cache): the count-prefixed entry array through the
 // vector destructor iterator (FUN_004058b0 per 0x1c record), then the merged index buffer.
-void PartCacheClear(FPartCache* Cache)
+void FPartCache::Clear()
 {
-    FPartCacheEntry* Entries = Cache->Entries;
+    FPartCacheEntry* Entries = this->Entries;
     if (Entries != nullptr)
     {
         unsigned* Prefix = reinterpret_cast<unsigned*>(Entries) - 1;
         unsigned Count = *Prefix;
         unsigned Index = 0;
         for (; Index < Count; ++Index)
-            PartCacheEntryDestroy(Entries + Index);
+            (Entries + Index)->Destroy();
         operator delete(Prefix);
     }
-    operator delete(Cache->MergedIndices);
-    Cache->Entries = nullptr;
-    Cache->PartCount = 0;
-    Cache->TotalIndices = 0;
-    Cache->TotalVertices = 0;
-    Cache->MergedIndices = nullptr;
+    operator delete(MergedIndices);
+    this->Entries = nullptr;
+    PartCount = 0;
+    TotalIndices = 0;
+    TotalVertices = 0;
+    MergedIndices = nullptr;
 }
 
 // FUN_00405fb0 (thiscall on the entry, RET 8: Wire, Xform). The wire is used untested.
-void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform const* Xform)
+void FPartCacheEntry::BuildFromWire(IVMeshWire* Wire, Transform const* Xform)
 {
     unsigned char* HeaderBytes = static_cast<unsigned char*>(Wire->GetMeshData());
     unsigned char* PartBytes = static_cast<unsigned char*>(Wire->GetWireData());
@@ -183,7 +183,7 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
     FVwireDataHeader const* PartHeader = reinterpret_cast<FVwireDataHeader*>(PartBytes);
 
     unsigned RemapCount = PartHeader->RemapCount;
-    Entry->VertexCount = RemapCount;
+    VertexCount = RemapCount;
     if (RemapCount == 0)
         return;
 
@@ -209,11 +209,11 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
     int TexBytes = FvfTexcoordBlockBytes(Fvf);
     unsigned Stride = static_cast<unsigned>(TexBytes) + ExtraTail + ExtraUv2 + ExtraPos;
 
-    Entry->Vertices = static_cast<FPartCacheVertex*>(
-        operator new(static_cast<std::size_t>(Entry->VertexCount) << 4));
-    Entry->IndexCount = PartHeader->Count;
-    Entry->Indices = static_cast<unsigned short*>(
-        operator new(static_cast<std::size_t>(Entry->IndexCount) * 2U));
+    Vertices = static_cast<FPartCacheVertex*>(
+        operator new(static_cast<std::size_t>(VertexCount) << 4));
+    IndexCount = PartHeader->Count;
+    Indices = static_cast<unsigned short*>(
+        operator new(static_cast<std::size_t>(IndexCount) * 2U));
 
     unsigned short const HeaderVerts = MeshHeader->Vertices;
     unsigned short* Remap = static_cast<unsigned short*>(
@@ -231,7 +231,7 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
     unsigned short const* PartIndices =
         reinterpret_cast<unsigned short const*>(PartBytes + 0x10);
 
-    if (Entry->IndexCount != 0)
+    if (IndexCount != 0)
     {
         do
         {
@@ -248,17 +248,17 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
                           * Stride);
                 Vector Transformed;
                 PartCacheMath()->TransformXform(Transformed, *Xform, *Source);
-                FPartCacheVertex* OutVert = Entry->Vertices + Compacted;
+                FPartCacheVertex* OutVert = Vertices + Compacted;
                 OutVert->X = Transformed.x;
                 OutVert->Y = Transformed.y;
                 OutVert->Z = Transformed.z;
-                OutVert->Tag = Entry->Tag;
+                OutVert->Tag = Tag;
                 Mapped = Compacted;
                 Compacted = static_cast<unsigned short>(Compacted + 1);
             }
-            Entry->Indices[IndexIter] = Mapped;
+            Indices[IndexIter] = Mapped;
             IndexIter += 1;
-        } while (IndexIter < Entry->IndexCount);
+        } while (IndexIter < IndexCount);
     }
 
     operator delete(Remap);
@@ -267,7 +267,7 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform 
 // FUN_00406230 (thiscall on the entry, RET 8: Mesh, Xform). Run twice: a counting pass (no
 // index buffer yet) and a filling pass. The Cell* locals are out-arguments the code never
 // reads.
-unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform)
+unsigned FPartCacheEntry::BuildFromMesh(IMesh* Mesh, Transform const* Xform)
 {
     unsigned short* Remap = nullptr;
     unsigned ReturnCursor = 0;
@@ -276,10 +276,10 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
     float* Positions = nullptr;          // written only by the prologue
 
     // Only while IndexCount is set and the index buffer is not.
-    if (Entry->IndexCount != 0 && Entry->Indices == nullptr)
+    if (this->IndexCount != 0 && Indices == nullptr)
     {
-        Entry->Indices = static_cast<unsigned short*>(
-            operator new(static_cast<std::size_t>(Entry->IndexCount) * 2U));
+        Indices = static_cast<unsigned short*>(
+            operator new(static_cast<std::size_t>(this->IndexCount) * 2U));
         Mesh->OpenFaceGroup(0, kMeshOpenRead);
         Mesh->OpenFaceGroupChannels(kMeshChannelEdgeIndices);
 
@@ -289,7 +289,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
         Mesh->GetFaceGroupData(kMeshChannelEdgeIndices, reinterpret_cast<void**>(&Positions), &CellB4c, &CellB48,
                      reinterpret_cast<void**>(&VertCap));
 
-        Entry->Vertices = static_cast<FPartCacheVertex*>(
+        Vertices = static_cast<FPartCacheVertex*>(
             operator new(static_cast<std::size_t>(VertCap) << 4));
         Mesh->CloseFaceGroup();
         Remap = static_cast<unsigned short*>(
@@ -340,7 +340,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
             {
                 // Unless byte +0x1b is set, a pair weight at or below the DOUBLE 0.1
                 // (DAT_005c7720) leaves the group; greater and unordered go on.
-                if (Entry->bSkipWeightTest == 0)
+                if (bSkipWeightTest == 0)
                 {
                     double const Weight = static_cast<double>(Weights[WeightIndex[Pair]]);
                     if (Weight <= 0.1)
@@ -348,7 +348,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
                 }
 
                 // The counting pass only moves the cursor.
-                if (Entry->Indices != nullptr)
+                if (Indices != nullptr)
                 {
                     unsigned PairOffset = Pair * 4U;
                     for (int PairLeft = 2; PairLeft != 0; --PairLeft)
@@ -367,14 +367,14 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
                             Vector Transformed;
                             PartCacheMath()->TransformXform(Transformed, *Xform, *Source);
 
-                            FPartCacheVertex* OutVert = Entry->Vertices + Mapped;
+                            FPartCacheVertex* OutVert = Vertices + Mapped;
                             OutVert->X = Transformed.x;
                             OutVert->Y = Transformed.y;
                             OutVert->Z = Transformed.z;
-                            OutVert->Tag = Entry->Tag;
+                            OutVert->Tag = Tag;
                         }
 
-                        Entry->Indices[WriteCursor] = Mapped;
+                        Indices[WriteCursor] = Mapped;
                         WriteCursor += 1;
                         PairOffset += 2;
                     }
@@ -389,19 +389,19 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform c
         Mesh->CloseFaceGroup();
     }
 
-    if (Entry->Vertices != nullptr)
-        Entry->VertexCount = Compacted;
+    if (Vertices != nullptr)
+        VertexCount = Compacted;
     if (Remap != nullptr)
         operator delete(Remap);
     return ReturnCursor;
 }
 
 // FUN_00406200
-void PartCacheBuildFromMeshTwice(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform)
+void FPartCacheEntry::BuildFromMeshTwice(IMesh* Mesh, Transform const* Xform)
 {
-    unsigned First = PartCacheBuildFromMesh(Entry, Mesh, Xform);
-    Entry->IndexCount = First;
-    PartCacheBuildFromMesh(Entry, Mesh, Xform);
+    unsigned First = BuildFromMesh(Mesh, Xform);
+    IndexCount = First;
+    BuildFromMesh(Mesh, Xform);
 }
 
 namespace
@@ -435,11 +435,11 @@ namespace
 
 // FUN_00405930 (thiscall, RET 8: Instance, bRecurseChildren). No test of the cache or of
 // DALib::Engine.
-void PartCacheMarkHidden(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren)
+void FPartCache::MarkHidden(InstanceIndex Instance, bool bRecurseChildren)
 {
     const InstanceIndex kInvalid = InvalidInstanceIndex;
 
-    FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
+    FPartCacheEntry* Found = PartCacheFindRecord(this, Instance);
     if (Found != nullptr)
         Found->bHidden = 1;
 
@@ -449,7 +449,7 @@ void PartCacheMarkHidden(FPartCache* Cache, InstanceIndex Instance, bool bRecurs
     InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
-        Found = PartCacheFindRecord(Cache, Child);
+        Found = PartCacheFindRecord(this, Child);
         if (Found != nullptr)
             Found->bHidden = 1;
         Child = DALib::Engine->GetRelatedInstance(Instance, 0, Child);
@@ -458,11 +458,11 @@ void PartCacheMarkHidden(FPartCache* Cache, InstanceIndex Instance, bool bRecurs
 
 // FUN_004059d0 (thiscall): from the second record on, a hidden record loses its active flag.
 // PartCount (re-read each pass) compared signed.
-void PartCacheClearHiddenActive(FPartCache* Cache)
+void FPartCache::ClearHiddenActive()
 {
-    for (int PartIndex = 1; PartIndex < static_cast<int>(Cache->PartCount); ++PartIndex)
+    for (int PartIndex = 1; PartIndex < static_cast<int>(PartCount); ++PartIndex)
     {
-        FPartCacheEntry* Entry = Cache->Entries + PartIndex;
+        FPartCacheEntry* Entry = Entries + PartIndex;
         if (Entry->bHidden != 0)
             Entry->bActive = 0;
     }
@@ -470,12 +470,12 @@ void PartCacheClearHiddenActive(FPartCache* Cache)
 
 // FUN_00405a00 (thiscall, RET 0xc: Instance, bRecurseChildren, Tag). Returns whether any
 // record matched. No test of the cache, of the vertex array or of DALib::Engine.
-bool PartCacheActivatePart(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren, unsigned Tag)
+bool FPartCache::ActivatePart(InstanceIndex Instance, bool bRecurseChildren, unsigned Tag)
 {
     const InstanceIndex kInvalid = InvalidInstanceIndex;
     bool bFound = false;
 
-    FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
+    FPartCacheEntry* Found = PartCacheFindRecord(this, Instance);
     if (Found != nullptr)
     {
         bFound = true;
@@ -488,7 +488,7 @@ bool PartCacheActivatePart(FPartCache* Cache, InstanceIndex Instance, bool bRecu
     InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
-        Found = PartCacheFindRecord(Cache, Child);
+        Found = PartCacheFindRecord(this, Child);
         if (Found != nullptr)
         {
             bFound = true;
@@ -500,7 +500,7 @@ bool PartCacheActivatePart(FPartCache* Cache, InstanceIndex Instance, bool bRecu
 }
 
 // FUN_00405b10 (thiscall on the cache, RET 8: Instance, Tag).
-bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
+bool FPartCache::Build(InstanceIndex Instance, unsigned Tag)
 {
     const InstanceIndex kInvalid = InvalidInstanceIndex;
 
@@ -510,21 +510,21 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
     IEngine* Engine = DALib::Engine;
 
     // FUN_004058e0's body inlined.
-    if (Cache->Entries != nullptr)
+    if (this->Entries != nullptr)
     {
-        unsigned* Prefix = reinterpret_cast<unsigned*>(Cache->Entries) - 1;
+        unsigned* Prefix = reinterpret_cast<unsigned*>(this->Entries) - 1;
         unsigned Count = *Prefix;
         unsigned Index = 0;
         for (; Index < Count; ++Index)
-            PartCacheEntryDestroy(Cache->Entries + Index);
+            (this->Entries + Index)->Destroy();
         operator delete(Prefix);
     }
-    operator delete(Cache->MergedIndices);
-    Cache->Entries = nullptr;
-    Cache->PartCount = 0;
-    Cache->TotalIndices = 0;
-    Cache->TotalVertices = 0;
-    Cache->MergedIndices = nullptr;
+    operator delete(MergedIndices);
+    this->Entries = nullptr;
+    this->PartCount = 0;
+    TotalIndices = 0;
+    TotalVertices = 0;
+    MergedIndices = nullptr;
 
     // The parts are cached in the instance's identity pose.
     Transform SavedTransform;
@@ -537,15 +537,15 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
     Engine->UpdateInstance(Instance, 0, nullptr);
 
     // Root + children.
-    Cache->PartCount = 1;
+    this->PartCount = 1;
     InstanceIndex Child = Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
-        Cache->PartCount += 1;
+        this->PartCount += 1;
         Child = Engine->GetRelatedInstance(Instance, 0, Child);
     }
 
-    unsigned PartCount = Cache->PartCount;
+    unsigned PartCount = this->PartCount;
     unsigned* Prefix = static_cast<unsigned*>(
         operator new(static_cast<std::size_t>(PartCount) * sizeof(FPartCacheEntry) + 4U));
     FPartCacheEntry* Entries = nullptr;
@@ -560,9 +560,9 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
 
     // No test of the array -- retail writes the root record through it whatever operator new
     // returned.
-    Cache->Entries = Entries;
-    Cache->TotalVertices = 0;
-    Cache->TotalIndices = 0;
+    this->Entries = Entries;
+    TotalVertices = 0;
+    TotalIndices = 0;
 
     Entries[0].Tag = Tag;
     Entries[0].InstanceId = Instance;
@@ -578,20 +578,20 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
         if (Engine->QueryInstance(Entries[0].InstanceId, Iids::VMeshWire,
                                   reinterpret_cast<void**>(&Wire.Ptr)) >= 0)
         {
-            PartCacheBuildFromWire(&Entries[0], static_cast<IVMeshWire*>(Wire.Ptr), &WorldXform);
+            Entries[0].BuildFromWire(static_cast<IVMeshWire*>(Wire.Ptr), &WorldXform);
         }
         else
         {
             FPartComHolder Mesh;
             if (Engine->QueryInstance(Entries[0].InstanceId, Iids::Mesh,
                                       reinterpret_cast<void**>(&Mesh.Ptr)) >= 0)
-                PartCacheBuildFromMeshTwice(&Entries[0], static_cast<IMesh*>(Mesh.Ptr),
-                                            &WorldXform);
+                Entries[0].BuildFromMeshTwice(static_cast<IMesh*>(Mesh.Ptr),
+                                              &WorldXform);
         }
     }
 
-    Cache->TotalIndices += Entries[0].IndexCount;
-    Cache->TotalVertices += Entries[0].VertexCount;
+    TotalIndices += Entries[0].IndexCount;
+    TotalVertices += Entries[0].VertexCount;
 
     // No bound against PartCount -- the counting walk above saw the same chain.
     FPartCacheEntry* Entry = Entries + 1;
@@ -610,20 +610,20 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
             if (Engine->QueryInstance(Entry->InstanceId, Iids::VMeshWire,
                                       reinterpret_cast<void**>(&Wire.Ptr)) >= 0)
             {
-                PartCacheBuildFromWire(Entry, static_cast<IVMeshWire*>(Wire.Ptr), &WorldXform);
+                Entry->BuildFromWire(static_cast<IVMeshWire*>(Wire.Ptr), &WorldXform);
             }
             else
             {
                 FPartComHolder Mesh;
                 if (Engine->QueryInstance(Entry->InstanceId, Iids::Mesh,
                                           reinterpret_cast<void**>(&Mesh.Ptr)) >= 0)
-                    PartCacheBuildFromMeshTwice(Entry, static_cast<IMesh*>(Mesh.Ptr),
-                                                &WorldXform);
+                    Entry->BuildFromMeshTwice(static_cast<IMesh*>(Mesh.Ptr),
+                                              &WorldXform);
             }
         }
 
-        Cache->TotalIndices += Entry->IndexCount;
-        Cache->TotalVertices += Entry->VertexCount;
+        TotalIndices += Entry->IndexCount;
+        TotalVertices += Entry->VertexCount;
 
         Entry += 1;
         Child = Engine->GetRelatedInstance(Instance, 0, Child);
@@ -633,19 +633,19 @@ bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
     Engine->UpdateInstance(Instance, 0, nullptr);
 
     // A SIGNED compare against 16000 indices.
-    if (static_cast<int>(Cache->TotalIndices) > 0x3E80)
+    if (static_cast<int>(TotalIndices) > 0x3E80)
     {
         FDUMP(kFdumpTrace1,
               "%s(%d) : TRACE_1:General:%s",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\cached_wire.cpp",
               0xE0,
               "way too many indicies in the wireframe object");
-        PartCacheClear(Cache);
+        Clear();
         return false;
     }
 
-    Cache->MergedIndices = static_cast<unsigned short*>(
-        operator new(static_cast<std::size_t>(Cache->TotalIndices) * 2U));
+    MergedIndices = static_cast<unsigned short*>(
+        operator new(static_cast<std::size_t>(TotalIndices) * 2U));
     return true;
 }
 
@@ -680,13 +680,13 @@ namespace
     }
 }
 
-void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
+void FPartCache::Draw(ICamera* Camera, Transform const* Xform)
 {
     // FUN_00406510.
     PartDrawApplyStates(DALib::Pipeline, kPartDrawStatesOff);
     DALib::Pipeline->SetTextureStageTexture(0, nullptr);
     PartDrawApplyStates(DALib::Pipeline, kPartDrawColourVertexOn);
-    if (Cache->TotalVertices == 0)
+    if (TotalVertices == 0)
     {
         return;
     }
@@ -704,7 +704,7 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
     Source.SrcFvf = D3DFVF_XYZ | D3DFVF_DIFFUSE;
     unsigned IndexTotal = 0;
     FVertexMemoryLock LockOut; // vertex buffer, FVF, base vertex, memory
-    DALib::VertexBuffer->LockVertexMemory(D3DFVF_XYZ | D3DFVF_DIFFUSE, Cache->TotalVertices, &LockOut);
+    DALib::VertexBuffer->LockVertexMemory(D3DFVF_XYZ | D3DFVF_DIFFUSE, TotalVertices, &LockOut);
 
     // The stride of the locked FVF.
     unsigned const Fvf = static_cast<unsigned>(LockOut.Listing.Fvf);
@@ -739,14 +739,14 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
 
     // Every active part's indices rebased by the vertices already placed (a 16-bit add).
     unsigned VertexTotal = 0;
-    FPartCacheEntry* Entry = Cache->Entries;
-    for (int PartIndex = 0; PartIndex < static_cast<int>(Cache->PartCount); ++PartIndex, ++Entry)
+    FPartCacheEntry* Entry = Entries;
+    for (int PartIndex = 0; PartIndex < static_cast<int>(PartCount); ++PartIndex, ++Entry)
     {
         if (Entry->bActive == 0)
         {
             continue;
         }
-        unsigned short* Merged = Cache->MergedIndices + IndexTotal;
+        unsigned short* Merged = MergedIndices + IndexTotal;
         for (int Index = 0; Index < static_cast<int>(Entry->IndexCount); ++Index)
         {
             Merged[Index] = static_cast<unsigned short>(
@@ -798,7 +798,7 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
     // D3DPT_LINELIST over everything placed above.
     DALib::Pipeline->DrawIndexedPrimitiveVb(2, LockOut.Listing.VertexBuffer,
                                             static_cast<unsigned>(LockOut.Listing.BaseVertex), VertexTotal,
-                                            Cache->MergedIndices, IndexTotal, 0);
+                                            MergedIndices, IndexTotal, 0);
     PartDrawApplyStates(DALib::Pipeline, kPartDrawColourVertexOff);
 }
 

@@ -1108,22 +1108,22 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
         CoreA->Speed.x = (float)(S2 * N.x + CoreA->Speed.x);
     }
 
-    if (CoreB != nullptr)
-    {
-        const Vector& C1 = F->CoordOSCrossNormal[1];
-        const Vector V = { (float)((double)(C1.x) * CoreB->InvRotInertia.x),
-                           (float)((double)(C1.y) * CoreB->InvRotInertia.y),
-                           (float)((double)(C1.z) * CoreB->InvRotInertia.z) };
-        const double S = (double)(Impulse);
-        CoreB->RotSpeed.y = (float)(S * V.y + CoreB->RotSpeed.y);
-        CoreB->RotSpeed.z = (float)(S * V.z + CoreB->RotSpeed.z);
-        CoreB->RotSpeed.x = (float)(S * V.x + CoreB->RotSpeed.x);
+    if (CoreB == nullptr)
+        return;
 
-        const double S2 = (double)(CoreB->InvMass) * (double)(Impulse);
-        CoreB->Speed.y = (float)(S2 * N.y + CoreB->Speed.y);
-        CoreB->Speed.z = (float)(S2 * N.z + CoreB->Speed.z);
-        CoreB->Speed.x = (float)((double)(N.x) * S2 + CoreB->Speed.x);
-    }
+    const Vector& C1 = F->CoordOSCrossNormal[1];
+    const Vector V = { (float)((double)(C1.x) * CoreB->InvRotInertia.x),
+                       (float)((double)(C1.y) * CoreB->InvRotInertia.y),
+                       (float)((double)(C1.z) * CoreB->InvRotInertia.z) };
+    const double S = (double)(Impulse);
+    CoreB->RotSpeed.y = (float)(S * V.y + CoreB->RotSpeed.y);
+    CoreB->RotSpeed.z = (float)(S * V.z + CoreB->RotSpeed.z);
+    CoreB->RotSpeed.x = (float)(S * V.x + CoreB->RotSpeed.x);
+
+    const double S2 = (double)(CoreB->InvMass) * (double)(Impulse);
+    CoreB->Speed.y = (float)(S2 * N.y + CoreB->Speed.y);
+    CoreB->Speed.z = (float)(S2 * N.z + CoreB->Speed.z);
+    CoreB->Speed.x = (float)((double)(N.x) * S2 + CoreB->Speed.x);
 }
 
 // FUN_06353e80 converts this dist's 2D SpanFrictionS pair back into a

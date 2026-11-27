@@ -362,14 +362,14 @@ FRandomMissionGenerator::FRandomMissionGenerator()
 // FUN_06f9d970; DAT_06fcf25c is cleared last by the registration base (FUN_06f9fc10).
 FRandomMissionGenerator::~FRandomMissionGenerator()
 {
-    if (bLoaded)
-    {
-        bLoaded = false;
-        bLinked = false;
-        RootNodeId = 0xffffffffu;
-        LeafNodeIds.clear();
-        Nodes.clear();
-    }
+    if (!bLoaded)
+        return;
+
+    bLoaded = false;
+    bLinked = false;
+    RootNodeId = 0xffffffffu;
+    LeafNodeIds.clear();
+    Nodes.clear();
 }
 
 // LAB_06f9f600 (vtable slot 2); the map clear is inlined (FUN_06fa38c0 / FUN_06fa3470).
@@ -1436,13 +1436,13 @@ unsigned int FRandomMissionGenerator::PickOfferNode(FRmOfferQuery const* Query)
         for (std::list<FRmDifficultyWindow>::const_iterator Window = Node.Windows.Windows.begin();
              Window != Node.Windows.Windows.end(); ++Window)
         {
-            if (Window->IsInRange(Difficulty))
-            {
-                Candidates.Items.insert(Candidates.Items.end(), 1,
-                                        std::pair<unsigned int, float>(Node.NodeId,
-                                                                       Node.Params.Weight));
-                break;
-            }
+            if (!Window->IsInRange(Difficulty))
+                continue;
+
+            Candidates.Items.insert(Candidates.Items.end(), 1,
+                                    std::pair<unsigned int, float>(Node.NodeId,
+                                                                   Node.Params.Weight));
+            break;
         }
     }
 

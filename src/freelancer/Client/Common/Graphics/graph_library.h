@@ -31,6 +31,13 @@ struct FGraphRange
     unsigned char Pad01[3];
     float Min;            // +0x04
     float Max;            // +0x08
+
+    // FUN_00419460 -- __thiscall on an FGraphRange: clamp T into [Min, Max - 0.001] or wrap it
+    // into [0, Max - Min).
+    double Wrap(float T) const;
+
+    // FUN_004194e0 -- __thiscall on an FGraphRange: (T - Min) / (Max - Min).
+    double Normalize(float T) const;
 };
 
 // One key: X, then either a float (ElemType FLOAT) or a dword (INTEGER, or COLOR packed
@@ -117,12 +124,6 @@ private:
     FGraphRange Range;    // +0x20 bClamp is always 0 here (wrap); Min/Max = key X extent
     int RefCount;         // +0x2C
 };
-
-// FUN_00419460 -- __thiscall on an FGraphRange: clamp T into [Min, Max - 0.001] or wrap it
-// into [0, Max - Min).
-double GraphRangeWrap(FGraphRange const* Range, float T);
-// FUN_004194e0 -- __thiscall on an FGraphRange: (T - Min) / (Max - Min).
-double GraphRangeNormalize(FGraphRange const* Range, float T);
 
 // FUN_00419760 -- find by nickname (case-insensitive), AddRef and return; null plus an FDUMP
 // warning when absent.

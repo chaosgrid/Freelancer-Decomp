@@ -408,7 +408,7 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* 
                 }
                 Relation->GroupId = Scratch;
                 // operator new(0xc) node; bumps the list size.
-                RpcRelationListLink(&Wire.Relations, Relation);
+                Wire.Relations.Link(Relation);
             }
         }
     } else {

@@ -248,38 +248,38 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
 
         // Core B's column entries.
         CoreB = LongTerm->ContactCores[1];
-        if (CoreB != nullptr)
-        {
-            Vector RotArm;
-            IVP_SetPairwiseMult(RotArm, LongTerm->CoordOSCrossNormal[1], CoreB->InvRotInertia);
-            Vector LinArm;
-            IVP_SetMultiple(LinArm, LongTerm->ContactNormalWS, CoreB->InvMass);
+        if (CoreB == nullptr)
+            continue;
 
-            IVP_Friction_Info_For_Core* Info = LongTerm->FrictionInfos[1];
-            IVP_Core* ThisCore = LongTerm->ContactCores[1];
-            for (int J = 0; J < static_cast<int>(Info->FrDists.n_elems); ++J)
+        Vector RotArm;
+        IVP_SetPairwiseMult(RotArm, LongTerm->CoordOSCrossNormal[1], CoreB->InvRotInertia);
+        Vector LinArm;
+        IVP_SetMultiple(LinArm, LongTerm->ContactNormalWS, CoreB->InvMass);
+
+        IVP_Friction_Info_For_Core* Info = LongTerm->FrictionInfos[1];
+        IVP_Core* ThisCore = LongTerm->ContactCores[1];
+        for (int J = 0; J < static_cast<int>(Info->FrDists.n_elems); ++J)
+        {
+            const int Row = static_cast<int>(Info->FrDists.elems[J]->Owner->IndexInFs);
+            if (Row < 0)
             {
-                const int Row = static_cast<int>(Info->FrDists.elems[J]->Owner->IndexInFs);
-                if (Row < 0)
-                {
-                    continue;
-                }
-                IVP_Impact_Solver_Long_Term* Other = DistsOfSystem.elems[Row];
-                int Side = 1;
-                float Sign = 1.0f;
-                if (Other->ContactCores[0] == ThisCore)
-                {
-                    Side = 0;
-                    Sign = -1.0f;
-                }
-                if (Other->ContactCores[Side] == nullptr)
-                {
-                    continue;
-                }
-                const double Value = IVP_CrossAndNormalDot(Other, Side, RotArm, LinArm); // 06368d30
-                float* Cell = &DistChangeMat.MatrixValues[Row * DistChangeMat.AlignedRowLen + I];
-                *Cell = (float)(Value * (double)(Sign) + (double)(*Cell));
+                continue;
             }
+            IVP_Impact_Solver_Long_Term* Other = DistsOfSystem.elems[Row];
+            int Side = 1;
+            float Sign = 1.0f;
+            if (Other->ContactCores[0] == ThisCore)
+            {
+                Side = 0;
+                Sign = -1.0f;
+            }
+            if (Other->ContactCores[Side] == nullptr)
+            {
+                continue;
+            }
+            const double Value = IVP_CrossAndNormalDot(Other, Side, RotArm, LinArm); // 06368d30
+            float* Cell = &DistChangeMat.MatrixValues[Row * DistChangeMat.AlignedRowLen + I];
+            *Cell = (float)(Value * (double)(Sign) + (double)(*Cell));
         }
     }
 
@@ -725,12 +725,12 @@ int IVP_ListManager::CoreIsInAtMostOneDynamicPair(IVP_Core* Core) const
     for (int I = static_cast<int>(CorePairEntries.n_elems) - 1; I >= 0; --I)
     {
         const IVP_ListManager_CorePairEntry* Pair = CorePairEntries.elems[I];
-        if (Pair->CoreA == Core || Pair->CoreB == Core)
+        if (Pair->CoreA != Core && Pair->CoreB != Core)
+            continue;
+
+        if (((Pair->CoreB->Flags | Pair->CoreA->Flags) & 0xc) == 0)
         {
-            if (((Pair->CoreB->Flags | Pair->CoreA->Flags) & 0xc) == 0)
-            {
-                ++Count;
-            }
+            ++Count;
         }
     }
     return Count > 1 ? 0 : 1;
@@ -743,15 +743,15 @@ void IVP_ListManager::StaticFrOversizedMatrixPanic()
     {
         IVP_Core* Core = RegisteredDynamicCores.elems[I];
         Core->Flags = (Core->Flags & 0xfffffffdu) | 1u;
-        if (CoreIsInAtMostOneDynamicPair(Core) == 0)
-        {
-            Core->Speed.x = 0.0f;
-            Core->Speed.y = 0.0f;
-            Core->Speed.z = 0.0f;
-            Core->RotSpeed.x = 0.0f;
-            Core->RotSpeed.y = 0.0f;
-            Core->RotSpeed.z = 0.0f;
-        }
+        if (CoreIsInAtMostOneDynamicPair(Core) != 0)
+            continue;
+
+        Core->Speed.x = 0.0f;
+        Core->Speed.y = 0.0f;
+        Core->Speed.z = 0.0f;
+        Core->RotSpeed.x = 0.0f;
+        Core->RotSpeed.y = 0.0f;
+        Core->RotSpeed.z = 0.0f;
     }
 }
 
@@ -903,12 +903,12 @@ void IVP_Friction_Sys_Static::core_is_going_to_be_deleted_event(IVP_Core* Core)
     for (int I = static_cast<int>(FrictionSystem->CorePairEntries.n_elems) - 1; I >= 0; --I)
     {
         IVP_ListManager_CorePairEntry* Pair = FrictionSystem->CorePairEntries.elems[I];
-        if (Pair->CoreA == Core || Pair->CoreB == Core)
+        if (Pair->CoreA != Core && Pair->CoreB != Core)
+            continue;
+
+        for (int J = static_cast<int>(Pair->AttachedCtx.n_elems) - 1; J >= 0; --J)
         {
-            for (int J = static_cast<int>(Pair->AttachedCtx.n_elems) - 1; J >= 0; --J)
-            {
-                FrictionSystem->RemoveDistFromSystem(Pair->AttachedCtx.elems[J]);
-            }
+            FrictionSystem->RemoveDistFromSystem(Pair->AttachedCtx.elems[J]);
         }
     }
 

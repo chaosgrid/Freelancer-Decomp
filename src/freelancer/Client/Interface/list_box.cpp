@@ -262,7 +262,7 @@ void ListBox::Draw()
     }
 
     Win3DPopProjection();
-    Win3DDrawChildren(this);
+    DrawChildren();
 }
 
 void ListBox::MouseOver(Vector const* /*Ray*/)

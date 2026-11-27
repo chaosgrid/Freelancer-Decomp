@@ -154,7 +154,3 @@ public:
 };
 static_assert(sizeof(IVP_Cluster_Manager) == 0x18, "IVP_Cluster_Manager is 0x18 bytes (operator new(0x18) in FUN_0634bf50, 0634c2a9)");
 
-// FUN_06345e40: IVP_Real_Object method -- -1 when the object has no OV element
-// (+0x90), else the element's collision count (word at element+0x2a, the
-// n_elems of collision_fvector).
-int32_t IVP_Real_Object_Get_Collision_Check_Count(const IVP_Real_Object* Object);

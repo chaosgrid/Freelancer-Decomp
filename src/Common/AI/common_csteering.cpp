@@ -415,13 +415,13 @@ StrafeDir CStrafeEngine::GetStrafe() const
 void CStrafeEngine::SetStrafe(StrafeDir Dir)
 {
     // Ghidra @ 0x5b940
-    if (Dir != CurrentStrafe)
+    if (Dir == CurrentStrafe)
+        return;
+
+    CurrentStrafe = Dir;
+    if (Dir != StrafeNone)
     {
-        CurrentStrafe = Dir;
-        if (Dir != StrafeNone)
-        {
-            wakeup();
-        }
+        wakeup();
     }
 }
 

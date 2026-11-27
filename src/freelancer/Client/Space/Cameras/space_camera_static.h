@@ -34,15 +34,4 @@ static_assert(sizeof(FStaticCamera) == 0x0f8, "FStaticCamera adds nothing to FGa
 // The controller ctor's step for this slot: FUN_0051b2f0 then the vptr, nothing more.
 void StaticCameraConstruct(FStaticCamera* Cam);
 
-// Slot 0x64 (LAB_0051e920).
-bool StaticCameraActivate(FStaticCamera* Cam, const int* ViewRect4);
-
-// Slot 0x68 (LAB_0051e980).
-void StaticCameraDeactivate(FStaticCamera* Cam);
-
-// Slot 0x74 (LAB_0051e9d0). Retail's argument is the command record SpaceSendCommand
-// (FUN_0054bcb0) routes, whose first dword is its USER_* id; the only id this camera reacts to
-// is USER_CANCEL (15), and it reacts by asking for the "player" mode. Always returns 0.
-int StaticCameraOnEvent(FStaticCamera* Cam, const int* Event);
-
 inline FSpaceCamera* SpaceCameraOf(FStaticCamera* Cam) { return Cam; }

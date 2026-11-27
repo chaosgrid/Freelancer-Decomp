@@ -175,7 +175,7 @@ namespace
                 // the single-player session (FUN_005739c0); failure -> state 13 (quit).
                 if (Latch == 0 || Latch == 1)
                     Nav.CurrentState = kMenuStateMainMenu;
-                if (!MenuNavStartSinglePlayer(&Nav))
+                if (!Nav.StartSinglePlayer())
                     Nav.CurrentState = kMenuStateQuit;
             }
 
@@ -243,7 +243,7 @@ namespace
             // FUN_00573eb0 -- the whole IntroFocus frame, the scene step and the draw included.
             // The column's mouse input arrives through the Win3D manager (FUN_0059d140 /
             // FUN_0059e080), not through this slot.
-            return MenuStateDriverUpdate(&Nav, DeltaSeconds);
+            return Nav.Update(DeltaSeconds);
         }
     };
 

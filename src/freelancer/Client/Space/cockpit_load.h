@@ -25,7 +25,7 @@ const FCockpitMeshHolder& GetCockpitMeshHolder();
 
 // Part of FUN_0054ab40: resolve the player ship's cockpit ini (or the "cockpits\cockpit.ini"
 // fallback with a warning), run the four cockpit camera loaders over it and load the HUD
-// elements (FUN_004c73d0). The rest of the init is InitSpaceState.
+// elements (FUN_004c73d0). The rest of the init is SpaceApp::Init.
 bool InitPlayerCockpitSlice();
 
 // FUN_004c7290 -- .data:00673560. Read by HUD_Button::Update (LAB_004c93d0: the button is

@@ -1104,14 +1104,14 @@ void BspPartition::InsertSplit(FSpatialNode* Node, FSpatialEntry const* Entry)
                         FSpatialSplit Candidate;
                         ClassifyEntries(Candidate, Node->Plane, Node->Slots, 8);
                         unsigned const Score = ScoreCounts(Candidate.Counts);
-                        if (Score < BestScore)
+                        if (Score >= BestScore)
+                            continue;
+
+                        Best = Candidate;
+                        BestScore = Score;
+                        if (Score == 0)
                         {
-                            Best = Candidate;
-                            BestScore = Score;
-                            if (Score == 0)
-                            {
-                                break; // leaves this row only
-                            }
+                            break; // leaves this row only
                         }
                     }
                 }
@@ -1320,14 +1320,14 @@ void BspPartition::Build(FSpatialNode* Node, std::vector<FSpatialEntry> const& E
         FSpatialSplit Split;
         ClassifyVector(Split, Candidate, Entries);
         int const Score = (int)ScoreCounts(Split.Counts);
-        if (Score < BestScore) // signed (JGE)
+        if (Score >= BestScore) // signed (JGE)
+            continue;
+
+        Best = Candidate;
+        BestScore = Score;
+        if (Score == 0)
         {
-            Best = Candidate;
-            BestScore = Score;
-            if (Score == 0)
-            {
-                break;
-            }
+            break;
         }
     }
 

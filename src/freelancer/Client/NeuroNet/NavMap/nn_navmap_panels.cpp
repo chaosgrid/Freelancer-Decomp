@@ -534,11 +534,11 @@ void NeuroNetNavMap::RefreshMissionZones()
 
     // In the system view (and with no transition running) the mission
     // filter shows only with zones; the mission mode falls back to physical without them.
-    if (ViewMode != kNavMapViewUniverse && bTransition == 0)
-    {
-        unsigned char const bNoZones = MissionZoneIds.empty() ? 1 : 0;
-        MissionFilter->SetProperty(kWinPropHide, bNoZones, 0);
-        if (bNoZones != 0 && G_NavMapFilterMode == kNavMapFilterMission)
-            SetFilterMode(kNavMapFilterPhysical);
-    }
+    if (ViewMode == kNavMapViewUniverse || bTransition != 0)
+        return;
+
+    unsigned char const bNoZones = MissionZoneIds.empty() ? 1 : 0;
+    MissionFilter->SetProperty(kWinPropHide, bNoZones, 0);
+    if (bNoZones != 0 && G_NavMapFilterMode == kNavMapFilterMission)
+        SetFilterMode(kNavMapFilterPhysical);
 }

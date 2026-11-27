@@ -372,13 +372,13 @@ EquipDesc* EquipDescVector::traverse_equipment_type(unsigned Type, EquipDesc con
 {
     for (EquipDesc* It = Begin; It != End; ++It)
     {
-        if (It->ArchId == Type)
-        {
-            if (Prev == nullptr)
-                return It;
-            if (Prev == It)
-                Prev = nullptr;
-        }
+        if (It->ArchId != Type)
+            continue;
+
+        if (Prev == nullptr)
+            return It;
+        if (Prev == It)
+            Prev = nullptr;
     }
     return nullptr;
 }
@@ -545,13 +545,13 @@ EquipDesc* EquipDescList::traverse_equipment_type(unsigned Type, EquipDesc const
     for (std::list<EquipDesc>::iterator Node = Items.begin(); Node != Items.end(); ++Node)
     {
         EquipDesc* It = &*Node;
-        if (It->ArchId == Type)
-        {
-            if (Prev == nullptr)
-                return It;
-            if (Prev == It)
-                Prev = nullptr;
-        }
+        if (It->ArchId != Type)
+            continue;
+
+        if (Prev == nullptr)
+            return It;
+        if (Prev == It)
+            Prev = nullptr;
     }
     return nullptr;
 }

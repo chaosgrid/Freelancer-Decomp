@@ -206,8 +206,8 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, Vector const& HalfE
     if (Template.Material == nullptr)
         Template.Material = G_PhySysMaterial;
 
-    NewPhantom->Body = IVP_Environment_CreatePolygon(System.Environment, NewPhantom->SurfaceManager, &Template,
-                                                     &Rotation, &Position);
+    NewPhantom->Body = System.Environment->create_polygon(NewPhantom->SurfaceManager, &Template,
+                                                          &Rotation, &Position);
 
     PhySys_ConvertToPhantom(NewPhantom, Parms);
 
@@ -272,8 +272,8 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, PhyArch::Part const
     if (Template.Material == nullptr)
         Template.Material = G_PhySysMaterial;
 
-    NewPhantom->Body = IVP_Environment_CreatePolygon(System.Environment, NewPhantom->SurfaceManager, &Template,
-                                                     &Rotation, &Position);
+    NewPhantom->Body = System.Environment->create_polygon(NewPhantom->SurfaceManager, &Template,
+                                                          &Rotation, &Position);
 
     PhySys_ConvertToPhantom(NewPhantom, Parms);
 
@@ -387,7 +387,7 @@ void __cdecl PhySys::SetCollisionStatePhantom(void* Handle, bool bEnable)
 // Retail primitives used:
 // - The narrow-phase cache slot is resolved and released around every return path
 //   (ResolveNarrowPhaseCacheSlot / ReleaseNarrowPhaseCacheSlot; retail inlines the resolve).
-// - FUN_0634d8d0 -> IVP_TransformSlotToWorldSpace.
+// - FUN_0634d8d0 -> IVP_NarrowPhaseCacheSlot::transform_slot_to_world_space.
 // - FUN_0634ded0 -> the feature pointer masked to its triangle and ledge (GetCompactLedge).
 //   It allocates nothing.
 // - FUN_06345ea0 -> get_upper_limit_radius.
@@ -540,7 +540,7 @@ enum EPhySysSynapseFeature
 static void PhySys_SlotPointToWorld(IVP_NarrowPhaseCacheSlot* Slot,
                                      IVP_U_Float_Point const* LocalPoint, Vector& OutWorld)
 {
-    IVP_TransformSlotToWorldSpace(Slot, (IVP_U_Point const*)LocalPoint, (IVP_U_Point*)&OutWorld);
+    Slot->transform_slot_to_world_space((IVP_U_Point const*)LocalPoint, (IVP_U_Point*)&OutWorld);
 }
 
 static void PhySys_CalcClosestPointOnSynapse(Vector const& QueryPos, IVP_Synapse_Real const* Syn, Vector& Out)

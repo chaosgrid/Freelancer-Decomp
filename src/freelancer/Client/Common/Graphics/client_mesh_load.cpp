@@ -103,46 +103,46 @@ void ClientMeshHolderConstruct(FClientMeshHolder* Holder)
     Holder->UserFloats[4] = 1.0f;
 }
 
-void MeshHolderConstruct(FMeshHolder* Holder)
+void FMeshHolder::Construct()
 {
     // FUN_00420d40 field stores; the compiler owns the existing object's vptr.
-    Holder->EngineInstance = InvalidInstanceIndex;
-    Holder->MaterialEntry = nullptr;
-    Holder->AuxMaterialEntry = nullptr;
+    EngineInstance = InvalidInstanceIndex;
+    MaterialEntry = nullptr;
+    AuxMaterialEntry = nullptr;
 }
 
-bool ClientMeshHolderHasInstance(FMeshHolder const* Holder)
+bool FMeshHolder::HasInstance() const
 {
-    return Holder->EngineInstance != InvalidInstanceIndex;
+    return EngineInstance != InvalidInstanceIndex;
 }
 
-void ClientMeshHolderRelease(FMeshHolder* Holder)
+void FMeshHolder::Release()
 {
-    if (Holder->EngineInstance != InvalidInstanceIndex)
-        DALib::Engine->DestroyInstance(Holder->EngineInstance);
-    Holder->EngineInstance = InvalidInstanceIndex;
-    Archetype::ReleaseMaterialEntrySlot(&Holder->MaterialEntry);
-    Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
+    if (EngineInstance != InvalidInstanceIndex)
+        DALib::Engine->DestroyInstance(EngineInstance);
+    EngineInstance = InvalidInstanceIndex;
+    Archetype::ReleaseMaterialEntrySlot(&MaterialEntry);
+    Archetype::ReleaseMaterialEntrySlot(&AuxMaterialEntry);
 }
 
 FClientMeshHolder::~FClientMeshHolder()
 {
     // FUN_0059ef20: FUN_0059eee0's body inlined, then FUN_00420d10, which only resets the vptr.
-    ClientUiMeshHolderRelease(this);
+    ReleaseWithAnim();
 }
 
-void ClientUiMeshHolderRelease(FClientMeshHolder* Holder)
+void FClientMeshHolder::ReleaseWithAnim()
 {
-    if (Holder->AnimOrArchIndex != -1)
+    if (AnimOrArchIndex != -1)
     {
-        DALib::Anim->CloseScript(reinterpret_cast<void*>(Holder->AnimOrArchIndex));
-        Holder->AnimOrArchIndex = -1;
+        DALib::Anim->CloseScript(reinterpret_cast<void*>(AnimOrArchIndex));
+        AnimOrArchIndex = -1;
     }
-    if (ClientMeshHolderHasInstance(Holder))
-        ClientMeshHolderRelease(Holder);
+    if (HasInstance())
+        Release();
 }
 
-bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* AuxPath)
+bool FMeshHolder::Load(char const* Path, char const* AuxPath)
 {
     // FUN_00420dd0 (thiscall, RET 8).
     bool bOk = false;
@@ -164,9 +164,9 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
             ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
     {
         if (Path != nullptr)
-            Holder->MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
+            MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
         if (AuxPath != nullptr)
-            Holder->AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
+            AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 
         long Handle = -1;
         bOk = Archetype::Load(static_cast<IFileSystem*>(FsOut), &Handle, nullptr);
@@ -174,15 +174,15 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
         {
             // Retail quirk: an instance already bound is destroyed and BOTH cache slots
             // released -- including the two entries resolved just above.
-            if (Holder->EngineInstance != InvalidInstanceIndex)
+            if (EngineInstance != InvalidInstanceIndex)
             {
-                DALib::Engine->DestroyInstance(Holder->EngineInstance);
-                Holder->EngineInstance = InvalidInstanceIndex;
-                Archetype::ReleaseMaterialEntrySlot(&Holder->MaterialEntry);
-                Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
+                DALib::Engine->DestroyInstance(EngineInstance);
+                EngineInstance = InvalidInstanceIndex;
+                Archetype::ReleaseMaterialEntrySlot(&MaterialEntry);
+                Archetype::ReleaseMaterialEntrySlot(&AuxMaterialEntry);
             }
             const ArchetypeIndex HandlePtr = Handle;
-            Holder->EngineInstance = DALib::Engine->CreateInstance(HandlePtr, nullptr);
+            EngineInstance = DALib::Engine->CreateInstance(HandlePtr, nullptr);
             DALib::Engine->ReleaseHandle(HandlePtr);
         }
     }
@@ -192,33 +192,33 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
     return bOk;
 }
 
-void ClientMeshHolderSetMaterials(FMeshHolder* Holder, char const* Path, char const* AuxPath)
+void FMeshHolder::SetMaterials(char const* Path, char const* AuxPath)
 {
     // FUN_00420f30.
     if (Path != nullptr)
-        Holder->MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
+        MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
     if (AuxPath != nullptr)
-        Holder->AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
+        AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 }
 
-bool ClientMeshHolderBindInstance(FMeshHolder* Holder, ArchetypeIndex ArchHandle)
+bool FMeshHolder::BindInstance(ArchetypeIndex ArchHandle)
 {
     // FUN_00420d70. A bound instance takes both material entries with it.
-    if (Holder->EngineInstance != InvalidInstanceIndex)
+    if (EngineInstance != InvalidInstanceIndex)
     {
-        DALib::Engine->DestroyInstance(Holder->EngineInstance);
-        Holder->EngineInstance = InvalidInstanceIndex;
-        Archetype::ReleaseMaterialEntrySlot(&Holder->MaterialEntry);
-        Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
+        DALib::Engine->DestroyInstance(EngineInstance);
+        EngineInstance = InvalidInstanceIndex;
+        Archetype::ReleaseMaterialEntrySlot(&MaterialEntry);
+        Archetype::ReleaseMaterialEntrySlot(&AuxMaterialEntry);
     }
-    Holder->EngineInstance = DALib::Engine->CreateInstance(ArchHandle, nullptr);
-    return Holder->EngineInstance != InvalidInstanceIndex;
+    EngineInstance = DALib::Engine->CreateInstance(ArchHandle, nullptr);
+    return EngineInstance != InvalidInstanceIndex;
 }
 
-const Transform* ClientMeshHolderGetTransform(FMeshHolder const* Holder)
+const Transform* FMeshHolder::GetTransform() const
 {
     // FUN_00421030.
-    return DALib::Engine->GetInstanceTransform(Holder->EngineInstance);
+    return DALib::Engine->GetInstanceTransform(EngineInstance);
 }
 
 namespace
@@ -227,12 +227,12 @@ namespace
     I3DMathEngine* G_MeshHolderMathEngine = nullptr;
 }
 
-float ClientMeshHolderGetBoundingSphere(FMeshHolder const* Holder, float* OutCenter)
+float FMeshHolder::GetBoundingSphere(float* OutCenter) const
 {
     // FUN_00421090.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent(Holder->EngineInstance, 0, &Radius, (Vector*)OutCenter);
-    const Transform* const InstanceXform = DALib::Engine->GetInstanceTransform(Holder->EngineInstance);
+    DALib::Engine->GetInstanceExtent(EngineInstance, 0, &Radius, (Vector*)OutCenter);
+    const Transform* const InstanceXform = DALib::Engine->GetInstanceTransform(EngineInstance);
     if (G_MeshHolderMathEngine == nullptr)
         G_MeshHolderMathEngine = Acquire3DMathEngine();
     Vector World;
@@ -244,61 +244,61 @@ float ClientMeshHolderGetBoundingSphere(FMeshHolder const* Holder, float* OutCen
     return Radius;
 }
 
-void ClientMeshHolderSetMatrix(FMeshHolder* Holder, const Transform* Xform)
+void FMeshHolder::SetMatrix(const Transform* Xform)
 {
     // FUN_00421050.
-    DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, Xform);
+    DALib::Engine->SetInstanceMatrix(EngineInstance, Xform);
 }
 
-void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags)
+void FMeshHolder::Render(void* Camera, unsigned long Flags)
 {
     // FUN_00421120.
-    DALib::Renderer->RenderInstance(Camera, Holder->EngineInstance, 1.0f, Flags, nullptr, nullptr);
+    DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, Flags, nullptr, nullptr);
 }
 
-void ClientMeshHolderSetPosition(FMeshHolder* Holder, Vector const* Position)
+void FMeshHolder::SetPosition(Vector const* Position)
 {
     // FUN_00420fd0.
-    DALib::Engine->SetInstancePosition(Holder->EngineInstance, (const Vector*)Position);
+    DALib::Engine->SetInstancePosition(EngineInstance, (const Vector*)Position);
 }
 
-const Vector* ClientMeshHolderGetPosition(FMeshHolder const* Holder)
+const Vector* FMeshHolder::GetPosition() const
 {
     // FUN_00420fb0.
-    return DALib::Engine->GetInstancePosition(Holder->EngineInstance);
+    return DALib::Engine->GetInstancePosition(EngineInstance);
 }
 
-const Matrix* ClientMeshHolderGetOrientation(FMeshHolder const* Holder)
+const Matrix* FMeshHolder::GetOrientation() const
 {
     // FUN_00420ff0.
-    return DALib::Engine->GetInstanceOrientation(Holder->EngineInstance);
+    return DALib::Engine->GetInstanceOrientation(EngineInstance);
 }
 
-void ClientMeshHolderSetOrientation(FMeshHolder* Holder, float const Orientation[9])
+void FMeshHolder::SetOrientation(float const Orientation[9])
 {
     // FUN_00421010.
-    DALib::Engine->SetInstanceOrientation(Holder->EngineInstance,
+    DALib::Engine->SetInstanceOrientation(EngineInstance,
                                           (const Matrix*)(const_cast<float*>(Orientation)));
 }
 
-void ClientMeshHolderUpdate(FMeshHolder* Holder)
+void FMeshHolder::Update()
 {
     // FUN_00421070.
-    DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
+    DALib::Engine->UpdateInstance(EngineInstance, 0, nullptr);
 }
 
-void ClientMeshHolderSetColor(FClientMeshHolder* Holder, unsigned char const* Rgba)
+void FClientMeshHolder::SetColor(unsigned char const* Rgba)
 {
     // FUN_004a1af0: float 1/255 is DAT_005c7f68. UserFloats[3] (+0x20) is not written.
     double const Inv255 = static_cast<double>(0.003921568859368563f);
-    Holder->UserFloats[0] = static_cast<float>(static_cast<double>(Rgba[0]) * Inv255);
-    Holder->UserFloats[1] = static_cast<float>(static_cast<double>(Rgba[1]) * Inv255);
-    Holder->UserFloats[2] = static_cast<float>(static_cast<double>(Rgba[2]) * Inv255);
-    Holder->UserFloats[4] = static_cast<float>(static_cast<double>(Rgba[3]) * Inv255);
+    UserFloats[0] = static_cast<float>(static_cast<double>(Rgba[0]) * Inv255);
+    UserFloats[1] = static_cast<float>(static_cast<double>(Rgba[1]) * Inv255);
+    UserFloats[2] = static_cast<float>(static_cast<double>(Rgba[2]) * Inv255);
+    UserFloats[4] = static_cast<float>(static_cast<double>(Rgba[3]) * Inv255);
 }
 
-bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
-                            char const* MaterialPath, bool bRegisterCache)
+bool FClientMeshHolder::LoadFromPath(char const* RelPath, char const* MaterialPath,
+                                     bool bRegisterCache)
 {
     // FUN_0059ec80 (thiscall on the holder, RET 0xc).
     FEngineName Name = {};
@@ -308,10 +308,10 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
     if (Found != InvalidArchetypeIndex)
     {
         // Already loaded: no FileSystem, no material entries.
-        if (ClientMeshHolderBindInstance(Holder, Found))
-            AnalyzeBoundInstance(Holder);
+        if (BindInstance(Found))
+            AnalyzeBoundInstance(this);
         DALib::Engine->ReleaseHandle(Found);
-        return ClientMeshHolderHasInstance(Holder);
+        return HasInstance();
     }
 
     // The FileSystem is an EH-guarded local released whatever happened.
@@ -322,12 +322,12 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
     {
         // FUN_00420f30: the mesh's own material entry and the material library's.
-        ClientMeshHolderSetMaterials(Holder, RelPath, MaterialPath);
+        SetMaterials(RelPath, MaterialPath);
 
         // Archetype::Load(Fs, &handle, holder +0x10) on both branches; the handle lands in
         // retail's own RelPath argument slot.
         long LoadedHandle = -1;
-        int* const AnimIndex = reinterpret_cast<int*>(&Holder->AnimOrArchIndex);
+        int* const AnimIndex = reinterpret_cast<int*>(&AnimOrArchIndex);
         if (bRegisterCache)
         {
             // A loaded handle is kept in the model cache and NOT released here (FUN_0059e8d0
@@ -337,8 +337,8 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
                 const ArchetypeIndex Loaded = LoadedHandle;
                 if (FindModelCacheEntry(Loaded) == nullptr)
                     AppendModelCacheEntry(Loaded);
-                if (ClientMeshHolderBindInstance(Holder, Loaded))
-                    AnalyzeBoundInstance(Holder);
+                if (BindInstance(Loaded))
+                    AnalyzeBoundInstance(this);
             }
         }
         else
@@ -346,14 +346,14 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
                 const ArchetypeIndex Loaded = LoadedHandle;
-                if (ClientMeshHolderBindInstance(Holder, Loaded))
-                    AnalyzeBoundInstance(Holder);
+                if (BindInstance(Loaded))
+                    AnalyzeBoundInstance(this);
                 DALib::Engine->ReleaseHandle(Loaded);
             }
         }
     }
 
-    bool const bResult = ClientMeshHolderHasInstance(Holder);
+    bool const bResult = HasInstance();
     if (FsOut != nullptr)
         static_cast<IFileSystem*>(FsOut)->Release();
     return bResult;
@@ -440,14 +440,14 @@ void Win3DModelCacheClear()
     G_Win3DModelCache.clear();
 }
 
-bool ClientMeshQueryAabb(FClientMeshHolder* Holder, FClientMeshAabb* OutAabb)
+bool FClientMeshHolder::QueryAabb(FClientMeshAabb* OutAabb)
 {
     // FUN_0059f0d0 (thiscall on the holder, RET 4). The only test is the instance against -1;
     // OutAabb is not cleared, and the Renderer's answer is not looked at.
-    if (!ClientMeshHolderHasInstance(Holder))
+    if (!HasInstance())
         return false;
 
-    ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(Holder->EngineInstance);
+    ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(EngineInstance);
     // IRenderer2 slot 4 (+0x10).
     DALib::Renderer->GetBounds(Arch, 1.0f, OutAabb->Values);
     DALib::Engine->ReleaseHandle(Arch);

@@ -1112,6 +1112,11 @@ struct FRpcRelationList {
     unsigned char Pad_0x01[3];      // +0x01
     FRpcRelationNode* Head;         // +0x04  dummy node; Next == Prev == itself when empty
     unsigned int Size;              // +0x08
+
+    // The node half alone: FUN_06d8cad0's insert of a value the caller already allocated --
+    // the decoders (06d91b5a / 06d925a2) new(8) the element before reading into it, so a
+    // failed read leaks it, as retail's does.
+    void Link(FRpcRelation* Block);
 };
 static_assert(sizeof(FRpcRelationList) == 0x0c,
               "retail std::list header is 0x0c: allocator, head, size");

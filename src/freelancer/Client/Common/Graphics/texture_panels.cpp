@@ -15,7 +15,7 @@
 #include "common_ini.h"
 #include "common_misc.h"
 #include "common_universe.h"
-#include "Space/Effects/effect_vertex_batch.h" // EffectVertexBatchDestroy (FUN_0046e9c0), the atexit LAB_0050a020
+#include "Space/Effects/effect_vertex_batch.h" // FEffectVertexBatch::Destroy (FUN_0046e9c0), the atexit LAB_0050a020
 #include "Common/engine_light.h"
 #include "Common/Graphics/part_cache.h"    // FvfTexcoordBlockBytes (FUN_004061a0)
 #include "Core/perf_options.h"
@@ -241,7 +241,7 @@ namespace
             if ((G_PanelBatcherDtorOnce & 1u) != 0u)
                 return;
             G_PanelBatcherDtorOnce = static_cast<unsigned char>(G_PanelBatcherDtorOnce | 1u);
-            EffectVertexBatchDestroy(reinterpret_cast<FEffectVertexBatch*>(&G_PanelBatcher));
+            (reinterpret_cast<FEffectVertexBatch*>(&G_PanelBatcher))->Destroy();
         }
     };
 
@@ -349,9 +349,9 @@ namespace
         IRenderPipeline* const Pipe = DALib::Pipeline;
         if (This->DetailShape != nullptr && This->Shape != nullptr)
         {
-            Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(This->Shape, 0));
+            Pipe->SetTextureStageTexture(0, This->Shape->GetGpuHandle(0));
             Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
-            Pipe->SetTextureStageTexture(1, TexShapeGetGpuHandle(This->DetailShape, 0));
+            Pipe->SetTextureStageTexture(1, This->DetailShape->GetGpuHandle(0));
             Pipe->SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
             PipelineApplyTssTable(Pipe, 0, kTssStage0);
             PipelineApplyTssTable(Pipe, 1, kTssStage1);
@@ -362,7 +362,7 @@ namespace
         }
         if (This->Shape != nullptr)
         {
-            Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(This->Shape, 0));
+            Pipe->SetTextureStageTexture(0, This->Shape->GetGpuHandle(0));
             Pipe->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
             PipelineApplyTssTable(Pipe, 0, kTssStage0);
             PipelineApplyTssTable(Pipe, 1, kTssStage2);
@@ -471,7 +471,7 @@ void FTexturePanels::Clear()
     {
         if (N->Clouds != nullptr)
         {
-            NebulaCloudsReleaseBits(N->Clouds);
+            N->Clouds->ReleaseBits();
             operator delete(N->Clouds);
         }
     }
@@ -644,7 +644,7 @@ void FTexturePanels::ApplyDetail(float Detail)
     // LAB_0050bf70 (thiscall, RET 4): FUN_005524a0 per clouds object. Nothing is tested.
     FTexturePanelsListNode* const Sentinel = ListSentinel;
     for (FTexturePanelsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
-        NebulaCloudsApplyDetail(N->Clouds, Detail);
+        N->Clouds->ApplyDetail(Detail);
 }
 
 namespace
@@ -755,7 +755,7 @@ void FTexturePanels::Update(void* Camera, float Dt)
     // FUN_00550d40 per clouds object.
     FTexturePanelsListNode* const Sentinel = ListSentinel;
     for (FTexturePanelsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
-        NebulaCloudsUpdate(N->Clouds, Camera, Dt, Visibility, nullptr);
+        N->Clouds->Update(Camera, Dt, Visibility, nullptr);
 }
 
 // -------------------------------------------------------------------- slot4 LAB_0050b510
@@ -799,112 +799,112 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
     Win3DBindModelview(Camera, &World);
 
     // Zero skips straight to the restorers.
-    if (SetupPanelPipeline(this) != 0)
+    if (SetupPanelPipeline(this) == 0)
+        return;
+
+    FTexturePanelPiece const* const Piece = &Pieces[PieceIndex];
+    int const First = Piece->FirstSegment;
+    int const Last = Piece->LastSegment;
+
+    IRenderPipeline* const Pipe = DALib::Pipeline;
+    if (G_PanelBatcher.Pipeline != nullptr)
     {
-        FTexturePanelPiece const* const Piece = &Pieces[PieceIndex];
-        int const First = Piece->FirstSegment;
-        int const Last = Piece->LastSegment;
-
-        IRenderPipeline* const Pipe = DALib::Pipeline;
-        if (G_PanelBatcher.Pipeline != nullptr)
-        {
-            G_PanelBatcher.Pipeline->Release();
-            G_PanelBatcher.Pipeline = nullptr;
-        }
-        if (Pipe != nullptr)
-        {
-            G_PanelBatcher.Pipeline = Pipe;
-            Pipe->AddRef();
-        }
-
-        // Primitive 5 (triangle strip).
-        PanelBatcherReset(&G_PanelBatcher);
-        G_PanelBatcher.PrimitiveType = 5;
-        G_PanelBatcher.bCloseLoop = 0;
-        G_PanelBatcher.bStripMode = 0;
-        // Double 255.0 (.rdata 0x005c89c0), truncated, low byte kept. No clamp.
-        double const K255 = 255.0;
-        G_PanelBatcher.ColorR = static_cast<unsigned char>(static_cast<int>(ColorR * K255));
-        G_PanelBatcher.ColorG = static_cast<unsigned char>(static_cast<int>(ColorG * K255));
-        G_PanelBatcher.ColorB = static_cast<unsigned char>(static_cast<int>(ColorB * K255));
-        G_PanelBatcher.ColorA = static_cast<unsigned char>(static_cast<int>(Opacity * K255));
-
-        // 2*I indexes the ring mesh, wrapped by ONE subtraction each.
-        int Twice = First * 2;
-        for (int I = First; I <= Last; ++I)
-        {
-            int const MeshCount = MeshVertexCount;
-            int IndexA = Twice;
-            if (IndexA >= MeshCount)
-                IndexA -= MeshCount;
-            int IndexB = Twice + 1;
-            if (IndexB >= MeshCount)
-                IndexB -= MeshCount;
-            float const* const Mesh = static_cast<float const*>(MeshBuffer);
-            float const* const A = Mesh + IndexA * 3;
-            float const* const B = Mesh + IndexB * 3;
-            float const Ax = A[0];
-            float const Ay = A[1];
-            float const Az = A[2];
-            float const Bx = B[0];
-            float const By = B[1];
-            float const Bz = B[2];
-
-            // Odd segments take the shape's right edge and the integer detail_tile V, even
-            // ones the left edge and 0.
-            FTexShape const* const Shape = this->Shape;
-            float const U = ((I & 1) != 0) ? Shape->U1 : Shape->U0;
-            int const DetailUInt = ((I & 1) != 0) ? DetailTileV : 0;
-            float const DetailU = static_cast<float>(DetailUInt);
-
-            // Vertex a (FUN_0050bb60 inlined here).
-            G_PanelBatcher.StageV = Shape->V0;
-            G_PanelBatcher.StageU = U;
-            G_PanelBatcher.StageV1 = 0.0f;
-            G_PanelBatcher.StageU1 = DetailU;
-            PanelBatcherPushVert(&G_PanelBatcher, Ax, Ay, Az);
-
-            // Vertex b: detail V = detail_tile U.
-            G_PanelBatcher.StageV = Shape->V1;
-            G_PanelBatcher.StageU = U;
-            G_PanelBatcher.StageV1 = DetailTileU;
-            G_PanelBatcher.StageU1 = DetailU;
-            PanelBatcherPushVert(&G_PanelBatcher, Bx, By, Bz);
-
-            Twice += 2;
-        }
-
-        // Flush. With bCloseLoop set vertex 0 is copied past the end (no grow). The held pipeline
-        // is released either way.
-        int Count = G_PanelBatcher.VertCount;
-        if (Count != 0)
-        {
-            if (G_PanelBatcher.bCloseLoop != 0)
-            {
-                memcpy(&G_PanelBatcher.Verts[Count], &G_PanelBatcher.Verts[0], sizeof(FPanelVert20));
-                Count += 1;
-                G_PanelBatcher.VertCount = Count;
-            }
-            if (G_PanelBatcher.Pipeline != nullptr)
-            {
-                G_PanelBatcher.Pipeline->DrawPrimitive(G_PanelBatcher.PrimitiveType,
-                                                       static_cast<unsigned int>(G_PanelBatcher.Fvf),
-                                                       G_PanelBatcher.Verts,
-                                                       static_cast<unsigned int>(Count), nullptr);
-            }
-        }
-        if (G_PanelBatcher.Pipeline != nullptr)
-        {
-            G_PanelBatcher.Pipeline->Release();
-            G_PanelBatcher.Pipeline = nullptr;
-        }
-
-        // With a detail shape, stage 1 goes back to DAT_005db178.
-        if (DetailShape != nullptr)
-            PipelineApplyTssPairTable(DALib::Pipeline, 1, kTssStage2);
-
-        DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+        G_PanelBatcher.Pipeline->Release();
+        G_PanelBatcher.Pipeline = nullptr;
     }
+    if (Pipe != nullptr)
+    {
+        G_PanelBatcher.Pipeline = Pipe;
+        Pipe->AddRef();
+    }
+
+    // Primitive 5 (triangle strip).
+    PanelBatcherReset(&G_PanelBatcher);
+    G_PanelBatcher.PrimitiveType = 5;
+    G_PanelBatcher.bCloseLoop = 0;
+    G_PanelBatcher.bStripMode = 0;
+    // Double 255.0 (.rdata 0x005c89c0), truncated, low byte kept. No clamp.
+    double const K255 = 255.0;
+    G_PanelBatcher.ColorR = static_cast<unsigned char>(static_cast<int>(ColorR * K255));
+    G_PanelBatcher.ColorG = static_cast<unsigned char>(static_cast<int>(ColorG * K255));
+    G_PanelBatcher.ColorB = static_cast<unsigned char>(static_cast<int>(ColorB * K255));
+    G_PanelBatcher.ColorA = static_cast<unsigned char>(static_cast<int>(Opacity * K255));
+
+    // 2*I indexes the ring mesh, wrapped by ONE subtraction each.
+    int Twice = First * 2;
+    for (int I = First; I <= Last; ++I)
+    {
+        int const MeshCount = MeshVertexCount;
+        int IndexA = Twice;
+        if (IndexA >= MeshCount)
+            IndexA -= MeshCount;
+        int IndexB = Twice + 1;
+        if (IndexB >= MeshCount)
+            IndexB -= MeshCount;
+        float const* const Mesh = static_cast<float const*>(MeshBuffer);
+        float const* const A = Mesh + IndexA * 3;
+        float const* const B = Mesh + IndexB * 3;
+        float const Ax = A[0];
+        float const Ay = A[1];
+        float const Az = A[2];
+        float const Bx = B[0];
+        float const By = B[1];
+        float const Bz = B[2];
+
+        // Odd segments take the shape's right edge and the integer detail_tile V, even
+        // ones the left edge and 0.
+        FTexShape const* const Shape = this->Shape;
+        float const U = ((I & 1) != 0) ? Shape->U1 : Shape->U0;
+        int const DetailUInt = ((I & 1) != 0) ? DetailTileV : 0;
+        float const DetailU = static_cast<float>(DetailUInt);
+
+        // Vertex a (FUN_0050bb60 inlined here).
+        G_PanelBatcher.StageV = Shape->V0;
+        G_PanelBatcher.StageU = U;
+        G_PanelBatcher.StageV1 = 0.0f;
+        G_PanelBatcher.StageU1 = DetailU;
+        PanelBatcherPushVert(&G_PanelBatcher, Ax, Ay, Az);
+
+        // Vertex b: detail V = detail_tile U.
+        G_PanelBatcher.StageV = Shape->V1;
+        G_PanelBatcher.StageU = U;
+        G_PanelBatcher.StageV1 = DetailTileU;
+        G_PanelBatcher.StageU1 = DetailU;
+        PanelBatcherPushVert(&G_PanelBatcher, Bx, By, Bz);
+
+        Twice += 2;
+    }
+
+    // Flush. With bCloseLoop set vertex 0 is copied past the end (no grow). The held pipeline
+    // is released either way.
+    int Count = G_PanelBatcher.VertCount;
+    if (Count != 0)
+    {
+        if (G_PanelBatcher.bCloseLoop != 0)
+        {
+            memcpy(&G_PanelBatcher.Verts[Count], &G_PanelBatcher.Verts[0], sizeof(FPanelVert20));
+            Count += 1;
+            G_PanelBatcher.VertCount = Count;
+        }
+        if (G_PanelBatcher.Pipeline != nullptr)
+        {
+            G_PanelBatcher.Pipeline->DrawPrimitive(G_PanelBatcher.PrimitiveType,
+                                                   static_cast<unsigned int>(G_PanelBatcher.Fvf),
+                                                   G_PanelBatcher.Verts,
+                                                   static_cast<unsigned int>(Count), nullptr);
+        }
+    }
+    if (G_PanelBatcher.Pipeline != nullptr)
+    {
+        G_PanelBatcher.Pipeline->Release();
+        G_PanelBatcher.Pipeline = nullptr;
+    }
+
+    // With a detail shape, stage 1 goes back to DAT_005db178.
+    if (DetailShape != nullptr)
+        PipelineApplyTssPairTable(DALib::Pipeline, 1, kTssStage2);
+
+    DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
 }
 
 // -------------------------------------------------------------------- slot5 LAB_0050bc90
@@ -918,7 +918,7 @@ void FTexturePanels::DrawPanels(void* Camera)
         return;
     FTexturePanelsListNode* const Sentinel = ListSentinel;
     for (FTexturePanelsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
-        TexturePanelDrawClouds(N->Clouds, Camera, nullptr);
+        N->Clouds->DrawClouds(Camera, nullptr);
 }
 
 // -------------------------------------------------------------------- slot1 LAB_0050a240
@@ -1016,8 +1016,8 @@ void FTexturePanels::Load(char const* IniPath,
                 // FUN_00550180 / FUN_00550240 against the ring's own ShapeDB; owner at +0xc4.
                 FNebulaClouds* const Clouds =
                     static_cast<FNebulaClouds*>(operator new(sizeof(FNebulaClouds)));
-                NebulaCloudsConstruct(Clouds);
-                NebulaCloudsParseIni(Clouds, Reader, &Shapes);
+                Clouds->Construct();
+                Clouds->ParseIni(Reader, &Shapes);
                 Clouds->Owner = this;
                 Clouds->FullVisibility = 0.5f;   // 0x3f000000
                 Clouds->BudgetVisibility = 0.9f; // 0x3f666666
@@ -1167,10 +1167,10 @@ void FTexturePanels::Load(char const* IniPath,
 
     // A shape whose frame-0 handle (FUN_00425640) the pipeline rejects is dropped.
     if (Shape != nullptr &&
-        DALib::Pipeline->IsTexture(TexShapeGetGpuHandle(Shape, 0)) != 0)
+        DALib::Pipeline->IsTexture(Shape->GetGpuHandle(0)) != 0)
         Shape = nullptr;
     if (DetailShape != nullptr &&
-        DALib::Pipeline->IsTexture(TexShapeGetGpuHandle(DetailShape, 0)) != 0)
+        DALib::Pipeline->IsTexture(DetailShape->GetGpuHandle(0)) != 0)
         DetailShape = nullptr;
 
     // A VerifyState failure drops the detail shape and tries again, a second failure drops the
@@ -1227,19 +1227,19 @@ namespace
 // FUN_00551500 (__thiscall, RET 8): this = the clouds object, arg2 = the exclusion manager
 // handed to FUN_005513b0. No null tests anywhere: not on the camera, its orientation, the
 // pipeline, the vertex-buffer manager, the puff table or a puff.
-void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* ExclusionCtx)
+void FNebulaClouds::DrawClouds(void* Camera, void* ExclusionCtx)
 {
     ICamera* const Cam = static_cast<ICamera*>(Camera);
 
     if (static_cast<unsigned char*>(Camera)[0xbc] != 0)
-        NebulaCloudsRegenExcluded(Clouds, ExclusionCtx);
+        RegenExcluded(ExclusionCtx);
 
     // bLoaded +0xec, the active count +0x14 and the first shape +0x28.
-    if (Clouds->bLoaded == 0)
+    if (bLoaded == 0)
         return;
-    if (Clouds->ActiveCount == 0)
+    if (ActiveCount == 0)
         return;
-    if (Clouds->PuffShapes[0] == nullptr)
+    if (PuffShapes[0] == nullptr)
         return;
 
     // Twelve dwords copied from camera slot 4.
@@ -1251,7 +1251,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     CloudsMath()->Rotate(W, CamXform, UnitZ);
 
     // C1 = N x W (N = Up, +0x6c) through FUN_00422b80, each component stored as a float.
-    float* const N = &Clouds->Up.x;
+    float* const N = &Up.x;
     float C1[3];
     C1[0] = static_cast<float>(static_cast<double>(W.z) * N[1] - static_cast<double>(W.y) * N[2]);
     C1[1] = static_cast<float>(static_cast<double>(W.x) * N[2] - static_cast<double>(W.z) * N[0]);
@@ -1278,10 +1278,10 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     }
 
     // DAT_005d8d40 = 0.8f, DAT_005d8e80 = 0.7f.
-    float const Radius = Clouds->CloudRadius;
+    float const Radius = CloudRadius;
     float const AheadThreshold =
-        static_cast<float>(static_cast<double>(Clouds->CentreAhead) * 0.8f);
-    int const VertTotal = Clouds->PuffCount * 6;
+        static_cast<float>(static_cast<double>(CentreAhead) * 0.8f);
+    int const VertTotal = PuffCount * 6;
     float const InnerRadius = static_cast<float>(static_cast<double>(Radius) * 0.7f);
     int VertCount = 0;
 
@@ -1293,7 +1293,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
 
     // The first shape's alpha probe, cached in its +0x04 while negative (the format query's
     // result is untested).
-    FTexShape* const Shape0 = Clouds->PuffShapes[0];
+    FTexShape* const Shape0 = PuffShapes[0];
     if (Shape0->AlphaCache < 0)
     {
         int Fmt = PixelFormatFromD3D(0);
@@ -1340,7 +1340,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         Pipe->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_INVSRCCOLOR);
     }
 
-    Pipe->SetTextureStageTexture(0, TexShapeGetGpuHandle(Shape0, 0));
+    Pipe->SetTextureStageTexture(0, Shape0->GetGpuHandle(0));
 
     // DAT_005e09f0 on stage 0, DAT_005e0a28 on stage 1.
     for (unsigned long const* Pair = kTssClouds0; Pair[0] != 0; Pair += 2)
@@ -1391,17 +1391,17 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     float const InnerSq = static_cast<float>(static_cast<double>(InnerRadius) * InnerRadius);
     float const InvRing =
         static_cast<float>(1.0f / (static_cast<double>(RadiusSq) - InnerSq));
-    float const NearLo = Clouds->NearFadeStart;
-    float const NearHi = Clouds->NearFadeEnd;
+    float const NearLo = NearFadeStart;
+    float const NearHi = NearFadeEnd;
     float const InvNear = static_cast<float>(1.0f / (static_cast<double>(NearHi) - NearLo));
 
     FVertexMemoryLock Desc = {};
-    FNebulaCloudPuff** const Table = Clouds->PuffTable;
+    FNebulaCloudPuff** const Table = PuffTable;
     // The count +0xc is re-read at every iteration's test; the table pointer is read once.
-    for (int I = 0; I < Clouds->PuffCount; ++I)
+    for (int I = 0; I < PuffCount; ++I)
     {
         // The puff must be active (+0x50) and not hidden (+0x51).
-        float Alpha = static_cast<float>(static_cast<double>(Clouds->PuffMaxAlpha) * Clouds->Fade);
+        float Alpha = static_cast<float>(static_cast<double>(PuffMaxAlpha) * Fade);
         FNebulaCloudPuff* const Puff = Table[I];
         if (Puff->bActive == 0 || Puff->bHidden != 0)
             continue;
@@ -1420,7 +1420,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             Vector T;
             T.x = 0.0f;
             T.y = 0.0f;
-            T.z = -Clouds->CentreAhead;
+            T.z = -CentreAhead;
             Vector D;
             Win3DVec3Sub(&D, &T, &VP);
             double const Dist2 = (static_cast<double>(D.z) * D.z + static_cast<double>(D.y) * D.y) +
@@ -1437,9 +1437,9 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
 
         // FUN_00411d60 twice.
         float Wisp1[3];
-        ScaleVec3(Wisp1, Clouds->LightningColor, Puff->LightningFlash);
+        ScaleVec3(Wisp1, LightningColor, Puff->LightningFlash);
         float Wisp2[3];
-        ScaleVec3(Wisp2, Wisp1, Clouds->LightningIntensity);
+        ScaleVec3(Wisp2, Wisp1, LightningIntensity);
 
         // The stored float depth is tested again here.
         float const Size = Puff->Size;
@@ -1458,7 +1458,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         Col[2] = Puff->Color[2];
 
         // The wisp is added (FUN_004d7270) and each channel not ordered-less than 1 is set to 1.0f.
-        if (Clouds->DisableLightningFlash == 0 && Clouds->LightningIntensity > 0.0f &&
+        if (DisableLightningFlash == 0 && LightningIntensity > 0.0f &&
             Puff->LightningTimer >= 0.0f)
         {
             Vec3AddInPlace(Col, Wisp2);
@@ -1518,7 +1518,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             }
         }
 
-        FTexShape const* const Shape = Clouds->PuffShapes[Puff->ShapeIndex];
+        FTexShape const* const Shape = PuffShapes[Puff->ShapeIndex];
         if (Shape == nullptr)
             continue;
 
@@ -1616,7 +1616,7 @@ void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera)
 
     FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
     for (FNebulaCloudsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
-        TexturePanelDrawClouds(N->Clouds, Camera, Nebula->ExclusionMgr);
+        N->Clouds->DrawClouds(Camera, Nebula->ExclusionMgr);
 
     // FUN_00422190(1); FUN_00421ed0(0xb60).
     DALib::MaterialBatcher->SetBinOrder(1u, 1);
@@ -1627,13 +1627,13 @@ void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera)
     Win3DDisable(0xb60);
 
     // Dead in retail (see DAT_0067500c).
-    if (G_NebulaCloudsLockBackBuffer != 0)
-    {
-        unsigned long LockDesc[5];
-        LockDesc[4] = static_cast<unsigned long>(PixelFormatFromD3D(0));
-        DALib::Pipeline->LockBuffer(LockDesc);
-        DALib::Pipeline->UnlockBuffer();
-    }
+    if (G_NebulaCloudsLockBackBuffer == 0)
+        return;
+
+    unsigned long LockDesc[5];
+    LockDesc[4] = static_cast<unsigned long>(PixelFormatFromD3D(0));
+    DALib::Pipeline->LockBuffer(LockDesc);
+    DALib::Pipeline->UnlockBuffer();
 }
 
 unsigned char TexturePanelsFormatHasAlpha(int FormatId)

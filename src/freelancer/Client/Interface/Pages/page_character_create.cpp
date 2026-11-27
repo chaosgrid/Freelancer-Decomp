@@ -15,8 +15,8 @@
 #include "Interface/menu_ui_init.h"         // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot (5645c0)
 #include "NeuroNet/nn_error.h"             // NnErrorRunModal (FUN_00473cb0)
 #include "Interface/Pages/page_character_select.h" // G_CharacterCreateSelection (DAT_0067bcf8)
-#include "Space/Cameras/space_camera.h"         // AsCamera, SpaceCameraSetHalfFovX (FUN_0040f8c0)
-#include "Space/space_scene_obj_draw.h" // SpaceCameraSetNearFar (FUN_0040fb60)
+#include "Space/Cameras/space_camera.h"         // AsCamera, FSpaceCamera::SetHalfFovX (FUN_0040f8c0)
+#include "Space/space_scene_obj_draw.h" // FSpaceCamera::SetNearFar (FUN_0040fb60)
 #include "Interface/tooltip_hover.h"        // FToolTipHoverInfo
 #include "Interface/ui_rich_text_win.h"
 #include "Interface/ui_text_edit.h"
@@ -214,17 +214,15 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: the scene's +0x98 is its angle on a 4:3 surface, so the width it spans
     // is the scene width over the Hor+ factor.
-    SpaceCameraSetHalfFovX(
-        Preview, static_cast<float>(static_cast<double>(PreviewWidth) *
+    Preview->SetHalfFovX(static_cast<float>(static_cast<double>(PreviewWidth) *
                                     static_cast<double>(Scene->HalfFovXDeg) /
                                     (static_cast<double>(SceneWidth) / SpaceCameraHorPlusScale(Scene))));
 #else
-    SpaceCameraSetHalfFovX(
-        Preview, static_cast<float>(static_cast<double>(PreviewWidth) *
+    Preview->SetHalfFovX(static_cast<float>(static_cast<double>(PreviewWidth) *
                                     static_cast<double>(Scene->HalfFovXDeg) /
                                     static_cast<double>(SceneWidth)));
 #endif
-    SpaceCameraSetNearFar(Preview, 1.0f, 100.0f);
+    Preview->SetNearFar(1.0f, 100.0f);
 
     RdlClear(Back->TextBodyList);
     {

@@ -105,7 +105,7 @@ WinControl::~WinControl()
         bCaptured = 0;
         Win3DRemoveCapture(this);
     }
-    ClientUiMeshHolderRelease(&MeshHolder);
+    MeshHolder.ReleaseWithAnim();
 
     // Retail also dynamic_casts each child to WinControl here and discards the result.
     Win3D* Child = ChildHead;
@@ -138,7 +138,7 @@ bool WinControl::HitTest(Vector const* Ray)
     Xform.Translation.x = 0.0f;
     Xform.Translation.y = 0.0f;
     Xform.Translation.z = 0.0f;
-    if (ClientMeshHolderHasInstance(&MeshHolder))
+    if (MeshHolder.HasInstance())
     {
         const void* const Source = DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance);
         memcpy(&Xform, Source, sizeof(Xform));
@@ -212,7 +212,7 @@ void WinControl::SetOrientation(Matrix const* NewOrientation)
 {
     // FUN_005a0950.
     memmove(&Orientation, NewOrientation, sizeof(Orientation));
-    if (ClientMeshHolderHasInstance(&MeshHolder))
+    if (MeshHolder.HasInstance())
     {
         DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance,
                                               const_cast<Matrix*>(NewOrientation));
@@ -225,7 +225,7 @@ void WinControl::SetOrientation(Matrix const* NewOrientation)
 void WinControl::Destroy()
 {
     // FUN_0059fb60.
-    ClientUiMeshHolderRelease(&MeshHolder);
+    MeshHolder.ReleaseWithAnim();
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
@@ -248,27 +248,27 @@ void WinControl::Draw()
 #endif
     // FUN_005a0760 (FUN_005a06a0 inlined).
     DrawStaticMesh();
-    Win3DDrawChildren(this);
+    DrawChildren();
     PostDraw();
 }
 
 void WinControl::DrawStaticMesh()
 {
     // FUN_005a06a0. The tint is the HUD chrome colour DAT_00679bb4.
-    if (GetGameOption(kGameOptDrawStaticControls) != 0 && ClientMeshHolderHasInstance(&MeshHolder))
-    {
-        Win3DDisable(kWin3DDepthTest);
-        MeshHolder.UserFloats[0] =
-            static_cast<float>(static_cast<double>(G_HudChromeColorRgba[0]) * kInv255);
-        MeshHolder.UserFloats[1] =
-            static_cast<float>(static_cast<double>(G_HudChromeColorRgba[1]) * kInv255);
-        MeshHolder.UserFloats[2] =
-            static_cast<float>(static_cast<double>(G_HudChromeColorRgba[2]) * kInv255);
-        MeshHolder.UserFloats[4] =
-            static_cast<float>(static_cast<double>(G_HudChromeColorRgba[3]) * kInv255);
-        SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0);
-        Win3DDisable(kWin3DDepthTest);
-    }
+    if (GetGameOption(kGameOptDrawStaticControls) == 0 || !MeshHolder.HasInstance())
+        return;
+
+    Win3DDisable(kWin3DDepthTest);
+    MeshHolder.UserFloats[0] =
+        static_cast<float>(static_cast<double>(G_HudChromeColorRgba[0]) * kInv255);
+    MeshHolder.UserFloats[1] =
+        static_cast<float>(static_cast<double>(G_HudChromeColorRgba[1]) * kInv255);
+    MeshHolder.UserFloats[2] =
+        static_cast<float>(static_cast<double>(G_HudChromeColorRgba[2]) * kInv255);
+    MeshHolder.UserFloats[4] =
+        static_cast<float>(static_cast<double>(G_HudChromeColorRgba[3]) * kInv255);
+    MeshHolder.SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0);
+    Win3DDisable(kWin3DDepthTest);
 }
 
 void WinControl::SetHiddenWithChildren(bool bHide)
@@ -350,7 +350,7 @@ void WinControl::LoadIni(char const* Path)
             Offset.x = X;
             Offset.y = Y;
             Offset.z = Z;
-            if (ClientMeshHolderHasInstance(&MeshHolder))
+            if (MeshHolder.HasInstance())
             {
                 Vector Placed;
                 Placed.z = Offset.z + Position.z;
@@ -495,7 +495,7 @@ bool WinControl::GetHardpointTransform(char const* Name, Transform* OutXform)
 {
     // FUN_005a0a70 (RET 8). *OutXform is 3x3 orientation then position; the position always has
     // +0xa8 added.
-    if (ClientMeshHolderHasInstance(&MeshHolder))
+    if (MeshHolder.HasInstance())
     {
         const ArchetypeIndex Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
         DALib::Engine->ReleaseHandle(Archetype);
@@ -543,9 +543,9 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
     if (HasInstance(this) && _stricmp(MeshPath, Path) == 0)
         return;
     strcpy(MeshPath, Path);
-    ClientUiMeshHolderRelease(&MeshHolder);
+    MeshHolder.ReleaseWithAnim();
     if (Path[0] != '\0')
-        ClientMeshLoadFromPath(&MeshHolder, Path, MaterialPath, false);
+        MeshHolder.LoadFromPath(Path, MaterialPath, false);
     if (HasInstance(this))
     {
         Transform Xform;

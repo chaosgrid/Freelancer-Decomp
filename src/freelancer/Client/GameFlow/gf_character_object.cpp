@@ -660,7 +660,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     // DAT_0067dbfc (FUN_00423b90).
     FSpaceCamera* const Cam = Win3DGetCamera();
     Vector Local;
-    Win3DScreenToNearPlane(Cam, Local, static_cast<float>(Hotspot->ScreenRect.Left),
+    Cam->ScreenToNearPlane(Local, static_cast<float>(Hotspot->ScreenRect.Left),
                            static_cast<float>(Hotspot->ScreenRect.Top + -0x1e));
     Matrix CamOrientation;
     memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
@@ -785,9 +785,9 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     float const Height = GetFloorHeight();
     unsigned long HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
-    RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
-                          HeightBits, 1);
-    RoomControlLightObject(Owner, this); // FUN_0044ae80
+    Owner->DrawShadow(static_cast<unsigned long>(Instance),
+                      HeightBits, 1);
+    Owner->LightObject(this); // FUN_0044ae80
     // The out int is an uninitialised stack slot in retail.
     int DrawnLod = 0;
     DALib::Deform->Draw(Lod.Instance, Camera, LodIds, nullptr, &DrawnLod, 0);
@@ -1280,7 +1280,7 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
         {
             char const* const Name = Behavior->StringArray[Index];
             FCharacterObject* const Listed =
-                RoomControlFindCharacterByKey(Room, Behavior->IdArray[Index]);
+                Room->FindCharacterByKey(Behavior->IdArray[Index]);
             Sequence->Mirror.Add(Listed, Name);
         }
     }
@@ -1333,7 +1333,7 @@ void PlacePlayerAtSetpoint(char const* SetpointName)
     Matrix Orient = Found->Frame.Orient;
 
     // FUN_00449cd0.
-    FCharacterObject* const Player = RoomControlPlayerCharacter(Runtime);
+    FCharacterObject* const Player = Runtime->PlayerCharacter();
     if (Player == nullptr)
         return;
     void* const Instance = Player->Lod.Instance;

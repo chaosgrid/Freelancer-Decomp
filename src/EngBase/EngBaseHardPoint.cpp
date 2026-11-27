@@ -42,9 +42,9 @@ static const char* const G_FdumpFileHardPoint =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\EngBase\\Hardpoint\\HardPoint.cpp";
 
 // FUN_06625d00 (dtor, thiscall). Reports each archetype still in the map, in ascending key order.
-static void HardpointDestruct(FHardpointObject* Object)
+void FHardpointObject::Destroy()
 {
-    for (FHardpointMap::iterator It = Object->Archetypes.begin(); It != Object->Archetypes.end();
+    for (FHardpointMap::iterator It = Archetypes.begin(); It != Archetypes.end();
          ++It)
     {
         char Message[0x2000];
@@ -53,8 +53,8 @@ static void HardpointDestruct(FHardpointObject* Object)
                                         "Hardpoint: dtor: Archetype %d has dangling hardpoints\n",
                                         It->first));
     }
-    Object->Engine = nullptr;
-    Object->~FHardpointObject();
+    Engine = nullptr;
+    this->~FHardpointObject();
 }
 
 static FHardpointObject* HardpointFromNested(void* Nested, unsigned long Offset)
@@ -532,7 +532,7 @@ GENRESULT DACOM_API HardpointFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     {
         if (Agg->Outer != nullptr)
             *Agg->Outer = nullptr;
-        HardpointDestruct(Object);
+        Object->Destroy();
         std::free(Object);
         *Out = nullptr;
         return (GENRESULT)HookResult;
@@ -569,7 +569,7 @@ unsigned long DACOM_API FHardpointInner::Release()
     FHardpointObject* Owner = Object;
     if (Owner != nullptr)
     {
-        HardpointDestruct(Owner);
+        Owner->Destroy();
         std::free(Owner);
     }
     return 0;

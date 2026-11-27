@@ -35,6 +35,61 @@ struct FMeshHolder
     InstanceIndex EngineInstance = InvalidInstanceIndex;   // +0x04
     Archetype::FCliMaterialEntry* MaterialEntry = nullptr;    // +0x08
     Archetype::FCliMaterialEntry* AuxMaterialEntry = nullptr; // +0x0c
+
+    // FUN_00420d40 itself: the four stores and nothing else.
+    void Construct();
+
+    // FUN_00420d60 — instance bound?
+    bool HasInstance() const;
+
+    // FUN_00420f70 — destroy the instance and release both material-cache slots.
+    void Release();
+
+    // FUN_00420dd0 (thiscall on the holder, RET 8) - open Path as a DALib::Data FileSystem,
+    // resolve the material-cache entries for Path/AuxPath into +0x08/+0x0c, Archetype::Load the
+    // FileSystem and, on success, replace the bound instance with CreateInstance(handle, 0).
+    // Returns Archetype::Load's result. Caller: the star sphere layer load FUN_00552fd0.
+    bool Load(char const* Path, char const* AuxPath);
+
+    // FUN_00420f30 (thiscall on the holder, RET 8) - a non-null Path resolves its material-cache
+    // entry into +0x08 (FUN_0041aa50(Path, 1, -1)), a non-null AuxPath into +0x0c. What was there
+    // before is not released. Caller: FUN_004c9a80 (the engine-character accessory material).
+    void SetMaterials(char const* Path, char const* AuxPath);
+
+    // FUN_00420d70 (thiscall on the holder, RET 4) - a bound instance is destroyed and BOTH
+    // material-cache slots released (FUN_0041b030); then CreateInstance(ArchHandle, 0). True when
+    // that is not -1. Callers: FLFxMeshFactory, FUN_0059ec80.
+    bool BindInstance(ArchetypeIndex ArchHandle);
+
+    // FUN_00421030 (thiscall on the holder) - IEngine GetInstanceTransform.
+    const Transform* GetTransform() const;
+
+    // FUN_00421090 (thiscall on the holder, RET 4) - the instance's bounding sphere in world space
+    // (the centre through the instance transform). The math engine is cached in DAT_00616870.
+    // Returns the radius. Caller: the first-person cockpit pass.
+    float GetBoundingSphere(float* OutCenter) const;
+
+    // FUN_00421050 (thiscall on the holder, RET 4) - IEngine SetInstanceMatrix.
+    void SetMatrix(const Transform* Xform);
+
+    // FUN_00421120 (thiscall on the holder, RET 8) - IRenderer2 slot 7 at lod 1.0.
+    void Render(void* Camera, unsigned long Flags);
+
+    // FUN_00420fd0 (thiscall on the holder, RET 4) - IEngine SetInstancePosition.
+    void SetPosition(Vector const* Position);
+
+    // FUN_00420fb0 (thiscall on the holder) - IEngine GetInstancePosition.
+    const Vector* GetPosition() const;
+
+    // FUN_00420ff0 (thiscall on the holder) - IEngine GetInstanceOrientation: nine floats,
+    // row-major.
+    const Matrix* GetOrientation() const;
+
+    // FUN_00421010 (thiscall on the holder, RET 4) - IEngine SetInstanceOrientation.
+    void SetOrientation(float const Orientation[9]);
+
+    // FUN_00421070 (thiscall on the holder) - IEngine UpdateInstance(instance, 0, 0).
+    void Update();
 };
 
 static_assert(sizeof(FMeshHolder) == 0x10, "FUN_00420d40 object is 0x10");
@@ -47,6 +102,8 @@ static_assert(offsetof(FMeshHolder, EngineInstance) == 0x4, "holder +0x4 instanc
 // release a bound instance -- then ~ObjectHandle; it runs as the member dtor of every owner
 // (21 call sites, most of them EH unwind funclets), so the port holds it as a real destructor.
 // Copying is deleted: two holders would release one instance twice.
+struct FClientMeshAabb;
+
 struct FClientMeshHolder : FMeshHolder
 {
     FClientMeshHolder() = default;
@@ -56,14 +113,37 @@ struct FClientMeshHolder : FMeshHolder
 
     long AnimOrArchIndex = -1;                            // +0x10
     float UserFloats[5] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f}; // +0x14..+0x24 (FUN_00492250)
+
+    // FUN_0059eee0 — close the animation script, then release a bound mesh holder.
+    void ReleaseWithAnim();
+
+    // FUN_004a1af0 (thiscall on the holder, RET 4) - the RGBA byte quad at Rgba scaled by 1/255
+    // into UserFloats[0..2] and [4]; +0x20 is left alone. Callers: HUD_DamageIndicator::Draw, the
+    // nav map, HUD_Comm and ScrollControl.
+    void SetColor(unsigned char const* Rgba);
+
+    // FUN_0059ec80 (thiscall on the holder, RET 0xc) -- bind RelPath's archetype to Holder.
+    // FindArchetype hit: FUN_00420d70 + CompoundInstanceAnalyze, then the handle is released.
+    // Miss: RelPath is opened as a DALib::Data FileSystem, FUN_00420f30(Holder, RelPath,
+    // MaterialPath) resolves both material-cache entries (MaterialPath may be null), then
+    // Archetype::Load; with bRegisterCache the handle is kept in the Win3D model cache
+    // (DAT_0067dcf4) instead of being released. Returns FUN_00420d60 (instance bound).
+    bool LoadFromPath(char const* RelPath, char const* MaterialPath, bool bRegisterCache);
+
+    // FUN_0059f0d0 (thiscall on the holder, RET 4) — false when the instance is -1, else
+    // IRenderer2 slot 4 into OutAabb and true whatever it answered. OutAabb is not cleared on the
+    // false path.
+    bool QueryAabb(FClientMeshAabb* OutAabb);
+
+    // FUN_0059efa0 — thiscall on the holder (its instance at +0x04). bDepthTested non-zero: ZFUNC
+    // LESSEQUAL with z write off; zero: ZFUNC ALWAYS with z write on (RS 0x17 / 0x0e, not restored).
+    void SubmitWin3DEngineInstance(void* ArchAnchor, unsigned char bDepthTested, float Scale,
+                                   unsigned long Flags);
 };
 
 static_assert(sizeof(FClientMeshHolder) == 0x28, "retail HUD mesh holder 0x28");
 static_assert(offsetof(FClientMeshHolder, AnimOrArchIndex) == 0x10, "holder +0x10 anim");
 static_assert(offsetof(FClientMeshHolder, UserFloats) == 0x14, "holder +0x14 analyze ctx");
-
-// FUN_00420d40 itself: the four stores and nothing else.
-void MeshHolderConstruct(FMeshHolder* Holder);
 
 // IRenderer2 slot 4 / FUN_0059f0d0 out — 6 floats (AABB max/min XYZ, per RendComp slot 13).
 struct FClientMeshAabb
@@ -73,75 +153,6 @@ struct FClientMeshAabb
 
 // FUN_00420d40 + the inlined Object3D part — construct an empty holder.
 void ClientMeshHolderConstruct(FClientMeshHolder* Holder);
-
-// FUN_00420d60 — instance bound?
-bool ClientMeshHolderHasInstance(FMeshHolder const* Holder);
-
-// FUN_00420f70 — destroy the instance and release both material-cache slots.
-void ClientMeshHolderRelease(FMeshHolder* Holder);
-
-// FUN_0059eee0 — close the animation script, then release a bound mesh holder.
-void ClientUiMeshHolderRelease(FClientMeshHolder* Holder);
-
-// FUN_00420dd0 (thiscall on the holder, RET 8) - open Path as a DALib::Data FileSystem,
-// resolve the material-cache entries for Path/AuxPath into +0x08/+0x0c, Archetype::Load the
-// FileSystem and, on success, replace the bound instance with CreateInstance(handle, 0).
-// Returns Archetype::Load's result. Caller: the star sphere layer load FUN_00552fd0.
-bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* AuxPath);
-
-// FUN_00420f30 (thiscall on the holder, RET 8) - a non-null Path resolves its material-cache
-// entry into +0x08 (FUN_0041aa50(Path, 1, -1)), a non-null AuxPath into +0x0c. What was there
-// before is not released. Caller: FUN_004c9a80 (the engine-character accessory material).
-void ClientMeshHolderSetMaterials(FMeshHolder* Holder, char const* Path, char const* AuxPath);
-
-// FUN_00420d70 (thiscall on the holder, RET 4) - a bound instance is destroyed and BOTH
-// material-cache slots released (FUN_0041b030); then CreateInstance(ArchHandle, 0). True when
-// that is not -1. Callers: FLFxMeshFactory, FUN_0059ec80.
-bool ClientMeshHolderBindInstance(FMeshHolder* Holder, ArchetypeIndex ArchHandle);
-
-// FUN_00421030 (thiscall on the holder) - IEngine GetInstanceTransform.
-const Transform* ClientMeshHolderGetTransform(FMeshHolder const* Holder);
-
-// FUN_00421090 (thiscall on the holder, RET 4) - the instance's bounding sphere in world space
-// (the centre through the instance transform). The math engine is cached in DAT_00616870.
-// Returns the radius. Caller: the first-person cockpit pass.
-float ClientMeshHolderGetBoundingSphere(FMeshHolder const* Holder, float* OutCenter);
-
-// FUN_00421050 (thiscall on the holder, RET 4) - IEngine SetInstanceMatrix.
-void ClientMeshHolderSetMatrix(FMeshHolder* Holder, const Transform* Xform);
-
-// FUN_00421120 (thiscall on the holder, RET 8) - IRenderer2 slot 7 at lod 1.0.
-void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags);
-
-// FUN_00420fd0 (thiscall on the holder, RET 4) - IEngine SetInstancePosition.
-void ClientMeshHolderSetPosition(FMeshHolder* Holder, Vector const* Position);
-
-// FUN_00420fb0 (thiscall on the holder) - IEngine GetInstancePosition.
-const Vector* ClientMeshHolderGetPosition(FMeshHolder const* Holder);
-
-// FUN_00420ff0 (thiscall on the holder) - IEngine GetInstanceOrientation: nine floats,
-// row-major.
-const Matrix* ClientMeshHolderGetOrientation(FMeshHolder const* Holder);
-
-// FUN_00421010 (thiscall on the holder, RET 4) - IEngine SetInstanceOrientation.
-void ClientMeshHolderSetOrientation(FMeshHolder* Holder, float const Orientation[9]);
-
-// FUN_00421070 (thiscall on the holder) - IEngine UpdateInstance(instance, 0, 0).
-void ClientMeshHolderUpdate(FMeshHolder* Holder);
-
-// FUN_004a1af0 (thiscall on the holder, RET 4) - the RGBA byte quad at Rgba scaled by 1/255
-// into UserFloats[0..2] and [4]; +0x20 is left alone. Callers: HUD_DamageIndicator::Draw, the
-// nav map, HUD_Comm and ScrollControl.
-void ClientMeshHolderSetColor(FClientMeshHolder* Holder, unsigned char const* Rgba);
-
-// FUN_0059ec80 (thiscall on the holder, RET 0xc) -- bind RelPath's archetype to Holder.
-// FindArchetype hit: FUN_00420d70 + CompoundInstanceAnalyze, then the handle is released.
-// Miss: RelPath is opened as a DALib::Data FileSystem, FUN_00420f30(Holder, RelPath,
-// MaterialPath) resolves both material-cache entries (MaterialPath may be null), then
-// Archetype::Load; with bRegisterCache the handle is kept in the Win3D model cache
-// (DAT_0067dcf4) instead of being released. Returns FUN_00420d60 (instance bound).
-bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
-                            char const* MaterialPath, bool bRegisterCache);
 
 // The Win3D model cache DAT_0067dcf4 (a vector, element stride 0xc; FUN_0059ebf0 builds
 // {handle, 0, 0}). It keeps an archetype handle -- and for a preloaded model its two
@@ -162,7 +173,3 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath);
 // shutdown FUN_0059d6d0.
 void Win3DModelCacheClear();
 
-// FUN_0059f0d0 (thiscall on the holder, RET 4) — false when the instance is -1, else
-// IRenderer2 slot 4 into OutAabb and true whatever it answered. OutAabb is not cleared on the
-// false path.
-bool ClientMeshQueryAabb(FClientMeshHolder* Holder, FClientMeshAabb* OutAabb);

@@ -150,13 +150,13 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bN
         NameText->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(ShipArch->IdsName), 0);
 
     // The x87 product of two floats is exact in double, as it is in extended precision.
-    if (DamageBar != nullptr)
-    {
-        int const Health = static_cast<int>(static_cast<double>(GetPlayerHealthScaleRetail()) *
-                                            100.0); // FUN_004c4f70, DAT_005ca230
-        DamageBar->SetProperty(kBarPropFill, 100, static_cast<uintptr_t>(Health));
-        DamageBar->SetProperty(kWinPropToolTip, 0x408, 0);
-    }
+    if (DamageBar == nullptr)
+        return;
+
+    int const Health = static_cast<int>(static_cast<double>(GetPlayerHealthScaleRetail()) *
+                                        100.0); // FUN_004c4f70, DAT_005ca230
+    DamageBar->SetProperty(kBarPropFill, 100, static_cast<uintptr_t>(Health));
+    DamageBar->SetProperty(kWinPropToolTip, 0x408, 0);
 }
 
 void FInventoryShipModel::GetCargoCapacityAndUsed(float* OutCapacity, float* OutUsed) const
@@ -2538,16 +2538,16 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     Dealer->ClearSelection();
                 break;
             }
-            if (Control == EquipToggle[Row])
-            {
-                SelectRow(Row, 1);
-                int State = 0; // retail: uninitialised until slot 42 0x2f writes it
-                EquipToggle[Row]->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
-                EquipDesc* const Item = GetSelectedItem();
-                if (Item != nullptr)
-                    ToggleEquip(Item, State); // FUN_0047f720
-                break;
-            }
+            if (Control != EquipToggle[Row])
+                continue;
+
+            SelectRow(Row, 1);
+            int State = 0; // retail: uninitialised until slot 42 0x2f writes it
+            EquipToggle[Row]->SetProperty(kTogglePropGetState, reinterpret_cast<uintptr_t>(&State), 0);
+            EquipDesc* const Item = GetSelectedItem();
+            if (Item != nullptr)
+                ToggleEquip(Item, State); // FUN_0047f720
+            break;
         }
 
         if (Control == FilterCargoBay)
@@ -2881,15 +2881,15 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         }
     }
 
-    if (IsPlayerDockedRetail()) // FUN_004c4810
+    if (!IsPlayerDockedRetail()) // FUN_004c4810
+        return;
+
+    ReqPlayerEquipmentRetail(&Ship.Loadout); // FUN_004c4040
+    FObjectShip* const GfShip = GfObjectShip();
+    if (GfShip != nullptr)
     {
-        ReqPlayerEquipmentRetail(&Ship.Loadout); // FUN_004c4040
-        FObjectShip* const GfShip = GfObjectShip();
-        if (GfShip != nullptr)
-        {
-            GfShip->SetEquipment(&Ship.Loadout);
-            GfShip->RebuildModel();
-        }
+        GfShip->SetEquipment(&Ship.Loadout);
+        GfShip->RebuildModel();
     }
 }
 
@@ -3806,19 +3806,19 @@ void NnInventory::UpdateRowVisibility(int Count)
             }
         }
 
-        if (ItemView[Row] != nullptr && ItemButton[Row] != nullptr && ItemMesh[Row] != nullptr)
+        if (ItemView[Row] == nullptr || ItemButton[Row] == nullptr || ItemMesh[Row] == nullptr)
+            continue;
+
+        uintptr_t const HideValue = bHide ? 1 : 0;
+        ItemButton[Row]->SetProperty(kWinPropHide, 0, 0);
+        ItemMesh[Row]->SetProperty(kWinPropHide, HideValue, 0);
+        ItemView[Row]->SetProperty(kWinPropHide, 0, 0);
+        ItemView[Row]->SetProperty(kWinPropDisable, HideValue, 0);
+        ItemButton[Row]->SetProperty(kWinPropDisable, HideValue, 0);
+        if (bHide)
         {
-            uintptr_t const HideValue = bHide ? 1 : 0;
-            ItemButton[Row]->SetProperty(kWinPropHide, 0, 0);
-            ItemMesh[Row]->SetProperty(kWinPropHide, HideValue, 0);
-            ItemView[Row]->SetProperty(kWinPropHide, 0, 0);
-            ItemView[Row]->SetProperty(kWinPropDisable, HideValue, 0);
-            ItemButton[Row]->SetProperty(kWinPropDisable, HideValue, 0);
-            if (bHide)
-            {
-                ItemView[Row]->SetProperty(kWinPropToolTip, 0, 0);
-                ItemButton[Row]->SetProperty(kWinPropToolTip, 0, 0);
-            }
+            ItemView[Row]->SetProperty(kWinPropToolTip, 0, 0);
+            ItemButton[Row]->SetProperty(kWinPropToolTip, 0, 0);
         }
     }
 
@@ -4015,13 +4015,13 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                                                Entry->Class, 0);
 
             // An empty hardpoint keeps its class for the info card.
-            if (FirstSelected == nullptr && bSelected)
-            {
-                FirstSelected = Item;
-                FirstGood = Good;
-                if (ArchId == 0)
-                    SelectedHpClass = Entry->Class;
-            }
+            if (FirstSelected != nullptr || !bSelected)
+                continue;
+
+            FirstSelected = Item;
+            FirstGood = Good;
+            if (ArchId == 0)
+                SelectedHpClass = Entry->Class;
         }
     }
 

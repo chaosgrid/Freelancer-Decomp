@@ -187,6 +187,10 @@ struct Win3D : public LinkTree<Win3D>
 private:
     Win3D(Win3D const&) = delete;
     Win3D& operator=(Win3D const&) = delete;
+
+public:
+    // FUN_0059e5c0 (thiscall on Parent) -- draw Parent's visible children sorted by +0x70/+0x68.
+    void DrawChildren();
 };
 
 static_assert(sizeof(Win3D) == 0x7c, "retail Win3D is 0x7c bytes");
@@ -270,8 +274,6 @@ void Win3DDrawAll();
 void Win3DBeginDraw();
 // FUN_0059e5a0 -- MaterialBatcher slot 8 (1, 1), the epilogue of FUN_0059e300.
 void Win3DEndDraw();
-// FUN_0059e5c0 (thiscall on Parent) -- draw Parent's visible children sorted by +0x70/+0x68.
-void Win3DDrawChildren(Win3D* Parent);
 // FUN_0059e6e0 (cdecl) -- the same body for callers that pass the parent on the stack.
 void Win3DDrawChildrenOf(Win3D* Parent);
 // FUN_0043d2a0 (cdecl) -- post-order delete of Root's subtree: every child subtree, then slot 10
@@ -299,6 +301,3 @@ void Win3DTransformByMatrix(Vector& Out, Matrix const& Mat, Vector const& Source
 // inline before calling the engine directly.
 struct I3DMathEngine;
 I3DMathEngine* Win3DTransformMathEngine();
-// FUN_004bdd40 (thiscall on the camera) -- the camera-space point on the near plane under a
-// screen pixel: ((x - cx) * (znear / xscale), (y - cy) * (znear / yscale), -znear).
-void Win3DScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY);

@@ -92,60 +92,60 @@ FTextureRef::~FTextureRef()
 
 // -------------------------------------------------------------------- FUN_004255c0
 
-bool TextureRefLoad(FTextureRef* Ref, char const* Name)
+bool FTextureRef::Load(char const* Name)
 {
-    if (Ref->Texture != nullptr)
+    if (Texture != nullptr)
     {
-        DALib::TextureLib->ReleaseTextureRecord(Ref->Texture);
-        Ref->Texture = nullptr;
+        DALib::TextureLib->ReleaseTextureRecord(Texture);
+        Texture = nullptr;
     }
 
     FTexCrcQuery Query;
     Query.Name = Name;
     Query.Crc = DACOM_CRC::GetCRC32(Name);
-    if (DALib::TextureLib->FindTextureByCrc(&Query, &Ref->Texture) != GR_OK)
+    if (DALib::TextureLib->FindTextureByCrc(&Query, &Texture) != GR_OK)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: texture (%s) is not defined", kShapeDbCpp, 0x24,
               Name);
     }
-    return Ref->Texture != nullptr;
+    return Texture != nullptr;
 }
 
 // -------------------------------------------------------------------- FUN_00425640
 
-void* TexShapeGetGpuHandle(FTextureRef const* Ref, int Frame)
+void* FTextureRef::GetGpuHandle(int Frame) const
 {
-    if (Ref->Texture == nullptr)
+    if (Texture == nullptr)
         return nullptr;
 
     unsigned long FrameInfo[5];
-    DALib::TextureLib->GetTextureFrame(Ref->Texture, Frame, FrameInfo);
+    DALib::TextureLib->GetTextureFrame(Texture, Frame, FrameInfo);
     return reinterpret_cast<void*>(FrameInfo[0]);
 }
 
 // -------------------------------------------------------------------- FUN_00425680
 
-void TexShapeSetTexture(FTextureRef* Ref, void* Texture)
+void FTextureRef::SetTexture(void* Texture)
 {
-    if (Ref->Texture != nullptr)
+    if (this->Texture != nullptr)
     {
-        DALib::TextureLib->ReleaseTextureRecord(Ref->Texture);
-        Ref->Texture = nullptr;
+        DALib::TextureLib->ReleaseTextureRecord(this->Texture);
+        this->Texture = nullptr;
     }
-    Ref->Texture = Texture;
+    this->Texture = Texture;
     if (Texture != nullptr)
         DALib::TextureLib->CreatePlaybackGroup(Texture, nullptr);
 }
 
 // -------------------------------------------------------------------- FUN_004256c0
 
-void TexShapeSetRect(FTexShape* Shape, float X, float Y, float W, float H, float UpperLeftU,
-                     float UpperLeftV, float LowerRightU, float LowerRightV)
+void FTexShape::SetRect(float X, float Y, float W, float H, float UpperLeftU, float UpperLeftV,
+                        float LowerRightU, float LowerRightV)
 {
     // No check of either the record or the result. Deviation: retail leaves the out block
     // uninitialised; the port zeroes it so a failed call reads 0.
     unsigned long Frame[5] = {0, 0, 0, 0, 0};
-    DALib::TextureLib->GetTextureFrame(Shape->Texture, 0, Frame);
+    DALib::TextureLib->GetTextureFrame(Texture, 0, Frame);
 
     // The result is not checked.
     unsigned int TexW = 0;
@@ -181,12 +181,12 @@ void TexShapeSetRect(FTexShape* Shape, float X, float Y, float W, float H, float
     // never bleed into each other.
     float const Right = X + W;
     float const Bottom = Y + H;
-    Shape->U0 = (X + kUvInset) / FTexW;
-    Shape->V0 = (Y + kUvInset) / FTexH;
-    Shape->U1 = (Right - kUvInset) / FTexW;
-    Shape->V1 = (Bottom - kUvInset) / FTexH;
-    Shape->PixelW = static_cast<int>(W);
-    Shape->PixelH = static_cast<int>(H);
+    U0 = (X + kUvInset) / FTexW;
+    V0 = (Y + kUvInset) / FTexH;
+    U1 = (Right - kUvInset) / FTexW;
+    V1 = (Bottom - kUvInset) / FTexH;
+    PixelW = static_cast<int>(W);
+    PixelH = static_cast<int>(H);
 
     // A negative corner means "take it from the rect".
     if (UpperLeftU < kZero)
@@ -220,10 +220,10 @@ void TexShapeSetRect(FTexShape* Shape, float X, float Y, float W, float H, float
     float const MidU = UpperLeftU + SpanU * kHalf + HalfPixelU;
     float const MidV = UpperLeftV + SpanV * kHalf;
 
-    Shape->ScaleU = InvHalfW * SpanU * kHalf;
-    Shape->ScaleV = InvHalfH * SpanV * kHalf;
-    Shape->OffsetU = (MidU - CenterX) * InvHalfW;
-    Shape->OffsetV = (MidV - CenterY) * InvHalfH;
+    ScaleU = InvHalfW * SpanU * kHalf;
+    ScaleV = InvHalfH * SpanV * kHalf;
+    OffsetU = (MidU - CenterX) * InvHalfW;
+    OffsetV = (MidV - CenterY) * InvHalfH;
 }
 
 // ------------------------------------------------------------------------ ShapeDB
@@ -462,9 +462,9 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         }
                         else
                         {
-                            TexShapeSetTexture(Shape, CurrentTexture);
+                            Shape->SetTexture(CurrentTexture);
                             if (Shape->Texture != nullptr)
-                                TexShapeSetRect(Shape, 0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
+                                Shape->SetRect(0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
                             CurrentShape = Shape;
                         }
                     }
@@ -503,9 +503,9 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         FTexShape* const Shape = FindOrCreate(Key);
                         if (Shape->Texture == nullptr)
                         {
-                            TexShapeSetTexture(Shape, Texture);
+                            Shape->SetTexture(Texture);
                             if (Shape->Texture != nullptr)
-                                TexShapeSetRect(Shape, 0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
+                                Shape->SetRect(0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
                         }
                         else
                         {
@@ -543,8 +543,8 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                                 Values[Index] =
                                     Reader.is_value_empty(Index) ? 0.f : Reader.get_value_float(Index);
                             }
-                            TexShapeSetRect(CurrentShape, Values[0], Values[1], Values[2], Values[3],
-                                            Values[4], Values[5], Values[6], Values[7]);
+                            CurrentShape->SetRect(Values[0], Values[1], Values[2], Values[3],
+                                                  Values[4], Values[5], Values[6], Values[7]);
                             CurrentShape = nullptr;
                         }
                     }
@@ -663,9 +663,9 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         Shape->Texture = CurrentTexture;
                         Library->CreatePlaybackGroup(CurrentTexture, nullptr);
                         if (Shape->Texture != nullptr)
-                            TexShapeSetRect(Shape, 0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
-                        TexShapeSetRect(Shape, X, Y, W, H, UpperLeftU, UpperLeftV, LowerRightU,
-                                        LowerRightV);
+                            Shape->SetRect(0.f, 0.f, 0.f, 0.f, -1.f, -1.f, -1.f, -1.f);
+                        Shape->SetRect(X, Y, W, H, UpperLeftU, UpperLeftV, LowerRightU,
+                                       LowerRightV);
                     }
                 }
             }

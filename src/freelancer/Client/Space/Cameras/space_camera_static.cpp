@@ -26,12 +26,12 @@ void StaticCameraConstruct(FStaticCamera* Cam)
 {
     // The controller calls the FGameCamera ctor directly and swaps the vptr; no ctor of its own,
     // so the class has no fields. No null test (the caller passes SpaceApp + 0x9a4).
-    GameCameraConstruct((FGameCamera*)Cam);
+    Cam->FGameCamera::Construct();
 }
 
-bool StaticCameraActivate(FStaticCamera* Cam, const int* ViewRect4)
+bool FStaticCamera::Activate(int const* ViewRect4)
 {
-    const bool bBaseResult = GameCameraActivate((FGameCamera*)Cam, ViewRect4);
+    const bool bBaseResult = FGameCamera::Activate(ViewRect4);
 
     SetLetterboxTarget(1.0f, kLetterboxSpeed);
 
@@ -40,10 +40,8 @@ bool StaticCameraActivate(FStaticCamera* Cam, const int* ViewRect4)
     return bBaseResult;
 }
 
-void StaticCameraDeactivate(FStaticCamera* Cam)
+void FStaticCamera::Deactivate()
 {
-    (void)Cam;
-
     // The base deactivate is the empty IDPMsgHandler::OnDisconnect.
 
     // The reverse of activate's order: notify BEFORE the bars here, AFTER them there.
@@ -52,9 +50,9 @@ void StaticCameraDeactivate(FStaticCamera* Cam)
     SetLetterboxTarget(0.0f, kLetterboxSpeed);
 }
 
-int StaticCameraOnEvent(FStaticCamera* Cam, const int* Event)
+int FStaticCamera::HandleCommand74(void* Command)
 {
-    (void)Cam;
+    const int* Event = (int const*)Command;
 
     // No null test on Event.
     if (*Event == USER_CANCEL)
@@ -62,19 +60,4 @@ int StaticCameraOnEvent(FStaticCamera* Cam, const int* Event)
 
     // Always zero, whether or not the event matched.
     return 0;
-}
-
-bool FStaticCamera::Activate(int const* ViewRect4)
-{
-    return StaticCameraActivate(this, ViewRect4);
-}
-
-void FStaticCamera::Deactivate()
-{
-    StaticCameraDeactivate(this);
-}
-
-int FStaticCamera::HandleCommand74(void* Command)
-{
-    return StaticCameraOnEvent(this, (int const*)Command);
 }

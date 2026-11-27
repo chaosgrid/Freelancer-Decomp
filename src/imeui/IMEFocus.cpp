@@ -142,15 +142,15 @@ static void HideLanguageBar()
     ITfLangBarMgr* Manager = nullptr;
     HRESULT const Result = CoCreateInstance(GLangBarClass, nullptr, CLSCTX_INPROC_SERVER,
         __uuidof(ITfLangBarMgr), reinterpret_cast<void**>(&Manager));
-    if (SUCCEEDED(Result) && Manager != nullptr)
-    {
-        DWORD Status;
-        if (SUCCEEDED(Manager->GetShowFloatingStatus(&Status)))
-            GLangBarStatus = Status;
-        if ((GLangBarStatus & TF_SFT_DESKBAND) == 0)
-            Manager->ShowFloating(TF_SFT_HIDDEN);
-        Manager->Release();
-    }
+    if (FAILED(Result) || Manager == nullptr)
+        return;
+
+    DWORD Status;
+    if (SUCCEEDED(Manager->GetShowFloatingStatus(&Status)))
+        GLangBarStatus = Status;
+    if ((GLangBarStatus & TF_SFT_DESKBAND) == 0)
+        Manager->ShowFloating(TF_SFT_HIDDEN);
+    Manager->Release();
 }
 
 static void RestoreLanguageBar()
@@ -368,14 +368,14 @@ bool IMEFocus::OnKeyDown(UINT Key)
 
 void IMEFocus::SetFocus(IMEInputBox* InputBox, bool bForce)
 {
-    if (bForce || m_pActiveInputBox != InputBox)
-    {
-        if (m_pActiveInputBox)
-            m_pActiveInputBox->OnKillFocus();
-        m_pActiveInputBox = InputBox;
-        if (m_pActiveInputBox)
-            m_pActiveInputBox->OnSetFocus();
-    }
+    if (!bForce && m_pActiveInputBox == InputBox)
+        return;
+
+    if (m_pActiveInputBox)
+        m_pActiveInputBox->OnKillFocus();
+    m_pActiveInputBox = InputBox;
+    if (m_pActiveInputBox)
+        m_pActiveInputBox->OnSetFocus();
 }
 
 void IMEFocus::Draw(void* Context)

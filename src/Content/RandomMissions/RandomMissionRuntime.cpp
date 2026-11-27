@@ -541,15 +541,15 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
         for (std::list<FRmSolarSpawn>::const_iterator Solar = Solars.Solars.begin();
              Solar != Solars.Solars.end(); ++Solar)
         {
-            if (Solar->SolarType == kRmSolarDefensive || Solar->SolarType == kRmSolarKillableNeutral)
+            if (Solar->SolarType != kRmSolarDefensive && Solar->SolarType != kRmSolarKillableNeutral)
+                continue;
+
+            Arch = Solar->Arch;
+            ++Count;
+            if (Count > 1)
             {
-                Arch = Solar->Arch;
-                ++Count;
-                if (Count > 1)
-                {
-                    Out->append_installation(Arch->StringId + 1);
-                    return true;
-                }
+                Out->append_installation(Arch->StringId + 1);
+                return true;
             }
         }
         if (Count == 0)

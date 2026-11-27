@@ -200,62 +200,60 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     LagAlert = CreateAlert(this, "LagAlert", "Interface\\multiplayer\\MULTI_lag.3db", &LagPos, 0);
 
     // FUN_0059ec80, in retail's order.
-    ClientMeshLoadFromPath(&TargetArrow, "interface\\hud\\hud_targetarrow.3db", 0, true);
-    ClientMeshLoadFromPath(&TargetArrowHat, "interface\\hud\\hud_targetarrowhat.3db", 0, true);
-    ClientMeshLoadFromPath(&TargetArrowPlayer, "interface\\hud\\hud_targetarrowplayer.3db", 0,
-                           true);
-    ClientMeshLoadFromPath(&TargetHealth, "interface\\hud\\hud_targethealth.3db", 0, true);
-    ClientMeshLoadFromPath(&TargetShields, "interface\\hud\\hud_targetshields.3db", 0, true);
-    ClientMeshLoadFromPath(&TargetArrowQuotes, "interface\\hud\\hud_targetarrowquotes.3db", 0,
-                           true);
-    ClientMeshLoadFromPath(&NonselectedArrow, "interface\\hud\\hud_nonselectedarrow.3db", 0, true);
-    ClientMeshLoadFromPath(&NonselectedArrowHat, "interface\\hud\\hud_nonselectedarrowhat.3db", 0,
-                           true);
-    ClientMeshLoadFromPath(&NonselectedPlayerArrow,
-                           "interface\\hud\\hud_nonselectedplayerarrow.3db", 0, true);
-    ClientMeshLoadFromPath(&LootArrow, "interface\\hud\\hud_lootarrow.3db", 0, true);
-    ClientMeshLoadFromPath(&NonselectedArrowQuotes,
-                           "interface\\hud\\hud_nonselectedarrowquotes.3db", 0, true);
+    TargetArrow.LoadFromPath("interface\\hud\\hud_targetarrow.3db", 0, true);
+    TargetArrowHat.LoadFromPath("interface\\hud\\hud_targetarrowhat.3db", 0, true);
+    TargetArrowPlayer.LoadFromPath("interface\\hud\\hud_targetarrowplayer.3db", 0,
+                                   true);
+    TargetHealth.LoadFromPath("interface\\hud\\hud_targethealth.3db", 0, true);
+    TargetShields.LoadFromPath("interface\\hud\\hud_targetshields.3db", 0, true);
+    TargetArrowQuotes.LoadFromPath("interface\\hud\\hud_targetarrowquotes.3db", 0,
+                                   true);
+    NonselectedArrow.LoadFromPath("interface\\hud\\hud_nonselectedarrow.3db", 0, true);
+    NonselectedArrowHat.LoadFromPath("interface\\hud\\hud_nonselectedarrowhat.3db", 0,
+                                     true);
+    NonselectedPlayerArrow.LoadFromPath("interface\\hud\\hud_nonselectedplayerarrow.3db", 0, true);
+    LootArrow.LoadFromPath("interface\\hud\\hud_lootarrow.3db", 0, true);
+    NonselectedArrowQuotes.LoadFromPath("interface\\hud\\hud_nonselectedarrowquotes.3db", 0, true);
 
     // The bar extents. FUN_0059f0d0 fills {maxX, minX, maxY, minY,
     // maxZ, minZ} into one stack buffer that every query below reuses; a query on a holder with
     // no instance leaves it as the previous query left it.
     FClientMeshAabb Extents;
-    ClientMeshQueryAabb(&TargetHealth, &Extents);
+    TargetHealth.QueryAabb(&Extents);
     HealthBarRect.Left = Extents.Values[1];
     HealthBarRect.Width = Extents.Values[0] - Extents.Values[1];
     HealthBarRect.Top = Extents.Values[4];
     HealthBarRect.Bottom = Extents.Values[5];
-    ClientMeshQueryAabb(&TargetShields, &Extents);
+    TargetShields.QueryAabb(&Extents);
     ShieldBarRect.Width = Extents.Values[0] - Extents.Values[1];
     ShieldBarRect.Bottom = Extents.Values[5];
     ShieldBarRect.Left = Extents.Values[1];
     ShieldBarRect.Top = Extents.Values[4];
 
-    ClientMeshLoadFromPath(&Reticle, "interface\\hud\\hud_reticle.3db", 0, true);
-    ClientMeshLoadFromPath(&ReticleQuotes, "interface\\hud\\hud_reticle_quotes.3db", 0, true);
-    ClientMeshLoadFromPath(&ReticleArrows, "interface\\hud\\hud_reticle_arrows.3db", 0, true);
-    ClientMeshLoadFromPath(&ReticleHealth, "interface\\hud\\hud_reticle_health.3db", 0, true);
-    ClientMeshLoadFromPath(&ReticleShields, "interface\\hud\\hud_reticle_shields.3db", 0, true);
-    ClientMeshLoadFromPath(&WaypointReticle, "interface\\hud\\hud_waypointreticle.3db", 0, true);
-    ClientMeshLoadFromPath(&SelectedWaypoint, "interface\\hud\\hud_selectedwaypoint.3db", 0, true);
-    ClientMeshLoadFromPath(&NonselectedWaypoint, "interface\\hud\\hud_nonselectedwaypoint.3db", 0,
-                           true);
+    Reticle.LoadFromPath("interface\\hud\\hud_reticle.3db", 0, true);
+    ReticleQuotes.LoadFromPath("interface\\hud\\hud_reticle_quotes.3db", 0, true);
+    ReticleArrows.LoadFromPath("interface\\hud\\hud_reticle_arrows.3db", 0, true);
+    ReticleHealth.LoadFromPath("interface\\hud\\hud_reticle_health.3db", 0, true);
+    ReticleShields.LoadFromPath("interface\\hud\\hud_reticle_shields.3db", 0, true);
+    WaypointReticle.LoadFromPath("interface\\hud\\hud_waypointreticle.3db", 0, true);
+    SelectedWaypoint.LoadFromPath("interface\\hud\\hud_selectedwaypoint.3db", 0, true);
+    NonselectedWaypoint.LoadFromPath("interface\\hud\\hud_nonselectedwaypoint.3db", 0,
+                                     true);
 
-    ClientMeshQueryAabb(&WaypointReticle, &Extents);
+    WaypointReticle.QueryAabb(&Extents);
     WaypointReticleWidth = Extents.Values[0] - Extents.Values[1];
     WaypointReticleHeight = Extents.Values[2] - Extents.Values[3];
-    ClientMeshQueryAabb(&Reticle, &Extents);
+    Reticle.QueryAabb(&Extents);
     ReticleRect.Left = Extents.Values[1];
     ReticleRect.Top = Extents.Values[2] - Extents.Values[3];
     ReticleRect.Bottom = Extents.Values[3];
     ReticleRect.Width = Extents.Values[0] - Extents.Values[1];
-    ClientMeshQueryAabb(&ReticleHealth, &Extents);
+    ReticleHealth.QueryAabb(&Extents);
     ReticleHealthRect.Left = Extents.Values[1];
     ReticleHealthRect.Width = Extents.Values[0] - Extents.Values[1];
     ReticleHealthRect.Top = Extents.Values[2];
     ReticleHealthRect.Bottom = Extents.Values[3];
-    ClientMeshQueryAabb(&ReticleShields, &Extents);
+    ReticleShields.QueryAabb(&Extents);
     ReticleShieldsRect.Width = Extents.Values[0] - Extents.Values[1];
     ReticleShieldsRect.Left = Extents.Values[1];
     ReticleShieldsRect.Bottom = Extents.Values[3];
@@ -285,13 +283,13 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     // The two waypoint captions, scaled to twice the reticle width.
     wchar_t Caption[0x80];
     LoadLabelIds(0x442, Caption);
-    FontStringSetFont(&WaypointLabel, SmallFont);                 // FUN_004ea670
-    FontStringSetScale(&WaypointLabel, WaypointReticleWidth + WaypointReticleWidth, -1.0f);
-    FontStringSetText(&WaypointLabel, Caption);                   // FUN_00415860
+    WaypointLabel.SetFont(SmallFont);                 // FUN_004ea670
+    WaypointLabel.SetScale(WaypointReticleWidth + WaypointReticleWidth, -1.0f);
+    WaypointLabel.SetText(Caption);                   // FUN_00415860
     LoadLabelIds(0x443, Caption);
-    FontStringSetFont(&BestPathLabel, SmallFont);                 // inlined FUN_004ea670
-    FontStringSetScale(&BestPathLabel, WaypointReticleWidth + WaypointReticleWidth, -1.0f);
-    FontStringSetText(&BestPathLabel, Caption);
+    BestPathLabel.SetFont(SmallFont);                 // inlined FUN_004ea670
+    BestPathLabel.SetScale(WaypointReticleWidth + WaypointReticleWidth, -1.0f);
+    BestPathLabel.SetText(Caption);
 
     NameCacheSimpleId = 0;
     NameCacheLootUnits = -1;
@@ -311,51 +309,51 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
 HudTargetableObjects::~HudTargetableObjects()
 {
     // FUN_004ea7b0.
-    FontStringClearContents(&WaypointLabel);
-    FontStringClearContents(&BestPathLabel);
-    FontStringClearContents(&TargetNameText);
-    FontStringClearContents(&TargetInfoText);
-    FontStringClearContents(&RangeText);
+    WaypointLabel.ClearContents();
+    BestPathLabel.ClearContents();
+    TargetNameText.ClearContents();
+    TargetInfoText.ClearContents();
+    RangeText.ClearContents();
 
     // Every name label emptied, then the whole map erased (FUN_004f2c90).
     for (std::map<unsigned, FHudNameLabel>::iterator It = NameLabels.begin();
          It != NameLabels.end(); ++It)
     {
-        FontStringClearContents(&It->second.Text);
+        It->second.Text.ClearContents();
     }
     NameLabels.clear();
 
     // FUN_0059eee0 on each holder, in retail's order.
-    ClientUiMeshHolderRelease(&TargetArrow);
-    ClientUiMeshHolderRelease(&TargetArrowHat);
-    ClientUiMeshHolderRelease(&TargetArrowPlayer);
-    ClientUiMeshHolderRelease(&TargetHealth);
-    ClientUiMeshHolderRelease(&TargetShields);
-    ClientUiMeshHolderRelease(&TargetArrowQuotes);
-    ClientUiMeshHolderRelease(&NonselectedArrow);
-    ClientUiMeshHolderRelease(&NonselectedPlayerArrow);
-    ClientUiMeshHolderRelease(&LootArrow);
-    ClientUiMeshHolderRelease(&NonselectedArrowHat);
-    ClientUiMeshHolderRelease(&NonselectedArrowQuotes);
-    ClientUiMeshHolderRelease(&Reticle);
-    ClientUiMeshHolderRelease(&ReticleQuotes);
-    ClientUiMeshHolderRelease(&ReticleArrows);
-    ClientUiMeshHolderRelease(&ReticleHealth);
-    ClientUiMeshHolderRelease(&ReticleShields);
-    ClientUiMeshHolderRelease(&WaypointReticle);
-    ClientUiMeshHolderRelease(&SelectedWaypoint);
-    ClientUiMeshHolderRelease(&NonselectedWaypoint);
+    TargetArrow.ReleaseWithAnim();
+    TargetArrowHat.ReleaseWithAnim();
+    TargetArrowPlayer.ReleaseWithAnim();
+    TargetHealth.ReleaseWithAnim();
+    TargetShields.ReleaseWithAnim();
+    TargetArrowQuotes.ReleaseWithAnim();
+    NonselectedArrow.ReleaseWithAnim();
+    NonselectedPlayerArrow.ReleaseWithAnim();
+    LootArrow.ReleaseWithAnim();
+    NonselectedArrowHat.ReleaseWithAnim();
+    NonselectedArrowQuotes.ReleaseWithAnim();
+    Reticle.ReleaseWithAnim();
+    ReticleQuotes.ReleaseWithAnim();
+    ReticleArrows.ReleaseWithAnim();
+    ReticleHealth.ReleaseWithAnim();
+    ReticleShields.ReleaseWithAnim();
+    WaypointReticle.ReleaseWithAnim();
+    SelectedWaypoint.ReleaseWithAnim();
+    NonselectedWaypoint.ReleaseWithAnim();
 
     G_HudTargetableObjects = nullptr;
     LeadMarkers.clear();
 
     // Retail's Font::String member dtors (FUN_00444e50), last declared first, run here ahead of
     // the holders'; the port's ~FFontString member dtors then run again on empty strings.
-    FontStringDestroy(&RangeText);
-    FontStringDestroy(&TargetInfoText);
-    FontStringDestroy(&TargetNameText);
-    FontStringDestroy(&BestPathLabel);
-    FontStringDestroy(&WaypointLabel);
+    RangeText.Destroy();
+    TargetInfoText.Destroy();
+    TargetNameText.Destroy();
+    BestPathLabel.Destroy();
+    WaypointLabel.Destroy();
 
     // The rest is the member and base destructors (the holders' FUN_0059ef20 repeats the
     // release above and finds nothing bound).
@@ -603,12 +601,12 @@ void HudTargetableObjects::RebuildContacts()
         {
             Vector Pos;
             unsigned System = 0;
-            if (BestPathWaypointResolvePosition(Waypoint, &Pos, &System) &&   // FUN_004c52d0
+            if (Waypoint->ResolvePosition(&Pos, &System) &&   // FUN_004c52d0
                 System == GetPlayerStarSystemIdRetail())
             {
                 BestPathRecord.World = Pos;
                 BestPathRecord.bValid = 1;
-                IObjRW* const Object = BestPathWaypointResolveObject(Waypoint);   // FUN_004c5110
+                IObjRW* const Object = Waypoint->ResolveObject();   // FUN_004c5110
                 BestPathRecord.ObjectId = (Object != nullptr) ? Object->get_id() : 0;
                 BestPathRecord.bOnScreen =
                     ProjectContact(&Pos, 40.0f, &BestPathRecord.Screen,
@@ -737,13 +735,13 @@ void HudTargetableObjects::RebuildContacts()
         {
             bTake = true;
         }
-        if (bTake)
-        {
-            HotIndex = Index;
-            HotObject = Object;
-            HotDistance = Distance;
-            HotScreenRadius = ScreenRadius;
-        }
+        if (!bTake)
+            continue;
+
+        HotIndex = Index;
+        HotObject = Object;
+        HotDistance = Distance;
+        HotScreenRadius = ScreenRadius;
     }
 
     // The scan index doubles as the vector index (as retail, though a skipped null watcher leaves
@@ -2270,9 +2268,9 @@ void HudTargetableObjects::DrawTargetReticle()
             }
             wcscat(Text, Ship->get_pilot_name());
 
-            FontStringSetFont(Label, PlayerNameFont);   // inlined FUN_004ea670
-            FontStringSetScale(Label, 0.171f, -1.0f);   // DAT_005d8f0c
-            FontStringSetText(Label, Text);
+            Label->SetFont(PlayerNameFont);   // inlined FUN_004ea670
+            Label->SetScale(0.171f, -1.0f);   // DAT_005d8f0c
+            Label->SetText(Text);
         }
 
         DrawReticleLabel(ReticleRangeText, &It->second.Text, Point);
@@ -2900,9 +2898,9 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
                 NameCacheSimpleId = Simple->Id;
                 NameCacheLootUnits = LootUnits;
                 NameCacheTimer = 0.0f;
-                FontStringSetFont(CaptionText, bPlayerOwned ? PlayerNameFont : SmallFont);
-                FontStringSetScale(CaptionText, 0.171f, -1.0f);
-                FontStringSetText(CaptionText, Text);
+                CaptionText->SetFont(bPlayerOwned ? PlayerNameFont : SmallFont);
+                CaptionText->SetScale(0.171f, -1.0f);
+                CaptionText->SetText(Text);
             }
             else
             {
@@ -2911,7 +2909,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
                 NameCacheVisited = -1;
                 NameCacheSimpleId = 0;
                 NameCacheTimer = 0.0f;
-                FontStringClearContents(CaptionText);
+                CaptionText->ClearContents();
             }
         }
 
@@ -2970,9 +2968,9 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
                 swprintf(ToughnessText, 0x80, L"%d", Toughness);
                 TargetInfoKey = Toughness;
             }
-            FontStringSetFont(&RangeText, SmallFont);
-            FontStringSetScale(&RangeText, 0.171f, -1.0f);
-            FontStringSetText(&RangeText, ToughnessText);
+            RangeText.SetFont(SmallFont);
+            RangeText.SetScale(0.171f, -1.0f);
+            RangeText.SetText(ToughnessText);
         }
         float const ToughnessY = static_cast<float>(
             (ReticleHeight * static_cast<double>(0.5f) - ReticleHeight * 0.16) *
@@ -3063,12 +3061,12 @@ bool HudIsWaypointObjectId(unsigned ObjectId)
     FBestPathWaypoint* const Point = BestPathGetWaypoint(0);
     Vector Position;
     unsigned System = 0;
-    if (BestPathWaypointResolvePosition(Point, &Position, &System) &&
+    if (Point->ResolvePosition(&Position, &System) &&
         GetHudWaypoint()->IsWaypointAt(&Position))
     {
         return true;
     }
-    IObjRW* const Resolved = BestPathWaypointResolveObject(Point);
+    IObjRW* const Resolved = Point->ResolveObject();
     if (Resolved == nullptr)
         return false;
     return Resolved->get_id() == ObjectId;

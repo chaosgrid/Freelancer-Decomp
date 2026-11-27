@@ -502,6 +502,11 @@ public:
         WinFont();
         ~WinFont();
 
+        // FUN_063277f0 (thiscall on the WinFont) -- FontDesc to LOGFONTA. lfHeight is the UNSCALED
+        // size (+0x3C); the caller rescales it. No null guard on Desc.Name. Defined in
+        // common_textrender.cpp.
+        void BuildRichTextLogFont(TextRenderContext::FontDesc const& Desc);
+
         LOGFONTA LogFont;           // +0x00
         int UnscaledSize;           // +0x3C  FUN_063277f0 stashes the unscaled size here; FILD (signed)
         HFONT FontHandle;           // +0x40

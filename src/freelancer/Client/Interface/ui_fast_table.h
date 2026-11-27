@@ -207,7 +207,7 @@ struct FUiFastTableEdges
 // teardown the vector instantiation gives it.
 struct FUiFastTableTip
 {
-    // SetTipMode's prototype (three copies): then ToolTipHoverReset. Retail leaves +0x48..+0x5f
+    // SetTipMode's prototype (three copies): then FToolTipHoverInfo::Reset. Retail leaves +0x48..+0x5f
     // (WorldPos, HalfExtents) as stack garbage and every copy inherits it; the port zeroes them.
     FUiFastTableTip();
 

@@ -31,7 +31,7 @@ namespace
     void HolderSetMatrixAndUpdate(FClientMeshHolder* Holder, float* Transform12)
     {
         DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, (const Transform*)Transform12);
-        ClientMeshHolderUpdate(Holder);
+        Holder->Update();
     }
 }
 
@@ -57,7 +57,7 @@ WinButton::WinButton()
 bool WinButtonProjectedRect(FClientMeshHolder* Holder, float* OutRect4)
 {
     // FUN_0059f200.
-    if (!ClientMeshHolderHasInstance(Holder))
+    if (!Holder->HasInstance())
         return false;
 
     float Radius = 0.0f;
@@ -216,7 +216,7 @@ void WinButton::Draw()
 
     if ((Flags & kWin3DVisible) != 0)
     {
-        SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0);
+        MeshHolder.SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0);
         // With bit 0 of +0xa4 the tinted pass (FUN_00434630).
         if ((DrawFlags & 1) != 0)
         {
@@ -226,7 +226,7 @@ void WinButton::Draw()
     }
 
     if (ChildHead != nullptr)
-        Win3DDrawChildren(this);
+        DrawChildren();
 }
 
 void WinButton::MouseOver(Vector const* Ray)

@@ -8,7 +8,7 @@
 
 #include "Interface/Pages/character_select_equip.h" // GetPlayerShipArchetypeIdRetail (FUN_004c3e10)
 #include "Core/globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "Space/HUD/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
+#include "Space/HUD/hud_command_dispatch.h"   // EventHandler::PushCancelHandler (FUN_00576360)
 #include "Common/Fonts/ids_rdl.h"                // AppendTextMaybeXmlRdl (FUN_0057e2c0), RdlAppendNode
 #include "NeuroNet/Economy/knowledge_map.h"          // KnowledgeMapRevealFmtStr (FUN_00459950)
 #include "Network/login_mgr.h"              // G_Server (DAT_0067ecd0)
@@ -242,7 +242,7 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
         Vector const Position = {-0.54f, -0.01f, BasePosition[2]};
         CreateTextControl("MissionVendorNoMissions", "SubHeader", &Position, nullptr, 1.055f, 0.03f,
                           2.0f, Ids, 1, 0, 1);
-        HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
+        PushCancelHandler(0); // FUN_00576360
         return Win3D::Create(NewParent, Data);      // FUN_004b5060
     }
 
@@ -384,7 +384,7 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
     if (Selected != -1)
         RevealSelectedOffer();
 
-    HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
+    PushCancelHandler(0); // FUN_00576360
     return Win3D::Create(NewParent, Data);      // FUN_004b5060
 }
 

@@ -838,23 +838,23 @@ void FGfScriptSequence::StartEntry(int Index)
 
     // A kind-4 entry (an info box): the nav map is focused on the place the info text names
     // (FUN_00459ad0; FUN_004a2aa0 with bZone = flag bit 0x20).
-    if (Entries[Current].Kind == 4 && bInfoShown == 0)
+    if (Entries[Current].Kind != 4 || bInfoShown != 0)
+        return;
+
+    unsigned Id = 0;
+    unsigned char Flags = 0;
+    if (KnowledgeMapLookupFmtStr(&DialogTextB, &Id, &Flags))
+        NavMapRequestFocus(Id, (Flags & 0x20) != 0 ? 1 : 0);
+    InfoDialog = static_cast<NnOfferDialog*>(
+        WinFactoryCreate("ScriptSequence_InfoDialog", "NN_OfferDialog", nullptr, nullptr));
+    InfoDialog->Open(4, &DialogTextB, true, &FGfScriptSequence::OnInfoDialogClosed, this);
+    if (bLetterbox != 0)
     {
-        unsigned Id = 0;
-        unsigned char Flags = 0;
-        if (KnowledgeMapLookupFmtStr(&DialogTextB, &Id, &Flags))
-            NavMapRequestFocus(Id, (Flags & 0x20) != 0 ? 1 : 0);
-        InfoDialog = static_cast<NnOfferDialog*>(
-            WinFactoryCreate("ScriptSequence_InfoDialog", "NN_OfferDialog", nullptr, nullptr));
-        InfoDialog->Open(4, &DialogTextB, true, &FGfScriptSequence::OnInfoDialogClosed, this);
-        if (bLetterbox != 0)
-        {
-            SetLetterboxTarget(0.0f, 3.0f);
-            SetClientMouseCursorDrawFlag(1);
-        }
-        bInfoShown = 1;
-        bInfoClosed = 0;
+        SetLetterboxTarget(0.0f, 3.0f);
+        SetClientMouseCursorDrawFlag(1);
     }
+    bInfoShown = 1;
+    bInfoClosed = 0;
 }
 
 // FUN_00455290. The room ambience / music duck unless a script plays its own: at the fixed rate
@@ -969,7 +969,7 @@ void FGfScriptSequence::StopPlayback(unsigned char bArg)
         SetLetterboxTarget(0.0f, 3.0f);
         UnlockHotspotInput();
         SetClientMouseCursorDrawFlag(1);
-        RoomControlRequestCharacterScripts(Room);
+        Room->RequestCharacterScripts();
     }
 
     bool const bRestoreAmbient = bDuckAmbient != 0 && !bMoved;
@@ -1344,13 +1344,13 @@ bool FGfScriptSequence::Update(int Ms)
                 Current = -1;
                 bDone = true;
             }
-            if (!bDone)
-            {
-                int const Kind = Entries[Current].Kind;
-                if (Kind == 1 || Kind == 4)
-                    bSkip = 0;
-                StartEntry(Current);
-            }
+            if (bDone)
+                continue;
+
+            int const Kind = Entries[Current].Kind;
+            if (Kind == 1 || Kind == 4)
+                bSkip = 0;
+            StartEntry(Current);
         }
     }
 
@@ -1531,13 +1531,13 @@ void FGfScriptManager::DestroySequence(FGfScriptSequence* Sequence)
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
     for (; It != Sequences.end(); ++It)
     {
-        if (*It == Sequence)
-        {
-            if (Sequence != nullptr)
-                delete Sequence;
-            Sequences.erase(It);
-            return;
-        }
+        if (*It != Sequence)
+            continue;
+
+        if (Sequence != nullptr)
+            delete Sequence;
+        Sequences.erase(It);
+        return;
     }
 }
 

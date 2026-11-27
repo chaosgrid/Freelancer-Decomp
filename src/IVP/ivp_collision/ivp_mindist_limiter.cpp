@@ -623,7 +623,7 @@ namespace
         Owner->SolverContactPointWS.z = Point->z;
 
         IVP_U_Point LocalPoint;
-        IVP_TransformWorldToSlotSpace(CacheF->cache_object, Point, &LocalPoint); // FUN_0634d860
+        CacheF->cache_object->transform_world_to_slot_space(Point, &LocalPoint); // FUN_0634d860
 
         if (static_cast<uint8_t>(Candidate->RecheckFeatureFlags) == 1)
         {
@@ -644,7 +644,7 @@ namespace
         Normal.x = (float)((double)(Normal.x) * InvNormalLength);
 
         IVP_U_Point WorldNormal;
-        IVP_RotateSlotToWorldSpace(CacheF->cache_object, &Normal, &WorldNormal); // FUN_0634d9d0
+        CacheF->cache_object->rotate_slot_to_world_space(&Normal, &WorldNormal); // FUN_0634d9d0
 
         const IVP_U_Float_Point* const V0 = CacheF->compact_poly_points + F->GetStartPointIndex();
         const IVP_U_Float_Point* const V1 = CacheF->compact_poly_points + F->GetNextEdge()->GetStartPointIndex();
@@ -663,7 +663,7 @@ namespace
         EdgeVec.y = (float)((double)(V1->Y) - V0->Y);
         EdgeVec.z = (float)((double)(V1->Z) - V0->Z);
         IVP_U_Point Tangent;
-        IVP_RotateSlotToWorldSpace(CacheF->cache_object, &EdgeVec, &Tangent); // retail writes Owner+0x78 directly
+        CacheF->cache_object->rotate_slot_to_world_space(&EdgeVec, &Tangent); // retail writes Owner+0x78 directly
         Owner->TangentAxis0.x = Tangent.x;
         Owner->TangentAxis0.y = Tangent.y;
         Owner->TangentAxis0.z = Tangent.z;

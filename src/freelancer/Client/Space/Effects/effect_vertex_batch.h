@@ -56,6 +56,35 @@ struct FEffectVertexBatch
     unsigned char ColorA;         // +0x33  DAT_00674caf
     float U;                      // +0x34  DAT_00674cb0
     float V;                      // +0x38  DAT_00674cb4
+
+    // FUN_0046e9c0 — the batch's destructor: release Pipeline (+0x18) and free both buffers.
+    // Retail callers: the texture panels' atexit LAB_0050a020 (DAT_00675018 -- the port's
+    // FPanelVertexBatcher in texture_panels.cpp, whose +0x04/+0x10/+0x18 are asserted to line up;
+    // G_PanelBatcherAtExit calls this on it) and the unwind funclet of the chat background draw
+    // FUN_0045e470 (chat_text_input.cpp FChatBgBatch's destructor). The effect batch's own atexit
+    // LAB_004f93f0 inlines the same body.
+    void Destroy();
+
+    // FUN_0046ecd0 — grow Vertices when VertCapacity <= VertCount (step Growth, stride 0x18).
+    void GrowVertices();
+
+    // FUN_0046ebc0 — zero VertCount/IndexCount/strip state; ensure index capacity >= 1.
+    void Reset();
+
+    // FUN_0046eab0 — append one vertex from current Color/UV; returns new index (count-1).
+    int Append(float X, float Y, float Z);
+
+    // FUN_004fcb40 — ensure IndexCapacity >= IndexCount + Needed (growth Growth*3).
+    void EnsureIndices(int Needed);
+
+    // FUN_004fc9a0 — push one triangle (3 indices); grows as needed.
+    void PushTriangle(unsigned short I0, unsigned short I1, unsigned short I2);
+
+    // FUN_004fca50 — push quad as two triangles (I0,I1,I2) + (I0,I2,I3).
+    void PushQuad(unsigned short I0, unsigned short I1, unsigned short I2, unsigned short I3);
+
+    // FUN_004fc950 — colour bytes = low byte of ftol(component * 255.0), alpha 0xff.
+    void SetColor(float R, float G, float B);
 };
 
 static_assert(sizeof(FEffectVertexBatch) == 0x3C, "batch object 0x3C");
@@ -73,37 +102,6 @@ extern I3DMathEngine* G_EffectMathEngine;
 // LAB_004f9360 + atexit LAB_004f93f0.
 void EffectVertexBatchStaticInit();
 void EffectVertexBatchStaticShutdown();
-
-// FUN_0046e9c0 — the batch's destructor: release Pipeline (+0x18) and free both buffers.
-// Retail callers: the texture panels' atexit LAB_0050a020 (DAT_00675018 -- the port's
-// FPanelVertexBatcher in texture_panels.cpp, whose +0x04/+0x10/+0x18 are asserted to line up;
-// G_PanelBatcherAtExit calls this on it) and the unwind funclet of the chat background draw
-// FUN_0045e470 (chat_text_input.cpp FChatBgBatch's destructor). The effect batch's own atexit
-// LAB_004f93f0 inlines the same body.
-void EffectVertexBatchDestroy(FEffectVertexBatch* Batch);
-
-// FUN_0046ecd0 — grow Vertices when VertCapacity <= VertCount (step Growth, stride 0x18).
-void EffectVertexBatchGrowVertices(FEffectVertexBatch* Batch);
-
-// FUN_0046ebc0 — zero VertCount/IndexCount/strip state; ensure index capacity >= 1.
-void EffectVertexBatchReset(FEffectVertexBatch* Batch);
-
-// FUN_0046eab0 — append one vertex from current Color/UV; returns new index (count-1).
-int EffectVertexBatchAppend(FEffectVertexBatch* Batch, float X, float Y, float Z);
-
-// FUN_004fcb40 — ensure IndexCapacity >= IndexCount + Needed (growth Growth*3).
-void EffectVertexBatchEnsureIndices(FEffectVertexBatch* Batch, int Needed);
-
-// FUN_004fc9a0 — push one triangle (3 indices); grows as needed.
-void EffectVertexBatchPushTriangle(FEffectVertexBatch* Batch, unsigned short I0,
-                                   unsigned short I1, unsigned short I2);
-
-// FUN_004fca50 — push quad as two triangles (I0,I1,I2) + (I0,I2,I3).
-void EffectVertexBatchPushQuad(FEffectVertexBatch* Batch, unsigned short I0,
-                               unsigned short I1, unsigned short I2, unsigned short I3);
-
-// FUN_004fc950 — colour bytes = low byte of ftol(component * 255.0), alpha 0xff.
-void EffectVertexBatchSetColor(FEffectVertexBatch* Batch, float R, float G, float B);
 
 // FUN_004f9de0 — RS/TSS tables (DAT_005d9a04/9a3c/99dc/99f4), FUN_00425640 texture, the
 // camera's view as the modelview, DrawIndexedPrimitiveUp of G_EffectVertexBatch, restore.

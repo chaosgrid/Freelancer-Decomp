@@ -35,36 +35,36 @@ unsigned CopyBoundedString(char* Dest, unsigned Capacity, const char* Src)
 }
 
 // FUN_005621a0, __thiscall(this = &DAT_00679bc0, FClientCommandLine*), called once from WinMain.
-void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* CommandLine)
+void DisplaySettings::LoadStartupConfig(const FClientCommandLine* CommandLine)
 {
     // Scatter the 71 descriptors at .data:006143b8 into this+0x28. No bound check: every Index
     // in the constant table is in range.
     for (int Row = 0; Row < GGameOptionDescCount; ++Row)
-        Options->options[GGameOptionDescs[Row].Index] = GGameOptionDescs[Row].DefaultValue;
+        options[GGameOptionDescs[Row].Index] = GGameOptionDescs[Row].DefaultValue;
 
-    Options->ini_path.Length = CopyBoundedString(Options->ini_path.Text, 0x104, "Freelancer.ini");
-    Options->data_path.Length = CopyBoundedString(Options->data_path.Text, 0x104, "..\\Data");
+    ini_path.Length = CopyBoundedString(ini_path.Text, 0x104, "Freelancer.ini");
+    data_path.Length = CopyBoundedString(data_path.Text, 0x104, "..\\Data");
 
     // In retail's store order.
-    Options->present_when_inactive = 0;
-    Options->quick_flag = 0;
-    Options->color_bpp = -1;
-    Options->depth_bpp = -1;
-    Options->stencil_bpp = 0;
-    Options->width = 1024;
-    Options->height = 768;
-    Options->interval = 1;
-    Options->buffer_count = 2;
-    Options->border = 1;
-    Options->refresh_rate = 0x3c;
-    Options->mode_field00 = -1;
-    Options->fullscreen = 1;
+    present_when_inactive = 0;
+    quick_flag = 0;
+    color_bpp = -1;
+    depth_bpp = -1;
+    stencil_bpp = 0;
+    width = 1024;
+    height = 768;
+    interval = 1;
+    buffer_count = 2;
+    border = 1;
+    refresh_rate = 0x3c;
+    mode_field00 = -1;
+    fullscreen = 1;
 
     // The movie_file counter is kept across every [Startup] section in the file.
     int MovieCount = 0;
 
     INI_Reader Reader;
-    if (Reader.open(Options->ini_path.Text, false))
+    if (Reader.open(ini_path.Text, false))
     {
         if (Reader.read_header())
         {
@@ -81,13 +81,13 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
                                 const char* Value = Reader.get_value_string();
                                 if (Value == nullptr)
                                 {
-                                    Options->data_path.Length = 0;
-                                    Options->data_path.Text[0] = '\0';
+                                    data_path.Length = 0;
+                                    data_path.Text[0] = '\0';
                                 }
                                 else
                                 {
-                                    Options->data_path.Length =
-                                        CopyBoundedString(Options->data_path.Text, 0x104, Value);
+                                    data_path.Length =
+                                        CopyBoundedString(data_path.Text, 0x104, Value);
                                 }
                             }
                         } while (Reader.read_value());
@@ -104,7 +104,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
                             if (Reader.is_value("movie_file") && MovieCount < 3)
                             {
                                 const char* Value = Reader.get_value_string();
-                                FClientPathString& Movie = Options->movie_files[MovieCount];
+                                FClientPathString& Movie = movie_files[MovieCount];
                                 ++MovieCount;
                                 if (Value == nullptr)
                                 {
@@ -130,13 +130,13 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
                                 const char* Value = Reader.get_value_string();
                                 if (Value == nullptr)
                                 {
-                                    Options->gate_tunnels.Length = 0;
-                                    Options->gate_tunnels.Text[0] = '\0';
+                                    gate_tunnels.Length = 0;
+                                    gate_tunnels.Text[0] = '\0';
                                 }
                                 else
                                 {
-                                    Options->gate_tunnels.Length =
-                                        CopyBoundedString(Options->gate_tunnels.Text, 0x104, Value);
+                                    gate_tunnels.Length =
+                                        CopyBoundedString(gate_tunnels.Text, 0x104, Value);
                                 }
                             }
                             else if (Reader.is_value("jump_effect"))
@@ -144,13 +144,13 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
                                 const char* Value = Reader.get_value_string();
                                 if (Value == nullptr)
                                 {
-                                    Options->jump_effect.Length = 0;
-                                    Options->jump_effect.Text[0] = '\0';
+                                    jump_effect.Length = 0;
+                                    jump_effect.Text[0] = '\0';
                                 }
                                 else
                                 {
-                                    Options->jump_effect.Length =
-                                        CopyBoundedString(Options->jump_effect.Text, 0x104, Value);
+                                    jump_effect.Length =
+                                        CopyBoundedString(jump_effect.Text, 0x104, Value);
                                 }
                             }
                         } while (Reader.read_value());
@@ -162,7 +162,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     else
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: Unable to read Freelancer config file (%s)",
-              "E:\\FL\\Scratch\\Source\\Client\\config.cpp", 0x17f, Options->ini_path.Text);
+              "E:\\FL\\Scratch\\Source\\Client\\config.cpp", 0x17f, ini_path.Text);
     }
 
     // "+Q"/"-Q" and "+X"/"-X". A token that does not start with '+' or
@@ -180,7 +180,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
         }
 
         if (Letter == 'Q')
-            Options->quick_flag = 1;
+            quick_flag = 1;
         else if (Letter == 'X')
             G_bFpExceptionTrap = bPlus;
     }
@@ -188,7 +188,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
 
 // FUN_004242e0, __thiscall(this = render mode block, FClientCommandLine*). The only caller is
 // InitializeEngine, on its local mode block after PerfOptions.ini has filled it.
-bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLine* CommandLine)
+bool DisplaySettings::ApplyCmdlineOverrides(const FClientCommandLine* CommandLine)
 {
     bool bFound = false;
 
@@ -209,11 +209,11 @@ bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLin
         {
         case 'B':
             bFound = true;
-            Mode->border = bPlus ? 0 : 1;
+            border = bPlus ? 0 : 1;
             break;
         case 'F':
             bFound = true;
-            Mode->fullscreen = bPlus ? 0 : 1;
+            fullscreen = bPlus ? 0 : 1;
             break;
         case 'M':
         {
@@ -223,40 +223,40 @@ bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLin
             {
                 if (Size == 1024)
                 {
-                    Mode->width = 1024;
-                    Mode->height = 768;
+                    width = 1024;
+                    height = 768;
                 }
                 else
                 {
-                    Mode->width = 640;
-                    Mode->height = 480;
+                    width = 640;
+                    height = 480;
                 }
             }
             else if (Size == 800)
             {
-                Mode->width = 800;
-                Mode->height = 600;
+                width = 800;
+                height = 600;
             }
             else if (Size == 320)
             {
-                Mode->width = 320;
-                Mode->height = 240;
+                width = 320;
+                height = 240;
             }
             else if (Size == 512)
             {
-                Mode->width = 512;
-                Mode->height = 384;
+                width = 512;
+                height = 384;
             }
             else
             {
-                Mode->width = 640;
-                Mode->height = 480;
+                width = 640;
+                height = 480;
             }
             break;
         }
         case 'W':
             bFound = true;
-            Mode->fullscreen = 0;
+            fullscreen = 0;
             break;
         default:
             break;

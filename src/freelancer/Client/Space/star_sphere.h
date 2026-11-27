@@ -40,6 +40,12 @@ struct FStarGlowDesc
     FTexShape const* Shape;  // +0x48  resolved from ShapeName on first use (LAB_00511690)
     unsigned char bShapeAlpha; // +0x4c the shape's texture has alpha
     unsigned char Pad4D[3];
+
+    // FUN_0050c950 — parse [star_glow] nickname into Desc from IniPath. Returns 0 on ok.
+    int LoadFromIni(char const* IniPath, char const* Nickname);
+
+    // FUN_00420750. Defined in star_sphere.cpp.
+    void InitDefaults(unsigned char OwnerTag);
 };
 static_assert(sizeof(FStarGlowDesc) == 0x50, "star_glow desc 0x50");
 
@@ -81,6 +87,15 @@ struct FSunEffectBody
     float InteriorTween;               // +0x2f0 interior_tween
     float InteriorRayTween;            // +0x2f4 interior_ray_tween
     int LodPixelThresholds[5];         // +0x2f8 8, 15, 25, 40, 60
+
+    // FUN_0050d420 — parse [lens_glow] into SunBody. Returns 0 on ok.
+    int LensGlowLoadFromIni(char const* IniPath, char const* Nickname);
+
+    // FUN_0050d930 — bake corona ring positions/UVs after lens_glow load.
+    int BakeCorona();
+
+    // FUN_0050d300
+    FSunEffectBody* Init();
 };
 static_assert(sizeof(FSunEffectBody) == 0x30c, "SunEffect body 0x30c");
 static_assert(offsetof(FSunEffectBody, InteriorSlots) == 0x138, "interior slots +0x138");
@@ -116,6 +131,18 @@ struct FStarFxChild40
     FTexShape const* Shape;      // +0x34 resolved on first draw
     float MinRadius;             // +0x38 min_radius (the pixel scale's floor)
     float MaxRadius;             // +0x3c max_radius (its ceiling)
+
+    // FUN_0050f3a0 — parse [lens_flare] into child at StarSphere+0x18. Returns 0 on ok.
+    int LensFlareLoadFromIni(char const* IniPath, char const* Nickname);
+
+    // FUN_0050fba0 — parse [spines] into child at StarSphere+0x1c. Returns 0 on ok.
+    int SpinesLoadFromIni(char const* IniPath, char const* Nickname);
+
+    // FUN_0050f340. Defined in star_sphere.cpp.
+    void LensFlareFree();
+
+    // FUN_0050fb50. Defined in star_sphere.cpp.
+    void SpinesFree();
 };
 static_assert(sizeof(FStarFxChild40) == 0x40, "lens flare / spines 0x40");
 static_assert(offsetof(FStarFxChild40, SpineEnd) == 0x08, "child vector end +0x08");
@@ -161,6 +188,12 @@ struct FStarSphere
     float ScreenY;                   // +0x80  Project OutY
     float ScreenZFlat;               // +0x84  forced 0 for 2D corona
     float PixelScale;                // +0x88  znear·xscale / depth
+
+    Vector* GetOwnerPosition(Vector* Out) const;
+
+    // FUN_00512620 -- max(glow scale, centre scale or 0) * Radius; the glow is read with no test.
+    // Caller: the Solar radius slot FUN_00548110.
+    float MaxGlowScale() const;
 };
 static_assert(offsetof(FStarSphere, SunBody) == 0x14, "SunBody +0x14");
 static_assert(offsetof(FStarSphere, Dt) == 0x60, "Dt +0x60");
@@ -171,22 +204,10 @@ static_assert(offsetof(FStarSphere, PixelScale) == 0x88, "PixelScale +0x88");
 // DAT_0067509c — SunEffect perf quality (LAB_00510bf0). Draw/DrawFlare gate on > 0.
 extern float G_SunEffectQuality;
 
-// FUN_0050c950 — parse [star_glow] nickname into Desc from IniPath. Returns 0 on ok.
-int StarGlowLoadFromIni(FStarGlowDesc* Desc, char const* IniPath, char const* Nickname);
-// FUN_0050d420 — parse [lens_glow] into SunBody. Returns 0 on ok.
-int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* Nickname);
-// FUN_0050f3a0 — parse [lens_flare] into child at StarSphere+0x18. Returns 0 on ok.
-int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const* Nickname);
-// FUN_0050fba0 — parse [spines] into child at StarSphere+0x1c. Returns 0 on ok.
-int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* Nickname);
-// FUN_0050d930 — bake corona ring positions/UVs after lens_glow load.
-int SunBodyBakeCorona(FSunEffectBody* Body);
-// FUN_0050d300
-FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body);
 // FUN_00510f90 — solar\\StarArch.ini path + Pipeline block + shapes load.
 void LoadSolarStarArchIni();
 // FUN_00511010 — clear the StarArch ShapeDB (DAT_006750a0); called by the space teardown
-// FUN_0054aec0 (DestroySpaceState).
+// FUN_0054aec0 (SpaceApp::Destroy).
 void ClearSolarStarArchShapes();
 
 
@@ -219,7 +240,3 @@ void StarSphereDestroyAll();
 // FUN_005125f0 -- the owner's (+4) IObjInspect slot 0 get_position copied into *Out; returns
 // Out. No tests. Callers: the Ship draw LAB_00546050 and the Solar radius slot FUN_00548110.
 class Vector;
-Vector* StarSphereGetOwnerPosition(FStarSphere const* Sphere, Vector* Out);
-// FUN_00512620 -- max(glow scale, centre scale or 0) * Radius; the glow is read with no test.
-// Caller: the Solar radius slot FUN_00548110.
-float StarSphereMaxGlowScale(FStarSphere const* Sphere);

@@ -53,7 +53,7 @@ public:
     // FUN_00525200 -- beam the object to Pos with an identity orientation and give it a random
     // velocity (up to MaxVelocity per axis, square-biased) and a random angular velocity (up to
     // MaxAngularVelocity); the particle's intensity starts at 0. Called from
-    // CliDynamicAsteroidUpdate.
+    // FCliDynamicAsteroid::Update.
     void Place(Vector const* Pos, float MaxVelocity, float MaxAngularVelocity);
 
     // +0xa8 -- the owning manager. Retail stores the dword over GameObject's bWatchListed byte
@@ -75,32 +75,3 @@ static_assert(offsetof(FCliDynamicAsteroidGameobj, Nickname) == 0xb4, "DynamicAs
 static_assert(offsetof(FCliDynamicAsteroidGameobj, Companion) == 0xb8, "DynamicAsteroid +0xb8");
 static_assert(sizeof(FCliDynamicAsteroidGameobj) == 0xc8,
               "DynamicAsteroid sizeof 0xc8 (operator new(0xc8))");
-
-// FUN_005256a0 -- the manager constructor over raw operator new(0xe8) memory: only the
-// fields it names are written. Called from CliAsteroidLoadFieldIni.
-FCliDynamicAsteroid* CliDynamicAsteroidConstruct(FCliDynamicAsteroid* This,
-                                                 CmnAsteroid::CAsteroidField* CmnField);
-// FUN_00525760 -- release the archetype, the slots (MarkForRemoval(true)), the slot array,
-// the material and the mesh copy. The record itself is freed by the caller
-// (CliAsteroidDestruct, CliAsteroidLoadFieldIni).
-void CliDynamicAsteroidDestroy(FCliDynamicAsteroid* This);
-// FUN_00525800 -- the [DynamicAsteroids] keys, the slot array rebuilt, the archetype's mesh
-// copied (IMesh / IRenderableMesh), then the vertex source descriptor. Called from
-// CliAsteroidLoadFieldIni.
-void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader);
-// FUN_005267b0 -- every live slot gets MarkForRemoval(true) and is cleared. Called from
-// CliDynamicAsteroidParseIni and (inlined) CliAsteroidApplyDetail.
-void CliDynamicAsteroidReleaseSlots(FCliDynamicAsteroid* This);
-// FUN_00525c80 -- the per-frame spawn / recycle / fade of the slots around a point ahead of
-// the camera. Called from CliAsteroidUpdate.
-void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, float Dt,
-                              Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr);
-// FUN_005261b0 -- the draw: the mesh copy into a locked vertex buffer, then every visible
-// slot with its alpha, the field's ambient pass run once (*bAmbientDone). Called from the
-// per-field tick.
-void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
-                            unsigned char* bAmbientDone, FCliAsteroid* Field);
-// FUN_00526650 -- a new DynamicAsteroid gameobj for this manager: created from the
-// archetype, init'ed in the active system, collisions off, slot 92, into the ObjDB. Called
-// from CliDynamicAsteroidUpdate.
-FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This);

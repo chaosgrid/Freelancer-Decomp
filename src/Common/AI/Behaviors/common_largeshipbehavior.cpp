@@ -5,8 +5,8 @@
 // Author: Giperion.
 
 #include "common_largeshipbehavior.h"
-#include "common_aisteer.h"        // FAiTarget, GetCachedRange, RaySphereIntersect
-#include "common_iustategraph.h"   // BuildAiTargetList / GetAiTargetList (FUN_062e7580)
+#include "common_aisteer.h"        // FAiTarget, FAiTarget::GetCachedRange, RaySphereIntersect
+#include "common_iustategraph.h"   // SystemManagerTimerTable::BuildAiTargetList / GetAiTargetList (FUN_062e7580)
 #include "common_systemmanager.h"  // SystemManager, FAiTargetVector
 #include "common_ini.h"            // Vec3Assign (FUN_0628b030)
 #include "AI/common_aisteer_internal.h" // CmnAiSteer::InlineFastLength
@@ -203,7 +203,7 @@ int LargeShipBehavior::Update()
         // Rebuilt (or reused within one IBehaviorManager tick), see common_iustategraph.h.
         Vector HostileCentre = {0.0f, 0.0f, 0.0f};
         int HostileCount = 0;
-        FAiTargetVector* const List = BuildAiTargetList(GetAiTargetList(Sys));
+        FAiTargetVector* const List = GetAiTargetList(Sys)->BuildAiTargetList();
 
         // ---- Pass 1: sum the positions of every candidate whose cached attitude is
         // ---- hostile enough.
@@ -211,7 +211,7 @@ int LargeShipBehavior::Update()
         {
             float Attitude = 0.0f;
             float AttitudeHigh = 0.0f;
-            GetCachedRange(Elem, &Attitude, &AttitudeHigh);
+            Elem->GetCachedRange(&Attitude, &AttitudeHigh);
 
             // DAT_0639f540 = -0.6f here, not the -0.2f the other consumer uses. Iface is
             // dereferenced with no null test.

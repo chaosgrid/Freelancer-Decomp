@@ -92,7 +92,7 @@ namespace
 
     // The player's object as a CEqObj through the watcher DAT_00679744: minus eight, the +0xc'd
     // pointer's +0x4, then the class mask (0x503 ship, 0x103 any CEqObj) -- the chain retail
-    // inlines (FUN_0054b230 twice, the death camera, DestroySpaceState). Null when any link is
+    // inlines (FUN_0054b230 twice, the death camera, SpaceApp::Destroy). Null when any link is
     // missing.
     CEqObj* PlayerEqObj(unsigned ClassMask)
     {
@@ -221,14 +221,14 @@ SpaceApp::SpaceApp()
     // FUN_00549300. The Events member is constructed before this body.
 
     // The eight cameras, in this order.
-    FirstPersonCameraConstruct(&FirstPerson); // FUN_00517180 on +0x00c
-    ThirdPersonCameraConstruct(&ThirdPerson); // FUN_00518600 on +0x1b0
-    TurretCameraConstruct(&Turret);           // FUN_0051a210 on +0x3c8
-    RearViewCameraConstruct(&RearView);       // FUN_0051ad30 on +0x500
+    FirstPerson.Construct();                  // FUN_00517180 on +0x00c
+    ThirdPerson.Construct();                  // FUN_00518600 on +0x1b0
+    Turret.Construct();                       // FUN_0051a210 on +0x3c8
+    RearView.Construct();                     // FUN_0051ad30 on +0x500
     DeathCameraConstruct(&Death);             // FUN_0051b2f0, 4 floats, vt 0x005e061c (+0x60c)
-    ScriptCameraConstruct(&Script);           // FUN_0051e100 on +0x760
+    Script.Construct();                       // FUN_0051e100 on +0x760
     StaticCameraConstruct(&Static);           // FUN_0051b2f0, vt 0x005e0594 (+0x9a4)
-    DockingCameraConstruct(&Docking);         // FUN_0051ea20 on +0xa9c
+    Docking.Construct();                      // FUN_0051ea20 on +0xa9c
 
     bCameraReady = 0;
     ActiveCamera = nullptr;
@@ -329,12 +329,6 @@ void SpaceApp::PreInit()
 {
 }
 
-// Slot 9: FUN_0054ab20.
-void SpaceApp::Shutdown()
-{
-    ShutdownSpaceState(this);
-}
-
 // Slot 10 (0x00401e90): empty (FUN_005b2a30 case 5 calls it).
 void SpaceApp::Slot10()
 {
@@ -354,24 +348,6 @@ void SpaceApp::Resize(int Width, int Height)
     ViewRect[2] = Width - 1;
     ViewRect[3] = Height - 1;
     ((FGameCamera*)Active)->ApplyViewport(ViewRect);
-}
-
-// Slot 12: FUN_0054ab40.
-bool SpaceApp::Init(int Param)
-{
-    return InitSpaceState(this, Param);
-}
-
-// Slot 13: FUN_0054aec0.
-void SpaceApp::Destroy()
-{
-    DestroySpaceState(this);
-}
-
-// Slot 14: LAB_0054b000.
-int SpaceApp::Update(float DeltaSeconds)
-{
-    return UpdateSpaceState(this, DeltaSeconds);
 }
 
 namespace
@@ -529,44 +505,44 @@ void SpaceAppLoadCamerasIni(SpaceApp* App)
 {
     // FUN_00549830
     INI_Reader Reader;
-    if (Reader.open(GetFullFilename("cameras.ini"), false))
-    {
-        while (Reader.read_header())
-        {
-            // [WinCamera] is the Win3D camera DAT_0067dbf8; the rest are the controller's own.
-            FSpaceCamera* Camera = nullptr;
-            if (Reader.is_header("WinCamera"))
-                Camera = Win3DGetCamera();
-            else if (Reader.is_header("CockpitCamera"))
-                Camera = SpaceCameraOf(&App->FirstPerson);
-            else if (Reader.is_header("ThirdPersonCamera"))
-                Camera = SpaceCameraOf(&App->ThirdPerson);
-            else if (Reader.is_header("TurretCamera"))
-                Camera = SpaceCameraOf(&App->Turret);
-            else if (Reader.is_header("RearViewCamera"))
-                Camera = SpaceCameraOf(&App->RearView);
-            else if (Reader.is_header("DeathCamera"))
-                Camera = SpaceCameraOf(&App->Death);
-            else
-            {
-                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown camera type? (%s)",
-                      "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x17e,
-                      Reader.get_header_ptr());
-                continue;
-            }
+    if (!Reader.open(GetFullFilename("cameras.ini"), false))
+        return;
 
-            // Every entry to the camera's slot 0x4c (SetProperty). (The [WinCamera] path skips
-            // the null test the others make -- they are never null.)
-            while (Reader.read_value())
+    while (Reader.read_header())
+    {
+        // [WinCamera] is the Win3D camera DAT_0067dbf8; the rest are the controller's own.
+        FSpaceCamera* Camera = nullptr;
+        if (Reader.is_header("WinCamera"))
+            Camera = Win3DGetCamera();
+        else if (Reader.is_header("CockpitCamera"))
+            Camera = SpaceCameraOf(&App->FirstPerson);
+        else if (Reader.is_header("ThirdPersonCamera"))
+            Camera = SpaceCameraOf(&App->ThirdPerson);
+        else if (Reader.is_header("TurretCamera"))
+            Camera = SpaceCameraOf(&App->Turret);
+        else if (Reader.is_header("RearViewCamera"))
+            Camera = SpaceCameraOf(&App->RearView);
+        else if (Reader.is_header("DeathCamera"))
+            Camera = SpaceCameraOf(&App->Death);
+        else
+        {
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown camera type? (%s)",
+                  "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x17e,
+                  Reader.get_header_ptr());
+            continue;
+        }
+
+        // Every entry to the camera's slot 0x4c (SetProperty). (The [WinCamera] path skips
+        // the null test the others make -- they are never null.)
+        while (Reader.read_value())
+        {
+            const char* const Name = Reader.get_name_ptr();
+            const char* const Value = Reader.get_value_string();
+            if (static_cast<unsigned char>(AsCamera(Camera)->SetProperty(Name, Value)) == 0)
             {
-                const char* const Name = Reader.get_name_ptr();
-                const char* const Value = Reader.get_value_string();
-                if (static_cast<unsigned char>(AsCamera(Camera)->SetProperty(Name, Value)) == 0)
-                {
-                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [%s] unknown property '%s = %s'",
-                          "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x18a,
-                          Reader.get_header_ptr(), Name, Value);
-                }
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [%s] unknown property '%s = %s'",
+                      "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x18a,
+                      Reader.get_header_ptr(), Name, Value);
             }
         }
     }
@@ -808,21 +784,22 @@ namespace
     };
 }
 
-bool InitSpaceState(SpaceApp* State, int Param)
+// Slot 12: FUN_0054ab40.
+bool SpaceApp::Init(int Param)
 {
     // FUN_0054ab40 -- slot 12; the argument is never read.
     (void)Param;
 
     // +0x0b raised for the whole init (FUN_0054bd40 reads it) and dropped by the guard's
     // destructor on every exit, the exception path included.
-    FScopedFlagByte InitInProgress(&State->bInitInProgress);
+    FScopedFlagByte InitInProgress(&bInitInProgress);
 
     // The loading screen (FUN_00579290), the NN system (FUN_0045a100(1)).
     LoadingScreenStart();
     NnSystemInit(true);
     RefreshLoadingProgress();
 
-    State->bCameraReady = 1;
+    bCameraReady = 1;
     RegisterAcceleratorGroup("IDR_SPACE");
 
     // IServer slot 64, no test on the server.
@@ -881,20 +858,20 @@ bool InitSpaceState(SpaceApp* State, int Param)
     InitPlayerCockpitSlice();
 
     // FUN_00549bc0(this, 0, 0), then the cockpit shake amplitude DAT_00675294 = 0.
-    State->bDockingPending = 0;
+    bDockingPending = 0;
     RefreshLoadingProgress();
     InstallSpaceCamera(nullptr, false);
     ResetCameraShakeAmount();
     RefreshLoadingProgress();
 
-    SpaceAppLoadCamerasIni(State);
+    SpaceAppLoadCamerasIni(this);
     RefreshLoadingProgress();
 
     // FUN_004120d0(1) -- fade in from a covered screen.
     FadeIn(true);
 
-    State->bPlayerLostHandled = 0;
-    State->bLeaveRequested = 0;
+    bPlayerLostHandled = 0;
+    bLeaveRequested = 0;
 
     // Registered on the Event::Handler face (FUN_005760d0), in this order.
     {
@@ -902,7 +879,7 @@ bool InitSpaceState(SpaceApp* State, int Param)
                                       USER_COCKPIT_CAMERA_MODE, USER_REARVIEW_CAMERA_MODE_OFF,
                                       USER_REARVIEW_CAMERA_MODE, USER_AUTO_TURRET};
         for (int Index = 0; Index < 7; ++Index)
-            State->Events.RegisterEvent(EventIds[Index]);
+            Events.RegisterEvent(EventIds[Index]);
     }
 
     // FUN_0045b490 (the system-arrival caption).
@@ -911,11 +888,11 @@ bool InitSpaceState(SpaceApp* State, int Param)
 
     // Session flag 8 (FUN_004c8110) -> first person; otherwise the preference stays (the
     // ctor's 1, or the last choice).
-    State->bSpaceReady = 1;
+    bSpaceReady = 1;
     if (TestGameSessionFlags(kSessionFirstPerson))
-        State->PlayerPreference = 0;
+        PlayerPreference = 0;
 
-    if (State->ActiveCamera == nullptr)
+    if (ActiveCamera == nullptr)
         SwitchSpaceCameraMode("player", nullptr);
 
     // No launch answer -> DAT_0067ecbd (single player) or DAT_0067ecbe.
@@ -938,7 +915,8 @@ bool InitSpaceState(SpaceApp* State, int Param)
     return G_SpaceNextState == 0;
 }
 
-int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
+// Slot 14: LAB_0054b000.
+int SpaceApp::Update(float DeltaSeconds)
 {
     // LAB_0054b000 -- slot 14. The whole in-space frame: simulation, camera, sound, then the
     // render bracket FUN_00424f30 .. FUN_00425080 / FUN_00425140 with the scene drawn through
@@ -993,7 +971,7 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
             LightGridRebuild();
         }
 
-        UpdateSpaceDocking(State);
+        UpdateSpaceDocking(this);
 
         // The active camera's slot 0x6c, re-read and tested.
         FSpaceCamera* const Cam = GetActiveSpaceCamera();
@@ -1030,7 +1008,7 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
         FSpaceCamera* const Cam = GetActiveSpaceCamera();
         if (Cam != nullptr)
         {
-            GameCameraBeginFrame(reinterpret_cast<FGameCamera*>(Cam));
+            reinterpret_cast<FGameCamera*>(Cam)->BeginFrame();
             FSpaceCamera* const DrawCam = GetActiveSpaceCamera();
             ((FGameCamera*)DrawCam)->DrawScene(0xffffu, 0u);
         }
@@ -1082,21 +1060,21 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
             void* const Player = GetPlayerObjRW();
             if (Player == nullptr)
             {
-                if (State->bPlayerLostHandled == 0)
+                if (bPlayerLostHandled == 0)
                 {
                     NnExitPostShipLostMessage(); // FUN_00471e80
-                    State->bPlayerLostHandled = 1;
+                    bPlayerLostHandled = 1;
                 }
             }
             else
             {
                 SwitchSpaceCameraMode("player", Player);
-                State->bScriptCameraLatch = 0;
+                bScriptCameraLatch = 0;
             }
         }
     }
 
-    if (State->bLeaveRequested != 0)
+    if (bLeaveRequested != 0)
         G_SpaceNextState = kClientStateMenu;
 
     // FUN_00425140, only when FUN_00424f30 began the scene.
@@ -1109,7 +1087,8 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
     return G_SpaceNextState;
 }
 
-void DestroySpaceState(SpaceApp* State)
+// Slot 13: FUN_0054aec0.
+void SpaceApp::Destroy()
 {
     // FUN_0054aec0 -- slot 13. No null test on `this`: the client state driver only calls slot
     // 13 on a live state.
@@ -1118,7 +1097,7 @@ void DestroySpaceState(SpaceApp* State)
     UnregisterAcceleratorGroup("IDR_SPACE");
 
     // FUN_00576190 on the Event::Handler face -- drop every registration of this handler.
-    State->Events.UnregisterAllEvents();
+    Events.UnregisterAllEvents();
 
     // FUN_004348b0 on DAT_00667e50 (the engine-instance table).
     ResetEngineInstanceCache();
@@ -1137,19 +1116,19 @@ void DestroySpaceState(SpaceApp* State)
 
     // +0xbaa is tested and only then cleared (the compare is on the value before the other two
     // stores).
-    State->bSpaceReady = 0;        // +0xba9
-    State->bScriptCameraLatch = 0; // +0xba8
-    if (State->bDockingPending != 0)
-        State->bDockingPending = 0; // +0xbaa
+    bSpaceReady = 0;        // +0xba9
+    bScriptCameraLatch = 0; // +0xba8
+    if (bDockingPending != 0)
+        bDockingPending = 0; // +0xbaa
     G_bNnScreenUp = false;      // DAT_0067dcc8
-    State->bDockingActive = 0;  // +0xbab
+    bDockingActive = 0;  // +0xbab
 
     // The player's ship CEqObj; when control exclusion 7 is set it is cleared (0).
     CEqObj* const EqObj = PlayerEqObj(CObject::ClassShip);
     if (EqObj != nullptr && EqObj->is_control_excluded(7u))
         EqObj->set_control_exclusion(0u);
 
-    State->bCameraReady = 0;
+    bCameraReady = 0;
 
     StarSysLeave(nullptr);
 
@@ -1190,13 +1169,14 @@ void DestroySpaceState(SpaceApp* State)
     NnSystemShutdown();
 }
 
-void ShutdownSpaceState(SpaceApp* State)
+// Slot 9: FUN_0054ab20.
+void SpaceApp::Shutdown()
 {
     // FUN_0054ab20 (slot 9).
     StarSysLeaveWithoutPlayer();
     // Slot 13 (FUN_0054aec0). Retail calls it even when the atexit teardown already ran slot 13
     // on the current state.
-    State->Destroy();
+    Destroy();
     CObject::ReleaseAll();
     // FUN_0051fbc0 (tail jump).
     SpaceDrawQueueRelease();

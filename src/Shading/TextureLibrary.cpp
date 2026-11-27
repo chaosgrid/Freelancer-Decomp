@@ -1622,12 +1622,12 @@ static void WriteEmptyFrame(unsigned long* Out)
     Out[4] = 0x3f800000;
 }
 
-static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Frame, unsigned long* Out)
+GENRESULT FTexturePlayback::ReadFrame(unsigned int Frame, unsigned long* Out)
 {
     // FUN_06ebe7f0: cache count lazily, then select the child via the frame's first word.
-    if (Playback->FrameCount == 0)
-        Playback->FrameCount = (unsigned int)Playback->Source->Frames.size();
-    const unsigned int Count = Playback->FrameCount;
+    if (FrameCount == 0)
+        FrameCount = (unsigned int)Source->Frames.size();
+    const unsigned int Count = FrameCount;
     if (Count == 0)
     {
         WriteEmptyFrame(Out);
@@ -1635,11 +1635,11 @@ static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Fram
     }
     unsigned int Selected = Frame;
     if (Selected == (unsigned int)kTextureFrameCurrent)
-        Selected = Count <= 1 ? 0 : Playback->CurrentFrame;
+        Selected = Count <= 1 ? 0 : CurrentFrame;
     else if (Selected >= Count)
         Selected = Count - 1;
-    const FTextureFrame& Value = Playback->Source->Frames[Selected];
-    Out[0] = Playback->Source->Children[Value.ChildIndex]->GpuHandle;
+    const FTextureFrame& Value = Source->Frames[Selected];
+    Out[0] = Source->Children[Value.ChildIndex]->GpuHandle;
     std::memcpy(Out + 1, Value.Uv, sizeof(Value.Uv));
     return GR_OK;
 }
@@ -1650,7 +1650,7 @@ GENRESULT DACOM_API FTextureLibrary::GetFrame(int Id, int Frame, unsigned long* 
     FTexturePlayback* Playback = FindPlayback(Id);
     if (Playback == nullptr)
         return GR_GENERIC;
-    ReadPlaybackFrame(Playback, (unsigned int)Frame, Out);
+    Playback->ReadFrame((unsigned int)Frame, Out);
     return GR_OK;
 }
 
@@ -2150,17 +2150,17 @@ GENRESULT DACOM_API FTextureLibrary::RemoveSubTexture(int GroupId, void* Record)
     while (Index != Group->Members.size())
     {
         void* Resolved;
-        if (ResolveTextureRecord(Group->Members[Index], &Resolved) >= 0)
+        if (ResolveTextureRecord(Group->Members[Index], &Resolved) < 0)
+            continue;
+
+        ReleaseTextureRecord(Resolved);
+        if (Resolved == Record)
         {
-            ReleaseTextureRecord(Resolved);
-            if (Resolved == Record)
-            {
-                DecRefById(Group->Members[Index]);
-                Group->Members.erase(Group->Members.begin() + Index);
-                return GR_OK;
-            }
-            ++Index;
+            DecRefById(Group->Members[Index]);
+            Group->Members.erase(Group->Members.begin() + Index);
+            return GR_OK;
         }
+        ++Index;
         // Retail (06ec26f0) does not advance past a member that fails to resolve.
     }
     return GR_GENERIC;

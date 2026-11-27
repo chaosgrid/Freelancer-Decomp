@@ -1033,7 +1033,7 @@ struct FBehaviorTradelaneEvent
 static_assert(sizeof(FBehaviorTradelaneEvent) == 0x18, "FBehaviorTradelaneEvent size");
 
 // The case-0 payload of IBehaviorManager::Slot00 ("this object took damage"). Common's
-// case 0 (FUN_062e86d0, AccumulateSystemManagerTimerLevel) reads +0x08 / +0x14 / +0x18.
+// case 0 (FUN_062e86d0, SystemManagerTimerTable::AccumulateTimerLevel) reads +0x08 / +0x14 / +0x18.
 // Built by Server.dll's EqObj::apply_root_entry (.text:06ceb61b .. 06ceb66c),
 // apply_equip_entry, apply_group_entry and apply_power_entry: nine dwords copied from
 // the controller event 0xd record, whose own order starts with the object id. Retail
@@ -1375,8 +1375,8 @@ static_assert(sizeof(IBehaviorManager) == 0x1CC,
 // Not exported and not a named retail method, so it is a free function here (a member of
 // this member-exported class would be one more export than retail has). Stores ObjectDb at
 // +0xEC, hands it to every BehaviorDispatchTable entry through Behavior slot 2 (+0x08), then
-// to the SystemManager (FUN_062e68e0, SetSystemManagerSharedListHead) and to the
-// PathfindManager (FUN_062db7c0, SetPathfindObjectDb). Callers: CEqObj::connect
+// to the SystemManager (FUN_062e68e0, SystemManager::SetSharedListHead) and to the
+// PathfindManager (FUN_062db7c0, PathfindManager::SetObjectDb). Callers: CEqObj::connect
 // (.text:062aa1b2, a tail JMP), CEqObj::disconnect (.text:062aa1e3, with 0) and
 // CEqObj::create_behavior_interface (.text:062ac2ab).
 void ConnectBehaviorManagerObjectDb(IBehaviorManager* Self, IObjDB* ObjectDb);

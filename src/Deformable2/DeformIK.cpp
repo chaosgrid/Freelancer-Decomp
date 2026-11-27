@@ -233,13 +233,13 @@ unsigned char FSvdMatrix::SvdCmp(float* A, float* W, float* V)
                                        (double)(SvdCell(A, K, I));
                         }
                         const float Factor = (float)(HInv * Dot);
-                        if (I < RowCount)
-                        {
-                            for (int K = I; K < RowCount; ++K)
-                                SvdCell(A, K, J) = (float)(
-                                    (double)Factor * SvdCell(A, K, I) +
-                                    (double)(SvdCell(A, K, J)));
-                        }
+                        if (I >= RowCount)
+                            continue;
+
+                        for (int K = I; K < RowCount; ++K)
+                            SvdCell(A, K, J) = (float)(
+                                (double)Factor * SvdCell(A, K, I) +
+                                (double)(SvdCell(A, K, J)));
                     }
                 }
                 for (int K = I; K < RowCount; ++K)
@@ -288,13 +288,13 @@ unsigned char FSvdMatrix::SvdCmp(float* A, float* W, float* V)
                                 Dot += (double)(SvdCell(A, I, K)) *
                                        (double)(SvdCell(A, J, K));
                         }
-                        if (L < ColCount)
-                        {
-                            for (int K = L; K < ColCount; ++K)
-                                SvdCell(A, J, K) = (float)(
-                                    Dot * (double)Rv1[K] +
-                                    (double)(SvdCell(A, J, K)));
-                        }
+                        if (L >= ColCount)
+                            continue;
+
+                        for (int K = L; K < ColCount; ++K)
+                            SvdCell(A, J, K) = (float)(
+                                Dot * (double)Rv1[K] +
+                                (double)(SvdCell(A, J, K)));
                     }
                 }
                 if (L < ColCount)
@@ -339,13 +339,13 @@ unsigned char FSvdMatrix::SvdCmp(float* A, float* W, float* V)
                                 Dot += (double)(SvdCell(V, K, J)) *
                                        (double)(SvdCell(A, I, K));
                         }
-                        if (L < ColCount)
-                        {
-                            for (int K = L; K < ColCount; ++K)
-                                SvdCell(V, K, J) = (float)(
-                                    Dot * (double)(SvdCell(V, K, I)) +
-                                    (double)(SvdCell(V, K, J)));
-                        }
+                        if (L >= ColCount)
+                            continue;
+
+                        for (int K = L; K < ColCount; ++K)
+                            SvdCell(V, K, J) = (float)(
+                                Dot * (double)(SvdCell(V, K, I)) +
+                                (double)(SvdCell(V, K, J)));
                     }
                 }
             }
@@ -395,13 +395,13 @@ unsigned char FSvdMatrix::SvdCmp(float* A, float* W, float* V)
                     }
                     const float Factor = (float)(
                         Dot / (double)(SvdCell(A, I, I)) * (double)GInv);
-                    if (I < RowCount)
-                    {
-                        for (int K = I; K < RowCount; ++K)
-                            SvdCell(A, K, J) = (float)(
-                                (double)Factor * SvdCell(A, K, I) +
-                                (double)(SvdCell(A, K, J)));
-                    }
+                    if (I >= RowCount)
+                        continue;
+
+                    for (int K = I; K < RowCount; ++K)
+                        SvdCell(A, K, J) = (float)(
+                            (double)Factor * SvdCell(A, K, I) +
+                            (double)(SvdCell(A, K, J)));
                 }
             }
             if (I < RowCount)
@@ -647,7 +647,7 @@ static const char* const G_FdumpFileDeformIk =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Deformable2\\deformIK.cpp";
 
 // FUN_065fb030 (thiscall on the event: JointCount).
-bool SetIkJointCount(FIkEvent* Event, unsigned int JointCount)
+bool FIkEvent::SetJointCount(unsigned int JointCount)
 {
     if (JointCount > (unsigned int)G_IkMaxJoints)
     {
@@ -657,7 +657,7 @@ bool SetIkJointCount(FIkEvent* Event, unsigned int JointCount)
                                   (int)JointCount, G_IkMaxJoints));
         return false;
     }
-    Event->JointCount = (int)JointCount;
+    this->JointCount = (int)JointCount;
     return true;
 }
 
@@ -877,13 +877,13 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
     {
         for (int Index = 0; Index < JointCount; ++Index)
         {
-            if ((int)Channels[Index] == MatchId)
-            {
-                G_Engine->GetJointParams(
-                    JointIds[Index], 0,
-                    OutQuat);
-                return 1;
-            }
+            if ((int)Channels[Index] != MatchId)
+                continue;
+
+            G_Engine->GetJointParams(
+                JointIds[Index], 0,
+                OutQuat);
+            return 1;
         }
         return 1;
     }

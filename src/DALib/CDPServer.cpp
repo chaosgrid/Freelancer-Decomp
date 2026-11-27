@@ -152,13 +152,13 @@ void CDPServer::GetHostAddresses()
     {
         char Url[0x400];
         DWORD UrlLen = sizeof(Url);
-        if (SUCCEEDED(HostAddresses[i]->GetURLA(Url, &UrlLen)))
-        {
-            OutputDebugStringA("\n");
-            OutputDebugStringA("HOSTING URL: ");
-            OutputDebugStringA(Url);
-            OutputDebugStringA("\n\n");
-        }
+        if (FAILED(HostAddresses[i]->GetURLA(Url, &UrlLen)))
+            continue;
+
+        OutputDebugStringA("\n");
+        OutputDebugStringA("HOSTING URL: ");
+        OutputDebugStringA(Url);
+        OutputDebugStringA("\n\n");
     }
 }
 

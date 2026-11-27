@@ -77,7 +77,7 @@ namespace
         if (*Slot != nullptr)
         {
             DustArmDeath(*Slot);
-            ParticleEffectRelease(*Slot); // FUN_004f7a90
+            (*Slot)->Release(); // FUN_004f7a90
             *Slot = nullptr;
         }
     }
@@ -207,7 +207,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
             if (G_FadingDustEffect != nullptr)
             {
                 DustArmDeath(G_FadingDustEffect);
-                ParticleEffectRelease(G_FadingDustEffect);
+                G_FadingDustEffect->Release();
             }
             G_FadingDustEffect = G_ZoneDustEffect;
             G_FadingDustParticles = G_ZoneDustParticles;
@@ -232,7 +232,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
             else
             {
                 DustArmDeath(G_FadingDustEffect);
-                ParticleEffectRelease(G_FadingDustEffect);
+                G_FadingDustEffect->Release();
                 G_FadingDustEffect = nullptr;
             }
         }

@@ -175,7 +175,7 @@ BaseRichTextWin::~BaseRichTextWin()
 
     // The hover record goes first in retail; it is torn down here because the port releases
     // the members below it by hand in this body. ~FToolTipHoverInfo then finds it empty.
-    ToolTipHoverDestroy(&HoverInfo);
+    HoverInfo.Destroy();
 
     if (Image != nullptr)
     {
@@ -425,7 +425,7 @@ void BaseRichTextWin::Draw()
         }
     }
 
-    Win3DDrawChildren(this);
+    DrawChildren();
     PostDraw();
 }
 

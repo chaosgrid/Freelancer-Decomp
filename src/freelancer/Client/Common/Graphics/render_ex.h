@@ -43,7 +43,7 @@ namespace RenderEx
     // the 2D interface (SpaceCameraRenderSlot78). Hot reload: once a second (wall clock) checks
     // volumetric.ini (changed -> [Debug] and the nebula volume settings re-read) and
     // DATA_EXTRA/SHADERS/*.hlsl* (changed -> every Ex program recompiled); then runs the [Debug]
-    // scene_depth_view pass. (The volumetric nebula is drawn earlier, inside SpaceObjDrawPass --
+    // scene_depth_view pass. (The volumetric nebula is drawn earlier, inside FGameCamera::DrawScene --
     // nebula_volume.h.)
     void AfterSpaceScene();
 }

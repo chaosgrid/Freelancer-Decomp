@@ -643,7 +643,7 @@ namespace
         // writes through, as retail).
         FEffectArch* const Arch = static_cast<FEffectArch*>(operator new(sizeof(FEffectArch)));
         if (Arch != nullptr)
-            EffectArchConstruct(Arch);
+            Arch->Construct();
 
         while (Reader->read_value())
             EffectArchParseValue(Arch, Reader);
@@ -669,7 +669,7 @@ namespace
         // FUN_0040e2a0 inlined.
         if (Arch != nullptr)
         {
-            EffectArchDestruct(Arch);
+            Arch->Destruct();
             operator delete(Arch);
         }
     }
@@ -786,45 +786,45 @@ int EffectArchLoadIni(char const* Path, bool bReload)
     return static_cast<int>(G_EffectArchs.size() - OldCount);
 }
 
-void EffectArchConstruct(FEffectArch* Arch)
+void FEffectArch::Construct()
 {
     // FUN_0040e250 (also inlined in FUN_0040eac0).
-    Arch->EffectType = 0;          // +0x00
-    Arch->NicknameId = 0;          // +0x04  ID_String()
-    Arch->VisEffect = nullptr;     // +0x08
-    Arch->VisEffectName = nullptr; // +0x0c  CacheString()
-    Arch->VisGeneric = nullptr;    // +0x10
-    Arch->VisBeam = nullptr;       // +0x14
-    Arch->SndEffect = nullptr;     // +0x18
-    Arch->LgtEffectLen = 0;        // +0x1c
-    Arch->LgtEffect[0] = '\0';     // +0x20  (a byte store)
-    Arch->LgtRangeScale = 1.0f;    // +0x40
-    Arch->LgtTimeScale = 1.0f;     // +0x44
-    Arch->LgtRadius = 0.0f;        // +0x48
-    Arch->LgtColorR = 0xff;        // +0x4c  (one dword store of -1)
-    Arch->LgtColorG = 0xff;
-    Arch->LgtColorB = 0xff;
-    Arch->LgtColorA = 0xff;
-    Arch->Flags = 0;               // +0x50  (a dword store)
-    Arch->FlagsHigh[0] = 0;
-    Arch->FlagsHigh[1] = 0;
-    Arch->FlagsHigh[2] = 0;
-    Arch->RefCount = 0;            // +0x54
+    EffectType = 0;          // +0x00
+    NicknameId = 0;          // +0x04  ID_String()
+    VisEffect = nullptr;     // +0x08
+    VisEffectName = nullptr; // +0x0c  CacheString()
+    VisGeneric = nullptr;    // +0x10
+    VisBeam = nullptr;       // +0x14
+    SndEffect = nullptr;     // +0x18
+    LgtEffectLen = 0;        // +0x1c
+    LgtEffect[0] = '\0';     // +0x20  (a byte store)
+    LgtRangeScale = 1.0f;    // +0x40
+    LgtTimeScale = 1.0f;     // +0x44
+    LgtRadius = 0.0f;        // +0x48
+    LgtColorR = 0xff;        // +0x4c  (one dword store of -1)
+    LgtColorG = 0xff;
+    LgtColorB = 0xff;
+    LgtColorA = 0xff;
+    Flags = 0;               // +0x50  (a dword store)
+    FlagsHigh[0] = 0;
+    FlagsHigh[1] = 0;
+    FlagsHigh[2] = 0;
+    RefCount = 0;            // +0x54
 }
 
-void EffectArchDestruct(FEffectArch* Arch)
+void FEffectArch::Destruct()
 {
     // FUN_0040e2a0 (also inlined in FUN_0040eac0 and FUN_0040ef30).
-    int Dangling = Arch->RefCount;
+    int Dangling = RefCount;
     if (Dangling <= 0)
         return;
     FDUMP(kFdumpWarning,
           "%s(%d) : *** WARNING: Destroying effect archetype (%s) with %d dangling references. "
           "See SSTEVENS",
-          kEffectArchCpp, 0x25, EffectArchNickname(Arch), Dangling);
+          kEffectArchCpp, 0x25, EffectArchNickname(this), Dangling);
     while (Dangling > 0)
     {
-        EffectArchRelease(Arch);
+        Release();
         --Dangling;
     }
 }
@@ -838,7 +838,7 @@ void EffectArchShutdown()
         FEffectArch* const Arch = It->second;
         if (Arch == nullptr)
             continue;
-        EffectArchDestruct(Arch);
+        Arch->Destruct();
         operator delete(Arch);
     }
 
@@ -887,25 +887,25 @@ FEffectArch* FindEffectArchByNickname(char const* Nickname)
     return FindEffectArch(&Id);
 }
 
-void EffectArchAddRef(FEffectArch* Arch, unsigned UnusedArg)
+void FEffectArch::AddRef(unsigned UnusedArg)
 {
     // FUN_0040e960. The VisEffect AddRef's result is not read.
     (void)UnusedArg;
-    if (Arch->VisEffect != nullptr)
-        VisEffectArchAddRef(Arch->VisEffect);
-    if (Arch->SndEffect != nullptr)
-        AcquireClientSoundArch(Arch->SndEffect);
-    Arch->RefCount = Arch->RefCount + 1;
+    if (VisEffect != nullptr)
+        VisEffect->AddRef();
+    if (SndEffect != nullptr)
+        AcquireClientSoundArch(SndEffect);
+    RefCount = RefCount + 1;
 }
 
-void EffectArchRelease(FEffectArch* Arch)
+void FEffectArch::Release()
 {
     // FUN_0040e990.
-    if (Arch->VisEffect != nullptr)
-        VisEffectArchRelease(Arch->VisEffect);
-    if (Arch->SndEffect != nullptr)
-        ReleaseClientSoundArch(Arch->SndEffect);
-    Arch->RefCount = Arch->RefCount - 1;
+    if (VisEffect != nullptr)
+        VisEffect->Release();
+    if (SndEffect != nullptr)
+        ReleaseClientSoundArch(SndEffect);
+    RefCount = RefCount - 1;
 }
 
 FVisEffectArch::~FVisEffectArch()
@@ -919,50 +919,50 @@ FVisEffectArch::~FVisEffectArch()
     }
 }
 
-bool VisEffectArchAddRef(FVisEffectArch* Vis)
+bool FVisEffectArch::AddRef()
 {
     // FUN_0042e080. A live reference only counts up (and answers false).
     bool bLoaded = false;
-    if (Vis->RefCount > 0)
+    if (RefCount > 0)
     {
-        Vis->RefCount += 1;
+        RefCount += 1;
         return bLoaded;
     }
 
-    if (Vis->TextureSlots.size() != Vis->Textures.size())
+    if (TextureSlots.size() != Textures.size())
     {
-        VisEffectArchReleaseTextures(Vis);
+        VisEffectArchReleaseTextures(this);
         // Its answer is not read.
-        VisEffectArchLoadTextures(Vis);
+        VisEffectArchLoadTextures(this);
     }
 
     // An empty ale name is an error; the count still goes up.
-    if (Vis->AlchemyPath[0] == '\0')
+    if (AlchemyPath[0] == '\0')
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\VisEffectArch.cpp", 0x13a,
               "[VisEffect]: Missing ale file name!");
-        Vis->RefCount += 1;
+        RefCount += 1;
         return bLoaded;
     }
 
-    Vis->AleHandle = AleLibLoad(Vis->AlchemyPath);
-    if (Vis->AleHandle != -1)
+    AleHandle = AleLibLoad(AlchemyPath);
+    if (AleHandle != -1)
         bLoaded = true;
-    Vis->RefCount += 1;
+    RefCount += 1;
     return bLoaded;
 }
 
-bool VisEffectArchRelease(FVisEffectArch* Vis)
+bool FVisEffectArch::Release()
 {
     // FUN_0042e160.
-    Vis->RefCount -= 1;
-    if (Vis->RefCount != 0)
+    RefCount -= 1;
+    if (RefCount != 0)
         return false;
 
-    VisEffectArchReleaseTextures(Vis);
-    AleLibRelease(Vis->AleHandle);
-    Vis->AleHandle = -1;
+    VisEffectArchReleaseTextures(this);
+    AleLibRelease(AleHandle);
+    AleHandle = -1;
     return true;
 }
 

@@ -53,9 +53,9 @@ struct FHudNamedValue
 {
     char const* Name;   // +0x00
     int Value;          // +0x04
+
+    bool Lookup(char const* Name, int* OutValue, unsigned Count) const;
 };
-bool HudLookupNamedValue(FHudNamedValue const* Table, char const* Name, int* OutValue,
-                         unsigned Count);
 
 // One [Maneuvers] "maneuver" line (0x148 bytes, vector element of HUD_Maneuvers +0x37c):
 //   maneuver = <behaviour name>, <tooltip ids>, <ids>, <mesh>, <gray mesh>

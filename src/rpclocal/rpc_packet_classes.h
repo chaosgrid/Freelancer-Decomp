@@ -57,6 +57,15 @@ public:
 
     // +0x20. A POINTER to the operator new(4) handle the list hangs off.
     FRpcEquipWireHandle* EquipHandle;
+
+    // 0x06d916a0 + 0x06da2240 / 0x06d95bf0 + 0x06da2480 -- the equipment/cargo list. Four
+    // types: ch2 0x24 SETEQUIPMENT, ch2 0x25 SETCARGO, ch3 0x16 REQEQUIPMENT, ch3 0x17
+    // REQCARGO. A word count then one { dword, float, dword, word, byte, byte, word, run }
+    // record per element; the payload's four bytes are the handle POINTER, not the handle.
+    unsigned int EncodeWireEquipList(unsigned char** BufferHolder, unsigned int Capacity,
+                                     unsigned int* OutLength);
+    unsigned int DecodeWireEquipList(const unsigned char* Buffer, unsigned int Size,
+                                     unsigned int* OutLength);
 };
 
 // Vtable 06db3fb4, slot 0 the purecall stub LAB_06db1dd0: abstract. CREATESHIP and
@@ -1155,11 +1164,11 @@ public:
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d916a0
-        return RpcEncodeWireEquipList(*this, BufferHolder, Capacity, OutLength);
+        return EncodeWireEquipList(BufferHolder, Capacity, OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
                         unsigned int* OutLength) override {   // 06d95bf0
-        return RpcDecodeWireEquipList(*this, Buffer, Size, OutLength);
+        return DecodeWireEquipList(Buffer, Size, OutLength);
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETEQUIPMENT) == 0x24u, "FLPACKET_SERVER_SETEQUIPMENT is operator new(0x24)");
@@ -1178,11 +1187,11 @@ public:
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d916a0
-        return RpcEncodeWireEquipList(*this, BufferHolder, Capacity, OutLength);
+        return EncodeWireEquipList(BufferHolder, Capacity, OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
                         unsigned int* OutLength) override {   // 06d95bf0
-        return RpcDecodeWireEquipList(*this, Buffer, Size, OutLength);
+        return DecodeWireEquipList(Buffer, Size, OutLength);
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCARGO) == 0x24u, "FLPACKET_SERVER_SETCARGO is operator new(0x24)");
@@ -2823,11 +2832,11 @@ public:
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d916a0
-        return RpcEncodeWireEquipList(*this, BufferHolder, Capacity, OutLength);
+        return EncodeWireEquipList(BufferHolder, Capacity, OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
                         unsigned int* OutLength) override {   // 06d95bf0
-        return RpcDecodeWireEquipList(*this, Buffer, Size, OutLength);
+        return DecodeWireEquipList(Buffer, Size, OutLength);
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCARGO) == 0x24u, "FLPACKET_CLIENT_REQCARGO is operator new(0x24)");
@@ -2895,11 +2904,11 @@ public:
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d916a0
-        return RpcEncodeWireEquipList(*this, BufferHolder, Capacity, OutLength);
+        return EncodeWireEquipList(BufferHolder, Capacity, OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
                         unsigned int* OutLength) override {   // 06d95bf0
-        return RpcDecodeWireEquipList(*this, Buffer, Size, OutLength);
+        return DecodeWireEquipList(Buffer, Size, OutLength);
     }
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQEQUIPMENT) == 0x24u, "FLPACKET_CLIENT_REQEQUIPMENT is operator new(0x24)");

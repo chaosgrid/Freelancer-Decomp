@@ -43,6 +43,22 @@ struct FTurretCamera : FHudCamera
     float MouseAimTime;          // +0x134  FUN_0051a7d0's mouse-aim clock (frame time summed while
                                  //         mouse flight steers; zeroed when it does not). The
                                  //         retail ctor never touches it.
+
+    // FUN_0051a210. Chains to the HUDCamera ctor, then plants the defaults (+0x124 gets 0.75f, which
+    // no ini key can change).
+    void Construct();
+
+    // FUN_0051a7d0: the turret view -- the watched ship's orientation turned by
+    // the eased yaw (+0x10c) and pitch (+0x114), shaken, and the tether (+0x100) through it onto the
+    // ship's position, into Out12 = {3x3, position}. The targets (+0x110/+0x118) move by the key
+    // rates (+0x11c/+0x120) or, after 0.25s of left-button / locked mouse flight, by the cursor's
+    // offset from the surface centre. Answers true (Out12 untouched) when the watcher does not hold
+    // a client ship; false otherwise. The last argument is passed by both callers and never read.
+    bool ComputeView(Transform* OutView, float DeltaSeconds, bool bAttach);
+
+    // FUN_0051a2b0, taking the cockpit ini path. Reads [TurretCamera] and warns about
+    // the obsolete [Turret] section. Returns false when the file could not be opened.
+    bool Load(const char* CockpitIniPath);
 };
 
 // The rear-view camera sits at controller + 0x500 and this one at + 0x3c8.
@@ -53,38 +69,5 @@ static_assert(offsetof(FTurretCamera, YawRotateSpeed) == 0x128, "TC +0x128");
 static_assert(offsetof(FTurretCamera, PitchRotateSpeed) == 0x12c, "TC +0x12c");
 static_assert(offsetof(FTurretCamera, AccelSpeed) == 0x130, "TC +0x130");
 
-// FUN_0051a210. Chains to the HUDCamera ctor, then plants the defaults (+0x124 gets 0.75f, which
-// no ini key can change).
-void TurretCameraConstruct(FTurretCamera* Cam);
-
 // Slot 0x54 (0x0051a2a0): the class name, a plain .rdata literal.
 const char* TurretCameraGetName();
-
-// FUN_0051ac20 -- slot 0 of the Turret Event::Handler face (+0xf8, table 0x005dbcb8): blocked
-// mouse pick -> false; HUDCamera's FUN_0051d7f0 first; then 0x32/0x33 set +0x11c and 0x34/0x35
-// set +0x120 to -/+ +0x124 while the key is down (0 when released), 0x36 zeroes +0x10c..+0x118;
-// those five answer true, anything else false.
-bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId);
-
-// Slot 0x64 (FUN_0051a640): register the face for 0x32..0x36, then HUDCamera's activate.
-bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4);
-
-// FUN_0051a7d0: the turret view -- the watched ship's orientation turned by
-// the eased yaw (+0x10c) and pitch (+0x114), shaken, and the tether (+0x100) through it onto the
-// ship's position, into Out12 = {3x3, position}. The targets (+0x110/+0x118) move by the key
-// rates (+0x11c/+0x120) or, after 0.25s of left-button / locked mouse flight, by the cursor's
-// offset from the surface centre. Answers true (Out12 untouched) when the watcher does not hold
-// a client ship; false otherwise. The last argument is passed by both callers and never read.
-bool TurretCameraComputeView(FTurretCamera* Cam, Transform* OutView, float DeltaSeconds, bool bAttach);
-
-// Slot 0x58 (FUN_0051a6a0): zero the four angles, HUDCamera's attach, then the view on an
-// identity 3x4 into the world transform.
-void TurretCameraAttach(FTurretCamera* Cam, void* Object);
-
-// Slot 0x6c (FUN_0051a730): the view on an identity 3x4 into the world transform, then
-// HUDCamera's update.
-void TurretCameraUpdate(FTurretCamera* Cam, float DeltaSeconds);
-
-// FUN_0051a2b0, taking the cockpit ini path. Reads [TurretCamera] and warns about
-// the obsolete [Turret] section. Returns false when the file could not be opened.
-bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath);

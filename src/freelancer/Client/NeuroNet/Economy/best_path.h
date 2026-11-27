@@ -56,6 +56,17 @@ struct FBestPathWaypoint
     // Bits 0x80 / 0x20 / 0x10 are one-shot requests FUN_004bcbf0 serves and clears (story star
     // reset, mission-log history FUN_004ba2a0, mission-log queue FUN_004b9f90).
     unsigned ObjectiveState;
+
+    // FUN_004c5110 (thiscall on the record) -- the object the first 'B' or 'R' token names: a base
+    // through the cached base watcher DAT_006728d8 (the base's docking solar, searched in ObjDB
+    // bucket 2 only while the base's system is the player's), an object id through FUN_00541890;
+    // null otherwise.
+    IObjRW* ResolveObject() const;
+
+    // FUN_004c52d0 (thiscall on the record, RET 8) -- the position and star system of the record:
+    // the 'B' / 'R' object's position in the player's system, else the first 'N' block's {system,
+    // -, pos}; false when neither.
+    bool ResolvePosition(Vector* OutPos, unsigned* OutSystem) const;
 };
 
 // The value of one map entry (node +0x10, 0x44 bytes).
@@ -101,18 +112,6 @@ bool BestPathHasText();
 // MadLibId, rotate left 1 per token and add its data unless the tag is 'R' or 'N'. The nav
 // map's FUN_004a0800 caches its resolved position under it.
 unsigned BestPathWaypointHash(int Index);
-
-// FUN_004c5110 (thiscall on the record) -- the object the first 'B' or 'R' token names: a base
-// through the cached base watcher DAT_006728d8 (the base's docking solar, searched in ObjDB
-// bucket 2 only while the base's system is the player's), an object id through FUN_00541890;
-// null otherwise.
-IObjRW* BestPathWaypointResolveObject(FBestPathWaypoint const* Waypoint);
-
-// FUN_004c52d0 (thiscall on the record, RET 8) -- the position and star system of the record:
-// the 'B' / 'R' object's position in the player's system, else the first 'N' block's {system,
-// -, pos}; false when neither.
-bool BestPathWaypointResolvePosition(FBestPathWaypoint const* Waypoint, Vector* OutPos,
-                                     unsigned* OutSystem);
 
 // FUN_004bcbf0 (cdecl) -- the objectives changed (IClient slot 72): raise the nav map's
 // (DAT_006720c9) and the contact list's (DAT_0067494c) refresh flags; with a route, drop the

@@ -86,12 +86,20 @@ struct FEffectTypeInfo
 };
 static_assert(sizeof(FEffectTypeInfo) == 0x28, "EffectTypeInfo 0x28");
 
+struct ICamera;
+
 // One EffectLOD row: max_lod_screen_size / min_lod_screen_size / min_screen_size.
 struct FEffectLodSizes
 {
     float MaxLodScreenSize;
     float MinLodScreenSize;
     float MinScreenSize;
+
+    // FUN_0042da00 (on the row) — screen size = Radius / Distance * ZNear *
+    // XScaleOverNear (camera slots +0x20 / +0x2c); at or below min_screen_size -> *Out = 0, false;
+    // else the blend (size - min_lod) / (max_lod - min_lod) clamped to [0, 1], true. A distance
+    // below 1e-5 (double DAT_005c75f0) gives 1.0 without asking the camera.
+    bool RowBlend(ICamera* Cam, float Distance, float Radius, float* OutBlend) const;
 };
 
 extern FEffectTypeInfo G_EffectTypeTable[kEffectTypeCount];
@@ -113,15 +121,6 @@ bool LoadEffectTypeSection(class INI_Reader* Reader);
 
 // FUN_0042dae0 — parse one [EffectLOD] section into G_EffectLodTable.
 bool LoadEffectLodSection(class INI_Reader* Reader);
-
-struct ICamera;
-
-// FUN_0042da00 (on the row) — screen size = Radius / Distance * ZNear *
-// XScaleOverNear (camera slots +0x20 / +0x2c); at or below min_screen_size -> *Out = 0, false;
-// else the blend (size - min_lod) / (max_lod - min_lod) clamped to [0, 1], true. A distance
-// below 1e-5 (double DAT_005c75f0) gives 1.0 without asking the camera.
-bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance, float Radius,
-                       float* OutBlend);
 
 // FUN_0042dcd0 — the type's lod_type 1..6 selects the G_EffectLodTable row for
 // FUN_0042da00 with the type's radius; any other type (or no row) gives *Out = 1.0, true.

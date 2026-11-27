@@ -75,7 +75,7 @@ static const char* const G_FdumpFileDeformablePartArchetype =
 const char* const G_ParentNode = "..";
 
 // FUN_065f7760 (thiscall on the mesh: Fs).
-static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
+bool FMeshArchetype::LoadFaceGroups(IFileSystem* Fs)
 {
     if (Fs->OpenNode("Face_groups") == 0)
         return false;
@@ -101,7 +101,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
         Groups[GroupIndex].Construct();
         GroupIndex += 1;
     }
-    Arch->FaceGroups = Groups;
+    FaceGroups = Groups;
 
     WIN32_FIND_DATAA FindData;
     const int Finder = FsFindFirst(Fs, "Group*", &FindData);
@@ -109,7 +109,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
     {
         for (;;)
         {
-            FFaceGroup* Group = &Arch->FaceGroups[Arch->FaceGroupCount];
+            FFaceGroup* Group = &FaceGroups[FaceGroupCount];
             IFileSystem* Child = nullptr;
             DropFileSystem(&Child);
             FFileSystemDesc ChildDesc;
@@ -208,8 +208,8 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                 }
             }
 
-            Arch->FaceGroupCount += 1;
-            if (Arch->FaceGroupCount >= Count)
+            FaceGroupCount += 1;
+            if (FaceGroupCount >= Count)
                 break;
             if (FsFindNext(Fs, Finder, &FindData) == 0)
                 break;
@@ -621,7 +621,7 @@ static const unsigned long G_ParseTagUtf = D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_T
 // FUN_065f89e0 (thiscall on the mesh: Holder, Fs).
 bool FMeshArchetype::LoadTables(FLodHolder* Holder, IFileSystem* Fs)
 {
-    if (!LoadFaceGroups(this, Fs))
+    if (!LoadFaceGroups(Fs))
         return false;
     if (!LoadGeometry(Fs))
         return false;
@@ -884,14 +884,14 @@ void FMeshArchetype::FillStreamDesc(FRpVertexSrcDesc* Out)
     Out->Normal.Stride = 0x18;
     Out->Normal.IndexArray = PointIndices;
     Out->Normal.Count = VertexCount;
-    if (UvData != nullptr)
-    {
-        Out->Tex[0].Base = (const unsigned char*)UvData;
-        Out->Tex[0].ByteSize = 8;
-        Out->Tex[0].Stride = 8;
-        Out->Tex[0].IndexArray = UvIndices;
-        Out->Tex[0].Count = UvCount;
-    }
+    if (UvData == nullptr)
+        return;
+
+    Out->Tex[0].Base = (const unsigned char*)UvData;
+    Out->Tex[0].ByteSize = 8;
+    Out->Tex[0].Stride = 8;
+    Out->Tex[0].IndexArray = UvIndices;
+    Out->Tex[0].Count = UvCount;
 }
 
 // FUN_065f9150.

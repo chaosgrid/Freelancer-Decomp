@@ -99,6 +99,25 @@ struct FNebulaClouds
     int DisableLightningBolts;                 // +0x120 disable_lightning_bolts
     int DisableLightningFlash;                 // +0x124 disable_lightning_flash
     int DisableBatcher;                        // +0x128 disable_batcher
+
+    void Construct();
+    void ParseIni(class INI_Reader& Reader, FShapeDB* Shapes);
+    void ReleaseBits();
+    void RebuildBits();
+    void ApplyDetail(float Detail);
+    void RegenExcluded(void* ExclusionCtx);
+
+    // FUN_00550d40 (__thiscall, RET 0x10) — per-frame puff update: fade, cull, sort, respawn,
+    // drift, move; active count at +0x14. Camera is an ICamera (vt+0x0c / vt+0x10).
+    void Update(void* Camera, float Dt, float Visibility,
+                Exclusion::NebulaExclusionZoneMgr* ExclusionMgr);
+    void Destroy(unsigned char Flags);
+
+    // Defined in cli_nebula.cpp.
+    void SetDetail(float Detail);
+
+    // FUN_00551500 — shared Clouds panel draw (this = FNebulaClouds).
+    void DrawClouds(void* Camera, void* ExclusionCtx);
 };
 
 static_assert(sizeof(FNebulaClouds) == 0x12c, "Clouds component 0x12c");
@@ -113,18 +132,12 @@ static_assert(offsetof(FNebulaClouds, DisableBatcher) == 0x128, "clouds disable_
 struct I3DMathEngine;
 extern I3DMathEngine* G_CloudsMath;
 
-void NebulaCloudsConstruct(FNebulaClouds* Clouds);                 // FUN_00550180
-void NebulaCloudsParseIni(FNebulaClouds* Clouds, class INI_Reader& Reader,
-                          FShapeDB* Shapes); // FUN_00550240
-void NebulaCloudsReleaseBits(FNebulaClouds* Clouds);               // FUN_005501e0 / 00550cf0
-void NebulaCloudsRebuildBits(FNebulaClouds* Clouds);               // FUN_00550b60 (+ FUN_00550040)
-void NebulaCloudsApplyDetail(FNebulaClouds* Clouds, float Detail); // FUN_005524a0
-void NebulaCloudsRegenExcluded(FNebulaClouds* Clouds, void* ExclusionCtx); // FUN_005513b0
-// FUN_00550d40 (__thiscall, RET 0x10) — per-frame puff update: fade, cull, sort, respawn,
-// drift, move; active count at +0x14. Camera is an ICamera (vt+0x0c / vt+0x10).
-void NebulaCloudsUpdate(FNebulaClouds* Clouds, void* Camera, float Dt, float Visibility,
-                        Exclusion::NebulaExclusionZoneMgr* ExclusionMgr);
-void NebulaCloudsDestroy(FNebulaClouds* Clouds, unsigned char Flags);
+                 // FUN_00550180
+ // FUN_00550240
+               // FUN_005501e0 / 00550cf0
+               // FUN_00550b60 (+ FUN_00550040)
+ // FUN_005524a0
+ // FUN_005513b0
 
 struct FNebulaCloudsListNode
 {
@@ -324,6 +337,18 @@ struct FNebulaEffect : INebula
     float SunBurnthroughScaler;                      // +0x2c8 [NebulaLight] sun_burnthrough_scaler
     unsigned char bHasAmbient;                       // +0x2cc
     unsigned char Ambient[3];                        // +0x2cd [NebulaLight] ambient
+
+    // FUN_00506600
+    void Rebuild();
+
+    // FUN_00507340 — re-aim the exterior bits' axes square to the camera
+    void OrientExteriorBits(float Tx, float Ty, float Tz);
+
+    // FUN_005074e0 — the two crossing fog sheets textured with the fill shape (+0x5c)
+    void DrawFillSheets(float CamX, float CamY, float CamZ);
+
+    // FUN_00507ed0 — the exterior bit billboards (Win3D quads + Pipeline RS 0x18)
+    void DrawExteriorBits(void* Camera);
 };
 #pragma pack(pop)
 
@@ -350,28 +375,6 @@ static_assert(offsetof(FNebulaEffect, FlagLoaded) == 0x2c0, "FlagLoaded +0x2c0")
 FNebulaEffect* NebulaConstruct(FNebulaEffect* This);
 FNebulaEffect* NebulaCreate();
 void NebulaDestroy(FNebulaEffect* Nebula);
-
-// LAB_00509ac0
-void NebulaSetDetail(FNebulaEffect* Nebula, float Detail);
-
-// FUN_00506600
-void NebulaRebuild(FNebulaEffect* Nebula);
-
-// FUN_00506cc0
-void NebulaShutdown(FNebulaEffect* Nebula);
-
-// LAB_00506f20 — vtable +0x08. Camera's vt+0xc gives the position; Dt is stored to +0x1c.
-// Caller: StarSysUpdate FUN_00554eb0.
-void NebulaUpdate(FNebulaEffect* Nebula, void* Camera, float Dt);
-
-// FUN_00507340 — re-aim the exterior bits' axes square to the camera
-void NebulaOrientExteriorBits(FNebulaEffect* Nebula, float Tx, float Ty, float Tz);
-
-// FUN_005074e0 — the two crossing fog sheets textured with the fill shape (+0x5c)
-void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float CamZ);
-
-// FUN_00507ed0 — the exterior bit billboards (Win3D quads + Pipeline RS 0x18)
-void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera);
 
 // FUN_00504cf0 — full object destructor body
 void NebulaDestruct(FNebulaEffect* Nebula);

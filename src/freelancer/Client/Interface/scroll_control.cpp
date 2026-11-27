@@ -15,7 +15,7 @@
 #include "Space/Cameras/space_camera.h"      // AsCamera, FSpaceCamera
 #include "Space/star_sphere.h"       // Win3DIdentityRotation3x3 (FUN_004215b0)
 #include "Interface/win3d.h"
-#include "Interface/win3d_engine_submit.h" // SubmitWin3DEngineInstance, Win3DRayHitsAabbHalfExtents
+#include "Interface/win3d_engine_submit.h" // FClientMeshHolder::FClientMeshHolder::SubmitWin3DEngineInstance, Win3DRayHitsAabbHalfExtents
 #include "Interface/win3d_immediate.h"   // Win3DDisable (FUN_00421ed0)
 #include "Interface/win_factory.h"
 
@@ -59,7 +59,7 @@ namespace
     // The instance-bound test plus SetInstanceMatrix / UpdateInstance pair every slot inlines.
     void PushInstanceMatrix(FClientMeshHolder* Holder, Transform* Xform)
     {
-        if (!ClientMeshHolderHasInstance(Holder))
+        if (!Holder->HasInstance())
             return;
         DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, Xform);
         DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
@@ -68,7 +68,7 @@ namespace
     // The same with SetInstancePosition (the "<part>_offset" keys).
     void PushInstancePosition(FClientMeshHolder* Holder, Vector* Position)
     {
-        if (!ClientMeshHolderHasInstance(Holder))
+        if (!Holder->HasInstance())
             return;
         DALib::Engine->SetInstancePosition(Holder->EngineInstance, Position);
         DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
@@ -78,9 +78,9 @@ namespace
     void LoadPartMesh(ScrollControl* Control, FClientMeshHolder* Holder, char const* Path,
                       Transform* Xform)
     {
-        ClientUiMeshHolderRelease(Holder);
+        Holder->ReleaseWithAnim();
         if (Path[0] != '\0')
-            ClientMeshLoadFromPath(Holder, Path, 0, false);
+            Holder->LoadFromPath(Path, 0, false);
         PushInstanceMatrix(Holder, Xform);
         Control->RefreshAttachment();
     }
@@ -189,8 +189,8 @@ namespace
     // FUN_004a1af0's arithmetic).
     void DrawPartMesh(FClientMeshHolder* Holder, unsigned long const* Rgba)
     {
-        ClientMeshHolderSetColor(Holder, reinterpret_cast<unsigned char const*>(Rgba));
-        SubmitWin3DEngineInstance(Holder, Win3DGetCamera(), 0, 1.0f, 0);
+        Holder->SetColor(reinterpret_cast<unsigned char const*>(Rgba));
+        Holder->SubmitWin3DEngineInstance(Win3DGetCamera(), 0, 1.0f, 0);
         Win3DDisable(kWin3DDepthTest);
     }
 
@@ -267,10 +267,10 @@ ScrollControl::ScrollControl()
 ScrollControl::~ScrollControl()
 {
     // FUN_00580190. Back, prev, next, thumb, in that order.
-    ClientUiMeshHolderRelease(&Back.Holder);
-    ClientUiMeshHolderRelease(&Prev.Holder);
-    ClientUiMeshHolderRelease(&Next.Holder);
-    ClientUiMeshHolderRelease(&ThumbHolder);
+    Back.Holder.ReleaseWithAnim();
+    Prev.Holder.ReleaseWithAnim();
+    Next.Holder.ReleaseWithAnim();
+    ThumbHolder.ReleaseWithAnim();
 
     // A held thumb, back plate or button drops the capture.
     if (bDragging != 0 || bPaging != 0 || bNextPressed != 0 || bPrevPressed != 0)
@@ -908,20 +908,20 @@ void ScrollControl::Update()
         return;
     }
 
-    if (bPrevPressed != 0)
+    if (bPrevPressed == 0)
+        return;
+
+    if (!(GetClientElapsedTime() - static_cast<double>(RepeatTime) > 0.3))
+        return;
+    if (Value > MinRange)
     {
-        if (!(GetClientElapsedTime() - static_cast<double>(RepeatTime) > 0.3))
-            return;
-        if (Value > MinRange)
-        {
-            Value -= Step;
-            if (Value < MinRange)
-                Value = MinRange;
-            UpdateThumb();
-            NotifyValue();
-        }
-        RepeatTime = static_cast<float>(GetClientElapsedTime());
+        Value -= Step;
+        if (Value < MinRange)
+            Value = MinRange;
+        UpdateThumb();
+        NotifyValue();
     }
+    RepeatTime = static_cast<float>(GetClientElapsedTime());
 }
 
 void ScrollControl::Draw()
@@ -932,7 +932,7 @@ void ScrollControl::Draw()
         return;
     if (GetGameOption(kGameOptNeuronet) == 0)
         return;
-    Win3DDrawChildren(this);
+    DrawChildren();
     if (bThumbValid == 0)
         return;
 
@@ -945,7 +945,7 @@ void ScrollControl::Draw()
 
     // The back plate: the untinted pass unless back_no_mesh_render, then depth test off and
     // always the idle-tinted pass.
-    if (ClientMeshHolderHasInstance(&Back.Holder))
+    if (Back.Holder.HasInstance())
     {
         if (Back.bNoMeshRender == 0)
             DrawPartMesh(&Back.Holder, &Idle);
@@ -957,7 +957,7 @@ void ScrollControl::Draw()
     }
 
     // Next: hot while pressed or hovered; no tinted pass.
-    if (ClientMeshHolderHasInstance(&Next.Holder))
+    if (Next.Holder.HasInstance())
     {
         unsigned long const* const Color =
             (bNextPressed != 0 || bNextHover != 0) ? &Hot : &Idle;
@@ -966,7 +966,7 @@ void ScrollControl::Draw()
         Win3DDisable(kWin3DDepthTest);
     }
 
-    if (ClientMeshHolderHasInstance(&Prev.Holder))
+    if (Prev.Holder.HasInstance())
     {
         unsigned long const* const Color =
             (bPrevPressed != 0 || bPrevHover != 0) ? &Hot : &Idle;
@@ -979,7 +979,7 @@ void ScrollControl::Draw()
     // dragged or hovered, then depth test off.
     if (bThumbValid == 0)
         return;
-    if (!ClientMeshHolderHasInstance(&ThumbHolder))
+    if (!ThumbHolder.HasInstance())
         return;
     if (bThumbNoMeshRender == 0)
         DrawPartMesh(&ThumbHolder, &Idle);

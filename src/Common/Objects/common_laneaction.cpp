@@ -110,32 +110,32 @@ void LaneAction::request_exit()
 void LaneAction::stop(char bSkipStopTradelane)
 {
     // FUN_062c2350
-    if (LaneState != LANE_STOPPED)
+    if (LaneState == LANE_STOPPED)
+        return;
+
+    LaneState = LANE_STOPPED;
+    PhySys::Controller::UnRegister(this);
+
+    if (TradelaneObjWatcher.target() != nullptr)
     {
-        LaneState = LANE_STOPPED;
-        PhySys::Controller::UnRegister(this);
-
-        if (TradelaneObjWatcher.target() != nullptr)
+        IObjRW* const Rw = TradelaneObj();
+        if (Rw != nullptr)
         {
-            IObjRW* const Rw = TradelaneObj();
-            if (Rw != nullptr)
-            {
-                // The CEqObj narrowing is used without a further test.
-                CObject* const Obj = (CObject*)Rw->cobject();
-                CEqObj* const Eq = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
-                    ? (CEqObj*)Obj : nullptr;
-                Eq->set_control_exclusion(0);
-                Eq->enable_collisions_r(true);
+            // The CEqObj narrowing is used without a further test.
+            CObject* const Obj = (CObject*)Rw->cobject();
+            CEqObj* const Eq = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
+                ? (CEqObj*)Obj : nullptr;
+            Eq->set_control_exclusion(0);
+            Eq->enable_collisions_r(true);
 
-                if (bSkipStopTradelane == 0)
-                    Rw->stop_tradelane();          // IObjAffect slot 26
+            if (bSkipStopTradelane == 0)
+                Rw->stop_tradelane();          // IObjAffect slot 26
 
-                (void)Rw->cobject();               // result dropped
-                Rw->set_throttle(1.0f);            // IObjAffect slot 0
-            }
+            (void)Rw->cobject();               // result dropped
+            Rw->set_throttle(1.0f);            // IObjAffect slot 0
         }
-        LaneState = LANE_STOPPED;
     }
+    LaneState = LANE_STOPPED;
 }
 
 void LaneAction::BuildRingTransform(IObjInspect const* Ring, LaneRingTransform& OutXform)

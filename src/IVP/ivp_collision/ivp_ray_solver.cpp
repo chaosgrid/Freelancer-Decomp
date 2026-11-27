@@ -367,8 +367,8 @@ IVP_Ray_Solver_Os::IVP_Ray_Solver_Os(IVP_Ray_Solver* RaySolver, IVP_Real_Object*
     ray_solver = RaySolver;  // +0x44
 
     IVP_NarrowPhaseCacheSlot* Cache = Object->get_cache_object_no_lock();
-    IVP_TransformWorldToSlotSpace(Cache, &RaySolver->ray_start_point, &ray_start_point);
-    IVP_RotateWorldToSlotSpace(Cache, &RaySolver->ray_normized_direction, &ray_normized_direction);
+    Cache->transform_world_to_slot_space(&RaySolver->ray_start_point, &ray_start_point);
+    Cache->rotate_world_to_slot_space(&RaySolver->ray_normized_direction, &ray_normized_direction);
 
     ray_length = RaySolver->ray_length;
     const double Length = ray_length;

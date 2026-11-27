@@ -545,60 +545,60 @@ IVP_Real_Object::IVP_Real_Object(IVP_Cluster* Father, IVP_SurfaceManager* Surfac
 // (Secondary keeps the core position); (b) with q_core_f_object, Quat =
 // Quat * q_core_f_object inlined in retail's summation order, then the rows
 // are rebuilt.
-void IVP_RefreshNarrowPhaseCacheSlot(IVP_NarrowPhaseCacheSlot* Slot)
+void IVP_NarrowPhaseCacheSlot::refresh()
 {
-    IVP_Real_Object* Owner = Slot->Owner;
+    IVP_Real_Object* Owner = this->Owner;
     IVP_Environment* Env = Owner->environment;
     IVP_Core* Core = Owner->core;
 
     const double DTime = (((double)(Env->current_time.time_base) - Core->TimeOfLastPsi.time_base)
                           + Env->current_time.time_offset) - Core->TimeOfLastPsi.time_offset;
 
-    Slot->LastRefreshTick = Env->sim_step_count;
+    LastRefreshTick = Env->sim_step_count;
 
     if (DTime == 0.0 || std::isnan(DTime)) // DAT_063a53d4; equal or unordered
     {
-        Slot->Quat = Core->QWorldFCore;
+        Quat = Core->QWorldFCore;
 
-        Slot->WorldTransform.vv.x = Core->PosWorldFCore.x;
-        Slot->WorldTransform.vv.y = Core->PosWorldFCore.y;
-        Slot->WorldTransform.vv.z = Core->PosWorldFCore.z;
+        WorldTransform.vv.x = Core->PosWorldFCore.x;
+        WorldTransform.vv.y = Core->PosWorldFCore.y;
+        WorldTransform.vv.z = Core->PosWorldFCore.z;
     }
     else
     {
         const float Alpha = (float)(DTime * Core->IDeltaTime);
-        Slot->Quat.set_interpolate_quat(&Core->QWorldFCore, &Core->QWorldFCoreNext, Alpha);
+        Quat.set_interpolate_quat(&Core->QWorldFCore, &Core->QWorldFCoreNext, Alpha);
 
-        Slot->WorldTransform.vv.x = (float)(DTime * Core->DeltaWorldFCore.x + Core->PosWorldFCore.x);
-        Slot->WorldTransform.vv.y = (float)(DTime * Core->DeltaWorldFCore.y + Core->PosWorldFCore.y);
-        Slot->WorldTransform.vv.z = (float)(DTime * Core->DeltaWorldFCore.z + Core->PosWorldFCore.z);
+        WorldTransform.vv.x = (float)(DTime * Core->DeltaWorldFCore.x + Core->PosWorldFCore.x);
+        WorldTransform.vv.y = (float)(DTime * Core->DeltaWorldFCore.y + Core->PosWorldFCore.y);
+        WorldTransform.vv.z = (float)(DTime * Core->DeltaWorldFCore.z + Core->PosWorldFCore.z);
     }
 
-    Slot->Secondary.x = Slot->WorldTransform.vv.x;
-    Slot->Secondary.y = Slot->WorldTransform.vv.y;
-    Slot->Secondary.z = Slot->WorldTransform.vv.z;
+    Secondary.x = WorldTransform.vv.x;
+    Secondary.y = WorldTransform.vv.y;
+    Secondary.z = WorldTransform.vv.z;
 
-    Slot->Quat.set_matrix(&Slot->WorldTransform);
+    Quat.set_matrix(&WorldTransform);
 
     if ((Owner->flags & 0xc00u) == 0) // (a)
-        Slot->WorldTransform.vmult4(&Owner->shift_core_f_object, &Slot->WorldTransform.vv);
+        WorldTransform.vmult4(&Owner->shift_core_f_object, &WorldTransform.vv);
 
-    if (Owner->q_core_f_object != nullptr) // (b)
-    {
-        // Every term is read before the first store; y and x stay on the
-        // FPU, z and w are spilled as floats; stores go z, w, x, y.
-        IVP_U_Quat& Q = Slot->Quat;
-        const IVP_U_Quat* R = Owner->q_core_f_object;
-        const double Y = (((double)Q.y * R->w + (double)R->y * Q.w) + (double)Q.z * R->x) - (double)Q.x * R->z;
-        const float Z = (float)((((double)R->y * Q.x + (double)Q.z * R->w) + (double)Q.w * R->z) - (double)Q.y * R->x);
-        const float W = (float)((((double)Q.w * R->w - (double)Q.x * R->x) - (double)Q.y * R->y) - (double)Q.z * R->z);
-        const double X = (((double)Q.x * R->w + (double)Q.y * R->z) + (double)Q.w * R->x) - (double)R->y * Q.z;
-        Q.z = Z;
-        Q.w = W;
-        Q.x = (float)X;
-        Q.y = (float)Y;
-        Q.set_matrix(&Slot->WorldTransform); // FUN_06350bc0
-    }
+    if (Owner->q_core_f_object == nullptr) // (b)
+        return;
+
+    // Every term is read before the first store; y and x stay on the
+    // FPU, z and w are spilled as floats; stores go z, w, x, y.
+    IVP_U_Quat& Q = Quat;
+    const IVP_U_Quat* R = Owner->q_core_f_object;
+    const double Y = (((double)Q.y * R->w + (double)R->y * Q.w) + (double)Q.z * R->x) - (double)Q.x * R->z;
+    const float Z = (float)((((double)R->y * Q.x + (double)Q.z * R->w) + (double)Q.w * R->z) - (double)Q.y * R->x);
+    const float W = (float)((((double)Q.w * R->w - (double)Q.x * R->x) - (double)Q.y * R->y) - (double)Q.z * R->z);
+    const double X = (((double)Q.x * R->w + (double)Q.y * R->z) + (double)Q.w * R->x) - (double)R->y * Q.z;
+    Q.z = Z;
+    Q.w = W;
+    Q.x = (float)X;
+    Q.y = (float)Y;
+    Q.set_matrix(&WorldTransform); // FUN_06350bc0
 }
 
 // FUN_0634d530. Advances the round-robin cursor past busy slots (RefCount
@@ -631,7 +631,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Cache_Object_Manager::get_cache_object(IVP_Real_Ob
     Slot->LastRefreshTick = 0;
 
     if (int8_t(Owner->flags & 0xff) >= IVP_MT_NOT_SIM)
-        IVP_RefreshNarrowPhaseCacheSlot(Slot);
+        Slot->refresh();
 
     return Slot;
 }
@@ -646,7 +646,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::ResolveNarrowPhaseCacheSlot()
     ++Slot->RefCount;
 
     if (int8_t(flags & 0xff) < IVP_MT_NOT_SIM && environment->sim_step_count > Slot->LastRefreshTick)
-        IVP_RefreshNarrowPhaseCacheSlot(Slot);
+        Slot->refresh();
 
     return Slot;
 }
@@ -660,7 +660,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::get_cache_object_no_lock()
 
     IVP_NarrowPhaseCacheSlot* Slot = cache_object;
     if (int8_t(flags & 0xff) < IVP_MT_NOT_SIM && environment->sim_step_count > Slot->LastRefreshTick)
-        IVP_RefreshNarrowPhaseCacheSlot(Slot);
+        Slot->refresh();
 
     return Slot;
 }
@@ -680,27 +680,31 @@ void IVP_Real_Object::ReleaseNarrowPhaseCacheSlot(IVP_NarrowPhaseCacheSlot* Slot
 //   0634d970 == 06366010 vimult,  0634d9d0 == 06348580 vmult.
 
 // FUN_0634d860: out = M^T * (in - vv).
-void IVP_TransformWorldToSlotSpace(IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* WorldPos, IVP_U_Point* OutLocalPos)
+void IVP_NarrowPhaseCacheSlot::transform_world_to_slot_space(const IVP_U_Point* WorldPos,
+                                                             IVP_U_Point* OutLocalPos)
 {
-    Slot->WorldTransform.vimult4(WorldPos, OutLocalPos);
+    WorldTransform.vimult4(WorldPos, OutLocalPos);
 }
 
 // FUN_0634d9d0: out = M * in. Alias-safe; Leave_PK 06365280 calls it in place.
-void IVP_RotateSlotToWorldSpace(IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* LocalDir, IVP_U_Point* OutWorldDir)
+void IVP_NarrowPhaseCacheSlot::rotate_slot_to_world_space(const IVP_U_Point* LocalDir,
+                                                          IVP_U_Point* OutWorldDir)
 {
-    Slot->WorldTransform.vmult(LocalDir, OutWorldDir);
+    WorldTransform.vmult(LocalDir, OutWorldDir);
 }
 
 // FUN_0634d970: out = M^T * in. Alias-safe (called in place).
-void IVP_RotateWorldToSlotSpace(IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* WorldDir, IVP_U_Point* OutLocalDir)
+void IVP_NarrowPhaseCacheSlot::rotate_world_to_slot_space(const IVP_U_Point* WorldDir,
+                                                          IVP_U_Point* OutLocalDir)
 {
-    Slot->WorldTransform.vimult(WorldDir, OutLocalDir);
+    WorldTransform.vimult(WorldDir, OutLocalDir);
 }
 
 // FUN_0634d8d0: out = M * in + vv.
-void IVP_TransformSlotToWorldSpace(IVP_NarrowPhaseCacheSlot* Slot, const IVP_U_Point* LocalPos, IVP_U_Point* OutWorldPos)
+void IVP_NarrowPhaseCacheSlot::transform_slot_to_world_space(const IVP_U_Point* LocalPos,
+                                                             IVP_U_Point* OutWorldPos)
 {
-    Slot->WorldTransform.vmult4(LocalPos, OutWorldPos);
+    WorldTransform.vmult4(LocalPos, OutWorldPos);
 }
 
 // FUN_063454e0: sets the core's movement state to 0x21 (low bits) around a
@@ -991,27 +995,27 @@ void IVP_Real_Object::get_m_world_f_object_at_transform(IVP_Time Time, IVP_U_Mat
     // InterpQuat * q_core_f_object inlined with its own summation order (not
     // set_mult_quat 063510f0's); y and x stay on the FPU, z and w are spilled;
     // stores go z, w, x, y; then the rows are rebuilt.
-    if (q_core_f_object != nullptr)
-    {
-        const IVP_U_Quat* Q2 = q_core_f_object;
-        const double Ry = (((double)InterpQuat.z * Q2->x + (double)InterpQuat.y * Q2->w) +
-                           (double)InterpQuat.w * Q2->y) -
-                          (double)InterpQuat.x * Q2->z;
-        const float Rz = (float)((((double)InterpQuat.w * Q2->z + (double)InterpQuat.z * Q2->w) +
-                                  (double)InterpQuat.x * Q2->y) -
-                                 (double)InterpQuat.y * Q2->x);
-        const float Rw = (float)((((double)InterpQuat.w * Q2->w - (double)InterpQuat.x * Q2->x) -
-                                  (double)InterpQuat.y * Q2->y) -
-                                 (double)InterpQuat.z * Q2->z);
-        const double Rx = (((double)InterpQuat.y * Q2->z + (double)InterpQuat.w * Q2->x) +
-                           (double)InterpQuat.x * Q2->w) -
-                          (double)InterpQuat.z * Q2->y;
-        InterpQuat.z = Rz;
-        InterpQuat.w = Rw;
-        InterpQuat.x = (float)Rx;
-        InterpQuat.y = (float)Ry;
-        InterpQuat.set_matrix(OutMatrix);
-    }
+    if (q_core_f_object == nullptr)
+        return;
+
+    const IVP_U_Quat* Q2 = q_core_f_object;
+    const double Ry = (((double)InterpQuat.z * Q2->x + (double)InterpQuat.y * Q2->w) +
+                       (double)InterpQuat.w * Q2->y) -
+                      (double)InterpQuat.x * Q2->z;
+    const float Rz = (float)((((double)InterpQuat.w * Q2->z + (double)InterpQuat.z * Q2->w) +
+                              (double)InterpQuat.x * Q2->y) -
+                             (double)InterpQuat.y * Q2->x);
+    const float Rw = (float)((((double)InterpQuat.w * Q2->w - (double)InterpQuat.x * Q2->x) -
+                              (double)InterpQuat.y * Q2->y) -
+                             (double)InterpQuat.z * Q2->z);
+    const double Rx = (((double)InterpQuat.y * Q2->z + (double)InterpQuat.w * Q2->x) +
+                       (double)InterpQuat.x * Q2->w) -
+                      (double)InterpQuat.z * Q2->y;
+    InterpQuat.z = Rz;
+    InterpQuat.w = Rw;
+    InterpQuat.x = (float)Rx;
+    InterpQuat.y = (float)Ry;
+    InterpQuat.set_matrix(OutMatrix);
 }
 
 // ============================================================================
@@ -1058,26 +1062,26 @@ void IVP_Real_Object::calc_at_time(IVP_Time Time, IVP_U_Quat* OutQuat, IVP_U_Poi
 
     // OutQuat * q_core_f_object inlined with its own summation order; every
     // read precedes the first store; stores go z, w, x, y.
-    if (q_core_f_object != nullptr)
-    {
-        const IVP_U_Quat* Q2 = q_core_f_object;
-        const double Ry = (((double)OutQuat->w * Q2->y + (double)OutQuat->z * Q2->x) +
-                           (double)OutQuat->y * Q2->w) -
-                          (double)OutQuat->x * Q2->z;
-        const float Rz = (float)((((double)OutQuat->w * Q2->z + (double)Q2->w * OutQuat->z) +
-                                  (double)Q2->y * OutQuat->x) -
-                                 (double)OutQuat->y * Q2->x);
-        const float Rw = (float)((((double)OutQuat->w * Q2->w - (double)OutQuat->x * Q2->x) -
-                                  (double)Q2->y * OutQuat->y) -
-                                 (double)OutQuat->z * Q2->z);
-        const double Rx = (((double)OutQuat->x * Q2->w + (double)OutQuat->y * Q2->z) +
-                           (double)OutQuat->w * Q2->x) -
-                          (double)Q2->y * OutQuat->z;
-        OutQuat->z = Rz;
-        OutQuat->w = Rw;
-        OutQuat->x = (float)Rx;
-        OutQuat->y = (float)Ry;
-    }
+    if (q_core_f_object == nullptr)
+        return;
+
+    const IVP_U_Quat* Q2 = q_core_f_object;
+    const double Ry = (((double)OutQuat->w * Q2->y + (double)OutQuat->z * Q2->x) +
+                       (double)OutQuat->y * Q2->w) -
+                      (double)OutQuat->x * Q2->z;
+    const float Rz = (float)((((double)OutQuat->w * Q2->z + (double)Q2->w * OutQuat->z) +
+                              (double)Q2->y * OutQuat->x) -
+                             (double)OutQuat->y * Q2->x);
+    const float Rw = (float)((((double)OutQuat->w * Q2->w - (double)OutQuat->x * Q2->x) -
+                              (double)Q2->y * OutQuat->y) -
+                             (double)OutQuat->z * Q2->z);
+    const double Rx = (((double)OutQuat->x * Q2->w + (double)OutQuat->y * Q2->z) +
+                       (double)OutQuat->w * Q2->x) -
+                      (double)Q2->y * OutQuat->z;
+    OutQuat->z = Rz;
+    OutQuat->w = Rw;
+    OutQuat->x = (float)Rx;
+    OutQuat->y = (float)Ry;
 }
 
 // ============================================================================
@@ -1099,7 +1103,7 @@ void IVP_Real_Object::EnsureInSimulation()
 {
     if (static_cast<uint8_t>(flags) == 8)
     {
-        IVP_Environment_Enqueue_Core(environment, friction_core);
+        environment->add_revive_core(friction_core);
         return;
     }
     core->update_time_of_last_motion();
@@ -1341,7 +1345,7 @@ void* IVP_SurfaceManager_Default::get_single_convex()
 }
 
 // Slot 1 (063623d0): zeroes three floats and returns the pointer. Used by
-// IVP_InitCoreRestStateAndDamping when there is no centre-of-mass override.
+// IVP_Real_Object::init_core_rest_state_and_damping when there is no centre-of-mass override.
 float* IVP_SurfaceManager_Default::get_mass_center(float* OutVec3)
 {
     OutVec3[0] = 0.0f;
@@ -1414,7 +1418,7 @@ IVP_SurfaceManager* IVP_GetDefaultSurfaceManager()
 // The two IVP_Real_Object leaves, IVP_Polygon (object_type 2) and IVP_Ball
 // (object_type 3); see ivp_real_object.h. Both constructors: base ctor
 // FUN_06345100, vptr, object_type, extra_radius, then FUN_06345b20
-// (IVP_InitCoreRestStateAndDamping) with (Father->environment, Parms), then
+// (IVP_Real_Object::init_core_rest_state_and_damping) with (Father->environment, Parms), then
 // FUN_0634cea0 (object listeners slot 1) with a stack {Core->Environment,
 // this} -- the record FUN_0634b480 also builds
 // (IVP_Environment_Object_Notify_Event). No null tests.
@@ -1432,7 +1436,7 @@ IVP_Polygon::IVP_Polygon(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager
     // A plain dword copy (IVP_Ball adds its radius).
     extra_radius = Parms->ExtraRadius;
 
-    IVP_InitCoreRestStateAndDamping(this, Father->environment, Parms);
+    init_core_rest_state_and_damping(Father->environment, Parms);
 
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
@@ -1457,7 +1461,7 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
     // A real float addition (IVP_Polygon copies).
     extra_radius = Parms->ExtraRadius + *Radius;
 
-    IVP_InitCoreRestStateAndDamping(this, Father->environment, Parms);
+    init_core_rest_state_and_damping(Father->environment, Parms);
 
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
@@ -1480,11 +1484,11 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
 //     the radius just stored as UpperLimitRadius. Retail stashes object_type
 //     in [ESP+0x1c] for this second switch because EBP is reused.
 // ============================================================================
-void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Environment,
-                                     const IVP_RealObjectConstructionTemplate* Template)
+void IVP_Real_Object::init_core_rest_state_and_damping(IVP_Environment* Environment,
+                                                       const IVP_RealObjectConstructionTemplate* Template)
 {
     IVP_U_Matrix LocalCsys; // the rows' trivial constructor (eh vector ctor, 3 x 0x10)
-    const int32_t ObjectType = Self->object_type; // kept in [ESP+0x1c] for both switches
+    const int32_t ObjectType = object_type; // kept in [ESP+0x1c] for both switches
 
     // Rotation: identity, applied by set_matrix after the translation is
     // fetched. set_matrix writes the three rows only.
@@ -1502,13 +1506,13 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
     }
     else
     {
-        Self->surface_manager->get_mass_center(&LocalCsys.vv.k[0]);
+        surface_manager->get_mass_center(&LocalCsys.vv.k[0]);
     }
     IdentityLocalQuat.set_matrix(&LocalCsys); // FUN_06350bc0
 
-    Self->ApplyLocalCsys(&LocalCsys); // slot 2
+    ApplyLocalCsys(&LocalCsys); // slot 2
 
-    IVP_Core* const Core = Self->core; // loaded after the call
+    IVP_Core* const Core = core; // loaded after the call
 
     // UpperLimitRadius / MaxSurfaceDeviation addends (FUN_06346870).
     float SurfaceRadius = 0.0f;
@@ -1522,7 +1526,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
         // Slot 2 (adapter LAB_0634acb0): D = |Inner.center - centre|; writes
         // D + Inner.radius to the first output and D + kind * radius *
         // DAT_063a54b4 to the second. No null test on surface_manager.
-        Self->surface_manager->get_radius_and_radius_dev_to_given_center(
+        surface_manager->get_radius_and_radius_dev_to_given_center(
             const_cast<IVP_U_Point*>(&LocalCsys.vv), &SurfaceRadius, &MaxSurfaceDeviationValue);
     }
     else
@@ -1532,7 +1536,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
 
     // The sum is rounded into the addend's own stack slot and reused below as
     // the sphere radius.
-    const float Radius = Self->extra_radius + SurfaceRadius;
+    const float Radius = extra_radius + SurfaceRadius;
     Core->SetRadius(Radius, MaxSurfaceDeviationValue); // FUN_06346870
 
     // ---- mass and rotation inertia ----
@@ -1558,7 +1562,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
         {
             // Surface manager slot 3 (adapter LAB_0634ac90). No null test.
             IVP_U_Point Scratch;
-            Self->surface_manager->get_rotation_inertia(&Scratch);
+            surface_manager->get_rotation_inertia(&Scratch);
             ScaleScratch[0] = Scratch.x;
             ScaleScratch[1] = Scratch.y;
             ScaleScratch[2] = Scratch.z;
@@ -1930,7 +1934,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     if (Template->ClientData != nullptr)
         Object->client_data = Template->ClientData;
     Object->extra_radius = Template->ExtraRadius;
-    IVP_InitCoreRestStateAndDamping(Object, Env, Template); // 06345b20(Env, Template)
+    Object->init_core_rest_state_and_damping(Env, Template); // 06345b20(Env, Template)
 
     // Retail quirk kept: OldCore is null here when the old core held only this
     // object, and retail still reads its +0x60 (an access violation), so retail
@@ -1954,35 +1958,35 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     IVP_U_Vector_Fixed<IVP_Hull_Manager, 0x80> ActiveHullManagers;
 
     NewCore = Object->core;
-    if ((NewCore->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
+    if ((NewCore->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
+        return;
+
+    IVP_Hull_Manager& Hull = Object->hull_manager;
+    Hull.OuterGradient = 0.0f;
+    Hull.InnerGradient = 0.0f;
+    const float Value = (float)((double)(ShiftLength) + Hull.AccumulatedDeltaA);
+    Hull.AccumulatedDeltaA = Value;
+    Hull.OuterValueAtLastEdit = Value;
+
+    IVP_Event_Sim EventSim;
+    if (DeltaPsi > 1e-10f) // DAT_063a53d8
     {
-        IVP_Hull_Manager& Hull = Object->hull_manager;
-        Hull.OuterGradient = 0.0f;
-        Hull.InnerGradient = 0.0f;
-        const float Value = (float)((double)(ShiftLength) + Hull.AccumulatedDeltaA);
-        Hull.AccumulatedDeltaA = Value;
-        Hull.OuterValueAtLastEdit = Value;
-
-        IVP_Event_Sim EventSim;
-        if (DeltaPsi > 1e-10f) // DAT_063a53d8
-        {
-            EventSim.delta_time = DeltaPsi;
-            EventSim.i_delta_time = (float)(1.0 / (double)(DeltaPsi)); // DAT_063a53d0 = 1.0f
-        }
-        else
-        {
-            EventSim.delta_time = Env->delta_time;
-            EventSim.i_delta_time = Env->inv_delta_time;
-        }
-        EventSim.environment = Env;
-        // +0x0c (sim_unit) is not written, as in retail; calc_next_PSI_matrix
-        // reads only +0x00/+0x04.
-
-        IVP_Calc_Next_PSI_Solver Solver(NewCore);
-        Solver.calc_next_PSI_matrix(&EventSim, &ActiveHullManagers);
-        NewCore->OldSyncInfo = nullptr;
-        IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(Env, &ActiveHullManagers);
-        Object->recalc_exact_mindists();
-        Object->recheck_mindists_of_other_cores();
+        EventSim.delta_time = DeltaPsi;
+        EventSim.i_delta_time = (float)(1.0 / (double)(DeltaPsi)); // DAT_063a53d0 = 1.0f
     }
+    else
+    {
+        EventSim.delta_time = Env->delta_time;
+        EventSim.i_delta_time = Env->inv_delta_time;
+    }
+    EventSim.environment = Env;
+    // +0x0c (sim_unit) is not written, as in retail; calc_next_PSI_matrix
+    // reads only +0x00/+0x04.
+
+    IVP_Calc_Next_PSI_Solver Solver(NewCore);
+    Solver.calc_next_PSI_matrix(&EventSim, &ActiveHullManagers);
+    NewCore->OldSyncInfo = nullptr;
+    IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(Env, &ActiveHullManagers);
+    Object->recalc_exact_mindists();
+    Object->recheck_mindists_of_other_cores();
 }

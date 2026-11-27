@@ -192,7 +192,7 @@ unsigned long DACOM_API FAnimationObject::PlayScript(void* InScript, InstanceInd
     Record.Script = nullptr;
     Record.CloneTypedChannels(Entry);
     Record.Script = Script;
-    BindPlaybackTracks(&Record, Root, Sink, SinkContext);
+    Record.BindTracks(Root, Sink, SinkContext);
     std::vector<FTypedChannel*>::iterator Cursor = Record.Typed.begin();
     while (Cursor != Record.Typed.end())
     {

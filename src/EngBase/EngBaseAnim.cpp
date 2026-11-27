@@ -426,19 +426,18 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
 }
 
 // FUN_066124e0. Record +4 is Root.
-void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Sink,
-                        void* SinkContext)
+void FAnimPlayback::BindTracks(FEngineInstance* Root, void* Sink, void* SinkContext)
 {
-    Playback->Root = Root;
-    Playback->LongestTyped = nullptr;
+    this->Root = Root;
+    LongestTyped = nullptr;
     float BestDuration = -1.0f;
-    if (Playback->Typed.empty())
+    if (this->Typed.empty())
         return;
-    std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
+    std::vector<FTypedChannel*>::iterator Cursor = this->Typed.begin();
     // The track cursor walks the name value's vector (+0x14 first) alongside, advancing once
     // per iteration whether or not the channel was kept.
-    FAnimTrack* Track = Playback->Name->Tracks.data();
-    while (Cursor != Playback->Typed.end())
+    FAnimTrack* Track = Name->Tracks.data();
+    while (Cursor != this->Typed.end())
     {
         FAnimBindOut Bind;
         Bind.Kind = G_BindKindRoot;
@@ -460,7 +459,7 @@ void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Si
             Track->Channel->GetDuration(&Duration);
             if (BestDuration < Duration)
             {
-                Playback->LongestTyped = *Cursor;
+                LongestTyped = *Cursor;
                 BestDuration = Duration;
             }
             ++Cursor;
@@ -476,7 +475,7 @@ void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Si
                     char Message[0x2000];
                     _snprintf(Message, sizeof(Message),
                               "%s failed to map JOINT (parent: %s, child: %s) channel",
-                              Playback->Name->Name, Parent, Child);
+                              Name->Name, Parent, Child);
                     Message[sizeof(Message) - 1] = '\0';
                     EngBaseFdump(kFdumpWarning, G_FdumpFileAnim, 0x2F5, "WARNING", Message);
                 }
@@ -485,7 +484,7 @@ void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Si
                     const char* Parent = Track->ParentName != nullptr ? Track->ParentName : "";
                     char Message[0x2000];
                     _snprintf(Message, sizeof(Message), "%s failed to map OBJECT (%s) channel",
-                              Playback->Name->Name, Parent);
+                              Name->Name, Parent);
                     Message[sizeof(Message) - 1] = '\0';
                     EngBaseFdump(kFdumpWarning, G_FdumpFileAnim, 0x2FA, "WARNING", Message);
                 }
@@ -500,7 +499,7 @@ void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Si
                 }
                 ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.
             }
-            Cursor = Playback->Typed.erase(Cursor);
+            Cursor = this->Typed.erase(Cursor);
         }
         ++Track;
     }

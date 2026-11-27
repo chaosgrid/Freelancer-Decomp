@@ -893,24 +893,24 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
             MissionNpcs.insert(std::map<unsigned int, FMsnNpc>::value_type(Nickname.Id, Npc));
             continue;
         }
-        if (Reader->is_header("Dialog"))
+        if (!Reader->is_header("Dialog"))
+            continue;
+
+        // Every "line" spoken to "Player": the speaker's costume goes into +0x31c.
+        while (Reader->read_value())
         {
-            // Every "line" spoken to "Player": the speaker's costume goes into +0x31c.
-            while (Reader->read_value())
-            {
-                if (!Reader->is_value("line"))
-                    continue;
-                if (_stricmp(Reader->get_value_string(1), "Player") != 0)
-                    continue;
-                TString<0x30> Speaker;
-                Speaker.Length = 0;
-                Speaker.Data[0] = '\0';
-                Speaker = Reader->get_value_string(0);
-                Costume* const SpeakerCostume = GetMissionCostume(&Speaker);
-                if (SpeakerCostume == nullptr)
-                    continue;
-                AddDialogCostume(SpeakerCostume);
-            }
+            if (!Reader->is_value("line"))
+                continue;
+            if (_stricmp(Reader->get_value_string(1), "Player") != 0)
+                continue;
+            TString<0x30> Speaker;
+            Speaker.Length = 0;
+            Speaker.Data[0] = '\0';
+            Speaker = Reader->get_value_string(0);
+            Costume* const SpeakerCostume = GetMissionCostume(&Speaker);
+            if (SpeakerCostume == nullptr)
+                continue;
+            AddDialogCostume(SpeakerCostume);
         }
     }
 }
@@ -1724,16 +1724,16 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                     NnPath.Load(Reader, this);
                     continue;
                 }
-                if (MadLib != nullptr)
-                {
-                    MadLib->destroy();
-                    MadLib->Head = nullptr;
-                    MadLib->MadLibId = 0;
-                    for (int Index = 0; Index < FmtStr::KindCount; ++Index)
-                        MadLib->ValueIndex[Index] = 0;
-                    MadLib->begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
-                    MadLib->end_mad_lib();
-                }
+                if (MadLib == nullptr)
+                    continue;
+
+                MadLib->destroy();
+                MadLib->Head = nullptr;
+                MadLib->MadLibId = 0;
+                for (int Index = 0; Index < FmtStr::KindCount; ++Index)
+                    MadLib->ValueIndex[Index] = 0;
+                MadLib->begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
+                MadLib->end_mad_lib();
             }
             continue;
         }

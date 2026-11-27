@@ -158,14 +158,14 @@ namespace
     GENRESULT DACOM_API FLFxMesh::SetTransform(const Transform* Xform)
     {
         // LAB_004f6910 (RET 8).
-        ClientMeshHolderSetMatrix(this, Xform);
+        SetMatrix(Xform);
         return GR_OK;
     }
 
     const Transform* DACOM_API FLFxMesh::GetTransform()
     {
         // LAB_004f6930 (RET 4).
-        return ClientMeshHolderGetTransform(this);
+        return FMeshHolder::GetTransform();
     }
 
     GENRESULT DACOM_API FLFxMesh::Update(void* Arg)
@@ -185,7 +185,7 @@ namespace
         FFxMeshRenderState ZFunc(0x17);
         ZFunc.Pipe->SetRenderState((D3DRENDERSTATETYPE)ZFunc.State, 4);
 
-        ClientMeshHolderRender(this, Camera, 0x100u);
+        FMeshHolder::Render(Camera, 0x100u);
 
         // The guards restore ZFUNC, then ZWRITEENABLE.
         return GR_OK;
@@ -287,9 +287,9 @@ namespace
 
         *Out = Mesh;
         const ArchetypeIndex Loaded = ArchHandle;
-        ClientMeshHolderSetMaterials(Mesh, Path.Text, nullptr);
-        ClientMeshHolderBindInstance(Mesh, Loaded);
-        ClientMeshHolderSetPosition(Mesh, reinterpret_cast<Vector const*>(Position));
+        Mesh->SetMaterials(Path.Text, nullptr);
+        Mesh->BindInstance(Loaded);
+        Mesh->SetPosition(reinterpret_cast<Vector const*>(Position));
         DALib::Engine->ReleaseHandle(Loaded);
         return GR_OK;
     }

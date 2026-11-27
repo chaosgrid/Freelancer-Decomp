@@ -2736,25 +2736,25 @@ void PlayerDB::DeleteAccount(CiWString& AccountName) {
         FDUMP(kFdumpNotice, "LOG: Delete account %S \"%s\"\n", NamePtr, AccountDir);
     }
 
-    if (Account != nullptr) {
-        Account->ForceLogout();
+    if (Account == nullptr)
+        return;
+    Account->ForceLogout();
 
-        // Retail rebuilds each "<hash>.fl" key from the account's character list and
-        // erases it from the character-id map; erasing by stored pointer is equivalent.
-        std::map<CiString, CAccount*>::iterator CharIt =
-            m_CharacterIDMap.begin();
-        while (CharIt != m_CharacterIDMap.end()) {
-            if (CharIt->second == Account) {
-                m_CharacterIDMap.erase(CharIt++);
-            } else {
-                ++CharIt;
-            }
+    // Retail rebuilds each "<hash>.fl" key from the account's character list and
+    // erases it from the character-id map; erasing by stored pointer is equivalent.
+    std::map<CiString, CAccount*>::iterator CharIt =
+        m_CharacterIDMap.begin();
+    while (CharIt != m_CharacterIDMap.end()) {
+        if (CharIt->second == Account) {
+            m_CharacterIDMap.erase(CharIt++);
+        } else {
+            ++CharIt;
         }
-
-        m_AccountNameMap.erase(It);
-
-        delete Account;
     }
+
+    m_AccountNameMap.erase(It);
+
+    delete Account;
 }
 
 // Account/character hashes use Server_AccountCrc (server_playerdb.cpp, server_savefile.h):

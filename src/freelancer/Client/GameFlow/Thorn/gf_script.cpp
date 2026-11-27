@@ -328,7 +328,7 @@ void GfLightsSelectNearest(FGfLightWrapper* const* List, int Count, float const*
 
         // FUN_00411370, then FUN_005586f0.
         Vector Dir;
-        Vector* DirOut = EngineLightComputeDirection(Light, &Dir, nullptr, nullptr);
+        Vector* DirOut = Light->ComputeDirection(&Dir, nullptr, nullptr);
         float Score = 0.0f;
         if (!GfLightScore(&Light->D3d, &Light->Position.x, DirOut, Pos3, Radius, &Score))
             continue;

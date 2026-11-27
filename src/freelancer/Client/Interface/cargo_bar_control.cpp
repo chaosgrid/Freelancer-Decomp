@@ -78,14 +78,14 @@ void ToolTipHoverSetCaption(FToolTipHoverInfo* Info, wchar_t const* Text)
 
 // FUN_00444ee0, the record's destructor: the Font::String at +0x10, then the caption buffer at
 // +0x08. Runs as ~FToolTipHoverInfo, so the stack records below need no teardown call.
-void ToolTipHoverDestroy(FToolTipHoverInfo* Info)
+void FToolTipHoverInfo::Destroy()
 {
-    FontStringDestroy(&Info->Text);
-    if (Info->CaptionW != nullptr)
+    Text.Destroy();
+    if (CaptionW != nullptr)
     {
-        free(Info->CaptionW);
-        Info->CaptionW = nullptr;
-        Info->CaptionCapacity = 0;
+        free(CaptionW);
+        CaptionW = nullptr;
+        CaptionCapacity = 0;
     }
 }
 
@@ -254,18 +254,18 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
             memcpy(Color, Rgba, sizeof(Color));
             continue;
         }
-        if (Ini->is_value("color_highlight"))
-        {
-            double const V2 = Ini->get_value_float(2);
-            double const V1 = Ini->get_value_float(1);
-            double const V0 = Ini->get_value_float(0);
-            unsigned char Rgba[4];
-            Rgba[0] = static_cast<unsigned char>(static_cast<int>(V0));
-            Rgba[1] = static_cast<unsigned char>(static_cast<int>(V1));
-            Rgba[2] = static_cast<unsigned char>(static_cast<int>(V2));
-            Rgba[3] = static_cast<unsigned char>(static_cast<int>(Ini->get_value_float(3)));
-            memcpy(HighlightColor, Rgba, sizeof(HighlightColor));
-        }
+        if (!Ini->is_value("color_highlight"))
+            continue;
+
+        double const V2 = Ini->get_value_float(2);
+        double const V1 = Ini->get_value_float(1);
+        double const V0 = Ini->get_value_float(0);
+        unsigned char Rgba[4];
+        Rgba[0] = static_cast<unsigned char>(static_cast<int>(V0));
+        Rgba[1] = static_cast<unsigned char>(static_cast<int>(V1));
+        Rgba[2] = static_cast<unsigned char>(static_cast<int>(V2));
+        Rgba[3] = static_cast<unsigned char>(static_cast<int>(Ini->get_value_float(3)));
+        memcpy(HighlightColor, Rgba, sizeof(HighlightColor));
     }
     return bResult;
 }

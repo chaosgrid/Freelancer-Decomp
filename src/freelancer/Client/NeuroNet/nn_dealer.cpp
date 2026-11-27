@@ -217,16 +217,16 @@ void NnDealer::CreateControls()
         }
 
         // "ItemGoodDeal0%d" -- the commodity dealer (trade mode 1) only.
-        if (TradeMode == kTradeModeCommodity)
-        {
-            sprintf(Name, "ItemGoodDeal0%d", Number);
-            Vector const DealPosition = {1.201f, QuantityY, 0.0001f}; // 0x38d1b717
-            Vector const DealHalfExtents = {0.012f, 0.012f, 0.0f};
-            Vector const DealVector338 = {0.0f, 0.0f, 0.0f};
-            CreateStaticControl(Name, "Interface\\NeuroNet\\Inventory\\INV_green_square.3db",
-                                &DealPosition, nullptr, &DealHalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                0, &DealVector338); // FUN_005a0db0
-        }
+        if (TradeMode != kTradeModeCommodity)
+            continue;
+
+        sprintf(Name, "ItemGoodDeal0%d", Number);
+        Vector const DealPosition = {1.201f, QuantityY, 0.0001f}; // 0x38d1b717
+        Vector const DealHalfExtents = {0.012f, 0.012f, 0.0f};
+        Vector const DealVector338 = {0.0f, 0.0f, 0.0f};
+        CreateStaticControl(Name, "Interface\\NeuroNet\\Inventory\\INV_green_square.3db",
+                            &DealPosition, nullptr, &DealHalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                            0, &DealVector338); // FUN_005a0db0
     }
 
     // The info card (FUN_005a10e0). "InfoCard_Info" is not kept; the three
@@ -1564,13 +1564,13 @@ void NnDealer::SortMarketGoodsByName(std::list<FClientMarketGood const*>* Goods)
                      _wcsicmp(&Names[static_cast<size_t>(A.NameIndex) * 0x40],
                               &Names[static_cast<size_t>(B.NameIndex) * 0x40]) > 0)
                 bSwap = true;
-            if (bSwap)
-            {
-                FNnDealerNameSortRecord const Saved = A;
-                A = B;
-                B = Saved;
-                bSorted = false;
-            }
+            if (!bSwap)
+                continue;
+
+            FNnDealerNameSortRecord const Saved = A;
+            A = B;
+            B = Saved;
+            bSorted = false;
         }
     }
 
@@ -1679,13 +1679,13 @@ void NnDealer::SortEquipmentMarketGoods(std::list<FClientMarketGood const*>* Goo
                         bSwap = true;
                 }
             }
-            if (bSwap)
-            {
-                FNnDealerEquipSortRecord const Saved = A;
-                A = B;
-                B = Saved;
-                bSorted = false;
-            }
+            if (!bSwap)
+                continue;
+
+            FNnDealerEquipSortRecord const Saved = A;
+            A = B;
+            B = Saved;
+            bSorted = false;
         }
     }
 

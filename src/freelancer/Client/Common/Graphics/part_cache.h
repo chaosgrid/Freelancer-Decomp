@@ -20,6 +20,7 @@
 
 struct IVMeshWire;
 struct IMesh;
+struct ICamera;
 
 // One part record — retail size 0x1c (LAB_00405f80 ctor).
 #pragma pack(push, 1)
@@ -43,6 +44,18 @@ struct FPartCacheEntry
     unsigned char bActive;          // +0x19  ctor=1; ActivatePart sets 1
     unsigned char Field1A;          // +0x1A  ctor=0
     unsigned char bSkipWeightTest;  // +0x1B  IMesh path weight cull gate
+
+    // FUN_004058b0 — free one entry's vertex/index buffers.
+    void Destroy();
+
+    // FUN_00405fb0 — VMeshWire path: weld part verts through TransformXform.
+    void BuildFromWire(IVMeshWire* Wire, Transform const* Xform);
+
+    // FUN_00406230 — IMesh path: walk groups, weld positions (channel 0x100).
+    unsigned BuildFromMesh(IMesh* Mesh, Transform const* Xform);
+
+    // FUN_00406200 — call BuildFromMesh twice; store first return in Entry->IndexCount.
+    void BuildFromMeshTwice(IMesh* Mesh, Transform const* Xform);
 };
 #pragma pack(pop)
 
@@ -57,6 +70,24 @@ struct FPartCache
     unsigned TotalIndices;          // +0x08
     unsigned TotalVertices;         // +0x0C
     unsigned short* MergedIndices;  // +0x10
+
+    // FUN_004058e0 — destroy all entries + merged IB.
+    void Clear();
+
+    // FUN_00405b10 — rebuild whole hierarchy cache for Instance with Tag color.
+    // Returns true on success (TotalIndices <= 16000); false on invalid instance or overflow.
+    bool Build(InstanceIndex Instance, unsigned Tag);
+
+    // FUN_00405930 — mark part (and optional children) hidden.
+    void MarkHidden(InstanceIndex Instance, bool bRecurseChildren);
+
+    // FUN_004059d0 — clear bActive on non-root parts that are hidden.
+    void ClearHiddenActive();
+
+    // FUN_00405a00 — activate part, optionally retag vertices; recurse children if asked.
+    // Returns true if the instance was found in the cache.
+    bool ActivatePart(InstanceIndex Instance, bool bRecurseChildren, unsigned Tag);
+    void Draw(ICamera* Camera, Transform const* Xform);
 };
 
 // FUN_004061a0 — byte size of packed FVF texcoord block.
@@ -65,44 +96,12 @@ int FvfTexcoordBlockBytes(unsigned Fvf);
 // FUN_00406880 — copy 12 dwords (Transform / instance matrix).
 void CopyTransform12(Transform* Dest, Transform const* Source);
 
-// FUN_004058b0 — free one entry's vertex/index buffers.
-void PartCacheEntryDestroy(FPartCacheEntry* Entry);
-
 // LAB_00405f80 — zero-init one entry.
 void PartCacheEntryConstruct(FPartCacheEntry* Entry);
-
-// FUN_004058e0 — destroy all entries + merged IB.
-void PartCacheClear(FPartCache* Cache);
-
-// FUN_00405fb0 — VMeshWire path: weld part verts through TransformXform.
-void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform const* Xform);
-
-// FUN_00406230 — IMesh path: walk groups, weld positions (channel 0x100).
-unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform);
-
-// FUN_00406200 — call BuildFromMesh twice; store first return in Entry->IndexCount.
-void PartCacheBuildFromMeshTwice(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform);
-
-// FUN_00405b10 — rebuild whole hierarchy cache for Instance with Tag color.
-// Returns true on success (TotalIndices <= 16000); false on invalid instance or overflow.
-bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag);
-
-// FUN_00405930 — mark part (and optional children) hidden.
-void PartCacheMarkHidden(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren);
-
-// FUN_004059d0 — clear bActive on non-root parts that are hidden.
-void PartCacheClearHiddenActive(FPartCache* Cache);
-
-// FUN_00405a00 — activate part, optionally retag vertices; recurse children if asked.
-// Returns true if the instance was found in the cache.
-bool PartCacheActivatePart(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren, unsigned Tag);
 
 // FUN_00406510 (thiscall on the cache, RET 8) — draw the active parts as one line list (FVF
 // 0x42, XYZ + diffuse tag), untextured and unlit. Caller: HUD_Target's target view (the view
 // camera +0x3b8, the object's transform).
-struct ICamera;
-void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform);
-
 // The instance -> saved LOD map FUN_00402580 fills and FUN_00402720 replays (retail VC6
 // std::map<long,int>, 0x18-byte nodes: key +0xc, value +0x10; ctor FUN_004e7f60, destroy
 // FUN_004e7e70 / FUN_004e7f20, insert FUN_00402790, iterator ++ FUN_0052afa0).

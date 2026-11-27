@@ -274,12 +274,12 @@ void FContentPlayerState::RecalculateRank()
         pub::Player::SetRank(PlayerId, static_cast<int>(TableRank));
 }
 
-void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
+void FContentPlayerState::Load(INI_Reader* Reader)
 {
     // Content.dll FUN_06f483d0: both collections are empty after construction,
     // and the retail loader erases their full old ranges before scanning.
-    State->Vnpcs.clear();
-    State->Rumors.clear();
+    Vnpcs.clear();
+    Rumors.clear();
 
     INI_Reader::State SavedState;
     Reader->get_state(SavedState);
@@ -291,7 +291,7 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
             {
                 if (Reader->is_value("locked_gate"))
                 {
-                    RegisterContentGateLock(State->PlayerId,
+                    RegisterContentGateLock(PlayerId,
                                             static_cast<unsigned int>(Reader->get_value_int(0)));
                 }
                 else if (Reader->is_value("vnpc"))
@@ -301,38 +301,38 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                     Record.MissionState = static_cast<unsigned int>(Reader->get_value_int(3));
                     Record.TalkCount = static_cast<unsigned int>(Reader->get_value_int(2));
                     Record.BaseId = static_cast<unsigned int>(Reader->get_value_int(0));
-                    State->Vnpcs.push_back(Record);
+                    Vnpcs.push_back(Record);
                 }
                 else if (Reader->is_value("can_dock"))
                 {
-                    State->bCanDock = Reader->get_value_bool(0) ? 1 : 0;
+                    bCanDock = Reader->get_value_bool(0) ? 1 : 0;
                 }
                 else if (Reader->is_value("dock_exception"))
                 {
-                    State->DockExceptions.push_back(
+                    DockExceptions.push_back(
                         static_cast<unsigned int>(Reader->get_value_int(0)));
                 }
                 else if (Reader->is_value("can_tl"))
                 {
-                    State->bCanTradelane = Reader->get_value_bool(0) ? 1 : 0;
+                    bCanTradelane = Reader->get_value_bool(0) ? 1 : 0;
                 }
                 else if (Reader->is_value("tlr_exception"))
                 {
                     FTlrException Record = {};
                     Record.FirstRingId = static_cast<unsigned int>(Reader->get_value_int(0));
                     Record.SecondRingId = static_cast<unsigned int>(Reader->get_value_int(1));
-                    State->TradelaneExceptions.push_back(Record);
+                    TradelaneExceptions.push_back(Record);
                 }
                 else if (Reader->is_value("rumor"))
                 {
                     FRumorRecord Record;
                     Record.Count = static_cast<unsigned int>(Reader->get_value_int(1));
                     Record.RumorId = static_cast<unsigned int>(Reader->get_value_int(0));
-                    State->Rumors.push_back(Record);
+                    Rumors.push_back(Record);
                 }
                 else
                 {
-                    LoadContentPlayerStatsValue(State->Stats, Reader);
+                    LoadContentPlayerStatsValue(Stats, Reader);
                 }
             }
         }
@@ -353,20 +353,20 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                 CreateRandomMissionLoader(MissionType, &Loader);
 
                 FRandomMissionData* Mission = nullptr;
-                if (Loader->Load(Reader, &Mission, State->PlayerId))
+                if (Loader->Load(Reader, &Mission, PlayerId))
                 {
                     unsigned int ControllerId = pub::Controller::Create(
                         "content.dll", MissionType, Mission, pub::Controller::ABOVE_NORMAL);
-                    State->LiveMissionId = ControllerId;
+                    LiveMissionId = ControllerId;
 
                     FRandomMissionAttachMessage AttachMessage;
                     AttachMessage.MissionControllerId = ControllerId;
-                    AttachMessage.PlayerId = State->PlayerId;
+                    AttachMessage.PlayerId = PlayerId;
                     unsigned int BroadcastFlid = 0;
                     pub::Controller::_SendMessage(BroadcastFlid,
                                                   pub::Controller::EMessage::PlayerMissionChanged,
                                                   &AttachMessage);
-                    pub::Player::SetMsnID(State->PlayerId, ControllerId, State->PlayerId, false,
+                    pub::Player::SetMsnID(PlayerId, ControllerId, PlayerId, false,
                                          0);
                 }
 
@@ -375,12 +375,11 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
         }
     }
 
-    State->RecalculateRank();                                      // FUN_06f49440
+    RecalculateRank();                                       // FUN_06f49440
     Reader->set_state(SavedState);
 }
 
-void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int MissionNumber,
-                                   unsigned int bAdvanceRank)
+void FContentPlayerState::SetMissionNumber(unsigned int MissionNumber, unsigned int bAdvanceRank)
 {
     if ((bAdvanceRank & 0xffu) != 0)
     {
@@ -406,8 +405,8 @@ void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int Miss
         case kStoryChapterComplete:
         {
             int Rank;
-            pub::Player::GetRank(State->PlayerId, Rank);
-            pub::Player::SetRank(State->PlayerId, Rank + 1);
+            pub::Player::GetRank(PlayerId, Rank);
+            pub::Player::SetRank(PlayerId, Rank + 1);
             break;
         }
         default:
@@ -415,5 +414,5 @@ void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int Miss
         }
     }
 
-    State->MissionNumber = MissionNumber;
+    this->MissionNumber = MissionNumber;
 }

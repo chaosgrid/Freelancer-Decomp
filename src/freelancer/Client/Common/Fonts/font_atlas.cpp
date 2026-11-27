@@ -257,10 +257,10 @@ void FontAtlasSetDrawColor(unsigned PackedArgb)
     G_AtlasDrawColor = PackedArgb;
 }
 
-unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeCheck)
+unsigned char FontStringChild::Rasterize(unsigned char bSkipSizeCheck)
 {
     // FUN_004127d0 (thiscall on a FontString, RET 4).
-    if (This->Font_ == nullptr)
+    if (Font_ == nullptr)
     {
         return 0;
     }
@@ -269,7 +269,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     // +0x14 is read below. The grid is checked and built with the Check extents, the text
     // drawn with the raw ones.
     int Size[2];
-    This->GetSize(Size);
+    GetSize(Size);
     int const RawW = Size[0];
     int const RawH = Size[1];
     unsigned CheckW = static_cast<unsigned>(RawW);
@@ -290,10 +290,10 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     // An existing grid is kept when its first row's widths and first column's heights cover
     // the checked extents; with the head's content height equal to the raw height it needs no
     // redraw. A grid that does not cover goes back to the pool (FUN_00413e80 inlined).
-    if (This->GlyphHead_ != nullptr)
+    if (GlyphHead_ != nullptr)
     {
         unsigned SumW = 0;
-        for (FFontAtlasPage* Page = This->GlyphHead_; Page != nullptr; Page = Page->NextX)
+        for (FFontAtlasPage* Page = GlyphHead_; Page != nullptr; Page = Page->NextX)
         {
             SumW += Page->PageW;
         }
@@ -301,7 +301,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
         if (bCovers)
         {
             unsigned SumH = 0;
-            for (FFontAtlasPage* Page = This->GlyphHead_; Page != nullptr; Page = Page->NextY)
+            for (FFontAtlasPage* Page = GlyphHead_; Page != nullptr; Page = Page->NextY)
             {
                 SumH += Page->PageH;
             }
@@ -309,20 +309,20 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
         }
         if (bCovers)
         {
-            if (This->GlyphHead_->ContentH == static_cast<unsigned>(RawH))
+            if (GlyphHead_->ContentH == static_cast<unsigned>(RawH))
             {
                 return 1;
             }
         }
         else
         {
-            FontAtlasFreePages(This->GlyphHead_);
+            FontAtlasFreePages(GlyphHead_);
         }
     }
 
     // Build the grid: unsigned clamps, signed loop tests, both limits re-read every step. The
     // pool's result is not tested.
-    if (This->GlyphHead_ == nullptr)
+    if (GlyphHead_ == nullptr)
     {
         FFontAtlasPage* Head = nullptr;
         FFontAtlasPage* RowTail = nullptr;
@@ -364,7 +364,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
                 Previous = Page;
             }
         }
-        This->GlyphHead_ = Head;
+        GlyphHead_ = Head;
         if (Head == nullptr)
         {
             return 0;
@@ -373,8 +373,8 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
 
     // IFont vt+0x0c (LAB_00416570) returns the HFONT, selected without a test.
     unsigned char bOk = 1;
-    FFontAtlasPage* Row = This->GlyphHead_;
-    HFONT const Font = This->Font_->GetHFont();
+    FFontAtlasPage* Row = GlyphHead_;
+    HFONT const Font = Font_->GetHFont();
     FAtlasFontSelection const Selection(G_AtlasDc, Font);
 
     // Row and column counts follow the raw extents alone (no null test on the page links).
@@ -405,8 +405,8 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
 
             // ExtTextOutW goes through the unicows thunk FUN_005b7420 in retail.
             UINT const Length =
-                This->Text_ != nullptr ? static_cast<UINT>(wcslen(This->Text_)) : 0u;
-            if (ExtTextOutW(G_AtlasDc, -SrcX, -SrcY, ETO_OPAQUE, &Clip, This->Text_, Length,
+                Text_ != nullptr ? static_cast<UINT>(wcslen(Text_)) : 0u;
+            if (ExtTextOutW(G_AtlasDc, -SrcX, -SrcY, ETO_OPAQUE, &Clip, Text_, Length,
                             nullptr) == FALSE)
             {
                 FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
@@ -464,7 +464,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
 
     if (bOk != 0)
     {
-        This->GlyphHead_->ContentH = static_cast<unsigned>(RawH);
+        GlyphHead_->ContentH = static_cast<unsigned>(RawH);
     }
     return bOk;
 }

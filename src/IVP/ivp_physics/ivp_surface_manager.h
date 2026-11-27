@@ -86,7 +86,7 @@ public:
 
     // Slot 2 -- three arguments. The default traps; IVP_SurfaceManager_Polygon
     // implements it as (const IVP_U_Point* In, float* OutA, float* OutB), see
-    // IVP_InitCoreRestStateAndDamping. Parameter types stay generic.
+    // IVP_Real_Object::init_core_rest_state_and_damping. Parameter types stay generic.
     virtual void get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3) = 0;
 
     // Slot 3 -- one argument. As slot 2: the polygon manager writes an

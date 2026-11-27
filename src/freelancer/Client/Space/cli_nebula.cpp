@@ -133,7 +133,7 @@ namespace
     // memory.
     void NebulaZoneShellDestroy(FNebulaZoneShell* Shell)
     {
-        ClientMeshHolderRelease(&Shell->Handle);
+        Shell->Handle.Release();
     }
 
     // DAT_0067505c/60/64 is the TexturePanels instance list, not a nebula list; it and its
@@ -211,7 +211,7 @@ namespace
     }
 
     // FUN_005097c0 — ambient GameLight at +0x270: SetPosition, flicker accum, colour/enable.
-    // Called from NebulaUpdate. No test of `this` or of the position pointer.
+    // Called from FNebulaEffect::Update. No test of `this` or of the position pointer.
     void NebulaAmbientTick(FNebulaEffect* Nebula, Vector const* CamPos3)
     {
         // The light at +0x270 is the one pointer retail tests.
@@ -231,7 +231,7 @@ namespace
         if (Period <= 0.0f)
             return;
 
-        EngineLightSetPosition(Light, CamPos3);
+        Light->SetPosition(CamPos3);
 
         // The sum is stored as float but the unrounded value is compared below.
         float const Dt = Nebula->FrameDelta;
@@ -266,7 +266,7 @@ namespace
             Dir.x = static_cast<float>(Z * Inv);
             Dir.y = static_cast<float>(Y * Inv);
             Dir.z = static_cast<float>(static_cast<float>(X) * static_cast<double>(Inv));
-            EngineLightSetDirection(Light, &Dir);
+            Light->SetDirection(&Dir);
             // Lit (+0xb4 bit 3) -> GameLight vt+8 (disable).
             if ((Light->Flags & kLightFlagEnabled) != 0)
                 GameLightVirtualDisable(GLight);
@@ -307,10 +307,10 @@ namespace
         Rgba[1] = static_cast<unsigned char>(Green);
         Rgba[2] = static_cast<unsigned char>(Blue);
         Rgba[3] = 0xff;
-        EngineLightSetColorBytes(Light, Rgba);
+        Light->SetColorBytes(Rgba);
         // Not lit -> GameLight vt+4 (enable).
         if ((Light->Flags & kLightFlagEnabled) == 0)
-            GameLightEnable(Light);
+            static_cast<FGameLight*>(Light)->FGameLight::Enable();
     }
 
     float const kCloudsRandScale = 3.0517578125e-05f; // DAT_005caeec = 1/32768
@@ -1350,7 +1350,7 @@ namespace
                 NewShell->MaxAlpha = 1.0f;
 
                 // FUN_00420dd0; on failure there is no current shell.
-                if (!ClientMeshHolderLoad(&NewShell->Handle, Name, nullptr))
+                if (!NewShell->Handle.Load(Name, nullptr))
                 {
                     NebulaZoneShellDestroy(NewShell);
                     delete NewShell;
@@ -1552,7 +1552,7 @@ namespace
         ICamera* const Cam = static_cast<ICamera*>(Camera);
         Win3DApplyCamera(Cam);
 
-        Win3DBindTexture(TexShapeGetGpuHandle(Lightning->Texture, 0));
+        Win3DBindTexture(Lightning->Texture->GetGpuHandle(0));
 
         Win3DColor3f(Red, Green, Blue);
         Win3DBegin(kWin3DQuads);
@@ -1573,50 +1573,50 @@ namespace
 
 } // anonymous namespace
 
-void NebulaCloudsConstruct(FNebulaClouds* Clouds)
+void FNebulaClouds::Construct()
 {
-    LocalNebulaCloudsConstruct(Clouds);
+    LocalNebulaCloudsConstruct(this);
 }
 
-void NebulaCloudsSetDetail(FNebulaClouds* Clouds, float Detail)
+void FNebulaClouds::SetDetail(float Detail)
 {
-    LocalNebulaCloudsSetDetail(Clouds, Detail);
+    LocalNebulaCloudsSetDetail(this, Detail);
 }
 
-void NebulaCloudsApplyDetail(FNebulaClouds* Clouds, float Detail)
+void FNebulaClouds::ApplyDetail(float Detail)
 {
-    LocalNebulaCloudsApplyDetail(Clouds, Detail);
+    LocalNebulaCloudsApplyDetail(this, Detail);
 }
 
-void NebulaCloudsReleaseBits(FNebulaClouds* Clouds)
+void FNebulaClouds::ReleaseBits()
 {
-    LocalNebulaCloudsReleaseBits(Clouds);
+    LocalNebulaCloudsReleaseBits(this);
 }
 
-void NebulaCloudsRebuildBits(FNebulaClouds* Clouds)
+void FNebulaClouds::RebuildBits()
 {
-    LocalNebulaCloudsRebuildBits(Clouds);
+    LocalNebulaCloudsRebuildBits(this);
 }
 
-void NebulaCloudsRegenExcluded(FNebulaClouds* Clouds, void* ExclusionCtx)
+void FNebulaClouds::RegenExcluded(void* ExclusionCtx)
 {
-    LocalNebulaCloudsRegenExcluded(Clouds, ExclusionCtx);
+    LocalNebulaCloudsRegenExcluded(this, ExclusionCtx);
 }
 
-void NebulaCloudsUpdate(FNebulaClouds* Clouds, void* Camera, float Dt, float Visibility,
-                        Exclusion::NebulaExclusionZoneMgr* ExclusionMgr)
+void FNebulaClouds::Update(void* Camera, float Dt, float Visibility,
+                           Exclusion::NebulaExclusionZoneMgr* ExclusionMgr)
 {
-    LocalNebulaCloudsUpdate(Clouds, Camera, Dt, Visibility, ExclusionMgr);
+    LocalNebulaCloudsUpdate(this, Camera, Dt, Visibility, ExclusionMgr);
 }
 
-void NebulaCloudsDestroy(FNebulaClouds* Clouds, unsigned char Flags)
+void FNebulaClouds::Destroy(unsigned char Flags)
 {
-    LocalNebulaCloudsDestroy(Clouds, Flags);
+    LocalNebulaCloudsDestroy(this, Flags);
 }
 
-void NebulaCloudsParseIni(FNebulaClouds* Clouds, INI_Reader& Reader, FShapeDB* Shapes)
+void FNebulaClouds::ParseIni(INI_Reader& Reader, FShapeDB* Shapes)
 {
-    LocalNebulaCloudsParseIni(Clouds, Reader, Shapes);
+    LocalNebulaCloudsParseIni(this, Reader, Shapes);
 }
 
 // FUN_00504e60 -- vt+0x00. Caller: StarSysLoadIni's [Nebula] block. No test of `this` or of
@@ -1727,7 +1727,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
         }
     }
 
-    NebulaRebuild(This);
+    This->Rebuild();
 
     // Ambient GameLight.
     {
@@ -1744,17 +1744,17 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                 Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
             This->DynamicLight = Light;
             // Type 3 = directional.
-            EngineLightSetType((FEngineLight*)Light, kLightDirectional, false);
+            ((FEngineLight*)Light)->SetType(kLightDirectional, false);
             Vector Zero = {0.0f, 0.0f, 0.0f};
-            EngineLightSetPosition((FEngineLight*)Light, &Zero);
+            ((FEngineLight*)Light)->SetPosition(&Zero);
             unsigned char White[3] = {0xff, 0xff, 0xff};
-            EngineLightSetColorBytesAlt((FEngineLight*)Light, White);
-            EngineLightSetRangeRaw((FEngineLight*)Light, 500000.0f);
+            ((FEngineLight*)Light)->SetColorBytesAlt(White);
+            ((FEngineLight*)Light)->SetRangeRaw(500000.0f);
             // Success turns it straight off again when its flag bit 3 is set (FUN_005097c0's
             // flicker enables it).
-            if (!GameLightEnable((FEngineLight*)Light))
+            if (!Light->FGameLight::Enable())
             {
-                GameLightRelease(Light);
+                Light->Release();
                 // Retail passes the double 500000.0 to a "%d".
                 FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Could not create nebula light of range %d",
@@ -1875,7 +1875,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     // takes without a fill shape; the states around it stay as retail.
     if (!NebulaVolume::ReplacesFillSheets(This))
 #endif
-        NebulaDrawFillSheets(This, Xform.Translation.x, Xform.Translation.y, Xform.Translation.z);
+        This->DrawFillSheets(Xform.Translation.x, Xform.Translation.y, Xform.Translation.z);
 
     SetMaterialBatchBinOrder(1u, 1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
@@ -1883,7 +1883,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     Win3DEnable(kWin3DDepthTest);
 }
 
-// FUN_00508e00 — fog render states + NebulaDrawExteriorBits under the MaterialBatcher / depth gate.
+// FUN_00508e00 — fog render states + FNebulaEffect::DrawExteriorBits under the MaterialBatcher / depth gate.
 // No null tests on This, the Pipeline or the MaterialBatcher, and no guard on a zero +0x298
 // (retail divides straight through).
 void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
@@ -1913,7 +1913,7 @@ void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
     // takes with the zone out of view; the states around it stay as retail.
     if (!NebulaVolume::ReplacesExteriorBits(This))
 #endif
-        NebulaDrawExteriorBits(This, Camera);
+        This->DrawExteriorBits(Camera);
 
     SetMaterialBatchBinOrder(1u, 1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
@@ -2353,12 +2353,7 @@ void FNebulaEffect::Detail(float Detail)
     FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
     for (FNebulaCloudsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
         LocalNebulaCloudsApplyDetail(N->Clouds, Detail);
-    NebulaRebuild(Nebula);
-}
-
-void NebulaSetDetail(FNebulaEffect* Nebula, float Detail)
-{
-    Nebula->FNebulaEffect::Detail(Detail);
+    Nebula->Rebuild();
 }
 
 void NebulaApplyGlobalDetail(float Detail)
@@ -2376,18 +2371,18 @@ void NebulaApplyGlobalDetail(float Detail)
     TexturePanelsApplyDetailAll(Detail); // FUN_00509f60
 }
 
-void NebulaOrientExteriorBits(FNebulaEffect* Nebula, float Tx, float Ty, float Tz)
+void FNebulaEffect::OrientExteriorBits(float Tx, float Ty, float Tz)
 {
     // FUN_00507340: re-aim each exterior bit's axis (+0x14..+0x1c) square to the direction from
     // the bit to the target. No test of `this`, the zone or the buffer; no zero-length test.
-    Vector const ZonePos = Nebula->Zone->GetPos();
+    Vector const ZonePos = Zone->GetPos();
     float const RelX = Tx - ZonePos.x;
     float const RelY = Ty - ZonePos.y;
     float const RelZ = Tz - ZonePos.z;
 
-    for (int I = 0; I < Nebula->ExteriorBitCount; ++I)
+    for (int I = 0; I < ExteriorBitCount; ++I)
     {
-        FNebulaExteriorBit* const Bit = &Nebula->ExteriorBits[I];
+        FNebulaExteriorBit* const Bit = &ExteriorBits[I];
         // D = normalize(Rel - anchor). The z difference is squared as unrounded * float. Dx and
         // Dz are stored as floats, Dy stays on the FPU; the dot below uses the unrounded Dz, the
         // cross the stored one.
@@ -2447,51 +2442,51 @@ namespace
     }
 }
 
-void NebulaRebuild(FNebulaEffect* Nebula)
+void FNebulaEffect::Rebuild()
 {
     // FUN_00506600: the exterior bits (+0xe0, count +0xdc) rebuilt on the zone's surface. No
     // test of `this`.
-    operator delete(Nebula->ExteriorBits);
-    Nebula->ExteriorBits = nullptr;
-    Nebula->ExteriorBitCount = 0;
+    operator delete(ExteriorBits);
+    ExteriorBits = nullptr;
+    ExteriorBitCount = 0;
 
     // double 0.05 (0x005d5b58); only an ordered "less" returns. The zone is the one pointer
     // tested.
-    if (static_cast<double>(G_NebulaDetail) < 0.05 || Nebula->Zone == nullptr)
+    if (static_cast<double>(G_NebulaDetail) < 0.05 || Zone == nullptr)
         return;
 
-    Vector const ZonePos = Nebula->Zone->GetPos();
+    Vector const ZonePos = Zone->GetPos();
 
     // Intermediates stay on the FPU.
     double const OneMinusDetail = 1.0 - static_cast<double>(G_NebulaDetail);
     double const Ease = 1.0f - OneMinusDetail * OneMinusDetail;
     double const OneMinusEase = 1.0f - Ease;
     float const Scale = static_cast<float>((G_NebulaDetailEase * OneMinusEase + Ease) *
-                                           Nebula->BitRadius);
+                                           BitRadius);
     float const Density = static_cast<float>(
         (1.0 - static_cast<double>(G_NebulaDetail)) * G_NebulaDetailMix + G_NebulaDetail);
-    Nebula->BitAlpha =
-        static_cast<float>((OneMinusEase * G_NebulaDetailFog + Ease) * Nebula->Opacity);
+    BitAlpha =
+        static_cast<float>((OneMinusEase * G_NebulaDetailFog + Ease) * Opacity);
 
     // Per-slice bit counts: max_bits at the middle slice, min_bits at the ends.
-    int const MidCount = static_cast<int>(static_cast<double>(Nebula->MaxBits) * Density + 0.5f);
-    int const EndCount = static_cast<int>(static_cast<double>(Nebula->MinBits) * Density + 0.5f);
+    int const MidCount = static_cast<int>(static_cast<double>(MaxBits) * Density + 0.5f);
+    int const EndCount = static_cast<int>(static_cast<double>(MinBits) * Density + 0.5f);
 
-    int const PlaneSlices = Nebula->PlaneSlices;
+    int const PlaneSlices = this->PlaneSlices;
     if (PlaneSlices <= 0)
         return;
 
     // Shape weights normalised; the sum on the FPU, no zero test.
     {
-        float* const Weights = Nebula->ExteriorShapeWeights;
-        int const WeightCount = Nebula->ExteriorShapeCount;
+        float* const Weights = ExteriorShapeWeights;
+        int const WeightCount = ExteriorShapeCount;
         double Sum = 0.0f;
         for (int I = 0; I < WeightCount; ++I)
             Sum += Weights[I];
         if (WeightCount > 0)
         {
             double const InvSum = 1.0f / Sum;
-            for (int I = 0; I < Nebula->ExteriorShapeCount; ++I)
+            for (int I = 0; I < ExteriorShapeCount; ++I)
                 Weights[I] = static_cast<float>(InvSum * Weights[I]);
         }
     }
@@ -2523,19 +2518,19 @@ void NebulaRebuild(FNebulaEffect* Nebula)
 
     // + 2 for the two polar caps; the buffer is neither tested nor cleared.
     int const BitCount = BitTotal + 2;
-    Nebula->ExteriorBitCount = BitCount;
+    ExteriorBitCount = BitCount;
     FNebulaExteriorBit* const Bits =
         static_cast<FNebulaExteriorBit*>(operator new(static_cast<unsigned>(BitCount) << 5));
-    Nebula->ExteriorBits = Bits;
+    ExteriorBits = Bits;
 
     // Per bit: a random radius, the axis sin/cos of a random angle and 0, a weighted random
     // shape.
 
-    for (int I = 0; I < Nebula->ExteriorBitCount; ++I)
+    for (int I = 0; I < ExteriorBitCount; ++I)
     {
         FNebulaExteriorBit* const Bit = &Bits[I];
-        float const RadiusLo = Nebula->BitRadiusMin;
-        float const RadiusHi = Nebula->BitRadiusMax;
+        float const RadiusLo = BitRadiusMin;
+        float const RadiusHi = BitRadiusMax;
         int const RRadius = rand();
         Bit->Radius = static_cast<float>(
             (static_cast<double>(RRadius) * 3.0517578125e-05f *
@@ -2552,14 +2547,14 @@ void NebulaRebuild(FNebulaEffect* Nebula)
         // The weights accumulate on the FPU. No match leaves +0x10 as it was.
         int const RPick = rand();
         float const Pick = static_cast<float>(static_cast<double>(RPick) * 3.0517578125e-05f);
-        int const WeightCount = Nebula->ExteriorShapeCount;
+        int const WeightCount = ExteriorShapeCount;
         double Running = 0.0f;
         for (int J = 0; J < WeightCount; ++J)
         {
-            Running += Nebula->ExteriorShapeWeights[J];
+            Running += ExteriorShapeWeights[J];
             if (Pick < Running)
             {
-                Bit->Shape = Nebula->ExteriorShapes[J];
+                Bit->Shape = ExteriorShapes[J];
                 break;
             }
         }
@@ -2568,9 +2563,9 @@ void NebulaRebuild(FNebulaEffect* Nebula)
     // The latitude rings. The phase carries over between slices.
     FNebulaExteriorBit* Bit = Bits;
     float Phase = 0.0f;
-    for (int Slice = 0; Slice < Nebula->PlaneSlices; ++Slice)
+    for (int Slice = 0; Slice < this->PlaneSlices; ++Slice)
     {
-        int const Slices = Nebula->PlaneSlices;
+        int const Slices = this->PlaneSlices;
         int SliceBits;
         if (Slices == 1)
         {
@@ -2595,7 +2590,7 @@ void NebulaRebuild(FNebulaEffect* Nebula)
             acos((((static_cast<double>(Slice) + 1.0f) / (static_cast<double>(Slices) + 1.0f)) *
                       2.0 -
                   1.0f) *
-                 Nebula->EquatorBias);
+                 EquatorBias);
 
         if (SliceBits > 0)
         {
@@ -2618,11 +2613,11 @@ void NebulaRebuild(FNebulaEffect* Nebula)
                 Point.x = static_cast<float>(ZonePos.x + DirX);
                 Point.y = PointY;
                 Point.z = ZonePos.z + DirZ;
-                NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+                NebulaBitProject(Zone, Point, ZonePos, Bit);
                 double const Len = sqrt((static_cast<double>(Bit->Offset[2]) * Bit->Offset[2] +
                                          static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
                                         static_cast<double>(Bit->Offset[0]) * Bit->Offset[0]);
-                NebulaBitShrink(Nebula, Bit, Len);
+                NebulaBitShrink(this, Bit, Len);
                 ++Bit;
             }
         }
@@ -2633,20 +2628,20 @@ void NebulaRebuild(FNebulaEffect* Nebula)
     Point.x = ZonePos.x;
     Point.y = ZonePos.y + 1.0f;
     Point.z = ZonePos.z;
-    NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+    NebulaBitProject(Zone, Point, ZonePos, Bit);
     double const TopLen = sqrt((static_cast<double>(Bit->Offset[2]) * Bit->Offset[2] +
                                 static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
                                static_cast<double>(Bit->Offset[0]) * Bit->Offset[0]);
-    NebulaBitShrink(Nebula, Bit, TopLen);
+    NebulaBitShrink(this, Bit, TopLen);
     ++Bit;
 
     // The -Y cap; this length sums (x^2 + y^2) + z^2.
     Point.y = ZonePos.y - 1.0f;
-    NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+    NebulaBitProject(Zone, Point, ZonePos, Bit);
     double const BottomLen = sqrt((static_cast<double>(Bit->Offset[0]) * Bit->Offset[0] +
                                    static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
                                   static_cast<double>(Bit->Offset[2]) * Bit->Offset[2]);
-    NebulaBitShrink(Nebula, Bit, BottomLen);
+    NebulaBitShrink(this, Bit, BottomLen);
 }
 
 void FNebulaEffect::Update(void* Camera, float Dt)
@@ -2690,7 +2685,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     {
         if (Nebula->ExteriorOrientTimer > 1.0f || CameraCut != 0)
         {
-            NebulaOrientExteriorBits(Nebula, CamPos.x, CamPos.y, CamPos.z);
+            Nebula->OrientExteriorBits(CamPos.x, CamPos.y, CamPos.z);
             Nebula->ExteriorOrientTimer = 0.0f;
         }
     }
@@ -2809,7 +2804,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     {
         FNebulaCloudsListNode* const CloudSent = Nebula->Clouds.Sentinel;
         for (FNebulaCloudsListNode* N = CloudSent->Next; N != CloudSent; N = N->Next)
-            NebulaCloudsUpdate(N->Clouds, Camera, Dt, Nebula->InsideFade, Nebula->ExclusionMgr);
+            N->Clouds->Update(Camera, Dt, Nebula->InsideFade, Nebula->ExclusionMgr);
 
     }
 
@@ -2823,11 +2818,6 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     Nebula->ExteriorOrientTimer = Dt + Nebula->ExteriorOrientTimer;
     Nebula->ExclusionSortTimer = Dt + Nebula->ExclusionSortTimer;
     Nebula->ExteriorSortTimer = Dt + Nebula->ExteriorSortTimer;
-}
-
-void NebulaUpdate(FNebulaEffect* Nebula, void* Camera, float Dt)
-{
-    Nebula->FNebulaEffect::Update(Camera, Dt);
 }
 
 namespace
@@ -2875,16 +2865,16 @@ namespace
     }
 }
 
-void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float CamZ)
+void FNebulaEffect::DrawFillSheets(float CamX, float CamY, float CamZ)
 {
     // FUN_005074e0: two crossing fog sheets through the zone, textured with the fill shape
     // (+0x5c). Only +0x5c is tested; the arguments are the camera position.
 
-    FTexShape* const Shape = Nebula->FillShape;
+    FTexShape* const Shape = FillShape;
     if (Shape == nullptr)
         return;
 
-    Universe::IZone* const Zone = Nebula->Zone;
+    Universe::IZone* const Zone = this->Zone;
     Vector const Size = Zone->GetSize();
     Vector const ZonePos = Zone->GetPos();
     Matrix const Orient = Zone->GetOrientation();
@@ -2992,11 +2982,11 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     Win3DSetDepthWrite(0);
     Win3DDisable(kWin3DDepthTest);
     Win3DEnable(kWin3DBlend);
-    Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0));
+    Win3DBindTexture(Shape->GetGpuHandle(0));
     Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
     Win3DBegin(kWin3DQuads);
 
-    float const* const Fog = Nebula->FogColor;
+    float const* const Fog = FogColor;
     float V[3];
     float T[3];
 
@@ -3057,20 +3047,20 @@ void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float C
     Win3DEnable(kWin3DCullFace);
 }
 
-void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
+void FNebulaEffect::DrawExteriorBits(void* Camera)
 {
     // FUN_00507ed0 — the exterior bit billboards. Nothing once +0x294 is not below 1.0
     // (unordered also exits).
-    if (Nebula->ExteriorBitCount <= 0)
+    if (ExteriorBitCount <= 0)
         return;
-    if (!(Nebula->InsideFade < 1.0))
+    if (!(InsideFade < 1.0))
         return;
 
     ICamera* const Cam = static_cast<ICamera*>(Camera);
     Transform View;
     memcpy(&View, Cam->GetOrientation(), sizeof(View));
     Vector const CamPos = { View.Translation.x, View.Translation.y, View.Translation.z };
-    Vector const ZonePos = Nebula->Zone->GetPos();
+    Vector const ZonePos = Zone->GetPos();
 
     // Zone sphere in view space; a ClassifySphere result below 3 draws nothing.
     {
@@ -3081,7 +3071,7 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
         Vector ZoneView = {};
         AcquireNebulaMath()->InverseTransform(ZoneView, View, ZoneWorld);
         float const Center[3] = { ZoneView.x, ZoneView.y, ZoneView.z };
-        float const ZoneRadius = Nebula->Zone->GetRadius();
+        float const ZoneRadius = Zone->GetRadius();
         if (static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)Center, ZoneRadius)) < kSphereStraddling)
             return;
     }
@@ -3091,20 +3081,20 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
     // is cached only right after a swap -- the swapped-down record keeps its value; a pair left
     // alone inside the 10 band keeps the flag as it was (retail quirk, kept). +0x54 is zeroed
     // after the sort, including when there is only one bit.
-    if (Nebula->ExteriorSortTimer > 1.15f)
+    if (ExteriorSortTimer > 1.15f)
     {
         int Swapped = 0;
         do
         {
             Swapped = 0;
-            if (Nebula->ExteriorBitCount <= 1)
+            if (ExteriorBitCount <= 1)
                 break;
             bool bPrevCached = false;
             double PrevDistSq = 0.0;
-            for (int I = 1; I < Nebula->ExteriorBitCount; ++I)
+            for (int I = 1; I < ExteriorBitCount; ++I)
             {
-                FNebulaExteriorBit* const Prev = &Nebula->ExteriorBits[I - 1];
-                FNebulaExteriorBit* const Cur = &Nebula->ExteriorBits[I];
+                FNebulaExteriorBit* const Prev = &ExteriorBits[I - 1];
+                FNebulaExteriorBit* const Cur = &ExteriorBits[I];
                 if (!bPrevCached)
                 {
                     float const Dx = (ZonePos.x + Prev->Offset[0]) - CamPos.x;
@@ -3134,7 +3124,7 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
                 bPrevCached = true;
             }
         } while (Swapped > 0);
-        Nebula->ExteriorSortTimer = 0.0f;
+        ExteriorSortTimer = 0.0f;
     }
 
     Win3DDisable(kWin3DLightingCap);
@@ -3144,8 +3134,8 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
     Win3DEnable(kWin3DBlend);
     Win3DApplyCamera(Cam);
     // The first shape (+0x60) is bound for every bit.
-    FTexShape* const BoundShape = Nebula->ExteriorShapes[0];
-    Win3DBindTexture(TexShapeGetGpuHandle(BoundShape, 0));
+    FTexShape* const BoundShape = ExteriorShapes[0];
+    Win3DBindTexture(BoundShape->GetGpuHandle(0));
     // The shape's alpha cache (+0x04) is probed while negative (FUN_00552420 inline): format
     // ids 10..14 have alpha, any other id takes its descriptor's +0x48 byte.
     if (BoundShape->AlphaCache < 0)
@@ -3170,8 +3160,8 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
     DALib::Pipeline->SetRenderState(D3DRS_ALPHAREF, 4);
 
     // Base alpha +0xb8, faded out over the second half of +0x294.
-    float const Fade = Nebula->InsideFade;
-    float BaseAlpha = Nebula->BitAlpha;
+    float const Fade = InsideFade;
+    float BaseAlpha = BitAlpha;
     if (Fade > 0.5f)
         BaseAlpha = static_cast<float>((1.0 - ((static_cast<double>(Fade) - 0.5) +
                                                (static_cast<double>(Fade) - 0.5))) * BaseAlpha);
@@ -3183,7 +3173,7 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
         EdgeFade = 0.0f;
     else
     {
-        float const Span = Nebula->FogStart - Nebula->FogNear;
+        float const Span = FogStart - FogNear;
         if (Span < 7000.0f)
             EdgeFade = 0.0f;
         else if (Span < 10000.0f)
@@ -3202,8 +3192,8 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
     }
 
     // The count is re-read per iteration.
-    FNebulaExteriorBit* Bit = Nebula->ExteriorBits;
-    for (int I = 0; I < Nebula->ExteriorBitCount; ++I, ++Bit)
+    FNebulaExteriorBit* Bit = ExteriorBits;
+    for (int I = 0; I < ExteriorBitCount; ++I, ++Bit)
     {
         float A = BaseAlpha;
 
@@ -3224,7 +3214,7 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
 
         // Facing fade. Dot uses the bit's offset from the zone centre, not its axis.
 
-        int const Mode = Nebula->bCullBackBits;
+        int const Mode = bCullBackBits;
         if (Mode != 0 || EdgeFade < 1.0f)
         {
             float const Sx = Bit->Offset[0];
@@ -3270,9 +3260,9 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
             continue;
 
         // The additive path premultiplies the colour.
-        float const Cr = Nebula->ExteriorColor[0];
-        float const Cg = Nebula->ExteriorColor[1];
-        float const Cb = Nebula->ExteriorColor[2];
+        float const Cr = ExteriorColor[0];
+        float const Cg = ExteriorColor[1];
+        float const Cb = ExteriorColor[2];
         if (bHasAlpha)
             Win3DColor4f(Cr, Cg, Cb, A);
         else
@@ -3298,10 +3288,10 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
     Win3DEnable(kWin3DCullFace);
 
     // The effect at +0xec (the companion's, released by Shutdown).
-    FEffectBase* const Effect = static_cast<FEffectBase*>(Nebula->Companion.Values[2]);
+    FEffectBase* const Effect = static_cast<FEffectBase*>(Companion.Values[2]);
     if (Effect != nullptr)
     {
-        Effect->SetIntensity(static_cast<float>(1.0 - Nebula->InsideFade));
+        Effect->SetIntensity(static_cast<float>(1.0 - InsideFade));
     }
 }
 
@@ -3374,7 +3364,7 @@ void FNebulaEffect::Shutdown()
     {
         if ((Ambient->Flags & kLightFlagEnabled) != 0)
             GameLightVirtualDisable(Ambient);
-        GameLightRelease(Nebula->DynamicLight);
+        Nebula->DynamicLight->Release();
     }
 
     NebulaShapes(Nebula)->Clear();
@@ -3382,16 +3372,11 @@ void FNebulaEffect::Shutdown()
     Nebula->FlagLoaded = 0;
 }
 
-void NebulaShutdown(FNebulaEffect* Nebula)
-{
-    Nebula->FNebulaEffect::Shutdown();
-}
-
 FNebulaEffect::~FNebulaEffect()
 {
     FNebulaEffect* const Nebula = this;
     // FUN_00504cf0
-    NebulaShutdown(Nebula);
+    Nebula->FNebulaEffect::Shutdown();
 
 
     // ~lightning (+0x100) is FUN_005526d0.

@@ -229,6 +229,9 @@ struct FMeshArchetype : FDeformMesh
 
     // FUN_065f89e0. Defined in DeformablePartArchetype.cpp.
     bool LoadTables(FLodHolder* Holder, IFileSystem* Fs);
+
+    // FUN_065f7760 (thiscall). Defined in DeformablePartArchetype.cpp.
+    bool LoadFaceGroups(IFileSystem* Fs);
 };
 
 static_assert(sizeof(FMeshArchetype) == 0x84, "mesh archetype must be 0x84");
@@ -378,6 +381,9 @@ struct FDeformableObject : FDeformable
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
+
+    // FUN_065f1900 (thiscall). Defined in Deformable.cpp.
+    GENRESULT ApplyCreateInstanceInit(FAggDesc18* Desc);
 };
 
 // FUN_065f36c0 ctor: 150 * 0x34 + header. FUN_065f13e0 identity at bone+4.
@@ -402,6 +408,12 @@ struct FSkeleton
 
     // FUN_065f1100. Defined in Deformable.cpp.
     bool Load(const char* Name, IFileSystem* Fs);
+
+    // FUN_065f1420 (thiscall). Defined in Deformable.cpp.
+    int Release();
+
+    // FUN_065f1410 (thiscall). Defined in Deformable.cpp.
+    void AddRef();
 };
 
 static_assert(sizeof(FSkeleton) == 0x1E88, "skeleton must be 0x1e88");
@@ -467,6 +479,15 @@ struct FLodHolder
 
     // FUN_065f14f0. Defined in Deformable.cpp.
     bool LinkBoneByParent(InstanceIndex BoneInst, int Parent);
+
+    // FUN_065f17d0 (thiscall). Defined in Deformable.cpp.
+    void AddRef();
+
+    // FUN_065f17e0 (thiscall). Defined in Deformable.cpp.
+    int Release();
+
+    // FUN_065f1470 (thiscall). Defined in Deformable.cpp.
+    void DestroyBody();
 };
 
 static_assert(sizeof(FLodHolder) == 0x10, "LOD holder must be 0x10");
@@ -555,6 +576,9 @@ struct FIkEvent : IChannelOwner
 
     // FUN_065fce60. Defined in DeformIK.cpp.
     void SolveDlsAlt();
+
+    // FUN_065fb030 (thiscall). Defined in DeformIK.cpp.
+    bool SetJointCount(unsigned int JointCount);
 };
 
 static_assert(sizeof(FIkEvent) == 0x44, "IK event must be 0x44");
@@ -738,9 +762,6 @@ extern IRenderer2* G_Renderer;
 extern IRPVertexBuffer* G_VertexBuffer;
 extern IRPIndexBuffer* G_IndexBuffer;
 extern float G_DeformRate;
-int ReleaseSkeleton(FSkeleton* Skel);
-void AddRefLodHolder(FLodHolder* Holder);
-int ReleaseLodHolder(FLodHolder* Holder);
 void WriteIdentity3x3(Matrix* Dest);
 
 // DeformablePartArchetype.cpp
@@ -769,5 +790,3 @@ void WriteVec3(float* Dest, float X, float Y, float Z);
 void ScaleVec3(float* Out, const float* In, float Scale);
 void SubVec3(float* Out, const float* A, const float* B);
 
-// DeformIK.cpp
-bool SetIkJointCount(FIkEvent* Event, unsigned int JointCount);

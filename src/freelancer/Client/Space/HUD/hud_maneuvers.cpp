@@ -135,7 +135,7 @@ namespace
         OutXform->Translation.x = 0.0f;
         OutXform->Translation.y = 0.0f;
         OutXform->Translation.z = 0.0f;
-        if (ClientMeshHolderHasInstance(&Control->MeshHolder))
+        if (Control->MeshHolder.HasInstance())
         {
             const Transform* const Source =
                 DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance);
@@ -164,15 +164,14 @@ namespace
     }
 }
 
-bool HudLookupNamedValue(FHudNamedValue const* Table, char const* Name, int* OutValue,
-                         unsigned Count)
+bool FHudNamedValue::Lookup(char const* Name, int* OutValue, unsigned Count) const
 {
     // FUN_004d9ca0.
     for (unsigned i = 0; i < Count; ++i)
     {
-        if (Table[i].Name != nullptr && _stricmp(Name, Table[i].Name) == 0)
+        if (this[i].Name != nullptr && _stricmp(Name, this[i].Name) == 0)
         {
-            *OutValue = Table[i].Value;
+            *OutValue = this[i].Value;
             return true;
         }
     }
@@ -207,7 +206,7 @@ HUD_Maneuvers::HUD_Maneuvers(INI_Reader& Reader)
         Maneuver.Mesh = Reader.get_value_string(3);
 
         int Command = 0;
-        bool const bFound = HudLookupNamedValue(kManeuverCommands, Maneuver.Name.Data, &Command, 4);
+        bool const bFound = kManeuverCommands->Lookup(Maneuver.Name.Data, &Command, 4);
         Maneuver.CommandId = bFound ? Command : 0;
 
         Maneuver.BehaviorId = BehaviorTypes::get_behavior_id(Maneuver.Name.Data);

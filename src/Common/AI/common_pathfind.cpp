@@ -14,7 +14,7 @@
 #include "common_aisteer.h"
 #include "common_behavior.h"      // GetIfacePositionOrZero
 #include "common_cequip.h"        // IObject::ThrustEquipEngine (PathfindManager ctor)
-#include "common_cobjdb.h"        // IObjDB::GetZoneDb (SetPathfindObjectDb, FUN_062db7c0)
+#include "common_cobjdb.h"        // IObjDB::GetZoneDb (PathfindManager::SetObjectDb, FUN_062db7c0)
 #include "common_csys.h"          // Acquire3DMathEngine, Matrix
 #include "common_iface.h"         // IBehaviorManager, IObjRW, ObjRwFromWatchable
 #include "common_misc.h"          // FastInvSqrt, SUBOBJ_ID_NONE
@@ -150,11 +150,11 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
 }
 
 // FUN_062db7c0, thiscall. Sole caller is ConnectBehaviorManagerObjectDb (FUN_062d2830).
-void SetPathfindObjectDb(PathfindManager* Self, IObjDB* ObjectDb)
+void PathfindManager::SetObjectDb(IObjDB* ObjectDb)
 {
     if (ObjectDb == nullptr)
     {
-        Self->Avoidance.PhysSystemId = 0;
+        Avoidance.PhysSystemId = 0;
         return;
     }
 
@@ -164,7 +164,7 @@ void SetPathfindObjectDb(PathfindManager* Self, IObjDB* ObjectDb)
     Universe::ISystem const* ZoneDb = ObjectDb->GetZoneDb();
     (void)ZoneDb->GetId();
     ZoneDb = ObjectDb->GetZoneDb();
-    Self->Avoidance.PhysSystemId = ZoneDb->GetId();
+    Avoidance.PhysSystemId = ZoneDb->GetId();
 }
 
 void PathfindManager::clear_user_zone()
@@ -498,7 +498,7 @@ int PathfindManager::SelectObstacleDirection(Vector* OutDirection, IObjRW** OutO
     OutDirection->x = 0.0f;
     bNudgeObstacleFound = false;
     IObjInspect* const Obstacle =
-        FindClosestObstacleToAvoid(&Sys->Timers, ExcludeId, static_cast<unsigned>(NudgeObstacleTypeMask));
+        Sys->Timers.FindClosestObstacleToAvoid(ExcludeId, static_cast<unsigned>(NudgeObstacleTypeMask));
     if (Obstacle != nullptr)
     {
         // The shape-biased direction around it (FUN_062e55b0).

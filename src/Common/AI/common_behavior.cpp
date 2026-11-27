@@ -35,9 +35,9 @@ float Behavior_GetProjectedThrottle(IObjInspect const* Obj, float Value, ThrustE
 
 // FUN_062d21c0. See common_behavior.h for the receiver. No null test, as retail: every call
 // site has already called through the same pointer.
-void Behavior_ReleaseDirectiveTarget(Behavior* Target)
+void Behavior::ReleaseDirectiveTarget()
 {
-    Target->Flags28 = static_cast<unsigned char>((Target->Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
+    Flags28 = static_cast<unsigned char>((Flags28 & ~kBehaviorFlagDirectiveAccepted) | kBehaviorFlagDisengageRequested);
 }
 
 // FUN_062e5af0. Same shape as Behavior_GetProjectedThrottle, slot 0xd8 (get_speed).

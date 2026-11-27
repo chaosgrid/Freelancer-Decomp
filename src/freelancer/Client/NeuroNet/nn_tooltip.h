@@ -50,7 +50,7 @@ public:
     // FUN_004be390 — clear sticky-visible + hover flag.
     void HideNow();
 
-    // LAB_004bdfe0 — gates + background quads + FontStringDrawChildren.
+    // LAB_004bdfe0 — gates + background quads + FFontStringDrawOrigin::DrawChildren.
     void Draw() override;
 
     // The body of FUN_004be2f0: the live hover's ids (+0xf4 / +0xf8), position (+0x13c),

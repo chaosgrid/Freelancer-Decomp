@@ -81,6 +81,10 @@ struct FCommMessage
     float Attenuation;        // +0x8c dB, set by Dispatch from the distance
     float Linger;             // +0x90 seconds the channel stays busy after the last line
     CommResult Result;        // +0x94 -- what CommComplete reports
+
+    // FUN_004ce810 (on To) -- the record copy every queue move uses: the costume's accessory ids only
+    // up to its count (FUN_0053c250's rule), every other field whole.
+    void CopyFrom(FCommMessage const* From);
 };
 
 static_assert(offsetof(FCommMessage, VoiceId) == 0x3c, "comm message +0x3c voice");
@@ -109,9 +113,6 @@ struct FCommInbox
 extern FCommInbox G_CommInboxPlayer;
 extern FCommInbox G_CommInboxOther;
 
-// FUN_004ce810 (on To) -- the record copy every queue move uses: the costume's accessory ids only
-// up to its count (FUN_0053c250's rule), every other field whole.
-void CommCopyMessage(FCommMessage* To, FCommMessage const* From);
 // FUN_0053c250 (on To) -- the four parts, the count, and only the first Count
 // accessory ids; the rest of To keeps what it had.
 void CommCopyCostume(Costume* To, Costume const* From);

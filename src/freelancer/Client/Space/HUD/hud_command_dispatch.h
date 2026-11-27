@@ -252,28 +252,6 @@ int HudPostCommand(unsigned MsgId, int bSkipMods);
 // FUN_00576410(msgId, mode): walk DAT_0067c3a4 handler tree; call handler vt[0].
 int HudDispatchCommand(unsigned MsgId, int Mode);
 
-// FUN_005760d0 — register Handler for MsgId into DAT_0067c3a4 multimap (after existing entries
-// with the same id; duplicates allowed).
-void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId);
-
-// FUN_005760f0 — erase Handler's entries for one MsgId (the tree is kept even if it empties).
-void HudUnregisterCommand(FHudCmdHandler* Handler, unsigned MsgId);
-
-// FUN_00576190 — erase every entry whose handler == Handler; free the tree once it is empty.
-void HudUnregisterCommandHandler(FHudCmdHandler* Handler);
-
-// FUN_005762f0 — cancel stack DAT_0067c270: skip the first Skip entries holding Handler and
-// unlink every later one.
-void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip);
-
-// FUN_00576360 — HudRemoveCancelHandler(Handler, Skip), then push Handler on the cancel stack;
-// USER_CANCEL (0xf) in mode 1 pops it and calls its slot 0 with 0x10 (FUN_00576410 tail).
-void HudPushCancelHandler(FHudCmdHandler* Handler, int Skip);
-
-// FUN_00576010 — Event::Handler base destructor body: HudPopInputFocus, erase every
-// registration (freeing an emptied tree), HudRemoveCancelHandler(Handler, 0).
-void HudDestroyEventHandler(FHudCmdHandler* Handler);
-
 // FUN_00577b40 — make Handler the Mode-1 filter (DAT_0067c3ac); a filter already in place is
 // pushed onto DAT_0067c3a8. Modal NeuroNet dialogs call it when they open.
 void HudPushInputFocus(FHudCmdHandler* Handler);

@@ -130,7 +130,7 @@ namespace
     // IRenderer2 slot 7 (&DAT_0067dbf8, instance, 1.0f, 0, 0, 0).
     void DrawPart(FHudDamageIndicatorPart& Part, unsigned char const* Colour)
     {
-        ClientMeshHolderSetColor(&Part.Holder, Colour);
+        Part.Holder.SetColor(Colour);
         DALib::Renderer->RenderInstance(Win3DGetCamera(), Part.Holder.EngineInstance, 1.0f, 0, nullptr,
                                nullptr);
     }
@@ -209,8 +209,8 @@ FHudDamageIndicatorPart::FHudDamageIndicatorPart(char const* Path, float Degrees
     Holder.UserFloats[0] = 1.0f;          // +0x14
     Holder.UserFloats[4] = 1.0f;          // +0x24
     Holder.AnimOrArchIndex = -1;          // +0x10
-    ClientMeshLoadFromPath(&Holder, Path, 0, true); // FUN_0059ec80
-    if (!ClientMeshHolderHasInstance(&Holder))
+    Holder.LoadFromPath(Path, 0, true); // FUN_0059ec80
+    if (!Holder.HasInstance())
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: HUD_DamageIndicator is missing: %s.",
               kDamageIndicatorCpp, 0xf7, Path);
@@ -243,9 +243,9 @@ FHudDamageIndicatorPart::~FHudDamageIndicatorPart()
 {
     // FUN_004d7400: release with an instance bound; the holder's own destructor FUN_0059ef20
     // then runs the same release again and finds nothing.
-    if (ClientMeshHolderHasInstance(&Holder))
+    if (Holder.HasInstance())
     {
-        ClientUiMeshHolderRelease(&Holder);
+        Holder.ReleaseWithAnim();
     }
 }
 
@@ -352,13 +352,13 @@ void HUD_DamageIndicator::Draw()
         CalledColour(Alpha, Colour);
         DrawPart(PartDegMinus90, Colour);
     }
-    if (FlashAlpha(PartDeg90.Flash, &Alpha))
-    {
-        // FUN_004b5140 zeroes the quad before FUN_004d6a40 fills it.
-        memset(Colour, 0, sizeof(Colour));
-        CalledColour(Alpha, Colour);
-        DrawPart(PartDeg90, Colour);
-    }
+    if (!FlashAlpha(PartDeg90.Flash, &Alpha))
+        return;
+
+    // FUN_004b5140 zeroes the quad before FUN_004d6a40 fills it.
+    memset(Colour, 0, sizeof(Colour));
+    CalledColour(Alpha, Colour);
+    DrawPart(PartDeg90, Colour);
 }
 
 void HUD_DamageIndicator::FlashFromPosition(Vector const* WorldPos)
