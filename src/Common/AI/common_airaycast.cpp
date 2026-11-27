@@ -812,7 +812,7 @@ namespace
 
 // FUN_062e1aa0, cdecl. Two-interface bearing: the angle between (Self's centre - Target's
 // centre) and column 2 of Self's own transform.
-double BearingAngleToIface(void* Self, void* Target)
+double BearingAngleToIface(IObjInspect const* Self, IObjInspect const* Target)
 {
     if (Self == nullptr || Target == nullptr)
     {
@@ -821,12 +821,12 @@ double BearingAngleToIface(void* Self, void* Target)
 
     // Retail queries Target first, then Self, each with the inlined GetIfacePositionOrZero.
     Vector PosTarget;
-    GetIfacePositionOrZero(&PosTarget, ObjInspectOf(Target));
+    GetIfacePositionOrZero(&PosTarget, Target);
     Vector PosSelf;
-    GetIfacePositionOrZero(&PosSelf, ObjInspectOf(Self));
+    GetIfacePositionOrZero(&PosSelf, Self);
 
     // The matrix is read at +8/+0x14/+0x20 (column 2).
-    Matrix const& M = ObjInspectOf(Self)->get_transform().Rotation;
+    Matrix const& M = Self->get_transform().Rotation;
 
     float const Dx = PosSelf.x - PosTarget.x;
     float const Dy = PosSelf.y - PosTarget.y;
@@ -863,7 +863,7 @@ double BearingAngleToIface(void* Self, void* Target)
 // FUN_062e1c90, cdecl(Self, Vector const* Point). Ghidra counts one parameter; all three
 // callers push two dwords. Same bearing as BearingAngleToIface against a caller-supplied
 // point, but its normalisation rounds differently (see below).
-double BearingAngleToPoint(void* Self, Vector const& ComparisonPoint)
+double BearingAngleToPoint(IObjInspect const* Self, Vector const& ComparisonPoint)
 {
     if (Self == nullptr)
     {
@@ -871,9 +871,9 @@ double BearingAngleToPoint(void* Self, Vector const& ComparisonPoint)
     }
 
     Vector PosSelf;
-    GetIfacePositionOrZero(&PosSelf, ObjInspectOf(Self));
+    GetIfacePositionOrZero(&PosSelf, Self);
 
-    Matrix const& M = ObjInspectOf(Self)->get_transform().Rotation;
+    Matrix const& M = Self->get_transform().Rotation;
 
     float const Dx = PosSelf.x - ComparisonPoint.x;
     float const Dy = PosSelf.y - ComparisonPoint.y;

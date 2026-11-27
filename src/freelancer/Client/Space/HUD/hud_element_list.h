@@ -27,6 +27,7 @@
 class INI_Reader;
 struct IObjRW;
 struct FSpaceCamera;
+struct FSpaceCommand;
 struct FTextureRef;
 
 // -------------------------------------------------------------------------------------------
@@ -75,9 +76,9 @@ public:
     // slot 6 (+0x18) FUN_0053aaa0
     virtual void Render(FSpaceCamera* Camera, float DeltaSeconds);
     // slots 7 / 8 / 9 (+0x1c / +0x20 / +0x24) FUN_0053f330
-    virtual bool Slot7(void* Command);
-    virtual bool Slot8(void* Command);
-    virtual bool Slot9(void* Command);
+    virtual bool Slot7(FSpaceCommand* Command);
+    virtual bool Slot8(FSpaceCommand* Command);
+    virtual bool Slot9(FSpaceCommand* Command);
     // slot 10 (+0x28) FUN_00401e90
     virtual void Slot10();
 
@@ -208,9 +209,9 @@ void HudElementListSetViewport(int const* ViewRect4);
 // batcher's bin order (1, -1) / (1, 1). Its one caller is the HUD camera's draw FUN_0051daa0.
 void HudElementListRender(FSpaceCamera* Camera, float DeltaSeconds);
 // FUN_004c7820 (cdecl) -- true at the first active element whose Slot7(Command) is true.
-bool HudElementListAnySlot7(void* Command);
+bool HudElementListAnySlot7(FSpaceCommand* Command);
 // FUN_004c7860 (cdecl) -- the same over Slot8.
-bool HudElementListAnySlot8(void* Command);
+bool HudElementListAnySlot8(FSpaceCommand* Command);
 // FUN_004c77a0 -- release the static_txm texture, Shutdown() on every element, delete every
 // element, empty the list, then clear the HUD ShapeDB (FUN_00425a20). Called by the space
 // teardown.

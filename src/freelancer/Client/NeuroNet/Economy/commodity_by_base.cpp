@@ -18,6 +18,8 @@
 #include "NeuroNet/nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "NeuroNet/nn_modal.h"               // NnFloatBits, NnMainButtonHasActivePanel, G_bNnScreenUp
 #include "NeuroNet/NavMap/nn_navmap.h"              // NavMapRequestFocus (FUN_004a2aa0)
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "NeuroNet/nn_ui_pulse.h"            // NnUiPulseBlendArgb (FUN_00561da0), palette colours
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)

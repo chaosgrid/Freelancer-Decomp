@@ -594,7 +594,7 @@ SERVER_API int __cdecl DisplayMissionMessage(const unsigned int& player_id, cons
     if (msg_type == 0) {
         Players[player_id].bSkipNextAutosave = 1;
     }
-    CPlayerGroup* const Group = static_cast<CPlayerGroup*>(Players[player_id].group_ptr);
+    CPlayerGroup* const Group = Players[player_id].group_ptr;
     if (broadcast && Group != nullptr) {
         Group->SetMissionMessage(Record);
     } else {
@@ -670,7 +670,7 @@ SERVER_API int __cdecl LoadHint(unsigned int player_id, BaseHint* hint) {
 // means a party of one. Always 0.
 SERVER_API int __cdecl GetGroupSize(unsigned int player_id, unsigned int& out_size) {
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
-    CPlayerGroup* grp = p ? (CPlayerGroup*)p->group_ptr : nullptr;
+    CPlayerGroup* grp = p ? p->group_ptr : nullptr;
     if (grp) {
         out_size = grp->GetMemberCount();
     } else {
@@ -698,7 +698,7 @@ SERVER_API int __cdecl GetName(unsigned int player_id, std::wstring& out_name) {
 SERVER_API int __cdecl IsGroupMember(unsigned int player1_id, unsigned int player2_id, bool& out_result) {
     if (player1_id == player2_id) { out_result = true; return 0; }
     PlayerSlot* p1 = PlayerDB_GetPlayer(player1_id);
-    CPlayerGroup* grp = p1 ? (CPlayerGroup*)p1->group_ptr : nullptr;
+    CPlayerGroup* grp = p1 ? p1->group_ptr : nullptr;
     out_result = grp ? grp->IsMember(player2_id) : false;
     return 0;
 }
@@ -707,7 +707,7 @@ SERVER_API int __cdecl IsGroupMember(unsigned int player1_id, unsigned int playe
 // CPlayerGroup::DelMember clears group_ptr, unregisters the player and notifies the rest.
 SERVER_API int __cdecl RemoveFromGroup(unsigned int player_id) {
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
-    CPlayerGroup* grp = p ? (CPlayerGroup*)p->group_ptr : nullptr;
+    CPlayerGroup* grp = p ? p->group_ptr : nullptr;
     if (!grp) return -3;
     grp->DelMember(player_id);
     return 0;
@@ -717,7 +717,7 @@ SERVER_API int __cdecl RemoveFromGroup(unsigned int player_id) {
 // raw, before any bounds or occupancy test. With a group: RewardMembers. Solo: the usual
 // guard, then PlayerData::AdjustCash(amount, true) (FUN_06d4f4e0) inlined. Always 0.
 SERVER_API int __cdecl RewardGroup(unsigned int player_id, int amount) {
-    CPlayerGroup* const Group = static_cast<CPlayerGroup*>(Players[player_id].group_ptr);
+    CPlayerGroup* const Group = Players[player_id].group_ptr;
     if (Group != nullptr) {
         Group->RewardMembers(amount);
         return 0;
@@ -848,7 +848,7 @@ SERVER_API int __cdecl GetGroupMembers(unsigned int player_id, std::vector<unsig
     if (!IsValidPlayer(player_id)) return -2;
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (p && p->group_ptr) {
-        CPlayerGroup* grp = (CPlayerGroup*)p->group_ptr;
+        CPlayerGroup* grp = p->group_ptr;
         grp->StoreMemberList(out_members);
     } else {
         out_members.push_back(player_id);
@@ -1741,10 +1741,10 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
         SetPersonalityParams* Params = static_cast<SetPersonalityParams*>(Op);
         Behavior->set_state_graph(Params->StateGraphId, false);
         // -1 means "leave the callback as it is".
-        if (Params->DirectiveCallbackObject != (DirectiveCallback*)-1) {
+        if (Params->DirectiveCallbackObject != reinterpret_cast<DirectiveCallback*>(-1)) {
             Behavior->set_directive_callback(Params->DirectiveCallbackObject);
         }
-        if (Params->ContentCallbackObject != (ContentCallback*)-1) {
+        if (Params->ContentCallbackObject != reinterpret_cast<ContentCallback*>(-1)) {
             Behavior->set_content_callback(Params->ContentCallbackObject);
         }
         if (Params->bSetPersonality != 0) {

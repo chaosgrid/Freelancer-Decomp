@@ -19,6 +19,7 @@
 #include "Interface/win3d.h"
 #include "Interface/win3d_renderables.h"  // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 
 #include <stdlib.h>
 #include <windows.h>
@@ -67,7 +68,7 @@ bool NnError::Create(Win3D* NewParent, void* Data)
     Text = CreateTextControl("Text", "SubHeader", &TextPosition, nullptr, NnFloatBits(0x3f07ae14),
                              NnFloatBits(0x3e08b439), NnFloatBits(0x3fa00000), 0, 1, 0, 0);
     // Text's Font::String goes multi-line (re-laid out) unless it already is. No null test.
-    FFontString* const TextFont = static_cast<NnTextControl*>(Text)->GetFontString();
+    FFontString* const TextFont = Text->GetFontString();
     if (TextFont->bMultiLine != 1)
     {
         TextFont->bMultiLine = 1;
@@ -89,7 +90,7 @@ bool NnError::Create(Win3D* NewParent, void* Data)
                               NnFloatBits(0x3ee66666), NnFloatBits(0x3d75c28f),
                               NnFloatBits(0x3f99999a), 0x3e8, 1, 0, 1);
     // The same Font::String poke on the title.
-    FFontString* const TitleFont = static_cast<NnTextControl*>(Title)->GetFontString();
+    FFontString* const TitleFont = Title->GetFontString();
     if (TitleFont->bMultiLine != 1)
     {
         TitleFont->bMultiLine = 1;

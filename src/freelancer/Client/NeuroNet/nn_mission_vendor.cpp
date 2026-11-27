@@ -27,6 +27,9 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 
 #include "DALib.h"
 #include "common_goods.h"           // MissionVendorProperties, MissionVendorAcceptance
@@ -211,7 +214,7 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
     // The offers of the base of the current room (FUN_0043a460's +0x34, 0x0048b8d1). Retail:
     // LoadOffers reads those of DAT_0066873c instead (0x0048c788).
     TMirrorPropertyBucket<MissionVendorProperties>* const Bucket = GetClientLocationBaseMissionOffers(
-        GetRoomRuntimeBaseId(static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime())));
+        GetRoomRuntimeBaseId(GetClientCurrentLocationRuntime()));
     int Count = 0;
     MetaNode<MissionVendorProperties>* Node = nullptr;
     while (Bucket->List.traverse(Node, true))

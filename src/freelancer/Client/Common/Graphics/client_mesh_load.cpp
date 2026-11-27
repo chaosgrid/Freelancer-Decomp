@@ -159,9 +159,9 @@ bool FMeshHolder::Load(char const* Path, char const* AuxPath)
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
 
-    void* FsOut = nullptr;
+    IFileSystem* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)
-            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
+            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FsOut)) == 0)
     {
         if (Path != nullptr)
             MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
@@ -169,7 +169,7 @@ bool FMeshHolder::Load(char const* Path, char const* AuxPath)
             AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 
         long Handle = -1;
-        bOk = Archetype::Load(static_cast<IFileSystem*>(FsOut), &Handle, nullptr);
+        bOk = Archetype::Load(FsOut, &Handle, nullptr);
         if (bOk)
         {
             // Retail quirk: an instance already bound is destroyed and BOTH cache slots
@@ -188,7 +188,7 @@ bool FMeshHolder::Load(char const* Path, char const* AuxPath)
     }
 
     if (FsOut != nullptr)
-        static_cast<IFileSystem*>(FsOut)->Release();
+        FsOut->Release();
     return bOk;
 }
 
@@ -231,7 +231,7 @@ float FMeshHolder::GetBoundingSphere(float* OutCenter) const
 {
     // FUN_00421090.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent(EngineInstance, 0, &Radius, (Vector*)OutCenter);
+    DALib::Engine->GetInstanceExtent(EngineInstance, 0, &Radius, reinterpret_cast<Vector*>(OutCenter));
     const Transform* const InstanceXform = DALib::Engine->GetInstanceTransform(EngineInstance);
     if (G_MeshHolderMathEngine == nullptr)
         G_MeshHolderMathEngine = Acquire3DMathEngine();
@@ -259,7 +259,7 @@ void FMeshHolder::Render(void* Camera, unsigned long Flags)
 void FMeshHolder::SetPosition(Vector const* Position)
 {
     // FUN_00420fd0.
-    DALib::Engine->SetInstancePosition(EngineInstance, (const Vector*)Position);
+    DALib::Engine->SetInstancePosition(EngineInstance, Position);
 }
 
 const Vector* FMeshHolder::GetPosition() const
@@ -278,7 +278,7 @@ void FMeshHolder::SetOrientation(float const Orientation[9])
 {
     // FUN_00421010.
     DALib::Engine->SetInstanceOrientation(EngineInstance,
-                                          (const Matrix*)(const_cast<float*>(Orientation)));
+                                          reinterpret_cast<const Matrix*>(const_cast<float*>(Orientation)));
 }
 
 void FMeshHolder::Update()
@@ -317,9 +317,9 @@ bool FClientMeshHolder::LoadFromPath(char const* RelPath, char const* MaterialPa
     // The FileSystem is an EH-guarded local released whatever happened.
     FFileSystemAggDesc Desc;
     BuildMeshFileSystemDesc(&Desc, RelPath);
-    void* FsOut = nullptr;
+    IFileSystem* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)
-            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
+            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FsOut)) == 0)
     {
         // FUN_00420f30: the mesh's own material entry and the material library's.
         SetMaterials(RelPath, MaterialPath);
@@ -332,7 +332,7 @@ bool FClientMeshHolder::LoadFromPath(char const* RelPath, char const* MaterialPa
         {
             // A loaded handle is kept in the model cache and NOT released here (FUN_0059e8d0
             // does that).
-            if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
+            if (Archetype::Load(FsOut, &LoadedHandle, AnimIndex))
             {
                 const ArchetypeIndex Loaded = LoadedHandle;
                 if (FindModelCacheEntry(Loaded) == nullptr)
@@ -343,7 +343,7 @@ bool FClientMeshHolder::LoadFromPath(char const* RelPath, char const* MaterialPa
         }
         else
         {
-            if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
+            if (Archetype::Load(FsOut, &LoadedHandle, AnimIndex))
             {
                 const ArchetypeIndex Loaded = LoadedHandle;
                 if (BindInstance(Loaded))
@@ -355,7 +355,7 @@ bool FClientMeshHolder::LoadFromPath(char const* RelPath, char const* MaterialPa
 
     bool const bResult = HasInstance();
     if (FsOut != nullptr)
-        static_cast<IFileSystem*>(FsOut)->Release();
+        FsOut->Release();
     return bResult;
 }
 
@@ -382,11 +382,11 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
     bool bResult = false;
     FFileSystemAggDesc Desc;
     BuildMeshFileSystemDesc(&Desc, Path);
-    void* FsOut = nullptr;
+    IFileSystem* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)
-            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
+            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FsOut)) == 0)
     {
-        IFileSystem* const Filesys = static_cast<IFileSystem*>(FsOut);
+        IFileSystem* const Filesys = FsOut;
         // FUN_0041ade0 reads the mesh's own materials from the file system already open;
         // FUN_0041aa50 takes AuxPath as is.
         Archetype::FCliMaterialEntry* const Material =
@@ -417,7 +417,7 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
     }
 
     if (FsOut != nullptr)
-        static_cast<IFileSystem*>(FsOut)->Release();
+        FsOut->Release();
     return bResult;
 }
 

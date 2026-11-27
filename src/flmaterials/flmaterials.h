@@ -15,6 +15,8 @@
 #include "render/shading.h"
 
 
+struct IEngine;
+
 // Registration uses this opaque token; callers remove const explicitly.
 static const void* kRegisterPriority = (void*)0x80000000;
 
@@ -54,7 +56,7 @@ void FlmVisibleCounterReset();
 void FlmVisibleCounterCopy(unsigned long* Out3);
 
 // Borrowed engine outer component cached by FLAppearance initialization.
-extern IDAComponent* G_FlmEngineOuter;
+extern IEngine* G_FlmEngineOuter;
 
 // Look up the root-instance fade value; leave Out untouched on a miss.
 bool FlmLookupIdValue(int Id, void** Out);
@@ -83,12 +85,12 @@ public:
     };
 
     GENRESULT DACOM_API Initialize(IDAComponent* Outer) override;                  // 066f1210
-    GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem) override;             // 066f13e0
-    GENRESULT DACOM_API SaveProperties(void* FileSystem) override;                 // 066f14f0
+    GENRESULT DACOM_API LoadFromFileSystem(IFileSystem* FileSystem) override;             // 066f13e0
+    GENRESULT DACOM_API SaveProperties(IFileSystem* FileSystem) override;                 // 066f14f0
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f15d0
     GENRESULT DACOM_API ResolveTextures(float Delta) override;                     // LAB_066f1610
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066f3330
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066f3330
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // LAB_066f3370
     GENRESULT DACOM_API SetName(const char* Name) override;                        // LAB_066f1670
@@ -115,14 +117,14 @@ protected:
     void ReleaseMaterialResources();
     void SeedWhiteMaterialBlock();
     void RecomputeOpacityFlags();
-    void TeardownCandidateIgnoringResult(void* Context);
-    GENRESULT SubmitCandidateGeometry(void* Context, unsigned long PrimType,
+    void TeardownCandidateIgnoringResult(FMaterialSubmitContext* Context);
+    GENRESULT SubmitCandidateGeometry(FMaterialSubmitContext* Context, unsigned long PrimType,
                                      unsigned long Start, unsigned long Count,
                                      unsigned long IbStart, unsigned long IndexSpan,
                                      unsigned long Flags);
     void ApplyTssFromTextureBlock(unsigned long Stage, const unsigned long* Block);
     unsigned long TextureHandleAt(const unsigned long* Block) const;
-    bool ContextWantsColorVertex(void* Context) const;
+    bool ContextWantsColorVertex(FMaterialSubmitContext* Context) const;
     float GetDiffuseAlpha() const;
 
     IRenderPipeline* Pipeline_;                  // +4
@@ -167,9 +169,9 @@ public:
 class FBackdropMaterial : public FMaterialImpl
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f2da0
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066f2e30
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f2da0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066f2e30
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f2ec0
     const char* __thiscall ClassName() override;
@@ -177,8 +179,8 @@ public:
 
 protected:
     FBackdropMaterial();
-    GENRESULT TeardownBackdrop(void* Context);
-    GENRESULT DrawBackdrop(void* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
+    GENRESULT TeardownBackdrop(FMaterialSubmitContext* Context);
+    GENRESULT DrawBackdrop(FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
                            unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags);
 
     unsigned char bBackdrop_;              // +68  1 for BackdropMaterial, 0 for StarsphereMaterial
@@ -190,9 +192,9 @@ class FCloakMaterial : public FGenericPropertyMaterial
 {
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f4000
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f4010
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // LAB_066f42e0
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f4010
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // LAB_066f42e0
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f4220
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f3ff0
@@ -221,8 +223,8 @@ class FColorizeMaterial : public FMaterialImpl
 {
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f4000
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f4d20
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // LAB_066f5010
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f4d20
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // LAB_066f5010
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f4a90
     const char* __thiscall ClassName() override;
     GENRESULT __thiscall StoreParameterValue(unsigned long Index, void* Entry, void* Value) override; // 066f4ad0
@@ -241,7 +243,7 @@ class FEngineGlowMaterial : public FGenericPropertyMaterial
 {
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f5700
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f5760
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f5760
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f56e0
     const char* __thiscall ClassName() override;
     GENRESULT __thiscall InitializeFromDescriptor(void* Arg) override;             // 066f6a40
@@ -258,9 +260,9 @@ protected:
 class FEnvMapMaterial : public FMaterialImpl
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f5af0
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066f6240
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f5af0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066f6240
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f5dc0
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f56e0
@@ -280,8 +282,8 @@ protected:
 class FExclusionZoneMaterial : public FGenericPropertyMaterial
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f6a60
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f6a60
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f6b40
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f8010
@@ -299,8 +301,8 @@ protected:
 class FGlassMaterial : public FGenericPropertyMaterial
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f7500
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f7500
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f7640
     const char* __thiscall ClassName() override;
@@ -311,7 +313,7 @@ public:
 class FHudIconMaterial : public FGenericPropertyMaterial
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f8030
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f8030
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f8010
     const char* __thiscall ClassName() override;
     unsigned long __thiscall GetParameterTable(void** OutBase) override;           // 066f7c10
@@ -337,9 +339,9 @@ class FNomadMaterial : public FMaterialImpl
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f8bf0
     GENRESULT DACOM_API ResolveTextures(float Delta) override;                     // 066f88b0
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f8940
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066f8bd0
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f8940
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066f8bd0
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066f8c50
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f8930
@@ -368,9 +370,9 @@ class FPlanetWaterMaterial : public FGenericPropertyMaterial
 {
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066f9c00
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f9cd0
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066f9e50
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f9cd0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066f9e50
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // FUN_066f9ea0
     const char* __thiscall ClassName() override;
@@ -387,9 +389,9 @@ protected:
 class FShadowMaterial : public FMaterialImpl
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066fa3f0
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066fa530
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066fa3f0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066fa530
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066fa5c0
     const char* __thiscall ClassName() override;
@@ -397,8 +399,8 @@ public:
 protected:
     FShadowMaterial();
     ~FShadowMaterial() noexcept(false);                                             // 066faad0
-    GENRESULT ShadowCandidateDispatch(void* Context);
-    GENRESULT DrawShadow(void* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
+    GENRESULT ShadowCandidateDispatch(FMaterialSubmitContext* Context);
+    GENRESULT DrawShadow(FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
                          unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags);
 
     unsigned long ShadowLayerCount_;         // +68  candidate layer count
@@ -412,9 +414,9 @@ protected:
 class FVisibleCounterMaterial : public FMaterialImpl
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066fadb0
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 066fadb0
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066fadb0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 066fadb0
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // LAB_066FADC0
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f56e0
@@ -425,8 +427,8 @@ public:
 class FWireMaterial : public FMaterialImpl
 {
 public:
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066fb490
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066fb490
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066fb540
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066fb1e0
@@ -452,8 +454,8 @@ class FWire2Material : public FMaterialImpl
 {
 public:
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;          // 066fc0d0
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 066f32e0
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 066f32e0
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // 066fc150
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066fb1e0
@@ -482,9 +484,9 @@ class FHudAnimMaterial : public FGenericPropertyMaterial
 public:
     GENRESULT DACOM_API Initialize(IDAComponent* Outer) override;                  // LAB_066ffee0
     GENRESULT DACOM_API ResolveTextures(float Delta) override;                     // LAB_066fff20
-    GENRESULT DACOM_API Bind(void* Context) override;                              // 06700070
-    GENRESULT DACOM_API Teardown(void* Context) override;                          // 06700200
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                              // 06700070
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                          // 06700200
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                unsigned long Flags) override;                      // LAB_06700260
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;               // 066f56e0

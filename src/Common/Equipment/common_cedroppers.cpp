@@ -60,7 +60,7 @@ FireResult CEMineDropper::CanFire(Vector const& Target) const
     if (Result == FireOk && Owner != nullptr &&
         (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
-        CShip* Ship = (CShip*)Owner;
+        CShip* Ship = static_cast<CShip*>(Owner);
         if (Ship->is_cruise_active())
             return FireCruise;
     }
@@ -72,7 +72,7 @@ CEMineDropper* __cdecl CEMineDropper::cast(CEquip* Equip)
     // RVA 0x3a2d0
     if (Equip == nullptr || Equip->GetType() != EquipTypeMineDropper)
         return nullptr;
-    return (CEMineDropper*)Equip;
+    return static_cast<CEMineDropper*>(Equip);
 }
 
 CEMineDropper const* __cdecl CEMineDropper::cast(CEquip const* Equip)
@@ -103,18 +103,18 @@ bool CECounterMeasureDropper::Update(float Dt, unsigned Flags)
     // Notify(IncomingMissileDetected) and ends the walk. The tail is CELauncher::Update inlined.
     if (IsFunctioning() && (Flags & 0x20) == 0)
     {
-        Archetype::CounterMeasureDropper const* CmArch = (Archetype::CounterMeasureDropper const*)Arch;
+        Archetype::CounterMeasureDropper const* CmArch = static_cast<Archetype::CounterMeasureDropper const*>(Arch);
         if (CmArch->AiRangeSq > 0.0f)
         {
             // FindFirst's result is used as the scanner with no cast and no null test.
-            CEScanner const* Scanner = (CEScanner const*)Owner->EquipManager.FindFirst(EquipTypeScanner);
+            CEScanner const* Scanner = static_cast<CEScanner const*>(Owner->EquipManager.FindFirst(EquipTypeScanner));
             for (int Index = 0; Index < Scanner->Scans.Count; ++Index)
             {
                 Watchable const* Watched = Scanner->Scans.Entries[Index].target();
                 if (Watched == nullptr)
                     continue;
                 // Retail tests the adjusted pointer (IObjRW's Watchable base is at +8).
-                IObjRW* Tracked = (IObjRW*)((char*)Watched - 8);
+                IObjRW* Tracked = reinterpret_cast<IObjRW*>(((char*)Watched - 8));
                 if (Tracked == nullptr)
                     continue;
 
@@ -155,7 +155,7 @@ CECounterMeasureDropper* __cdecl CECounterMeasureDropper::cast(CEquip* Equip)
     // RVA 0x3a4a0
     if (Equip == nullptr || Equip->GetType() != EquipTypeCmDropper)
         return nullptr;
-    return (CECounterMeasureDropper*)Equip;
+    return static_cast<CECounterMeasureDropper*>(Equip);
 }
 
 CECounterMeasureDropper const* __cdecl CECounterMeasureDropper::cast(CEquip const* Equip)
@@ -166,22 +166,22 @@ CECounterMeasureDropper const* __cdecl CECounterMeasureDropper::cast(CEquip cons
 
 Archetype::MineDropper const* CEMineDropper::MineDropperArch()
 {
-    return (Archetype::MineDropper const*)Arch;
+    return static_cast<Archetype::MineDropper const*>(Arch);
 }
 
 Archetype::Mine const* CEMineDropper::MineArch()
 {
     // RVA 0x369c0 (ICF-shared).
-    return (Archetype::Mine const*)Projectile;
+    return static_cast<Archetype::Mine const*>(Projectile);
 }
 
 Archetype::CounterMeasureDropper const* CECounterMeasureDropper::CounterMeasureDropperArch()
 {
-    return (Archetype::CounterMeasureDropper const*)Arch;
+    return static_cast<Archetype::CounterMeasureDropper const*>(Arch);
 }
 
 Archetype::CounterMeasure const* CECounterMeasureDropper::CounterMeasureArch()
 {
     // RVA 0x369c0 (ICF-shared).
-    return (Archetype::CounterMeasure const*)Projectile;
+    return static_cast<Archetype::CounterMeasure const*>(Projectile);
 }

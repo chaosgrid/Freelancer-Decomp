@@ -126,8 +126,8 @@ namespace
         Desc.FindHandle = 0xFFFFFFFF;
 
         void* Object = nullptr;
-        GENRESULT Result = DALib::Dacom->CreateInstance((AGGDESC*)&Desc, &Object);
-        GUniverseDirFs = (Result == GR_OK) ? (IFileSystem*)Object : nullptr;
+        GENRESULT Result = DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Object);
+        GUniverseDirFs = (Result == GR_OK) ? reinterpret_cast<IFileSystem*>(Object) : nullptr;
     }
 
     bool IdIsValid(unsigned NicknameId)

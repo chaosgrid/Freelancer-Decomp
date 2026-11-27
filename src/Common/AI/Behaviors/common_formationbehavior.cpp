@@ -41,7 +41,7 @@ FormationBehavior::FormationBehavior(int InTypeId)
 void FormationBehavior::OnEngage()
 {
     BaseFollowerBehavior::OnEngage();
-    (void)ObjInspectOf(OwnerContext)->get_formation_offset(Offset290);
+    (void)OwnerContext->get_formation_offset(Offset290);
     if (SysMgr->SelfTarget.Iface->is_player())
     {
         Flag28c = 1;
@@ -58,7 +58,7 @@ void FormationBehavior::OnDisengage()
     if (!SysMgr->SelfTarget.Iface->is_player())
         return;
     (void)SysMgr->FormationLeaders.RequestRelease();     // FUN_062ecd30
-    unsigned int const Id = ObjInspectOf(OwnerContext)->get_id();
+    unsigned int const Id = OwnerContext->get_id();
     (void)ObjAffectOf(OwnerContext)->request_cancel(kRequestEventFormation, &Id, -1);
 }
 
@@ -89,7 +89,7 @@ int FormationBehavior::OnEvaluateReadiness(float Value)
 EvaluateResult FormationBehavior::evaluate(unsigned int Context)
 {
     (void)Context;
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+    IObjInspect const* const Owner = OwnerContext;
     IObjRW* Target = nullptr;
     (void)Owner->get_target(Target);
 
@@ -108,7 +108,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
     if (!SinglePlayer())
     {
         CShip const* const A = ShipOrNull(Owner->cobject());
-        CShip const* const B = ShipOrNull(ObjInspectOf(Target)->cobject());
+        CShip const* const B = ShipOrNull(Target->cobject());
         if (A != nullptr && B != nullptr && A->bIsPlayer != 0 && B->bIsPlayer != 0)
         {
             unsigned int const GroupA = A->GroupId;
@@ -151,11 +151,11 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
         }
     }
 
-    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & OBJ_SHIP_MASK) == 0)
+    if ((GetObjectTypeOrZero(Target) & OBJ_SHIP_MASK) == 0)
         return EvalSkip;
 
     // Against the owner's ship captured at the top.
-    CShip const* const TargetShip = ShipOrNull(ObjInspectOf(Target)->cobject());
+    CShip const* const TargetShip = ShipOrNull(Target->cobject());
     if (OwnShip != nullptr && TargetShip != nullptr && TargetShip->bIsPlayer != 0)
     {
         if (OwnGroup == 0)
@@ -174,7 +174,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
     }
     // DAT_0639fbd8 = 25000000.0f. Summed in double in retail's (x, z, y) order; unordered
     // leaves.
-    Vector const& TargetPos = ObjInspectOf(Target)->get_position();
+    Vector const& TargetPos = Target->get_position();
     double const Dx = static_cast<double>(TargetPos.x) - Sys->SelfTarget.CachedPos.x;
     double const Dy = static_cast<double>(TargetPos.y) - Sys->SelfTarget.CachedPos.y;
     double const Dz = static_cast<double>(TargetPos.z) - Sys->SelfTarget.CachedPos.z;
@@ -184,7 +184,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
 
     // DAT_0639f540 = -0.6f.
     float Attitude = 0.0f;
-    (void)ObjInspectOf(Target)->get_attitude_towards(Attitude, Owner);
+    (void)Target->get_attitude_towards(Attitude, Owner);
     if (Attitude > -0.6f)
         return EvalBlocked;
     return EvalSkip;
@@ -264,12 +264,12 @@ void FormationBehavior::UpdateFollowerSteering()
     GetIfacePositionOrZero(&LeaderPos, Leader);
 
     // No null test.
-    (void)ObjInspectOf(OwnerContext)->get_formation_offset(Offset290);
+    (void)OwnerContext->get_formation_offset(Offset290);
 
     // The leader's own formation offset; retail re-unwraps the watcher for it.
     Vector LeaderFormationOffset{ 0.0f, 0.0f, 0.0f };
-    (void)ObjInspectOf(ObjRwFromWatchable(const_cast<void*>(static_cast<void const*>(
-        LeadWatcher.target()))))->get_formation_offset(LeaderFormationOffset);
+    (void)ObjRwFromWatchable(const_cast<void*>(static_cast<void const*>(
+        LeadWatcher.target())))->get_formation_offset(LeaderFormationOffset);
 
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
@@ -295,7 +295,7 @@ void FormationBehavior::UpdateFollowerSteering()
     // The standoff picked here is added to the ship's own physical radius further down.
     bool bCruise = false;
     bool bTradeLane = false;
-    (void)ObjInspectOf(OwnerContext)->is_cruise_active(bCruise, bTradeLane);   // no null test
+    (void)OwnerContext->is_cruise_active(bCruise, bTradeLane);   // no null test
     float const Standoff = (bCruise && !bTradeLane) ? CruiseStandoffDistance2a4
                                                     : StandoffDistance2a0;
 
@@ -368,7 +368,7 @@ void FormationBehavior::UpdateFollowerSteering()
 Vector FormationBehavior::GetRotatedOffset()
 {
     Vector FormationOffsetLocal{ 0.0f, 0.0f, 0.0f };
-    (void)ObjInspectOf(OwnerContext)->get_formation_offset(FormationOffsetLocal);   // no null test
+    (void)OwnerContext->get_formation_offset(FormationOffsetLocal);   // no null test
 
     IObjRW* const Leader = ObjRwFromWatchable(
         const_cast<void*>(static_cast<void const*>(LeadWatcher.target())));

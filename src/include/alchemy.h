@@ -16,7 +16,10 @@
 // ::IFxEffectLibrary* under the retail mangled names; alchemy_types.h pulls these into
 // AlchemyImpl with using-declarations so both sides mean one type.
 
+struct IAlchemy;
 struct IFxEffect;
+struct IFxEffectLibrary;
+struct IFxMeshFactory;
 struct IFileSystem;
 
 // File / vtable rec16 is 4 dwords. AddRec16 stores [in2, id, in0, in1]; GetRec16 un-reorders.
@@ -78,7 +81,7 @@ struct IFxNodeLibrary : IDAComponent
     virtual GENRESULT DACOM_API EnumerateNodes(FNodeLibraryEnumCallback Callback,
                                            void* Context) = 0;                // 8 RET 0xC
     virtual GENRESULT DACOM_API ClearNodeLibrary() = 0;                         // 9  RET 4
-    virtual GENRESULT DACOM_API MakeUniqueName(void* A, void* B) = 0;            // 10 RET 0xC
+    virtual GENRESULT DACOM_API MakeUniqueName(const char* A, const char** B) = 0;            // 10 RET 0xC
     virtual GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) = 0; // 11 RET 0xC
     virtual GENRESULT DACOM_API FindNodeByHash(unsigned long Hash, IDAComponent** Out) = 0; // 12 RET 0xC
 };
@@ -88,28 +91,28 @@ struct IAlchemy : IFxNodeLibrary
 {
     virtual GENRESULT DACOM_API CreateVertexBuffer() = 0;                       // 13 RET 4
     virtual GENRESULT DACOM_API ReleaseVertexBuffer() = 0;                      // 14 RET 4
-    virtual GENRESULT DACOM_API ComposeNodeTransforms(void* A, void* B) = 0;    // 15 RET 0xC
-    virtual GENRESULT DACOM_API UpdateNodes(void* A, void* B) = 0;              // 16 RET 0xC
-    virtual GENRESULT DACOM_API DrawNodes(void* A, void* B) = 0;                // 17 RET 0xC
+    virtual GENRESULT DACOM_API ComposeNodeTransforms(void* A, IDAComponent* B) = 0;    // 15 RET 0xC
+    virtual GENRESULT DACOM_API UpdateNodes(void* A, IDAComponent* B) = 0;              // 16 RET 0xC
+    virtual GENRESULT DACOM_API DrawNodes(void* A, IDAComponent* B) = 0;                // 17 RET 0xC
     virtual GENRESULT DACOM_API GetDrawCookie() = 0;                            // 18 RET 4
     virtual GENRESULT DACOM_API CreateNamedNode(const char* Name, void* Unused) = 0; // 19 +0x4C RET 0xC
-    virtual GENRESULT DACOM_API AttachNode(void* A, void* B) = 0;               // 20 RET 0xC
-    virtual GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) = 0;       // 21 RET 0xC
-    virtual GENRESULT DACOM_API DetachNode(void* Node) = 0;                     // 22 RET 8
-    virtual GENRESULT DACOM_API SubmitNode(void* Node) = 0;                     // 23 RET 8
-    virtual GENRESULT DACOM_API SubmitChildNodes(void* Node) = 0;               // 24 RET 8
-    virtual GENRESULT DACOM_API GetRootNode(void** Out) = 0;                    // 25 RET 8
-    virtual GENRESULT DACOM_API FindNode(void* A, void* B, void* C) = 0;        // 26 RET 0x10
+    virtual GENRESULT DACOM_API AttachNode(IDAComponent* A, IDAComponent* B) = 0;               // 20 RET 0xC
+    virtual GENRESULT DACOM_API AttachNodeFiltered(void* A, IDAComponent* B) = 0;       // 21 RET 0xC
+    virtual GENRESULT DACOM_API DetachNode(IDAComponent* Node) = 0;                     // 22 RET 8
+    virtual GENRESULT DACOM_API SubmitNode(IDAComponent* Node) = 0;                     // 23 RET 8
+    virtual GENRESULT DACOM_API SubmitChildNodes(IDAComponent* Node) = 0;               // 24 RET 8
+    virtual GENRESULT DACOM_API GetRootNode(IDAComponent** Out) = 0;                    // 25 RET 8
+    virtual GENRESULT DACOM_API FindNode(IDAComponent** A, void* B, IDAComponent* C) = 0;        // 26 RET 0x10
     virtual GENRESULT DACOM_API SetUpdateCallback(void* Fn) = 0;                // 27 RET 8
     virtual GENRESULT DACOM_API SetFilterCallback(void* Fn) = 0;                // 28 RET 8
     virtual GENRESULT DACOM_API BeginDraw() = 0;                                // 29 RET 4
     virtual GENRESULT DACOM_API EndDraw() = 0;                                  // 30 RET 4
     virtual GENRESULT DACOM_API SetUseMaterialBatcher(unsigned char Value) = 0; // 31 RET 8
     virtual GENRESULT DACOM_API GetUseMaterialBatcher() = 0;                    // 32 RET 4
-    virtual GENRESULT DACOM_API EnqueueAppearance(void* A, void* B) = 0;        // 33 RET 0xC
+    virtual GENRESULT DACOM_API EnqueueAppearance(void* A, IDAComponent* B) = 0;        // 33 RET 0xC
     virtual void* DACOM_API GetVertexBufferHandle() = 0;                        // 34 RET 4
-    virtual GENRESULT DACOM_API SetDrawFlags(void* Pair) = 0;                   // 35 RET 8
-    virtual GENRESULT DACOM_API CopyCounters(void* Out9Dwords) = 0;             // 36 RET 8
+    virtual GENRESULT DACOM_API SetDrawFlags(unsigned char* Pair) = 0;                   // 35 RET 8
+    virtual GENRESULT DACOM_API CopyCounters(unsigned char* Out9Dwords) = 0;             // 36 RET 8
     virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;                  // 37 +0x94
     virtual GENRESULT DACOM_API Slot38() = 0;                                   // 38 RET 4
     virtual GENRESULT DACOM_API GetFlagA() = 0;                                 // 39 RET 4
@@ -143,13 +146,13 @@ struct IFxMeshFactory : IDAComponent
 
 struct IFxRuntime : IDAComponent
 {
-    virtual GENRESULT DACOM_API BindAlchemy(void* Alchemy) = 0;            // +0x0C RET 8
+    virtual GENRESULT DACOM_API BindAlchemy(IAlchemy* Alchemy) = 0;            // +0x0C RET 8
     virtual GENRESULT DACOM_API BindUnknown(void* Value) = 0;              // +0x10 RET 8
-    virtual GENRESULT DACOM_API BindEffectLibrary(void* Library) = 0;      // +0x14 RET 8
+    virtual GENRESULT DACOM_API BindEffectLibrary(IFxEffectLibrary* Library) = 0;      // +0x14 RET 8
     virtual GENRESULT DACOM_API GetAlchemy(void** Out) = 0;                // +0x18 RET 8
     virtual GENRESULT DACOM_API GetUnknown(void** Out) = 0;                // +0x1C RET 8
     virtual GENRESULT DACOM_API GetEffectLibrary(void** Out) = 0;          // +0x20 RET 8
-    virtual GENRESULT DACOM_API BindMeshFactory(void* Factory) = 0;        // +0x24 LAB_0623b6a0 DAT_06257b9c
+    virtual GENRESULT DACOM_API BindMeshFactory(IFxMeshFactory* Factory) = 0;        // +0x24 LAB_0623b6a0 DAT_06257b9c
     virtual GENRESULT DACOM_API GetMeshFactory(void** Out) = 0;            // +0x28 LAB_0623b740
 };
 
@@ -162,7 +165,7 @@ struct IFxEffectLibrary : IDAComponent
     virtual GENRESULT DACOM_API InsertArchetype(IFxEffectArchetype* Archetype,
                                                 unsigned long* OutHash) = 0; // 4 FUN_0621fd50 RET 0xC
     virtual GENRESULT DACOM_API RemoveByHash(unsigned long Hash) = 0;   // 5 LAB_0621ff90 RET 8
-    virtual GENRESULT DACOM_API CreateEffect(void* Unused, void* Key,
+    virtual GENRESULT DACOM_API CreateEffect(IDAComponent* Unused, void* Key,
                                              IFxEffect** Out) = 0;      // FUN_06220020 RET 0x10
     virtual GENRESULT DACOM_API SaveAle(IFileSystem* FileSystem) = 0;   // FUN_06220140 RET 8
     virtual GENRESULT DACOM_API LoadAle(IFileSystem* FileSystem) = 0;   // LAB_06220310 RET 8
@@ -188,7 +191,7 @@ struct IFxEffect : IDAComponent
     virtual GENRESULT DACOM_API ComposeTransforms(void* Arg) = 0;      // FUN_0621f6d0 RET 8
     virtual GENRESULT DACOM_API Update(void* Arg) = 0;                 // FUN_0621f730 RET 8
     virtual GENRESULT DACOM_API Draw(void* Arg) = 0;                   // FUN_0621f790 RET 8
-    virtual GENRESULT DACOM_API FindNodeById(void* A, void* B) = 0;    // LAB_0621fa40 RET 0xC
+    virtual GENRESULT DACOM_API FindNodeById(void* A, void** B) = 0;    // LAB_0621fa40 RET 0xC
     virtual GENRESULT DACOM_API IsFinished(void* Arg) = 0;             // LAB_0621fa80 RET 8
     virtual GENRESULT DACOM_API EnumerateNodes(void* A, void* B) = 0;  // LAB_0621fb50 RET 0xC
     virtual GENRESULT DACOM_API DestroyNodes(void* Arg) = 0;           // FUN_0621fba0 RET 8: free nodes by mask 1=emitters, 2=fields, 4=appearances, 7=all

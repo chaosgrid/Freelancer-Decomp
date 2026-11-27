@@ -55,7 +55,7 @@ namespace
     // {orientation, position} -- twelve dwords -- into the camera's world transform (+0x04).
     void StoreWorldView(FTurretCamera* Cam, const Transform* View)
     {
-        FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
+        FSpaceCamera* const Space = SpaceCameraOf(Cam);
         memcpy(&Space->World, &View->Rotation, 9 * sizeof(float));
         Space->WorldPos.x = View->Translation.x;
         Space->WorldPos.y = View->Translation.y;
@@ -104,13 +104,13 @@ bool FTurretCamera::Activate(int const* ViewRect4)
 bool FTurretCamera::ComputeView(Transform* OutView, float DeltaSeconds, bool)
 {
     // FUN_0051a7d0. The third argument (1 from the attach, 0 from the update) is never read.
-    FHudCamera* const Hud = (FHudCamera*)this;
+    FHudCamera* const Hud = this;
 
     // Not a watched ship (CObject mask 0x503) -> true.
     if (GameCameraWatchedShip(Hud) == nullptr)
         return true;
 
-    IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
+    IObjRW* const Object = GameCameraGetTarget(Hud);
     Matrix const* const ShipRot = &Object->get_transform().Rotation;
 
     // This frame's yaw (a float) and pitch (kept double).
@@ -244,7 +244,7 @@ bool FTurretCamera::ComputeView(Transform* OutView, float DeltaSeconds, bool)
                                              Tether);
 
     // Retail re-reads the watcher.
-    IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
+    IObjRW* const Again = GameCameraGetTarget(Hud);
     Vector const& ShipPos = Again->get_position();
 
     memcpy(&OutView->Rotation, &M, 9 * sizeof(float));
@@ -254,7 +254,7 @@ bool FTurretCamera::ComputeView(Transform* OutView, float DeltaSeconds, bool)
     return false;
 }
 
-void FTurretCamera::Attach(void* Object)
+void FTurretCamera::Attach(IObjRW* Object)
 {
     // FUN_0051a6a0 (slot 0x58). The view solve's answer is ignored.
     Yaw = 0.0f;
@@ -266,7 +266,7 @@ void FTurretCamera::Attach(void* Object)
     Transform View;
     MakeIdentityView(&View);
     ComputeView(&View, 0.0f, true);
-    SpaceCameraOf((FHudCamera*)this)->bViewDirty = 1;
+    SpaceCameraOf(this)->bViewDirty = 1;
     StoreWorldView(this, &View);
 }
 
@@ -277,7 +277,7 @@ void FTurretCamera::Update(float DeltaSeconds)
     MakeIdentityView(&View);
     ComputeView(&View, DeltaSeconds, false);
     StoreWorldView(this, &View);
-    SpaceCameraOf((FHudCamera*)this)->bViewDirty = 1;
+    SpaceCameraOf(this)->bViewDirty = 1;
     FHudCamera::Update(DeltaSeconds);
 }
 

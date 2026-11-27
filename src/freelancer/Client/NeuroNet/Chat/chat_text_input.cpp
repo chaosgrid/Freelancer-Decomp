@@ -569,7 +569,7 @@ bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
                 unsigned OutSize = 0;
                 if (Writer.write_buffer(TextDisplay, G_ChatSendBuffer, 0x400, OutSize))
                 {
-                    IChatServer* const ChatServer = static_cast<IChatServer*>(G_ChatServer);
+                    IChatServer* const ChatServer = G_ChatServer;
                     if (ChatServer != nullptr)
                     {
                         ChatServer->SubmitChat(CHAT_ID(GetPlayerConnectionId() & 0xffffu), OutSize,

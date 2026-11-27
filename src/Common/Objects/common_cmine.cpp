@@ -68,7 +68,7 @@ void CMine::expire_safe_time()
 Archetype::Mine const* CMine::minearch()
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::Mine const*)Archetype;
+    return static_cast<Archetype::Mine const*>(Archetype);
 }
 
 // ============================================================================
@@ -119,5 +119,5 @@ void CCounterMeasure::expire_safe_time()
 Archetype::CounterMeasure const* CCounterMeasure::countermeasure_arch()
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::CounterMeasure const*)Archetype;
+    return static_cast<Archetype::CounterMeasure const*>(Archetype);
 }

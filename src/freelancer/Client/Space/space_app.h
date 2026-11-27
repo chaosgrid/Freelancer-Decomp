@@ -91,7 +91,7 @@ struct SpaceApp : public IEnvironment
     FScriptCamera      Script;              // +0x760  ctor FUN_0051e100
     FStaticCamera      Static;              // +0x9a4  GameCamera ctor, vt 0x005e0594
     FDockingCamera     Docking;             // +0xa9c  ctor FUN_0051ea20
-    FSpaceCamera*      ActiveCamera;        // +0xba0  DAT_00679738
+    FGameCamera*       ActiveCamera;        // +0xba0  DAT_00679738
     int                PlayerPreference;    // +0xba4  0 first person, 1 third (ctor 1)
     // +0xba8 = DAT_00679740: raised by FUN_0054bb10 (a script camera was set up) and read by
     // FUN_0054bc90; the frame drops it when the view returns to "player", and FUN_0054b230 keeps

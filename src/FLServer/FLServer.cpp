@@ -383,7 +383,7 @@ static DWORD WINAPI ServerThreadProc(LPVOID)
 		LoadStringChecked(Text, 0xf011);
 		ServerLogf(ErrorCode{ 0x100004 }, (LPCTSTR)Text);
 		GApp->ServerControl.SetLogLevel(SavedLevel);
-		Document = (CFLServerDoc*)GApp->MainDocument;
+		Document = static_cast<CFLServerDoc*>(GApp->MainDocument);
 	}
 
 	long long LastTicks = Timing::read_ticks();
@@ -526,7 +526,7 @@ BOOL CFLServerApp::InitInstance()
 		return FALSE;
 	}
 
-	CFrameWnd* Frame = (CFrameWnd*)m_pMainWnd;
+	CFrameWnd* Frame = static_cast<CFrameWnd*>(m_pMainWnd);
 	MainView = Frame->GetActiveView();
 	SummaryForm = new CFLSummaryForm;
 	MainDocument = Frame->GetActiveDocument();
@@ -539,7 +539,7 @@ BOOL CFLServerApp::InitInstance()
 		LoadStringChecked(Name, 0xf00d);
 		// Retail calls the virtual CWnd::Create; CFormView::Create is protected in MFC 14, so
 		// dispatch through the public CWnd declaration.
-		((CWnd*)SummaryForm)->Create(NULL, Name, WS_CHILD, Rect, m_pMainWnd, AFX_IDW_PANE_FIRST + 1, &Context);
+		static_cast<CWnd*>(SummaryForm)->Create(NULL, Name, WS_CHILD, Rect, m_pMainWnd, AFX_IDW_PANE_FIRST + 1, &Context);
 		::SendMessageA(SummaryForm->m_hWnd, WM_INITIALUPDATE, 0, 0);
 	}
 	SwitchView();
@@ -767,7 +767,7 @@ bool CFLServerApp::OnServerStartupFinished(bool bStarted)
 	SetRemoteClientResponseData(ServerControl.GetAllowPvp() != 0, ServerControl.GetAllowNewPlayers() != 0,
 		(int)GServerVersion, ServerControl.ServerDescription.c_str(), Server.GetServerID(),
 		Server.GetServerSig());
-	((CMainFrame*)m_pMainWnd)->OpenBandwidthLog(ServerControl.BandwidthLogPath);
+	static_cast<CMainFrame*>(m_pMainWnd)->OpenBandwidthLog(ServerControl.BandwidthLogPath);
 	return true;
 }
 
@@ -887,7 +887,7 @@ LPCTSTR CFLServerApp::GetServerTitle() const
 // .text:0040d420
 CView* CFLServerApp::SwitchView()
 {
-	CFrameWnd* Frame = (CFrameWnd*)m_pMainWnd;
+	CFrameWnd* Frame = static_cast<CFrameWnd*>(m_pMainWnd);
 	CView* OldView = Frame->GetActiveView();
 	CView* NewView = MainView;
 	if (OldView == MainView)
@@ -914,8 +914,8 @@ CView* CFLServerApp::SwitchView()
 		::SetWindowLongA(FrameWnd, GWL_STYLE, ::GetWindowLongA(FrameWnd, GWL_STYLE) | WS_THICKFRAME);
 	}
 
-	((CFrameWnd*)m_pMainWnd)->SetActiveView(NewView, TRUE);
-	((CFrameWnd*)m_pMainWnd)->RecalcLayout(TRUE);
+	static_cast<CFrameWnd*>(m_pMainWnd)->SetActiveView(NewView, TRUE);
+	static_cast<CFrameWnd*>(m_pMainWnd)->RecalcLayout(TRUE);
 	::InvalidateRect(NewView->m_hWnd, NULL, TRUE);
 
 	if (NewView == SummaryForm)
@@ -1022,7 +1022,7 @@ void CFLServerApp::OnDebugCrashMe()
 // .text:0040d580
 void CFLServerApp::OnUpdateViewConsole(CCmdUI* CmdUI)
 {
-	if (((CFrameWnd*)m_pMainWnd)->GetActiveView() == MainView)
+	if (static_cast<CFrameWnd*>(m_pMainWnd)->GetActiveView() == MainView)
 	{
 		CmdUI->Enable(FALSE);
 		CmdUI->SetCheck(1);
@@ -1035,7 +1035,7 @@ void CFLServerApp::OnUpdateViewConsole(CCmdUI* CmdUI)
 // .text:0040d5c0
 void CFLServerApp::OnUpdateViewStatusSummary(CCmdUI* CmdUI)
 {
-	if (((CFrameWnd*)m_pMainWnd)->GetActiveView() == SummaryForm)
+	if (static_cast<CFrameWnd*>(m_pMainWnd)->GetActiveView() == SummaryForm)
 	{
 		CmdUI->Enable(FALSE);
 		CmdUI->SetCheck(1);

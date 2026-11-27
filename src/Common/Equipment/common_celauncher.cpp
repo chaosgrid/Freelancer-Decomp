@@ -99,7 +99,7 @@ CELauncher::CELauncher(unsigned TypeBits, CEqObj* OwnerObj, unsigned short Equip
     for (; Barrel < 8; ++Barrel)
         Barrels[Barrel].EngineIndex = -1;
 
-    Archetype::Launcher* LauncherArch = (Archetype::Launcher*)(Arch);
+    Archetype::Launcher* LauncherArch = static_cast<Archetype::Launcher*>(Arch);
     Projectile = Archetype::GetEquipment(LauncherArch->ProjectileArchetype.Id);
     if (Projectile == nullptr)
     {
@@ -137,7 +137,7 @@ CELauncher* __cdecl CELauncher::cast(CEquip* Equip)
     if (TypeBits != EquipTypeGun && TypeBits != EquipTypeMineDropper &&
         TypeBits != EquipTypeCmDropper)
         return nullptr;
-    return (CELauncher*)(Equip);
+    return static_cast<CELauncher*>(Equip);
 }
 
 CELauncher const* __cdecl CELauncher::cast(CEquip const* Equip)
@@ -255,7 +255,7 @@ int CELauncher::GetAmmoCount() const
 {
     // FUN_06299a10: -1 when no ammo is needed, else the first matching cargo's count, else 0.
     // No Projectile / Owner / Arch tests.
-    Archetype::Projectile const* Proj = (Archetype::Projectile const*)(Projectile);
+    Archetype::Projectile const* Proj = static_cast<Archetype::Projectile const*>(Projectile);
     if (!Proj->bRequiresAmmo)
         return -1;
 
@@ -264,7 +264,7 @@ int CELauncher::GetAmmoCount() const
     while (Equip != nullptr)
     {
         if (Equip->Arch->Nickname.Id == Projectile->Nickname.Id)
-            return (int)(((CECargo*)Equip)->Count);
+            return (int)(static_cast<CECargo*>(Equip)->Count);
         Equip = Owner->EquipManager.Traverse(Walk);
     }
     return 0;
@@ -300,7 +300,7 @@ FireResult CELauncher::CanFire(Vector const& Target) const
         return FireCloakActive;
     if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
-        CShip* Ship = (CShip*)(Owner);
+        CShip* Ship = static_cast<CShip*>(Owner);
         if (Ship->is_using_tradelane())
             return FireTradelane;
     }
@@ -330,7 +330,7 @@ void CELauncher::DrawPower(int BarrelCount)
 void CELauncher::DrawAmmoFromCargo(int BarrelCount)
 {
     // FUN_0629a0a0: the first matching cargo gives up the ammo. No null guards.
-    Archetype::Projectile* Proj = (Archetype::Projectile*)(Projectile);
+    Archetype::Projectile* Proj = static_cast<Archetype::Projectile*>(Projectile);
     if (!Proj->bRequiresAmmo)
         return;
 
@@ -340,7 +340,7 @@ void CELauncher::DrawAmmoFromCargo(int BarrelCount)
     {
         if (Equip->Arch->Nickname.Id == Projectile->Nickname.Id)
         {
-            ((CECargo*)Equip)->RemoveFromStack((unsigned)(BarrelCount));
+            static_cast<CECargo*>(Equip)->RemoveFromStack((unsigned)(BarrelCount));
             return;
         }
         Equip = Owner->EquipManager.Traverse(Walk);
@@ -500,11 +500,11 @@ Vector CELauncher::GetAvgBarrelDirWS() const
 
 Archetype::Launcher const* CELauncher::LauncherArch() const
 {
-    return (Archetype::Launcher const*)(Arch);
+    return static_cast<Archetype::Launcher const*>(Arch);
 }
 
 Archetype::Projectile const* CELauncher::ProjectileArch() const
 {
     // RVA 0x369c0 (ICF-shared).
-    return (Archetype::Projectile const*)(Projectile);
+    return static_cast<Archetype::Projectile const*>(Projectile);
 }

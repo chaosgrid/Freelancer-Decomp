@@ -21,6 +21,7 @@
 #include "Common/Audio/menu_sound_arch.h"
 #include "Core/perf_options.h"
 #include "Space/Cameras/space_camera.h"
+#include "Space/Cameras/space_camera_game.h" // FGameCamera: the first/third/turret cameras
 #include "Space/space_scene_obj_draw.h" // the field controller DAT_00675244 / 0067524c / 00675248
 
 #include "DALib.h"
@@ -211,10 +212,10 @@ unsigned char FParticleEffect::CreateAlchemyNodes()
     }
 
     // No null test on the root.
-    void* RootRaw = nullptr;
+    IDAComponent* RootRaw = nullptr;
     DALib::Alchemy->GetRootNode(&RootRaw);
     DALib::Alchemy->AttachNode(RootRaw, FxNode);
-    reinterpret_cast<IDAComponent*>(RootRaw)->Release();
+    RootRaw->Release();
 
     Flags7C = static_cast<unsigned char>(Flags7C | kParticleFlagFxCreated);
     return static_cast<unsigned char>((Flags7C >> 2) & 1u);
@@ -384,7 +385,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
             return 0;
 
         // Only with a field controller (DAT_00675244).
-        void* const Field = GetSpaceFieldController();
+        FNebulaEffect* const Field = GetSpaceFieldController();
         if (Field != nullptr)
         {
             unsigned DrawStateB = 0;
@@ -655,7 +656,7 @@ void ParticleEffectCruiseDestroy(FParticleEffect* This, int FreeMemory)
     if ((FreeMemory & 1) != 0)
         delete This;
     else
-        ((FParticleEffectCruise*)This)->FParticleEffectCruise::~FParticleEffectCruise();
+        static_cast<FParticleEffectCruise*>(This)->FParticleEffectCruise::~FParticleEffectCruise();
 }
 
 
@@ -724,12 +725,12 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     Self->GetWorldTransform(&World);
 
     // Stored before the test.
-    void* const Camera = GetClientSoundListenerObject();
+    FSpaceCamera* const Camera = static_cast<FSpaceCamera*>(GetClientSoundListenerObject());
     Self->Camera = Camera;
     if (Camera != nullptr)
     {
         const Vector* const CamPos =
-            ((ICamera*)Camera)->GetPosition();
+            AsCamera(Camera)->GetPosition();
         float const Dx = CamPos->x - World.Translation.x;
         float const Dy = CamPos->y - World.Translation.y;
         float const Dz = CamPos->z - World.Translation.z;
@@ -770,7 +771,7 @@ unsigned char FCameraParticles::TickDraw(float Dt, FSpaceCamera* Cam)
 {
     FCameraParticles* const Self = this;
     // LAB_004f8fd0. A Start camera that is not the one drawing re-seeds the timer.
-    if (Self->Camera != nullptr && Self->Camera != static_cast<void*>(Cam))
+    if (Self->Camera != nullptr && Self->Camera != Cam)
         Self->Timer = kCameraParticlesFadeTime + kCameraParticlesFadeTime;
 
     // Every return is the negation of the opaque test. An opaque fade goes straight to the
@@ -830,17 +831,17 @@ namespace
 }
 
 FEffectBase* FStandardCliEffectFactory::CreateParticle() const { return ParticleEffectCreate(); }
-ISoundSource* FStandardCliEffectFactory::CreateSound() const { return (ISoundSource*)CreateClientSoundSource3D(); }
+ISoundSource* FStandardCliEffectFactory::CreateSound() const { return CreateClientSoundSource3D(); }
 FGameLight* FStandardCliEffectFactory::CreateLight() const { return CreateEffectGameLight(); }
 FEffectBase* FJumpCliEffectFactory::CreateParticle() const { return ParticleEffectCreateJump(); }
 FEffectBase* FCameraCliEffectFactory::CreateParticle() const { return CameraParticlesCreate(); }
-ISoundSource* FCameraCliEffectFactory::CreateSound() const { return (ISoundSource*)CreateClientSoundSource(); }
+ISoundSource* FCameraCliEffectFactory::CreateSound() const { return CreateClientSoundSource(); }
 FEffectBase* FTunnelCliEffectFactory::CreateParticle() const { return ParticleTunnelCreate(); }
 
-ISoundSource* FJumpCliEffectFactory::CreateSound() const { return (ISoundSource*)CreateClientSoundSource3D(); }
+ISoundSource* FJumpCliEffectFactory::CreateSound() const { return CreateClientSoundSource3D(); }
 FGameLight* FJumpCliEffectFactory::CreateLight() const { return CreateEffectGameLight(); }
 FGameLight* FCameraCliEffectFactory::CreateLight() const { return CreateEffectGameLight(); }
-ISoundSource* FTunnelCliEffectFactory::CreateSound() const { return (ISoundSource*)CreateClientSoundSource(); }
+ISoundSource* FTunnelCliEffectFactory::CreateSound() const { return CreateClientSoundSource(); }
 FGameLight* FTunnelCliEffectFactory::CreateLight() const { return CreateEffectGameLight(); }
 
 FStandardCliEffectFactory const G_CliEffectFactoryC60;
@@ -870,17 +871,17 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal)
     return 0;
 }
 
-unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
+unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, FClientGameobj* ListOwner,
                                      int EngineIndex, Transform const* LocalXform,
-                                     void* CompanionOut)
+                                     FEffectCompanion* CompanionOut)
 {
     return G_CliEffectFactoryC60.CreateEffectOneShotOn(EffectArch, ListOwner, EngineIndex,
                                                        LocalXform, CompanionOut);
 }
 
-unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, void* ListOwner,
+unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, FClientGameobj* ListOwner,
                                                        int EngineIndex, Transform const* LocalXform,
-                                                       void* CompanionOut) const
+                                                       FEffectCompanion* CompanionOut) const
 {
     // FUN_00503070 (on the factory).
     if (GetGameOption(kGameOptEffectsGroup) == 0 || EffectArch == nullptr)
@@ -896,7 +897,7 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
         Particle = CreateParticle();
     }
     if (EffectArch->SndEffect != nullptr)
-        Sound = static_cast<ISoundSource*>(CreateSound());
+        Sound = CreateSound();
     if (EffectArch->LgtRadius > 0.0f)
         Light = CreateLight();
 
@@ -928,11 +929,11 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
     }
     if (Light != nullptr)
     {
-        ((FEngineLight*)Light)->SetType(kLightPoint, true);
+        Light->SetType(kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
-        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
-        ((FEngineLight*)Light)->SetRadius(EffectArch->LgtRadius);
+        Light->SetColorBytesAlt(Rgb);
+        Light->SetRadius(EffectArch->LgtRadius);
         if (!Light->FGameLight::Enable())
         {
             Light->Release();
@@ -968,12 +969,11 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
     if (CompanionOut != nullptr)
     {
         // FUN_00502d90.
-        unsigned char* Out = static_cast<unsigned char*>(CompanionOut);
-        std::memset(Out, 0, 0x10);
-        *reinterpret_cast<FEffectArch**>(Out + 0) = EffectArch;
-        *reinterpret_cast<ISoundSource**>(Out + 4) = Sound;
-        *reinterpret_cast<FEffectBase**>(Out + 8) = Particle;
-        *reinterpret_cast<FGameLight**>(Out + 0xc) = Light;
+        std::memset(CompanionOut, 0, 0x10);
+        CompanionOut->EffectArch = EffectArch;
+        CompanionOut->Sound = Sound;
+        CompanionOut->Effect = Particle;
+        CompanionOut->Light = Light;
         if (Particle != nullptr)
             Particle->AddRef();
         if (Sound != nullptr)
@@ -983,7 +983,7 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
     }
 
     if (ListOwner != nullptr)
-        CliEffectListInsert(static_cast<unsigned char*>(ListOwner) + 0x28, LocalCompanion);
+        CliEffectListInsert(&ListOwner->EffectList, LocalCompanion);
 
     if (Particle != nullptr)
         Particle->Release();
@@ -995,7 +995,7 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
 }
 
 unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
-                                          float const* Pos3, void* CompanionOut)
+                                          float const* Pos3, FEffectCompanion* CompanionOut)
 {
     return G_CliEffectFactoryC60.CreateEffectWorldOneShotOn(EffectArch, LocalXform, Pos3,
                                                             CompanionOut);
@@ -1004,7 +1004,7 @@ unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform con
 unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectArch,
                                                             Transform const* LocalXform,
                                                             float const* Pos3,
-                                                            void* CompanionOut) const
+                                                            FEffectCompanion* CompanionOut) const
 {
     // FUN_00503f40. The effects option off and a null EffectArch return 0; neither pointer
     // argument is tested.
@@ -1021,7 +1021,7 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
         Particle = CreateParticle();
     }
     if (EffectArch->SndEffect != nullptr)
-        Sound = static_cast<ISoundSource*>(CreateSound());
+        Sound = CreateSound();
     if (EffectArch->LgtRadius > 0.0f)
         Light = CreateLight();
 
@@ -1032,14 +1032,14 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
     if (Sound != nullptr)
     {
         Sound->SetPosition(const_cast<float*>(&LocalXform->Translation.x));
-        Sound->SetVelocity((const Vector*)Pos3);
+        Sound->SetVelocity(reinterpret_cast<const Vector*>(Pos3));
     }
 
     if (Light != nullptr)
     {
         if (static_cast<int>(Light->EngineIndex) == -1)
         {
-            EngineLightSetTransform((FEngineLight*)Light, &LocalXform->Rotation.E[0][0],
+            EngineLightSetTransform(Light, &LocalXform->Rotation.E[0][0],
                                     &LocalXform->Translation);
         }
         else
@@ -1079,11 +1079,11 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
     }
     if (Light != nullptr)
     {
-        ((FEngineLight*)Light)->SetType(kLightPoint, true);
+        Light->SetType(kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
-        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
-        ((FEngineLight*)Light)->SetRadius(EffectArch->LgtRadius);
+        Light->SetColorBytesAlt(Rgb);
+        Light->SetRadius(EffectArch->LgtRadius);
         if (!Light->FGameLight::Enable())
         {
             Light->Release();
@@ -1098,12 +1098,13 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
         }
     }
 
-    unsigned char LocalCompanion[0x10];
-    std::memset(LocalCompanion, 0, sizeof(LocalCompanion));
-    *reinterpret_cast<FEffectArch**>(LocalCompanion + 0) = EffectArch;
-    *reinterpret_cast<ISoundSource**>(LocalCompanion + 4) = Sound;
-    *reinterpret_cast<FEffectBase**>(LocalCompanion + 8) = Particle;
-    *reinterpret_cast<FGameLight**>(LocalCompanion + 0xc) = Light;
+    unsigned char LocalCompanionBytes[0x10];
+    FEffectCompanion* const LocalCompanion = reinterpret_cast<FEffectCompanion*>(LocalCompanionBytes);
+    std::memset(LocalCompanionBytes, 0, sizeof(LocalCompanionBytes));
+    LocalCompanion->EffectArch = EffectArch;
+    LocalCompanion->Sound = Sound;
+    LocalCompanion->Effect = Particle;
+    LocalCompanion->Light = Light;
 
     if (CreateEffectCompanionAlive(LocalCompanion) == 0)
     {
@@ -1118,12 +1119,11 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
 
     if (CompanionOut != nullptr)
     {
-        unsigned char* Out = static_cast<unsigned char*>(CompanionOut);
-        std::memset(Out, 0, 0x10);
-        *reinterpret_cast<FEffectArch**>(Out + 0) = EffectArch;
-        *reinterpret_cast<ISoundSource**>(Out + 4) = Sound;
-        *reinterpret_cast<FEffectBase**>(Out + 8) = Particle;
-        *reinterpret_cast<FGameLight**>(Out + 0xc) = Light;
+        std::memset(CompanionOut, 0, 0x10);
+        CompanionOut->EffectArch = EffectArch;
+        CompanionOut->Sound = Sound;
+        CompanionOut->Effect = Particle;
+        CompanionOut->Light = Light;
         if (Particle != nullptr)
             Particle->AddRef();
         if (Sound != nullptr)

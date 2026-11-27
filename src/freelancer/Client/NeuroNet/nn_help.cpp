@@ -34,6 +34,8 @@
 #include "NeuroNet/nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "NeuroNet/nn_modal.h"               // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "NeuroNet/NavMap/nn_navmap.h"              // NavMapZoneAt (FUN_004a1b50)
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_text_scratch.h"        // G_NnTextScratchA / B, G_NnTextScratchCapacity
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
 #include "Interface/rich_text_win.h"
@@ -505,7 +507,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
         {
             // In space -- the system's name, ids 0x561 and the sector,
             // then the zone the player is in (named, any visit state).
-            IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+            IObjRW* const Player = GetPlayerObjRW();
             if (Player != nullptr)
             {
                 int const Capacity = G_NnTextScratchCapacity;
@@ -621,7 +623,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
         G_NnTextScratchB[0] = L'\0';
 
         // The pilot (ids 0x454).
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // EBP
+        IObjRW* const Player = GetPlayerObjRW(); // EBP
         FHudWideText Pilot = {nullptr, 0};                             // [ESP+0x38]
         GetShipPilotName(Target, &Pilot);
         if (Pilot.Text != nullptr && Pilot.Text[0] != L'\0')

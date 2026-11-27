@@ -1587,12 +1587,12 @@ FShipViewHpEntry const* ShipViewControl::GetHardpointListEntry(int Index) const
     return &HpList[static_cast<size_t>(Index)];
 }
 
-WinControl* WinControl::CreateShipViewControl(char const* Name, Vector const* RotSpeed,
-                                              Vector const* NewOffset, Vector const* Ypr,
-                                              Vector const* NewViewSize, char const* Hardpoint,
-                                              bool bShowRect, bool bShowWire,
-                                              unsigned const* RectColor,
-                                              unsigned const* WireColor)
+ShipViewControl* WinControl::CreateShipViewControl(char const* Name, Vector const* RotSpeed,
+                                                   Vector const* NewOffset, Vector const* Ypr,
+                                                   Vector const* NewViewSize, char const* Hardpoint,
+                                                   bool bShowRect, bool bShowWire,
+                                                   unsigned const* RectColor,
+                                                   unsigned const* WireColor)
 {
     // FUN_005a1020 (RET 0x28).
     Win3D* const Created = WinFactoryCreate(Name, "ShipViewControl", this, nullptr);
@@ -1602,5 +1602,5 @@ WinControl* WinControl::CreateShipViewControl(char const* Name, Vector const* Ro
                                                      Hardpoint, bShowRect, bShowWire, RectColor,
                                                      WireColor);
     }
-    return static_cast<WinControl*>(Created);
+    return static_cast<ShipViewControl*>(Created);
 }

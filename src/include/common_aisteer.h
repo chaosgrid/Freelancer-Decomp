@@ -446,11 +446,11 @@ bool SweptSphereCollisionTime(float RadiusA, Vector const& A0, Vector const& A1,
 // The dot is (z*m22 + y*m12) + x*m02 in both, FSTP'd to float before the clamp.
 //
 // BearingAngleToIface additionally queries Target's centre (first, before Self's).
-double BearingAngleToIface(void* Self, void* Target);
+double BearingAngleToIface(IObjInspect const* Self, IObjInspect const* Target);
 
 // Ghidra counts one parameter; the point is read at 062e1d02 (entry ESP + 8), and all
 // three callers push two dwords.
-double BearingAngleToPoint(void* Self, Vector const& ComparisonPoint);
+double BearingAngleToPoint(IObjInspect const* Self, Vector const& ComparisonPoint);
 
 // ----------------------------------------------------------------------------
 // BuildOrientationBasis / TransformedBoxesIntersect (0x062e0000-0x06301280).

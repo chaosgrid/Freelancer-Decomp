@@ -60,7 +60,7 @@ namespace
 
     IServer* LocalServer()
     {
-        return static_cast<IServer*>(GetLocalServerInterface());
+        return GetLocalServerInterface();
     }
 
     // The four-byte float every GF / player-state slot receives as a dword.

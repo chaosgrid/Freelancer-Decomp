@@ -456,7 +456,7 @@ namespace
             if (!bNode2C &&
                 ::GetFileTime(File, &ArchiveTimes[0], &ArchiveTimes[1], &ArchiveTimes[2]) == 0)
                 return false;
-            const unsigned char* Header = (const unsigned char*)(MapView);
+            const unsigned char* Header = static_cast<const unsigned char*>(MapView);
             if (Header == nullptr || MapSize <= 0x38)
                 return false;
             View = Header;
@@ -468,7 +468,7 @@ namespace
                 return false;
             const unsigned char* Tree = Header + TreeOffset;
             RootHandle = AllocHandle(Tree);
-            Strings = (const char*)(Header + StringOffset);
+            Strings = reinterpret_cast<const char*>(Header + StringOffset);
             return true;
         }
 
@@ -506,7 +506,7 @@ namespace
         {
             if (Value == 0xFFFFFFFFu)
                 return nullptr;
-            return (FUtfHandle*)(Value);
+            return reinterpret_cast<FUtfHandle*>(Value);
         }
 
         FUtfHandle* Open(const char* Path, unsigned long BaseValue, unsigned long Extra)
@@ -548,7 +548,7 @@ namespace
             if (BaseValue == 0)
                 Node = RootHandle->Node;
             else if (BaseValue != 0xFFFFFFFFu)
-                Node = ((const FUtfHandle*)(BaseValue))->Node;
+                Node = (reinterpret_cast<const FUtfHandle*>(BaseValue))->Node;
 
             const char* LastSeparator = nullptr;
             const char* Scan = Pattern;
@@ -655,7 +655,7 @@ namespace
             const char* Mask = Slot->Pattern;
             const bool bAll = Mask[0] == '*' &&
                               (Mask[1] == '\0' ||
-                               ReadUtfDword((const unsigned char*)(Mask), 0) ==
+                               ReadUtfDword(reinterpret_cast<const unsigned char*>(Mask), 0) ==
                                    0x002A2E2Au);
             if (!bAll && MatchUtfWildcard(RecordName(Slot->Next), Mask) == 0)
             {
@@ -744,7 +744,7 @@ namespace
             }
             if (HandleValue == 0xFFFFFFFFu)
                 return false;
-            const unsigned char* Node = ((const FUtfHandle*)(HandleValue))->Node;
+            const unsigned char* Node = (reinterpret_cast<const FUtfHandle*>(HandleValue))->Node;
             if (Node == nullptr)
                 return false;
             if (Creation != nullptr)
@@ -778,7 +778,7 @@ namespace
         {
             const unsigned char* Node = nullptr;
             if (BaseValue != 0 && BaseValue != 0xFFFFFFFFu)
-                Node = ((const FUtfHandle*)(BaseValue))->Node;
+                Node = (reinterpret_cast<const FUtfHandle*>(BaseValue))->Node;
             if (Node == nullptr)
                 Node = RootHandle->Node;
             return Node;
@@ -920,7 +920,7 @@ namespace
             *Out = nullptr;
             if (std::strcmp(Iids::ComponentFactory, Iid) != 0)
                 return GR_INTERFACE_UNSUPPORTED;
-            IComponentFactory* Face = (IComponentFactory*)(this);
+            IComponentFactory* Face = this;
             *Out = Face;
             Face->AddRef();
             return GR_OK;
@@ -1013,7 +1013,7 @@ namespace
                 *Out = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
             }
-            IFileSystem* Face = (IFileSystem*)(this);
+            IFileSystem* Face = this;
             Face->AddRef();
             *Out = Face;
             return GR_OK;
@@ -1088,7 +1088,7 @@ namespace
                     Got = Size;
                     if (Got > Open->Size - Open->Pos)
                         Got = Open->Size - Open->Pos;
-                    std::memcpy(Buffer, (const char*)(Open->View) + Open->Pos, Got);
+                    std::memcpy(Buffer, static_cast<const char*>(Open->View) + Open->Pos, Got);
                     Open->Pos = Open->Pos + Got;
                 }
             }
@@ -1296,7 +1296,7 @@ namespace
                 LastError = ERROR_ACCESS_DENIED;
                 return 0;
             }
-            return (int)((char*)(Open->View) + OffLow);
+            return (int)(static_cast<char*>(Open->View) + OffLow);
         }
 
         // DOS LAB_06b75350: always 1. Does not UnmapViewOfFile.
@@ -1546,7 +1546,7 @@ namespace
             }
             else
             {
-                if ((const void*)(this) == (const void*)(G_DosFactory))
+                if (static_cast<const void*>(this) == static_cast<const void*>(G_DosFactory))
                 {
                     G_DosRootLock = nullptr;
                     G_DosFactory = nullptr;
@@ -1748,7 +1748,7 @@ namespace
         // LAB_06b74470. Single exit: *Instance = Created; every early failure leaves Created = 0.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
+            FFileSystemDesc* FsDesc = reinterpret_cast<FFileSystemDesc*>(Desc);
             GENRESULT Result = GR_OK;
             void* Created = nullptr;
 
@@ -1785,12 +1785,12 @@ namespace
         GENRESULT CreateOnSingleton(FFileSystemDesc* FsDesc, void** Created)
         {
             FDosFileSystem* Child = new (std::nothrow) FDosFileSystem();
-            *Created = (Child != nullptr) ? (IFileSystem*)(Child) : nullptr;
+            *Created = (Child != nullptr) ? static_cast<IFileSystem*>(Child) : nullptr;
 
             // Retail: Child is used without a null test after new.
             if (FsDesc->Parent != nullptr)
             {
-                Child->AttachNestedChild((IFileSystem*)(FsDesc->Parent));
+                Child->AttachNestedChild(static_cast<IFileSystem*>(FsDesc->Parent));
                 Child->FileHandle = (HANDLE)(FsDesc->Extra);
                 Child->bFileInstance = 1;
                 Child->AccessFlags = FsDesc->Access;
@@ -1829,7 +1829,7 @@ namespace
 
         GENRESULT CreateRelative(AGGDESC* Desc, void** Created)
         {
-            FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
+            FFileSystemDesc* FsDesc = reinterpret_cast<FFileSystemDesc*>(Desc);
             char Resolved[0x105];
             if (JoinRoot(RootPath, FsDesc->Path, Resolved, 0x104) == 0)
                 return GR_GENERIC;
@@ -1844,7 +1844,7 @@ namespace
                 if (Child == nullptr)
                     return GR_GENERIC;
                 Child->AdoptDirectoryRoot(Resolved);
-                *Created = (IFileSystem*)(Child);
+                *Created = static_cast<IFileSystem*>(Child);
                 return GR_OK;
             }
 
@@ -1863,13 +1863,13 @@ namespace
                 Child->PathPrefix = 0;
                 Child->AccessFlags = FsDesc->Access;
                 Child->bFileInstance = 1;
-                *Created = (IFileSystem*)(Child);
+                *Created = static_cast<IFileSystem*>(Child);
                 return GR_OK;
             }
 
             // Not a "DOS" file: DACOM picks another "FileSystem" factory with desc+0x28 = this;
             // the field is cleared again afterwards.
-            FsDesc->Parent = (IFileSystem*)(this);
+            FsDesc->Parent = static_cast<IFileSystem*>(this);
             const GENRESULT Result = G_Dacom->CreateInstance(Desc, Created);
             FsDesc->Parent = nullptr;
             return Result;
@@ -1997,7 +1997,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             *Instance = nullptr;
-            FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
+            FFileSystemDesc* FsDesc = reinterpret_cast<FFileSystemDesc*>(Desc);
             if (FsDesc == nullptr || FsDesc->ComponentName == nullptr)
                 return GR_GENERIC;
             if (FsDesc->Size != offsetof(FFileSystemDesc, MemBuffer) && FsDesc->Size != offsetof(FFileSystemDesc, FindHandle))
@@ -2024,11 +2024,11 @@ namespace
 
             if (FsDesc->Parent != nullptr)
             {
-                IFileSystem* ParentFs = (IFileSystem*)(FsDesc->Parent);
+                IFileSystem* ParentFs = static_cast<IFileSystem*>(FsDesc->Parent);
                 bool bBuildPath = true;
                 if (bAtRoot &&
                     ParentFs->QueryInterface(Iids::DataBuffer,
-                                             (void**)(&DataBuffer)) == GR_OK)
+                                             reinterpret_cast<void**>(&DataBuffer)) == GR_OK)
                     bBuildPath = false;
                 if (bBuildPath)
                 {
@@ -2147,7 +2147,7 @@ namespace
                     Got = Map->Size - Map->Pos;
                     if (Got > kUtfHeaderSize)
                         Got = kUtfHeaderSize;
-                    std::memcpy(&Header, (const char*)(Map->View) + Map->Pos, Got);
+                    std::memcpy(&Header, static_cast<const char*>(Map->View) + Map->Pos, Got);
                     Map->Pos = Map->Pos + Got;
                 }
             }
@@ -2186,7 +2186,7 @@ namespace
                 *Out = nullptr;
                 return (GENRESULT)(0xFFFFFFFA);
             }
-            *Out = (IFileSystem*)(Object);
+            *Out = static_cast<IFileSystem*>(Object);
             return GR_OK;
         }
 
@@ -2205,7 +2205,7 @@ namespace
                 return GR_GENERIC;
 
             FUtfFileSystem* Child = new FUtfFileSystem();
-            *Created = (IFileSystem*)(Child);
+            *Created = static_cast<IFileSystem*>(Child);
             Child->SetOwnPath(Desc->Path, Found);
             if (Child->ParentFileSystem != this)
             {
@@ -2469,7 +2469,7 @@ namespace
             }
             if (Count > Archive->MappedSize - FileOff)
                 Count = Archive->MappedSize - FileOff;
-            std::memcpy(Buffer, (const char*)(Archive->MappedView) + FileOff, Count);
+            std::memcpy(Buffer, static_cast<const char*>(Archive->MappedView) + FileOff, Count);
             Archive->MappedPos = FileOff + Count;
             if (Count == 0)
             {
@@ -2540,7 +2540,7 @@ namespace
             const unsigned long DataSection = ReadUtfDword(ActiveW->GetView(), 0x24);
             const unsigned long FileOff = DataSection + UtfHandle->DataOffset();
             return (int)(
-                (unsigned long)((const char*)(ArchiveOwner->MappedView)) +
+                (unsigned long)(static_cast<const char*>(ArchiveOwner->MappedView)) +
                 FileOff + OffLow);
         }
 
@@ -2738,14 +2738,14 @@ namespace
         {
             if (std::strcmp(Iids::FileSystem, Iid) == 0)
             {
-                IFileSystem* Face = (IFileSystem*)(this);
+                IFileSystem* Face = this;
                 Face->AddRef();
                 *Out = Face;
                 return GR_OK;
             }
             if (std::strcmp(Iids::DataBuffer, Iid) == 0)
             {
-                IDataBuffer* Face = (IDataBuffer*)(&Inner);
+                IDataBuffer* Face = &Inner;
                 Face->AddRef();
                 *Out = Face;
                 return GR_OK;
@@ -2924,7 +2924,7 @@ namespace
             if (Handle != 0 || (Access & kGenericWrite) == 0)
                 return 0;
             if (PositionOverride != nullptr)
-                std::memcpy(&MappedPos, (const char*)(PositionOverride) + 8,
+                std::memcpy(&MappedPos, static_cast<const char*>(PositionOverride) + 8,
                             sizeof(MappedPos));
             unsigned long ToWrite = Size;
             const unsigned long End = MappedPos + Size;
@@ -2959,7 +2959,7 @@ namespace
                 }
             }
             if (ToWrite != 0)
-                std::memcpy((char*)(MappedView) + MappedPos, Buffer, ToWrite);
+                std::memcpy(static_cast<char*>(MappedView) + MappedPos, Buffer, ToWrite);
             if (BytesWritten != nullptr)
                 *BytesWritten = ToWrite;
             MappedPos = MappedPos + ToWrite;
@@ -3036,7 +3036,7 @@ namespace
             if (Handle != 0)
                 return 0;
             if (Extra != 0)
-                MappedPos = *(unsigned long*)(Extra + 8);
+                MappedPos = *reinterpret_cast<unsigned long*>(Extra + 8);
             if (MappedPos > LogicalSize)
                 MappedPos = LogicalSize;
             unsigned long Remain = 0;
@@ -3046,7 +3046,7 @@ namespace
             if (Got > Remain)
                 Got = Remain;
             // No checks on Buffer or BytesRead.
-            std::memcpy(Buffer, (char*)(MappedView) + MappedPos, Got);
+            std::memcpy(Buffer, static_cast<char*>(MappedView) + MappedPos, Got);
             *BytesRead = Got;
             MappedPos = MappedPos + Got;
             return 1;
@@ -3103,7 +3103,7 @@ namespace
                 *Instance = nullptr;
                 return GR_OUT_OF_MEMORY;
             }
-            FFileSystemDesc* MemDesc = (FFileSystemDesc*)(Desc);
+            FFileSystemDesc* MemDesc = reinterpret_cast<FFileSystemDesc*>(Desc);
             const GENRESULT InitResult = Object->InitializeFromDescriptor(MemDesc);
             if (InitResult != GR_OK)
             {
@@ -3111,7 +3111,7 @@ namespace
                 *Instance = nullptr;
                 return InitResult;
             }
-            *Instance = (IFileSystem*)(Object);
+            *Instance = static_cast<IFileSystem*>(Object);
             return GR_OK;
         }
     };
@@ -3121,7 +3121,7 @@ namespace
     {
         unsigned char Raw[0x34];
         std::memset(Raw, 0, sizeof(Raw));
-        FFileSystemDesc* Desc = (FFileSystemDesc*)(Raw);
+        FFileSystemDesc* Desc = reinterpret_cast<FFileSystemDesc*>(Raw);
         Desc->Size = offsetof(FFileSystemDesc, MemBuffer);
         Desc->ComponentName = "FileSystem";
         Desc->Implementation = "DOS";
@@ -3176,7 +3176,7 @@ namespace
             // Retail releases Created here when set; it is always null at this point.
         }
 
-        if (Factory->CreateInstance((AGGDESC*)(Desc), (void**)(&Created)) == GR_OK)
+        if (Factory->CreateInstance(reinterpret_cast<AGGDESC*>(Desc), reinterpret_cast<void**>(&Created)) == GR_OK)
         {
             if (Rest != nullptr && *Rest != '\0')
                 bResult = OpenSearchPathEntry(Created, Rest, Out);
@@ -3218,7 +3218,7 @@ namespace
                 *Out = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
             }
-            ISearchPath* Face = (ISearchPath*)(this);
+            ISearchPath* Face = this;
             Face->AddRef();
             *Out = Face;
             return GR_OK;
@@ -3365,7 +3365,7 @@ namespace
                 *Instance = nullptr;
                 return GR_OUT_OF_MEMORY;
             }
-            *Instance = (ISearchPath*)(Object);
+            *Instance = static_cast<ISearchPath*>(Object);
             return GR_OK;
         }
     };
@@ -3383,7 +3383,7 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
         G_Dacom = DACOM_Acquire();
         if (G_Dacom == nullptr)
             return TRUE;
-        G_Dacom->RegisterComponent(G_DosFactory, "FileSystem", (void*)(0x40000000));
+        G_Dacom->RegisterComponent(G_DosFactory, "FileSystem", reinterpret_cast<void*>(0x40000000));
         G_DosFactory->Release();
 
         // FUN_06b73d60 / FUN_06b77900 / FUN_06b78020 return null on allocation failure; a
@@ -3391,21 +3391,21 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
         FUtfFileSystem* UtfFactory = new (std::nothrow) FUtfFileSystem();
         if (UtfFactory != nullptr)
         {
-            G_Dacom->RegisterComponent(UtfFactory, "FileSystem", (void*)(0x80000000));
+            G_Dacom->RegisterComponent(UtfFactory, "FileSystem", reinterpret_cast<void*>(0x80000000));
             UtfFactory->Release();
         }
 
         FMemFactory* MemFactory = new (std::nothrow) FMemFactory();
         if (MemFactory != nullptr)
         {
-            G_Dacom->RegisterComponent(MemFactory, "FileSystem", (void*)(0x80000000));
+            G_Dacom->RegisterComponent(MemFactory, "FileSystem", reinterpret_cast<void*>(0x80000000));
             MemFactory->Release();
         }
 
         FSearchPathFactory* SearchFactory = new (std::nothrow) FSearchPathFactory();
         if (SearchFactory == nullptr)
             return TRUE;
-        G_Dacom->RegisterComponent(SearchFactory, "SearchPath", (void*)(0x80000000));
+        G_Dacom->RegisterComponent(SearchFactory, "SearchPath", reinterpret_cast<void*>(0x80000000));
         SearchFactory->Release();
     }
     else if (Reason == DLL_PROCESS_DETACH)

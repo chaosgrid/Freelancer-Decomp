@@ -113,10 +113,10 @@ void SystemManager::ClearFormationLeaderWatcherIfTarget(int TargetId)
 }
 
 // FUN_062e68e0
-void SystemManager::SetSharedListHead(void* NewHead)
+void SystemManager::SetSharedListHead(IObjDB* NewHead)
 {
-    ObjectDb = static_cast<IObjDB*>(NewHead);
-    Timers.ObjectDb = static_cast<IObjDB*>(NewHead);
+    ObjectDb = NewHead;
+    Timers.ObjectDb = NewHead;
 
     // Timers.Owner is dereferenced with no null test, as in retail.
     SystemManager* Owner = Timers.Owner;
@@ -166,7 +166,7 @@ bool SystemManager::Init(IObjRW* Object, IBehaviorManager* Manager)
     Owner = Manager;
 
     // The object is dereferenced without a test.
-    OwnerObjectId = static_cast<int>(static_cast<IObjInspect*>(WatchedObject(Watcher))->get_id());
+    OwnerObjectId = static_cast<int>(WatchedObject(Watcher)->get_id());
 
     (void)Timers.Arm(this);
 
@@ -207,7 +207,7 @@ bool SystemManager::Init(IObjRW* Object, IBehaviorManager* Manager)
     if (IsWatcherLive(Watcher))
     {
         TractorOwner = this;
-        (void)static_cast<IObjInspect*>(WatchedObject(Watcher))
+        (void)WatchedObject(Watcher)
             ->find_equipment(&TractorEquipId, 1, EquipTypeTractor);
     }
 
@@ -217,7 +217,7 @@ bool SystemManager::Init(IObjRW* Object, IBehaviorManager* Manager)
         Repair.CheckTimer = 0.0f;
         Repair.Hull.Count = 0;
         Repair.Shield.Count = 0;
-        (void)static_cast<IObjInspect*>(WatchedObject(Watcher))->enumerate_cargo(&Repair);
+        (void)WatchedObject(Watcher)->enumerate_cargo(&Repair);
     }
 
     // FUN_062eb9d0 on Sys+0x1344.
@@ -251,7 +251,7 @@ void SystemManager::Update(float Dt)
 
     // In cruise with the gate closed: disengage. The watched object is dereferenced blind.
     bool bCruise = false;
-    (void)static_cast<IObjInspect*>(WatchedObject(Thrust.Owner->Watcher))->is_cruise_active(bCruise);
+    (void)WatchedObject(Thrust.Owner->Watcher)->is_cruise_active(bCruise);
     if (bCruise && Thrust.bCruiseUnobstructed == 0)
         Thrust.engage_cruise(false);
 
@@ -266,7 +266,7 @@ void SystemManager::Update(float Dt)
         Repair.CheckTimer = 0.0f;
         Repair.Hull.Count = 0;
         Repair.Shield.Count = 0;
-        (void)static_cast<IObjInspect*>(WatchedObject(Repair.Owner->Watcher))->enumerate_cargo(&Repair);
+        (void)WatchedObject(Repair.Owner->Watcher)->enumerate_cargo(&Repair);
     }
     Repair.Hull.Update(Dt, WatchedObject(Repair.Owner->Watcher));
     Repair.Shield.Update(Dt, WatchedObject(Repair.Owner->Watcher));
@@ -286,7 +286,7 @@ void SystemManager::Update(float Dt)
     {
         // A live formation leader keeps the borrowed parameters.
         Watchable const* const Node = FormationLeaders.FormationLeaderWatcher.target();
-        if (Node != nullptr && Node != (Watchable const*)8)
+        if (Node != nullptr && Node != reinterpret_cast<Watchable const*>(8))
             return;
     }
 

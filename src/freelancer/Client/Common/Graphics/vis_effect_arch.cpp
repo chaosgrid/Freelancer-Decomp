@@ -565,7 +565,7 @@ namespace
         {
             char const* const NewName =
                 Incoming->SndEffect != nullptr
-                    ? static_cast<Archetype::ISound*>(Incoming->SndEffect)->GetFileName()
+                    ? Incoming->SndEffect->GetFileName()
                     : "NULL";
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s: 'snd_effect' changed to %s",
                   kEffectArchCpp, 0x93, EffectArchNickname(Existing), NewName);
@@ -998,11 +998,11 @@ int AleLibLoad(char const* AleName)
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
 
-    void* FsOut = nullptr;
+    IFileSystem* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)
-            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
+            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FsOut)) == 0)
     {
-        IFileSystem* const Filesys = static_cast<IFileSystem*>(FsOut);
+        IFileSystem* const Filesys = FsOut;
         // Neither result is read.
         DALib::Alchemy->LoadNodeLibrary(Filesys);
         DALib::FxEffectLibrary->LoadAle(Filesys);
@@ -1021,7 +1021,7 @@ int AleLibLoad(char const* AleName)
     }
 
     if (FsOut != nullptr)
-        static_cast<IFileSystem*>(FsOut)->Release();
+        FsOut->Release();
     return Handle;
 }
 

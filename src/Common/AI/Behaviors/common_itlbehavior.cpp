@@ -32,7 +32,7 @@ InstantTradeLaneBehavior::~InstantTradeLaneBehavior()
 }
 
 // Slot 1, LAB_062cee70. The fields are cleared only when BindContext (FUN_062d2090) succeeds.
-bool InstantTradeLaneBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool InstantTradeLaneBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     bool const bInstalled = BindContext(Param1, Param2, Param3);
 

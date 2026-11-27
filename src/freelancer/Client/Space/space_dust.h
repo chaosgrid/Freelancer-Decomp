@@ -14,6 +14,8 @@
 #include "common_archetype.h" // CacheString
 #include "common_universe.h"
 
+struct ICamera;
+
 // FUN_0054bde0 -- StarSysLoadIni's [Dust] section: remember the system dust name (pointer copy
 // into DAT_00679794) and reset the zone-dust bookkeeping. No effect is created here; the first
 // SpaceDustUpdate does that.
@@ -23,4 +25,4 @@ void SpaceDustSetSystemDust(CacheString const* Dust);
 void SpaceDustShutdown();
 
 // FUN_0054beb0 -- StarSysUpdate with DAT_00679954 and the active camera.
-void SpaceDustUpdate(Universe::ISystem const* System, void* Camera);
+void SpaceDustUpdate(Universe::ISystem const* System, ICamera* Camera);

@@ -1144,14 +1144,14 @@ unsigned CliAsteroidRegistryCount()
     return static_cast<unsigned>(Registry().size());
 }
 
-void CliAsteroidUpdateFields(void* Camera, float Dt)
+void CliAsteroidUpdateFields(FSpaceCamera* Camera, float Dt)
 {
     // No null test of the field, as retail.
     if (GetGameOption(kGameOptAsteroids) == 0)
         return;
     std::list<FCliAsteroid*>& List = Registry();
     for (std::list<FCliAsteroid*>::iterator It = List.begin(); It != List.end(); ++It)
-        (*It)->Update(static_cast<FSpaceCamera*>(Camera), Dt);
+        (*It)->Update(Camera, Dt);
 }
 
 void CliAsteroidDestroyAll()
@@ -1310,7 +1310,7 @@ namespace
     {
         Vector const& ZoneVec = Band->Zone->GetPos();
         float ZonePos[3] = {ZoneVec.x, ZoneVec.y, ZoneVec.z};
-        void* LightSlots[16];
+        FEngineLight* LightSlots[16];
         int const LightCount = SpaceCollectNearbyLights(LightSlots, 16, ZonePos, 100.0f, 0);
         if (LightCount == 0)
             return;
@@ -1334,7 +1334,7 @@ namespace
         int DirCount = 0;
         for (int I = 0; I < LightCount && DirCount < 4; ++I)
         {
-            FEngineLight* const Light = static_cast<FEngineLight*>(LightSlots[I]);
+            FEngineLight* const Light = LightSlots[I];
             if (Light->Type != kLightDirectional)
                 continue;
             float* const Dir = Lights[DirCount];
@@ -1937,11 +1937,11 @@ namespace
         float FogFactor = 1.0f;
         if (Field->bContainsFogZone != 0)
         {
-            void* const Controller = GetSpaceFieldController();
+            FNebulaEffect* const Controller = GetSpaceFieldController();
             if (Controller != nullptr && GetSpaceFieldEnclosure() != kFieldEnclosureNone)
             {
                 Field->FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Controller));
-                FogFactor = ((FNebulaEffect*)Controller)->GetInsideFade();
+                FogFactor = Controller->GetInsideFade();
             }
             else
             {

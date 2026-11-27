@@ -614,7 +614,7 @@ bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, I
     {
         // The live entry's IVP_Listener_Hull gets hull_limit_exceeded_event (slot 1).
         IVP_Hull_Manager::Entry& E = Hull.PoolEntries[Hull.PoolLiveIndex];
-        ((IVP_Listener_Hull*)E.Payload)->hull_limit_exceeded_event(&Hull, Excess);
+        static_cast<IVP_Listener_Hull*>(E.Payload)->hull_limit_exceeded_event(&Hull, Excess);
 
         int const GuardBeforeDecrement = Guard;
         Guard -= 1;

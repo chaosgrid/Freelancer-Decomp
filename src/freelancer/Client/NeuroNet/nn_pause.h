@@ -36,6 +36,8 @@
 
 #include <stddef.h>
 
+class WireButtonControl;
+
 // NnPause::ButtonAction values (see DoAction). The captions of the buttons are IDS 0x71d ..
 // 0x725 and 0x752; action 7 (a confirm with IDS 0x76b) is left numeric.
 enum EPauseAction
@@ -80,7 +82,7 @@ public:
     unsigned char bClosePending;     // +0x331
     unsigned char Pad332[2];         // +0x332
     WinControl* Title;               // +0x334
-    WinControl* ButtonBox[5];        // +0x338
+    WireButtonControl* ButtonBox[5]; // +0x338
     WinControl* ButtonText[5];       // +0x34c
     int ButtonAction[5];             // +0x360
 

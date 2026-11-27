@@ -285,7 +285,7 @@ void SetPlayerConnectionId(unsigned Id)
     G_PlayerConnectionId = Id;
 }
 
-void* GetPlayerShipWatcher()
+Watchable* GetPlayerShipWatcher()
 {
     return const_cast<Watchable*>(G_PlayerShipWatcher.target());
 }
@@ -297,7 +297,7 @@ void ClearPlayerShipWatcher()
         G_PlayerShipWatcher.set(nullptr);
 }
 
-void* GetPlayerShipObject()
+CShip* GetPlayerShipObject()
 {
     // NOT RETAIL (port accessor): the CShip behind the watched gameobj, narrowed the way
     // FUN_0054b520 narrows it.
@@ -321,7 +321,7 @@ void GetPlayerShipWorldPosition3(float OutPos3[3])
     OutPos3[1] = 0.f;
     OutPos3[2] = 0.f;
 
-    CShip* const Ship = static_cast<CShip*>(GetPlayerShipObject());
+    CShip* const Ship = GetPlayerShipObject();
     if (Ship == nullptr)
         return;
 
@@ -421,7 +421,7 @@ FClientShipGameobj* SpawnPlayerShip()
 
     // IServer slot 48; no null test on the server.
     G_bPlayerLaunchAcknowledged = false;
-    static_cast<IServer*>(GetLocalServerInterface())
+    GetLocalServerInterface()
         ->PlayerLaunch(G_PlayerCharacterId, G_PlayerConnectionId);
 
     return Go;

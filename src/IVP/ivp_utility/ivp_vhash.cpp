@@ -61,12 +61,6 @@ namespace
 
 namespace
 {
-    struct FVHashElem
-    {
-        unsigned hashTag; // +0x0
-        void* value;      // +0x4
-    };
-
     // Retail's "replace the low 24 bits, keep the flag byte" idiom
     // (`(new ^ old) & 0xffffff ^ old`), shared by all four count updates.
     unsigned ReplaceLow24PreserveTopByte(unsigned dwordWithFlags, unsigned newLow24)
@@ -81,20 +75,20 @@ namespace
 void IVP_VHash::Rehash(int NewSize)
 {
     int oldMask = SizeMm;
-    FVHashElem* oldBuckets = static_cast<FVHashElem*>(Elems);
+    IVP_VHash_Slot* oldBuckets = Elems;
     SizeMm = NewSize - 1;
-    Elems = calloc(static_cast<size_t>(NewSize), 0x8); // FUN_06343f80
+    Elems = static_cast<IVP_VHash_Slot*>(calloc(static_cast<size_t>(NewSize), 0x8)); // FUN_06343f80
     unsigned preRehashCount = NElemsAndFlags;
 
     if (oldMask >= 0)
     {
         int n = oldMask + 1;
-        FVHashElem* entry = oldBuckets;
+        IVP_VHash_Slot* entry = oldBuckets;
         do
         {
-            if (entry->value != nullptr)
+            if (entry->Elem != nullptr)
             {
-                AddElem(entry->value, entry->hashTag);
+                AddElem(entry->Elem, entry->HashIndex);
             }
             ++entry;
             --n;
@@ -127,33 +121,33 @@ void IVP_VHash::AddElem(void* Elem, unsigned HashIndex)
 
     unsigned mask2 = static_cast<unsigned>(SizeMm);
     unsigned idx = mask2 & hash;
-    FVHashElem* buckets = static_cast<FVHashElem*>(Elems);
-    FVHashElem* slot = &buckets[idx];
+    IVP_VHash_Slot* buckets = Elems;
+    IVP_VHash_Slot* slot = &buckets[idx];
     NElemsAndFlags = ReplaceLow24PreserveTopByte(NElemsAndFlags, (NElemsAndFlags + 1) & 0xffffffu);
 
-    void* residentValue = slot->value;
+    void* residentValue = slot->Elem;
     unsigned curIdx = idx;
     while (residentValue != nullptr)
     {
-        unsigned residentHash = slot->hashTag;
+        unsigned residentHash = slot->HashIndex;
         unsigned residentIdeal = residentHash & mask2;
         if (static_cast<int>(curIdx) < static_cast<int>(residentIdeal))
         {
-            slot->value = value;
-            slot->hashTag = hash;
+            slot->Elem = value;
+            slot->HashIndex = hash;
             curIdx = residentIdeal;
             value = residentValue;
             hash = residentHash;
         }
         mask2 = static_cast<unsigned>(SizeMm);
         idx = (idx + 1) & mask2;
-        buckets = static_cast<FVHashElem*>(Elems);
+        buckets = Elems;
         slot = &buckets[idx];
-        residentValue = slot->value;
+        residentValue = slot->Elem;
     }
 
-    slot->value = value;
-    slot->hashTag = hash;
+    slot->Elem = value;
+    slot->HashIndex = hash;
 }
 
 // FUN_06352480: probe from HashIndex & mask, calling Compare(stored, Elem) on
@@ -161,19 +155,19 @@ void IVP_VHash::AddElem(void* Elem, unsigned HashIndex)
 void* IVP_VHash::RemoveElem(void* Elem, unsigned HashIndex)
 {
     unsigned idx = HashIndex & static_cast<unsigned>(SizeMm);
-    FVHashElem* slot;
+    IVP_VHash_Slot* slot;
     for (;;)
     {
-        FVHashElem* buckets = static_cast<FVHashElem*>(Elems);
+        IVP_VHash_Slot* buckets = Elems;
         slot = &buckets[idx];
-        if (slot->value == nullptr)
+        if (slot->Elem == nullptr)
         {
             // Retail writes to address 0 when the element is absent (063524a0).
             IVP_CoreTrap();
         }
-        if (((slot->hashTag | 0x80000000u) == HashIndex))
+        if (((slot->HashIndex | 0x80000000u) == HashIndex))
         {
-            if (Compare(slot->value, Elem) == 1)
+            if (Compare(slot->Elem, Elem) == 1)
             {
                 break;
             }
@@ -181,22 +175,22 @@ void* IVP_VHash::RemoveElem(void* Elem, unsigned HashIndex)
         idx = (idx + 1) & static_cast<unsigned>(SizeMm);
     }
 
-    void* removedValue = slot->value;
-    FVHashElem* buckets = static_cast<FVHashElem*>(Elems);
+    void* removedValue = slot->Elem;
+    IVP_VHash_Slot* buckets = Elems;
     unsigned mask = static_cast<unsigned>(SizeMm);
     NElemsAndFlags = ReplaceLow24PreserveTopByte(NElemsAndFlags, (NElemsAndFlags - 1) & 0xffffffu);
 
     unsigned refDist = mask;
-    if (buckets[mask].value != nullptr)
+    if (buckets[mask].Elem != nullptr)
     {
-        refDist = buckets[mask].hashTag & mask;
+        refDist = buckets[mask].HashIndex & mask;
     }
 
     unsigned vacant = idx;
     unsigned scan = (idx + 1) & mask;
-    while (buckets[scan].value != nullptr)
+    while (buckets[scan].Elem != nullptr)
     {
-        unsigned scanIdeal = mask & buckets[scan].hashTag;
+        unsigned scanIdeal = mask & buckets[scan].HashIndex;
         bool doShift = false;
         if (static_cast<int>(vacant) < static_cast<int>(scan))
         {
@@ -226,12 +220,12 @@ void* IVP_VHash::RemoveElem(void* Elem, unsigned HashIndex)
         }
 
         mask = static_cast<unsigned>(SizeMm);
-        buckets = static_cast<FVHashElem*>(Elems);
+        buckets = Elems;
         scan = (scan + 1) & mask;
     }
 
-    buckets[vacant].value = nullptr;
-    buckets[vacant].hashTag = 0;
+    buckets[vacant].Elem = nullptr;
+    buckets[vacant].HashIndex = 0;
     return removedValue;
 }
 
@@ -239,9 +233,9 @@ void* IVP_VHash::RemoveElem(void* Elem, unsigned HashIndex)
 void* IVP_VHash::FindElem(void* Elem, unsigned HashIndex)
 {
     unsigned idx = HashIndex & static_cast<unsigned>(SizeMm);
-    FVHashElem* buckets = static_cast<FVHashElem*>(Elems);
-    FVHashElem* slot = &buckets[idx];
-    void* value = slot->value;
+    IVP_VHash_Slot* buckets = Elems;
+    IVP_VHash_Slot* slot = &buckets[idx];
+    void* value = slot->Elem;
 
     for (;;)
     {
@@ -249,7 +243,7 @@ void* IVP_VHash::FindElem(void* Elem, unsigned HashIndex)
         {
             return nullptr;
         }
-        if ((slot->hashTag | 0x80000000u) == HashIndex)
+        if ((slot->HashIndex | 0x80000000u) == HashIndex)
         {
             if (Compare(value, Elem) != 0)
             {
@@ -257,12 +251,12 @@ void* IVP_VHash::FindElem(void* Elem, unsigned HashIndex)
             }
         }
         idx = (idx + 1) & static_cast<unsigned>(SizeMm);
-        buckets = static_cast<FVHashElem*>(Elems);
+        buckets = Elems;
         slot = &buckets[idx];
-        value = slot->value;
+        value = slot->Elem;
     }
 
-    return slot->value;
+    return slot->Elem;
 }
 
 // FUN_063522f0 (the non-deleting ~IVP_VHash) is IVP_VHash::~IVP_VHash in ivp_vhash.h; the
@@ -285,16 +279,6 @@ unsigned __fastcall IVP_VHash_HashPointer(unsigned Key)
 // test `key != null`, as in retail; keys and values are never zero in use.
 // ============================================================================
 
-namespace
-{
-    struct FVHashStoreElem
-    {
-        unsigned hash; // +0x0
-        void* key;     // +0x4
-        void* value;   // +0x8
-    };
-}
-
 // FUN_063525f0. The array must be zeroed (FUN_06343f80 = calloc): an empty
 // slot is value == 0.
 IVP_VHash_Store::IVP_VHash_Store(int InSize)
@@ -303,7 +287,7 @@ IVP_VHash_Store::IVP_VHash_Store(int InSize)
     Size = InSize;
     NElems = 0;
     PreallocatedElemsStore = nullptr;
-    ElemsStore = calloc(static_cast<size_t>(InSize), 0xc);
+    ElemsStore = static_cast<IVP_VHash_Store_Slot*>(calloc(static_cast<size_t>(InSize), 0xc));
 }
 
 // FUN_06352620 (also reached through thunk_FUN_06352620).
@@ -320,11 +304,11 @@ IVP_VHash_Store::~IVP_VHash_Store()
 // old array. Called from the raw insert at 50% load.
 void IVP_VHash_Store::Rehash(int NewSize)
 {
-    FVHashStoreElem* oldBuckets = static_cast<FVHashStoreElem*>(ElemsStore);
+    IVP_VHash_Store_Slot* oldBuckets = ElemsStore;
     int oldCapacity = Size;
     Size = NewSize;
     SizeMm = NewSize - 1;
-    ElemsStore = calloc(static_cast<size_t>(NewSize), 0xc); // FUN_06343f80
+    ElemsStore = static_cast<IVP_VHash_Store_Slot*>(calloc(static_cast<size_t>(NewSize), 0xc)); // FUN_06343f80
     int savedCount = NElems;
     if (oldCapacity > 0)
     {
@@ -359,10 +343,10 @@ void IVP_VHash_Store::AddElem(void* Key, void* Value, unsigned HashIndex)
     {
         Rehash(Size * 2);
     }
-    FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+    IVP_VHash_Store_Slot* buckets = ElemsStore;
     unsigned mask = static_cast<unsigned>(SizeMm);
     unsigned idx = mask & HashIndex;
-    FVHashStoreElem* slot = &buckets[idx];
+    IVP_VHash_Store_Slot* slot = &buckets[idx];
     NElems = NElems + 1;
     void* residentKey = slot->key;
     unsigned carryIdeal = idx;
@@ -384,7 +368,7 @@ void IVP_VHash_Store::AddElem(void* Key, void* Value, unsigned HashIndex)
         }
         mask = static_cast<unsigned>(SizeMm);
         idx = (idx + 1) & mask;
-        buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+        buckets = ElemsStore;
         slot = &buckets[idx];
         carryValue = nextCarryValue;
         residentKey = slot->key;
@@ -405,7 +389,7 @@ void* IVP_VHash_Store::RemoveElem(void* Key)
 // not-found exit: the probe loops until the key is found.
 void* IVP_VHash_Store::RemoveElem(void* Key, unsigned HashIndex)
 {
-    FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+    IVP_VHash_Store_Slot* buckets = ElemsStore;
     unsigned mask = static_cast<unsigned>(SizeMm);
     unsigned probe = HashIndex;
     unsigned foundIdx;
@@ -429,7 +413,7 @@ void* IVP_VHash_Store::RemoveElem(void* Key, unsigned HashIndex)
         refDist = buckets[mask].hash & mask;
     }
     unsigned scan = (vacant + 1) & mask;
-    FVHashStoreElem* scanSlot = &buckets[scan];
+    IVP_VHash_Store_Slot* scanSlot = &buckets[scan];
     while (scanSlot->key != nullptr)
     {
         unsigned scanIdeal = scanSlot->hash & mask;
@@ -460,7 +444,7 @@ void* IVP_VHash_Store::RemoveElem(void* Key, unsigned HashIndex)
             vacant = scan;
         }
         mask = static_cast<unsigned>(SizeMm);
-        buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+        buckets = ElemsStore;
         scan = (scan + 1) & mask;
         scanSlot = &buckets[scan];
     }
@@ -487,8 +471,8 @@ void* IVP_VHash_Store::FindElem(void* Key, unsigned HashIndex)
         do
         {
             idx = static_cast<unsigned>(SizeMm) & idx;
-            FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
-            FVHashStoreElem* slot = &buckets[idx];
+            IVP_VHash_Store_Slot* buckets = ElemsStore;
+            IVP_VHash_Store_Slot* slot = &buckets[idx];
             probes = probes + 1;
             if (slot->value == nullptr)
             {
@@ -518,8 +502,8 @@ void IVP_VHash_Store::ChangeElem(void* Key, void* NewValue)
     for (;;)
     {
         idx = static_cast<unsigned>(SizeMm) & idx;
-        FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
-        FVHashStoreElem* slot = &buckets[idx];
+        IVP_VHash_Store_Slot* buckets = ElemsStore;
+        IVP_VHash_Store_Slot* slot = &buckets[idx];
         probes = probes + 1;
         if (slot->value == nullptr)
         {

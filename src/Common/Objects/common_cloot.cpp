@@ -191,5 +191,5 @@ Archetype::Equipment* CLoot::contents_arch() const
 Archetype::Equipment* CLoot::container_arch() const
 {
     // FUN_0629d480, a JMP to the ICF-folded CAsteroid::asteroidarch.
-    return (Archetype::Equipment*)Archetype;
+    return static_cast<Archetype::Equipment*>(Archetype);
 }

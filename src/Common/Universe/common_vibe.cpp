@@ -81,7 +81,7 @@ namespace
     // FUN_063782e0, handed to MSVCRT bsearch: the search key against a slot's key.
     int __cdecl StaticVibeKeyCompare(void const* KeyPtr, void const* SlotPtr)
     {
-        return StaticVibeKeyDiff(*(int const*)KeyPtr, ((FVibeSlot const*)SlotPtr)->Key);
+        return StaticVibeKeyDiff(*static_cast<int const*>(KeyPtr), static_cast<FVibeSlot const*>(SlotPtr)->Key);
     }
 
     // VC6 <algorithm> std::sort as FUN_063241c0 instantiates it for the static store: _Sort
@@ -847,7 +847,7 @@ namespace
             return From.AttitudeTowardsPlayer;
 
         float Base = 0.0f;
-        FGroup const* FromGroup = (FGroup const*)From.AffiliationGroup;
+        FGroup const* FromGroup = static_cast<FGroup const*>(From.AffiliationGroup);
         if (FromGroup != nullptr && To.Affiliation != kNoAffiliation)
         {
             if (From.Affiliation == To.Affiliation)

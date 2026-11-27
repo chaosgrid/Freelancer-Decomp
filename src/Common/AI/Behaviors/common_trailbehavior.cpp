@@ -128,7 +128,7 @@ TrailBehavior::~TrailBehavior()
 // ----------------------------------------------------------------------------
 // Slot 1, LAB_062ca570.
 // ----------------------------------------------------------------------------
-bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool TrailBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bOk = BindContext(Owner, Manager, Sys);              // FUN_062d2090
     if (!bOk)
@@ -140,7 +140,7 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     MatchThrottle.SetContext(OwnerContext, SysMgr, Manager);
     MatchThrottle.SetMaxBearing(3.14159274f);                       // ICF fold 063275d0
     MatchThrottle.SetCatchUpRange(CatchUpRange244);                 // FUN_062d6740
-    if (!ObjInspectOf(OwnerContext)->is_player())
+    if (!OwnerContext->is_player())
         MatchThrottle.SetFlag3b(true);                              // FUN_062d6730
     Move.SetContext(OwnerContext, SysMgr, Manager);
     Move.SetMode(kMoveModeTradelane);                                                // FUN_062d5980

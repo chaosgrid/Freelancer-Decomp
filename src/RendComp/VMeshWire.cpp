@@ -41,7 +41,7 @@ public:
             return GR_INTERFACE_UNSUPPORTED;
         }
         AddRef();
-        *Out = (IVMeshWire*)this;
+        *Out = static_cast<IVMeshWire*>(this);
         return GR_OK;
     }
 
@@ -222,7 +222,7 @@ GENRESULT DACOM_API FVMeshWire::FInner::QueryInterface(const char* Iid, void** O
         *Out = nullptr;
         return GR_INTERFACE_UNSUPPORTED;
     }
-    IEngineComponent* Face = (IEngineComponent*)Owner;
+    IEngineComponent* Face = Owner;
     Face->AddRef();
     *Out = Face;
     return GR_OK;
@@ -254,7 +254,7 @@ unsigned long DACOM_API FVMeshWire::FInner::Release()
 
 int DACOM_API FVMeshWire::CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem)
 {
-    IFileSystem* File = (IFileSystem*)FileSystem;
+    IFileSystem* File = FileSystem;
     const int Result = File->OpenNode("VMeshWire");
     if (Result == 0)
         return Result;
@@ -293,12 +293,12 @@ int DACOM_API FVMeshWire::CreateArchetype(ArchetypeIndex Archetype, IFileSystem*
 
     FVmeshWireInstance* Wire = new FVmeshWireInstance();
     Wire->RefCount = 1;
-    Wire->Blob = (FVwireDataHeader*)Blob;
+    Wire->Blob = static_cast<FVwireDataHeader*>(Blob);
     if (Result >= 0)
     {
         const int Key = (int)((intptr_t)Archetype);
         std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
-            Archetypes.insert(std::make_pair(Key, (FVmeshWireInstance*)nullptr));
+            Archetypes.insert(std::make_pair(Key, static_cast<FVmeshWireInstance*>(nullptr)));
         FVmeshWireInstance*& Slot = Inserted.first->second;
         if (Slot != Wire)
         {
@@ -328,7 +328,7 @@ int DACOM_API FVMeshWire::DuplicateArchetype(ArchetypeIndex NewArchetype, Archet
     FVmeshWireInstance* Shared = Found->second;
     const int NewKey = (int)((intptr_t)NewArchetype);
     std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
-        Archetypes.insert(std::make_pair(NewKey, (FVmeshWireInstance*)nullptr));
+        Archetypes.insert(std::make_pair(NewKey, static_cast<FVmeshWireInstance*>(nullptr)));
     FVmeshWireInstance*& Slot = Inserted.first->second;
     if (Slot != nullptr)
     {
@@ -380,7 +380,7 @@ int DACOM_API FVMeshWire::QueryInstance(InstanceIndex Instance, const char* Iid,
 // when set the inner goes to *(AGGDESC+0xC), otherwise the object is its own outer.
 GENRESULT DACOM_API VMeshWireFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
-    FWireAggDesc* Extended = (FWireAggDesc*)Desc;
+    FWireAggDesc* Extended = reinterpret_cast<FWireAggDesc*>(Desc);
     if (Extended->Size != 0x18 || std::strcmp(Extended->Name, This->Name) != 0)
     {
         *Out = nullptr;
@@ -399,6 +399,6 @@ GENRESULT DACOM_API VMeshWireFactoryCreate(FDacomFactory* This, AGGDESC* Desc, v
         Object->Outer = &Object->Inner;
     else
         *Extended->InnerOut = &Object->Inner;
-    *Out = (IEngineComponent*)Object;
+    *Out = static_cast<IEngineComponent*>(Object);
     return GR_OK;
 }

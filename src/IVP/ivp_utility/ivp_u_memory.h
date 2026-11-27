@@ -50,7 +50,7 @@ struct IVP_U_Memory
     // bytes (inlined at every retail site).
     static char* ChunkPayload(void* Chunk)
     {
-        return (char*)(((uintptr_t)Chunk + 0x23) & ~(uintptr_t)0x1F);
+        return reinterpret_cast<char*>(((uintptr_t)Chunk + 0x23) & ~(uintptr_t)0x1F);
     }
 
     // FUN_06344000 (`JMP FUN_06344150`): ~IVP_Environment calls it on +0xa0 /
@@ -89,7 +89,7 @@ struct IVP_U_Memory
         UsableSize = (uint16_t)(Size - 0x20);
 
         // The block's first dword becomes the link, then the block is the head.
-        *(void**)Block = ChunkListHead;
+        *reinterpret_cast<void**>(Block) = ChunkListHead;
         ChunkListHead = Block;
 
         Cursor = ChunkPayload(Block);
@@ -107,7 +107,7 @@ struct IVP_U_Memory
         {
             if (Node == ChunkListStart)
                 break; // the original chunk is never freed
-            void* Next = *(void**)Node;
+            void* Next = *static_cast<void**>(Node);
             free(Node); // FUN_06343fb0
             Node = Next;
         }
@@ -129,7 +129,7 @@ struct IVP_U_Memory
         void* Node = ChunkListHead;
         while (Node != nullptr)
         {
-            void* const Next = *(void**)Node;
+            void* const Next = *static_cast<void**>(Node);
             if (UsableSize != 0 && Node == ChunkListStart)
             {
                 break;
@@ -153,8 +153,8 @@ struct IVP_U_Memory
         unsigned int Payload = 0x7fd8;
         if (Rounded > Payload)                                                       // unsigned
             Payload = Rounded;
-        char* Block = (char*)malloc(Payload + 0x28);
-        *(void**)Block = ChunkListHead;
+        char* Block = static_cast<char*>(malloc(Payload + 0x28));
+        *reinterpret_cast<void**>(Block) = ChunkListHead;
         ChunkListHead = Block;
         char* Start = ChunkPayload(Block);
         Cursor = Start + Rounded;
@@ -168,7 +168,7 @@ struct IVP_U_Memory
     void* GetMem(int Size)
     {
         char* Old = Cursor;
-        char* New = (char*)(((uintptr_t)Old + (unsigned int)Size + 0x1f) & ~(uintptr_t)0x1F);
+        char* New = reinterpret_cast<char*>(((uintptr_t)Old + (unsigned int)Size + 0x1f) & ~(uintptr_t)0x1F);
         if ((uintptr_t)New < (uintptr_t)End)
         {
             Cursor = New;

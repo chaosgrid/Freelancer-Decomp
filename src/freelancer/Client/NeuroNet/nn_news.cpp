@@ -36,6 +36,8 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
 
 #include "DALib.h"
 #include "common_goods.h"           // NewsBroadcastProperties, GoodList::find_by_id
@@ -273,12 +275,12 @@ bool NnNews::Create(Win3D* NewParent, void* Data)
             HeadlinePositions[Row].x = Top[0] - 0.045f;
             HeadlinePositions[Row].y = RowY + 0.036f;
             HeadlinePositions[Row].z = Top[2];
-            Headlines[Row] = CreateTextControl(Name, "NewsMission", &HeadlinePositions[Row], nullptr,
-                                               0.475f, 0.03f, 1.5f, 0, 0, 0, 1);
+            Headlines[Row] = CreateTextControl(Name, "NewsMission", &HeadlinePositions[Row], nullptr, 0.475f,
+                                               0.03f, 1.5f, 0, 0, 0, 1);
         }
         // The headline goes multi-line (the factory's result is not tested).
         {
-            FFontString* const Text = static_cast<NnTextControl*>(Headlines[Row])->GetFontString();
+            FFontString* const Text = Headlines[Row]->GetFontString();
             if (Text->bMultiLine != 1)
             {
                 Text->bMultiLine = 1; // +0x30
@@ -430,7 +432,7 @@ void NnNews::RefreshRows()
         Vector const* const Stored = &HeadlinePositions[Row];
         Vector Moved = {Stored->x, Stored->y, Stored->z};
         unsigned const Lines = static_cast<unsigned>(
-            (static_cast<NnTextControl*>(Headlines[Row])->GetFontString())->ChildCount());
+            (Headlines[Row]->GetFontString())->ChildCount());
         if (Lines < 2)
             Moved.y = static_cast<float>(static_cast<double>(Stored->y) - 0.016);
         Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(&Moved), 0);

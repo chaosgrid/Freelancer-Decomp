@@ -160,7 +160,7 @@ namespace Archetype
                                   unsigned const* SrcBegin, unsigned const* SrcEnd)
         {
             unsigned const Count = SrcBegin == nullptr ? 0u : (unsigned)(SrcEnd - SrcBegin);
-            Begin = (unsigned*)malloc(Count * sizeof(unsigned));
+            Begin = static_cast<unsigned*>(malloc(Count * sizeof(unsigned)));
             unsigned Index = 0;
             for (; Index < Count; ++Index)
                 Begin[Index] = SrcBegin[Index];
@@ -179,7 +179,7 @@ namespace Archetype
             if (Count > Capacity)
             {
                 free(Begin);
-                Begin = (unsigned*)malloc(Count * sizeof(unsigned));
+                Begin = static_cast<unsigned*>(malloc(Count * sizeof(unsigned)));
                 Cap = Begin + Count;
             }
             unsigned Index = 0;
@@ -645,7 +645,7 @@ namespace Archetype
         Desc.FindHandle = 0xFFFFFFFF;
 
         IFileSystem* Filesys = nullptr;
-        if (DALib::Data->CreateInstance((AGGDESC*)&Desc, (void**)&Filesys) != 0)
+        if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&Filesys)) != 0)
         {
             FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: failed to open archetype (%s) file system\n",

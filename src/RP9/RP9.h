@@ -403,7 +403,7 @@ public:
     GENRESULT DACOM_API GetDisplayModeEnum(unsigned int Index, void* Out) override;
     GENRESULT DACOM_API SelectMode(int* Mode, unsigned int* OutIndex) override;
     GENRESULT DACOM_API CreateBuffers(HWND Hwnd, int* Mode, int* OutMode) override;
-    GENRESULT DACOM_API GetModeBlob(void* OutAdapter, void* OutMode10Dwords) override;
+    GENRESULT DACOM_API GetModeBlob(unsigned long* OutAdapter, void* OutMode10Dwords) override;
     GENRESULT DACOM_API DestroyGpuResources() override;
     GENRESULT DACOM_API ClearBuffers(unsigned long Flags, const void* Rects) override;
     GENRESULT DACOM_API SwapBuffers() override;
@@ -444,7 +444,7 @@ public:
                                       void** OutHandle) override;
     GENRESULT DACOM_API DestroyTexture(void* Handle) override;
     GENRESULT DACOM_API IsTexture(void* Handle) override;
-    GENRESULT DACOM_API LockTexture(void* Handle, int Level, void* Out) override;
+    GENRESULT DACOM_API LockTexture(void* Handle, int Level, unsigned long* Out) override;
     GENRESULT DACOM_API UnlockTexture(void* Handle, int Level) override;
     GENRESULT DACOM_API GetTextureFormat(void* Handle, int* OutFormat) override;
     GENRESULT DACOM_API GetTextureDim(void* Handle, unsigned int* OutW, unsigned int* OutH,

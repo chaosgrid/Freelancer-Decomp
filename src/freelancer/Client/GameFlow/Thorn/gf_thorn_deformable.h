@@ -54,7 +54,7 @@ struct FThornDeformable : FThornComponent
     // identity tail
     void Stop() override;                                                // 14 FUN_00452130
     bool FindActor(char const* InActorName, void** OutActorField,
-                   void** OutActor) override;                            // 16 LAB_00452df0
+                   FCharacterObject** OutActor) override;                            // 16 LAB_00452df0
     InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00452200
     void SetScene(void* Scene) override;                                 // 19 LAB_00452ec0
     void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,

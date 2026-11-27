@@ -222,6 +222,25 @@ enum ENavMapView : int
     kNavMapViewSystemZoomed = 2,  // a system zoomed in (FUN_0049f1a0)
 };
 
+// The two vertex layouts of the map's buffers: FVF 0x42 {position, diffuse} (0x10 bytes) and
+// FVF 0x142 {position, diffuse, uv} (0x18 bytes).
+struct FNavMapColorVertex
+{
+    float X;
+    float Y;
+    float Z;
+    unsigned long Diffuse;
+};
+struct FNavMapTexVertex
+{
+    float X;
+    float Y;
+    float Z;
+    unsigned long Diffuse;
+    float U;
+    float V;
+};
+
 class NeuroNetNavMap : public WinControl, public EventHandler, public ButtonMover
 {
 public:
@@ -635,7 +654,7 @@ public:
     // +0xd40..+0xd68 -- FUN_00498bd0's trade lane mesh (8 vertices / 12 indices a segment,
     // FVF 0x142 {pos, diffuse, uv}, 0x18 bytes a vertex) and the view it was built for;
     // FUN_004992b0 draws it through G_NavMapBufferHandles[2].
-    unsigned char* TradeLaneVertices;   // +0xd40 operator new(0x6000)
+    FNavMapTexVertex* TradeLaneVertices; // +0xd40 operator new(0x6000)
     unsigned short* TradeLaneIndices;   // +0xd44 operator new(0x1800)
     int TradeLaneVertexCount;           // +0xd48 ctor 0
     int TradeLaneIndexCount;            // +0xd4c ctor 0
@@ -647,7 +666,7 @@ public:
     // +0xd6c..+0xedc -- FUN_0049b600's terrain patches (33 vertices / 96 indices a zone, FVF
     // 0x142, 0x18 bytes a vertex), grouped into patches by terrain shape; FUN_0049c260 draws
     // them through G_NavMapBufferHandles[0].
-    unsigned char* TerrainVertices;     // +0xd6c operator new(0x9000)
+    FNavMapTexVertex* TerrainVertices;  // +0xd6c operator new(0x9000)
     unsigned short* TerrainIndices;     // +0xd70 operator new(0x2400)
     int TerrainVertexCount;             // +0xd74 ctor 0
     int TerrainMinIndex[16];            // +0xd78 a patch's first vertex
@@ -667,7 +686,7 @@ public:
     // +0xee0..+0xf14 -- FUN_0049c740's zone shading (up to 6000 vertices, FVF 0x42 {pos,
     // diffuse}, 0x10 bytes a vertex) and the view / filter it was built for; FUN_0049dcc0
     // draws it through G_NavMapBufferHandles[1].
-    unsigned char* ShadeVertices;       // +0xee0 operator new(0x17700)
+    FNavMapColorVertex* ShadeVertices;  // +0xee0 operator new(0x17700)
     unsigned short* ShadeIndices;       // +0xee4 operator new(0x8ca0)
     int ShadeVertexCount;               // +0xee8 ctor 0
     int ShadeIndexCount;                // +0xeec ctor 0

@@ -63,7 +63,7 @@ public:
         : Packet(InPacket) {
         Packet.MarshalCursor = 0;
         Packet.MarshalLimit = Capacity;
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(Buffer);
+        Packet.SetMarshalBuffer(static_cast<unsigned char*>(Buffer));
         Packet.MarshalError = 0;
     }
 
@@ -73,7 +73,7 @@ public:
     FRpcWireStream(FPacketBase& InPacket, unsigned char** BufferHolder, unsigned int Capacity)
         : Packet(InPacket) {
         Packet.MarshalLimit = Capacity;
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(*BufferHolder);
+        Packet.SetMarshalBuffer(*BufferHolder);
         Packet.MarshalCursor = 0;
         Packet.MarshalError = 0;
     }
@@ -129,11 +129,11 @@ public:
         return true;
     }
     void PutUncounted(const void* Value, unsigned int Width) {
-        std::memcpy(reinterpret_cast<void*>(Packet.MarshalPtr), Value, Width);
+        std::memcpy(Packet.MarshalBuffer(), Value, Width);
         Packet.MarshalPtr += Width;
     }
     void GetUncounted(void* Value, unsigned int Width) {
-        std::memcpy(Value, reinterpret_cast<const void*>(Packet.MarshalPtr), Width);
+        std::memcpy(Value, Packet.MarshalBuffer(), Width);
         Packet.MarshalPtr += Width;
     }
 
@@ -157,7 +157,7 @@ public:
 
     bool Get(void* Value, unsigned int Width) {
         if (!Advance(Width, kPacketDecodeOverrun)) return false;
-        if (Width != 0) std::memcpy(Value, reinterpret_cast<const void*>(Packet.MarshalPtr), Width);
+        if (Width != 0) std::memcpy(Value, Packet.MarshalBuffer(), Width);
         Packet.MarshalPtr += Width;
         return true;
     }
@@ -166,7 +166,7 @@ public:
     // others commit before it. Keep that ordering on an unmasked FP exception.
     bool GetBeforePointerCommit(void* Value, unsigned int Width) {
         if (!Advance(Width, kPacketDecodeOverrun)) return false;
-        std::memcpy(Value, reinterpret_cast<const void*>(Packet.MarshalPtr), Width);
+        std::memcpy(Value, Packet.MarshalBuffer(), Width);
         return true;
     }
 

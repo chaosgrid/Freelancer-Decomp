@@ -621,7 +621,7 @@ namespace
             Blocks.push_back(Block);
             FBlock& Added = Blocks.back();
             unsigned const Bytes = (unsigned)sizeof(FListNode) * 200;
-            Added.Memory = (FListNode*)malloc(Bytes);
+            Added.Memory = static_cast<FListNode*>(malloc(Bytes));
             Added.Bytes = Bytes;
             for (unsigned Index = 0; Index < 200; ++Index)
             {

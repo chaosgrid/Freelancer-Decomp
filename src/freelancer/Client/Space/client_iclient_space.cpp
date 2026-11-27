@@ -103,7 +103,7 @@ namespace
     bool IsPlayerGameobj(FClientGameobj const* Go)
     {
         // The FUN_0054baf0 compare the handlers make against a gameobj pointer.
-        return static_cast<void const*>(static_cast<IObjRW const*>(Go)) == GetPlayerObjRW();
+        return static_cast<IObjRW const*>(Go) == GetPlayerObjRW();
     }
 
     // IDirectiveInfo as slot 100 writes it: three dwords {First, 0, Type}.
@@ -431,7 +431,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     Obj->enable_collisions_r(true);
 
     // The player's gameobj is fetched before the single-player test.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (SinglePlayer() || Player == nullptr)
     {
         return;
@@ -1001,7 +1001,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
 
     // The player's behavior manager hears event 3 with {gate id, gate type, ship id}. No null
     // test on the narrowed CEqObj.
-    FClientGameobj* const Player = static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
+    FClientGameobj* const Player = static_cast<FClientGameobj*>(GetPlayerObjRW());
     if (Player != nullptr)
     {
         CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, CObject::ClassEqObj));
@@ -1597,12 +1597,12 @@ void IClientImpl::SendCommonRequestRankLevel(unsigned int /*ClientId*/, unsigned
 // (type 0x14 delay, 7 dock, 0x11 follow, 2 goto, 6 idle), for cancel {0, 0, -1}.
 void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const FPayloadServerSetDirective& Info)
 {
-    void* const PlayerObj = GetPlayerObjRW();
+    IObjRW* const PlayerObj = GetPlayerObjRW();
     if (PlayerObj == nullptr)
     {
         return;
     }
-    FClientGameobj* const Player = static_cast<FClientGameobj*>(static_cast<IObjRW*>(PlayerObj));
+    FClientGameobj* const Player = static_cast<FClientGameobj*>(PlayerObj);
     CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, CObject::ClassShip));
     IBehaviorManager* const Behavior = PlayerEq->get_behavior_interface();
 
@@ -1815,12 +1815,12 @@ void IClientImpl::SendServerMiscObjUpdateFormation(unsigned int /*ClientId*/,
 // LAB_0053e1a0 -- ch2 FORMATION_UPDATE on the player's ship; the leader gameobj is not tested.
 void IClientImpl::SendServerFormationUpdate(unsigned int /*ClientId*/, unsigned int LeaderId, const Vector& Offset)
 {
-    void* const PlayerObj = GetPlayerObjRW();
+    IObjRW* const PlayerObj = GetPlayerObjRW();
     if (PlayerObj == nullptr)
     {
         return;
     }
-    IObjRW* const Player = static_cast<IObjRW*>(PlayerObj);
+    IObjRW* const Player = PlayerObj;
     IObjRW* const Leader = ClientObjDb_FindObject(LeaderId, 0);
     Player->set_formation_leader(Leader);
     Player->set_formation_offset(Offset);

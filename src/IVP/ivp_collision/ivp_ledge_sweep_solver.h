@@ -61,6 +61,9 @@
 
 class IVP_Real_Object;
 class IVP_Core;
+class IVP_Compact_Edge;
+class IVP_Compact_Ledge;
+struct IVP_U_Float_Point;
 class IVP_Ledge_Mindist;
 class IVP_Environment;
 
@@ -165,8 +168,8 @@ public:
 // ----------------------------------------------------------------------------
 struct FIVP_Sweep_Ledge_Side
 {
-    const void *Points;                 // +0x00 -- IVP_U_Float_Point[], 0x10 stride
-    const void *Ledge;                  // +0x04 -- IVP_Compact_Ledge *
+    const IVP_U_Float_Point *Points;    // +0x00 -- IVP_U_Float_Point[], 0x10 stride
+    const IVP_Compact_Ledge *Ledge;     // +0x04 -- IVP_Compact_Ledge *
     IVP_NarrowPhaseCacheSlot *Source;    // +0x08
     IVP_Real_Object *Object;            // +0x0c
 };
@@ -200,27 +203,27 @@ struct IVP_Sweep_Estimator_Context
     IVP_Time OutEvent;          // +0x2c
 
     // FUN_0635df00, thiscall, RET 0xc. From LAB_0635fd10's ShapeTypeB == 2 arm.
-    void EstimateBallVsLedgeFaceContact(const void *FeatureEdge,
+    void EstimateBallVsLedgeFaceContact(const IVP_Compact_Edge *FeatureEdge,
                                         IVP_NarrowPhaseCacheSlot *SourceA,
                                         FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635da70, thiscall, RET 0x10. From LAB_0635fef0 (:0636002a).
-    void EstimateLedgeVertexVsLedgeFaceContact(const void *FeatureEdgeA,
-                                               const void *FeatureEdgeB,
+    void EstimateLedgeVertexVsLedgeFaceContact(const IVP_Compact_Edge *FeatureEdgeA,
+                                               const IVP_Compact_Edge *FeatureEdgeB,
                                                FIVP_Sweep_Ledge_Side *SideA,
                                                FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635e1d0, thiscall, RET 0x10. From LAB_0635fef0 (:0635fff4). The
     // feature edges are raw tagged compact edges.
-    void EstimateLedgeEdgeVsLedgeEdgeContact(const void *FeatureEdgeA,
-                                             const void *FeatureEdgeB,
+    void EstimateLedgeEdgeVsLedgeEdgeContact(const IVP_Compact_Edge *FeatureEdgeA,
+                                             const IVP_Compact_Edge *FeatureEdgeB,
                                              FIVP_Sweep_Ledge_Side *SideA,
                                              FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635f180, thiscall, RET 0x10. From LAB_0635fef0 (:06360045). The
     // only ledge-ledge driver that reads +0x0c (MaxSpeedSum).
-    void EstimateLedgeVertexVsLedgeEdgeContact(const void *FeatureEdgeA,
-                                               const void *FeatureEdgeB,
+    void EstimateLedgeVertexVsLedgeEdgeContact(const IVP_Compact_Edge *FeatureEdgeA,
+                                               const IVP_Compact_Edge *FeatureEdgeB,
                                                FIVP_Sweep_Ledge_Side *SideA,
                                                FIVP_Sweep_Ledge_Side *SideB);
 
@@ -230,8 +233,8 @@ struct IVP_Sweep_Estimator_Context
                                    IVP_NarrowPhaseCacheSlot *SourceB);
 
     // FUN_0635e790, thiscall, RET 0x10. From LAB_0635fef0's (0, 0) arm.
-    void EstimateLedgeVertexVsLedgeVertexContact(const void *FeatureEdgeA,
-                                                 const void *FeatureEdgeB,
+    void EstimateLedgeVertexVsLedgeVertexContact(const IVP_Compact_Edge *FeatureEdgeA,
+                                                 const IVP_Compact_Edge *FeatureEdgeB,
                                                  FIVP_Sweep_Ledge_Side *SideA,
                                                  FIVP_Sweep_Ledge_Side *SideB);
 
@@ -239,7 +242,7 @@ struct IVP_Sweep_Estimator_Context
     // arm. ObjectA is read only for ->core; SourceA is the ball's cache slot
     // passed directly; only SideB is a side record.
     void EstimateBallVsLedgeVertexContact(IVP_Real_Object *ObjectA,
-                                          const void *FeatureEdgeB,
+                                          const IVP_Compact_Edge *FeatureEdgeB,
                                           IVP_NarrowPhaseCacheSlot *SourceA,
                                           FIVP_Sweep_Ledge_Side *SideB);
 
@@ -247,7 +250,7 @@ struct IVP_Sweep_Estimator_Context
     // arm. ObjectA is unused; kept because the dispatcher pushes the same
     // four arguments as for FUN_0635ec90.
     void EstimateBallVsLedgeEdgeContact(IVP_Real_Object *ObjectA,
-                                        const void *FeatureEdgeB,
+                                        const IVP_Compact_Edge *FeatureEdgeB,
                                         IVP_NarrowPhaseCacheSlot *SourceA,
                                         FIVP_Sweep_Ledge_Side *SideB);
 };

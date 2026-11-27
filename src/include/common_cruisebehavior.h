@@ -48,7 +48,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1, LAB_062cf3e0: the binder FUN_062d2090 (Behavior::BindContext).
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, FUN_062ce380: FUN_062d20d0 (Behavior::OnEngage), then
     // ThrustManager::engage_cruise(SysMgr+0x18, true).

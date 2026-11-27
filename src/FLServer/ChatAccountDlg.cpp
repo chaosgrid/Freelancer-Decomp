@@ -112,7 +112,7 @@ void CChatAccountDlg::OnCloseButton()
 // key is eaten (*Result = 1); any other key passes (*Result = 0).
 void CChatAccountDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 {
-	const MSGFILTER* Filter = (const MSGFILTER*)Header;
+	const MSGFILTER* Filter = reinterpret_cast<const MSGFILTER*>(Header);
 	if (Filter->wParam != VK_RETURN)
 	{
 		*Result = 0;

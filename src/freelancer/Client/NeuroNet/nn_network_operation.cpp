@@ -61,7 +61,7 @@ bool NnNetworkOperation::Create(Win3D* NewParent, void* Data)
 
     // The text's Font::String (+0x334) goes multi-line (re-laid out via +0x28 = 0). No null test
     // on the text.
-    FFontString* const Font = static_cast<NnTextControl*>(ExitText)->GetFontString();
+    FFontString* const Font = ExitText->GetFontString();
     if (Font->bMultiLine != 1)
     {
         Font->bMultiLine = 1;

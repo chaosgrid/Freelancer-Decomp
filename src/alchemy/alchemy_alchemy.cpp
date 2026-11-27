@@ -192,7 +192,7 @@ namespace AlchemyImpl
         if (Iids::EqualNoNullTest(Iid, Iids::Alchemy) || Iids::EqualNoNullTest(Iid, Iids::FxNodeLibrary) ||
             Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
-            IAlchemy* const Interface = static_cast<IAlchemy*>(Owner_);
+            IAlchemy* const Interface = Owner_;
             Interface->AddRef();
             *Out = Interface;
             return GR_OK;
@@ -284,11 +284,11 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::MakeUniqueName(void* NameRaw, void* OutRaw)
+    GENRESULT DACOM_API FAlchemy::MakeUniqueName(const char* NameRaw, const char** OutRaw)
     {
         // 062277e0: borrowed original name or the independent DAT_06257d80 buffer.
-        const char* CurrentName = static_cast<const char*>(NameRaw);
-        const char** Out = static_cast<const char**>(OutRaw);
+        const char* CurrentName = NameRaw;
+        const char** Out = OutRaw;
         char Base[256];
         char Ext[32];
         int Suffix = 0;
@@ -336,7 +336,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FAlchemy::CreateVertexBuffer()
     {
         // LAB_06201330: the entry null test and post-call global reloads differ.
-        IRPVertexBuffer* VertexBuffer = static_cast<IRPVertexBuffer*>(G_RpVertexBuffer);
+        IRPVertexBuffer* VertexBuffer = G_RpVertexBuffer;
         if (VertexBuffer == nullptr)
         {
             G_VbHandle = nullptr;
@@ -345,7 +345,7 @@ namespace AlchemyImpl
         if (G_VbHandle != nullptr)
         {
             VertexBuffer->DestroyVb(&G_VbHandle);
-            VertexBuffer = static_cast<IRPVertexBuffer*>(G_RpVertexBuffer);
+            VertexBuffer = G_RpVertexBuffer;
             G_VbHandle = nullptr;
         }
         const GENRESULT Result = VertexBuffer->CreateVb(
@@ -353,7 +353,7 @@ namespace AlchemyImpl
         if (Result < 0)
         {
             FdumpAlchemyError(0x43, kMsgCreateVb);
-            VertexBuffer = static_cast<IRPVertexBuffer*>(G_RpVertexBuffer);
+            VertexBuffer = G_RpVertexBuffer;
             if (VertexBuffer != nullptr)
                 VertexBuffer->DestroyVb(&G_VbHandle);
             G_VbHandle = nullptr;
@@ -363,20 +363,20 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::ReleaseVertexBuffer()
     {
-        IRPVertexBuffer* const VertexBuffer = static_cast<IRPVertexBuffer*>(G_RpVertexBuffer);
+        IRPVertexBuffer* const VertexBuffer = G_RpVertexBuffer;
         if (VertexBuffer != nullptr)
             VertexBuffer->DestroyVb(&G_VbHandle);
         G_VbHandle = nullptr;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::ComposeNodeTransforms(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::ComposeNodeTransforms(void* A, IDAComponent* B)
     {
         // LAB_062016c0: Start = B, or G_RootNode (DAT_062578b0) when B is null, then
         // dereferenced without a null test. Start's world transform replaces
         // G_NodeWalkXform and is not restored; the child loop is FUN_06201620 inlined.
         // Start's own siblings are not visited.
-        IDAComponent* StartNode = static_cast<IDAComponent*>(B);
+        IDAComponent* StartNode = B;
         if (StartNode == nullptr)
             StartNode = G_RootNode;
         static const float kIdentityXform12[12] = {1.f, 0.f, 0.f, 0.f, 1.f, 0.f,
@@ -391,10 +391,10 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::UpdateNodes(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::UpdateNodes(void* A, IDAComponent* B)
     {
         // LAB_06201870: B (root when null), then its descendants via FUN_06201810.
-        IDAComponent* StartNode = static_cast<IDAComponent*>(B);
+        IDAComponent* StartNode = B;
         if (StartNode == nullptr)
             StartNode = G_RootNode;
         if (StartNode == nullptr)
@@ -416,7 +416,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::DrawNodes(void* Cookie, void* StartNode)
+    GENRESULT DACOM_API FAlchemy::DrawNodes(void* Cookie, IDAComponent* StartNode)
     {
         // LAB_06201910: successful child/sibling probes are called again;
         // ancestor traversal reads the parent even after finding a sibling.
@@ -426,7 +426,7 @@ namespace AlchemyImpl
             return GR_GENERIC;
         }
         G_DrawCookie = static_cast<unsigned long>(reinterpret_cast<unsigned int>(Cookie));
-        IDAComponent* Start = static_cast<IDAComponent*>(StartNode);
+        IDAComponent* Start = StartNode;
         if (Start == nullptr)
             Start = G_RootNode;
         IDAComponent* Node = Start;
@@ -465,14 +465,14 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::AttachNode(void* ParentRaw, void* ChildRaw)
+    GENRESULT DACOM_API FAlchemy::AttachNode(IDAComponent* ParentRaw, IDAComponent* ChildRaw)
     {
         // FUN_06201e90: fails when the child already has a parent; links through
         // FUN_06201e00 and AddRefs the child's new parent and the child.
-        IDAComponent* Child = static_cast<IDAComponent*>(ChildRaw);
+        IDAComponent* Child = ChildRaw;
         if (AsFxNode(Child)->GetAttachParent() != nullptr)
             return GR_GENERIC;
-        IDAComponent* Parent = static_cast<IDAComponent*>(ParentRaw);
+        IDAComponent* Parent = ParentRaw;
         LinkNodeTree(Parent, Child);
         if (AttachCount_ == AttachCapacity_)
         {
@@ -496,19 +496,19 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::AttachNodeFiltered(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::AttachNodeFiltered(void* A, IDAComponent* B)
     {
         // LAB_06201ed0: filter the parent before attaching the child. Retail: with no
         // filter callback the parent is null, and LinkNodeTree dereferences it.
         unsigned long FilterResult = 0;
         if (G_FilterCallback != nullptr)
             FilterResult = G_FilterCallback(A, B);
-        return AttachNode((void*)FilterResult, B);
+        return AttachNode(reinterpret_cast<IDAComponent*>(FilterResult), B);
     }
 
-    GENRESULT DACOM_API FAlchemy::DetachNode(void* Node)
+    GENRESULT DACOM_API FAlchemy::DetachNode(IDAComponent* Node)
     {
-        IDAComponent* Child = static_cast<IDAComponent*>(Node);
+        IDAComponent* Child = Node;
         IDAComponent* OriginalParent = AsFxNode(Child)->GetAttachParent();
         if (OriginalParent == nullptr)
             return GR_GENERIC;
@@ -555,11 +555,11 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::SubmitNode(void* Node)
+    GENRESULT DACOM_API FAlchemy::SubmitNode(IDAComponent* Node)
     {
         // FUN_06202010: children first, then tag the node (flags | 0x80000000),
         // fire the update callback and detach. Always returns 0.
-        IDAComponent* NodePtr = static_cast<IDAComponent*>(Node);
+        IDAComponent* NodePtr = Node;
         SubmitChildNodes(NodePtr);
         unsigned long Flag = 0;
         AsFxNode(NodePtr)->GetNodeFlags(&Flag);
@@ -571,17 +571,17 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::SubmitChildNodes(void* Node)
+    GENRESULT DACOM_API FAlchemy::SubmitChildNodes(IDAComponent* Node)
     {
         // LAB_062020e0: every child of Node, depth-first (FUN_06202070).
-        IDAComponent* NodePtr = static_cast<IDAComponent*>(Node);
+        IDAComponent* NodePtr = Node;
         IDAComponent* Child = AsFxNode(NodePtr)->GetFirstChild();
         if (Child != nullptr)
             SubmitNodeChain(Child);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::GetRootNode(void** Out)
+    GENRESULT DACOM_API FAlchemy::GetRootNode(IDAComponent** Out)
     {
         if (Out == nullptr)
             return GR_GENERIC;
@@ -592,12 +592,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::FindNode(void* Out, void* SearchKey, void* StartNode)
+    GENRESULT DACOM_API FAlchemy::FindNode(IDAComponent** Out, void* SearchKey, IDAComponent* StartNode)
     {
         // FUN_06202180: pre-order search; each node's instance-name hash (+0x74,
         // out-parameter getter) is compared with SearchKey.
-        IDAComponent** OutPtr = static_cast<IDAComponent**>(Out);
-        IDAComponent* Start = static_cast<IDAComponent*>(StartNode);
+        IDAComponent** OutPtr = Out;
+        IDAComponent* Start = StartNode;
         if (Start == nullptr)
             Start = G_RootNode;
         if (Start == nullptr)
@@ -641,7 +641,7 @@ namespace AlchemyImpl
             return GR_GENERIC;
         }
         G_bInDraw = true;
-        if (static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->SelectVb(G_VbHandle) < 0)
+        if (G_RpVertexBuffer->SelectVb(G_VbHandle) < 0)
         {
             if (G_RpVertexBuffer == nullptr)
             {
@@ -650,16 +650,16 @@ namespace AlchemyImpl
             }
             if (G_VbHandle != nullptr)
             {
-                static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->DestroyVb(&G_VbHandle);
+                G_RpVertexBuffer->DestroyVb(&G_VbHandle);
                 G_VbHandle = nullptr;
             }
-            if (static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->CreateVb(
+            if (G_RpVertexBuffer->CreateVb(
                     kAlchemyVbFvf, G_MaxVertices,
                     reinterpret_cast<unsigned int**>(&G_VbHandle), kRpBufferDynamic) < 0)
             {
                 FdumpAlchemyError(0x43, kMsgCreateVb);
                 if (G_RpVertexBuffer != nullptr)
-                    static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->DestroyVb(&G_VbHandle);
+                    G_RpVertexBuffer->DestroyVb(&G_VbHandle);
                 G_VbHandle = nullptr;
                 return GR_GENERIC;
             }
@@ -701,14 +701,14 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::EnqueueAppearance(void* ListIndexRaw, void* AppearanceRaw)
+    GENRESULT DACOM_API FAlchemy::EnqueueAppearance(void* ListIndexRaw, IDAComponent* AppearanceRaw)
     {
         const unsigned long ListIndex =
             static_cast<unsigned long>(reinterpret_cast<unsigned int>(ListIndexRaw));
-        return EnqueueAppearanceToList(ListIndex, static_cast<IDAComponent*>(AppearanceRaw));
+        return EnqueueAppearanceToList(ListIndex, AppearanceRaw);
     }
 
-    GENRESULT DACOM_API FAlchemy::SetDrawFlags(void* Pair)
+    GENRESULT DACOM_API FAlchemy::SetDrawFlags(unsigned char* Pair)
     {
         const unsigned char* Bytes = static_cast<const unsigned char*>(Pair);
         G_DrawFlagA = Bytes[0] != 0 ? 1 : 0;
@@ -716,9 +716,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::CopyCounters(void* Out9Dwords)
+    GENRESULT DACOM_API FAlchemy::CopyCounters(unsigned char* Out9Dwords)
     {
-        unsigned char* const OutBytes = static_cast<unsigned char*>(Out9Dwords);
+        unsigned char* const OutBytes = Out9Dwords;
         for (unsigned long Index = 0; Index < 9; ++Index)
         {
             const unsigned long Word = G_DrawCounters[Index];

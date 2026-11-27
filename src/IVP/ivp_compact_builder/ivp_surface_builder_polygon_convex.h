@@ -44,13 +44,6 @@ public:
     ~FPolygonPointHash() override
     {
     }
-
-    // The {hash index, element} pair array behind IVP_VHash::Elems.
-    struct FEntry
-    {
-        unsigned HashIndex;
-        void* Elem;
-    };
 };
 
 // The triangle argument of the second constructor (0636db00): +0x08 is a

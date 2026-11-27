@@ -1241,14 +1241,14 @@ GENRESULT DACOM_API FSoundInner::QueryInterface(const char* Iid, void** Out)
     // controlling unknown.
     if (Iids::EqualNoNullTest(Iid, Iids::SoundManager))
     {
-        ISoundManager* Found = static_cast<ISoundManager*>(Self);
+        ISoundManager* Found = Self;
         Found->AddRef();
         *Out = Found;
         return GR_OK;
     }
     if (Iids::EqualNoNullTest(Iid, Iids::SoundManagerStatus))
     {
-        ISoundManagerStatus* Found = static_cast<ISoundManagerStatus*>(Self);
+        ISoundManagerStatus* Found = Self;
         Found->AddRef();
         *Out = Found;
         return GR_OK;

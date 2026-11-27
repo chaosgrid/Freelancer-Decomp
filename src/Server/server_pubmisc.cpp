@@ -689,7 +689,7 @@ static void TimerListInsertBefore(FTimerNode* sentinel, FTimerNode* node) {
 extern "C" int __cdecl Server_ControllerSetTimer(unsigned int Flid, unsigned int Param1,
                                                  unsigned int Param2, float Timeout) {
     if (Timeout < 0.0f) return -4;
-    FTimerNode* node = (FTimerNode*)malloc(sizeof(FTimerNode));
+    FTimerNode* node = static_cast<FTimerNode*>(malloc(sizeof(FTimerNode)));
     node->TargetController = Flid;
     node->Param1 = Param1;
     node->Param2 = Param2;

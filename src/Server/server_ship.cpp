@@ -233,7 +233,7 @@ bool Ship::update(float Dt)
     if (SinglePlayer() != 0)
     {
         // CShip::bJumpedOut (+0x214).
-        if (((CShip*)DockedObj)->bJumpedOut == 0)
+        if (static_cast<CShip*>(DockedObj)->bJumpedOut == 0)
             return true;
         Ship_QueueDockExited(this);                                 // FUN_06d00130
         DockedObjId = 0u;

@@ -163,7 +163,7 @@ bool RepairManager::RefreshFromPersonality()
     {
         // +0x1370 watcher; the node is tested against null and the literal 8 (node - 8).
         Watchable const* const Node = Owner->FormationLeaders.FormationLeaderWatcher.target();
-        if (Node != nullptr && Node != (Watchable const*)8)
+        if (Node != nullptr && Node != reinterpret_cast<Watchable const*>(8))
         {
             IObjRW* const Handle = ObjRwFromWatchable(const_cast<Watchable*>(Node));
             CObject const* const Obj = Handle->cobject();   // IObjInspect slot 84

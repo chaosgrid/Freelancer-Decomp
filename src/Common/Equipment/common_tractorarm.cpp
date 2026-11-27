@@ -19,7 +19,7 @@ namespace
     {
         if (Target == nullptr)
             return nullptr;
-        return (Watchable const*)((unsigned char const*)Target + offsetof(CSimple, SelfWatchable));
+        return reinterpret_cast<Watchable const*>((reinterpret_cast<unsigned char const*>(Target) + offsetof(CSimple, SelfWatchable)));
     }
 }
 
@@ -133,7 +133,7 @@ void TractorArm::Update(float Dt)
         double const Dx = Delta.x;
         double const Dy = (double)Target->WorldPosition.y - Candidate.y;
         double const Dz = Delta.z;
-        double const MaxStep = (double)Dt * ((Archetype::Tractor const*)Owner->EquipArch())->ReachSpeed;
+        double const MaxStep = (double)Dt * static_cast<Archetype::Tractor const*>(Owner->EquipArch())->ReachSpeed;
         double const DistSq = Dz * Dz + Dy * Dy + Dx * Dx;
         if (DistSq > MaxStep * MaxStep)
         {

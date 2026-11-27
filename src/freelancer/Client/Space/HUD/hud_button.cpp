@@ -30,7 +30,7 @@ namespace
     // then UpdateInstance(+0x04, 0, 0).
     void HolderSetMatrixAndUpdate(FClientMeshHolder* Holder, float* Transform12)
     {
-        DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, (const Transform*)Transform12);
+        DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, reinterpret_cast<const Transform*>(Transform12));
         Holder->Update();
     }
 }

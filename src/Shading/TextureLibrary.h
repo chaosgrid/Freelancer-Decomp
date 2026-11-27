@@ -95,8 +95,8 @@ public:
 
     GENRESULT DACOM_API SetGenericSlot(int Index, unsigned long Value) override;
     GENRESULT DACOM_API GetGenericSlot(int Index, unsigned long* Out) override;
-    GENRESULT DACOM_API LoadTextureGroup(void* FileSystem, int* OutGroupId) override;
-    GENRESULT DACOM_API LoadTextureLibrary(void* FileSystem, const char* Name) override;
+    GENRESULT DACOM_API LoadTextureGroup(IFileSystem* FileSystem, int* OutGroupId) override;
+    GENRESULT DACOM_API LoadTextureLibrary(IFileSystem* FileSystem, const char* Name) override;
     GENRESULT DACOM_API GarbageCollect(int GroupId) override;
     GENRESULT DACOM_API TickAllPlayback(int Unused, float DeltaSeconds) override;
     GENRESULT DACOM_API SetGroupName(int Id, const char* Name) override;

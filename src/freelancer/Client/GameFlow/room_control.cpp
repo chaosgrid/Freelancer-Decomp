@@ -679,7 +679,7 @@ namespace
         Runtime->CameraToZFar = Info->FarPlane;
 
         FRoomCamera* const Camera = Runtime->Camera;
-        const float* const Orient = (const float*)Camera->GetOrientation();
+        const float* const Orient = reinterpret_cast<const float*>(Camera->GetOrientation());
         RoomCameraMath()->MatrixToQuaternion(Runtime->CameraFromQuat,
                                              *reinterpret_cast<Matrix const*>(Orient));
         memcpy(Runtime->CameraFromPos, Camera->GetPosition(), sizeof(Runtime->CameraFromPos));
@@ -1209,7 +1209,7 @@ static void RoomControlRunStartScript(FRoomRuntime* Runtime, int CharacterKey, i
     }
     StartCharacterBehaviorScript(Character, Runtime, Character->Placement,
                                  static_cast<unsigned>(BehaviorKey), nullptr, nullptr);
-    static_cast<IServer*>(GetLocalServerInterface())
+    GetLocalServerInterface()
         ->GFObjSelect(static_cast<unsigned>(CharacterKey), GetPlayerConnectionId());
     Runtime->SceneFlags[kRoomStartScriptRan] = 1;
 }

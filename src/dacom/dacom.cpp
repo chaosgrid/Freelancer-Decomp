@@ -554,7 +554,7 @@ namespace
         }
 
         // Retail FUN_065b1560.
-        static FIniSection* SectionFromHandle(void* Handle) { return (FIniSection*)Handle; }
+        static FIniSection* SectionFromHandle(void* Handle) { return static_cast<FIniSection*>(Handle); }
 
         std::list<FIniSection*> Sections;
 
@@ -830,7 +830,7 @@ namespace
             for (std::list<FIniSection*>::iterator It = Database.Sections.begin(); It != Database.Sections.end();
                  ++It)
             {
-                if (Callback((IProfileParser*)this, (*It)->Name, Context) == 0)
+                if (Callback(static_cast<IProfileParser*>(this), (*It)->Name, Context) == 0)
                     return 0;
             }
             return 1;
@@ -888,7 +888,7 @@ namespace
             for (std::list<FIniSection*>::iterator It = Database.Sections.begin(); It != Database.Sections.end();
                  ++It)
             {
-                if (Visitor->Visit((IProfileParser2*)this, (*It)->Name, nullptr, Context) == 0)
+                if (Visitor->Visit(static_cast<IProfileParser2*>(this), (*It)->Name, nullptr, Context) == 0)
                     return 0;
             }
             return 1;
@@ -904,7 +904,7 @@ namespace
                 return 0;
             for (std::list<FIniKeyValue*>::iterator It = Section->Keys.begin(); It != Section->Keys.end(); ++It)
             {
-                if (Visitor->Visit((IProfileParser2*)this, (*It)->Key, (*It)->Value, Context) == 0)
+                if (Visitor->Visit(static_cast<IProfileParser2*>(this), (*It)->Key, (*It)->Value, Context) == 0)
                     return 0;
             }
             return 1;
@@ -949,9 +949,9 @@ namespace
                 continue;
             IDAComponent* Face = nullptr;
             if (GParserQueryTable[Index].Face == EParserFace::ProfileParser)
-                Face = (IProfileParser*)Owner;
+                Face = static_cast<IProfileParser*>(Owner);
             else
-                Face = (IProfileParser2*)Owner;
+                Face = static_cast<IProfileParser2*>(Owner);
             Face->AddRef();
             *Out = Face;
             return GR_OK;
@@ -987,7 +987,7 @@ namespace
             *Out = nullptr;
             if (std::strcmp(Iid, Iids::ComponentFactory) != 0)
                 return GR_INTERFACE_UNSUPPORTED;
-            *Out = (IComponentFactory*)this;
+            *Out = static_cast<IComponentFactory*>(this);
             AddRef();
             return GR_OK;
         }
@@ -1011,7 +1011,7 @@ namespace
         // name, +8 the controlling outer unknown, +0xC the inner-unknown output.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            FAGGDESC14* Aggregate = (FAGGDESC14*)Desc;
+            FAGGDESC14* Aggregate = reinterpret_cast<FAGGDESC14*>(Desc);
             if (Aggregate->Size != sizeof(FAGGDESC14) || std::strcmp(Aggregate->NameAt4, Name) != 0)
             {
                 *Instance = nullptr;
@@ -1028,7 +1028,7 @@ namespace
             if (OuterIn == nullptr)
                 Object->Outer = &Object->Inner;
             else
-                *Aggregate->InnerUnknown = (IDAComponent*)(&Object->Inner);
+                *Aggregate->InnerUnknown = static_cast<IDAComponent*>(&Object->Inner);
 
             const GENRESULT Result = Object->Initialize(Desc);
             if (Result != GR_OK)
@@ -1039,7 +1039,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IProfileParser*)Object;
+            *Instance = static_cast<IProfileParser*>(Object);
             return GR_OK;
         }
 
@@ -1103,7 +1103,7 @@ namespace
             if (std::strcmp(Iid, Iids::COManager) == 0)
             {
                 AddRef();
-                *Out = (ICOManager*)this;
+                *Out = static_cast<ICOManager*>(this);
                 return GR_OK;
             }
             if (ParserInner != nullptr)
@@ -1152,20 +1152,20 @@ namespace
         CurrentLibrary[0] = '\0';
 
         IComponentFactory* Factory = new (std::nothrow) FProfileParserFactory("ProfileParser");
-        RegisterComponent(Factory, "ProfileParser", (void*)((uintptr_t)0x80000000u));
+        RegisterComponent(Factory, "ProfileParser", reinterpret_cast<void*>((uintptr_t)0x80000000u));
         Factory->Release();
 
         Factory = new (std::nothrow) FProfileParserFactory("ProfileParser2");
-        RegisterComponent(Factory, "ProfileParser2", (void*)((uintptr_t)0x80000000u));
+        RegisterComponent(Factory, "ProfileParser2", reinterpret_cast<void*>((uintptr_t)0x80000000u));
 
         // {0x14, "ProfileParser2", outer = this, &this+0x2c, 0}: the parser is aggregated, its
         // IProfileParser* lands in +0x28 and its inner unknown in +0x2c.
         FAGGDESC14 Desc = {};
         Desc.Size = sizeof(FAGGDESC14);
         Desc.NameAt4 = "ProfileParser2";
-        Desc.OuterUnknown = (ICOManager*)this;
+        Desc.OuterUnknown = static_cast<ICOManager*>(this);
         Desc.InnerUnknown = &ParserInner;
-        Factory->CreateInstance((AGGDESC*)(&Desc), (void**)(&Parser));
+        Factory->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&Parser));
         Factory->Release();
     }
 
@@ -1176,7 +1176,7 @@ namespace
         *Instance = nullptr;
         if (Desc == nullptr || Desc->interface_name == nullptr || std::strcmp(Desc->interface_name, "COManager") == 0)
         {
-            *Instance = (ICOManager*)this;
+            *Instance = static_cast<ICOManager*>(this);
             AddRef();
             return GR_OK;
         }
@@ -1213,7 +1213,7 @@ namespace
             ++Position;
 
         FFactoryLink Link;
-        Link.Factory = (IComponentFactory*)Factory;
+        Link.Factory = static_cast<IComponentFactory*>(Factory);
         Link.Name = DuplicateString(Name);
         Link.Priority = NewPriority;
         Link.LibraryName = DuplicateString(CurrentLibrary);
@@ -1242,7 +1242,7 @@ namespace
             FFactoryLinkList& Links = Bucket->second;
             for (FFactoryLinkList::iterator It = Links.begin(); It != Links.end(); ++It)
             {
-                if ((IDAComponent*)(It->Factory) != Factory)
+                if (static_cast<IDAComponent*>(It->Factory) != Factory)
                     continue;
                 DestroyLink(*It);
                 Links.erase(It);
@@ -1279,8 +1279,8 @@ namespace
             FFactoryLinkList& Links = Bucket->second;
             for (FFactoryLinkList::iterator It = Links.begin(); It != Links.end(); ++It)
             {
-                if (Callback((IDAComponent*)(It->Factory), It->Name,
-                             (void*)((uintptr_t)(It->Priority)), Context) == 0)
+                if (Callback(reinterpret_cast<IDAComponent*>(It->Factory), It->Name,
+                             reinterpret_cast<void*>((uintptr_t)(It->Priority)), Context) == 0)
                     return GR_OK;
             }
         }
@@ -1433,7 +1433,7 @@ namespace
         if ((Flags & 2) != 0)
         {
             IProfileParser2* Parser2 = nullptr;
-            if (Parser->QueryInterface(Iids::ProfileParser2, (void**)(&Parser2)) < 0)
+            if (Parser->QueryInterface(Iids::ProfileParser2, reinterpret_cast<void**>(&Parser2)) < 0)
             {
                 bParsed = false;
             }
@@ -2153,7 +2153,7 @@ namespace
         if (GRegSize >= 0x7fff)
             return nullptr;
 
-        FRegexpProgram* Program = (FRegexpProgram*)(malloc(sizeof(FRegexpProgram) + GRegSize));
+        FRegexpProgram* Program = static_cast<FRegexpProgram*>(malloc(sizeof(FRegexpProgram) + GRegSize));
         if (Program == nullptr)
             return nullptr;
 
@@ -2470,7 +2470,7 @@ namespace
         {
             if (std::strcmp(Iids::RegExp, Iid) == 0 || std::strcmp(Iids::DAComponent, Iid) == 0)
             {
-                IDAComponent* Face = (IRegExp*)this;
+                IDAComponent* Face = static_cast<IRegExp*>(this);
                 Face->AddRef();
                 *Out = Face;
                 return GR_OK;
@@ -2602,7 +2602,7 @@ namespace
             *Out = nullptr;
             if (std::strcmp(Iid, Iids::ComponentFactory) != 0)
                 return GR_INTERFACE_UNSUPPORTED;
-            *Out = (IComponentFactory*)this;
+            *Out = static_cast<IComponentFactory*>(this);
             AddRef();
             return GR_OK;
         }
@@ -2634,7 +2634,7 @@ namespace
                 *Instance = nullptr;
                 return GR_OUT_OF_MEMORY;
             }
-            *Instance = (IRegExp*)Object;
+            *Instance = static_cast<IRegExp*>(Object);
             return GR_OK;
         }
 
@@ -2650,7 +2650,7 @@ namespace
         if (Factory == nullptr)
             return;
         DACOM_Acquire()->RegisterComponent(Factory, "RegExp",
-                                           (void*)((uintptr_t)0x40000000u));
+                                           reinterpret_cast<void*>((uintptr_t)0x40000000u));
         Factory->Release();
     }
 
@@ -2659,7 +2659,7 @@ namespace
     alignas(FCOManager) unsigned char GManagerStorage[sizeof(FCOManager)];
     bool GbManagerConstructed = false;
 
-    FCOManager* GetManager() { return (FCOManager*)GManagerStorage; }
+    FCOManager* GetManager() { return reinterpret_cast<FCOManager*>(GManagerStorage); }
 
     void __cdecl TearDownManager() { GetManager()->TearDown(); }
 }
@@ -2725,8 +2725,8 @@ int __cdecl DACOM_CRC::CompareStringsI(const char* A, const char* B)
 // Retail 065b5e60, exported as "stricmp": fold table DAT_065b8428 (ASCII only), result -1/0/1.
 extern "C" int __cdecl DacomStricmp(const char* A, const char* B)
 {
-    const unsigned char* Left = (const unsigned char*)A;
-    const unsigned char* Right = (const unsigned char*)B;
+    const unsigned char* Left = reinterpret_cast<const unsigned char*>(A);
+    const unsigned char* Right = reinterpret_cast<const unsigned char*>(B);
     for (;;)
     {
         const unsigned char LeftCh = FoldStricmpChar(*Left);
@@ -2809,7 +2809,7 @@ extern "C" GENRESULT __cdecl DACOM_GetDllVersion(const char* Module, unsigned in
 
     VS_FIXEDFILEINFO* Info = nullptr;
     UINT InfoLength = 0;
-    if (!VerQueryValueA(Block, "\\", (void**)(&Info), &InfoLength))
+    if (!VerQueryValueA(Block, "\\", reinterpret_cast<void**>(&Info), &InfoLength))
         return GR_GENERIC;
 
     const VS_FIXEDFILEINFO Fixed = *Info;

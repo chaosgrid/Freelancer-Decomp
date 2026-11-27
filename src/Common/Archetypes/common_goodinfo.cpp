@@ -505,7 +505,7 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         {
             if (Info->AttachmentArchetype.Value[0] == '\0' && Equip->DaArchetype.Value[0] != '\0')
                 Info->AttachmentArchetype = Equip->DaArchetype;
-            Archetype::AttachedEquipment* const Attached = (Archetype::AttachedEquipment*)Equip;
+            Archetype::AttachedEquipment* const Attached = static_cast<Archetype::AttachedEquipment*>(Equip);
             if (Info->HpChild.Value[0] == '\0' && Attached->HpChild.Value[0] != '\0')
                 Info->HpChild = Attached->HpChild;
         }

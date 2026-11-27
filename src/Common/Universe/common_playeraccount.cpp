@@ -82,7 +82,7 @@ namespace
         }
         if (!bGotProductId)
         {
-            UuidCreate((UUID*)ProductId);
+            UuidCreate(reinterpret_cast<UUID*>(ProductId));
             ProductIdSize = 0x10;
         }
         Hash.AddData(ProductId, ProductIdSize);
@@ -101,7 +101,7 @@ namespace
     void AssignWidenedHash(std::wstring& Out, const char* Source)
     {
         const size_t Count = strlen(Source) + 1;
-        wchar_t* Wide = (wchar_t*)malloc(Count * sizeof(wchar_t));
+        wchar_t* Wide = static_cast<wchar_t*>(malloc(Count * sizeof(wchar_t)));
         mbstowcs(Wide, Source, Count);
         Out.assign(Wide, wcslen(Wide));
         free(Wide);
@@ -275,20 +275,20 @@ bool CPlayerAccount::SetTextKey(char* Key)
         ERROR_SUCCESS)
         return false;
 
-    RegSetValueExA(RegKey, "InstallKey", 0, REG_SZ, (const BYTE*)Key, (DWORD)strlen(Key));
+    RegSetValueExA(RegKey, "InstallKey", 0, REG_SZ, reinterpret_cast<const BYTE*>(Key), (DWORD)strlen(Key));
 
     MD5Hash NameHash;
     NameHash.AddData(Key, (unsigned long)strlen(Key));
     NameHash.CalcValue();
     const char* NameHashStr = NameHash.AsString();
-    RegSetValueExA(RegKey, "MPAccountName", 0, REG_SZ, (const BYTE*)NameHashStr,
+    RegSetValueExA(RegKey, "MPAccountName", 0, REG_SZ, reinterpret_cast<const BYTE*>(NameHashStr),
                    (DWORD)strlen(NameHashStr));
 
     MD5Hash SigHash;
     SigHash.AddData((void*)NameHashStr, (unsigned long)strlen(NameHashStr));
     SigHash.CalcValue();
     const char* SigHashStr = SigHash.AsString();
-    RegSetValueExA(RegKey, "MPAccountNameSig", 0, REG_SZ, (const BYTE*)SigHashStr,
+    RegSetValueExA(RegKey, "MPAccountNameSig", 0, REG_SZ, reinterpret_cast<const BYTE*>(SigHashStr),
                    (DWORD)strlen(SigHashStr));
 
     RegCloseKey(RegKey);

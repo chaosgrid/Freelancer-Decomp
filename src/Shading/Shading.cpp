@@ -34,7 +34,7 @@ namespace
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            FMaterialAggregateDesc* MaterialDesc = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* MaterialDesc = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (MaterialDesc->Size != sizeof(FMaterialAggregateDesc) ||
                 std::strcmp(MaterialDesc->NameAt4, Name) != 0)
             {
@@ -57,7 +57,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IMaterial*)Material;
+            *Instance = static_cast<IMaterial*>(Material);
             return Result;
         }
     };
@@ -71,7 +71,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // 06eb4530: FUN_06eb3e80 runs after the controller is published.
-            FMaterialAggregateDesc* BatchedDesc = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* BatchedDesc = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (BatchedDesc->Size != sizeof(FMaterialAggregateDesc) ||
                 std::strcmp(BatchedDesc->NameAt4, Name) != 0)
             {
@@ -94,7 +94,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IMaterial*)Batched;
+            *Instance = static_cast<IMaterial*>(Batched);
             return Result;
         }
     };
@@ -108,7 +108,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // FUN_06ec6760: descriptor initialization is distinct from aggregate Initialize.
-            FSystemAggDesc* TextureDesc = (FSystemAggDesc*)Desc;
+            FSystemAggDesc* TextureDesc = reinterpret_cast<FSystemAggDesc*>(Desc);
             if (TextureDesc->Size != sizeof(FSystemAggDesc) ||
                 std::strcmp(TextureDesc->Name, Name) != 0)
             {
@@ -123,7 +123,7 @@ namespace
             }
             Texture->Outer = TextureDesc->Outer;
             if (Texture->Outer != nullptr)
-                *TextureDesc->InnerOut = (IDAComponent*)(&Texture->Controller);
+                *TextureDesc->InnerOut = static_cast<IDAComponent*>(&Texture->Controller);
             const GENRESULT Result = Texture->InitializeFromDescriptor(TextureDesc);
             if (Result != GR_OK)
             {
@@ -133,7 +133,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (ITextureLibrary2*)Texture;
+            *Instance = static_cast<ITextureLibrary2*>(Texture);
             return Result;
         }
     };
@@ -147,7 +147,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // LAB_06ec6d40.
-            FMaterialAggregateDesc* AnimationDesc = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* AnimationDesc = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (AnimationDesc->Size != sizeof(FMaterialAggregateDesc) ||
                 std::strcmp(AnimationDesc->NameAt4, Name) != 0)
             {
@@ -162,8 +162,8 @@ namespace
             }
             Animation->Outer = AnimationDesc->OuterAt8;
             if (Animation->Outer != nullptr)
-                *AnimationDesc->InnerOutAtC = (IDAComponent*)(&Animation->Controller);
-            *Instance = (IMatAnimLibrary*)Animation;
+                *AnimationDesc->InnerOutAtC = static_cast<IDAComponent*>(&Animation->Controller);
+            *Instance = static_cast<IMatAnimLibrary*>(Animation);
             return GR_OK;
         }
     };
@@ -177,7 +177,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // FUN_06ecb940: controller publication precedes descriptor init.
-            FMaterialAggregateDesc* BatcherDesc = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* BatcherDesc = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (BatcherDesc->Size != sizeof(FMaterialAggregateDesc) ||
                 std::strcmp(BatcherDesc->NameAt4, Name) != 0)
             {
@@ -191,9 +191,9 @@ namespace
                 return GR_OUT_OF_MEMORY;
             }
             Batcher->ControllingUnknown = BatcherDesc->OuterAt8 != nullptr
-                ? BatcherDesc->OuterAt8 : (IDAComponent*)(&Batcher->Controller);
+                ? BatcherDesc->OuterAt8 : static_cast<IDAComponent*>(&Batcher->Controller);
             if (BatcherDesc->OuterAt8 != nullptr)
-                *BatcherDesc->InnerOutAtC = (IDAComponent*)(&Batcher->Controller);
+                *BatcherDesc->InnerOutAtC = static_cast<IDAComponent*>(&Batcher->Controller);
             const GENRESULT Result = Batcher->InitializeFromDescriptor(BatcherDesc);
             if (Result != GR_OK)
             {
@@ -203,7 +203,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IMaterialBatcher2*)Batcher;
+            *Instance = static_cast<IMaterialBatcher2*>(Batcher);
             return Result;
         }
     };
@@ -218,7 +218,7 @@ namespace
         {
             // 06eceff0: the nondelegating face is published only when aggregated;
             // descriptor initialization runs either way.
-            FMaterialAggregateDesc* LibraryDesc = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* LibraryDesc = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (LibraryDesc->Size != sizeof(FMaterialAggregateDesc) ||
                 std::strcmp(LibraryDesc->NameAt4, Name) != 0)
             {
@@ -232,9 +232,9 @@ namespace
                 return GR_OUT_OF_MEMORY;
             }
             Library->ControllingUnknown = LibraryDesc->OuterAt8 != nullptr
-                ? LibraryDesc->OuterAt8 : (IDAComponent*)(&Library->Controller);
+                ? LibraryDesc->OuterAt8 : static_cast<IDAComponent*>(&Library->Controller);
             if (LibraryDesc->OuterAt8 != nullptr)
-                *LibraryDesc->InnerOutAtC = (IDAComponent*)(&Library->Controller);
+                *LibraryDesc->InnerOutAtC = static_cast<IDAComponent*>(&Library->Controller);
             const GENRESULT Result = Library->InitializeFromDescriptor(LibraryDesc);
             if (Result != GR_OK)
             {
@@ -244,7 +244,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IMaterialLibrary*)Library;
+            *Instance = static_cast<IMaterialLibrary*>(Library);
             return Result;
         }
     };

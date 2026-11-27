@@ -857,7 +857,7 @@ namespace Archetype
     void Solar::redefine(Root const& Other)
     {
         Root::redefine(Other);
-        Solar const* Donor = (Solar const*)&Other;
+        Solar const* Donor = static_cast<Solar const*>(&Other);
         if (Donor->Toughness != Toughness)
             Toughness = Donor->Toughness;
     }
@@ -1089,7 +1089,7 @@ namespace Archetype
     void Ship::redefine(Root const& Other)
     {
         Root::redefine(Other);
-        Ship const* Donor = (Ship const*)&Other;
+        Ship const* Donor = static_cast<Ship const*>(&Other);
         if (Donor->HpBaySurface.Value != HpBaySurface.Value)
             HpBaySurface.Value = Donor->HpBaySurface.Value;
         if (Donor->HpBayExternal.Value != HpBayExternal.Value)

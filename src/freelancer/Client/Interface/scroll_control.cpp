@@ -1251,7 +1251,7 @@ void ScrollControl::AddAttachOffset(float const* Delta)
     ThumbHp1.Translation.z += Delta[2];
 }
 
-WinControl* WinControl::CreateScrollControl(
+ScrollControl* WinControl::CreateScrollControl(
     char const* Name, char const* BackMesh, Vector const* BackOffset, char const* BackHp,
     Vector const* BackMouse, bool bBackNoMeshRender, char const* NextMesh, Vector const* NextOffset,
     char const* NextHp, Vector const* NextMouse, bool bNextNoMeshRender, char const* PrevMesh,
@@ -1272,5 +1272,5 @@ WinControl* WinControl::CreateScrollControl(
             ThumbMouse, bThumbNoMeshRender, MinRange, MaxRange, PageSize, bSliderBehavior,
             bNoZEnableArg);
     }
-    return static_cast<WinControl*>(Created);
+    return static_cast<ScrollControl*>(Created);
 }

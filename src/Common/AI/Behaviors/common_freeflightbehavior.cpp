@@ -43,8 +43,8 @@ void FreeFlightBehavior::OnEngage()
     SteerAxis.x = 0.0f;
     SteerAxis.y = 0.0f;
     SteerAxis.z = 0.0f;
-    ObjInspectOf(OwnerContext)->get_throttle(UserThrottle);
-    ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag2e8));
+    OwnerContext->get_throttle(UserThrottle);
+    OwnerContext->is_cruise_active(reinterpret_cast<bool&>(Flag2e8));
     // Unordered keeps the throttle.
     if (UserThrottle < 0.0f)
     {

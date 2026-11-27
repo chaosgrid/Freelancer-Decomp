@@ -361,7 +361,7 @@ namespace
 
             // Dist beyond the zone's extent along that direction (greater or unordered) scores
             // (Dist - hit)^2, otherwise 0.
-            const float ZoneHit = (float)Zone->GetRadiusAlong(*(Vector const*)Dir);
+            const float ZoneHit = (float)Zone->GetRadiusAlong(*reinterpret_cast<Vector const*>(Dir));
             float Score = 0.0f;
             if (!(Dist <= ZoneHit))
             {
@@ -714,7 +714,7 @@ namespace
     }
 
     // FUN_00537f40. Nothing is tested and nothing is capped but the sorted list (0x100).
-    int CollectNearbyLights(void** OutSlots, int MaxSlots, float const* Pos3, float Radius,
+    int CollectNearbyLights(FEngineLight** OutSlots, int MaxSlots, float const* Pos3, float Radius,
                             unsigned char Flag)
     {
         // The query's first two dwords are never written or read.
@@ -821,7 +821,7 @@ namespace
         int OutCount = 0;
         for (int I = 0; I < FilterCount; ++I)
         {
-            FEngineLight* const Light = static_cast<FEngineLight*>(OutSlots[I]);
+            FEngineLight* const Light = OutSlots[I];
             if (Light->AffectsPoint(Pos3, Radius))
             {
                 OutSlots[OutCount] = Light;
@@ -836,7 +836,7 @@ namespace
 
     // FUN_005554d0: NebulaBits is the containing nebula (Gameobj +0x38), FogFactorBits the float
     // lerp factor (Gameobj +0x3c); Camera is handed on to FUN_004104e0.
-    void StarSysApplyObjectLighting(float const* Pos3, float Radius, void* Camera,
+    void StarSysApplyObjectLighting(float const* Pos3, float Radius, ICamera* Camera,
                                     unsigned NebulaBits, unsigned FogFactorBits,
                                     unsigned char Flag)
     {
@@ -861,7 +861,7 @@ namespace
 
         // No nebula -> straight to the tail.
         unsigned char const* AmbientPtr = G_AmbientWorkRgb;
-        FNebulaEffect* const Nebula = (FNebulaEffect*)(uintptr_t)NebulaBits;
+        FNebulaEffect* const Nebula = reinterpret_cast<FNebulaEffect*>(static_cast<uintptr_t>(NebulaBits));
         if (Nebula != nullptr)
         {
 
@@ -906,24 +906,11 @@ namespace
         // The shared tail: FUN_00410240, FUN_00537f40, FUN_004102c0.
         EngineLightSetAmbientRgbBytes(AmbientPtr);
 
-        void* LightSlots[4] = {};
+        FEngineLight* LightSlots[4] = {};
         int const Count = CollectNearbyLights(LightSlots, 4, Pos3, Radius, Flag);
-        EngineLightApplyList(reinterpret_cast<FEngineLight* const*>(LightSlots),
-                             static_cast<unsigned>(Count), static_cast<ICamera*>(Camera), Pos3);
+        EngineLightApplyList(LightSlots,
+                             static_cast<unsigned>(Count), Camera, Pos3);
     }
-
-    // The GameObject+0x28 list's 0x18-byte node: next, prev, then the 0x10-byte effect
-    // companion {slot0, ISoundSource*, particle, GameLight} that FUN_00502d90 clears.
-    struct FSweepEffectNode
-    {
-        FSweepEffectNode* Next;  // +0x00
-        FSweepEffectNode* Prev;  // +0x04
-        void* Slot0;             // +0x08  companion +0
-        ISoundSource* Sound;     // +0x0c  companion +4
-        unsigned char* Particle; // +0x10  companion +8
-        FGameLight* Light;       // +0x14  companion +0xc
-    };
-    static_assert(sizeof(FSweepEffectNode) == 0x18, "effect list node 0x18");
 
     // FUN_004fd040 (thiscall on GameObject+0x28) -- walk from the sentinel's next until the
     // node is the sentinel again. A node whose particle is live (non-null, +8 bit 1 clear) is
@@ -933,31 +920,32 @@ namespace
     // gets particle +8 |= 1 and FUN_004f7af0. No test of the list or the sentinel.
     void GameobjSweepEffectList(FGameobjEffectList* List)
     {
-        FSweepEffectNode* Node = static_cast<FSweepEffectNode*>(List->Head)->Next;
-        while (Node != static_cast<FSweepEffectNode*>(List->Head))
+        FEffectListNode* Node = List->Head->Next;
+        while (Node != List->Head)
         {
-            bool bKeep = Node->Particle != nullptr && (Node->Particle[8] & 2u) == 0;
-            if (!bKeep && Node->Sound != nullptr && Node->Sound->IsActive() != 0)
+            FEffectCompanion* const Companion = &Node->Companion;
+            bool bKeep = Companion->Effect != nullptr && (Companion->Effect->Flags08 & 2u) == 0;
+            if (!bKeep && Companion->Sound != nullptr && Companion->Sound->IsActive() != 0)
                 bKeep = true;
-            if (!bKeep && Node->Light != nullptr && Node->Light->Anim.Keys == nullptr)
+            if (!bKeep && Companion->Light != nullptr && Companion->Light->Anim.Keys == nullptr)
                 bKeep = true;
 
             if (!bKeep)
             {
-                FSweepEffectNode* const Next = Node->Next;
+                FEffectListNode* const Next = Node->Next;
                 Node->Prev->Next = Next;
                 Node->Next->Prev = Node->Prev;
-                CliEffectCompanionClear(&Node->Slot0);
+                CliEffectCompanionClear(Companion);
                 ::operator delete(Node);
                 List->Count = List->Count - 1;
                 Node = Next;
                 continue;
             }
 
-            if (Node->Particle != nullptr)
+            if (Companion->Effect != nullptr)
             {
-                Node->Particle[8] = static_cast<unsigned char>(Node->Particle[8] | 1u);
-                EffectTypeListLink(Node->Particle);
+                Companion->Effect->Flags08 = static_cast<unsigned char>(Companion->Effect->Flags08 | 1u);
+                EffectTypeListLink(Companion->Effect);
             }
             Node = Node->Next;
         }
@@ -965,7 +953,7 @@ namespace
 
     // FUN_00539b40 — Gameobj vtable +0x184. No null tests. The perf value (FUN_004f70c0) stays
     // unrounded; strictly below 0.999 (DAT_005c8b68) clears the flag.
-    void GameobjUpdateDrawLighting(FClientGameobj* Self, void* Camera)
+    void GameobjUpdateDrawLighting(FClientGameobj* Self, FSpaceCamera* Camera)
     {
         Vector Center;
         float const Radius = Self->GetPhysicalRadius(Center);
@@ -1439,7 +1427,7 @@ namespace
             }
 
             // Slot +0x14 (update/visibility).
-            FEffectBase* const TypedEffect = (FEffectBase*)Effect;
+            FEffectBase* const TypedEffect = static_cast<FEffectBase*>(Effect);
             unsigned char const UpdateOk = TypedEffect->UpdateVisibility(Dt, Cam);
 
             // FUN_004fd560 (EXIST_OFFSCREEN), read without a null test.
@@ -1606,13 +1594,13 @@ namespace
     void FZItemNebula::Draw(FSpaceCamera* Cam)
     {
         // LAB_0051ba00
-        ((FNebulaEffect*)Object)->DrawFogShell(Cam);
-        ((FNebulaEffect*)Object)->DrawExteriorBitsPass(Cam);
+        static_cast<FNebulaEffect*>(Object)->DrawFogShell(Cam);
+        static_cast<FNebulaEffect*>(Object)->DrawExteriorBitsPass(Cam);
 #ifdef FREELANCER_RP9
         // Port-only: a nebula the Direct3D 9 volumetric nebula draws from beyond the opaque
         // scene's far plane is ray-marched here, in this bucket's painter order (its retail
         // fill sheets and bits above are then left out by their own gates). A no-op otherwise.
-        NebulaVolume::DrawBackground((FNebulaEffect*)Object, AsCamera(Cam));
+        NebulaVolume::DrawBackground(static_cast<FNebulaEffect*>(Object), AsCamera(Cam));
 #endif
     }
 
@@ -1623,7 +1611,7 @@ namespace
 
     void FZItemPlanetRing::Draw(FSpaceCamera* Cam)
     {
-        ((FTexturePanels*)Object)->DrawPiece(Cam, (int)LodWord);
+        static_cast<FTexturePanels*>(Object)->DrawPiece(Cam, (int)LodWord);
     }
 
     // FUN_0051f810 -- the bucket's begin / end are read once. No test of the bucket index, a
@@ -1983,7 +1971,7 @@ namespace
                                                  *reinterpret_cast<Vector const*>(Center));
                 float ViewCenter3[3] = {ViewCenter.x, ViewCenter.y, ViewCenter.z};
                 unsigned short const Class =
-                    static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)ViewCenter3, Radius));
+                    static_cast<unsigned short>(Cam->ClassifySphere(reinterpret_cast<const Vector*>(ViewCenter3), Radius));
                 if (Class < kSphereStraddling)
                     continue;
 
@@ -2028,7 +2016,7 @@ void FGameobjEffectList::Sweep()
 }
 
 // FUN_00539b40 -- the body is FClientGameobj::UpdateDrawLighting (space_scene_obj_draw.cpp).
-void FClientGameobj::UpdateDrawLighting(void* Camera)
+void FClientGameobj::UpdateDrawLighting(FSpaceCamera* Camera)
 {
     // FUN_00539b40 -- the body is GameobjUpdateDrawLighting above.
     GameobjUpdateDrawLighting(this, Camera);
@@ -2040,7 +2028,7 @@ double SpaceEffectPerfOneMinus()
     return EffectPerfOneMinus();
 }
 
-void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned NebulaBits,
+void SpaceApplyObjectLighting(float const* Pos3, float Radius, ICamera* Camera, unsigned NebulaBits,
                               unsigned FogFactorBits, unsigned char Flag)
 {
     // FUN_005554d0 -- the body is StarSysApplyObjectLighting above.
@@ -2054,7 +2042,7 @@ void FSpaceCamera::SetNearFar(float ZNear, float ZFar)
 }
 
 // FUN_00539820 -- the body is FClientGameobj::PickLod (space_scene_obj_draw.cpp), which
-unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
+unsigned* FClientGameobj::PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsigned const* CachedLod)
 {
     // FUN_00539820. A cached LOD whose low word is non-zero is the answer.
     if (CachedLod != nullptr && static_cast<unsigned short>(*CachedLod) != 0)
@@ -2067,8 +2055,7 @@ unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const
     const float Radius = GetPhysicalRadius(Center);
 
     // Center into view space through DAT_006789d0.
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
-    Transform const* const View = Cam->GetViewTransform();
+    Transform const* const View = Camera->GetViewTransform();
     I3DMathEngine* const Math = GameobjMathEngine();
     Vector Local;
     Math->TransformXform(Local, *View, Center);
@@ -2076,7 +2063,7 @@ unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const
 
     // ClassifySphere -> low word; the high word is 0xffff and stays so when the class is below
     // 3.
-    const int Classify = Cam->ClassifySphere(&ViewPoint, Radius);
+    const int Classify = Camera->ClassifySphere(&ViewPoint, Radius);
     unsigned short LodLow = static_cast<unsigned short>(Classify);
     unsigned short LodHigh = 0xffffu;
     if (LodLow >= kSphereStraddling)
@@ -2121,7 +2108,7 @@ unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const
 }
 
 // FUN_00539980 -- the body is FClientGameobj::SubmitDraw (space_scene_obj_draw.cpp).
-unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod,
                                   Transform const* Xform, void* Extra)
 {
     // FUN_00539980
@@ -2148,7 +2135,7 @@ unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned Ca
     // 8 unless this object is the player's IObjRW. For the player, FUN_004022d0 (DAT_006101d4)
     // above 0.75 (or unordered) -> 0; otherwise FUN_00402580 with its result unused, and 0x80.
     unsigned long Flags = 0;
-    if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
+    if (static_cast<IObjRW*>(this) != GetPlayerObjRW())
     {
         Flags = 8u;
     }
@@ -2226,7 +2213,7 @@ namespace
 }
 
 // FUN_00533780 -- the body is FClientEquippedObj::SubmitDraw (space_scene_obj_draw.cpp).
-unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod,
                                       Transform const* Xform, void* Extra)
 {
     // FUN_00533780. Retail also tests `this` for null; a virtual call cannot arrive with a null
@@ -2289,7 +2276,7 @@ namespace
 
 void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 {
-    FSpaceCamera* Cam = (FSpaceCamera*)this;
+    FSpaceCamera* Cam = this;
     // FUN_0051c200. No test of `this`: the callers -- GameCamera slot 0x78, FUN_0051b250 and
     // the first-person scene slot FUN_00518420 -- run on a live camera.
     FGameCamera* const Gc = reinterpret_cast<FGameCamera*>(Cam);
@@ -2298,11 +2285,11 @@ void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 
     // The player's +0x158 state 2 or 3 takes the jump arm. The state is read without a class
     // test.
-    void* const PlayerRW = GetPlayerObjRW();
+    IObjRW* const PlayerRW = GetPlayerObjRW();
     if (PlayerRW != nullptr)
     {
         FClientShipGameobj* const Ship =
-            static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(PlayerRW));
+            static_cast<FClientShipGameobj*>(PlayerRW);
         if (Ship->JumpState == kJumpStateJumpOutTunnel || Ship->JumpState == kJumpStateJumpInTunnel)
         {
             G_FieldController = nullptr;
@@ -2402,7 +2389,7 @@ void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
     if (GetGameOption(kGameOptObjectsGroup) != 0 && GetGameOption(kGameOptSolar) != 0)
     {
         ISpatialPartition* const Bucket =
-            static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(kObjDbTypeMask));
+            GetClientObjDb()->GetBucket(kObjDbTypeMask);
         if (Bucket != nullptr)
         {
             Geometry::Sphere Query;
@@ -2537,7 +2524,7 @@ void FGameCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
             Win3DDisable(kWin3DFog);
         }
         // GameCamera slot 0x50 -- FUN_0051c8b0, or the empty 0x00401e90 on FirstPerson.
-        ((FGameCamera*)Cam)->ScaleEnvironmentEffects();
+        static_cast<FGameCamera*>(Cam)->ScaleEnvironmentEffects();
     }
 
     Pipe->SetRenderState(D3DRS_AMBIENT, -1);
@@ -2644,7 +2631,7 @@ void FSpaceCamera::EnvFxEndCockpitPass()
     }
 }
 
-int SpaceCollectNearbyLights(void** OutSlots, int MaxSlots, float const* Pos3, float Radius,
+int SpaceCollectNearbyLights(FEngineLight** OutSlots, int MaxSlots, float const* Pos3, float Radius,
                              unsigned char Flag)
 {
     return CollectNearbyLights(OutSlots, MaxSlots, Pos3, Radius, Flag);
@@ -2667,7 +2654,7 @@ void SpaceSetFarClip(float FarClip)
     G_SpaceDrawRange = FarClip - 1000.0f;
 }
 
-void* GetSpaceFieldController()
+FNebulaEffect* GetSpaceFieldController()
 {
     // DAT_00675244.
     return G_FieldController;

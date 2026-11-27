@@ -97,7 +97,7 @@ public:
     GENRESULT DACOM_API SetBinOrder(unsigned long Index, long Key) override;
     GENRESULT DACOM_API FlushBin(unsigned long Index, unsigned char Clear) override;
     GENRESULT DACOM_API FlushAll(unsigned char Clear) override;
-    GENRESULT DACOM_API Submit(IMaterial* Material, void* Context, unsigned long PrimType,
+    GENRESULT DACOM_API Submit(IMaterial* Material, FMaterialSubmitContext* Context, unsigned long PrimType,
                                unsigned long Start, unsigned long Count,
                                unsigned long IbStart, unsigned long IndexSpan,
                                void* SortDepth, unsigned long Flags) override;

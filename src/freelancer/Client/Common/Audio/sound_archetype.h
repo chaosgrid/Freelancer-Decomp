@@ -22,6 +22,8 @@
 #include <list>
 #include <string>
 
+struct IFileSystem;
+
 namespace Archetype
 {
     struct ISound
@@ -76,7 +78,7 @@ namespace Archetype
         // 1  LAB_004314e0 -- the message's sound file ("0x%X" of the id inside a .utf profile).
         virtual char const* GetSoundFile(unsigned int MsgId) = 0;
         // 2  LAB_00431590 -- the profile's .utf as an IFileSystem, null without one.
-        virtual void* OpenScriptFileSystem() = 0;
+        virtual IFileSystem* OpenScriptFileSystem() = 0;
         // 3  LAB_004313f0 -- the profile id.
         virtual unsigned int GetId() const = 0;
         // 4  LAB_00431400 -- ID_String::get_string of the id.

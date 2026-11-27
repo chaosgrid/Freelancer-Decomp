@@ -205,21 +205,21 @@ void HUDItem::Render(FSpaceCamera* Camera, float DeltaSeconds)
     (void)DeltaSeconds;
 }
 
-bool HUDItem::Slot7(void* Command)
+bool HUDItem::Slot7(FSpaceCommand* Command)
 {
     // FUN_0053f330.
     (void)Command;
     return false;
 }
 
-bool HUDItem::Slot8(void* Command)
+bool HUDItem::Slot8(FSpaceCommand* Command)
 {
     // FUN_0053f330.
     (void)Command;
     return false;
 }
 
-bool HUDItem::Slot9(void* Command)
+bool HUDItem::Slot9(FSpaceCommand* Command)
 {
     // FUN_0053f330.
     (void)Command;
@@ -360,7 +360,7 @@ void HudElementListRender(FSpaceCamera* Camera, float DeltaSeconds)
     DALib::MaterialBatcher->SetBinOrder(1, 1);
 }
 
-bool HudElementListAnySlot7(void* Command)
+bool HudElementListAnySlot7(FSpaceCommand* Command)
 {
     // FUN_004c7820.
     for (HUDItem* Item = G_HudItemHead; Item != nullptr; Item = Item->Next)
@@ -371,7 +371,7 @@ bool HudElementListAnySlot7(void* Command)
     return false;
 }
 
-bool HudElementListAnySlot8(void* Command)
+bool HudElementListAnySlot8(FSpaceCommand* Command)
 {
     // FUN_004c7860.
     for (HUDItem* Item = G_HudItemHead; Item != nullptr; Item = Item->Next)

@@ -53,7 +53,7 @@ SplineMoveIdea::SplineMoveIdea()
 
 // Own vtable slot 0 override -- FUN_062d9c80, RET 0xc. All three context pointers
 // go to both embedded members (Ghidra shows two arguments; the listing pushes three).
-bool SplineMoveIdea::SetContext(void* InObject, void* InHandle, void* InContext)
+bool SplineMoveIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext)
 {
     if (InObject == nullptr || InHandle == nullptr)
     {
@@ -62,7 +62,7 @@ bool SplineMoveIdea::SetContext(void* InObject, void* InHandle, void* InContext)
 
     Attached = 1;
     Object = InObject;
-    Handle = (SystemManager*)InHandle;
+    Handle = InHandle;
     Context = InContext;
 
     // Real virtual dispatch through each member's own slot 0.
@@ -102,7 +102,7 @@ void SplineMoveIdea::SetBankBlendCap(float Value)
 // FUN_062da4e0. No Mode ladder: the thrust type is always ThrustEquipEngine.
 void SplineMoveIdea::SetThrottleScale(float Value)
 {
-    BankBlendCap = Behavior_GetProjectedThrottle(ObjInspectOf(Object), Value, ThrustEquipEngine);
+    BankBlendCap = Behavior_GetProjectedThrottle(Object, Value, ThrustEquipEngine);
 }
 
 // FUN_062da400 -- `MOV [ECX+0x158],EAX; RET 4`. See the declaration for the
@@ -130,7 +130,7 @@ void SplineMoveIdea::SetSpline(ICRSplineSegment* NewSpline)
     Move.bKillEngineOffBearing = 0;
 
     // FUN_062e5af0: get_speed at full engine throttle.
-    MaxSpeed15c = Behavior_GetSpeed(ObjInspectOf(Object), 1.0f, ThrustEquipEngine);
+    MaxSpeed15c = Behavior_GetSpeed(Object, 1.0f, ThrustEquipEngine);
 
     // FUN_062e5ab0 consumes the rounded result above.
     CoastDistance = Behavior_GetCoastDistance(Object, MaxSpeed15c);
@@ -174,7 +174,7 @@ int SplineMoveIdea::Update(float Dt)
     (void)Spline->calculate_spline_vector(T1);
 
     // Unrounded |v| against 1.0f; not-less (and NaN) normalises the velocity.
-    Vector const RawForward = ObjInspectOf(Object)->get_velocity();
+    Vector const RawForward = Object->get_velocity();
     double const RawForwardLen = std::sqrt(((double)RawForward.y * RawForward.y + (double)RawForward.z * RawForward.z) +
                                            (double)RawForward.x * RawForward.x);
     Vector DirA;
@@ -225,7 +225,7 @@ int SplineMoveIdea::Update(float Dt)
         }
 
         // FUN_062e5bc0 then FUN_062e5b70(Object, that, Engine).
-        IObjInspect const* const Inspect = ObjInspectOf(Object);
+        IObjInspect const* const Inspect = Object;
         float const SlotDCResult = Behavior_GetInitialSpeedToCoastDistance(Inspect, (float)(BankFactor * CoastDistance));
         BankBlend = Behavior_GetProjectedThrottle(Inspect, SlotDCResult, ThrustEquipEngine);
     }
@@ -254,9 +254,9 @@ int SplineMoveIdea::Update(float Dt)
 
     // Retail dereferences the Context->Pathfind chain unconditionally.
     Move.Position = Spline->P2;
-    ((IBehaviorManager*)Move.Context)->Pathfind->CachedTargetPosition = Move.Position;
+    Move.Context->Pathfind->CachedTargetPosition = Move.Position;
 
-    ((IBehaviorManager*)Move.Context)->Pathfind->NudgeObstacleTypeMask = OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_MISSION_SATELLITE | OBJ_SATELLITE | OBJ_LOOT | OBJ_ASTEROID;
+    Move.Context->Pathfind->NudgeObstacleTypeMask = OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_MISSION_SATELLITE | OBJ_SATELLITE | OBJ_LOOT | OBJ_ASTEROID;
 
     int const MoveResult = Move.Update(Dt);
 
@@ -293,7 +293,7 @@ int SplineMoveIdea::Update(float Dt)
         (float)(ExtrapolateFactor * ChordDir.z + Spline->P2.z)
     };
     // FUN_062e53e0.
-    if (!IsPointOutsideHeadingCone(ProbePos, ObjInspectOf(Object), 0.0f))
+    if (!IsPointOutsideHeadingCone(ProbePos, Object, 0.0f))
         return 0;
 
     // Commit() is a virtual call through this object's slot 4.

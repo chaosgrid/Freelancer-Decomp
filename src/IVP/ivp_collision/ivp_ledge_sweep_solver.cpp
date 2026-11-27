@@ -1079,7 +1079,7 @@ namespace
 // IVP_Sweep_Frame_Cache::Init).
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
-    const void *FeatureEdge, IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
+    const IVP_Compact_Edge *FeatureEdge, IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
     CacheA.Init(SourceA);
@@ -1089,9 +1089,9 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
 
     // Retail indexes SideB->Points (the already-resolved point-array base),
     // not the ledge; equal by construction.
-    const IVP_Compact_Edge *const Edge = static_cast<const IVP_Compact_Edge *>(FeatureEdge);
+    const IVP_Compact_Edge *const Edge = FeatureEdge;
     const IVP_U_Float_Point *const PointArray =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
     const IVP_U_Float_Point *const Vertex = PointArray + Edge->GetStartPointIndex();
 
     IVP_Sweep_PointPlane_Evaluator Evaluator;
@@ -1104,7 +1104,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
     // normize's return is ignored, so a zero-area triangle leaves the normal
     // unnormalized rather than zeroed.
     IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(
-        Edge, static_cast<const IVP_Compact_Ledge *>(SideB->Ledge), &Evaluator.Normal); // FUN_0635b940
+        Edge, SideB->Ledge, &Evaluator.Normal); // FUN_0635b940
     Evaluator.Normal.normize();
 
     // A zero ClosingBound yields an unguarded infinity, as in retail.
@@ -1170,7 +1170,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
 //   DAT_063a53d0 = 00 00 80 3f              -> 1.0f
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
-    const void *FeatureEdgeA, const void *FeatureEdgeB,
+    const IVP_Compact_Edge *FeatureEdgeA, const IVP_Compact_Edge *FeatureEdgeB,
     FIVP_Sweep_Ledge_Side *SideA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -1186,12 +1186,12 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     this->OutEvent.time_base = this->NextBase;
     this->OutEvent.time_offset = this->NextOffset;
 
-    const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeA = FeatureEdgeA;
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsA =
-        static_cast<const IVP_U_Float_Point *>(SideA->Points);
+        SideA->Points;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
     const IVP_U_Float_Point *const VertexA = PointsA + EdgeA->GetStartPointIndex();
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
 
@@ -1202,7 +1202,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     VertexFace.Anchor.set(VertexB->X, VertexB->Y, VertexB->Z);
 
     IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(
-        EdgeB, static_cast<const IVP_Compact_Ledge *>(SideB->Ledge), &VertexFace.Normal); // FUN_0635b940
+        EdgeB, SideB->Ledge, &VertexFace.Normal); // FUN_0635b940
     VertexFace.Normal.normize();
 
     VertexFace.MaxRelativeSpeed = this->ClosingBound;
@@ -1355,7 +1355,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
 // DAT_0658ab34 == block[0x49] of the tolerance block.
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
-    const void *FeatureEdgeA, const void *FeatureEdgeB,
+    const IVP_Compact_Edge *FeatureEdgeA, const IVP_Compact_Edge *FeatureEdgeB,
     FIVP_Sweep_Ledge_Side *SideA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -1375,12 +1375,12 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     this->OutEvent.time_offset = this->NextOffset;
 
     // The far vertex is the NEXT edge's start point.
-    const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeA = FeatureEdgeA;
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsA =
-        static_cast<const IVP_U_Float_Point *>(SideA->Points);
+        SideA->Points;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
 
     const IVP_U_Float_Point *const VertexA = PointsA + EdgeA->GetStartPointIndex();
     const IVP_U_Float_Point *const FarVertexA =
@@ -1523,7 +1523,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
         // On the first two iterations the ledge is A's while the direction is
         // B's -- that asymmetry is the point of the test.
         IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(
-            FanEdge[FanIndex], static_cast<const IVP_Compact_Ledge *>(FanSide[FanIndex]->Ledge),
+            FanEdge[FanIndex], FanSide[FanIndex]->Ledge,
             &EdgeFace.Normal); // FUN_0635b940
         EdgeFace.Normal.normize();
 
@@ -1583,7 +1583,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
 //   DAT_063a56f8 = 9a 99 99 be -> -0.3f
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
-    const void *FeatureEdgeA, const void *FeatureEdgeB,
+    const IVP_Compact_Edge *FeatureEdgeA, const IVP_Compact_Edge *FeatureEdgeB,
     FIVP_Sweep_Ledge_Side *SideA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -1600,12 +1600,12 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     this->OutEvent.time_base = this->NextBase;
     this->OutEvent.time_offset = this->NextOffset;
 
-    const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeA = FeatureEdgeA;
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsA =
-        static_cast<const IVP_U_Float_Point *>(SideA->Points);
+        SideA->Points;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
 
     const IVP_U_Float_Point *const VertexA = PointsA + EdgeA->GetStartPointIndex();
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
@@ -1897,7 +1897,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
 //   DAT_063a56f0 = 00 00 00 bf  -> -0.5f   (next to -0.3f at 063a56f8)
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
-    const void *FeatureEdgeA, const void *FeatureEdgeB,
+    const IVP_Compact_Edge *FeatureEdgeA, const IVP_Compact_Edge *FeatureEdgeB,
     FIVP_Sweep_Ledge_Side *SideA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -1913,12 +1913,12 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
     this->OutEvent.time_base = this->NextBase;
     this->OutEvent.time_offset = this->NextOffset;
 
-    const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeA = FeatureEdgeA;
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsA =
-        static_cast<const IVP_U_Float_Point *>(SideA->Points);
+        SideA->Points;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
     const IVP_U_Float_Point *const VertexA = PointsA + EdgeA->GetStartPointIndex();
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
 
@@ -2098,7 +2098,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
 // FUN_0635e790's layout); CacheA is still argument seven.
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
-    IVP_Real_Object *ObjectA, const void *FeatureEdgeB,
+    IVP_Real_Object *ObjectA, const IVP_Compact_Edge *FeatureEdgeB,
     IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -2113,9 +2113,9 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
     this->OutEvent.time_base = this->NextBase;
     this->OutEvent.time_offset = this->NextOffset;
 
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
 
     const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
@@ -2260,7 +2260,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
 // spelled here as Source->WorldTransform.vmult4/vmult/vimult.
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
-    IVP_Real_Object * /*ObjectA*/, const void *FeatureEdgeB,
+    IVP_Real_Object * /*ObjectA*/, const IVP_Compact_Edge *FeatureEdgeB,
     IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     IVP_Sweep_Frame_Cache CacheA;
@@ -2272,9 +2272,9 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     this->OutEvent.time_base = this->NextBase;
     this->OutEvent.time_offset = this->NextOffset;
 
-    const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
+    const IVP_Compact_Edge *const EdgeB = FeatureEdgeB;
     const IVP_U_Float_Point *const PointsB =
-        static_cast<const IVP_U_Float_Point *>(SideB->Points);
+        SideB->Points;
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
     const IVP_U_Float_Point *const VertexBNext =
         PointsB + EdgeB->GetNextEdge()->GetStartPointIndex();

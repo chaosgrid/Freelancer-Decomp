@@ -38,7 +38,9 @@
 #include "Space/space_letterbox.h"      // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
 
 #include "common_goods.h"         // GoodList::find_by_id
 #include "common_reputation.h"    // Reputation::get_name, Reputation::Vibe::GetName
@@ -592,9 +594,9 @@ bool MissionObjectiveWindow::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004bb270 (RET 8).
     Vector const Position = {NnFloatBits(0xbf041893), NnFloatBits(0x3e83126f), 0.0f};
-    Text = static_cast<NnTextControl*>(CreateTextControl(
+    Text = CreateTextControl(
         "MissionObjectiveText", "MissionObjective", &Position, nullptr, NnFloatBits(0x3f82f1aa),
-        NnFloatBits(0x3cf5c28f), 2.0f, 0, 1, 0, 1));
+        NnFloatBits(0x3cf5c28f), 2.0f, 0, 1, 0, 1);
 
     // No null test.
     FFontString* const Font = Text->GetFontString();

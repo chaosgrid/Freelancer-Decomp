@@ -29,6 +29,8 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
 
 #include "common_archetype.h"
 #include "common_goods.h"
@@ -252,9 +254,9 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
         Vector const ViewSize = {0.18f, -0.162f, 0.0f};
         unsigned const RectColor = 0xffffdc0cu; // bytes 0c dc ff ff
         unsigned const WireColor = 0xffffffffu;
-        ShipView = static_cast<ShipViewControl*>(CreateShipViewControl(
+        ShipView = CreateShipViewControl(
             "ShipTrader3DShip", &RotSpeed, &ViewOffset, &Ypr, &ViewSize, nullptr, false, false,
-            &RectColor, &WireColor));
+            &RectColor, &WireColor);
     }
 
     {

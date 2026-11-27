@@ -237,7 +237,7 @@ unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo
         CiWString LoginName(Info.AccountName, wcslen(Info.AccountName));
         account_ptr = Players.FindAccountFromName(LoginName);
     }
-    CAccount* Account = static_cast<CAccount*>(account_ptr);
+    CAccount* Account = account_ptr;
     if (Account != nullptr) {
         if (Account->m_bLocked)
             return kLoginAccountLocked;
@@ -282,7 +282,7 @@ unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo
                 FDUMP(kFdumpNotice, "LOG: Login on account %S (\"%s\")\n",
                       Info.AccountName, AccountDir);
             }
-            static_cast<CAccount*>(account_ptr)->m_DirectoryPath = AccountDir;
+            account_ptr->m_DirectoryPath = AccountDir;
         }
     }
 
@@ -375,7 +375,7 @@ void PlayerData::teardown() {
     bCheatReported = 0;
 
     // (d) account_ptr itself is NOT cleared.
-    CAccount* Account = static_cast<CAccount*>(account_ptr);
+    CAccount* Account = account_ptr;
     if (Account != nullptr) {
         Account->m_ClientID = 0;
     }
@@ -717,7 +717,7 @@ void PlayerData::deselect_character(unsigned int SessionId) {
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogout, &SessionId);
 
     if (Owner.group_ptr != nullptr)
-        static_cast<CPlayerGroup*>(Owner.group_ptr)->HandleClientLogout(SessionId);
+        Owner.group_ptr->HandleClientLogout(SessionId);
 
     // No null test on the interface.
     unsigned int const MaxPlayers = Players.GetMaxPlayerCount();
@@ -751,7 +751,7 @@ bool PlayerData::select_character(CHARACTER_ID const& Id, unsigned int SessionId
 
         unsigned int OwnGroupId = 0;
         if (Players.is_valid(SessionId) && Owner.group_ptr != nullptr)
-            OwnGroupId = static_cast<CPlayerGroup*>(Owner.group_ptr)->GetID();
+            OwnGroupId = Owner.group_ptr->GetID();
 
         // Only when a character is already selected.
         if (selected_character.Buffer[0] != '\0') {
@@ -776,7 +776,7 @@ bool PlayerData::select_character(CHARACTER_ID const& Id, unsigned int SessionId
 
                 // The cached group id drops to 0.
                 if (Owner.group_ptr != nullptr) {
-                    static_cast<CPlayerGroup*>(Owner.group_ptr)->HandleClientLogout(SessionId);
+                    Owner.group_ptr->HandleClientLogout(SessionId);
                     OwnGroupId = 0;
                 }
 
@@ -813,7 +813,7 @@ bool PlayerData::select_character(CHARACTER_ID const& Id, unsigned int SessionId
 
             unsigned int OtherGroupId = 0;
             if (Players.is_valid(Other) && OtherSlot.group_ptr != nullptr)
-                OtherGroupId = static_cast<CPlayerGroup*>(OtherSlot.group_ptr)->GetID();
+                OtherGroupId = OtherSlot.group_ptr->GetID();
 
             // Tell the selecting session about everyone else.
             if (Other != SessionId) {
@@ -2965,7 +2965,7 @@ CAccount* PlayerDB::FindAccountFromClientID(unsigned int ClientId) {
     // port's range test is an addition.
     if (ClientId == 0) return nullptr;
     if (ClientId > m_MaxPlayers || !m_PlayerArray) return nullptr;
-    return reinterpret_cast<CAccount*>(m_PlayerArray[ClientId - 1].account_ptr);
+    return m_PlayerArray[ClientId - 1].account_ptr;
 }
 
 // FindAccountFromCharacterName -- RVA 0x72B60, export 126: the hashed character id
@@ -3328,7 +3328,7 @@ bool PlayerDB::create_new_character(const SCreateCharacterInfo& Info, unsigned i
 
     // The slot is indexed directly; no null test on the account.
     PlayerData* Player = &m_PlayerArray[SessionId - 1];
-    CAccount* Account = reinterpret_cast<CAccount*>(Player->account_ptr);
+    CAccount* Account = Player->account_ptr;
 
     if (Account->m_Characters.size() >= 5) {
         return true;
@@ -3413,7 +3413,7 @@ void PlayerDB::logout(unsigned int SessionId) {
 
     // (7) Tell the player's group, if any (+0x404).
     if (Slot.group_ptr != nullptr) {
-        static_cast<CPlayerGroup*>(Slot.group_ptr)->HandleClientLogout(SessionId);
+        Slot.group_ptr->HandleClientLogout(SessionId);
     }
 
     // (8) Every OTHER occupied session drops this player from its player list
@@ -3495,9 +3495,9 @@ void PlayerDB::SetMOTD(std::wstring& Message) {
 
 unsigned int PlayerDB::GetGroupID(unsigned int PlayerId) {
     if (!is_valid(PlayerId)) return 0;
-    void* GroupPtr = m_PlayerArray[PlayerId - 1].group_ptr;
+    CPlayerGroup* GroupPtr = m_PlayerArray[PlayerId - 1].group_ptr;
     if (GroupPtr != nullptr) {
-        CPlayerGroup* Group = (CPlayerGroup*)GroupPtr;
+        CPlayerGroup* Group = GroupPtr;
         return Group->GetID();
     }
     return 0;

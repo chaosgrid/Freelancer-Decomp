@@ -164,8 +164,8 @@ bool FmtStr::Val::operator==(const Val& Other) const
         {
             // x87: the square stays unrounded against 0.01f; NaN is unequal. The dwords hold
             // float bit patterns.
-            float FA = *(float const*)&ThisData[i];
-            float FB = *(float const*)&OtherData[i];
+            float FA = *reinterpret_cast<float const*>(&ThisData[i]);
+            float FB = *reinterpret_cast<float const*>(&OtherData[i]);
             double const Delta = (double)FA - (double)FB;
             double const Diff = Delta * Delta;
             if (!(Diff <= 0.01f))
@@ -216,8 +216,8 @@ void FmtStr::Val::operator delete(void* Ptr)
 int FmtStr::Val::InitFromVoid(const void* Src)
 {
     // FUN_0630d5a0: deserialize a Val from raw bytes.
-    const unsigned char* P = (const unsigned char*)Src;
-    unsigned short Tag = *(const unsigned short*)P;
+    const unsigned char* P = reinterpret_cast<const unsigned char*>(Src);
+    unsigned short Tag = *reinterpret_cast<const unsigned short*>(P);
     TypeTag = Tag;
     Flags = P[2];
 
@@ -235,7 +235,7 @@ int FmtStr::Val::InitFromVoid(const void* Src)
     {
         // Data block: 5 dwords, filled with no null test.
         NavMarker* Block = new (std::nothrow) NavMarker;
-        const unsigned int* SrcBlock = (const unsigned int*)(P + 3);
+        const unsigned int* SrcBlock = reinterpret_cast<const unsigned int*>((P + 3));
         for (int i = 0; i < 5; i++)
         {
             Block->Data[i] = SrcBlock[i];
@@ -244,14 +244,14 @@ int FmtStr::Val::InitFromVoid(const void* Src)
         return 0x17;
     }
     // Simple value: 4 bytes
-    Value = *(unsigned int const*)(P + 3);
+    Value = *reinterpret_cast<unsigned int const*>((P + 3));
     return 7;
 }
 
 unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
 {
     // FUN_0630d460: serialize this node.
-    unsigned char* P = (unsigned char*)Dest;
+    unsigned char* P = static_cast<unsigned char*>(Dest);
     *(unsigned short*)P = TypeTag;
     P[2] = Flags;
 
@@ -283,7 +283,7 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
     {
         // Copy 5 dwords from Data block
         unsigned int const* SrcBlock = Marker->Data;
-        unsigned int* DestBlock = (unsigned int*)(P + 3);
+        unsigned int* DestBlock = reinterpret_cast<unsigned int*>((P + 3));
         for (int i = 0; i < 5; i++)
         {
             DestBlock[i] = SrcBlock[i];
@@ -332,7 +332,7 @@ namespace
     // kind's counter (post-incremented), and the node goes to the tail.
     void AppendValueNode(FmtStr& Str, unsigned short Tag, unsigned int Value, unsigned char& Counter)
     {
-        FmtStr::Val* const Node = (FmtStr::Val*)malloc(sizeof(FmtStr::Val));
+        FmtStr::Val* const Node = static_cast<FmtStr::Val*>(malloc(sizeof(FmtStr::Val)));
         if (Node == nullptr)
             return;
         Node->Flags = Counter;
@@ -354,7 +354,7 @@ namespace
         FmtStr::Val** Link = &Dest.Head;
         for (FmtStr::Val const* Cur = Src; Cur != nullptr; Cur = Cur->Next)
         {
-            FmtStr::Val* const Node = (FmtStr::Val*)malloc(sizeof(FmtStr::Val));
+            FmtStr::Val* const Node = static_cast<FmtStr::Val*>(malloc(sizeof(FmtStr::Val)));
             if (Node != nullptr)
             {
                 Node->Next = Cur->Next;
@@ -378,7 +378,7 @@ namespace
                 }
             }
             *Link = Node;
-            Link = (FmtStr::Val**)Node; // &Node->Next (Next is at +0); null after a failed malloc
+            Link = reinterpret_cast<FmtStr::Val**>(Node); // &Node->Next (Next is at +0); null after a failed malloc
         }
     }
 }
@@ -494,7 +494,7 @@ void FmtStr::append_fmt_str(const FmtStr& Other)
     // (ValueIndex[KindFmtStr]). A failed malloc does nothing; a null subtree (VC6 new) still
     // appends the node with a null payload.
 
-    Val* const Node = (Val*)malloc(sizeof(Val));
+    Val* const Node = static_cast<Val*>(malloc(sizeof(Val)));
     if (Node == nullptr)
         return;
     FmtStr* const Sub = new (std::nothrow) FmtStr();
@@ -512,7 +512,7 @@ void FmtStr::append_nav_marker(const NavMarker& Marker)
 {
     // FUN_0630d8e0: tag 0x4E, counter +0x08. A failed malloc does nothing; the payload block is
     // null-tested here (on failure the node keeps a null payload).
-    Val* const Node = (Val*)malloc(sizeof(Val));
+    Val* const Node = static_cast<Val*>(malloc(sizeof(Val)));
     if (Node == nullptr)
         return;
     NavMarker* const Block = new (std::nothrow) NavMarker;
@@ -531,7 +531,7 @@ int FmtStr::append_void(void* Data)
     // FUN_0630d870: a node straight from a serialized Val, so the flags come from the source
     // and no counter moves. Returns the bytes consumed. Retail quirk kept: a failed malloc
     // returns the Data pointer itself.
-    Val* const Node = (Val*)malloc(sizeof(Val));
+    Val* const Node = static_cast<Val*>(malloc(sizeof(Val)));
     if (Node == nullptr)
         return (int)(std::uintptr_t)Data;
     Node->Next = nullptr;
@@ -609,7 +609,7 @@ void FmtStr::append_loot(int Id)
 int FmtStr::flatten(void* Dest, unsigned int MaxSize) const
 {
     // FUN_0630df60. The wire header is {mad-lib id : dword, node count : word}.
-    unsigned char* const Base = (unsigned char*)Dest;
+    unsigned char* const Base = static_cast<unsigned char*>(Dest);
     *(unsigned int*)Base = MadLibId;
 
     unsigned short NodeCount = 0;
@@ -659,9 +659,9 @@ int FmtStr::unflatten(void* Src, unsigned int Size)
     if (Src == nullptr)
         return 0;
 
-    unsigned char const* const Base = (unsigned char const*)Src;
-    MadLibId = *(unsigned int const*)Base;
-    unsigned short const NodeCount = *(unsigned short const*)(Base + 4);
+    unsigned char const* const Base = reinterpret_cast<unsigned char const*>(Src);
+    MadLibId = *reinterpret_cast<unsigned int const*>(Base);
+    unsigned short const NodeCount = *reinterpret_cast<unsigned short const*>((Base + 4));
 
     // Retail quirk kept: a failed malloc stores 0 and advances the cursor by the previous step
     // (initially the Src pointer itself); the next node's link store then goes through null.
@@ -670,7 +670,7 @@ int FmtStr::unflatten(void* Src, unsigned int Size)
     std::uintptr_t Step = (std::uintptr_t)Src;
     for (unsigned int Index = 0; Index < NodeCount; ++Index)
     {
-        Val* const Node = (Val*)malloc(sizeof(Val));
+        Val* const Node = static_cast<Val*>(malloc(sizeof(Val)));
         if (Node != nullptr)
         {
             Node->Next = nullptr;
@@ -678,7 +678,7 @@ int FmtStr::unflatten(void* Src, unsigned int Size)
         }
         Cursor += Step;
         *Link = Node;
-        Link = (Val**)Node; // &Node->Next (Next is at +0)
+        Link = reinterpret_cast<Val**>(Node); // &Node->Next (Next is at +0)
     }
     return (int)(Cursor - Base);
 }

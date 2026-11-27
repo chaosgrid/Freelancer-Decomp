@@ -39,7 +39,7 @@ MPCritSec& MPCritSec::operator=(MPCritSec const& Other)
 {
     // FUN_06261d70: a raw copy of all 7 dwords, no self-assignment test (hence memmove). See
     // the header comment for the aliasing caveat this reproduces.
-    memmove((void*)this, &Other, sizeof(MPCritSec));
+    memmove(static_cast<void*>(this), &Other, sizeof(MPCritSec));
     return *this;
 }
 

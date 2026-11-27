@@ -167,7 +167,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
 
     // No null test.
     for (int Index = 0; Index < 5; ++Index)
-        static_cast<NnButtonControl*>(Buttons[Index])->SetMontageMode(1);
+        Buttons[Index]->SetMontageMode(1);
 
     // The captions (FUN_005a0e30): Y = the button row's Y + 0.0018 (Save, Load), - 0.0898,
     // - 0.1814, - 0.273.
@@ -199,7 +199,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         bButtonEnabled[Index] = 0;
     for (int Index = 0; Index < 5; ++Index)
     {
-        NnTextControl* const Text = static_cast<NnTextControl*>(ButtonTexts[Index]);
+        NnTextControl* const Text = ButtonTexts[Index];
         memcpy(Text->BlinkColourOn, G_HudChromeColorRgba, 4);
         memcpy(Text->BlinkColourOff, &G_NnPaletteAmber, 4);
     }
@@ -305,7 +305,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         DescripButton = CreateButtonControl("LoadSave_DescripButton", kDescripButtonMesh, nullptr,
                                             nullptr, nullptr, &DescripPosition, nullptr,
                                             &DescripHalf, 0, 0, 1, 0, 0x596, 0, 0);
-        static_cast<NnButtonControl*>(DescripButton)->SetMontageMode(1);
+        DescripButton->SetMontageMode(1);
         DescripButton->SetProperty(kButtonPropNoMeshRender, 1, 0);
 
         Vector const DescripTextPosition = {NnFloatBits(0xbc1374bc), NnFloatBits(0x3e50e560),
@@ -339,7 +339,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     Vector const CloseHalf = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
     CloseButton = CreateButtonControl("LoadSave_Close", kCloseMesh, nullptr, nullptr, nullptr,
                                       &ClosePosition, nullptr, &CloseHalf, 0, 1, 0, 0, 0x409, 0, 0);
-    static_cast<NnButtonControl*>(CloseButton)->SetMontageMode(1);
+    CloseButton->SetMontageMode(1);
 
     // The buffer is used even after a failed lookup.
     wchar_t PrefixText[0x100];

@@ -95,7 +95,7 @@ void MarshalBuffer::put_void(const void* Src, int Count)
         return;
 
     unsigned char* Dst = Cursor;
-    const unsigned char* S = (const unsigned char*)Src;
+    const unsigned char* S = static_cast<const unsigned char*>(Src);
 
     // Dwords, then the 0..3 tail bytes, as retail.
     unsigned int Dwords = (unsigned int)Count >> 2;
@@ -124,7 +124,7 @@ void MarshalBuffer::get_void(void* Dst, int Count)
     if (Count <= 0 || Count > Remaining)
         return;
 
-    unsigned char* D = (unsigned char*)Dst;
+    unsigned char* D = static_cast<unsigned char*>(Dst);
     const unsigned char* S = Cursor;
 
     unsigned int Dwords = (unsigned int)Count >> 2;
@@ -278,7 +278,7 @@ char* MarshalBuffer::get_string()
     unsigned int Len = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
     {
-        Len = *(unsigned int*)Cursor;
+        Len = *reinterpret_cast<unsigned int*>(Cursor);
         Cursor += 4;
         Remaining -= 4;
     }
@@ -286,7 +286,7 @@ char* MarshalBuffer::get_string()
     if (Len == 0xFFFFFFFF || Len >= 0x4000)
         return nullptr;
 
-    char* Result = (char*)malloc(Len + 1);
+    char* Result = static_cast<char*>(malloc(Len + 1));
     get_void(Result, (int)Len);
     Result[Len] = '\0';
     return Result;
@@ -302,7 +302,7 @@ void MarshalBuffer::get_string_to_buffer(char* Buf, int MaxLen)
     unsigned int Len = (unsigned int)(std::uintptr_t)Buf;
     if (Remaining >= 4)
     {
-        Len = *(unsigned int*)Cursor;
+        Len = *reinterpret_cast<unsigned int*>(Cursor);
         Cursor += 4;
         Remaining -= 4;
     }
@@ -361,7 +361,7 @@ wchar_t* MarshalBuffer::get_wstring()
     unsigned int CharLen = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
     {
-        CharLen = *(unsigned int*)Cursor;
+        CharLen = *reinterpret_cast<unsigned int*>(Cursor);
         Cursor += 4;
         Remaining -= 4;
     }
@@ -369,7 +369,7 @@ wchar_t* MarshalBuffer::get_wstring()
     if (CharLen == 0xFFFFFFFF || CharLen >= 0x4000)
         return nullptr;
 
-    wchar_t* Result = (wchar_t*)malloc(CharLen * 2 + 2);
+    wchar_t* Result = static_cast<wchar_t*>(malloc(CharLen * 2 + 2));
     get_void(Result, (int)(CharLen * 2));
     Result[CharLen] = 0;
     return Result;
@@ -404,7 +404,7 @@ unsigned int MarshalBuffer::get_FL_ID()
     // reproduced on purpose.
     if (Remaining >= 4)
     {
-        unsigned int Id = *(unsigned int*)Cursor;
+        unsigned int Id = *reinterpret_cast<unsigned int*>(Cursor);
         Cursor += 4;
         Remaining -= 4;
         return Id;
@@ -561,7 +561,7 @@ Costume MarshalBuffer::get_Costume()
         Scratch = 0;
         if (Remaining >= 4)
         {
-            Scratch = *(unsigned int*)Cursor;
+            Scratch = *reinterpret_cast<unsigned int*>(Cursor);
             Cursor += 4;
             Remaining -= 4;
         }
@@ -570,7 +570,7 @@ Costume MarshalBuffer::get_Costume()
     Scratch = 0;
     if (Remaining >= 4)
     {
-        Scratch = *(unsigned int*)Cursor;
+        Scratch = *reinterpret_cast<unsigned int*>(Cursor);
         Cursor += 4;
         Remaining -= 4;
     }
@@ -580,7 +580,7 @@ Costume MarshalBuffer::get_Costume()
     {
         if (Remaining >= 4)
         {
-            Scratch = *(unsigned int*)Cursor;
+            Scratch = *reinterpret_cast<unsigned int*>(Cursor);
             Cursor += 4;
             Remaining -= 4;
         }

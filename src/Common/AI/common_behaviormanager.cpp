@@ -162,7 +162,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     AttackOverridePeriod = 1.0f;
 
     // IObjInspect::is_player (+0xBC) on the owner.
-    if (Owner != nullptr && static_cast<IObjInspect*>(Owner)->is_player())
+    if (Owner != nullptr && Owner->is_player())
         DefaultBehaviorIndex = 0x13;
     else
         DefaultBehaviorIndex = 6;
@@ -416,7 +416,7 @@ void IBehaviorManager::reset_current_behavior_direction()
     // No -1 test here, unlike every sibling: with no current behavior retail reads the dword
     // at +0x170 (TickSuppressedFlag and its padding) as the entry. Only the loaded pointer is
     // null-tested.
-    Behavior* const BehaviorObj = *(Behavior* const*)((char const*)BehaviorDispatchTable + CurrentBehaviorIndex * 4);
+    Behavior* const BehaviorObj = *(Behavior* const*)(reinterpret_cast<char const*>(BehaviorDispatchTable) + CurrentBehaviorIndex * 4);
     if (BehaviorObj != nullptr)
     {
         Vector ZeroDir = {0.0f, 0.0f, 0.0f};
@@ -551,7 +551,7 @@ void IBehaviorManager::set_state_graph(int GraphId, bool bForce)
     // The watched object (called with no null test): for the player the graph id becomes 0
     // and Flags1c8 bit 0 is cleared.
     int EffectiveGraphId = GraphId;
-    IObjInspect const* const Self = ObjInspectOf(ObjRwFromWatchable(WatchablePtr));
+    IObjInspect const* const Self = ObjRwFromWatchable(WatchablePtr);
     if (Self->is_player())
     {
         Flags1c8 &= 0xFE;
@@ -561,7 +561,7 @@ void IBehaviorManager::set_state_graph(int GraphId, bool bForce)
     // get_type (+0x88) writes into bForce's own stack slot; any type bit other than 0x200
     // clears Flags1c8 bit 0 too.
     unsigned int Type = static_cast<unsigned int>(bForce);   // the reused param_2 dword
-    ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->get_type(Type);
+    ObjRwFromWatchable(WatchablePtr)->get_type(Type);
     if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
         Flags1c8 &= 0xFE;
 
@@ -715,7 +715,7 @@ void IBehaviorManager::update_current_behavior_direction(Vector const& Dir)
         else
         {
             // The watched ship (unguarded).
-            IObjInspect const* const Ship = ObjInspectOf(ObjRwFromWatchable(WatchablePtr));
+            IObjInspect const* const Ship = ObjRwFromWatchable(WatchablePtr);
             Matrix const ShipRotation = Ship->get_transform().Rotation;
 
             Matrix Frame;
@@ -986,7 +986,7 @@ void IBehaviorManager::QueueNotification(IObjRW* Target, unsigned Extra, float D
         return;
     // IObjInspect +0x14c get_formation_followers.
     IObjRW* FollowerBuf[16];
-    int const Count = ObjInspectOf(Target)->get_formation_followers(FollowerBuf, 16);
+    int const Count = Target->get_formation_followers(FollowerBuf, 16);
     // Duration 0: each follower's own manager runs the Extra switch immediately.
     for (int I = 0; I < Count; ++I)
     {
@@ -1006,7 +1006,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         Node->Mode = 1;
         // WatcherA is this manager's own WatchablePtr (+0xf0), checked against the literal-8
         // sentinel (`W != nullptr && (W - 8) != nullptr`).
-        Watchable const* SelfWatched = reinterpret_cast<Watchable const*>(WatchablePtr);
+        Watchable const* SelfWatched = WatchablePtr;
         bool SelfValid = (SelfWatched != nullptr)
             && (reinterpret_cast<char const*>(SelfWatched) - 8 != nullptr);
         Node->WatcherA.set(SelfValid ? SelfWatched : nullptr);
@@ -1020,7 +1020,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
 
     if (Target == nullptr)
         return;
-    CObject const* Owner = ObjInspectOf(Target)->cobject();
+    CObject const* Owner = Target->cobject();
     if (Owner == nullptr)
         return;
     // ObjectClass & 0x103 == 0x103 -> CEqObj-derived.
@@ -1053,7 +1053,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         {
             // Re-enter QueueNotification on Mgr with its own object (no literal-8 sentinel
             // re-check on this path).
-            Watchable const* SelfWatched = reinterpret_cast<Watchable const*>(Mgr->WatchablePtr);
+            Watchable const* SelfWatched = Mgr->WatchablePtr;
             IObjRW* Raw = (SelfWatched != nullptr)
                 ? reinterpret_cast<IObjRW*>(const_cast<char*>(
                       reinterpret_cast<char const*>(SelfWatched) - 8))
@@ -1315,7 +1315,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                 bool bProximityGated = false;
                 if (CurrentBehaviorIndex == BEHAVIOR_DOCK)
                 {
-                    Target = static_cast<IObjRW*>(Active->GetDockTarget());
+                    Target = Active->GetDockTarget();
                 }
                 else if (CurrentBehaviorIndex == BEHAVIOR_FORMATION)
                 {
@@ -1329,7 +1329,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                         {
                             // Single player reaches through the partner ship's own behavior
                             // manager and asks its dock behavior ([+0x190], table[7]).
-                            CObject const* const PartnerObj = ObjInspectOf(Partner)->cobject();
+                            CObject const* const PartnerObj = Partner->cobject();
                             if (PartnerObj != nullptr
                                 && (static_cast<unsigned>(PartnerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                             {
@@ -1338,16 +1338,15 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                                 // The manager is null-tested, its table[7] is not.
                                 if (PartnerMgr != nullptr && PartnerMgr->CurrentBehaviorIndex == BEHAVIOR_DOCK)
                                 {
-                                    Target = static_cast<IObjRW*>(
-                                        PartnerMgr->BehaviorDispatchTable[7]->GetDockTarget());
+                                    Target = PartnerMgr->BehaviorDispatchTable[7]->GetDockTarget();
                                 }
                             }
                         }
                         else
                         {
                             // Multiplayer asks the partner for its own current target.
-                            if (ObjInspectOf(Partner)->get_behavior_id() == BEHAVIOR_DOCK)
-                                ObjInspectOf(Partner)->get_target(Target);
+                            if (Partner->get_behavior_id() == BEHAVIOR_DOCK)
+                                Partner->get_target(Target);
                         }
                     }
                 }
@@ -1355,7 +1354,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                 if (Target != nullptr)
                 {
                     unsigned TargetType = 0;
-                    ObjInspectOf(Target)->get_type(TargetType);
+                    Target->get_type(TargetType);
 
                     // The leader path also requires the target within 1000 units (squared
                     // 1.0e6f at DAT_063a03ec); strict `<`, unordered fails.
@@ -1364,7 +1363,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                     {
                         // Both get_position calls in this order; the sum stays on the x87 stack.
                         Vector const& SelfPos = ObjRwFromWatchable(WatchablePtr)->get_position();
-                        Vector const& TgtPos = ObjInspectOf(Target)->get_position();
+                        Vector const& TgtPos = Target->get_position();
                         double const Dx = static_cast<double>(TgtPos.x) - SelfPos.x;
                         double const Dy = static_cast<double>(TgtPos.y) - SelfPos.y;
                         double const Dz = static_cast<double>(TgtPos.z) - SelfPos.z;
@@ -1557,7 +1556,7 @@ void IBehaviorManager::RelevelShipUpDirection(bool bApply)
         return;
 
     // The watched ship (unguarded); its rotation is copied before bApply is tested.
-    Matrix const Rotation = ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->get_transform().Rotation;
+    Matrix const Rotation = ObjRwFromWatchable(WatchablePtr)->get_transform().Rotation;
     if (!bApply)
         return;
 
@@ -1766,7 +1765,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
         // No null test on the watcher; a CShip (& 0x503) gets leaving_system_update.
         CObject const* const WatchedCobj =
-            ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->cobject();
+            ObjRwFromWatchable(WatchablePtr)->cobject();
         if (WatchedCobj != nullptr &&
             (static_cast<unsigned int>(WatchedCobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             static_cast<CShip*>(const_cast<CObject*>(WatchedCobj))->leaving_system_update(LeftId);
@@ -1788,14 +1787,14 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         {
             // get_formation_leader (+0xb0), return value ignored; the watcher is not tested.
             IObjRW* Leader = nullptr;
-            ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->get_formation_leader(Leader);
+            ObjRwFromWatchable(WatchablePtr)->get_formation_leader(Leader);
             if (Leader != nullptr &&
-                ObjInspectOf(Leader)->get_id() == LeftId)
+                Leader->get_id() == LeftId)
             {
                 // The leader's id is read first.
                 IObjRW* const Self = ObjRwFromWatchable(WatchablePtr);
-                unsigned int const LeaderId = ObjInspectOf(Leader)->get_id();
-                if (LeaderId != ObjInspectOf(Self)->get_id())
+                unsigned int const LeaderId = Leader->get_id();
+                if (LeaderId != Self->get_id())
                     Rec->SetValueB0(*reinterpret_cast<unsigned int const*>(Data));
             }
             // Behavior slot 22 (+0x58); the entry is not null-tested.

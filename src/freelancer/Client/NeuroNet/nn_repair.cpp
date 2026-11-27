@@ -6,10 +6,12 @@
 
 #include "NeuroNet/nn_repair.h"
 
+#include "Interface/cargo_bar_control.h"
 #include "Interface/Pages/character_select_equip.h" // GetPlayerCreditsRetail, GetPlayerHealthScaleRetail, the
                                     // revisions, the collision-group and equipment lists,
                                     // GetPlayerShipArchetypeIdRetail
 #include "NeuroNet/Economy/client_base_market.h"     // ClientMarketGetPrice (FUN_00438060),
+#include "NeuroNet/nn_button_control.h"
                                     // GetClientLocationBaseMarket (FUN_0043a510),
                                     // GetClientCurrentLocationBaseData (FUN_0043b630)
 #include "Common/client_cliobj.h"          // Archetype::CliObjMaterialPaths (companion +0x20)
@@ -23,6 +25,8 @@
 #include "NeuroNet/nn_inventory.h"           // ReqPlayerSpendCashRetail, ReqPlayerHullStatusRetail,
                                     // ReqPlayerCollisionGroupsRetail, ReqPlayerEquipmentRetail
 #include "NeuroNet/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteGreen
 #include "Interface/ship_view_control.h"      // ShipViewEquipmentHpClass (FUN_005835f0)
 #include "Interface/ui_scroll.h"

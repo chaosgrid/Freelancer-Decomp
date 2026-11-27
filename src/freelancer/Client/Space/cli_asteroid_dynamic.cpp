@@ -77,7 +77,7 @@ namespace
 
     IServer* LocalServer()
     {
-        return static_cast<IServer*>(GetLocalServerInterface());
+        return GetLocalServerInterface();
     }
 
     void ParticleSetIntensity(FParticleEffect* Particle, float Intensity)
@@ -145,7 +145,7 @@ bool FCliDynamicAsteroidGameobj::find(unsigned const& Id)
     return false;
 }
 
-void FCliDynamicAsteroidGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
+void FCliDynamicAsteroidGameobj::OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                          void const* D)
 {
     // B is not read.
@@ -161,7 +161,7 @@ void FCliDynamicAsteroidGameobj::OnCollision(void const* A, void const* B, FClie
     if (OtherObj == nullptr || (static_cast<unsigned>(OtherObj->ObjectClass) & CObject::ClassProjectile) != CObject::ClassProjectile)
         return;
 
-    Explode(static_cast<Vector const*>(A));
+    Explode(&A->Point);
 
     // The shot's owner (+0xe4) must be the player's character (DAT_00673378).
     if (static_cast<CProjectile const*>(OtherObj)->OwnerId != GetPlayerCharacterId())
@@ -207,7 +207,7 @@ void FCliDynamicAsteroidGameobj::Explode(Vector const* Pos)
     bActive = 0;
     if (Object != nullptr)
         PhySys::SetCollisionState(Object, false);
-    CliEffectListRemove(&EffectList, Companion);
+    CliEffectListRemove(&EffectList, reinterpret_cast<FEffectCompanion*>(Companion));
     Vector const* const Where = (Pos != nullptr) ? Pos : &get_position();
     Vector const Copy = *Where;
 
@@ -593,7 +593,7 @@ void FCliDynamicAsteroid::Update(FSpaceCamera* Cam, float Dt,
     // No spawning while the player's ship (class & 0x503) is in a tradelane; otherwise only
     // when there is no zone or its immersion at the centre is above 0.001 (NaN blocks).
     FClientGameobj* const PlayerGo =
-        static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
+        static_cast<FClientGameobj*>(GetPlayerObjRW());
     CObject* const PlayerObj = (PlayerGo != nullptr) ? PlayerGo->GetObject() : nullptr;
     if (PlayerObj != nullptr &&
         (static_cast<unsigned>(PlayerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
@@ -689,7 +689,7 @@ void FCliDynamicAsteroid::Update(FSpaceCamera* Cam, float Dt,
         Place.z = PlaceRadius * Unit.z + Centre.z;
 
         Go = SlotPtrs[Index];
-        CliEffectListRemove(&Go->EffectList, Go->Companion);
+        CliEffectListRemove(&Go->EffectList, reinterpret_cast<FEffectCompanion*>(Go->Companion));
         if (SlotPtrs[Index]->GetObject() != nullptr)
             PhySys::SetCollisionState(SlotPtrs[Index]->GetObject(), false);
         SlotPtrs[Index]->Place(&Place, MaxVelocity, MaxAngularVelocity);
@@ -714,7 +714,7 @@ void FCliDynamicAsteroid::Update(FSpaceCamera* Cam, float Dt,
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x87c,
                   "dynamic asteroid effect already created");
-            CliEffectListRemove(&Go->EffectList, Go->Companion);
+            CliEffectListRemove(&Go->EffectList, reinterpret_cast<FEffectCompanion*>(Go->Companion));
         }
 
         // The archetype companion's particle_effect as a one-shot on the gameobj (DAT_00674c60)
@@ -740,7 +740,7 @@ void FCliDynamicAsteroid::Update(FSpaceCamera* Cam, float Dt,
             if (!EffectId->IsEmpty())
             {
                 CliCreateEffectOneShot(FindEffectArch(&EffectId->Id), Go, EngineIndex, &Frame,
-                                       Go->Companion);
+                                       reinterpret_cast<FEffectCompanion*>(Go->Companion));
             }
         }
 

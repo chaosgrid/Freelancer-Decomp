@@ -75,7 +75,7 @@ namespace
     {
         if (Target == nullptr)
             return false;
-        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->TractorEquipId);
+        unsigned short const* const Id = &Sys->TractorEquipId;
         if (*Id == SUBOBJ_ID_NONE)
             return false;
         IObjRW* const Current = WatchedObject(Sys->TractorTargetWatcher);
@@ -92,7 +92,7 @@ namespace
     {
         if (WatchedObject(Sys->TractorTargetWatcher) == nullptr)
             return false;
-        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->TractorEquipId);
+        unsigned short const* const Id = &Sys->TractorEquipId;
         if (*Id == SUBOBJ_ID_NONE)
             return false;
         Sys->TractorTargetWatcher.set(nullptr);
@@ -126,7 +126,7 @@ LootBehavior::~LootBehavior()
 // ----------------------------------------------------------------------------
 // Slot 1, LAB_062ce550.
 // ----------------------------------------------------------------------------
-bool LootBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool LootBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bOk = BindContext(Owner, Manager, Sys);              // FUN_062d2090
     if (bOk)

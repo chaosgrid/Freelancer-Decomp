@@ -103,7 +103,7 @@ public:
     // Slot 1, LAB_062c5cf0. The binder, then SetContext on all five Ideas, interleaved with
     // Move's configuration (SetField44(2) / SetAngle38(PI) / SetMode(0) /
     // SetRange3c(0.0f)).
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, LAB_062c5dd0. Resets Behavior's tick state (FUN_062d20d0), re-rolls
     // Move/B/C/D/E's per-tick tunables from SysMgr's large tunable

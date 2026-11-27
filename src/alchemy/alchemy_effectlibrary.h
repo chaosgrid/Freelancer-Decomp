@@ -33,7 +33,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API InsertArchetype(IFxEffectArchetype* Archetype,
                                             unsigned long* OutHash) override;
         GENRESULT DACOM_API RemoveByHash(unsigned long Hash) override;
-        GENRESULT DACOM_API CreateEffect(void* /*Unused*/, void* Key, IFxEffect** Out) override;
+        GENRESULT DACOM_API CreateEffect(IDAComponent* /*Unused*/, void* Key, IFxEffect** Out) override;
         GENRESULT DACOM_API SaveAle(IFileSystem* Filesys) override;
         GENRESULT DACOM_API LoadAle(IFileSystem* Filesys) override;
         GENRESULT DACOM_API ClearEffects() override;

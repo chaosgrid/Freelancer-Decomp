@@ -16,13 +16,6 @@
 
 namespace
 {
-    // One {hash index, element} slot of IVP_VHash::Elems.
-    struct FIvpVHashSlot
-    {
-        unsigned HashIndex; // +0x00
-        void* Elem;         // +0x04
-    };
-
     unsigned HashObjectKey(IVP_Real_Object* Object)
     {
         return IVP_VHash_HashPointer((unsigned)Object); // FUN_0635d4d0
@@ -33,7 +26,7 @@ namespace
     template <class TTable>
     void DeleteAllTables(IVP_VHash* Hash)
     {
-        FIvpVHashSlot* const Slots = static_cast<FIvpVHashSlot*>(Hash->Elems);
+        IVP_VHash_Slot* const Slots = Hash->Elems;
         for (int32_t I = Hash->SizeMm; I >= 0; --I)
         {
             TTable* const Table = static_cast<TTable*>(Slots[I].Elem);
@@ -433,7 +426,7 @@ void IVP_Cluster_Manager::fire_event_object_revived(IVP_Environment_Object_Notif
 }
 
 // FUN_0634b030 (RET 8): enabled_callbacks bit 1, slot 0 with Event.
-void IVP_Cluster_Manager::fire_event_pre_collision(IVP_Real_Object* Object, void* Event)
+void IVP_Cluster_Manager::fire_event_pre_collision(IVP_Real_Object* Object, IVP_Event_Collision* Event)
 {
     IVP_Collision_Callback_Table* const Table = collision_callback_hash->find_table(Object);
     if (Table == nullptr)
@@ -447,7 +440,7 @@ void IVP_Cluster_Manager::fire_event_pre_collision(IVP_Real_Object* Object, void
         {
             continue;
         }
-        Listener->event_pre_collision(static_cast<IVP_Event_Collision*>(Event));
+        Listener->event_pre_collision(Event);
         if (I > 0 && collision_callback_hash->find_table(Object) == nullptr)
         {
             return;

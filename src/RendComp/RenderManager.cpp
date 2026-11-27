@@ -63,27 +63,27 @@ public:
     int DACOM_API QueryInstance(InstanceIndex Arg1, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg1) override;
 
-    int DACOM_API QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, void* F, void* G) override;
-    int DACOM_API GetBounds(ArchetypeIndex Id, float Lod, void* Out) override;
+    int DACOM_API QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, int* F, void* G) override;
+    int DACOM_API GetBounds(ArchetypeIndex Id, float Lod, float* Out) override;
     int DACOM_API GetCentroid(ArchetypeIndex Id, float Lod, void* Out) override;
     int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override;
     int DACOM_API RenderInstance(void* Camera, InstanceIndex Inst, float Threshold, unsigned long Flags, const Transform* Xform,
                         void* Extra) override;
-    int DACOM_API GetInstanceLodCount(InstanceIndex Inst, void* Out) override;
-    int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, void* Out) override;
+    int DACOM_API GetInstanceLodCount(InstanceIndex Inst, int* Out) override;
+    int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, int* Out) override;
     int DACOM_API SetInstanceLod(InstanceIndex Inst, int Index) override;
     int DACOM_API GetArchetypeLodCount(ArchetypeIndex Id, int* Out) override;
     int DACOM_API GetArchetypeCurrentLod(ArchetypeIndex Id, int* Out) override;
     int DACOM_API SetArchetypeLod(ArchetypeIndex Id, int Index) override;
-    int DACOM_API GetArchetypeLodRange(ArchetypeIndex Id, int Index, void* OutA, void* OutB) override;
+    int DACOM_API GetArchetypeLodRange(ArchetypeIndex Id, int Index, float* OutA, float* OutB) override;
     int DACOM_API SetArchetypeLodRange(ArchetypeIndex Id, int Index, float A, float B) override;
-    int DACOM_API GetInstanceLodRange(InstanceIndex Inst, int Index, void* OutA, void* OutB) override;
+    int DACOM_API GetInstanceLodRange(InstanceIndex Inst, int Index, float* OutA, float* OutB) override;
     int DACOM_API SetInstanceLodRange(InstanceIndex Inst, int Index, float A, float B) override;
-    int DACOM_API QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, void* F, void* G) override;
+    int DACOM_API QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, int* F, void* G) override;
     int DACOM_API SetArchetypeRootLodSelection(ArchetypeIndex Id, void* Unused, unsigned long Flags) override;
     int DACOM_API SetInstanceRootLodSelection(InstanceIndex Id, void* A, void* B) override;
     int DACOM_API GetArchetypeRootLodSelection(ArchetypeIndex Key, void* Unused, unsigned long* Out) override;
-    int DACOM_API GetInstanceRootLodSelection(InstanceIndex Id, void* A, void* B) override;
+    int DACOM_API GetInstanceRootLodSelection(InstanceIndex Id, void* A, unsigned long* B) override;
 
     // Non-delegating inner IDAComponent (retail this+0x34, vtable PTR_LAB_06c368b0:
     // LAB_06c34cb0 / LAB_06c306b0 / LAB_06c34d70). The engine keeps this one in its component
@@ -107,8 +107,8 @@ public:
     unsigned long PluginCount;
 
     FLodSet* FindSet(int Id);
-    int MultiLevel(int Id, void* File);
-    int WalkPlugins(int Id, void* File);
+    int MultiLevel(int Id, IFileSystem* File);
+    int WalkPlugins(int Id, IFileSystem* File);
     int LoadPlugins();
     int UnloadPlugins();
     int SetParentFromDesc(FAggDesc18* Desc);
@@ -249,9 +249,9 @@ GENRESULT DACOM_API FRenderManager::FInner::QueryInterface(const char* Iid, void
             continue;
         IDAComponent* Found = nullptr;
         if (G_RenderManagerIidMap[Index].bRenderer != 0)
-            Found = (IRenderer2*)Owner;
+            Found = static_cast<IRenderer2*>(Owner);
         else
-            Found = (IEngineComponent*)Owner;
+            Found = static_cast<IEngineComponent*>(Owner);
         Found->AddRef();
         *Out = Found;
         return GR_OK;
@@ -345,11 +345,11 @@ int FRenderManager::LoadPlugins()
             Desc.Parent = Parent;
             Desc.Engine = G_Engine;
             void* Child = nullptr;
-            if (DACOM_Acquire()->CreateInstance((AGGDESC*)(&Desc), &Child) >= 0)
+            if (DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Child) >= 0)
             {
                 // push_back, the value copied as is (FUN_06c27640).
                 FPluginNode* Node = new FPluginNode();
-                Node->Plugin = (IRenderComponent*)Child;
+                Node->Plugin = static_cast<IRenderComponent*>(Child);
                 Node->Next = &PluginSentinel;
                 Node->Prev = PluginSentinel.Prev;
                 PluginSentinel.Prev->Next = Node;
@@ -402,15 +402,15 @@ FLodSet* FRenderManager::FindSet(int Id)
 }
 
 // FUN_06c33c50 (thiscall: Id, File).
-int FRenderManager::MultiLevel(int Id, void* FileArg)
+int FRenderManager::MultiLevel(int Id, IFileSystem* FileArg)
 {
-    IFileSystem* File = (IFileSystem*)FileArg;
+    IFileSystem* File = FileArg;
     FFileSystemDesc Desc;
     Desc.Init("MultiLevel", "FileSystem");
     IFileSystem* Child = nullptr;
     FArchetypeMap::iterator Found = Archetypes.find(Id);
     if (Found == Archetypes.end() ||
-        File->CreateInstance((AGGDESC*)(&Desc), (void**)(&Child)) < 0)
+        File->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)(&Child)) < 0)
     {
         if (Child != nullptr)
             Child->Release();
@@ -464,7 +464,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
             Level->Release();
             Level = nullptr;
         }
-        if (Child->CreateInstance((AGGDESC*)(&LevelDesc), (void**)(&Level)) < 0 ||
+        if (Child->CreateInstance(reinterpret_cast<AGGDESC*>(&LevelDesc), (void**)(&Level)) < 0 ||
             PluginSentinel.Next == &PluginSentinel)
         {
             bFailed = true;
@@ -507,7 +507,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
 
 // FUN_06c33fe0 (thiscall: Id, File). The first plugin in list order whose Claim is not -1
 // becomes the only LOD, switch {0, 1e6} (0x49742400).
-int FRenderManager::WalkPlugins(int Id, void* File)
+int FRenderManager::WalkPlugins(int Id, IFileSystem* File)
 {
     FArchetypeMap::iterator Found = Archetypes.find(Id);
     if (Found == Archetypes.end())
@@ -661,7 +661,7 @@ int DACOM_API FRenderManager::Notify(void* Arg1)
     return 0;
 }
 
-int DACOM_API FRenderManager::QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, void* F, void* G)
+int DACOM_API FRenderManager::QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, int* F, void* G)
 {
     FLodSet* Set = FindSet(ArchetypeKey(A));
     if (Set == nullptr)
@@ -675,7 +675,7 @@ int DACOM_API FRenderManager::QueryGeometry(ArchetypeIndex A, float Lod, void* C
 }
 
 // LAB_06c33350 (IRenderer slot 4). The plugin's answer is cut to its low byte.
-int DACOM_API FRenderManager::GetBounds(ArchetypeIndex Id, float Lod, void* Out)
+int DACOM_API FRenderManager::GetBounds(ArchetypeIndex Id, float Lod, float* Out)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
     if (Set == nullptr)
@@ -711,8 +711,8 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
     if (Threshold < 0.0f)
         return 1;
 
-    ICamera* Camera = (ICamera*)CameraArg;
-    const Transform* World = (const Transform*)(G_Engine->GetInstanceTransform(Inst));
+    ICamera* Camera = static_cast<ICamera*>(CameraArg);
+    const Transform* World = static_cast<const Transform*>(G_Engine->GetInstanceTransform(Inst));
 
     float Scale = 1.0f;
     if (Mat != nullptr)
@@ -857,23 +857,23 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, InstanceIndex Inst
 }
 
 // LAB_06c33460 (IRenderer slot 8).
-int DACOM_API FRenderManager::GetInstanceLodCount(InstanceIndex Inst, void* Out)
+int DACOM_API FRenderManager::GetInstanceLodCount(InstanceIndex Inst, int* Out)
 {
     ArchetypeIndex Arch = G_Engine->GetInstanceArchetype(Inst);
     if (Arch == InvalidArchetypeIndex)
         return -1;
     G_Engine->ReleaseHandle(Arch);
-    return GetArchetypeLodCount(Arch, (int*)Out);
+    return GetArchetypeLodCount(Arch, Out);
 }
 
 // LAB_06c334b0 (IRenderer slot 9).
-int DACOM_API FRenderManager::GetInstanceCurrentLod(InstanceIndex Inst, void* Out)
+int DACOM_API FRenderManager::GetInstanceCurrentLod(InstanceIndex Inst, int* Out)
 {
     ArchetypeIndex Arch = G_Engine->GetInstanceArchetype(Inst);
     if (Arch == InvalidArchetypeIndex)
         return -1;
     G_Engine->ReleaseHandle(Arch);
-    return GetArchetypeCurrentLod(Arch, (int*)Out);
+    return GetArchetypeCurrentLod(Arch, Out);
 }
 
 int DACOM_API FRenderManager::SetInstanceLod(InstanceIndex Inst, int Index)
@@ -930,13 +930,13 @@ int DACOM_API FRenderManager::SetArchetypeLod(ArchetypeIndex Id, int Index)
 }
 
 // LAB_06c33780 (IRenderer slot 14).
-int DACOM_API FRenderManager::GetArchetypeLodRange(ArchetypeIndex Id, int Index, void* OutA, void* OutB)
+int DACOM_API FRenderManager::GetArchetypeLodRange(ArchetypeIndex Id, int Index, float* OutA, float* OutB)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
     if (Set == nullptr || Index >= Set->LodCount)
         return -1;
-    *(float*)OutA = Set->Switch[Index];
-    *(float*)OutB = Set->Switch[Index + 1];
+    *OutA = Set->Switch[Index];
+    *OutB = Set->Switch[Index + 1];
     return 0;
 }
 
@@ -954,7 +954,7 @@ int DACOM_API FRenderManager::SetArchetypeLodRange(ArchetypeIndex Id, int Index,
 }
 
 // LAB_06c336e0 (IRenderer slot 16).
-int DACOM_API FRenderManager::GetInstanceLodRange(InstanceIndex Inst, int Index, void* OutA, void* OutB)
+int DACOM_API FRenderManager::GetInstanceLodRange(InstanceIndex Inst, int Index, float* OutA, float* OutB)
 {
     ArchetypeIndex Arch = G_Engine->GetInstanceArchetype(Inst);
     if (Arch == InvalidArchetypeIndex)
@@ -975,7 +975,7 @@ int DACOM_API FRenderManager::SetInstanceLodRange(InstanceIndex Inst, int Index,
 
 // LAB_06c332b0 (IRenderer slot 18): LOD B's plugin gets the bits of 1.0f as its LOD; the answer
 // is cut to its low byte.
-int DACOM_API FRenderManager::QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, void* F, void* G)
+int DACOM_API FRenderManager::QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, int* F, void* G)
 {
     FLodSet* Set = FindSet(ArchetypeKey(A));
     if (Set == nullptr)
@@ -1020,13 +1020,13 @@ int DACOM_API FRenderManager::GetArchetypeRootLodSelection(ArchetypeIndex Key, v
 }
 
 // LAB_06c339c0 (IRenderer slot 22).
-int DACOM_API FRenderManager::GetInstanceRootLodSelection(InstanceIndex Id, void* A, void* B)
+int DACOM_API FRenderManager::GetInstanceRootLodSelection(InstanceIndex Id, void* A, unsigned long* B)
 {
     ArchetypeIndex Arch = G_Engine->GetInstanceArchetype(Id);
     if (Arch == InvalidArchetypeIndex)
         return -1;
     G_Engine->ReleaseHandle(Arch);
-    return GetArchetypeRootLodSelection(Arch, A, (unsigned long*)B);
+    return GetArchetypeRootLodSelection(Arch, A, B);
 }
 
 // FUN_06c32350: the system container from AGGDESC+0x14, AddRef'd; none -> -2.
@@ -1041,7 +1041,7 @@ int FRenderManager::SetParentFromDesc(FAggDesc18* Desc)
 
 GENRESULT DACOM_API RenderManagerFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
-    FAggDesc18* Extended = (FAggDesc18*)Desc;
+    FAggDesc18* Extended = reinterpret_cast<FAggDesc18*>(Desc);
     if (Extended->Size != 0x18 || std::strcmp(Extended->Name, This->Name) != 0)
     {
         *Out = nullptr;
@@ -1056,7 +1056,7 @@ GENRESULT DACOM_API RenderManagerFactoryCreate(FDacomFactory* This, AGGDESC* Des
     }
     Object->Outer = Extended->Outer;
     if (Object->Outer != nullptr)
-        *Extended->InnerOut = (IDAComponent*)(&Object->Inner);
+        *Extended->InnerOut = static_cast<IDAComponent*>(&Object->Inner);
     else
         Object->Outer = &Object->Inner;
 
@@ -1069,6 +1069,6 @@ GENRESULT DACOM_API RenderManagerFactoryCreate(FDacomFactory* This, AGGDESC* Des
         *Out = nullptr;
         return Result;
     }
-    *Out = (IEngineComponent*)Object;
+    *Out = static_cast<IEngineComponent*>(Object);
     return GR_OK;
 }

@@ -162,14 +162,14 @@ void FFirstPersonCamera::ReleaseMesh()
     Mesh.Release();
 }
 
-void FFirstPersonCamera::Attach(void* Object)
+void FFirstPersonCamera::Attach(IObjRW* Object)
 {
     // LAB_005178e0 (slot 0x58).
     FHudCamera::Attach(Object);
 
-    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
+    FSpaceCamera* const Space = SpaceCameraOf(this);
 
-    IObjRW* const Watched = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)this));
+    IObjRW* const Watched = GameCameraGetTarget(this);
     if (Watched != nullptr)
     {
         IObjInspect* const Inspect = Watched;
@@ -208,7 +208,7 @@ void FFirstPersonCamera::Attach(void* Object)
     }
 
     // Retail tests the watcher again.
-    IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)this));
+    IObjRW* const Again = GameCameraGetTarget(this);
     if (Again != nullptr)
     {
         I3DMathEngine* const Math = FirstPersonMathEngine();
@@ -252,13 +252,13 @@ void FFirstPersonCamera::Attach(void* Object)
 void FFirstPersonCamera::Update(float DeltaSeconds)
 {
     // LAB_00517ba0 (slot 0x6c).
-    FHudCamera* const Hud = (FHudCamera*)this;
+    FHudCamera* const Hud = this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // Only with a watched client ship.
     if (GameCameraWatchedShip(Hud) != nullptr)
     {
-        IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
+        IObjRW* const Object = GameCameraGetTarget(Hud);
 
         // The ship's rotation is read through this reference for the rest of the function.
         Transform const& ShipXform = Object->get_transform();
@@ -442,7 +442,7 @@ void FFirstPersonCamera::Update(float DeltaSeconds)
 void FFirstPersonCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 {
     // LAB_00518420 (slot 0x78).
-    FHudCamera* const Hud = (FHudCamera*)this;
+    FHudCamera* const Hud = this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // The watcher at +0xc0 set, and the object (watcher - 8) non-null.
@@ -476,12 +476,12 @@ void FFirstPersonCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
         // The player in the jump arm (+0x158 == 2 or 3, read without a class test): registered
         // lights cleared, then the jump effect's ambient when both are set.
         FClientShipGameobj* const Ship =
-            static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
+            static_cast<FClientShipGameobj*>(GetPlayerObjRW());
         if (Ship != nullptr && (Ship->JumpState == kJumpStateJumpOutTunnel ||
                                 Ship->JumpState == kJumpStateJumpInTunnel))
         {
             EngineLightClearRegisteredList();
-            FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(Ship->JumpEffect);
+            FJumpShipEffect* const JumpFx = Ship->JumpEffect;
             if (JumpFx != nullptr && JumpFx->Ambient != nullptr)
                 EngineLightSetAmbientRgbBytes(JumpFx->Ambient);
         }
@@ -615,7 +615,7 @@ void FFirstPersonCamera::Load(const char* CockpitIniPath)
     }
 
     // The closing 4:3 check, read through the vtable as the third-person loader does.
-    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)this));
+    ICamera* const Space = AsCamera(SpaceCameraOf(this));
 
     const double TanX = tan(static_cast<double>(Space->GetHalfFovXDeg()) *
                             static_cast<double>(kDegreesToRadians));

@@ -104,7 +104,7 @@ Vector CAsteroid::get_velocity() const
 Archetype::Asteroid const* CAsteroid::asteroidarch() const
 {
     // FUN_06262d50 (ICF-folded with the other per-class arch accessors), +0x88.
-    return (Archetype::Asteroid const*)Archetype;
+    return static_cast<Archetype::Asteroid const*>(Archetype);
 }
 
 unsigned long CAsteroid::get_asteroid_id()
@@ -198,5 +198,5 @@ int CDynamicAsteroid::update(float Dt, unsigned Flags)
 Archetype::DynamicAsteroid const* CDynamicAsteroid::dynamicAsteroidArch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::DynamicAsteroid const*)Archetype;
+    return static_cast<Archetype::DynamicAsteroid const*>(Archetype);
 }

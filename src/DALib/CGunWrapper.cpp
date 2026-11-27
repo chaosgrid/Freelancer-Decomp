@@ -81,7 +81,7 @@ namespace
     // S_FALSE); frees the block in every case.
     DWORD __stdcall GunReleaseThread(void* Parameter)
     {
-        FGunReleaseContext* const Context = (FGunReleaseContext*)Parameter;
+        FGunReleaseContext* const Context = static_cast<FGunReleaseContext*>(Parameter);
         const HRESULT Hr = CoInitialize(nullptr);
         if (Hr == S_OK || Hr == S_FALSE)
         {

@@ -2152,44 +2152,44 @@ namespace
         lua_endblock();
     }
 
-    unsigned long IfsAddRef(void* FileSystem)
+    unsigned long IfsAddRef(IFileSystem* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
-        return static_cast<IFileSystem*>(FileSystem)->AddRef();
+        return FileSystem->AddRef();
     }
 
-    unsigned long IfsRelease(void* FileSystem)
+    unsigned long IfsRelease(IFileSystem* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
-        return static_cast<IFileSystem*>(FileSystem)->Release();
+        return FileSystem->Release();
     }
 
-    unsigned long IfsGetSize(void* FileSystem)
+    unsigned long IfsGetSize(IFileSystem* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
-        return static_cast<IFileSystem*>(FileSystem)->GetSize(0, 0); // +0x28
+        return FileSystem->GetSize(0, 0); // +0x28
     }
 
-    int IfsRead(void* FileSystem, void* Buffer, unsigned long Size, unsigned long* BytesRead)
+    int IfsRead(IFileSystem* FileSystem, void* Buffer, unsigned long Size, unsigned long* BytesRead)
     {
         if (BytesRead != nullptr)
             *BytesRead = 0;
         if (FileSystem == nullptr || Buffer == nullptr)
             return static_cast<int>(GR_GENERIC);
-        return static_cast<IFileSystem*>(FileSystem)->Read(0, Buffer, Size, BytesRead, 0); // +0x14
+        return FileSystem->Read(0, Buffer, Size, BytesRead, 0); // +0x14
     }
 
-    void IfsGetFileSysPath(void* FileSystem, char* Out, unsigned long MaxChars)
+    void IfsGetFileSysPath(IFileSystem* FileSystem, char* Out, unsigned long MaxChars)
     {
         if (Out == nullptr || MaxChars == 0)
             return;
         Out[0] = '\0';
         if (FileSystem == nullptr)
             return;
-        static_cast<IFileSystem*>(FileSystem)->GetFileSysPath(Out, MaxChars); // +0x84
+        FileSystem->GetFileSysPath(Out, MaxChars); // +0x84
     }
 }
 

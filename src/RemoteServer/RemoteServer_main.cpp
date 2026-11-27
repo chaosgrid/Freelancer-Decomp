@@ -256,7 +256,7 @@ IClient::IClient() {}
 IClient::IClient(const IClient& Other) {}
 IClient& IClient::operator=(const IClient& Other) { return *this; }
 
-void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
+void HandlePacket(unsigned int ClientId, FPacketBase* Packet)
 {
     IClient* Client = GGameClient;
 
@@ -270,7 +270,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
         {
             case FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT):
             {
-                const FRpcUpdateObjectPacket* Wire = reinterpret_cast<const FRpcUpdateObjectPacket*>(Packet);
+                const FRpcUpdateObjectPacket* Wire = static_cast<const FRpcUpdateObjectPacket*>(Packet);
                 FCommonUpdateObjectInfo Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.Orientation = Wire->Orientation;
@@ -301,7 +301,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON):
             {
-                const FRpcFireWeaponPacket* Wire = reinterpret_cast<const FRpcFireWeaponPacket*>(Packet);
+                const FRpcFireWeaponPacket* Wire = static_cast<const FRpcFireWeaponPacket*>(Packet);
                 XFireWeaponInfo Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.TargetPos = Wire->TargetPos;
@@ -311,7 +311,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_SETTARGET):
             {
-                const FRpcSetTargetPacket* Wire = reinterpret_cast<const FRpcSetTargetPacket*>(Packet);
+                const FRpcSetTargetPacket* Wire = static_cast<const FRpcSetTargetPacket*>(Packet);
                 XSetTarget Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.SubObjId = Wire->SubObjId;
@@ -322,14 +322,14 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_CHATMSG):
             {
-                const FRpcChatMsgPacket* Wire = reinterpret_cast<const FRpcChatMsgPacket*>(Packet);
+                const FRpcChatMsgPacket* Wire = static_cast<const FRpcChatMsgPacket*>(Packet);
                 GGameChatClient->SendCommonChatMsg(CHAT_ID(1u), CHAT_ID(Wire->SenderId), Wire->DataSize,
                     Wire->Data);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP):
             {
-                const FRpcActivateEquipPacket* Wire = reinterpret_cast<const FRpcActivateEquipPacket*>(Packet);
+                const FRpcActivateEquipPacket* Wire = static_cast<const FRpcActivateEquipPacket*>(Packet);
                 XActivateEquip Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.EquipId = Wire->EquipId;
@@ -339,7 +339,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE):
             {
-                const FRpcActivateCruisePacket* Wire = reinterpret_cast<const FRpcActivateCruisePacket*>(Packet);
+                const FRpcActivateCruisePacket* Wire = static_cast<const FRpcActivateCruisePacket*>(Packet);
                 XActivateCruise Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.bActivate = (Wire->bActive != 0);
@@ -349,7 +349,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE):
             {
-                const FRpcGoTradeLanePacket* Wire = reinterpret_cast<const FRpcGoTradeLanePacket*>(Packet);
+                const FRpcGoTradeLanePacket* Wire = static_cast<const FRpcGoTradeLanePacket*>(Packet);
                 XGoTradelane Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.TradelaneRing1 = Wire->TradelaneRing1;
@@ -360,19 +360,19 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_STOPTRADELANE):
             {
-                const FRpcStopTradeLanePacket* Wire = reinterpret_cast<const FRpcStopTradeLanePacket*>(Packet);
+                const FRpcStopTradeLanePacket* Wire = static_cast<const FRpcStopTradeLanePacket*>(Packet);
                 Client->SendCommonStopTradeLane(1, Wire->ShipId, Wire->TradeLaneRing1, Wire->TradeLaneRing2);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP):
             {
-                const FRpcSetWeaponGroupPacket* Wire = reinterpret_cast<const FRpcSetWeaponGroupPacket*>(Packet);
+                const FRpcSetWeaponGroupPacket* Wire = static_cast<const FRpcSetWeaponGroupPacket*>(Packet);
                 Client->SendCommonSetWeaponGroup(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE):
             {
-                const FRpcPlayerTradePacket* Wire = reinterpret_cast<const FRpcPlayerTradePacket*>(Packet);
+                const FRpcPlayerTradePacket* Wire = static_cast<const FRpcPlayerTradePacket*>(Packet);
                 switch (Wire->Action)
                 {
                     case kPlayerTradeInitiateTrade:
@@ -420,13 +420,13 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_SET_VISITED_STATE):
             {
-                const FRpcSetVisitedStatePacket* Wire = reinterpret_cast<const FRpcSetVisitedStatePacket*>(Packet);
+                const FRpcSetVisitedStatePacket* Wire = static_cast<const FRpcSetVisitedStatePacket*>(Packet);
                 Client->SendCommonSetVisitedState(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO):
             {
-                const FRpcJettisonCargoPacket* Wire = reinterpret_cast<const FRpcJettisonCargoPacket*>(Packet);
+                const FRpcJettisonCargoPacket* Wire = static_cast<const FRpcJettisonCargoPacket*>(Packet);
                 XJettisonCargo Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.ItemId = Wire->ItemId;
@@ -436,7 +436,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS):
             {
-                const FRpcActivateThrustersPacket* Wire = reinterpret_cast<const FRpcActivateThrustersPacket*>(Packet);
+                const FRpcActivateThrustersPacket* Wire = static_cast<const FRpcActivateThrustersPacket*>(Packet);
                 XActivateThrusters Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.bActivate = (Wire->bActive != 0);
@@ -445,37 +445,37 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_REQUEST_BEST_PATH):
             {
-                const FRpcRequestBestPathPacket* Wire = reinterpret_cast<const FRpcRequestBestPathPacket*>(Packet);
+                const FRpcRequestBestPathPacket* Wire = static_cast<const FRpcRequestBestPathPacket*>(Packet);
                 Client->SendCommonRequestBestPath(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS):
             {
-                const FRpcRequestGroupPositionsPacket* Wire = reinterpret_cast<const FRpcRequestGroupPositionsPacket*>(Packet);
+                const FRpcRequestGroupPositionsPacket* Wire = static_cast<const FRpcRequestGroupPositionsPacket*>(Packet);
                 Client->SendCommonRequestGroupPositions(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_REQUEST_PLAYER_STATS):
             {
-                const FRpcRequestPlayerStatsPacket* Wire = reinterpret_cast<const FRpcRequestPlayerStatsPacket*>(Packet);
+                const FRpcRequestPlayerStatsPacket* Wire = static_cast<const FRpcRequestPlayerStatsPacket*>(Packet);
                 Client->SendCommonRequestPlayerStats(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_SET_MISSION_LOG):
             {
-                const FRpcSetMissionLogPacket* Wire = reinterpret_cast<const FRpcSetMissionLogPacket*>(Packet);
+                const FRpcSetMissionLogPacket* Wire = static_cast<const FRpcSetMissionLogPacket*>(Packet);
                 Client->SendCommonSetMissionLog(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_REQUEST_RANK_LEVEL):
             {
-                const FRpcRequestRankLevelPacket* Wire = reinterpret_cast<const FRpcRequestRankLevelPacket*>(Packet);
+                const FRpcRequestRankLevelPacket* Wire = static_cast<const FRpcRequestRankLevelPacket*>(Packet);
                 Client->SendCommonRequestRankLevel(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_POP_UP_DIALOG):
             {
-                const FRpcPopUpDialogPacket* Wire = reinterpret_cast<const FRpcPopUpDialogPacket*>(Packet);
+                const FRpcPopUpDialogPacket* Wire = static_cast<const FRpcPopUpDialogPacket*>(Packet);
                 FmtStr TextA;
                 FmtStr TextB;
                 TextA.unflatten(Wire->DataA, Wire->SizeA);
@@ -485,13 +485,13 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             }
             case FlPacketOpcode(FLPACKET_COMMON_SET_INTERFACE_STATE):
             {
-                const FRpcSetInterfaceStatePacket* Wire = reinterpret_cast<const FRpcSetInterfaceStatePacket*>(Packet);
+                const FRpcSetInterfaceStatePacket* Wire = static_cast<const FRpcSetInterfaceStatePacket*>(Packet);
                 Client->SendCommonSetInterfaceState(1, Wire->Data, Wire->DataSize);
                 break;
             }
             case FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS):
             {
-                const FRpcTractorObjectsPacket* Wire = reinterpret_cast<const FRpcTractorObjectsPacket*>(Packet);
+                const FRpcTractorObjectsPacket* Wire = static_cast<const FRpcTractorObjectsPacket*>(Packet);
                 XTractorObjects Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.TractorEquipId = Wire->TractorEquipId;
@@ -504,7 +504,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
 
     if (Channel == kPacketChannelServer)
     {
-        RpcReceiveServerChannel(ClientId, reinterpret_cast<FPacketBase*>(Packet), Client);
+        RpcReceiveServerChannel(ClientId, Packet, Client);
     }
 }
 

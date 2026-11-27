@@ -293,11 +293,10 @@ void ChatAppendRdlCopy(RenderDisplayList& Dst, RenderDisplayList const& Source)
     // The FUN_0046c800 loop.
     if (Source.Count == 0)
         return;
-    void** const Sentinel = (void**)Source.NodeList;
-    for (void** Cell = static_cast<void**>(Sentinel[0]); Cell != Sentinel;
-         Cell = static_cast<void**>(Cell[0]))
+    FRdlListNode* const Sentinel = Source.NodeList;
+    for (FRdlListNode* Cell = Sentinel->Next; Cell != Sentinel; Cell = Cell->Next)
     {
-        RdlAppendNode(Dst, static_cast<RDLNode*>(Cell[2])->Clone());
+        RdlAppendNode(Dst, Cell->Node->Clone());
     }
 }
 

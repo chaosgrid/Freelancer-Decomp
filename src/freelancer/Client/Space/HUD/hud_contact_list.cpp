@@ -204,7 +204,7 @@ namespace
         unsigned const Group = ShipGroupId(Ship);
         if (Group != 0)
         {
-            IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+            IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
             if (Player != nullptr && ShipGroupId(PlayerShipForGroup(Player)) == Group)
             {
                 return kContactGroupMember;
@@ -386,7 +386,7 @@ namespace
             {
                 continue;
             }
-            NnTextControl* const Text = static_cast<NnTextControl*>(Self->NameTexts[Row]);
+            NnTextControl* const Text = Self->NameTexts[Row];
             Self->RowLabels[Row] = Text->GetFontString();
             Text->FontString = Label;
         }
@@ -418,7 +418,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
         }
         // Not the player -- distance from the player to the surface of the physical sphere,
         // z / y / x squared in that order, clamped at 0.
-        if (Watched != static_cast<IObjRW*>(GetPlayerObjRW()))
+        if (Watched != GetPlayerObjRW())
         {
             Vector Center;
             float const Radius = Watched->cobject()->get_physical_radius_r(Center);
@@ -563,7 +563,7 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
 
     // The player ship's scanner. Retail runs FindFirst on `EAX + 0xe4` with EAX null for a
     // player that is not a ship (faults here too).
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
     if (Player != nullptr)
     {
         CShip const* const Ship = AsShip(Player->cobject());       // slot +0x150
@@ -619,7 +619,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         NameTexts[Index]->HomeOffset.y = NamePos.y;
         NameTexts[Index]->HomeOffset.z = NamePos.z;
         NameTexts[Index]->SetProperty(kTextPropClickable, 1, 0);
-        static_cast<NnTextControl*>(NameTexts[Index])->SetMaxLines(1); // FUN_0058b770
+        NameTexts[Index]->SetMaxLines(1); // FUN_0058b770
     }
 
     Vector const IconHalf = {0.006f, 0.006f, 0.0f};    // 0x3bc49ba6
@@ -688,7 +688,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
 void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
 {
     // FUN_004d0170 (this = the HUDItem face).
-    int const Mode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false); // FUN_004e5470
+    int const Mode = G_HudTargetPanel->GetMode(false); // FUN_004e5470
     if (Mode != kTargetPanelContactList && Mode != kTargetPanelFormation)
     {
         LastPanelMode = -1;
@@ -733,7 +733,7 @@ void HUD_ContactList::Update()
 void HUD_ContactList::UpdateInactive()
 {
     // LAB_004d3dd0 (this = the WinControl face).
-    int const Mode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false);
+    int const Mode = G_HudTargetPanel->GetMode(false);
     if ((Mode == kTargetPanelContactList || Mode == kTargetPanelFormation) && GetClientMouseCursorDrawFlag() != 0 &&
         GetPlayerObjRW() != nullptr && !IsLetterboxVisible())
     {
@@ -806,7 +806,7 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 A == reinterpret_cast<uintptr_t>(NameTexts[Row]))
             {
                 SelectEntry(static_cast<int>(ScrollPos) + Row);
-                static_cast<HudTarget*>(G_HudTargetPanel)->SetMode(kTargetPanelTarget); // FUN_004e5460
+                G_HudTargetPanel->SetMode(kTargetPanelTarget); // FUN_004e5460
                 PlayOrRewindUiSoundSlot(kUiSoundSelectItem);
                 return 1;
             }
@@ -856,7 +856,7 @@ void HUD_ContactList::SelectEntry(int Index)
         return;
     }
     // Target the object, unless it is the player.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player != nullptr && Player->get_id() == Entry.Id)
     {
         return;
@@ -871,7 +871,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
     {
         return false;
     }
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr || static_cast<FClientGameobj*>(Player)->ManagerKind != EClientGameobjKind::Ship)
     {
         return false;
@@ -1058,7 +1058,7 @@ void HUD_ContactList::RebuildContacts()
     }
     Contacts.clear();
 
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -1114,7 +1114,7 @@ void HUD_ContactList::RebuildContacts()
     }
     float const RangeSq = static_cast<float>(static_cast<double>(Range) * Range);
 
-    int const PanelMode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false);
+    int const PanelMode = G_HudTargetPanel->GetMode(false);
     if (PanelMode == kTargetPanelFormation)
     {
         // The formation list.
@@ -1454,7 +1454,7 @@ void HUD_ContactList::RebuildContacts()
             // Everything within 14000 of the player in the object DB's spatial bucket (mask
             // 0xfdff), large solars left out.
             ISpatialPartition* const Spatial =
-                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
+                GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
             Geometry::Sphere Query;
             Query.Center = PlayerPos;
             Query.Radius = kSpatialQueryRadius;
@@ -1699,7 +1699,7 @@ void HUD_ContactList::RebuildContacts()
     }
 
     // The player's target when nothing above listed it.
-    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != kTargetPanelFormation &&
+    if (G_HudTargetPanel->GetMode(false) != kTargetPanelFormation &&
         (FilterMode == kContactFilterImportant || FilterMode == kContactFilterAll))
     {
         IObjRW* const Target = PlayerShip->get_target();
@@ -1720,7 +1720,7 @@ void HUD_ContactList::RebuildContacts()
 
     // Outside the formation list, nearest first. FUN_004d4340 is VC6 list::sort: stable
     // ascending, as std::list::sort is.
-    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != kTargetPanelFormation)
+    if (G_HudTargetPanel->GetMode(false) != kTargetPanelFormation)
     {
         Contacts.sort([](FHudContactEntry const& Left, FHudContactEntry const& Right)
                       { return Left.Distance < Right.Distance; });
@@ -1773,7 +1773,7 @@ void HUD_ContactList::Draw()
     }
 
     unsigned PlayerTargetId = 0;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player != nullptr)
     {
         CShip const* const Ship = AsShip(Player->cobject());
@@ -1848,7 +1848,7 @@ void HUD_ContactList::Draw()
             if (strcmp(MeshPath, Path) != 0)
             {
                 Icons[Row]->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Path), 0);
-                static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
+                Icons[Row]->MontageTile = Tile;
             }
 
             // Waypoints violet, the rest by reputation; a white NPC ship with no faction marks
@@ -1946,7 +1946,7 @@ void HUD_ContactList::Draw()
         // ids 0x3ce. FUN_00402180 is _vsnprintf into 0x2000 chars.
         int const Metres = static_cast<int>(Entry.Distance);
         char RangeText[0x2000];
-        NnTextControl* const RangeControl = static_cast<NnTextControl*>(RangeTexts[Row]);
+        NnTextControl* const RangeControl = RangeTexts[Row];
         if (Metres < 2000)
         {
             _snprintf(RangeText, 0x2000, "%d", Metres);
@@ -2205,7 +2205,7 @@ void HUD_ContactList::Draw()
 
         // The name text -- other players' names in PlayerName, dropped a little; everything
         // else in HudSmall at the rest offset.
-        NnTextControl* const NameText = static_cast<NnTextControl*>(NameTexts[Row]);
+        NnTextControl* const NameText = NameTexts[Row];
         if (Entry.Kind == kContactOtherPlayer || Entry.Kind == kContactGroupMember)
         {
             if (RowLabels[Row] == nullptr)
@@ -2247,7 +2247,7 @@ void HUD_ContactList::Draw()
         if (strcmp(MeshPath, Path) != 0)
         {
             Icons[Row]->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Path), 0);
-            static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
+            Icons[Row]->MontageTile = Tile;
         }
 
         // The colour (no faction test in this pass).

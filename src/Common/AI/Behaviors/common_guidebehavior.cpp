@@ -58,7 +58,7 @@ GuideBehavior::~GuideBehavior()
 }
 
 // Slot 1, LAB_062cf3e0: jumps to FUN_062d2090.
-bool GuideBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool GuideBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     return BindContext(Owner, Manager, Sys);
 }
@@ -232,7 +232,7 @@ void GuideBehavior::FireGuideEvent(IObjRW* Watched, FAiTarget* NavElem, int Even
                                    float Clearance)
 {
     unsigned const SelfId = NavElem->Iface->get_id();   // fetched first
-    unsigned const WatchedId = ObjInspectOf(Watched)->get_id();
+    unsigned const WatchedId = Watched->get_id();
     NotifyManagerGuideEvent(BehaviorMgr, SelfId, WatchedId, EventCode, Clearance, &GuideDestination);
 }
 
@@ -293,14 +293,14 @@ int GuideBehavior::Update()
     bool bLeaderIsSelf = false;
 
     // ---- is the escorted object formed up on me? ----
-    if (ObjInspectOf(ObjA)->get_behavior_id() == BEHAVIOR_FORMATION)
+    if (ObjA->get_behavior_id() == BEHAVIOR_FORMATION)
     {
         IObjRW* Leader = nullptr;
-        ObjInspectOf(ObjA)->get_formation_leader(Leader);
+        ObjA->get_formation_leader(Leader);
         if (Leader != nullptr)
         {
             unsigned const NavSelfId = NavElem->Iface->get_id();
-            if (ObjInspectOf(Leader)->get_id() == NavSelfId)
+            if (Leader->get_id() == NavSelfId)
             {
                 bEscortFollowing = 0;
                 bLeaderIsSelf = true;
@@ -310,7 +310,7 @@ int GuideBehavior::Update()
 
     // ---- ... or listed among my own formation followers ----
     if (SysMgr->FormationLeaders.IsIdAmongOwnerFormationFollowers(
-            ObjInspectOf(ObjA)->get_id())) // FUN_062ec520
+            ObjA->get_id())) // FUN_062ec520
     {
         bEscortFollowing = 0;
     }
@@ -328,7 +328,7 @@ int GuideBehavior::Update()
         Delta.y = GuideDestination.y - WatchedAPos.y;
         Delta.z = GuideDestination.z - WatchedAPos.z;
 
-        Matrix const& Rotation = ObjInspectOf(ObjA)->get_transform().Rotation;
+        Matrix const& Rotation = ObjA->get_transform().Rotation;
         Vector NegForward;
         NegForward.x = -Rotation.E[0][2];
         NegForward.y = -Rotation.E[1][2];

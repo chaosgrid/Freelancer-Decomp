@@ -1009,8 +1009,8 @@ void FCharacterObject::OnHotspotClick(unsigned long Cookie, int const* Point)
     {
         StartCharacterBehaviorScript(this, Owner, Placement, Props.BehaviorId,
                                      &OnBehaviorScriptStopped, this);
-        static_cast<IServer*>(GetLocalServerInterface())->GFObjSelect(Props.Key,
-                                                                      GetPlayerConnectionId());
+        GetLocalServerInterface()->GFObjSelect(Props.Key,
+                                               GetPlayerConnectionId());
         return;
     }
     OpenRoleDealer(Role);
@@ -1311,7 +1311,7 @@ void PlacePlayerAtSetpoint(char const* SetpointName)
 {
     // FUN_00435cf0. The room runtime (FUN_0043a460) and the RoomData (FUN_0043a3d0) are not
     // null-tested.
-    FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
+    FRoomRuntime* const Runtime = GetClientCurrentLocationRuntime();
     RoomData* const Room = LookupClientLocationRoom(GetClientLocationCurrentRoom());
 
     // The setpoint vector (+0x164) size is re-read every pass.

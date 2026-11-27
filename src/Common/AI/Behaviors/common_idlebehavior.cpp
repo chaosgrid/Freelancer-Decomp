@@ -20,7 +20,7 @@ IdleBehavior::~IdleBehavior()
 }
 
 // Slot 1, LAB_062cd590. The idea is bound only when BindContext (FUN_062d2090) succeeds.
-bool IdleBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool IdleBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     bool const bOk = BindContext(Param1, Param2, Param3);
     if (bOk)

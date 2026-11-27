@@ -110,9 +110,9 @@ void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target
         // quotient is stored to float.
         IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(SysMgr->Watcher.target()));
         float const OwnSpeed = Behavior_GetSpeed(
-            ObjInspectOf(Self), 1.0f, IObject::ThrustEquipCruise);
+            Self, 1.0f, IObject::ThrustEquipCruise);
         double const WatchedSpeed = Behavior_GetSpeed(
-            ObjInspectOf(Watched), 1.0f, IObject::ThrustEquipEngine);
+            Watched, 1.0f, IObject::ThrustEquipEngine);
         *Ratio = static_cast<float>(OwnSpeed / WatchedSpeed);
     }
     // Unordered keeps the value.
@@ -133,7 +133,7 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
     // Snapshot last tick's zones; the hysteresis bands below OR it back in.
     *SavedFlags = *ZoneFlags;
 
-    Vector const& Pos = ObjInspectOf(Obj)->get_position();
+    Vector const& Pos = Obj->get_position();
     float const Dx = Pos.x - RefPoint.x;
     float const Dy = Pos.y - RefPoint.y;
     float const Dz = Pos.z - RefPoint.z;
@@ -157,7 +157,7 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
 
     IObjRW* const CruiseObj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
     bool bCruiseActive = false;
-    ObjInspectOf(CruiseObj)->is_cruise_active(bCruiseActive);
+    CruiseObj->is_cruise_active(bCruiseActive);
 
     // The limits are re-derived on the x87 stack for each compare and never stored.
     float const CruiseScale = *reinterpret_cast<float*>(Watcher + 0x10);
@@ -203,7 +203,7 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
     // passed on unchanged.
     float const QueryValue = (Selector == 1) ? SelectorValue : 1.0f;
     float const OwnerSpeed =
-        Behavior_GetSpeed(ObjInspectOf(OwnerContext), QueryValue, ThrustType); // FUN_062e5af0
+        Behavior_GetSpeed(OwnerContext, QueryValue, ThrustType); // FUN_062e5af0
 
     unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
     double ZoneSpeed;
@@ -212,7 +212,7 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
         // Retail has two identical arms (one re-reads the watcher, one passes a null
         // receiver); collapsed, since Behavior_GetSpeed returns 0.0f on null.
         ZoneSpeed = Behavior_GetSpeed(
-            ObjInspectOf(ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00))), 1.0f, ThrustType);
+            ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00)), 1.0f, ThrustType);
     }
     else if ((ZoneFlags & kProxZoneFar) == 0)
     {
@@ -232,7 +232,7 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
         // Retail really multiplies by Blend twice (a square), unrounded until the caller's
         // store.
         float const FullSpeed = Behavior_GetSpeed(
-            ObjInspectOf(ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00))), 1.0f, ThrustType);
+            ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00)), 1.0f, ThrustType);
         ZoneSpeed = (static_cast<double>(FullSpeed) * Blend) * Blend;
 
         // DAT_0639e884 = 10.0f; unordered keeps the value.
@@ -269,7 +269,7 @@ void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, 
 
     unsigned const OwnerId = SysMgr->SelfTarget.Iface->get_id();
 
-    unsigned const WatchedId = ObjInspectOf(Obj)->get_id();
+    unsigned const WatchedId = Obj->get_id();
 
     // FUN_062d2a10.
     (void)BehaviorMgr->NotifyTetherEvent(
@@ -327,14 +327,14 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
 
     // The one-argument is_cruise_active overload (+0x60), not the (bool&, bool&) one at +0x5c.
     bool bCruise = false;
-    ObjInspectOf(OwnerObjOf(Sys))->is_cruise_active(bCruise);
+    OwnerObjOf(Sys)->is_cruise_active(bCruise);
 
     // FLT_MAX sentinel for the per-follower minimum (an immediate store, not .rdata).
     float MinFollowerAngularSpeed = 3.402823466e+38f; // 0x7f7fffff
 
     ThrustEquipType const ThrustType = bCruise ? ThrustEquipCruise : ThrustEquipEngine;
     float MinFollowerSpeed =
-        Behavior_GetSpeed(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType); // FUN_062e5af0
+        Behavior_GetSpeed(OwnerObjOf(Sys), 1.0f, ThrustType); // FUN_062e5af0
 
     // Four of the five out fields are written before the follower-count early-out, so a
     // `false` return still leaves this partial result for the caller.
@@ -345,7 +345,7 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
 
     // 0x503 is the "is a CShip" mask. Retail calls CShip::get_formation_followers
     // non-virtually even when the mask misses (this == 0), and so does the port.
-    CObject const* const Obj = ObjInspectOf(OwnerObjOf(Sys))->cobject();
+    CObject const* const Obj = OwnerObjOf(Sys)->cobject();
     CShip* const Ship = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         ? static_cast<CShip*>(const_cast<CObject*>(Obj))
         : nullptr;
@@ -378,18 +378,18 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
             continue;
 
         // Running minimum seeded from the owner's own speed.
-        float const FollowerSpeed = ObjInspectOf(Follower)->get_speed(1.0f, ThrustType);
+        float const FollowerSpeed = Follower->get_speed(1.0f, ThrustType);
         if (FollowerSpeed < MinFollowerSpeed)
             MinFollowerSpeed = FollowerSpeed;
 
         // Called directly rather than through FUN_062e5b20 (no null case in the loop).
-        float const FollowerAngularSpeed = ObjInspectOf(Follower)->get_angular_speed_XY(1.0f, 0.0f);
+        float const FollowerAngularSpeed = Follower->get_angular_speed_XY(1.0f, 0.0f);
         if (FollowerAngularSpeed < MinFollowerAngularSpeed)
             MinFollowerAngularSpeed = FollowerAngularSpeed;
 
         // The follower's own station, in the leader's local frame.
         Vector FormationOffset = { 0.0f, 0.0f, 0.0f };
-        ObjInspectOf(Follower)->get_formation_offset(FormationOffset);
+        Follower->get_formation_offset(FormationOffset);
 
         RefreshCachedPhysicalExtents(Sys);
 
@@ -472,7 +472,7 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
 
         // FUN_062e5b70.
         Out->Throttle =
-            Behavior_GetProjectedThrottle(ObjInspectOf(OwnerObjOf(Sys)), TargetSpeed, ThrustType);
+            Behavior_GetProjectedThrottle(OwnerObjOf(Sys), TargetSpeed, ThrustType);
 
         // The first compare uses the unrounded angle, the second the rounded copy.
         double const AngleExact = std::acos(static_cast<double>(MinAlignCos));
@@ -512,15 +512,15 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
         Out->AngularSpeed = AngularTarget;
 
         // FUN_062e5ba0.
-        Out->AngularThrottle = Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(OwnerObjOf(Sys)), AngularTarget);
+        Out->AngularThrottle = Behavior_GetProjectedAxisThrottleXY(OwnerObjOf(Sys), AngularTarget);
     }
     else
     {
         // Nothing to hold back for: the owner's own full speed and turn rate.
-        Out->Speed = Behavior_GetSpeed(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType);
+        Out->Speed = Behavior_GetSpeed(OwnerObjOf(Sys), 1.0f, ThrustType);
         Out->Throttle = 1.0f;
         // FUN_062e5b20 with both arguments 1.0f, unlike the in-loop (1.0f, 0.0f).
-        Out->AngularSpeed = Behavior_GetAngularSpeedXY(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, 1.0f);
+        Out->AngularSpeed = Behavior_GetAngularSpeedXY(OwnerObjOf(Sys), 1.0f, 1.0f);
         Out->AngularThrottle = 1.0f;
     }
 
@@ -540,7 +540,7 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
 // ============================================================================
 
 // Slot 1, LAB_062fd890. The ideas are bound only when BindContext (FUN_062d2090) succeeds.
-bool GotoBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool GotoBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bBound = BindContext(Owner, Manager, Sys);
     if (bBound)
@@ -561,7 +561,7 @@ void GotoBehavior::OnEngage()
     Flag369 = 0;
     // Retail does not clear Flag368 before the call.
     int const CruiseResult =
-        ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag368));
+        OwnerContext->is_cruise_active(reinterpret_cast<bool&>(Flag368));
     // Mode 2 only when the flag came back set AND the call returned 0.
     Move.SetMode((Flag368 != 0 && CruiseResult == 0) ? kMoveModeCruise : kMoveModeEngine);    // FUN_062d5980
     Flag365 = 1;
@@ -605,7 +605,7 @@ int GotoBehavior::OnEvaluateReadiness(float Value)
 EvaluateResult GotoBehavior::evaluate(unsigned int Context)
 {
     (void)Context;
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+    IObjInspect const* const Owner = OwnerContext;
     IObjRW* Target = nullptr;
     Owner->get_target(Target);
     if (Target == nullptr)
@@ -702,7 +702,7 @@ int GotoBehavior::Update()
         return kBehaviorUpdateAborted;
     }
 
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+    IObjInspect const* const Owner = OwnerContext;
     SystemManager* const Sys = SysMgr;
     FAiTarget* const Elem = &Sys->SelfTarget;
 
@@ -1089,7 +1089,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     {
         // FUN_062e74a0: watch the object Op.TargetId names.
         IObjRW* const Dest = static_cast<IObjRW*>(
-            ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.TargetId));
+            ObjDb->FindVerifiedObject(reinterpret_cast<unsigned const*>(&GotoOp.TargetId)));
         Watcher310.set(Dest != nullptr ? static_cast<Watchable const*>(Dest) : nullptr);
         Move.SetRange3c(ArrivalRange);
         IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher310.target()));
@@ -1123,7 +1123,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     MaxSpeed = Op.MaxSpeed;
     // DAT_0639f418 = 1.0e-5 (double); greater or unordered takes the projected throttle.
     if (!(static_cast<double>(Op.MaxSpeed) <= 1.0e-5))
-        MaxThrottle = Behavior_GetProjectedThrottle(ObjInspectOf(OwnerContext), Op.MaxSpeed,
+        MaxThrottle = Behavior_GetProjectedThrottle(OwnerContext, Op.MaxSpeed,
                                                 IObject::ThrustEquipEngine);
     else
         MaxThrottle = 1.0f;
@@ -1138,13 +1138,13 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
 
     // Only a nonzero op+0x5c is looked up, and only then are op+0x60/+0x64/+0x68 passed;
     // otherwise all four arguments are zero.
-    void* ProxTarget = nullptr;
+    IObjRW* ProxTarget = nullptr;
     float ProxNear = 0.0f;
     float ProxFar = 0.0f;
     float ProxRatio = 0.0f;
     if (Op.TetherObjectId != 0)
     {
-        ProxTarget = ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.TetherObjectId);
+        ProxTarget = ObjDb->FindVerifiedObject(&GotoOp.TetherObjectId);
         ProxNear = Op.TetherNearRange;
         ProxFar = Op.TetherFarRange;
         ProxRatio = *reinterpret_cast<float const*>(&Op.TetherCruiseRatio);

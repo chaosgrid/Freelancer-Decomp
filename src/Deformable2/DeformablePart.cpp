@@ -89,7 +89,7 @@ unsigned char FDeformPart::BindMeshes(FLodHolder* Holder, FDeformMesh** InMeshes
     MeshCount = Count;
     int* Block = (int*)new unsigned char[(size_t)Count * 4 + 4];
     *Block = Count;
-    FDeformMesh** Array = (FDeformMesh**)(Block + 1);
+    FDeformMesh** Array = reinterpret_cast<FDeformMesh**>((Block + 1));
     int Index = 0;
     while (Index < Count)
     {
@@ -698,7 +698,7 @@ void BuildVertexRemap(FMeshArchetype* Arch)
 
     const size_t VertexCount = (size_t)((unsigned int)Arch->VertexCount);
     FVertexRemapList* Lists =
-        (FVertexRemapList*)new unsigned char[VertexCount * sizeof(FVertexRemapList)];
+        reinterpret_cast<FVertexRemapList*>(new unsigned char[VertexCount * sizeof(FVertexRemapList)]);
     std::memset(Lists, 0, VertexCount * sizeof(FVertexRemapList));
     Arch->RemapStart = Lists;
     Arch->RemapFinish = Lists + VertexCount;

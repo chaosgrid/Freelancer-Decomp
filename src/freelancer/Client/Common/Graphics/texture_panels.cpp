@@ -402,9 +402,9 @@ namespace
 
     // Camera vt+0x0c -> world position. The slot is __stdcall with `this` on the stack, as in
     // space_camera.h.
-    void CameraReadPos(void* Camera, float* Out3)
+    void CameraReadPos(ICamera* Camera, float* Out3)
     {
-        const Vector* const Pos = ((ICamera*)Camera)->GetPosition();
+        const Vector* const Pos = Camera->GetPosition();
         Out3[0] = Pos->x;
         Out3[1] = Pos->y;
         Out3[2] = Pos->z;
@@ -521,7 +521,7 @@ FTexturePanels* TexturePanelsCreate()
 
 // The walk inlined in the StarSys tick FUN_00554eb0. Update forwards the dt as FUN_00550d40's
 // SECOND argument.
-void TexturePanelsUpdateAll(void* Camera, float Dt)
+void TexturePanelsUpdateAll(ICamera* Camera, float Dt)
 {
     for (FTexturePanelsGlobalNode* N = G_PanelsListSentinel.Next; N != &G_PanelsListSentinel;
          N = N->Next)
@@ -540,7 +540,7 @@ void TexturePanelsApplyDetailAll(float Detail)
 
 // FUN_00509f30 — slot 5 (+0x14, DrawPanels) with the camera on every live TexturePanels.
 // Caller: the space draw pass FUN_0051f950, between bucket 0 and FUN_00520170.
-void TexturePanelsDrawAll(void* Camera)
+void TexturePanelsDrawAll(ICamera* Camera)
 {
     for (FTexturePanelsGlobalNode* N = G_PanelsListSentinel.Next; N != &G_PanelsListSentinel;
          N = N->Next)
@@ -725,7 +725,7 @@ double FTexturePanels::GetImmersion(Vector const& Point) const
 
 // -------------------------------------------------------------------- slot3 LAB_0050b210
 
-void FTexturePanels::Update(void* Camera, float Dt)
+void FTexturePanels::Update(ICamera* Camera, float Dt)
 {
     // LAB_0050b210.
     float CamPos[3];
@@ -760,7 +760,7 @@ void FTexturePanels::Update(void* Camera, float Dt)
 
 // -------------------------------------------------------------------- slot4 LAB_0050b510
 
-void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
+void FTexturePanels::DrawPiece(ICamera* Camera, int PieceIndex)
 {
     // LAB_0050b510 (__thiscall, RET 8).
     if (bLoaded == 0)
@@ -786,7 +786,7 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
     // reads it.
     Transform ZoneXf;
     ZoneToTransform(*Zone, ZoneXf);
-    Vector const CamPos = *((ICamera*)Camera)->GetPosition();
+    Vector const CamPos = *Camera->GetPosition();
     Vector Scratch;
     AcquirePanelsMath()->InverseTransform(Scratch, ZoneXf, CamPos);
 
@@ -910,7 +910,7 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
 // -------------------------------------------------------------------- slot5 LAB_0050bc90
 
 // LAB_0050bc90 (__thiscall, RET 4). No null tests on This, the list or a node's clouds.
-void FTexturePanels::DrawPanels(void* Camera)
+void FTexturePanels::DrawPanels(ICamera* Camera)
 {
     if (bLoaded == 0)
         return;
@@ -1227,11 +1227,11 @@ namespace
 // FUN_00551500 (__thiscall, RET 8): this = the clouds object, arg2 = the exclusion manager
 // handed to FUN_005513b0. No null tests anywhere: not on the camera, its orientation, the
 // pipeline, the vertex-buffer manager, the puff table or a puff.
-void FNebulaClouds::DrawClouds(void* Camera, void* ExclusionCtx)
+void FNebulaClouds::DrawClouds(ICamera* Camera, void* ExclusionCtx)
 {
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
+    ICamera* const Cam = Camera;
 
-    if (static_cast<unsigned char*>(Camera)[0xbc] != 0)
+    if (reinterpret_cast<unsigned char*>(Camera)[0xbc] != 0)
         RegenExcluded(ExclusionCtx);
 
     // bLoaded +0xec, the active count +0x14 and the first shape +0x28.
@@ -1595,7 +1595,7 @@ namespace
 
 // LAB_005091a0 (__thiscall, RET 4). No null tests on This, the list, a node's clouds, the
 // Pipeline or the MaterialBatcher.
-void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera)
+void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, ICamera* Camera)
 {
     if (Nebula->FlagLoaded == 0)
         return;

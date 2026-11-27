@@ -81,15 +81,15 @@ EvaluateResult FollowBehavior::evaluate(unsigned int Context)
 {
     (void)Context;
     IObjRW* Target = nullptr;
-    (void)ObjInspectOf(OwnerContext)->get_target(Target);
+    (void)OwnerContext->get_target(Target);
     if (Target == nullptr)
         return EvalSkip;
     bool bInLane = false;
-    (void)ObjInspectOf(OwnerContext)->is_using_tradelane(&bInLane);
+    (void)OwnerContext->is_using_tradelane(&bInLane);
     if (bInLane)
         return EvalSkip;
     // FUN_062e6200: any ship-class bit.
-    if ((GetObjectTypeOrZero(ObjInspectOf(Target)) & OBJ_SHIP_MASK) != 0)
+    if ((GetObjectTypeOrZero(Target) & OBJ_SHIP_MASK) != 0)
         return EvalBlocked;
     return EvalSkip;
 }
@@ -104,7 +104,7 @@ bool FollowBehavior::OnApplyDirective(void* Param)
         // FUN_062e74a0: the object whose id the op's TargetId holds, through the IObjDB at
         // SystemManager::Timers+0x00, only if that object reports the same id.
         IObjRW* const Candidate = SysMgr->Timers.FindVerifiedObject(&Op->TargetId);
-        LeadWatcher.set(static_cast<Watchable*>(Candidate));
+        LeadWatcher.set(Candidate);
 
         if (ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target())) != nullptr)
         {
@@ -180,7 +180,7 @@ void FollowBehavior::UpdateInterceptEngageState()
         unsigned const OwnId = SysMgr->SelfTarget.Iface->get_id();
         // Retail pushes the range and status before the leader's get_id() runs.
         float const Range = FollowRangeBias + FollowDistance;
-        unsigned const LeaderId = ObjInspectOf(Leader)->get_id();
+        unsigned const LeaderId = Leader->get_id();
         (void)BehaviorMgr->NotifyFollowEvent(OwnId, LeaderId,
                                                 pub::AI::ContentCallback::FollowEnterRange, Range);
         return;
@@ -191,7 +191,7 @@ void FollowBehavior::UpdateInterceptEngageState()
     bLeaderInRange = 0;
     IObjRW* const Leader = LeaderObjectOf(LeadWatcher);
     unsigned const OwnId = SysMgr->SelfTarget.Iface->get_id();
-    unsigned const LeaderId = ObjInspectOf(Leader)->get_id();
+    unsigned const LeaderId = Leader->get_id();
     // Disengage passes the raw FollowDistance, not the biased range.
     (void)BehaviorMgr->NotifyFollowEvent(OwnId, LeaderId,
                                             pub::AI::ContentCallback::FollowLeaveRange,
@@ -206,7 +206,7 @@ void FollowBehavior::UpdateFollowerSteering()
 
     // Nothing reads the result; retail issues the call anyway.
     bool bCruiseActive = false;
-    (void)ObjInspectOf(OwnerContext)->is_cruise_active(bCruiseActive);
+    (void)OwnerContext->is_cruise_active(bCruiseActive);
 
     // Only the 3x3 of the leader's transform is copied (nine dwords).
     Matrix LeaderBasis = Behavior_GetTransform(LeaderObjectOf(LeadWatcher))->Rotation;
@@ -235,8 +235,8 @@ void FollowBehavior::UpdateFollowerSteering()
     // Only with a zero offset does the leader get to generate one.
     bool const bGenerated =
         !bHasOffset &&
-        ObjInspectOf(LeaderObjectOf(LeadWatcher))
-            ->generate_follow_offset(ObjInspectOf(OwnerContext), Probe);
+        LeaderObjectOf(LeadWatcher)
+            ->generate_follow_offset(OwnerContext, Probe);
 
     if (bGenerated)
     {

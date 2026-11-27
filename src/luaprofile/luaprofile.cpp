@@ -213,11 +213,11 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
 {
     IDAComponent* Facet = nullptr;
     if (ExactMatch(kInnerILua, Iid))
-        Facet = (ILua*)(Owner);
+        Facet = static_cast<ILua*>(Owner);
     else if (ExactMatch(kInnerProfileParser, Iid))
-        Facet = (IProfileParser*)(Owner);
+        Facet = static_cast<IProfileParser*>(Owner);
     else if (ExactMatch(kInnerAggregate, Iid))
-        Facet = (IAggregateComponent*)(Owner);
+        Facet = static_cast<IAggregateComponent*>(Owner);
     else
     {
         *Out = nullptr;
@@ -410,7 +410,7 @@ int DACOM_API FLuaObject::EnumerateSections(FSectionEnumCallback Callback, void*
         lua_Object Global = lua_getglobal(Name);
         if (lua_istable(Global) != 0)
         {
-            IProfileParser* Parser = (IProfileParser*)this;
+            IProfileParser* Parser = this;
             void* ParserOrZero = Parser;
             if ((uintptr_t)Parser == 4)
                 ParserOrZero = nullptr;
@@ -468,7 +468,7 @@ void* DACOM_API FLuaObject::OpenSection(const char* Name, unsigned int Flags)
 
 int DACOM_API FLuaObject::CloseSection(void* Handle)
 {
-    FSectionHandle* Target = (FSectionHandle*)(Handle);
+    FSectionHandle* Target = static_cast<FSectionHandle*>(Handle);
     if (Target == nullptr)
         return 0;
 
@@ -499,7 +499,7 @@ int DACOM_API FLuaObject::CloseSection(void* Handle)
 
 int DACOM_API FLuaObject::ReadLine(void* Handle, int Index, char* Buffer, unsigned int BufferSize)
 {
-    FSectionHandle* Target = (FSectionHandle*)(Handle);
+    FSectionHandle* Target = static_cast<FSectionHandle*>(Handle);
     if (Target == nullptr)
         return 0;
 
@@ -544,7 +544,7 @@ int DACOM_API FLuaObject::ReadLine(void* Handle, int Index, char* Buffer, unsign
 
 int DACOM_API FLuaObject::GetString(void* Handle, const char* Key, char* Buffer, unsigned int BufferSize)
 {
-    FSectionHandle* Target = (FSectionHandle*)(Handle);
+    FSectionHandle* Target = static_cast<FSectionHandle*>(Handle);
     if (Target == nullptr)
         return 0;
 
@@ -596,7 +596,7 @@ FLuaFactory::FLuaFactory() : FDacomComponentFactory(kComponentName) {}
 
 GENRESULT DACOM_API FLuaFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 {
-    FLuaAggDesc* LuaDesc = (FLuaAggDesc*)(Desc);
+    FLuaAggDesc* LuaDesc = reinterpret_cast<FLuaAggDesc*>(Desc);
     if (LuaDesc->Size != kAggDescSize || !ExactMatch(LuaDesc->Name, Name))
     {
         *Instance = nullptr;
@@ -613,7 +613,7 @@ GENRESULT DACOM_API FLuaFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 
     FLuaObject* Object = new (Memory) FLuaObject();
     Object->BindOuter(LuaDesc);
-    *Instance = (ILua*)(Object);
+    *Instance = static_cast<ILua*>(Object);
     return GR_OK;
 }
 
@@ -629,7 +629,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
         // no null test on either the factory or DACOM_Acquire's result.
         ICOManager* Dacom = DACOM_Acquire();
         Dacom->RegisterComponent(Factory, kComponentName,
-                                 (void*)(kRegisterPriority));
+                                 reinterpret_cast<void*>(kRegisterPriority));
         Factory->Release();
     }
     return TRUE;

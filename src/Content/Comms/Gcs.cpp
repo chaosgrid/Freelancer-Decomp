@@ -464,10 +464,9 @@ void FGcsLine::Play()
     GGcsConversations.DelayedMessages.insert(GGcsConversations.DelayedMessages.end(), 1, Entry);
 }
 
-bool FGcsLine::IsDone(void const* Parms)
+bool FGcsLine::IsDone(unsigned int const* Words)
 {
     // LAB_06ed67c0: {+0 listener, +4 system id, +8 speaker, +0xc last text}.
-    unsigned int const* Words = static_cast<unsigned int const*>(Parms);
     return System->SystemId == Words[1] && Listener == Words[0] && Speaker == Words[2] &&
            TextIds.back() == Words[3];
 }
@@ -608,10 +607,9 @@ void FGcsPlayerListLine::Play()
     GGcsConversations.DelayedMessages.insert(GGcsConversations.DelayedMessages.end(), 1, Entry);
 }
 
-bool FGcsPlayerListLine::IsDone(void const* Parms)
+bool FGcsPlayerListLine::IsDone(unsigned int const* Words)
 {
     // FUN_06ed6560. The ship lookup of word 0 is repeated for every player id.
-    unsigned int const* Words = static_cast<unsigned int const*>(Parms);
     for (std::vector<unsigned int>::iterator It = PlayerIds.begin(); It != PlayerIds.end(); ++It)
     {
         FContentPlayerState* const State = FindContentPlayerStateByShip(&Words[0]);
@@ -2034,7 +2032,7 @@ void FGcsConversation::Start()
         Lines.front()->Play();
 }
 
-bool FGcsConversation::OnMessage(void const* Parms)
+bool FGcsConversation::OnMessage(unsigned int const* Parms)
 {
     // FUN_06ee1f60.
     for (std::vector<FGcsLine*>::iterator It = Lines.begin(); It != Lines.end(); ++It)
@@ -3202,7 +3200,7 @@ bool FGcsConversationManager::Add(FRmConversationBase* Conversation)
     return true;
 }
 
-void FGcsConversationManager::OnMessage(void const* Parms)
+void FGcsConversationManager::OnMessage(unsigned int const* Parms)
 {
     // FUN_06ee8bd0.
     if (!bEnabled)

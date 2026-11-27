@@ -49,7 +49,7 @@ public:
     ~DrasticEvadeBehavior() override;
 
     // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, FUN_062c8790: FUN_062d20d0, then +0x2c = 0.
     void OnEngage() override;

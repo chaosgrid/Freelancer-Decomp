@@ -29,6 +29,7 @@
 
 #include <cstdint>
 
+struct FCharacterObject;
 struct FGfScript;
 struct ICamera;
 
@@ -156,7 +157,7 @@ struct FThornComponent : ICompoundControl,
     // 15 (+0x3c) -- the script's spawned table. Base: RET 8.
     virtual void SetSpawnTable(FThornComponent** Table, int Count);
     // 16 (+0x40) -- the actor named Name, if this entity is it. Base: false.
-    virtual bool FindActor(char const* ActorName, void** OutActorField, void** OutActor);
+    virtual bool FindActor(char const* ActorName, void** OutActorField, FCharacterObject** OutActor);
     // 17 (+0x44) -- the engine instance the entity moves. Base: _purecall.
     virtual InstanceIndex GetEngineInstance() = 0;
     // 18 (+0x48) -- the effects pass (FUN_0044f970, per spawned entity). Base: RET 4.

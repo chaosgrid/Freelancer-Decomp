@@ -359,18 +359,18 @@ namespace
                 Rgb[0] = LightColorByte(View->Color[0]);
                 Rgb[1] = LightColorByte(View->Color[1]);
                 Rgb[2] = LightColorByte(View->Color[2]);
-                ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);
-                ((FEngineLight*)Light)->SetRadius(View->Intensity);
+                Light->SetColorBytesAlt(Rgb);
+                Light->SetRadius(View->Intensity);
 
                 // A cone below 180 is a spot (type 2), anything else (NaN too) a point.
                 if (View->LightsourceCone < kFullConeDegrees)
                 {
-                    ((FEngineLight*)Light)->SetType(kLightSpot, true);
-                    ((FEngineLight*)Light)->SetConeAngle(View->LightsourceCone);
+                    Light->SetType(kLightSpot, true);
+                    Light->SetConeAngle(View->LightsourceCone);
                 }
                 else
                 {
-                    ((FEngineLight*)Light)->SetType(kLightPoint, true);
+                    Light->SetType(kLightPoint, true);
                 }
 
                 // A refused enable releases the light.
@@ -561,7 +561,7 @@ namespace
         Self->FGameLight::Tick(Dt);
         Transform World;
         Self->Owner->GetWorldTransform(&World);
-        EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.E[0][0], &World.Translation);
+        EngineLightSetTransform(Self, &World.Rotation.E[0][0], &World.Translation);
     }
 
     FCliLightEquipFx::FCliLightEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)
@@ -596,7 +596,7 @@ namespace
     FCliLightEquipFx::~FCliLightEquipFx()
     {
         // FUN_005323c0. The node the host's effect list holds keeps its own references.
-        CliEffectCompanionClear(Companion);
+        CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(Companion));
         // The inlined base destructor is ~FClientEquip.
     }
 
@@ -614,7 +614,7 @@ namespace
                 (Sound != nullptr && Sound->IsActive() != 0) ||
                 (Light != nullptr && Light->Anim.Keys == nullptr))
             {
-                CliEffectListRemove(&Host->EffectList, Companion);
+                CliEffectListRemove(&Host->EffectList, reinterpret_cast<FEffectCompanion*>(Companion));
             }
             return;
         }
@@ -637,7 +637,7 @@ namespace
 
         if (Code == EquipDestroying)
         {
-            CliEffectListRemove(&Host->EffectList, Companion);
+            CliEffectListRemove(&Host->EffectList, reinterpret_cast<FEffectCompanion*>(Companion));
             Equip->NotifyDisconnecting(this);
             Equip = nullptr;
         }
@@ -651,7 +651,7 @@ namespace
         if (Mem != nullptr)
         {
             unsigned char const bPlayer = static_cast<unsigned char>(
-                static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW() ? 1 : 0);
+                static_cast<IObjRW*>(Host) == GetPlayerObjRW() ? 1 : 0);
             Light = CliEquipLightConstruct(static_cast<FCliEquipLight*>(Mem), bPlayer);
         }
 
@@ -683,7 +683,7 @@ namespace
             void* const Local4[4] = {nullptr, nullptr, Light, nullptr};
             if (Light != nullptr)
                 Light->AddRef();
-            CliEffectCompanionClear(Companion);
+            CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(Companion));
             Companion[0] = Local4[0];
             Companion[2] = Local4[2];
             if (Light != nullptr)
@@ -756,7 +756,7 @@ namespace
     // Its first half alone (the repair droid): the player's host, not reaped.
     bool CliEquipHostIsPlayer(FClientGameobj* Host)
     {
-        if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
+        if (static_cast<IObjRW*>(Host) != GetPlayerObjRW())
             return false;
         return !Host->IsDead();
     }
@@ -892,16 +892,16 @@ namespace
         virtual void ReleaseSounds();
         // +0x14 LAB_0052e760: a collision on the shield bubble. HitInfo is the hit point (+0)
         // and the surface normal (+0xc); the third argument is not read.
-        virtual void OnCollisionHit(void const* HitInfo, FClientGameobj* Other,
+        virtual void OnCollisionHit(FClientCollisionRecord const* HitInfo, FClientGameobj* Other,
                                     void const* Unused);
         // +0x18 FUN_0052e8c0: a munition hitting the shield bubble.
-        virtual void OnMunitionHit(void const* HitInfo, FClientGameobj* Munition);
+        virtual void OnMunitionHit(FClientCollisionRecord const* HitInfo, FClientGameobj* Munition);
 
         // The body both the constructor and ReloadSounds run.
         void LoadSounds();
 
-        void* CollapseSound; // +0x10  CliEQShieldGenerator +0x58 (FUN_0042ae40, Acquire'd)
-        void* RebuiltSound;  // +0x14  CliEQShieldGenerator +0x5c
+        Archetype::ISound* CollapseSound; // +0x10  CliEQShieldGenerator +0x58 (FUN_0042ae40, Acquire'd)
+        Archetype::ISound* RebuiltSound;  // +0x14  CliEQShieldGenerator +0x5c
     };
     static_assert(sizeof(FCliShieldEquipFx) == 0x18, "ShieldFx 0x18");
 
@@ -929,13 +929,13 @@ namespace
         if (!Collapse->IsEmpty())
         {
             CollapseSound = LookupClientSoundArch(Collapse);
-            static_cast<Archetype::ISound*>(CollapseSound)->Acquire();
+            CollapseSound->Acquire();
         }
         ID_String const* const Rebuilt = reinterpret_cast<ID_String const*>(CompBytes + 0x5c);
         if (!Rebuilt->IsEmpty())
         {
             RebuiltSound = LookupClientSoundArch(Rebuilt);
-            static_cast<Archetype::ISound*>(RebuiltSound)->Acquire();
+            RebuiltSound->Acquire();
         }
     }
 
@@ -949,9 +949,9 @@ namespace
     {
         // FUN_0052e3c0.
         if (CollapseSound != nullptr)
-            static_cast<Archetype::ISound*>(CollapseSound)->Release();
+            CollapseSound->Release();
         if (RebuiltSound != nullptr)
-            static_cast<Archetype::ISound*>(RebuiltSound)->Release();
+            RebuiltSound->Release();
     }
 
     FCliShieldEquipFx::~FCliShieldEquipFx()
@@ -959,15 +959,15 @@ namespace
         // FUN_0052e2e0: the body of FUN_0052e3c0 inlined (neither pointer cleared), then the
         // base destructor FUN_00531af0.
         if (CollapseSound != nullptr)
-            static_cast<Archetype::ISound*>(CollapseSound)->Release();
+            CollapseSound->Release();
         if (RebuiltSound != nullptr)
-            static_cast<Archetype::ISound*>(RebuiltSound)->Release();
+            RebuiltSound->Release();
     }
 
     // The play key FUN_00428680 gets from both shield sounds: +0 zero, +4 the flag byte with
     // its low three bits cleared and bit 1 set (positional; the upper bits are whatever the
     // stack held in retail, zero here), +8 the position, +0x14 zero.
-    void CliShieldPlayAt(void* Sound, float const* Pos)
+    void CliShieldPlayAt(Archetype::ISound* Sound, float const* Pos)
     {
         unsigned Key[6] = {0u, 2u, 0u, 0u, 0u, 0u};
         std::memcpy(&Key[2], &Pos[0], sizeof(float));
@@ -992,7 +992,7 @@ namespace
         {
         case EquipActivating:
             // The player's host (a pointer compare only).
-            if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW())
+            if (static_cast<IObjRW*>(Host) == GetPlayerObjRW())
                 NnVoiceEnqueue(G_ShieldActivatedId, 0);
             break;
         case EquipDeactivating:
@@ -1000,7 +1000,7 @@ namespace
             // The player's host whose ship (null when it is not one; is_launching is called with
             // no test) is not launching.
             FClientGameobj* const Owner = Host;
-            if (static_cast<void*>(static_cast<IObjRW*>(Owner)) != GetPlayerObjRW())
+            if (static_cast<IObjRW*>(Owner) != GetPlayerObjRW())
                 break;
             CShip* Ship = nullptr;
             if (Owner != nullptr && Owner->Object != nullptr &&
@@ -1068,7 +1068,7 @@ namespace
         FClientEquip::notify(Code, nullptr);
     }
 
-    void FCliShieldEquipFx::OnCollisionHit(void const* HitInfo, FClientGameobj* Other,
+    void FCliShieldEquipFx::OnCollisionHit(FClientCollisionRecord const* HitInfo, FClientGameobj* Other,
                                            void const* /*Unused*/)
     {
         // LAB_0052e760.
@@ -1085,20 +1085,19 @@ namespace
         float const Damage = Other->get_mass() * COLLISION_DAMAGE_FACTOR * Speed;
         // The companion is re-read (null tests again) to pick the hit effect (FUN_00409f10).
         FEffectArch* const HitArch = Archetype::CliShieldGeneratorPickHitEffect(Comp, Damage);
-        void* Companion[4] = {nullptr, nullptr, nullptr, nullptr};
-        Vector const* const Hit = static_cast<Vector const*>(HitInfo);
-        Host->SpawnSurfaceHitEffect(Other->get_id(), HitArch, Hit, Hit + 1, Companion);
+        FEffectCompanion Companion = {nullptr, nullptr, nullptr, nullptr};
+        Host->SpawnSurfaceHitEffect(Other->get_id(), HitArch, &HitInfo->Point, &HitInfo->SurfaceNormal, &Companion);
         // Dead in retail: FUN_00539f90 never writes its fifth argument, so the slot stays null
         // and this does not run.
-        FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
+        FEffectBase* const Effect = Companion.Effect;
         if (Effect != nullptr)
         {
             Effect->SetIntensity(Equip->GetRelativeHealth());
         }
-        CliEffectCompanionClear(Companion);
+        CliEffectCompanionClear(&Companion);
     }
 
-    void FCliShieldEquipFx::OnMunitionHit(void const* HitInfo, FClientGameobj* Munition)
+    void FCliShieldEquipFx::OnMunitionHit(FClientCollisionRecord const* HitInfo, FClientGameobj* Munition)
     {
         // FUN_0052e8c0.
         Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
@@ -1115,17 +1114,16 @@ namespace
             MunArch->HullDamage * ShieldEquipConsts::HULL_DAMAGE_FACTOR + MunArch->EnergyDamage;
         FEffectArch* const HitArch = Archetype::CliShieldGeneratorPickHitEffect(Comp, Damage);
         // Keyed by the shot's owner (the class & 0x27 object, no test before the read).
-        void* Companion[4] = {nullptr, nullptr, nullptr, nullptr};
+        FEffectCompanion Companion = {nullptr, nullptr, nullptr, nullptr};
         CProjectile const* Shot = nullptr;
         if (MunObject != nullptr &&
             (static_cast<unsigned>(MunObject->ObjectClass) & 0x27u) == 0x27u)
         {
             Shot = static_cast<CProjectile const*>(MunObject);
         }
-        Vector const* const Hit = static_cast<Vector const*>(HitInfo);
-        Host->SpawnSurfaceHitEffect(Shot->OwnerId, HitArch, Hit, Hit + 1, Companion);
+        Host->SpawnSurfaceHitEffect(Shot->OwnerId, HitArch, &HitInfo->Point, &HitInfo->SurfaceNormal, &Companion);
         // As in OnCollisionHit (never runs: the slot stays null).
-        FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
+        FEffectBase* const Effect = Companion.Effect;
         if (Effect != nullptr)
         {
             Effect->SetIntensity(Equip->GetRelativeHealth());
@@ -1138,8 +1136,8 @@ namespace
         if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
             Shot1 = MunObject;
         Vector const Velocity = Shot1->get_velocity();
-        Host->SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
-        CliEffectCompanionClear(Companion);
+        Host->SpawnSplashHitEffect(LiveEffect, &HitInfo->Point, &HitInfo->SurfaceNormal, &Velocity, nullptr);
+        CliEffectCompanionClear(&Companion);
     }
 
     // The thruster's client wrapper (CliThruster.cpp): operator new(0x20), constructor
@@ -1154,7 +1152,7 @@ namespace
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
         // FUN_00503070 fills with the exhaust particle.
-        void* Companion[4];
+        FEffectCompanion Companion;
     };
     static_assert(sizeof(FCliThrusterEquipFx) == 0x20, "ThrusterFx 0x20");
     static_assert(offsetof(FCliThrusterEquipFx, Companion) == 0x10, "Thruster +0x10");
@@ -1184,7 +1182,7 @@ namespace
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
         // FUN_00503070 fills.
-        void* Companion[4];
+        FEffectCompanion Companion;
     };
     static_assert(sizeof(FCliAttachedFxEquipFx) == 0x20, "AttachedFx 0x20");
     static_assert(offsetof(FCliAttachedFxEquipFx, Companion) == 0x10, "AttachedFx +0x10");
@@ -1201,7 +1199,7 @@ namespace
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
         // FUN_00503070 fills on activation.
-        void* Companion[4];
+        FEffectCompanion Companion;
     };
     static_assert(sizeof(FCliRepairDroidEquipFx) == 0x20, "RepairDroidFx 0x20");
     static_assert(offsetof(FCliRepairDroidEquipFx, Companion) == 0x10, "RepairDroid +0x10");
@@ -1234,10 +1232,10 @@ namespace
         // FUN_0052f9a0.
         void DropLoot(unsigned LootId, int Units);
 
-        void* BeamCompanion[4];       // +0x10 {0, 0, the CliTractorBeam, 0} (FUN_0052fa10)
-        void* OperatingCompanion[4];  // +0x20 the operating_effect one-shot (notify 0xb)
+        FEffectCompanion BeamCompanion; // +0x10 {0, 0, the CliTractorBeam, 0} (FUN_0052fa10)
+        FEffectCompanion OperatingCompanion; // +0x20 the operating_effect one-shot (notify 0xb)
         FEffectArch* OperatingEffect; // +0x30 CliEQTractor +0x58, FUN_0040e960(..., 1)
-        void* CompleteSound;          // +0x34 CliEQTractor +0x5c, looked up and acquired
+        Archetype::ISound* CompleteSound; // +0x34 CliEQTractor +0x5c, looked up and acquired
     };
     static_assert(sizeof(FCliTractorEquipFx) == 0x38, "TractorFx 0x38");
     static_assert(offsetof(FCliTractorEquipFx, BeamCompanion) == 0x10, "Tractor +0x10");
@@ -1495,9 +1493,9 @@ namespace
             ISoundSource* Emitter = nullptr;
             if (!Cue->IsEmpty())
             {
-                void* const SoundArch = LookupClientSoundArch(Cue);
+                Archetype::ISound* const SoundArch = LookupClientSoundArch(Cue);
                 if (SoundArch != nullptr)
-                    Emitter = static_cast<ISoundSource*>(CreateClientEquipSoundEmitter(SoundArch));
+                    Emitter = CreateClientEquipSoundEmitter(SoundArch);
             }
             Wrapper->SoundEmitters[Index] = Emitter;
             if (Emitter == nullptr)
@@ -1850,10 +1848,10 @@ namespace
         if (Wrapper == nullptr)
             return nullptr;
         CliEquipFxBaseFill(Wrapper, Equip, Host);
-        Wrapper->Companion[0] = nullptr;
-        Wrapper->Companion[1] = nullptr;
-        Wrapper->Companion[2] = nullptr;
-        Wrapper->Companion[3] = nullptr;
+        Wrapper->Companion.EffectArch = nullptr;
+        Wrapper->Companion.Sound = nullptr;
+        Wrapper->Companion.Effect = nullptr;
+        Wrapper->Companion.Light = nullptr;
         return Wrapper;
     }
 
@@ -1866,7 +1864,7 @@ namespace
     FCliRepairDroidEquipFx::~FCliRepairDroidEquipFx()
     {
         // FUN_005328e0; the base destructor follows.
-        CliEffectCompanionClear(Companion);
+        CliEffectCompanionClear(&Companion);
     }
 
     void FCliRepairDroidEquipFx::notify(Event Code, void* /*Param*/)
@@ -1874,8 +1872,8 @@ namespace
         // LAB_00532980. FUN_00531b20 is never called.
         if (Code == EquipActivating)
         {
-            CliEffectCompanionArmStop(Companion);
-            CliEffectCompanionClear(Companion);
+            CliEffectCompanionArmStop(&Companion);
+            CliEffectCompanionClear(&Companion);
             // The companion archetype is null without an equipment and read anyway.
             Transform Identity;
             std::memset(&Identity, 0, sizeof(Identity));
@@ -1890,7 +1888,7 @@ namespace
             if (!FxId->IsEmpty())
             {
                 CliCreateEffectOneShot(FindEffectArch(&FxId->Id), Owner, static_cast<int>(Index),
-                                       &Identity, Companion);
+                                       &Identity, &Companion);
             }
             if (CliEquipHostIsPlayer(Host))
                 NnVoiceEnqueue(G_RepairDroidActivatedId, 0);
@@ -1898,7 +1896,7 @@ namespace
         }
         if (Code == EquipDeactivating)
         {
-            CliEffectListRemove(&Host->EffectList, Companion);
+            CliEffectListRemove(&Host->EffectList, &Companion);
             // Hit points above 0 pick "deactivated", else (NaN included) "exhausted".
             if (CliEquipHostIsPlayer(Host))
             {
@@ -1940,8 +1938,8 @@ namespace
         CliEquipFxBaseFill(Wrapper, Equip, Host);
         for (int I = 0; I < 4; ++I)
         {
-            Wrapper->BeamCompanion[I] = nullptr;
-            Wrapper->OperatingCompanion[I] = nullptr;
+            Wrapper->BeamCompanion.Slot[I] = nullptr;
+            Wrapper->OperatingCompanion.Slot[I] = nullptr;
         }
         Wrapper->OperatingEffect = nullptr;
         Wrapper->CompleteSound = nullptr;
@@ -1961,7 +1959,7 @@ namespace
         if (!Complete->IsEmpty())
         {
             Wrapper->CompleteSound = LookupClientSoundArch(Complete);
-            static_cast<Archetype::ISound*>(Wrapper->CompleteSound)->Acquire();
+            Wrapper->CompleteSound->Acquire();
         }
         return Wrapper;
     }
@@ -1978,10 +1976,10 @@ namespace
             OperatingEffect->Release();
         // Not cleared.
         if (CompleteSound != nullptr)
-            static_cast<Archetype::ISound*>(CompleteSound)->Release();
+            CompleteSound->Release();
         // The two companions in reverse member order.
-        CliEffectCompanionClear(OperatingCompanion);
-        CliEffectCompanionClear(BeamCompanion);
+        CliEffectCompanionClear(&OperatingCompanion);
+        CliEffectCompanionClear(&BeamCompanion);
         // The base destructor FUN_00531af0 follows.
     }
 
@@ -2005,12 +2003,12 @@ namespace
             // then the local released.
             if (Beam != nullptr)
                 Beam->AddRef();
-            CliEffectCompanionClear(BeamCompanion);
-            BeamCompanion[2] = Beam;
+            CliEffectCompanionClear(&BeamCompanion);
+            BeamCompanion.Effect = Beam;
             if (Beam != nullptr)
                 Beam->AddRef();
-            BeamCompanion[1] = nullptr;
-            BeamCompanion[3] = nullptr;
+            BeamCompanion.Sound = nullptr;
+            BeamCompanion.Light = nullptr;
             if (Beam != nullptr)
                 Beam->Release();
         }
@@ -2034,7 +2032,7 @@ namespace
         if (Loot != nullptr && static_cast<int>(Loot->Units) - Units > 0)
             return;
         // The player's host (a pointer compare), or any host outside single player.
-        if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW() && SinglePlayer())
+        if (static_cast<IObjRW*>(Host) != GetPlayerObjRW() && SinglePlayer())
             return;
         Tractor->RemoveTarget(LootId);
     }
@@ -2045,8 +2043,8 @@ namespace
         switch (Code)
         {
         case EquipDestroying:
-            CliEffectListRemove(&Host->EffectList, BeamCompanion);
-            CliEffectListRemove(&Host->EffectList, OperatingCompanion);
+            CliEffectListRemove(&Host->EffectList, &BeamCompanion);
+            CliEffectListRemove(&Host->EffectList, &OperatingCompanion);
             break;
         case EquipActivating:
             StartBeam();
@@ -2059,7 +2057,7 @@ namespace
                 Identity.Rotation.E[2][2] = 1.0f;
                 long const Index = Host->get_index();
                 CliCreateEffectOneShot(OperatingEffect, Host, static_cast<int>(Index), &Identity,
-                                       OperatingCompanion);
+                                       &OperatingCompanion);
             }
             break;
         case EquipDeactivating:
@@ -2072,8 +2070,8 @@ namespace
             std::memcpy(&Key[3], &Source.y, sizeof(float));
             std::memcpy(&Key[4], &Source.z, sizeof(float));
             PlayClientSoundArch(CompleteSound, Key, nullptr, 0);
-            CliEffectListRemove(&Host->EffectList, BeamCompanion);
-            CliEffectListRemove(&Host->EffectList, OperatingCompanion);
+            CliEffectListRemove(&Host->EffectList, &BeamCompanion);
+            CliEffectListRemove(&Host->EffectList, &OperatingCompanion);
             break;
         }
         case TractorTargetRejected:
@@ -2081,7 +2079,7 @@ namespace
             // The player's host with no arm active: failure code 2 -> "target_out_of_range",
             // 3..6 -> "nnv_tractor_failure".
             CETractor* const Tractor = static_cast<CETractor*>(Equip);
-            if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
+            if (static_cast<IObjRW*>(Host) != GetPlayerObjRW())
                 break;
             if (Tractor->CountActiveArms() != 0)
                 break;
@@ -2097,7 +2095,7 @@ namespace
             // The same with exactly one arm active and the arm's own error code (Param is the
             // TractorArm).
             CETractor* const Tractor = static_cast<CETractor*>(Equip);
-            if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
+            if (static_cast<IObjRW*>(Host) != GetPlayerObjRW())
                 break;
             if (Tractor->CountActiveArms() != 1)
                 break;
@@ -2121,10 +2119,10 @@ namespace
         if (Wrapper == nullptr)
             return nullptr;
         CliEquipFxBaseFill(Wrapper, Equip, Host);
-        Wrapper->Companion[0] = nullptr;
-        Wrapper->Companion[1] = nullptr;
-        Wrapper->Companion[2] = nullptr;
-        Wrapper->Companion[3] = nullptr;
+        Wrapper->Companion.EffectArch = nullptr;
+        Wrapper->Companion.Sound = nullptr;
+        Wrapper->Companion.Effect = nullptr;
+        Wrapper->Companion.Light = nullptr;
 
         // The companion archetype, no tests; hp_particles (+0x58) is a char pointer.
         unsigned char const* const Comp =
@@ -2155,7 +2153,7 @@ namespace
             return Wrapper;
         // The hardpoint handle is passed as the part index.
         CliCreateEffectOneShot(FindEffectArch(&Particles->Id), Host, static_cast<int>(HpHandle),
-                               &Xform, Wrapper->Companion);
+                               &Xform, &Wrapper->Companion);
         return Wrapper;
     }
 
@@ -2165,7 +2163,7 @@ namespace
     FCliThrusterEquipFx::~FCliThrusterEquipFx()
     {
         // FUN_0052edc0; the base destructor FUN_00531af0 follows.
-        CliEffectCompanionClear(Companion);
+        CliEffectCompanionClear(&Companion);
     }
 
     void FCliThrusterEquipFx::notify(Event Code, void* Param)
@@ -2176,12 +2174,12 @@ namespace
         case EquipDestroying:
             if (CliEquipHostIsLivePlayer(Host, CObject::ClassShip))
                 NnVoiceEnqueue(G_ThrusterDestroyedId, 0);
-            CliEffectListRemove(&Host->EffectList, Companion);
+            CliEffectListRemove(&Host->EffectList, &Companion);
             break;
         case EquipActivating:
         case EquipDeactivating:
         {
-            FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
+            FEffectBase* const Effect = Companion.Effect;
             if (Effect != nullptr)
             {
                 Effect->SetIntensity(Code == EquipActivating ? 1.0f : 0.0f);
@@ -2220,10 +2218,10 @@ namespace
         // FUN_00532210, with the base (FUN_00531a30) inlined.
         CliEquipFxBaseFill(this, EquipParam, HostParam);
 
-        Companion[0] = nullptr;
-        Companion[1] = nullptr;
-        Companion[2] = nullptr;
-        Companion[3] = nullptr;
+        Companion.EffectArch = nullptr;
+        Companion.Sound = nullptr;
+        Companion.Effect = nullptr;
+        Companion.Light = nullptr;
 
         // The CliEQAttachedFX is null without an equipment -- retail then reads +0x54 off null.
         Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
@@ -2248,14 +2246,14 @@ namespace
             return;
 
         CliCreateEffectOneShot(FindEffectArch(&View->Particles.Id), Host, static_cast<int>(Part),
-                               &Local, Companion);
+                               &Local, &Companion);
     }
 
     FCliAttachedFxEquipFx::~FCliAttachedFxEquipFx()
     {
         // FUN_005323c0 (shared with the light wrapper): the companion's destructor, then the
         // inlined base destructor (~FClientEquip).
-        CliEffectCompanionClear(Companion);
+        CliEffectCompanionClear(&Companion);
     }
 
     void FCliAttachedFxEquipFx::notify(Event Code, void* /*Param*/)
@@ -2263,7 +2261,7 @@ namespace
         // LAB_00532460: code 0xa only.
         if (Code == EquipDestroying)
         {
-            CliEffectListRemove(&Host->EffectList, Companion);
+            CliEffectListRemove(&Host->EffectList, &Companion);
             Equip->NotifyDisconnecting(this);
             Equip = nullptr;
         }
@@ -2273,7 +2271,7 @@ namespace
     {
         // FUN_00532490. A live equipment with a particle whose CliEQAttachedFX has use_throttle,
         // on a ship host: the particle's intensity follows CShip::Throttle (+0x29c).
-        if (Equip != nullptr && !Equip->IsDestroyed() && Companion[2] != nullptr)
+        if (Equip != nullptr && !Equip->IsDestroyed() && Companion.Effect != nullptr)
         {
             Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
             if (CompanionAsAttachedFX(Comp)->bUseThrottle && Host != nullptr &&
@@ -2281,7 +2279,7 @@ namespace
                 (static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 CShip const* const Ship = static_cast<CShip const*>(Host->Object);
-                FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
+                FEffectBase* const Effect = Companion.Effect;
                 Effect->SetIntensity(Ship->Throttle);
             }
         }
@@ -2309,12 +2307,12 @@ namespace
         ID_String const* const SoundId = reinterpret_cast<ID_String const*>(Comp + 0x54);
         if (SoundId->IsEmpty())
             return Wrapper;
-        void* const SoundArch = LookupClientSoundArch(SoundId);
+        Archetype::ISound* const SoundArch = LookupClientSoundArch(SoundId);
         if (SoundArch == nullptr)
             return Wrapper;
 
         // A Source3D; a failed allocation stores null and is used anyway.
-        ISoundSource* const Voice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
+        ISoundSource* const Voice = CreateClientSoundSource3D();
         Wrapper->Voice = Voice;
         Voice->SetLooping(1);
         Transform IdentityXform;
@@ -3364,14 +3362,14 @@ void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units
     static_cast<FCliTractorEquipFx*>(Wrapper)->DropLoot(LootId, Units);
 }
 
-void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, void const* HitInfo,
+void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, FClientCollisionRecord const* HitInfo,
                                   FClientGameobj* Other, void const* Unused)
 {
     // Wrapper vtable +0x14: LAB_0052e760 on a shield wrapper.
     static_cast<FCliShieldEquipFx*>(Wrapper)->OnCollisionHit(HitInfo, Other, Unused);
 }
 
-void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
+void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, FClientCollisionRecord const* HitInfo,
                                  FClientGameobj* Munition)
 {
     // Wrapper vtable +0x18: FUN_0052e8c0 on a shield wrapper.

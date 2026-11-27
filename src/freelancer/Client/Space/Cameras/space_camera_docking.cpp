@@ -33,12 +33,12 @@ namespace
 
     // FUN_0054baf0: the player's ship as an IObjRW, or null -- the Watched pointer of the
     // BaseWatcher at .data 0x00679744, minus eight.
-    void* GetPlayerShipObjRW()
+    IObjRW* GetPlayerShipObjRW()
     {
-        void* const Watched = GetPlayerShipWatcher();
+        Watchable* const Watched = GetPlayerShipWatcher();
         if (Watched == nullptr)
             return nullptr;
-        return static_cast<unsigned char*>(Watched) - kWatchableOffset;
+        return reinterpret_cast<IObjRW*>(reinterpret_cast<unsigned char*>(Watched) - kWatchableOffset);
     }
 
     // Vtable PTR_LAB_005dc2d4: the GameCamera table with slot 0x60 = FUN_0044fd00 (the shared
@@ -57,7 +57,7 @@ void FDockingCamera::Construct()
     // Retail then sets the vptr to PTR_LAB_005dc2d4.
 }
 
-void FDockingCamera::Attach(void* Object)
+void FDockingCamera::Attach(IObjRW* Object)
 {
     // Before the watcher is touched, the player ship stops steering: behaviour direction reset
     // and strafe burst cancelled, both through IBehaviorManager on the player IObjRW.
@@ -65,10 +65,7 @@ void FDockingCamera::Attach(void* Object)
     SetPlayerStrafeBurst(0);   // StrafeNone
 
     Watchable const* const Target =
-        (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
-                                                 kWatchableOffset)
-            : nullptr;
+        (Object != nullptr) ? static_cast<Watchable const*>(Object) : nullptr;
 
     if (Target != Watched.target())
         Watched.set(Target);
@@ -101,15 +98,15 @@ void FDockingCamera::Deactivate()
 void FDockingCamera::Update(float DeltaSeconds)
 {
     // The aim half runs only while there is a ship; the countdown half runs either way.
-    void* const Ship = GetPlayerShipObjRW();
+    IObjRW* const Ship = GetPlayerShipObjRW();
     if (Ship != nullptr)
     {
-        const Vector& ShipPosition = static_cast<IObjInspect*>(Ship)->get_position();
+        const Vector& ShipPosition = Ship->get_position();
 
         const float Ship3[3] = {ShipPosition.x, ShipPosition.y, ShipPosition.z};
 
         // The camera's position comes through its slot 0x0c, not off the field.
-        FSpaceCamera* const Base = (FSpaceCamera*)this;
+        FSpaceCamera* const Base = this;
         const Vector* const CameraPosition = AsCamera(Base)->GetPosition();
 
         Vector Direction;

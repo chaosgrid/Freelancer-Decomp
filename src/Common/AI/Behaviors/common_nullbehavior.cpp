@@ -22,7 +22,7 @@ NullBehavior::~NullBehavior()
 }
 
 // Slot 1, LAB_062d76a0: unconditionally succeeds and touches nothing, unlike every sibling.
-bool NullBehavior::SetContext(void* /*Param1*/, void* /*Param2*/, void* /*Param3*/)
+bool NullBehavior::SetContext(IObjRW* /*Param1*/, IBehaviorManager* /*Param2*/, SystemManager* /*Param3*/)
 {
     return true;
 }

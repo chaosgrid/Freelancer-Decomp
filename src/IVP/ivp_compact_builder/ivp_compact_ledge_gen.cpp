@@ -170,9 +170,9 @@ int32_t IVP_Compact_Ledge_Generator::prepare_compact_ledge(IVP_U_Vector<IVP_Tria
 
 // FUN_0637a6a0. Layout: header, compact triangles from +0x10, then the points
 // (x, y, z, 0). Dword +8 gets the size / 16 in bits 8..31 and bit 2 set.
-void IVP_Compact_Ledge_Generator::generate_compact_ledge(void* Buffer)
+void IVP_Compact_Ledge_Generator::generate_compact_ledge(IVP_Compact_Ledge* Buffer)
 {
-    IVP_Compact_Ledge* const Ledge = static_cast<IVP_Compact_Ledge*>(Buffer);
+    IVP_Compact_Ledge* const Ledge = Buffer;
     compact_ledge = Ledge;
     IVP_Compact_Ledge_Construct(Ledge);
     Ledge->NTriangles = static_cast<int16_t>(n_triangles);

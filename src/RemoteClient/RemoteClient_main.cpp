@@ -19,7 +19,7 @@ static SCreateCharacterInfo GStaticCreateCharacterInfo = {};
 IServer* RemoteClientGetServer();
 IChatServer* RemoteClientGetChatServer();
 
-static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
+static void DispatchClientPacket(unsigned int ClientId, FPacketBase* Packet)
 {
     IServer* Server = RemoteClientGetServer();
 
@@ -30,7 +30,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         switch (Opcode) {
         case FlPacketOpcode(FLPACKET_COMMON_UPDATEOBJECT):
         {
-            const FRpcUpdateObjectPacket* Wire = static_cast<const FRpcUpdateObjectPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcUpdateObjectPacket* Wire = static_cast<const FRpcUpdateObjectPacket*>(Packet);
             SSPObjUpdateInfo Info;
             Info.ObjectId = Wire->ObjectId;
             Info.Orientation = Wire->Orientation;
@@ -61,7 +61,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_FIREWEAPON):
         {
-            const FRpcFireWeaponPacket* Wire = static_cast<const FRpcFireWeaponPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcFireWeaponPacket* Wire = static_cast<const FRpcFireWeaponPacket*>(Packet);
             XFireWeaponInfo Info;
             Info.ObjectId = Wire->ObjectId;
             Info.TargetPos = Wire->TargetPos;
@@ -71,7 +71,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_SETTARGET):
         {
-            const FRpcSetTargetPacket* Wire = static_cast<const FRpcSetTargetPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetTargetPacket* Wire = static_cast<const FRpcSetTargetPacket*>(Packet);
             XSetTarget Info;
             Info.ObjectId = Wire->ObjectId;
             Info.SubObjId = Wire->SubObjId;
@@ -82,7 +82,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_CHATMSG):
         {
-            const FRpcChatMsgPacket* Wire = static_cast<const FRpcChatMsgPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcChatMsgPacket* Wire = static_cast<const FRpcChatMsgPacket*>(Packet);
             RemoteClientGetChatServer()->SubmitChat(
                 CHAT_ID(static_cast<unsigned short>(ClientId)), Wire->DataSize,
                 Wire->Data, CHAT_ID(Wire->TargetId), -1);
@@ -90,7 +90,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_ACTIVATEEQUIP):
         {
-            const FRpcActivateEquipPacket* Wire = static_cast<const FRpcActivateEquipPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcActivateEquipPacket* Wire = static_cast<const FRpcActivateEquipPacket*>(Packet);
             XActivateEquip Info;
             Info.ObjectId = Wire->ObjectId;
             Info.EquipId = Wire->EquipId;
@@ -100,7 +100,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_ACTIVATECRUISE):
         {
-            const FRpcActivateCruisePacket* Wire = static_cast<const FRpcActivateCruisePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcActivateCruisePacket* Wire = static_cast<const FRpcActivateCruisePacket*>(Packet);
             XActivateCruise Info;
             Info.ObjectId = Wire->ObjectId;
             Info.bActivate = (Wire->bActive != 0);
@@ -110,7 +110,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_GOTRADELANE):
         {
-            const FRpcGoTradeLanePacket* Wire = static_cast<const FRpcGoTradeLanePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcGoTradeLanePacket* Wire = static_cast<const FRpcGoTradeLanePacket*>(Packet);
             XGoTradelane Info;
             Info.ObjectId = Wire->ObjectId;
             Info.TradelaneRing1 = Wire->TradelaneRing1;
@@ -121,19 +121,19 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_STOPTRADELANE):
         {
-            const FRpcStopTradeLanePacket* Wire = static_cast<const FRpcStopTradeLanePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcStopTradeLanePacket* Wire = static_cast<const FRpcStopTradeLanePacket*>(Packet);
             Server->StopTradelane(ClientId, Wire->ShipId, Wire->TradeLaneRing1, Wire->TradeLaneRing2);
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_SET_WEAPON_GROUP):
         {
-            const FRpcSetWeaponGroupPacket* Wire = static_cast<const FRpcSetWeaponGroupPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetWeaponGroupPacket* Wire = static_cast<const FRpcSetWeaponGroupPacket*>(Packet);
             Server->SetWeaponGroup(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_PLAYER_TRADE):
         {
-            const FRpcPlayerTradePacket* Wire = static_cast<const FRpcPlayerTradePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcPlayerTradePacket* Wire = static_cast<const FRpcPlayerTradePacket*>(Packet);
             switch (Wire->Action)
             {
             case kPlayerTradeInitiateTrade:
@@ -181,13 +181,13 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_SET_VISITED_STATE):
         {
-            const FRpcSetVisitedStatePacket* Wire = static_cast<const FRpcSetVisitedStatePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetVisitedStatePacket* Wire = static_cast<const FRpcSetVisitedStatePacket*>(Packet);
             Server->SetVisitedState(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_JETTISONCARGO):
         {
-            const FRpcJettisonCargoPacket* Wire = static_cast<const FRpcJettisonCargoPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcJettisonCargoPacket* Wire = static_cast<const FRpcJettisonCargoPacket*>(Packet);
             XJettisonCargo Info;
             Info.ObjectId = Wire->ObjectId;
             Info.ItemId = Wire->ItemId;
@@ -197,7 +197,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_ACTIVATETHRUSTERS):
         {
-            const FRpcActivateThrustersPacket* Wire = static_cast<const FRpcActivateThrustersPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcActivateThrustersPacket* Wire = static_cast<const FRpcActivateThrustersPacket*>(Packet);
             XActivateThrusters Info;
             Info.ObjectId = Wire->ObjectId;
             Info.bActivate = (Wire->bActive != 0);
@@ -206,49 +206,49 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_COMMON_REQUEST_BEST_PATH):
         {
-            const FRpcRequestBestPathPacket* Wire = static_cast<const FRpcRequestBestPathPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestBestPathPacket* Wire = static_cast<const FRpcRequestBestPathPacket*>(Packet);
             Server->RequestBestPath(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_REQUEST_GROUP_POSITIONS):
         {
-            const FRpcRequestGroupPositionsPacket* Wire = static_cast<const FRpcRequestGroupPositionsPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestGroupPositionsPacket* Wire = static_cast<const FRpcRequestGroupPositionsPacket*>(Packet);
             Server->RequestGroupPositions(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_REQUEST_PLAYER_STATS):
         {
-            const FRpcRequestPlayerStatsPacket* Wire = static_cast<const FRpcRequestPlayerStatsPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestPlayerStatsPacket* Wire = static_cast<const FRpcRequestPlayerStatsPacket*>(Packet);
             Server->RequestPlayerStats(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_SET_MISSION_LOG):
         {
-            const FRpcSetMissionLogPacket* Wire = static_cast<const FRpcSetMissionLogPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetMissionLogPacket* Wire = static_cast<const FRpcSetMissionLogPacket*>(Packet);
             Server->SetMissionLog(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_REQUEST_RANK_LEVEL):
         {
-            const FRpcRequestRankLevelPacket* Wire = static_cast<const FRpcRequestRankLevelPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestRankLevelPacket* Wire = static_cast<const FRpcRequestRankLevelPacket*>(Packet);
             Server->RequestRankLevel(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_POP_UP_DIALOG):
         {
-            const FRpcPopUpDialogPacket* Wire = static_cast<const FRpcPopUpDialogPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcPopUpDialogPacket* Wire = static_cast<const FRpcPopUpDialogPacket*>(Packet);
             Server->PopUpDialog(ClientId, Wire->Buttons);
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_SET_INTERFACE_STATE):
         {
-            const FRpcSetInterfaceStatePacket* Wire = static_cast<const FRpcSetInterfaceStatePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetInterfaceStatePacket* Wire = static_cast<const FRpcSetInterfaceStatePacket*>(Packet);
             Server->SetInterfaceState(ClientId, Wire->Data, static_cast<int>(Wire->DataSize));
             break;
         }
         case FlPacketOpcode(FLPACKET_COMMON_TRACTOROBJECTS):
         {
-            const FRpcTractorObjectsPacket* Wire = static_cast<const FRpcTractorObjectsPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcTractorObjectsPacket* Wire = static_cast<const FRpcTractorObjectsPacket*>(Packet);
             XTractorObjects Info;
             Info.ObjectId = Wire->ObjectId;
             Info.TractorEquipId = Wire->TractorEquipId;
@@ -264,7 +264,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_LOGIN):
             // Slot 18 - Login
             {
-                const FRpcClientLoginPacket* Wire = static_cast<const FRpcClientLoginPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+                const FRpcClientLoginPacket* Wire = static_cast<const FRpcClientLoginPacket*>(Packet);
                 wchar_t AccountName[256];
                 wchar_t SecondString[256];
                 memcpy(AccountName, Wire->AccountName, sizeof(AccountName));
@@ -281,7 +281,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_MUNCOLLISION):
             // Slot 53 - SPMunitionCollision
             {
-                const FRpcMunitionCollisionPacket* Wire = static_cast<const FRpcMunitionCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+                const FRpcMunitionCollisionPacket* Wire = static_cast<const FRpcMunitionCollisionPacket*>(Packet);
                 SSPMunitionCollisionInfo Info;
                 Info.ProjectileArchId = Wire->ProjectileArchId;
                 Info.AttackerId = Wire->AttackerId;
@@ -296,7 +296,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_REQUESTLAUNCH):
             // Slot 48 - PlayerLaunch
         {
-            const FRpcRequestLaunchPacket* Wire = static_cast<const FRpcRequestLaunchPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestLaunchPacket* Wire = static_cast<const FRpcRequestLaunchPacket*>(Packet);
             Server->PlayerLaunch(Wire->Value, ClientId);
             break;
         }
@@ -307,21 +307,21 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_SELECTCHARACTER):
             // Slot 20 - CharacterSelect
         {
-            const FRpcSelectCharacterPacket* Wire = static_cast<const FRpcSelectCharacterPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSelectCharacterPacket* Wire = static_cast<const FRpcSelectCharacterPacket*>(Packet);
             Server->CharacterSelect(Wire->CharacterId, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_ENTERBASE):
             // Slot 35 - BaseEnter
         {
-            const FRpcEnterBasePacket* Wire = static_cast<const FRpcEnterBasePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcEnterBasePacket* Wire = static_cast<const FRpcEnterBasePacket*>(Packet);
             Server->BaseEnter(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQUESTBASEINFO):
             // Slot 39 - BaseInfoRequest
         {
-            const FRpcRequestBaseInfoPacket* Wire = static_cast<const FRpcRequestBaseInfoPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestBaseInfoPacket* Wire = static_cast<const FRpcRequestBaseInfoPacket*>(Packet);
             // The Server/BaseDB endpoint observes only zero versus nonzero.
             Server->BaseInfoRequest(Wire->Id, ClientId, Wire->bFull != 0);
             break;
@@ -329,7 +329,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_REQUESTLOCATIONINFO):
             // Slot 40 - LocationInfoRequest
         {
-            const FRpcRequestLocationInfoPacket* Wire = static_cast<const FRpcRequestLocationInfoPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestLocationInfoPacket* Wire = static_cast<const FRpcRequestLocationInfoPacket*>(Packet);
             Server->LocationInfoRequest(Wire->Id, ClientId, Wire->bFull != 0);
             break;
         }
@@ -338,14 +338,14 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE):
             // Slot 47 - SystemSwitchOutComplete
         {
-            const FRpcSystemSwitchOutCompletePacket* Wire = static_cast<const FRpcSystemSwitchOutCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSystemSwitchOutCompletePacket* Wire = static_cast<const FRpcSystemSwitchOutCompletePacket*>(Packet);
             Server->SystemSwitchOutComplete(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_OBJCOLLISION):
             // Slot 55 - SPObjCollision
             {
-                const FRpcObjectCollisionPacket* Wire = static_cast<const FRpcObjectCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+                const FRpcObjectCollisionPacket* Wire = static_cast<const FRpcObjectCollisionPacket*>(Packet);
                 SSPObjCollisionInfo Info;
                 Info.TargetObjectId = Wire->TargetObjectId;
                 Info.TargetSubObjId = Wire->TargetSubObjId;
@@ -359,21 +359,21 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case FlPacketOpcode(FLPACKET_CLIENT_EXITBASE):
             // Slot 36 - BaseExit
         {
-            const FRpcExitBasePacket* Wire = static_cast<const FRpcExitBasePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcExitBasePacket* Wire = static_cast<const FRpcExitBasePacket*>(Packet);
             Server->BaseExit(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_ENTERLOCATION):
             // Slot 37 - LocationEnter
         {
-            const FRpcEnterLocationPacket* Wire = static_cast<const FRpcEnterLocationPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcEnterLocationPacket* Wire = static_cast<const FRpcEnterLocationPacket*>(Packet);
             Server->LocationEnter(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_EXITLOCATION):
             // Slot 38 - LocationExit
         {
-            const FRpcExitLocationPacket* Wire = static_cast<const FRpcExitLocationPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcExitLocationPacket* Wire = static_cast<const FRpcExitLocationPacket*>(Packet);
             Server->LocationExit(Wire->Value, ClientId);
             break;
         }
@@ -383,7 +383,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_GFGOODSELL):
         {
-            const FRpcGfGoodSellPacket* Wire = static_cast<const FRpcGfGoodSellPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcGfGoodSellPacket* Wire = static_cast<const FRpcGfGoodSellPacket*>(Packet);
             SGFGoodSellInfo Info;
             Info.BaseId = Wire->Field_0x00;
             Info.GoodId = Wire->Field_0x04;
@@ -393,7 +393,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_GFGOODBUY):
         {
-            const FRpcGfGoodBuyPacket* Wire = static_cast<const FRpcGfGoodBuyPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcGfGoodBuyPacket* Wire = static_cast<const FRpcGfGoodBuyPacket*>(Packet);
             SGFGoodBuyInfo Info;
             Info.BaseId = Wire->Field_0x00;
             Info.Null04 = Wire->Field_0x04;
@@ -404,19 +404,19 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_GFSELECTOBJECT):
         {
-            const FRpcGfSelectObjectPacket* Wire = static_cast<const FRpcGfSelectObjectPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcGfSelectObjectPacket* Wire = static_cast<const FRpcGfSelectObjectPacket*>(Packet);
             Server->GFObjSelect(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_MISSIONRESPONSE):
         {
-            const FRpcMissionResponsePacket* Wire = static_cast<const FRpcMissionResponsePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcMissionResponsePacket* Wire = static_cast<const FRpcMissionResponsePacket*>(Packet);
             Server->MissionResponse(Wire->OfferId, Wire->OfferKind, Wire->bAccepted, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQSHIPARCH):
         {
-            const FRpcRequestShipArchPacket* Wire = static_cast<const FRpcRequestShipArchPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestShipArchPacket* Wire = static_cast<const FRpcRequestShipArchPacket*>(Packet);
             Server->ReqShipArch(Wire->Value, ClientId);
             break;
         }
@@ -424,7 +424,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             EquipDescList List;
             FRpcServerEquipHandle Snapshot;
-            const FRpcRequestEquipmentPacket* Wire = static_cast<const FRpcRequestEquipmentPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestEquipmentPacket* Wire = static_cast<const FRpcRequestEquipmentPacket*>(Packet);
             Wire->ExtractEquipment(&Snapshot);
             if (Snapshot.Records != nullptr)
             {
@@ -460,7 +460,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             EquipDescList List;
             FRpcServerEquipHandle Snapshot;
-            const FRpcRequestCargoPacket* Wire = static_cast<const FRpcRequestCargoPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestCargoPacket* Wire = static_cast<const FRpcRequestCargoPacket*>(Packet);
             Wire->ExtractEquipment(&Snapshot);
             if (Snapshot.Records != nullptr)
             {
@@ -494,45 +494,45 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQADDITEM):
         {
-            const FRpcRequestAddItemPacket* Wire = static_cast<const FRpcRequestAddItemPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestAddItemPacket* Wire = static_cast<const FRpcRequestAddItemPacket*>(Packet);
             Server->ReqAddItem(Wire->ArchId, Wire->Hardpoint, Wire->Count, Wire->Health,
                                Wire->bMounted, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQREMOVEITEM):
         {
-            const FRpcRequestRemoveItemPacket* Wire = static_cast<const FRpcRequestRemoveItemPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestRemoveItemPacket* Wire = static_cast<const FRpcRequestRemoveItemPacket*>(Packet);
             Server->ReqRemoveItem(static_cast<unsigned short>(Wire->EquipId), Wire->Count, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQMODIFYITEM):
         {
-            const FRpcRequestModifyItemPacket* Wire = static_cast<const FRpcRequestModifyItemPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestModifyItemPacket* Wire = static_cast<const FRpcRequestModifyItemPacket*>(Packet);
             Server->ReqModifyItem(static_cast<unsigned short>(Wire->EquipId), Wire->Hardpoint, Wire->Count,
                                   Wire->Health, Wire->bMounted, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQSETCASH):
         {
-            const FRpcRequestSetCashPacket* Wire = static_cast<const FRpcRequestSetCashPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestSetCashPacket* Wire = static_cast<const FRpcRequestSetCashPacket*>(Packet);
             Server->ReqSetCash(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQCHANGECASH):
         {
-            const FRpcRequestChangeCashPacket* Wire = static_cast<const FRpcRequestChangeCashPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestChangeCashPacket* Wire = static_cast<const FRpcRequestChangeCashPacket*>(Packet);
             Server->ReqChangeCash(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_SAVEGAME):
         {
-            const FRpcSaveGamePacket* Wire = static_cast<const FRpcSaveGamePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSaveGamePacket* Wire = static_cast<const FRpcSaveGamePacket*>(Packet);
             Server->SaveGame(Wire->CharacterId, Wire->Description, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_MINEASTEROID):
         {
-            const FRpcMineAsteroidPacket* Wire = static_cast<const FRpcMineAsteroidPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcMineAsteroidPacket* Wire = static_cast<const FRpcMineAsteroidPacket*>(Packet);
             Vector Position;
             std::memcpy(&Position.x, &Wire->Position.x, 4u);
             std::memcpy(&Position.y, &Wire->Position.y, 4u);
@@ -553,7 +553,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_DOCK):
         {
-            const FRpcDockPacket* Wire = static_cast<const FRpcDockPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcDockPacket* Wire = static_cast<const FRpcDockPacket*>(Packet);
             Server->Dock(Wire->Value, ClientId);
             break;
         }
@@ -564,13 +564,13 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_TRADERESPONSE):
         {
-            const FRpcTradeResponsePacket* Wire = static_cast<const FRpcTradeResponsePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcTradeResponsePacket* Wire = static_cast<const FRpcTradeResponsePacket*>(Packet);
             Server->TradeResponse(Wire->Data, static_cast<int>(Wire->DataSize), ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_CARGOSCAN):
         {
-            const FRpcCargoScanPacket* Wire = static_cast<const FRpcCargoScanPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcCargoScanPacket* Wire = static_cast<const FRpcCargoScanPacket*>(Packet);
             Server->SPScanCargo(Wire->Field_0x00, Wire->Field_0x04, ClientId);
             break;
         }
@@ -586,7 +586,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_SETMANEUVER):
         {
-            const FRpcSetManeuverPacket* Wire = static_cast<const FRpcSetManeuverPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcSetManeuverPacket* Wire = static_cast<const FRpcSetManeuverPacket*>(Packet);
             XSetManeuver Info;
             Info.ShipFrom = Wire->ShipFrom;
             Info.ObjectId = Wire->ObjectId;
@@ -601,7 +601,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_REQUEST_EVENT):
         {
-            const FRpcRequestEventPacket* Wire = static_cast<const FRpcRequestEventPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestEventPacket* Wire = static_cast<const FRpcRequestEventPacket*>(Packet);
             const int Tail = static_cast<signed char>(Wire->Field_0x10);
             Server->RequestEvent(static_cast<int>(Wire->EventType), Wire->ShipId, Wire->TargetId, Wire->SecondId,
                                  static_cast<unsigned long>(Tail), ClientId);
@@ -609,7 +609,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQUEST_CANCEL):
         {
-            const FRpcRequestCancelPacket* Wire = static_cast<const FRpcRequestCancelPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestCancelPacket* Wire = static_cast<const FRpcRequestCancelPacket*>(Packet);
             const int Tail = static_cast<signed char>(Wire->Field_0x0c);
             Server->RequestCancel(static_cast<int>(Wire->EventType), Wire->ShipId, Wire->TargetId,
                                   static_cast<unsigned long>(Tail), ClientId);
@@ -617,19 +617,19 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_INTERFACEITEMUSED):
         {
-            const FRpcInterfaceItemUsedPacket* Wire = static_cast<const FRpcInterfaceItemUsedPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcInterfaceItemUsedPacket* Wire = static_cast<const FRpcInterfaceItemUsedPacket*>(Packet);
             Server->InterfaceItemUsed(ClientId, Wire->Value);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQCOLLISIONGROUPS):
         {
-            const FRpcRequestCollisionGroupsPacket* Wire = static_cast<const FRpcRequestCollisionGroupsPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestCollisionGroupsPacket* Wire = static_cast<const FRpcRequestCollisionGroupsPacket*>(Packet);
             Server->ReqCollisionGroups(Wire->Groups, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_COMMCOMPLETE):
         {
-            const FRpcCommCompletePacket* Wire = static_cast<const FRpcCommCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcCommCompletePacket* Wire = static_cast<const FRpcCommCompletePacket*>(Packet);
             Server->CommComplete(Wire->Field_0x00, Wire->Field_0x04, Wire->Field_0x08,
                                  static_cast<CommResult>(Wire->Field_0x0c));
             break;
@@ -639,7 +639,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_CREATENEWCHAR):
         {
-            const FRpcCreateNewCharacterPacket* Wire = static_cast<const FRpcCreateNewCharacterPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcCreateNewCharacterPacket* Wire = static_cast<const FRpcCreateNewCharacterPacket*>(Packet);
             wcscpy(GStaticCreateCharacterInfo.Name, Wire->Name);
             GStaticCreateCharacterInfo.FactionId = Wire->FactionId;
             GStaticCreateCharacterInfo.BaseId = Wire->BaseId;
@@ -650,19 +650,19 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_DESTROYCHAR):
         {
-            const FRpcDestroyCharacterPacket* Wire = static_cast<const FRpcDestroyCharacterPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcDestroyCharacterPacket* Wire = static_cast<const FRpcDestroyCharacterPacket*>(Packet);
             Server->DestroyCharacter(Wire->CharacterId, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQHULLSTATUS):
         {
-            const FRpcRequestHullStatusPacket* Wire = static_cast<const FRpcRequestHullStatusPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestHullStatusPacket* Wire = static_cast<const FRpcRequestHullStatusPacket*>(Packet);
             Server->ReqHullStatus(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_GFGOODVAPORIZED):
         {
-            const FRpcGfGoodVaporizedPacket* Wire = static_cast<const FRpcGfGoodVaporizedPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcGfGoodVaporizedPacket* Wire = static_cast<const FRpcGfGoodVaporizedPacket*>(Packet);
             SGFGoodVaporizedInfo Info;
             Info.Field_0x00 = Wire->Field_0x00;
             Info.Field_0x04 = Wire->Field_0x04;
@@ -672,7 +672,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_BADLANDSOBJCOLLISION):
         {
-            const FRpcBadlandsObjectCollisionPacket* Wire = static_cast<const FRpcBadlandsObjectCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcBadlandsObjectCollisionPacket* Wire = static_cast<const FRpcBadlandsObjectCollisionPacket*>(Packet);
             SSPBadLandsObjCollisionInfo Info;
             Info.BadLandsObjId = Wire->BadLandsObjId;
             Info.ObjectId = Wire->ObjectId;
@@ -682,20 +682,20 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_LAUNCHCOMPLETE):
         {
-            const FRpcLaunchCompletePacket* Wire = static_cast<const FRpcLaunchCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcLaunchCompletePacket* Wire = static_cast<const FRpcLaunchCompletePacket*>(Packet);
             Server->LaunchComplete(Wire->Field_0x00, Wire->Field_0x04);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_HAIL):
         {
-            const FRpcHailPacket* Wire = static_cast<const FRpcHailPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcHailPacket* Wire = static_cast<const FRpcHailPacket*>(Packet);
             Server->Hail(Wire->Field_0x00, Wire->Field_0x04, Wire->Field_0x08);
             break;
         }
         
         case FlPacketOpcode(FLPACKET_CLIENT_REQUEST_USE_ITEM):
         {
-            const FRpcRequestUseItemPacket* Wire = static_cast<const FRpcRequestUseItemPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestUseItemPacket* Wire = static_cast<const FRpcRequestUseItemPacket*>(Packet);
             SSPUseItem Info;
             Info.ObjectId = Wire->ObjectId;
             Info.ItemId = Wire->ItemId;
@@ -705,7 +705,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         }
         case FlPacketOpcode(FLPACKET_CLIENT_ABORT_MISSION):
         {
-            const FRpcAbortMissionPacket* Wire = static_cast<const FRpcAbortMissionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcAbortMissionPacket* Wire = static_cast<const FRpcAbortMissionPacket*>(Packet);
             Server->AbortMission(ClientId, Wire->Value);
             break;
         }
@@ -714,32 +714,32 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         case FlPacketOpcode(FLPACKET_CLIENT_JUMPINCOMPLETE):
         {
-            const FRpcJumpInCompletePacket* Wire = static_cast<const FRpcJumpInCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcJumpInCompletePacket* Wire = static_cast<const FRpcJumpInCompletePacket*>(Packet);
             Server->JumpInComplete(Wire->Field_0x00, Wire->Field_0x04);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQINVINCIBILITY):
         {
-            const FRpcRequestInvincibilityPacket* Wire = static_cast<const FRpcRequestInvincibilityPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestInvincibilityPacket* Wire = static_cast<const FRpcRequestInvincibilityPacket*>(Packet);
             Server->SPRequestInvincibility(Wire->ShipId, Wire->bInvincible,
                                            static_cast<InvincibilityReason>(Wire->Reason), ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_MISSIONSAVEB):
         {
-            const FRpcMissionSaveBPacket* Wire = static_cast<const FRpcMissionSaveBPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcMissionSaveBPacket* Wire = static_cast<const FRpcMissionSaveBPacket*>(Packet);
             Server->MissionSaveB(ClientId, Wire->Value);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_REQDIFFICULTYSCALE):
         {
-            const FRpcRequestDifficultyScalePacket* Wire = static_cast<const FRpcRequestDifficultyScalePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRequestDifficultyScalePacket* Wire = static_cast<const FRpcRequestDifficultyScalePacket*>(Packet);
             Server->ReqDifficultyScale(Wire->Value, ClientId);
             break;
         }
         case FlPacketOpcode(FLPACKET_CLIENT_RTCDONE):
         {
-            const FRpcRtcDonePacket* Wire = static_cast<const FRpcRtcDonePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
+            const FRpcRtcDonePacket* Wire = static_cast<const FRpcRtcDonePacket*>(Packet);
             Server->RTCDone(ClientId, Wire->Value);
             break;
         }
@@ -749,8 +749,8 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
     }
 }
 
-void HandleClientPacket(unsigned int ClientId, CDAPacket* Packet)
+void HandleClientPacket(unsigned int ClientId, FPacketBase* Packet)
 {
     DispatchClientPacket(ClientId, Packet);
-    reinterpret_cast<FPacketBase*>(Packet)->Release();
+    Packet->Release();
 }

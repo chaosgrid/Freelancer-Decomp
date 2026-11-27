@@ -22,6 +22,7 @@
 #include <list>
 
 class UiScroll;
+class WireButtonControl;
 struct FClientMarketGood;
 
 // One reputation entry of the REQUEST_PLAYER_STATS block (IClient slot 94, LAB_0053c3d0): the
@@ -159,7 +160,7 @@ public:
     WinControl* BuyArrow;            // +0x9a4 "BuyArrow"
     WinControl* SellText;            // +0x9a8 "SellText"
     WinControl* SellArrow;           // +0x9ac "SellArrow"
-    WinControl* BuySellTradeButton;  // +0x9b0 "BuySellTradeButton"
+    WireButtonControl* BuySellTradeButton; // +0x9b0 "BuySellTradeButton"
     WinControl* QuantityPrompt;      // +0x9b4 "QuantityPrompt"
     UiScroll* QuantitySlider;        // +0x9b8 "QuantitySlider" (UIScroll)
     WinControl* QuantityText;        // +0x9bc "QuantityText"

@@ -109,7 +109,7 @@ namespace Archetype
     void Launcher::redefine(Root const& Other)
     {
         AttachedEquipment::redefine(Other);
-        Launcher const* Donor = (Launcher const*)&Other;
+        Launcher const* Donor = static_cast<Launcher const*>(&Other);
         if (Donor->PowerUsage != PowerUsage)
             PowerUsage = Donor->PowerUsage;
         if (Donor->MuzzleVelocity != MuzzleVelocity)
@@ -247,7 +247,7 @@ namespace Archetype
                                        : 0;
                 unsigned Growth = (Weapon.HpGunTypesBegin == nullptr || OldSize < 2) ? 1 : OldSize;
                 unsigned NewCount = OldSize + Growth;
-                unsigned* NewBuf = (unsigned*)malloc(NewCount * sizeof(unsigned));
+                unsigned* NewBuf = static_cast<unsigned*>(malloc(NewCount * sizeof(unsigned)));
                 if (Weapon.HpGunTypesBegin != nullptr)
                     memcpy(NewBuf, Weapon.HpGunTypesBegin, OldSize * sizeof(unsigned));
                 NewBuf[OldSize] = Value;
@@ -333,7 +333,7 @@ namespace Archetype
     void Gun::redefine(Root const& Other)
     {
         Launcher::redefine(Other);
-        Gun const* Donor = (Gun const*)&Other;
+        Gun const* Donor = static_cast<Gun const*>(&Other);
         if (Donor->DispersionAngle != DispersionAngle)
             DispersionAngle = Donor->DispersionAngle;
         if (Donor->TurnRate != TurnRate)
@@ -352,7 +352,7 @@ namespace Archetype
         // ArchDB::Get inlined. A miss reads +0xa8 through null in retail (a deterministic
         // fault); reproduced, no null test.
         Equipment* Found = GEquipmentDb.Get(ProjectileArchetype.Id);
-        return (HpAttachmentType)((Munition*)Found)->HpType;
+        return (HpAttachmentType)(static_cast<Munition*>(Found))->HpType;
     }
 
     HpAttachmentType Gun::get_hp_type_by_index(int Index) const
@@ -429,7 +429,7 @@ namespace Archetype
     void CounterMeasureDropper::redefine(Root const& Other)
     {
         Launcher::redefine(Other);
-        CounterMeasureDropper const* Donor = (CounterMeasureDropper const*)&Other;
+        CounterMeasureDropper const* Donor = static_cast<CounterMeasureDropper const*>(&Other);
         if (Donor->AiRangeSq != AiRangeSq)
             AiRangeSq = Donor->AiRangeSq;
     }
@@ -492,7 +492,7 @@ namespace Archetype
     void Projectile::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Projectile const* Donor = (Projectile const*)&Other;
+        Projectile const* Donor = static_cast<Projectile const*>(&Other);
         if (Donor->Lifetime != Lifetime)
             Lifetime = Donor->Lifetime;
         if (Donor->OwnerSafeTime != OwnerSafeTime)
@@ -697,7 +697,7 @@ namespace Archetype
     void Munition::redefine(Root const& Other)
     {
         Projectile::redefine(Other);
-        Munition const* Donor = (Munition const*)&Other;
+        Munition const* Donor = static_cast<Munition const*>(&Other);
         if (Donor->HullDamage != HullDamage)
             HullDamage = Donor->HullDamage;
         if (Donor->EnergyDamage != EnergyDamage)
@@ -801,7 +801,7 @@ namespace Archetype
     void Mine::redefine(Root const& Other)
     {
         Projectile::redefine(Other);
-        Mine const* Donor = (Mine const*)&Other;
+        Mine const* Donor = static_cast<Mine const*>(&Other);
         if (Donor->LinearDrag != LinearDrag)
             LinearDrag = Donor->LinearDrag;
         if (Donor->DetonationDist != DetonationDist)
@@ -875,7 +875,7 @@ namespace Archetype
     void CounterMeasure::redefine(Root const& Other)
     {
         Projectile::redefine(Other);
-        CounterMeasure const* Donor = (CounterMeasure const*)&Other;
+        CounterMeasure const* Donor = static_cast<CounterMeasure const*>(&Other);
         if (Donor->LinearDrag != LinearDrag)
             LinearDrag = Donor->LinearDrag;
         if (Donor->Range != Range)
@@ -923,7 +923,7 @@ namespace Archetype
             return CachedMunitionRange;
         }
 
-        Munition* Muni = (Munition*)Found;
+        Munition* Muni = static_cast<Munition*>(Found);
         if (Muni->Motor.IsEmpty())
         {
             CachedMunitionRange = Muni->Lifetime * MuzzleVelocity;

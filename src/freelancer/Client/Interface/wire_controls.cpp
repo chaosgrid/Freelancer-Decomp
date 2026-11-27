@@ -596,7 +596,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         {
             ID_String SoundId;
             SoundId.Id = CreateID(SoundName.c_str());
-            void* const Arch = LookupClientSoundArch(&SoundId); // FUN_0042ae40
+            Archetype::ISound* const Arch = LookupClientSoundArch(&SoundId); // FUN_0042ae40
             PlayClientSoundArchIfIdle(Arch, nullptr, nullptr);          // FUN_004285f0
         }
 

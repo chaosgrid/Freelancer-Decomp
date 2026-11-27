@@ -17,13 +17,15 @@
 
 #include "math3d.h"
 
+struct ICamera;
+
 // FUN_004215b0 — write identity 3×3 into *Out (nine floats, no translation).
 void Win3DIdentityRotation3x3(Matrix* Out);
 
 // FUN_00422690 — GWin3DModelview = ObjectOrNull ? view(vt+0x40) * Xform : Xform;
 // pipeline state 7 set -> SetModelview, else SetView(view or identity) + SetWorld(Xform).
 // ObjectOrNull is a camera (TexturePanelsDrawPiece) or null (DrawClouds, the UI tables).
-void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform);
+void Win3DBindModelview(ICamera* ObjectOrNull, Transform const* Xform);
 
 struct FTexShape;
 
@@ -150,6 +152,7 @@ static_assert(offsetof(FStarFxChild40, Shape) == 0x34, "child shape +0x34");
 
 
 struct IObjInspect;
+struct FSpaceCamera;
 struct FStarSphere;
 
 // StarEffects::Star — seven thiscall virtual methods.
@@ -159,10 +162,10 @@ struct FStarSphere
     virtual ~FStarSphere();                     // +0x00 FUN_00510ef0 / FUN_00510f10
     virtual int Load(char const* IniPath, char const* Nickname); // +0x04
     virtual void UpdateIntensity(float Dt);                     // +0x08
-    virtual void DrawSimple(void* Camera);                      // +0x0c
-    virtual void Draw(void* Camera, float Dt);                   // +0x10
-    virtual void DrawFlare(void* Camera, float Dt);              // +0x14
-    virtual void DrawBillboard(void* Camera, float A, float B);   // +0x18
+    virtual void DrawSimple(FSpaceCamera* Camera);                      // +0x0c
+    virtual void Draw(FSpaceCamera* Camera, float Dt);                   // +0x10
+    virtual void DrawFlare(FSpaceCamera* Camera, float Dt);              // +0x14
+    virtual void DrawBillboard(FSpaceCamera* Camera, float A, float B);   // +0x18
 
     IObjInspect* Owner;              // +0x04 borrowed solar IObjRW primary base
     float Radius;                    // +0x08  default 1000

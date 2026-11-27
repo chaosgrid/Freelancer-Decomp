@@ -338,17 +338,17 @@ bool SpaceSendCommand(FSpaceCommand* Command)
         return false;
 
     // DAT_00679738 is re-read before every use, as retail does.
-    FSpaceCamera* Camera = GetActiveSpaceCamera();
+    FGameCamera* Camera = GetActiveSpaceCamera();
     if (Camera != nullptr)
     {
         // Slot 0x70; the result is ignored, but a record whose id it cleared to 0 is consumed.
-        ((FGameCamera*)Camera)->HandleCommand70(Command);
+        Camera->HandleCommand70(Command);
         if (Command->Id == 0)
             return true;
 
         // Slot 0x74; non-zero consumes the record.
         Camera = GetActiveSpaceCamera();
-        if (((FGameCamera*)Camera)->HandleCommand74(Command) != 0)
+        if (Camera->HandleCommand74(Command) != 0)
             return true;
 
         Camera = GetActiveSpaceCamera();
@@ -363,7 +363,7 @@ bool SpaceSendCommand(FSpaceCommand* Command)
     // ignored. FSpaceCommand here is FCliEquipFirePacket on the object side.
     if (Camera != nullptr)
     {
-        FGameCamera* const GameCamera = reinterpret_cast<FGameCamera*>(Camera);
+        FGameCamera* const GameCamera = Camera;
         unsigned char* const Held = const_cast<unsigned char*>(
             reinterpret_cast<unsigned char const*>(GameCamera->Watched.target()));
         if (Held != nullptr)

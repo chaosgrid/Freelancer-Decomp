@@ -269,7 +269,7 @@ void __cdecl Add(VChannel* Chan)
     Entry->Channel = Chan;
 
     // Retail calls GetId() three times and does not test Engine or the user data.
-    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData(Chan->GetId());
+    CObject* const InstObj = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Chan->GetId()));
     Entry->Sub.Root = GetRoot(InstObj);
 
     if (InstObj->EngineInstanceId == Chan->GetId())
@@ -300,7 +300,7 @@ void __cdecl Rem(VChannel const* Chan)
 // std::vector; always returns 1 so enumeration continues.
 static unsigned char __cdecl CollectChannel(void* Channel, void* Context)
 {
-    ((std::vector<void*>*)Context)->push_back(Channel);
+    static_cast<std::vector<void*>*>(Context)->push_back(Channel);
     return 1;
 }
 
@@ -328,7 +328,7 @@ COMMON_API void __cdecl Add(int PlaybackId)
         DALib::Channel->GetHeader(Header, (unsigned long)*ChanIt);   // IChannel slot 16
         if (Header[0] != 0)
             continue;
-        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData(Header[3]);
+        CObject* const Inst = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Header[3]));
         LastInstance = Inst;
         if (Inst->EngineInstanceId == (int)Header[3])   // no null test
         {
@@ -383,7 +383,7 @@ static void CollectInstanceChildren(CObject* Obj, long InstanceId, std::vector<C
                                                                    InvalidInstanceIndex);
     while (Child != -1)
     {
-        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData(Child);
+        CObject* const ChildObj = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Child));
         if (ChildObj != nullptr && ChildObj != Obj)
         {
             InsertUnique(Objs, ChildObj);
@@ -471,7 +471,7 @@ void __cdecl Update(float Dt)
             // position, IVP-ordered orientation and one PhySys time; the controller's own tick
             // does the blending. Setters FUN_06343580 then FUN_06343670.
             FLControllerGolem* const Golem =
-                (FLControllerGolem*)GetGolemController(Obj);  // CObject+0x60
+                reinterpret_cast<FLControllerGolem*>(GetGolemController(Obj));  // CObject+0x60
             if (Golem != nullptr)
             {
                 IVP_Time const Now = PhySys::GetCurrentTime(Obj->PhysicsSystemId);

@@ -43,7 +43,7 @@ FaceIdea::FaceIdea()
     // Retail calls FUN_062e5ba0(this->Object, 1.0f) here while Object is still
     // null, so the result is 0.0f. SetThrottleScale() stores raw/derived the other
     // way round (raw in +0x90, derived in +0x94); that asymmetry is retail's.
-    , Field90(Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(Object), 1.0f))   // FUN_062e5ba0
+    , Field90(Behavior_GetProjectedAxisThrottleXY(Object, 1.0f))   // FUN_062e5ba0
     , TurnThrottle(1.0f)
     , AngleWeight98(BitsToFloat(0x3f1c28f6u))
     , AngleWeight9c(BitsToFloat(0x3e490fdbu))
@@ -60,12 +60,12 @@ FaceIdea::FaceIdea()
 
 // Own vtable slot 0 override -- LAB_062d6820, RET 0xc. Retail inlines the BaseIdea
 // body.
-bool FaceIdea::SetContext(void* InObject, void* InHandle, void* InContext)
+bool FaceIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext)
 {
     if (!BaseIdea::SetContext(InObject, InHandle, InContext))
         return false;
 
-    IObjInspect const* const Obj = ObjInspectOf(Object);
+    IObjInspect const* const Obj = Object;
 
     float const Rate = Behavior_GetAngularSpeedXY(Obj, 1.0f, 0.0f);   // FUN_062e5b20
 
@@ -142,7 +142,7 @@ void FaceIdea::SetAxis(Vector const& Axis)
 void FaceIdea::SetThrottleScale(float Value)
 {
     Field90 = Value;
-    TurnThrottle = Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(Object), Value);   // FUN_062e5ba0
+    TurnThrottle = Behavior_GetProjectedAxisThrottleXY(Object, Value);   // FUN_062e5ba0
 }
 
 // FUN_062d7640. Retail's three compares against DAT_06399408 (0.0f) are equality
@@ -200,7 +200,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         return 3;
 
     SystemManager* const Sys = Handle;
-    IBehaviorManager* const Manager = static_cast<IBehaviorManager*>(Context);
+    IBehaviorManager* const Manager = Context;
     PathfindManager* const Pathfind = Manager->Pathfind;
 
     // Every consumer re-reads the cached position after its own refresh; there is
@@ -428,7 +428,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
     // Step 3: FUN_062e2c70 (LimitAxisThrottleForTurn). With a watched target moving
     // faster than 1.0 (DAT_06399410, double), TurnAngle = lead angle and
     // ReferenceAngle = 0.35f; otherwise 0.0f and this->0x98.
-    IObjInspect const* const BoundObject = static_cast<IObjInspect const*>(Object);
+    IObjInspect const* const BoundObject = Object;
     IObjRW* const LeadNode = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
 
     Vector LimitedSteer{ 0.0f, 0.0f, 0.0f };

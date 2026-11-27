@@ -71,7 +71,7 @@ namespace
         IObjRW* __thiscall GetNext(void* IterStateRaw) override;
         IObjRW* __thiscall FindById(unsigned const* ObjectId) override;
         Universe::ISystem* __thiscall GetZoneDb() override;
-        void* __thiscall GetBucket(unsigned TypeMask) override;
+        ISpatialPartition* __thiscall GetBucket(unsigned TypeMask) override;
     };
 
     unsigned TotalCount(FIObjDB const* Db)
@@ -223,7 +223,7 @@ namespace
         return const_cast<Universe::ISystem*>(StarSysGetSystem());
     }
 
-    void* __thiscall FIObjDB::GetBucket(unsigned TypeMask)
+    ISpatialPartition* __thiscall FIObjDB::GetBucket(unsigned TypeMask)
     {
         // LAB_005422d0: (TypeMask & 0xfdff) ? DAT_00678ae0 : nullptr. The partition is only
         // created by FUN_00540eb0 (ClientObjDb_RebuildSpatial) at the end of a system load.
@@ -466,7 +466,7 @@ void ClientObjDb_UpdateAll(float Dt)
     if (Spatial != nullptr)
     {
         // A sphere around the listener camera (FUN_0040f130).
-        ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());
+        ICamera* const Camera = GetClientSoundListenerObject();
         const Vector* const CameraPos = Camera->GetPosition();
         Geometry::Sphere Query;
         Query.Center.x = CameraPos->x;
@@ -674,16 +674,6 @@ namespace
     // reader is that increment.
     int GClientCollisionEventCount = 0;
 
-    // The 0x24-byte record FUN_0052fc20 builds for slot 101's first argument (the vectors
-    // negated for side A).
-    struct FClientCollisionRecord
-    {
-        Vector Point;      // +0x00  event +0x10
-        Vector SurfaceNormal; // +0x0c  event +0x1c
-        Vector RelativeVelocity; // +0x18  event +0x28
-    };
-    static_assert(sizeof(FClientCollisionRecord) == 0x24, "collision record 0x24");
-
     // FUN_0052fe60: one side of a PhySys collision -> the Gameobj of the part's root
     // (FUN_005419a0) and the sub-object it was hit on.
     void ResolveCollisionSide(CObject* Part, unsigned PartId, FClientGameobj** OutGo,
@@ -847,8 +837,8 @@ void ClientObjDb_UpdateRemotePhysics(float Dt)
         Info.Pad_0x2d[0] = 0;
         Info.Pad_0x2d[1] = 0;
         Info.Pad_0x2d[2] = 0;
-        static_cast<IServer*>(GetLocalServerInterface())->SPObjUpdate(Info,
-                                                                       GetPlayerConnectionId());
+        GetLocalServerInterface()->SPObjUpdate(Info,
+                                               GetPlayerConnectionId());
 
         // The Timestamp is re-read from the info.
         Block->Simulation.RemoteUpdate(Ship->WorldPosition, Orientation, Info.Timestamp);

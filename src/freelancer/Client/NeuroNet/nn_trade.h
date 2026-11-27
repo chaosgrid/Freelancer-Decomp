@@ -37,6 +37,7 @@
 #include <stdint.h>
 
 class CShip;
+class NnStaticControl;
 class NnTextControl;
 class RichTextWin;
 class ScrollControl;
@@ -136,7 +137,7 @@ public:
     unsigned Field3ac;                 // +0x3ac ctor 0; no other access. TODO: meaning
     unsigned Field3b0;                 // +0x3b0 ctor 0; no other access. TODO: meaning
     WinControl* PlayerCargoText;       // +0x3b4 "PlayerCargoText"
-    WinControl* PlayerCargoFull;       // +0x3b8 "PlayerCargoBarFull" -- TRADE_cargofull
+    NnStaticControl* PlayerCargoFull;  // +0x3b8 "PlayerCargoBarFull" -- TRADE_cargofull
     WinControl* PlayerCargoEmpty;      // +0x3bc second "PlayerCargoBarFull" -- TRADE_cargoempty
     double PlayerCargoUsed;            // +0x3c0
     int PlayerNanobots;                // +0x3c8
@@ -144,7 +145,7 @@ public:
     int PlayerBatteries;               // +0x3d0
     int PlayerBatteryLimit;            // +0x3d4 (-1 -> 50000000)
     WinControl* TargetCargoText;       // +0x3d8 "TargetCargoText"
-    WinControl* TargetCargoFull;       // +0x3dc "TargetCargoBarFull" -- TRADE_cargofull
+    NnStaticControl* TargetCargoFull;  // +0x3dc "TargetCargoBarFull" -- TRADE_cargofull
     WinControl* TargetCargoEmpty;      // +0x3e0 second "TargetCargoBarFull" -- TRADE_cargoempty
     unsigned Field3e4;                 // +0x3e4 never accessed in 004bfb60..004c3908 (the gap before the double). TODO: meaning
     double TargetCargoUsed;            // +0x3e8

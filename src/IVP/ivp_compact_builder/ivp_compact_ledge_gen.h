@@ -37,7 +37,7 @@ public:
     int32_t prepare_compact_ledge(IVP_U_Vector<IVP_Triangle>* Triangles);
     // 0637a6a0 (thiscall, RET 4): writes header, triangles and points into
     // Buffer (prepare_compact_ledge's size, 16-byte aligned).
-    void generate_compact_ledge(void* Buffer);
+    void generate_compact_ledge(IVP_Compact_Ledge* Buffer);
 
     FPolygonPointHash* point_hash;                   // +0x00 vtable 063a5918
     IVP_U_Vector<IVP_Poly_Point> points;             // +0x04

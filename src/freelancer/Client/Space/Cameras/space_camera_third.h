@@ -43,7 +43,7 @@ enum EThirdPersonCameraSlot
 struct FThirdPersonCamera : FHudCamera
 {
     char const* GetName() override;
-    void Attach(void* Object) override;
+    void Attach(IObjRW* Object) override;
     bool Activate(int const* ViewRect4) override;
     void Deactivate() override;
     void Update(float DeltaSeconds) override;

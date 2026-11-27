@@ -199,12 +199,12 @@ static_assert(sizeof(FVmeshGroup) == 0x28, "VMesh group 0x28");
 // FDUMP(Flags, "%s(%d) : <severity>:General:%s", File, Line, Message) exactly as retail pushes it.
 void RendCompFdumpAt(int Flags, const char* File, int Line, const char* Message);
 
-int FileOpenNode(void* File, const char* Name);
-int FileClose(void* File, int Handle);
-int FileRead(void* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut);
-unsigned long FileGetSize(void* File, int Handle);
-int FileGetCurrentPath(void* File, char* Out, unsigned long MaxChars);
-int FileOpenByName(void* File, const char* ChildName);
+int FileOpenNode(IFileSystem* File, const char* Name);
+int FileClose(IFileSystem* File, int Handle);
+int FileRead(IFileSystem* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut);
+unsigned long FileGetSize(IFileSystem* File, int Handle);
+int FileGetCurrentPath(IFileSystem* File, char* Out, unsigned long MaxChars);
+int FileOpenByName(IFileSystem* File, const char* ChildName);
 
 void* QueryIid(IDAComponent* Object, const char* Iid);
 void ReleaseIf(IDAComponent* Object);

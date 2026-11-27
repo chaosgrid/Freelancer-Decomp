@@ -254,7 +254,7 @@ class FNpcShipEventList
 public:
     // FUN_06f683e0: SpaceSupport messages 0x3e (timer), 0x39 (object destroyed), 0xb (comm
     // line finished).
-    void HandleMessage(pub::Controller::EMessage MsgId, void const* Parms);
+    void HandleMessage(pub::Controller::EMessage MsgId, unsigned int const* Words);
     // FUN_06f68570.
     void SetCommLine(FContentNpcShip* Ship, unsigned int CommLineId);
     // FUN_06f68600.

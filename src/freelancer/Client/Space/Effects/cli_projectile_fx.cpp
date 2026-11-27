@@ -118,17 +118,6 @@ namespace
         return sqrtf(Vel.x * Vel.x + Vel.y * Vel.y + Vel.z * Vel.z);
     }
 
-    // Effect-list node: next/prev + FUN_004fd480 payload (4 dwords = slots +0xC0..+0xCC).
-    struct FEffectListNode
-    {
-        FEffectListNode* Next; // +0x00
-        FEffectListNode* Prev; // +0x04
-        void* EffectArch;      // +0x08
-        void* Sound;           // +0x0C  ISoundSource*
-        FEffectBase* Effect;   // +0x10
-        void* Light;           // +0x14  FGameLight*
-    };
-    static_assert(sizeof(FEffectListNode) == 0x18, "effect list node 0x18");
 }
 
 void FBeamEffect::SetProgressFromSpeed(float Speed)
@@ -152,16 +141,15 @@ void FBeamEffect::SetHitFlags(bool bHit, bool bHitPlayer)
     Flags70 = Flags;
 }
 
-void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle,
+void CliEffectCompanionInit(FEffectCompanion* Companion, FEffectArch* Arch, FEffectBase* Particle,
                             ISoundSource* Sound, FGameLight* Light)
 {
     // FUN_005154a0: +0x00 = Arch, +0x04 = Sound (third argument), +0x08 = Particle (second),
     // +0x0c = Light; then AddRef each non-null one.
-    void** const Slots = static_cast<void**>(Companion16);
-    Slots[1] = Sound;
-    Slots[0] = Arch;
-    Slots[2] = Particle;
-    Slots[3] = Light;
+    Companion->Sound = Sound;
+    Companion->EffectArch = Arch;
+    Companion->Effect = Particle;
+    Companion->Light = Light;
     if (Particle != nullptr)
         Particle->AddRef();
     if (Sound != nullptr)
@@ -170,15 +158,15 @@ void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle
         Light->AddRef();
 }
 
-void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots)
+void CliEffectListCopyPayload(FEffectCompanion* DstSlots, FEffectCompanion const* SrcSlots)
 {
     // FUN_004fd480: the companion copy constructor run as a placement new. Only the destination
     // is tested (the placement-new null test); the source is read unconditionally.
     if (DstSlots == nullptr)
         return;
 
-    void** Dst = static_cast<void**>(DstSlots);
-    void* const* Src = static_cast<void* const*>(SrcSlots);
+    void** Dst = reinterpret_cast<void**>(DstSlots);
+    void* const* Src = reinterpret_cast<void* const*>(SrcSlots);
     Dst[0] = Src[0];
     Dst[1] = Src[1];
     Dst[2] = Src[2];
@@ -206,14 +194,13 @@ void FGameLight::SetFreeMotionOffset(float const* Offset3)
     VelocityZ = Offset3[2];
 }
 
-void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
+void CliEffectListInsert(FGameobjEffectListStorage* List, void const* Payload)
 {
     // FUN_004fcea0, on the list base (+0 allocator byte, +4 head, +8 count). No null tests: the
     // owner's constructor allocates the head (FGameobjEffectListStorage).
-    unsigned char* ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    int& CountRef = List->Count;
 
-    FEffectListNode* Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
+    FEffectListNode* Head = List->Head;
     FEffectListNode* OldPrev = Head->Prev;
     FEffectListNode* Node =
         static_cast<FEffectListNode*>(::operator new(sizeof(FEffectListNode)));
@@ -224,48 +211,46 @@ void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
     Head->Prev = Node;
     Node->Prev->Next = Node;
 
-    CliEffectListCopyPayload(&Node->EffectArch, Payload16);
+    CliEffectListCopyPayload(&Node->Companion, static_cast<FEffectCompanion const*>(Payload));
     CountRef = CountRef + 1;
 }
 
-void CliEffectCompanionClear(void* Companion16)
+void CliEffectCompanionClear(FEffectCompanion* Companion)
 {
     // FUN_00502d90. No test of the companion pointer; every caller passes an embedded member.
-    void** const Slots = static_cast<void**>(Companion16);
-    if (Slots[2] != nullptr)
+    if (Companion->Effect != nullptr)
     {
-        static_cast<FEffectBase*>(Slots[2])->Release();
-        Slots[2] = nullptr;
+        Companion->Effect->Release();
+        Companion->Effect = nullptr;
     }
-    if (Slots[1] != nullptr)
+    if (Companion->Sound != nullptr)
     {
-        ISoundSource* const Sound = static_cast<ISoundSource*>(Slots[1]);
+        ISoundSource* const Sound = Companion->Sound;
         Sound->Release();
-        Slots[1] = nullptr;
+        Companion->Sound = nullptr;
     }
-    if (Slots[3] != nullptr)
+    if (Companion->Light != nullptr)
     {
-        static_cast<FGameLight*>(Slots[3])->Release();
-        Slots[3] = nullptr;
+        Companion->Light->Release();
+        Companion->Light = nullptr;
     }
-    Slots[0] = nullptr;
+    Companion->EffectArch = nullptr;
 }
 
-void CliEffectCompanionArmStop(void* Companion16)
+void CliEffectCompanionArmStop(FEffectCompanion* Companion)
 {
     // Prelude shared by FUN_004fcef0 / FUN_005139d0 / FUN_005137c0 before clear; the
     // JumpShipEffect dtor FUN_00503a80 inlines it three times. No copy tests the companion
     // pointer itself.
-    void** const Slots = static_cast<void**>(Companion16);
     // The effect's own slot 1 (dispatched): the slot holds a particle, a beam or a
     // CliEquipLight, whose slot 1 is FUN_004f7bd0 (FEffectBase::Kill).
-    if (Slots[2] != nullptr)
+    if (Companion->Effect != nullptr)
     {
-        ((FEffectBase*)Slots[2])->Kill();
+        Companion->Effect->Kill();
     }
-    if (Slots[1] != nullptr)
+    if (Companion->Sound != nullptr)
     {
-        ISoundSource* const Sound = static_cast<ISoundSource*>(Slots[1]);
+        ISoundSource* const Sound = Companion->Sound;
         float Ident[12];
         Ident[0] = 1.0f;
         Ident[1] = 0.0f;
@@ -279,66 +264,63 @@ void CliEffectCompanionArmStop(void* Companion16)
         Ident[9] = 0.0f;
         Ident[10] = 0.0f;
         Ident[11] = 0.0f;
-        Sound->SetPose(-1, (const Transform*)Ident);
-        ((ISoundSource*)Slots[1])->Stop();
+        Sound->SetPose(-1, reinterpret_cast<const Transform*>(Ident));
+        Companion->Sound->Stop();
     }
     // FUN_005379b0, then the light's own vtable slot 2 -- FUN_005376f0 on a GameLight and on the
     // CliEquipLight table PTR_FUN_005da424 alike, but dispatched.
-    if (Slots[3] != nullptr)
+    if (Companion->Light != nullptr)
     {
-        FGameLight* const Light = static_cast<FGameLight*>(Slots[3]);
+        FGameLight* const Light = Companion->Light;
         Light->AnimDetach();
-        GameLightVirtualDisable((FGameLight*)Slots[3]);
+        GameLightVirtualDisable(Companion->Light);
     }
 }
 
-unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
+unsigned char CliEffectListRemove(FGameobjEffectListStorage* List, FEffectCompanion* Payload)
 {
     // FUN_004fcef0 (list base, companion). No test of the list, its head or the companion. The
     // node is not unlinked.
-    unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
+    FEffectListNode* const Head = List->Head;
 
-    void** const Want = static_cast<void**>(Payload16);
     for (FEffectListNode* Cursor = Head->Next; Cursor != Head; Cursor = Cursor->Next)
     {
-        if (Cursor->Effect != Want[2] || Cursor->Sound != Want[1] ||
-            Cursor->Light != Want[3])
+        if (Cursor->Companion.Effect != Payload->Effect || Cursor->Companion.Sound != Payload->Sound ||
+            Cursor->Companion.Light != Payload->Light)
             continue;
 
         // Clear node-owned copies first.
-        void* NodeSlots[4] = {Cursor->EffectArch, Cursor->Sound, Cursor->Effect,
-                              Cursor->Light};
-        if (NodeSlots[2] != nullptr)
+        FEffectCompanion NodeSlots = {Cursor->Companion.EffectArch, Cursor->Companion.Sound,
+                                      Cursor->Companion.Effect, Cursor->Companion.Light};
+        if (NodeSlots.Effect != nullptr)
         {
-            static_cast<FEffectBase*>(NodeSlots[2])->Release();
-            Cursor->Effect = nullptr;
+            NodeSlots.Effect->Release();
+            Cursor->Companion.Effect = nullptr;
         }
-        if (NodeSlots[1] != nullptr)
+        if (NodeSlots.Sound != nullptr)
         {
-            static_cast<ISoundSource*>(NodeSlots[1])->Release();
-            Cursor->Sound = nullptr;
+            NodeSlots.Sound->Release();
+            Cursor->Companion.Sound = nullptr;
         }
-        if (NodeSlots[3] != nullptr)
+        if (NodeSlots.Light != nullptr)
         {
-            static_cast<FGameLight*>(NodeSlots[3])->Release();
-            Cursor->Light = nullptr;
+            NodeSlots.Light->Release();
+            Cursor->Companion.Light = nullptr;
         }
-        Cursor->EffectArch = nullptr;
+        Cursor->Companion.EffectArch = nullptr;
 
-        CliEffectCompanionArmStop(Payload16);
-        CliEffectCompanionClear(Payload16);
+        CliEffectCompanionArmStop(Payload);
+        CliEffectCompanionClear(Payload);
         return 1;
     }
     return 0;
 }
 
-void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
+void CliEffectListClear(FGameobjEffectListStorage* List, void* ArchFilter)
 {
     // FUN_004fd0d0. No null tests: the owner's ctor allocates the head.
-    unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    FEffectListNode* const Head = List->Head;
+    int& CountRef = List->Count;
 
     // Pass 1. With a filter, a node whose slot 0 is null or does not hold the filter in its
     // first dword is skipped. Every other node is stopped and released (both sequences inlined
@@ -347,11 +329,12 @@ void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
     {
         if (ArchFilter != nullptr)
         {
-            if (Node->EffectArch == nullptr || *static_cast<void**>(Node->EffectArch) != ArchFilter)
+            if (Node->Companion.EffectArch == nullptr ||
+                *reinterpret_cast<void* const*>(Node->Companion.EffectArch) != ArchFilter)
                 continue;
         }
-        CliEffectCompanionArmStop(&Node->EffectArch);
-        CliEffectCompanionClear(&Node->EffectArch);
+        CliEffectCompanionArmStop(&Node->Companion);
+        CliEffectCompanionClear(&Node->Companion);
     }
 
     // Pass 2: erase every node, filtered or not (the clear is a no-op for those pass 1 cleared).
@@ -361,7 +344,7 @@ void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
         FEffectListNode* const Next = Node->Next;
         Node->Prev->Next = Node->Next;
         Node->Next->Prev = Node->Prev;
-        CliEffectCompanionClear(&Node->EffectArch);
+        CliEffectCompanionClear(&Node->Companion);
         ::operator delete(Node);
         CountRef = CountRef - 1;
         Node = Next;
@@ -372,10 +355,10 @@ namespace
 {
     // FUN_004fd420: a new 0x18 node linked in before Where, the payload copied in with its
     // references taken, ++count. A node with a null Prev links to itself.
-    FEffectListNode* EffectListInsertBefore(void* ListBase, FEffectListNode* Where,
-                                            void const* Payload16)
+    FEffectListNode* EffectListInsertBefore(FGameobjEffectListStorage* List, FEffectListNode* Where,
+                                            FEffectCompanion const* Payload)
     {
-        int& CountRef = *reinterpret_cast<int*>(static_cast<unsigned char*>(ListBase) + 8);
+        int& CountRef = List->Count;
         FEffectListNode* const Node =
             static_cast<FEffectListNode*>(::operator new(sizeof(FEffectListNode)));
         Node->Next = Where;
@@ -385,7 +368,7 @@ namespace
         Node->Prev = Prev;
         Where->Prev = Node;
         Node->Prev->Next = Node;
-        CliEffectListCopyPayload(&Node->EffectArch, Payload16);
+        CliEffectListCopyPayload(&Node->Companion, Payload);
         CountRef = CountRef + 1;
         return Node;
     }
@@ -402,23 +385,22 @@ namespace
     }
 }
 
-void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameobj* NewOwner)
+void CliEffectListDetachPart(FGameobjEffectListStorage* List, long PartIndex, FClientGameobj* NewOwner)
 {
     // FUN_004fd230 (on the list). Every effect node attached to PartIndex or
     // one of its descendants leaves this list: with NewOwner, one that is still alive moves to
     // the end of NewOwner's list; everything else is stopped and released.
-    unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const* const HeadSlot = reinterpret_cast<FEffectListNode**>(ListBase + 4);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    FEffectListNode* const* const HeadSlot = &List->Head;
+    int& CountRef = List->Count;
 
     FEffectListNode* Next = (*HeadSlot)->Next;
     while (Next != *HeadSlot)
     {
         FEffectListNode* const Node = Next;
         Next = Node->Next;
-        void** const Companion = reinterpret_cast<void**>(&Node->EffectArch);
-        FEffectBase* const Particle = static_cast<FEffectBase*>(Companion[2]);
-        ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
+        FEffectCompanion* const Companion = &Node->Companion;
+        FEffectBase* const Particle = Companion->Effect;
+        ISoundSource* const Sound = Companion->Sound;
 
         // The node's engine instance: the particle's (+0x40), else the sound's attach handle
         // (slot 39), else, for a light-only node, the dword at absolute address 0x40 (retail
@@ -428,7 +410,7 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
             InstIndex = Particle->EngineIndex;
         else if (Sound != nullptr)
             InstIndex = Sound->GetAttachHandle();
-        else if (Companion[3] != nullptr)
+        else if (Companion->Light != nullptr)
             InstIndex = *reinterpret_cast<long volatile*>(static_cast<uintptr_t>(0x40));
         else
             continue;
@@ -448,16 +430,14 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
                 bAlive = true;
             else if (Sound != nullptr && Sound->IsActive() != 0)
                 bAlive = true;
-            else if (Companion[3] != nullptr &&
-                     static_cast<FGameLight*>(Companion[3])->Anim.Keys == nullptr)
+            else if (Companion->Light != nullptr &&
+                     Companion->Light->Anim.Keys == nullptr)
                 bAlive = true;
 
             if (bAlive)
             {
                 // At the end of NewOwner's list, then the particle's owner watcher.
-                EffectListInsertBefore(&NewOwner->EffectList,
-                                       static_cast<FEffectListNode*>(NewOwner->EffectList.Head),
-                                       Companion);
+                EffectListInsertBefore(&NewOwner->EffectList, NewOwner->EffectList.Head, Companion);
                 if (Particle != nullptr)
                     ParticleEffectSetOwner(Particle, NewOwner);
                 bMoved = true;
@@ -479,11 +459,11 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
     }
 }
 
-void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform const* LocalXform)
+void CliExplosionAttachLocalXform(FGameLight* ExplosionFx, int EngineIndex, Transform const* LocalXform)
 {
     // FUN_005377c0 (on the game light). No null test inside: all eight retail call sites test
     // the light first.
-    unsigned char* const Base = static_cast<unsigned char*>(ExplosionFx);
+    unsigned char* const Base = reinterpret_cast<unsigned char*>(ExplosionFx);
 
     // +0xec = the engine index, +0xf0 = the local transform.
     *reinterpret_cast<int*>(Base + 0xec) = EngineIndex;
@@ -502,7 +482,7 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform 
 
     // Copied to a second local first, as retail does (FUN_00410fe0).
     Transform const Copy = World;
-    EngineLightSetTransform(static_cast<FEngineLight*>(ExplosionFx), &Copy.Rotation.E[0][0],
+    EngineLightSetTransform(ExplosionFx, &Copy.Rotation.E[0][0],
                             &Copy.Translation);
 
     // The free-motion velocity +0x120..+0x128 = 0.
@@ -564,25 +544,25 @@ void FClientBeamGameobj::ActivateEffects(Vector const* LookDir, unsigned char bU
                 // Flags70 bit 3 = bUseLookDir; no null test on the allocation.
                 Beam->Flags70 = static_cast<unsigned char>(
                     (((bUseLookDir << 3) ^ Beam->Flags70) & kBeamFlagUseLookDir) ^ Beam->Flags70);
-                this->Companion[2] = BeamAlloc;
+                this->Companion.Effect = BeamAlloc;
                 BeamAlloc->AddRef();
             }
 
             int const EngineIndex = static_cast<int>(get_index());
-            FBeamEffect* const LiveBeam = static_cast<FBeamEffect*>(this->Companion[2]);
+            FBeamEffect* const LiveBeam = static_cast<FBeamEffect*>(this->Companion.Effect);
             if (LiveBeam != nullptr)
                 LiveBeam->Attach(this, EngineIndex, &LocalXform);
-            ISoundSource* const Sound = static_cast<ISoundSource*>(this->Companion[1]);
+            ISoundSource* const Sound = this->Companion.Sound;
             if (Sound != nullptr)
                 Sound->SetPose(EngineIndex, &LocalXform);
-            if (this->Companion[3] != nullptr)
-                CliExplosionAttachLocalXform(this->Companion[3], EngineIndex, &LocalXform);
+            if (this->Companion.Light != nullptr)
+                CliExplosionAttachLocalXform(this->Companion.Light, EngineIndex, &LocalXform);
 
             // Start the beam; on success its progress from the CBeam's speed (class & 0x67, no
-            // null test); on failure release it and clear Companion[2].
-            if (this->Companion[2] != nullptr)
+            // null test); on failure release it and clear Companion.Effect.
+            if (this->Companion.Effect != nullptr)
             {
-                FBeamEffect* const StartBeam = static_cast<FBeamEffect*>(this->Companion[2]);
+                FBeamEffect* const StartBeam = static_cast<FBeamEffect*>(this->Companion.Effect);
                 if (StartBeam->FBeamEffect::Start(EffectArch) != 0)
                 {
                     float const Speed = OwnerVelocityLength(NarrowBeamObject(this, CObject::ClassBeam));
@@ -591,11 +571,11 @@ void FClientBeamGameobj::ActivateEffects(Vector const* LookDir, unsigned char bU
                 else
                 {
                     StartBeam->Release();
-                    this->Companion[2] = nullptr;
+                    this->Companion.Effect = nullptr;
                 }
             }
 
-            CliEffectListInsert(&EffectList, this->Companion);
+            CliEffectListInsert(&EffectList, &this->Companion);
         }
     }
 
@@ -639,7 +619,7 @@ void FCliLauncherFx::FireProjectiles(Vector const* Target)
         // velocity; any other along the launch velocity.
         Vector LookDir = Info.Velocity;
         unsigned char bUseLook = 0;
-        if (static_cast<void*>(Host) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(Host) == GetPlayerObjRW())
         {
             Vector Pos;
             bUseLook = 1;
@@ -687,7 +667,7 @@ unsigned char FCliLauncherFx::TryFire(Vector const* Target)
     if (Result == FireNoAmmo)
     {
         // The player's own launcher seen from the first-person camera plays its dry-fire sound.
-        if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW() &&
+        if (static_cast<IObjRW*>(Host) == GetPlayerObjRW() &&
             IsFirstPersonCameraCurrent())
         {
             PlayClientSoundArch(DryFireSoundArch, nullptr, nullptr, 0);
@@ -698,7 +678,7 @@ unsigned char FCliLauncherFx::TryFire(Vector const* Target)
     {
         // Cruise / tradelane / cloak-active (6..8) on the player's own host -> its slot 0x1d0
         // (the ship's LAB_00545cc0).
-        if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(Host) == GetPlayerObjRW())
             static_cast<FClientShipGameobj*>(Host)->PlayFireFailedSound();
     }
     return 0;
@@ -783,7 +763,7 @@ unsigned char FCliLauncherFx::FireBarrelAim()
         Info.ObjectId = Host->get_id();
         Info.Hardpoints.insert(Info.Hardpoints.end(), 1u, Equip->GetID());
         Info.TargetPos = Aim;
-        static_cast<IServer*>(GetLocalServerInterface())
+        GetLocalServerInterface()
             ->FireWeapon(GetPlayerConnectionId(), Info);
     }
     return bFired;
@@ -798,7 +778,7 @@ ID_String FCliLauncherFx::OneShotSoundId() const
     // With a one-shot sound, its lod link's nickname id (slot 12); else the cleared one.
     if (OneShotSoundArch != nullptr)
     {
-        void* const Linked = GetClientSoundArchLinked(OneShotSoundArch);
+        Archetype::ISound* const Linked = GetClientSoundArchLinked(OneShotSoundArch);
         if (Linked != nullptr)
             Result.Id = GetClientSoundArchId(Linked);
     }
@@ -812,10 +792,10 @@ void FCliLauncherFx::PlayFireSound(Vector const* Pos, int ShotCount)
         return;
     // The fire voice (a Source3D) is made on first use, not tested afterwards.
     if (FireVoice == nullptr)
-        FireVoice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
+        FireVoice = CreateClientSoundSource3D();
     FireVoice->SetPosition(const_cast<Vector*>(Pos));
     // Integer attenuation -(arch attenuation * (ShotCount - 1)).
-    Archetype::ISound* const Arch = static_cast<Archetype::ISound*>(OneShotSoundArch);
+    Archetype::ISound* const Arch = OneShotSoundArch;
     int const Attenuation = -(Arch->GetAttenuation() * (ShotCount - 1));
     FireVoice->SetAttenuation(static_cast<float>(Attenuation));
     FireVoice->SetPitch(Arch->GetRandomPitch());
@@ -881,13 +861,13 @@ namespace
     void InvokeServerSetTarget(XSetTarget const& Info)
     {
         // DAT_0067ecd0 vt+0x10 -- IServer::SetTarget(DAT_00673344, &info), no tests.
-        static_cast<IServer*>(GetLocalServerInterface())->SetTarget(GetPlayerConnectionId(), Info);
+        GetLocalServerInterface()->SetTarget(GetPlayerConnectionId(), Info);
     }
 } // namespace
 
     // LAB_005468e0 — CShip Host+4 vt+0x48 (target, sub, player). Public: the Ship
     // gameobj's IObjAffect set_target (client_gameobj.cpp) forwards here.
-    int CliShipSetTarget(void* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId)
+    int CliShipSetTarget(IObjAffect* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId)
     {
         // Nothing is null-tested except the CShip narrowing's own chain, whose result is used
         // untested.
@@ -897,7 +877,7 @@ namespace
             bLocal = 1;
 
         FClientEquippedObj* Host =
-            static_cast<FClientEquippedObj*>(static_cast<IObjAffect*>(AdjustorThis));
+            static_cast<FClientEquippedObj*>(AdjustorThis);
         CEqObj* EqObj = ResolveEqObjFromHost(Host);
         CShip* Ship = nullptr;
         if (EqObj != nullptr &&
@@ -938,7 +918,7 @@ namespace
     }
 
     // FUN_005351d0 — EquippedObj/CShip Host+4 vt+0x44 (hp*, target, sub, player).
-    int CliEquippedObjSetGunTarget(void* AdjustorThis, unsigned short const* HardpointId,
+    int CliEquippedObjSetGunTarget(IObjAffect* AdjustorThis, unsigned short const* HardpointId,
                                    IObjRW* Target, unsigned short SubId, int PlayerId)
     {
         // Neither the adjustor nor the hardpoint pointer is tested; FindByID runs on the class
@@ -952,7 +932,7 @@ namespace
             return 0;
 
         FClientEquippedObj* const Owner =
-            static_cast<FClientEquippedObj*>(static_cast<IObjAffect*>(AdjustorThis));
+            static_cast<FClientEquippedObj*>(AdjustorThis);
         CObject* const Obj0 = Owner->Object;
         CEqObj* const EqObj =
             (Obj0 != nullptr && (static_cast<unsigned>(Obj0->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
@@ -980,7 +960,7 @@ namespace
             return 0;
 
         FClientEquippedObj* Host =
-            static_cast<FClientEquippedObj*>(static_cast<IObjAffect*>(AdjustorThis));
+            static_cast<FClientEquippedObj*>(AdjustorThis);
         XSetTarget Info;
         std::memset(&Info, 0, sizeof(Info));
         Info.ObjectId = HostObjectId(Host);
@@ -1060,7 +1040,7 @@ void FCliLauncherFx::PlayMuzzleFx()
     // The previous muzzle effect goes.
     if (MuzzleEffect != nullptr)
     {
-        FParticleEffect* const Prior = static_cast<FParticleEffect*>(MuzzleEffect);
+        FParticleEffect* const Prior = MuzzleEffect;
         Prior->CleanupAlchemy();
         Prior->FParticleEffect::Kill();
         Prior->Release();
@@ -1092,7 +1072,7 @@ void FCliLauncherFx::PlayMuzzleFx()
     }
 }
 
-int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
+int CliShipActivateEquip(IObjAffect* AdjustorThis, unsigned short const* HardpointId,
                          unsigned char bOn, int PlayerId)
 {
     // LAB_00535330 -- EquippedObj IObjAffect vt+0x4c, this = the gameobj + 4. Every path
@@ -1107,7 +1087,7 @@ int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
     // The object narrowed by 0x103, null when the narrow fails -- read through below with no
     // test, as retail does.
     FClientGameobj* const Self =
-        static_cast<FClientGameobj*>(static_cast<IObjAffect*>(AdjustorThis));
+        static_cast<FClientGameobj*>(AdjustorThis);
     CObject* const Obj = Self->Object;
     CEqObj* const EqObj =
         (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
@@ -1147,19 +1127,19 @@ int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
         Info.EquipId = *HardpointId;
         Info.bActivate = bOn != 0;
         Info.Pad_0x07 = 0;
-        static_cast<IServer*>(GetLocalServerInterface())->ActivateEquip(GetPlayerConnectionId(),
-                                                                         Info);
+        GetLocalServerInterface()->ActivateEquip(GetPlayerConnectionId(),
+                                                 Info);
     }
     return 0;
 }
 
-unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointIds,
+unsigned CliShipFireWeapons(IObjAffect* AdjustorThis, unsigned short const* HardpointIds,
                             unsigned HardpointCount, Vector const* TargetPos, int PlayerId)
 {
     // FUN_00534870 (on the IObjAffect sub-object). Every launcher that fired is remembered (at most ten, retail's
     // stack array at +0x84); afterwards the ones sharing a one-shot sound play it once together.
     FClientEquippedObj* const Host =
-        static_cast<FClientEquippedObj*>(static_cast<IObjAffect*>(AdjustorThis));
+        static_cast<FClientEquippedObj*>(AdjustorThis);
     FEquipFxListNode* const Head = static_cast<FEquipFxListNode*>(Host->EquipFx.Head);
     // Retail's inlined CEqObj cast of the host object (class & 0x103); a null result would
     // fault at +0xe4 in CEquipManager::FindByID, and an equipped object's object always is one.
@@ -1246,7 +1226,7 @@ unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointI
         // A non-empty record goes to the server.
         if (!Info.Hardpoints.empty())
         {
-            static_cast<IServer*>(GetLocalServerInterface())
+            GetLocalServerInterface()
                 ->FireWeapon(GetPlayerConnectionId(), Info);
         }
     }
@@ -1647,7 +1627,7 @@ FLauncherEffectCompanion::~FLauncherEffectCompanion()
 {
     // FUN_00502d90 on +0x30 (Unwind@005c0443 / Unwind@005c0473, and the second pass inlined in
     // FUN_0052caa0).
-    CliEffectCompanionClear(Slots);
+    CliEffectCompanionClear(this);
 }
 
 FCliLauncherFx::FCliLauncherFx()
@@ -1660,10 +1640,10 @@ FCliLauncherFx::FCliLauncherFx()
     , DefaultEffectArch(nullptr)
 {
     AnimJointIndex.Value = -1;
-    Companion.Slots[0] = nullptr;
-    Companion.Slots[1] = nullptr;
-    Companion.Slots[2] = nullptr;
-    Companion.Slots[3] = nullptr;
+    Companion.EffectArch = nullptr;
+    Companion.Sound = nullptr;
+    Companion.Effect = nullptr;
+    Companion.Light = nullptr;
 }
 
 namespace
@@ -1683,7 +1663,7 @@ namespace
     // called on it regardless) still has hit points strictly above 0 (NaN fails).
     bool IsLivePlayerHost(FClientGameobj* Host)
     {
-        if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
+        if (static_cast<IObjRW*>(Host) != GetPlayerObjRW())
             return false;
         if (Host->IsDead())
             return false;
@@ -1709,15 +1689,15 @@ namespace
 
     // The companion "still running" test the launcher Update inlines twice (FUN_00503330's
     // predicate): a live particle, an active sound, or a light without anim keys (+0xd4).
-    bool LauncherCompanionAlive(void* const* Companion)
+    bool LauncherCompanionAlive(FEffectCompanion const* Companion)
     {
-        FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
+        FEffectBase const* const Effect = Companion->Effect;
         if (Effect != nullptr && (Effect->Flags08 & kEffectFlagDeactivated) == 0)
             return true;
-        ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
+        ISoundSource* const Sound = Companion->Sound;
         if (Sound != nullptr && Sound->IsActive() != 0)
             return true;
-        FGameLight const* const Light = static_cast<FGameLight const*>(Companion[3]);
+        FGameLight const* const Light = Companion->Light;
         return Light != nullptr && Light->Anim.Keys == nullptr;
     }
 }
@@ -1735,7 +1715,7 @@ FCliLauncherFx::~FCliLauncherFx()
     // The muzzle effect re-attached to nothing, killed, released.
     if (MuzzleEffect != nullptr)
     {
-        FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
+        FEffectBase* const Effect = MuzzleEffect;
         Transform const Identity = IdentityTransform();
         Effect->Attach(nullptr, -1, &Identity);
         Effect->Kill();
@@ -1765,7 +1745,7 @@ FCliLauncherFx::~FCliLauncherFx()
         DefaultEffectArch->Release();
     // The +0x30 companion released by hand; the member destructors then run (the companion's
     // second pass finds it null, the +0x10 handle's finds -1).
-    CliEffectCompanionClear(Companion.Slots);
+    CliEffectCompanionClear(&Companion);
 }
 
 void FCliLauncherFx::DropOnDestroying()
@@ -1779,11 +1759,11 @@ void FCliLauncherFx::DropOnDestroying()
             static_cast<uintptr_t>(static_cast<unsigned long>(AnimJointIndex.Value))));
         AnimJointIndex.Value = -1;
     }
-    CliEffectListRemove(&Host->EffectList, Companion.Slots);
+    CliEffectListRemove(&Host->EffectList, &Companion);
     if (MuzzleEffect == nullptr)
         return;
 
-    FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
+    FEffectBase* const Effect = MuzzleEffect;
     Effect->Kill();
     Effect->Release();
     MuzzleEffect = nullptr;
@@ -1806,7 +1786,7 @@ bool FCliLauncherFx::Update(float Dt)
         if (Launch->IsConnected() && Launch->IsDisabled())
         {
             // Nothing while the companion still runs.
-            if (!LauncherCompanionAlive(Companion.Slots))
+            if (!LauncherCompanionAlive(&Companion))
             {
                 ID_String SparksId;
                 SparksId.Id = CreateID("multi_sparks02");
@@ -1816,15 +1796,15 @@ bool FCliLauncherFx::Update(float Dt)
                 if (!SparksId.IsEmpty())
                 {
                     CliCreateEffectOneShot(FindEffectArch(&SparksId.Id), Host,
-                                           static_cast<int>(Part), &Local, Companion.Slots);
+                                           static_cast<int>(Part), &Local, &Companion);
                 }
             }
         }
         else
         {
             // A companion still running leaves the host's effect list.
-            if (LauncherCompanionAlive(Companion.Slots))
-                CliEffectListRemove(&Host->EffectList, Companion.Slots);
+            if (LauncherCompanionAlive(&Companion))
+                CliEffectListRemove(&Host->EffectList, &Companion);
         }
     }
     return FClientEquip::Update(Dt);
@@ -1951,10 +1931,10 @@ namespace
 
     // FUN_0052c830 after the object's allocation; the port's default constructor has already
     // zeroed +0x10..+0x3c and set +0x10 to -1.
-    void CliLauncherFxBaseFill(FCliLauncherFx* Wrapper, CEquip* Equip, void* Host)
+    void CliLauncherFxBaseFill(FCliLauncherFx* Wrapper, CEquip* Equip, FClientGameobj* Host)
     {
         // FUN_00531a30 (connect, separation explosion).
-        Wrapper->BaseFill(Equip, static_cast<FClientGameobj*>(Host));
+        Wrapper->BaseFill(Equip, Host);
 
         // A non-empty use_animation (arch +0x9c, no null test) plays on the equipment's root
         // into +0x10.
@@ -2034,7 +2014,7 @@ namespace
     }
 }
 
-FCliLauncherFx* CliMineEquipFxConstruct(CEquip* Equip, void* Host)
+FCliLauncherFx* CliMineEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
 {
     // FUN_0052d570 — FUN_0052c830, then the mine vtable PTR_FUN_005dd564 (no extra fields).
     FCliLauncherFx* Wrapper = new FCliMineDropperFx();
@@ -2042,7 +2022,7 @@ FCliLauncherFx* CliMineEquipFxConstruct(CEquip* Equip, void* Host)
     return Wrapper;
 }
 
-FCliLauncherFx* CliCmEquipFxConstruct(CEquip* Equip, void* Host)
+FCliLauncherFx* CliCmEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
 {
     // FUN_0052d6e0 — FUN_0052c830, then the CM vtable PTR_FUN_005dd598.
     FCliLauncherFx* Wrapper = new FCliCmDropperFx();
@@ -2050,7 +2030,7 @@ FCliLauncherFx* CliCmEquipFxConstruct(CEquip* Equip, void* Host)
     return Wrapper;
 }
 
-FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, void* Host)
+FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
 {
     // FUN_0052d880: FUN_0052c830, +0x40 = 0, the gun vtable PTR_LAB_005dd5d8.
     FCliGunFx* const Wrapper = new FCliGunFx();
@@ -2065,7 +2045,7 @@ FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, void* Host)
         // Look up and Acquire; the result is not read.
         PreloadClientSoundArch(TurretSound);
         // A Source3D (operator new(0x64), vtable 005c9efc), not tested afterwards.
-        Wrapper->TurretVoice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
+        Wrapper->TurretVoice = CreateClientSoundSource3D();
         // Looping, posed on the equipment's root with an identity frame.
         Wrapper->TurretVoice->SetLooping(1);
         long const RootIndex = Wrapper->LaunchEquip()->GetRootIndex();

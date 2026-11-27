@@ -334,7 +334,7 @@ bool SystemManagerGunGroupManager::Retarget(IObjRW* NewTarget)
     if (NewTarget == CurrentTarget())
         return true;
 
-    Watcher.set(static_cast<Watchable const*>(NewTarget));
+    Watcher.set(NewTarget);
 
     // Retail queries get_type on a live watch and discards the result.
     if (IsWatcherLive(Watcher))
@@ -483,11 +483,11 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
         }
 
         // The player's own subtarget carries over only when the pick is the player's target.
-        unsigned short const SubTarget = ((void*)BestIface == (void*)PlayerTarget)
+        unsigned short const SubTarget = (static_cast<void*>(BestIface) == static_cast<void*>(PlayerTarget))
             ? PlayerSubTarget
             : SUBOBJ_ID_NONE;
 
-        OwnShip()->set_gun_target(&Slot.HardpointId, (IObjRW*)BestIface, SubTarget, -1);
+        OwnShip()->set_gun_target(&Slot.HardpointId, static_cast<IObjRW*>(BestIface), SubTarget, -1);
     }
 
     if (SelfRecord->bFlagsValid == 0)

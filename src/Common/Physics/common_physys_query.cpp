@@ -420,7 +420,7 @@ namespace
     {
         static_assert(offsetof(CObject, WorldPosition) == offsetof(CObject, Orientation) + sizeof(Matrix),
                       "CObject: Orientation and WorldPosition are one Transform");
-        return *(Transform*)&Object->Orientation;
+        return *reinterpret_cast<Transform*>(&Object->Orientation);
     }
 
     // FUN_06284f70, called with the nine elements pushed in column order: the transpose.
@@ -577,11 +577,11 @@ namespace
         PhySys::RayHit* Out = Hits;
         for (;;)
         {
-            IVP_Ray_Hit* const Hit = (IVP_Ray_Hit*)Solver.min_hash.find_min_elem();
+            IVP_Ray_Hit* const Hit = static_cast<IVP_Ray_Hit*>(Solver.min_hash.find_min_elem());
             if (Hit == nullptr || Count >= MaxHits)
                 break;
 
-            CObject* const Client = (CObject*)Hit->hit_real_object->client_data;
+            CObject* const Client = static_cast<CObject*>(Hit->hit_real_object->client_data);
             if (Client != nullptr)
             {
                 Out->Object = Client;

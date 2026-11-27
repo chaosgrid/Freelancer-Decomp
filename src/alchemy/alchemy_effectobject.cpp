@@ -234,7 +234,7 @@ namespace AlchemyImpl
         return WalkNodesAlchemy(&IAlchemy::DrawNodes, Arg);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::FindNodeById(void* IdRaw, void* Out)
+    GENRESULT DACOM_API FFxEffectObject::FindNodeById(void* IdRaw, void** Out)
     {
         const unsigned long Id =
             static_cast<unsigned long>(reinterpret_cast<unsigned int>(IdRaw));
@@ -242,7 +242,7 @@ namespace AlchemyImpl
         {
             if (Nodes_[Index].Id != Id)
                 continue;
-            *static_cast<void**>(Out) = Nodes_[Index].Node;
+            *Out = Nodes_[Index].Node;
             return GR_OK;
         }
         return GR_GENERIC;
@@ -317,7 +317,7 @@ namespace AlchemyImpl
     }
 
     GENRESULT FFxEffectObject::WalkNodesAlchemy(
-        GENRESULT (DACOM_API IAlchemy::*Method)(void*, void*), void* Arg)
+        GENRESULT (DACOM_API IAlchemy::*Method)(void*, IDAComponent*), void* Arg)
     {
         GENRESULT Result = GR_OK;
         FFxEffectNodeRec* Record = Nodes_;

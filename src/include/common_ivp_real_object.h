@@ -519,9 +519,8 @@ public:
     IVP_Real_Object_Fast_Static(IVP_Cluster* Father, const IVP_RealObjectConstructionTemplate* Template);
 
     // +0x1c: the object's IVP_Controller_Phantom, or null (convert_to_phantom
-    // 06345f10, deleted by ~IVP_Real_Object at 06345326-06345345). Every reader
-    // casts it to IVP_Controller_Phantom*.
-    void* controller_phantom; // +0x1C
+    // 06345f10, deleted by ~IVP_Real_Object at 06345326-06345345).
+    IVP_Controller_Phantom* controller_phantom; // +0x1C
 
     // +0x20: head of this object's intrusive list of attached synapses, threaded
     // through the synapse (an IVP_Ledge_Mindist's +0x18 or +0x34 slot), so the stored

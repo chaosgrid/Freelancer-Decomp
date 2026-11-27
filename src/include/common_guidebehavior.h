@@ -53,7 +53,7 @@ public:
 
     // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090` (BindContext), shared with Flee/Cruise/
     // DrasticEvade.
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, LAB_062cf3f0 (Engage): re-arm, capture the manager's Goto (+0x17c) and Follow
     // (+0x1b8) behaviors, hand them GotoOp/FollowOp and engage both.

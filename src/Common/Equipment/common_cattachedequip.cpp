@@ -96,7 +96,7 @@ CAttachedEquip::~CAttachedEquip()
 int CAttachedEquip::GetToughness() const
 {
     // RVA 0x33200; no null check.
-    return ((Archetype::AttachedEquipment const*)Arch)->Toughness;
+    return static_cast<Archetype::AttachedEquipment const*>(Arch)->Toughness;
 }
 
 bool CAttachedEquip::Update(float Dt, unsigned Flags)
@@ -166,7 +166,7 @@ void CAttachedEquip::Disconnect()
             Vector Point;
             ComputeExplosiveImpulses(GetRootIndex(), ParentPush, ChildPush, Point);
             Archetype::AttachedEquipment const* AttachedArch =
-                (Archetype::AttachedEquipment const*)(Arch);
+                static_cast<Archetype::AttachedEquipment const*>(Arch);
             ParentPush.x = ParentPush.x * AttachedArch->ParentImpulse; // Arch+0x7c
             ParentPush.y = ParentPush.y * AttachedArch->ParentImpulse;
             ParentPush.z = ParentPush.z * AttachedArch->ParentImpulse;
@@ -293,7 +293,7 @@ CAttachedEquip* __cdecl CAttachedEquip::cast(CEquip* Equip)
 {
     if (Equip == nullptr || (Equip->GetType() & kAttachedEquipMask) == 0)
         return nullptr;
-    return (CAttachedEquip*)(Equip);
+    return static_cast<CAttachedEquip*>(Equip);
 }
 
 CAttachedEquip const* __cdecl CAttachedEquip::cast(CEquip const* Equip)
@@ -310,5 +310,5 @@ CAttachedEquip const* __cdecl CAttachedEquip::cast(CEquip const* Equip)
 // the leaf archetype.
 Archetype::AttachedEquipment const* CAttachedEquip::AttachedEquipArch() const
 {
-    return (Archetype::AttachedEquipment const*)(Arch);
+    return static_cast<Archetype::AttachedEquipment const*>(Arch);
 }

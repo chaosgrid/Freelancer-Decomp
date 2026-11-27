@@ -32,6 +32,8 @@
 
 #include <stddef.h>
 
+class NnTextControl;
+
 // The slot 9 payload FUN_004889e0 / FUN_00488a80 build on their stacks: the question and the
 // text style (never null by the time Create reads it).
 struct FNnConfirmPayload
@@ -61,7 +63,7 @@ public:
     bool OnEvent(unsigned MsgId) override;
 
     WinControl* Frame;   // +0x330
-    WinControl* Text;    // +0x334
+    NnTextControl* Text; // +0x334
     WinControl* YesBox;  // +0x338
     WinControl* NoBox;   // +0x33c
     WinControl* YesText; // +0x340

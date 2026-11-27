@@ -23,6 +23,7 @@
 #include "Interface/cargo_bar_control.h"
 #include "Common/Fonts/font_string.h"           // FFontString::Construct (FUN_004144b0)
 #include "NeuroNet/nn_rollover.h"           // NnRolloverShowIdsAtGlobal / NnRolloverShowHoverAtGlobal
+#include "NeuroNet/nn_static_control.h"
 #include "Interface/tooltip_hover.h"         // FToolTipHoverInfo, FToolTipHoverInfo::Reset (FUN_004963a0)
 #include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_ui_pulse.h"           // G_NnPaletteCyan / 679ba4 / 679b94
@@ -2268,11 +2269,11 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             // The music preview plays only when no background music is bound.
             if (Row >= 0)
             {
-                void* Source = nullptr;
+                ISoundSource* Source = nullptr;
                 if (!BindClientBackgroundMusic(&Source)) // FUN_00428ba0
                     PlayUiSoundSlotFlag1(0x20);
                 else
-                    static_cast<ISoundSource*>(Source)->Release(); // vt+8
+                    Source->Release(); // vt+8
             }
             break;
         }
@@ -2986,10 +2987,9 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     }
 
     // 0.481 x 0.06, scale 1.75.
-    Title = static_cast<NnTextControl*>(
-        CreateTextControl("Screen Title", "PageHeader", &TitlePosition, nullptr,
-                          NnFloatBits(0x3ef645a2), NnFloatBits(0x3d75c28f), NnFloatBits(0x3fe00000),
-                          0x4f8, 1, 0, 1));
+    Title = CreateTextControl("Screen Title", "PageHeader", &TitlePosition, nullptr,
+                              NnFloatBits(0x3ef645a2), NnFloatBits(0x3d75c28f), NnFloatBits(0x3fe00000),
+                              0x4f8, 1, 0, 1);
     Title->TextColour = G_NnPaletteCyan;
 
     // The page column's origin and step.
@@ -3013,27 +3013,23 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     float const Step6 = static_cast<float>(static_cast<double>(Step) * 6.0);
     {
         Vector Position = {ColumnX, ColumnY, 0.0f};
-        PageButtons[1] = static_cast<NnButtonControl*>(
-            CreateButtonControl("interfaceButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
-                                &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0));
+        PageButtons[1] = CreateButtonControl("interfaceButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
+                                             &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0);
         PageButtons[1]->SetMontageMode(1);
 
         Position.y = static_cast<float>(static_cast<double>(ColumnY) - static_cast<double>(Step));
-        PageButtons[0] = static_cast<NnButtonControl*>(
-            CreateButtonControl("keymapButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
-                                &Position, nullptr, &KeymapExtents, 0, 0, 0, 0, 0, 0, 0));
+        PageButtons[0] = CreateButtonControl("keymapButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
+                                             &Position, nullptr, &KeymapExtents, 0, 0, 0, 0, 0, 0, 0);
         PageButtons[0]->SetMontageMode(1);
 
         Position.y = static_cast<float>(static_cast<double>(ColumnY) - static_cast<double>(Step2));
-        PageButtons[2] = static_cast<NnButtonControl*>(
-            CreateButtonControl("VideoButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
-                                &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0));
+        PageButtons[2] = CreateButtonControl("VideoButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
+                                             &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0);
         PageButtons[2]->SetMontageMode(1);
 
         Position.y = static_cast<float>(static_cast<double>(ColumnY) - static_cast<double>(Step3));
-        PageButtons[3] = static_cast<NnButtonControl*>(
-            CreateButtonControl("AudioButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
-                                &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0));
+        PageButtons[3] = CreateButtonControl("AudioButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
+                                             &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0);
         PageButtons[3]->SetMontageMode(1);
 
         if (bInGame == 0)
@@ -3041,15 +3037,13 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             // No SetMontageMode (FUN_0055bfc0) for this one.
             Position.y = static_cast<float>(static_cast<double>(ColumnY) -
                                              static_cast<double>(Step) * 4.0);
-            PageButtons[4] = static_cast<NnButtonControl*>(
-                CreateButtonControl("CreditsButton", kButtonMesh, nullptr, "ui_select_item",
-                                    nullptr, &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0));
+            PageButtons[4] = CreateButtonControl("CreditsButton", kButtonMesh, nullptr, "ui_select_item",
+                                                 nullptr, &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0);
         }
 
         Position.y = static_cast<float>(static_cast<double>(ColumnY) - static_cast<double>(Step6));
-        PageButtons[5] = static_cast<NnButtonControl*>(
-            CreateButtonControl("MainMenuButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
-                                &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0));
+        PageButtons[5] = CreateButtonControl("MainMenuButton", kButtonMesh, nullptr, "ui_select_item", nullptr,
+                                             &Position, nullptr, &ButtonExtents, 0, 0, 0, 0, 0, 0, 0);
         PageButtons[5]->SetMontageMode(1);
     }
 
@@ -3063,44 +3057,38 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const TextHeight = NnFloatBits(0x3cf5c28f);
         float const TextScale = NnFloatBits(0x3fa00000);
 
-        PageTexts[1] = static_cast<NnTextControl*>(
-            CreateTextControl("InterfaceText", "ButtonText", &Position, nullptr, TextWidth,
-                              TextHeight, TextScale, 0x52e, 1, 0, 1));
+        PageTexts[1] = CreateTextControl("InterfaceText", "ButtonText", &Position, nullptr, TextWidth,
+                                         TextHeight, TextScale, 0x52e, 1, 0, 1);
         PageTexts[1]->SetProperty(kTextPropClickable, 1, 0);
 
         Position.y = static_cast<float>(TextBase - static_cast<double>(Step));
-        PageTexts[0] = static_cast<NnTextControl*>(
-            CreateTextControl("keymapText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
-                              TextScale, 0x52f, 1, 0, 1));
+        PageTexts[0] = CreateTextControl("keymapText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
+                                         TextScale, 0x52f, 1, 0, 1);
         PageTexts[0]->SetProperty(kTextPropClickable, 1, 0);
 
         Position.y = static_cast<float>(TextBase - static_cast<double>(Step2));
-        PageTexts[2] = static_cast<NnTextControl*>(
-            CreateTextControl("VideoText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
-                              TextScale, 0x5e2, 1, 0, 1));
+        PageTexts[2] = CreateTextControl("VideoText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
+                                         TextScale, 0x5e2, 1, 0, 1);
         PageTexts[2]->SetProperty(kTextPropClickable, 1, 0);
 
         Position.y = static_cast<float>(TextBase - static_cast<double>(Step3));
-        PageTexts[3] = static_cast<NnTextControl*>(
-            CreateTextControl("AudioText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
-                              TextScale, 0x5e3, 1, 0, 1));
+        PageTexts[3] = CreateTextControl("AudioText", "ButtonText", &Position, nullptr, TextWidth, TextHeight,
+                                         TextScale, 0x5e3, 1, 0, 1);
         PageTexts[3]->SetProperty(kTextPropClickable, 1, 0);
 
         unsigned MainMenuIds = 0x58b;
         if (bInGame == 0)
         {
             Position.y = static_cast<float>(TextBase - static_cast<double>(Step) * 4.0);
-            PageTexts[4] = static_cast<NnTextControl*>(
-                CreateTextControl("CreditsText", "ButtonText", &Position, nullptr, TextWidth,
-                                  TextHeight, TextScale, 0x532, 1, 0, 1));
+            PageTexts[4] = CreateTextControl("CreditsText", "ButtonText", &Position, nullptr, TextWidth,
+                                             TextHeight, TextScale, 0x532, 1, 0, 1);
             PageTexts[4]->SetProperty(kTextPropClickable, 1, 0);
             MainMenuIds = 0x533;
         }
 
         Position.y = static_cast<float>(TextBase - static_cast<double>(Step6));
-        PageTexts[5] = static_cast<NnTextControl*>(
-            CreateTextControl("mainMenuText", "ButtonText", &Position, nullptr, TextWidth,
-                              TextHeight, TextScale, MainMenuIds, 1, 0, 1));
+        PageTexts[5] = CreateTextControl("mainMenuText", "ButtonText", &Position, nullptr, TextWidth,
+                                         TextHeight, TextScale, MainMenuIds, 1, 0, 1);
         PageTexts[5]->SetProperty(kTextPropClickable, 1, 0);
         PageTexts[5]->TextColour = G_NnPaletteCyan;
     }
@@ -3125,16 +3113,14 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         // {-0.03, TY, 0}, 0.215 x 0.03, scale 1.43.
         sprintf(Name, "opt_titleText %d", Index);
         Vector const TitleRow = {NnFloatBits(0xbcf5c28f), RowTextY, 0.0f};
-        OptTitleText[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "PageHeader", &TitleRow, nullptr, NnFloatBits(0x3e5c28f6),
-                              NnFloatBits(0x3cf5c28f), NnFloatBits(0x3fb70a3d), 0, 0, 0, 0));
+        OptTitleText[Index] = CreateTextControl(Name, "PageHeader", &TitleRow, nullptr, NnFloatBits(0x3e5c28f6),
+                                                NnFloatBits(0x3cf5c28f), NnFloatBits(0x3fb70a3d), 0, 0, 0, 0);
 
         // {0, TY, 0}, scale 1.0.
         sprintf(Name, "opt_text %d", Index);
         Vector const TextRow = {0.0f, RowTextY, 0.0f};
-        OptText[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "SubHeader", &TextRow, nullptr, NnFloatBits(0x3e5c28f6),
-                              NnFloatBits(0x3cf5c28f), 1.0f, 0, 0, 0, 0));
+        OptText[Index] = CreateTextControl(Name, "SubHeader", &TextRow, nullptr, NnFloatBits(0x3e5c28f6),
+                                           NnFloatBits(0x3cf5c28f), 1.0f, 0, 0, 0, 0);
         OptText[Index]->SetProperty(kTextPropClickable, 1, 0);
         OptText[Index]->bHoverPulse = 0;
 
@@ -3142,10 +3128,10 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         sprintf(Name, "opt_toggle %d", Index);
         Vector const TogglePosition = {NnFloatBits(0x3ed47ae1), RowTextY, 0.0f};
         Vector const ToggleExtents = {NnFloatBits(0x3c75c28f), NnFloatBits(0x3c75c28f), 0.0f};
-        OptToggle[Index] = static_cast<NnButtonControl*>(CreateToggleButtonControl(
+        OptToggle[Index] = CreateToggleButtonControl(
             Name, "Interface\\NeuroNet\\Inventory\\check.3db",
             "Interface\\NeuroNet\\Inventory\\repairblackbox.3db", "ui_shipview_select", nullptr,
-            &TogglePosition, nullptr, &ToggleExtents, 0, 0, 0, 0, 0x65f, 0x67a));
+            &TogglePosition, nullptr, &ToggleExtents, 0, 0, 0, 0, 0x65f, 0x67a);
         OptToggle[Index]->SetProperty(kButtonPropGlow, 1, 0);
         memcpy(OptToggle[Index]->Colour, &G_NnPaletteGrey, 4);
 
@@ -3154,9 +3140,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const ToggleTextY = static_cast<float>(static_cast<double>(RowTextY) -
                                                      static_cast<double>(NnFloatBits(0x3b449ba6)));
         Vector const ToggleTextRow = {NnFloatBits(0x3e8f5c29), ToggleTextY, 0.0f};
-        OptToggleText[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "SubHeader", &ToggleTextRow, nullptr, NnFloatBits(0x3e6147ae),
-                              NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f666666), 0, 2, 0, 0));
+        OptToggleText[Index] = CreateTextControl(Name, "SubHeader", &ToggleTextRow, nullptr, NnFloatBits(0x3e6147ae),
+                                                 NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f666666), 0, 2, 0, 0);
 
         // {0.19, float(ScrollRowY - F), -1}, 0.24 x 0.014.
         sprintf(Name, "opt_scroll %d", Index);
@@ -3173,74 +3158,67 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         // {0.133, TY, 0}, 0.11 x 0.02, scale 0.8.
         sprintf(Name, "opt_smallText %d", Index);
         Vector const SmallRow = {NnFloatBits(0x3e083127), RowTextY, 0.0f};
-        SmallText[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "HudSmall", &SmallRow, nullptr, NnFloatBits(0x3de147ae),
-                              NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 2, 0, 0));
+        SmallText[Index] = CreateTextControl(Name, "HudSmall", &SmallRow, nullptr, NnFloatBits(0x3de147ae),
+                                             NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 2, 0, 0);
 
         // {0.26, TY + 0.017f, 0} (left) and {0.359, same, 0} (right).
         sprintf(Name, "opt_scrollTextLeft %d", Index);
         float const ScrollTextY = static_cast<float>(static_cast<double>(RowTextY) +
                                                      static_cast<double>(NnFloatBits(0x3c8b4396)));
         Vector const LeftRow = {NnFloatBits(0x3e851eb8), ScrollTextY, 0.0f};
-        ScrollTextLeft[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ToolTip", &LeftRow, nullptr, NnFloatBits(0x3de147ae),
-                              NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 0, 0, 0));
+        ScrollTextLeft[Index] = CreateTextControl(Name, "ToolTip", &LeftRow, nullptr, NnFloatBits(0x3de147ae),
+                                                  NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 0, 0, 0);
 
         sprintf(Name, "opt_scrollTextRight %d", Index);
         Vector const RightRow = {NnFloatBits(0x3eb7ced9), ScrollTextY, 0.0f};
-        ScrollTextRight[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ToolTip", &RightRow, nullptr, NnFloatBits(0x3de147ae),
-                              NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 2, 0, 0));
+        ScrollTextRight[Index] = CreateTextControl(Name, "ToolTip", &RightRow, nullptr, NnFloatBits(0x3de147ae),
+                                                   NnFloatBits(0x3ca3d70a), NnFloatBits(0x3f4ccccd), 0, 2, 0, 0);
 
         // {0.32, TY, 0}, half extents {0.09, 0.011, 0}; +0x378 = DAT_00679b94, +0x35d |= 1.
         sprintf(Name, "opt_smallBtn %d", Index);
         Vector const SmallButtonRow = {NnFloatBits(0x3ea3d70a), RowTextY, 0.0f};
         Vector const SmallButtonExtents = {NnFloatBits(0x3db851ec), NnFloatBits(0x3c343958), 0.0f};
-        SmallButton[Index] = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            Name, "ui_select_item", &SmallButtonRow, &SmallButtonExtents, 0, 0, 0, 0, 0));
+        SmallButton[Index] = CreateWireButtonControl(
+            Name, "ui_select_item", &SmallButtonRow, &SmallButtonExtents, 0, 0, 0, 0, 0);
         memcpy(SmallButton[Index]->Colour, &G_NnPaletteGrey, 4);
         SmallButton[Index]->WireState2 = static_cast<unsigned char>(SmallButton[Index]->WireState2 | kWire2FlushBatchers);
 
         // {0.32, TY - 0.003f, 0}, 0.18 x 0.03, scale 0.9.
         sprintf(Name, "opt_smallBtnText %d", Index);
         Vector const SmallButtonTextRow = {NnFloatBits(0x3ea3d70a), ToggleTextY, 0.0f};
-        SmallButtonText[Index] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ItemName", &SmallButtonTextRow, nullptr,
-                              NnFloatBits(0x3e3851ec), NnFloatBits(0x3cf5c28f),
-                              NnFloatBits(0x3f666666), 0, 1, 0, 0));
+        SmallButtonText[Index] = CreateTextControl(Name, "ItemName", &SmallButtonTextRow, nullptr,
+                                                   NnFloatBits(0x3e3851ec), NnFloatBits(0x3cf5c28f),
+                                                   NnFloatBits(0x3f666666), 0, 1, 0, 0);
     }
 
     // {0.31, 0.31, -1}, half extents {0.53, 0.0295, 0}.
     {
         Vector const BarPosition = {NnFloatBits(0x3e9eb852), NnFloatBits(0x3e9eb852), -1.0f};
         Vector const BarExtents = {NnFloatBits(0x3f07ae14), NnFloatBits(0x3cf1a9fc), 0.0f};
-        StaticBar = static_cast<WireStaticControl*>(
-            CreateWireStaticControl("opt_static_bar", &BarPosition, &BarExtents, 0, 0, 0, 1));
+        StaticBar = CreateWireStaticControl("opt_static_bar", &BarPosition, &BarExtents, 0, 0, 0, 1);
     }
 
     // Cancel / set defaults boxes and captions.
     {
         Vector const WireExtents = {NnFloatBits(0x3d8f5c29), NnFloatBits(0x3c75c28f), 0.0f};
         Vector const CancelPosition = {NnFloatBits(0x3e9a1cac), NnFloatBits(0xbe970a3d), 0.0f};
-        CancelButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            "opt_cancel_btn", "ui_select_item", &CancelPosition, &WireExtents, 0, 0, 0, 0, 0));
+        CancelButton = CreateWireButtonControl(
+            "opt_cancel_btn", "ui_select_item", &CancelPosition, &WireExtents, 0, 0, 0, 0, 0);
         Vector const DefaultsPosition = {NnFloatBits(0xbc75c28f), NnFloatBits(0xbe970a3d), 0.0f};
-        DefaultsButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            "opt_set_defaults_btn", "ui_select_item", &DefaultsPosition, &WireExtents, 0, 0, 0, 0, 0));
+        DefaultsButton = CreateWireButtonControl(
+            "opt_set_defaults_btn", "ui_select_item", &DefaultsPosition, &WireExtents, 0, 0, 0, 0, 0);
         memcpy(CancelButton->Colour, &G_NnPaletteGrey, 4);
         memcpy(DefaultsButton->Colour, &G_NnPaletteGrey, 4);
 
         Vector const CancelTextPosition = {NnFloatBits(0x3e9a1cac), NnFloatBits(0xbe981062), 0.0f};
-        CancelText = static_cast<NnTextControl*>(
-            CreateTextControl("opt_cancel_txt", "ItemName", &CancelTextPosition, nullptr,
-                              NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x2148, 1, 0,
-                              0));
+        CancelText = CreateTextControl("opt_cancel_txt", "ItemName", &CancelTextPosition, nullptr,
+                                       NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x2148, 1, 0,
+                                       0);
         Vector const DefaultsTextPosition = {NnFloatBits(0xbc75c28f), NnFloatBits(0xbe981062),
                                              0.0f};
-        DefaultsText = static_cast<NnTextControl*>(
-            CreateTextControl("opt_set_defaults_txt", "ItemName", &DefaultsTextPosition, nullptr,
-                              NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x5e4, 1, 0,
-                              0));
+        DefaultsText = CreateTextControl("opt_set_defaults_txt", "ItemName", &DefaultsTextPosition, nullptr,
+                                         NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0x5e4, 1, 0,
+                                         0);
     }
 
     // The video mode cycle, its two frames and caption.
@@ -3250,17 +3228,14 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
                                        NnFloatBits(0x3ccccccd), 0, 0, 0, 0);
         Vector const BoxPosition = {NnFloatBits(0x3f1a9fbe), NnFloatBits(0x3ed2f1aa), -1.0f};
         Vector const BoxExtents = {NnFloatBits(0x3e6147ae), NnFloatBits(0x3ccccccd), 0.0f};
-        VideoBox = static_cast<WireStaticControl*>(
-            CreateWireStaticControl("video_mode_box", &BoxPosition, &BoxExtents, 0, 0, 0, 0xf));
+        VideoBox = CreateWireStaticControl("video_mode_box", &BoxPosition, &BoxExtents, 0, 0, 0, 0xf);
         Vector const Box2Position = {NnFloatBits(0x3f578d50), NnFloatBits(0x3ed2f1aa), -1.0f};
         Vector const Box2Extents = {NnFloatBits(0x3c54fdf4), NnFloatBits(0x3ccccccd), 0.0f};
-        VideoBox2 = static_cast<WireStaticControl*>(
-            CreateWireStaticControl("video_mode_box2", &Box2Position, &Box2Extents, 0, 0, 0, 0xf));
+        VideoBox2 = CreateWireStaticControl("video_mode_box2", &Box2Position, &Box2Extents, 0, 0, 0, 0xf);
         Vector const TextPosition = {NnFloatBits(0x3e9a1cac), NnFloatBits(0x3e4ed917), 0.0f};
-        VideoModeText = static_cast<NnTextControl*>(
-            CreateTextControl("video_mode_text", "ItemName", &TextPosition, nullptr,
-                              NnFloatBits(0x3e604189), NnFloatBits(0x3cf5c28f),
-                              NnFloatBits(0x3f666666), 0, 1, 0, 0));
+        VideoModeText = CreateTextControl("video_mode_text", "ItemName", &TextPosition, nullptr,
+                                          NnFloatBits(0x3e604189), NnFloatBits(0x3cf5c28f),
+                                          NnFloatBits(0x3f666666), 0, 1, 0, 0);
         VideoModeCycle->SetStepMode(true);
         VideoModeCycle->SetPageField(1.0f);
         VideoModeText->SetProperty(kTextPropClickable, 1, 0);
@@ -3291,8 +3266,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             static_cast<float>(static_cast<double>(Group) * 0.175 - 0.03), NnFloatBits(0x3e428f5c),
             0.0f};
         Vector const TabExtents = {NnFloatBits(0x3d8f5c29), NnFloatBits(0x3c75c28f), 0.0f};
-        GroupButtons[Group] = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            Name, "ui_select_item", &TabPosition, &TabExtents, 0, 0, 0, 0, 0xf));
+        GroupButtons[Group] = CreateWireButtonControl(
+            Name, "ui_select_item", &TabPosition, &TabExtents, 0, 0, 0, 0, 0xf);
         GroupButtons[Group]->WireState =
             static_cast<unsigned char>(GroupButtons[Group]->WireState & ~kWirePulseWhileHovered);
     }
@@ -3303,17 +3278,14 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const TabTextHeight = NnFloatBits(0x3cf1a9fc);
         float const TabTextScale = NnFloatBits(0x3f666666);
         Vector Position = {NnFloatBits(0xbce56042), NnFloatBits(0x3e400000), 0.0f};
-        GroupTexts[0] = static_cast<NnTextControl*>(
-            CreateTextControl("IGroup_Txt_Row1", "ItemName", &Position, nullptr, TabTextWidth,
-                              TabTextHeight, TabTextScale, 0x76e, 1, 0, 0));
+        GroupTexts[0] = CreateTextControl("IGroup_Txt_Row1", "ItemName", &Position, nullptr, TabTextWidth,
+                                          TabTextHeight, TabTextScale, 0x76e, 1, 0, 0);
         Position.x = NnFloatBits(0x3e178d50);
-        GroupTexts[1] = static_cast<NnTextControl*>(
-            CreateTextControl("IGroup_Txt_Row2", "ItemName", &Position, nullptr, TabTextWidth,
-                              TabTextHeight, TabTextScale, 0x76f, 1, 0, 0));
+        GroupTexts[1] = CreateTextControl("IGroup_Txt_Row2", "ItemName", &Position, nullptr, TabTextWidth,
+                                          TabTextHeight, TabTextScale, 0x76f, 1, 0, 0);
         Position.x = NnFloatBits(0x3ea5e354);
-        GroupTexts[2] = static_cast<NnTextControl*>(
-            CreateTextControl("IGroup_Txt_Row3", "ItemName", &Position, nullptr, TabTextWidth,
-                              TabTextHeight, TabTextScale, 0x770, 1, 0, 0));
+        GroupTexts[2] = CreateTextControl("IGroup_Txt_Row3", "ItemName", &Position, nullptr, TabTextWidth,
+                                          TabTextHeight, TabTextScale, 0x770, 1, 0, 0);
         for (int Group = 0; Group < 3; ++Group)
             GroupTexts[Group]->SetProperty(kTextPropClickable, 1, 0);
     }
@@ -3328,15 +3300,15 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         // {0.34, BY, -1}, half extents {0.15, 0.0295, 0}.
         sprintf(Name, "IBtn_Row%d", Row);
         Vector const ButtonPosition = {NnFloatBits(0x3eae147b), ButtonY, -1.0f};
-        KeyBtnRows[Row] = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            Name, "ui_select_item", &ButtonPosition, &RowExtents, 0, 0, 0, 0, 0xa));
+        KeyBtnRows[Row] = CreateWireButtonControl(
+            Name, "ui_select_item", &ButtonPosition, &RowExtents, 0, 0, 0, 0, 0xa);
         KeyBtnRows[Row]->WireState = static_cast<unsigned char>(KeyBtnRows[Row]->WireState & ~kWirePulseWhileHovered);
 
         // {0.64, BY, -1}.
         sprintf(Name, "IBtn_alt_Row%d", Row);
         Vector const AltPosition = {NnFloatBits(0x3f23d70a), ButtonY, -1.0f};
-        KeyAltBtnRows[Row] = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            Name, "ui_select_item", &AltPosition, &RowExtents, 0, 0, 0, 0, 0));
+        KeyAltBtnRows[Row] = CreateWireButtonControl(
+            Name, "ui_select_item", &AltPosition, &RowExtents, 0, 0, 0, 0, 0);
         KeyAltBtnRows[Row]->EdgeMask = 0;
 
         double const CaptionOffset = (static_cast<double>(Row) + 0.5) *
@@ -3348,9 +3320,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             NnFloatBits(0xbc656042),
             static_cast<float>(static_cast<double>(NnFloatBits(0x3e03126f)) - CaptionOffset),
             0.0f};
-        CommandRows[Row] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ItemName", &CommandPosition, nullptr, NnFloatBits(0x3e48b439),
-                              NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f8ccccd), 0, 0, 0, 0));
+        CommandRows[Row] = CreateTextControl(Name, "ItemName", &CommandPosition, nullptr, NnFloatBits(0x3e48b439),
+                                             NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f8ccccd), 0, 0, 0, 0);
         CommandRows[Row]->SetProperty(kTextPropClickable, 1, 0);
         CommandRows[Row]->bHoverPulse = 0;
 
@@ -3359,14 +3330,12 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
                                               CaptionOffset);
         sprintf(Name, "IKey_Row%d", Row);
         Vector const KeyPosition = {NnFloatBits(0x3e2e147b), KeyY, 0.0f};
-        KeyRows[Row] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ItemName", &KeyPosition, nullptr, NnFloatBits(0x3e147ae1),
-                              NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0, 1, 0, 0));
+        KeyRows[Row] = CreateTextControl(Name, "ItemName", &KeyPosition, nullptr, NnFloatBits(0x3e147ae1),
+                                         NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0, 1, 0, 0);
         sprintf(Name, "IKey_alt_Row%d", Row);
         Vector const KeyAltPosition = {NnFloatBits(0x3ea1cac1), KeyY, 0.0f};
-        KeyAltRows[Row] = static_cast<NnTextControl*>(
-            CreateTextControl(Name, "ItemName", &KeyAltPosition, nullptr, NnFloatBits(0x3e147ae1),
-                              NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0, 1, 0, 0));
+        KeyAltRows[Row] = CreateTextControl(Name, "ItemName", &KeyAltPosition, nullptr, NnFloatBits(0x3e147ae1),
+                                            NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0, 1, 0, 0);
         KeyRows[Row]->SetProperty(kTextPropClickable, 1, 0);
         KeyAltRows[Row]->SetProperty(kTextPropClickable, 1, 0);
     }
@@ -3374,13 +3343,11 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     // The two column headers.
     {
         Vector Position = {NnFloatBits(0x3e2e147b), NnFloatBits(0x3e1cac08), 0.0f};
-        KeyColumn1 = static_cast<NnTextControl*>(
-            CreateTextControl("keymap_col1", "ItemName", &Position, nullptr, NnFloatBits(0x3e147ae1),
-                              NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0x763, 1, 0, 0));
+        KeyColumn1 = CreateTextControl("keymap_col1", "ItemName", &Position, nullptr, NnFloatBits(0x3e147ae1),
+                                       NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0x763, 1, 0, 0);
         Position.x = NnFloatBits(0x3ea1cac1);
-        KeyColumn2 = static_cast<NnTextControl*>(
-            CreateTextControl("keymap_col2", "ItemName", &Position, nullptr, NnFloatBits(0x3e147ae1),
-                              NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0x764, 1, 0, 0));
+        KeyColumn2 = CreateTextControl("keymap_col2", "ItemName", &Position, nullptr, NnFloatBits(0x3e147ae1),
+                                       NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0x764, 1, 0, 0);
     }
 
     // Fourteen row separators at {0.287, BY, -1}, half extents {0.53, 0.0295, 0}.
@@ -3391,8 +3358,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             NnFloatBits(0x3e92f1aa),
             static_cast<float>(0.1745 - static_cast<double>(Row - 1) * 0.059), -1.0f};
         Vector const StaticExtents = {NnFloatBits(0x3f07ae14), NnFloatBits(0x3cf1a9fc), 0.0f};
-        StaticRows[Row] = static_cast<WireStaticControl*>(
-            CreateWireStaticControl(Name, &StaticPosition, &StaticExtents, 0, 0, 0, 1));
+        StaticRows[Row] = CreateWireStaticControl(Name, &StaticPosition, &StaticExtents, 0, 0, 0, 1);
     }
 
     StaticRows[13]->WireState2 = static_cast<unsigned char>(StaticRows[13]->WireState2 | kWire2FlushBatchers);
@@ -3443,17 +3409,14 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const DialogHeight = NnFloatBits(0x3cf5c28f);
         float const DialogScale = NnFloatBits(0x3fc00000);
         Vector Position = {NnFloatBits(0xbc343958), NnFloatBits(0x3da3d70a), 0.0f};
-        DialogText[0] = static_cast<NnTextControl*>(
-            CreateTextControl("SetKeyFrameText1", "ConfirmText", &Position, nullptr, DialogWidth,
-                              DialogHeight, DialogScale, 0x5e6, 1, 0, 0));
+        DialogText[0] = CreateTextControl("SetKeyFrameText1", "ConfirmText", &Position, nullptr, DialogWidth,
+                                          DialogHeight, DialogScale, 0x5e6, 1, 0, 0);
         Position.y = NnFloatBits(0x3d23d70a);
-        DialogText[1] = static_cast<NnTextControl*>(
-            CreateTextControl("SetKeyFrameText2", "ConfirmText", &Position, nullptr, DialogWidth,
-                              DialogHeight, DialogScale, 0, 1, 0, 0));
+        DialogText[1] = CreateTextControl("SetKeyFrameText2", "ConfirmText", &Position, nullptr, DialogWidth,
+                                          DialogHeight, DialogScale, 0, 1, 0, 0);
         Position.y = NnFloatBits(0xbbc49ba6);
-        DialogText[2] = static_cast<NnTextControl*>(
-            CreateTextControl("SetKeyFrameText3", "ConfirmText", &Position, nullptr, DialogWidth,
-                              DialogHeight, DialogScale, 0, 1, 0, 0));
+        DialogText[2] = CreateTextControl("SetKeyFrameText3", "ConfirmText", &Position, nullptr, DialogWidth,
+                                          DialogHeight, DialogScale, 0, 1, 0, 0);
     }
 
     // Overwrite / cancel boxes and captions.
@@ -3461,20 +3424,18 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         Vector const DialogExtents = {NnFloatBits(0x3dcccccd), NnFloatBits(0x3cac0831), 0.0f};
         Vector const LeftPosition = {NnFloatBits(0xbde56042), NnFloatBits(0xbd8f5c29), 0.0f};
         Vector const RightPosition = {NnFloatBits(0x3de56042), NnFloatBits(0xbd8f5c29), 0.0f};
-        OverwriteButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            "SetKeyOverwriteBtn", "ui_select_item", &LeftPosition, &DialogExtents, 0, 0, 0, 0, 0));
-        DialogCancelButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
-            "SetKeyCancelBtn", "ui_select_item", &RightPosition, &DialogExtents, 0, 0, 0, 0, 0));
+        OverwriteButton = CreateWireButtonControl(
+            "SetKeyOverwriteBtn", "ui_select_item", &LeftPosition, &DialogExtents, 0, 0, 0, 0, 0);
+        DialogCancelButton = CreateWireButtonControl(
+            "SetKeyCancelBtn", "ui_select_item", &RightPosition, &DialogExtents, 0, 0, 0, 0, 0);
         DialogCancelButton->WireState2 =
             static_cast<unsigned char>(DialogCancelButton->WireState2 | kWire2FlushBatchers);
-        DialogButtonText[0] = static_cast<NnTextControl*>(
-            CreateTextControl("keymap_keyBtnText1", "ButtonText", &LeftPosition, nullptr,
-                              NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
-                              NnFloatBits(0x3fc00000), 0x5e8, 1, 0, 0));
-        DialogButtonText[1] = static_cast<NnTextControl*>(
-            CreateTextControl("keymap_keyBtnText2", "ButtonText", &RightPosition, nullptr,
-                              NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
-                              NnFloatBits(0x3fc00000), 0x2148, 1, 0, 0));
+        DialogButtonText[0] = CreateTextControl("keymap_keyBtnText1", "ButtonText", &LeftPosition, nullptr,
+                                                NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
+                                                NnFloatBits(0x3fc00000), 0x5e8, 1, 0, 0);
+        DialogButtonText[1] = CreateTextControl("keymap_keyBtnText2", "ButtonText", &RightPosition, nullptr,
+                                                NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
+                                                NnFloatBits(0x3fc00000), 0x2148, 1, 0, 0);
     }
 
     HideControl(DialogText[0]);

@@ -462,7 +462,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
 
     // The solar's +0x204 JumpGateEffect (FUN_00548890); without one a temporary is built, and a
     // failed new skips to the hardpoint.
-    FJumpGateEffect* Gate = static_cast<FJumpGateEffect*>(GateSolar->JumpGateEffect);
+    FJumpGateEffect* Gate = GateSolar->JumpGateEffect;
     FJumpGateEffect* Temp = nullptr;
     FJumpEffectDesc* GateDesc = nullptr;
     bool bHaveGate = true;
@@ -522,7 +522,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
 
     // For the player's ship, the gate descriptor's jump_tunnel. Retail quirk kept: the
     // not-found error passes the raw id dword where the format wants a string.
-    if (static_cast<void*>(static_cast<IObjRW*>(Ship)) == GetPlayerObjRW())
+    if (static_cast<IObjRW*>(Ship) == GetPlayerObjRW())
     {
         FGateTunnel* Found = nullptr;
         if (GateDesc != nullptr)
@@ -602,8 +602,8 @@ namespace
     void AttachCompanionToShip(FJumpFxCompanion& Fx, FClientShipGameobj* Ship, int Index,
                                Transform const& Xform)
     {
-        if (Fx.Particle != nullptr)
-            Fx.Particle->Attach(Ship, Index, &Xform);
+        if (Fx.Effect != nullptr)
+            Fx.Effect->Attach(Ship, Index, &Xform);
         if (Fx.Sound != nullptr)
             Fx.Sound->SetPose(Index, &Xform);
         if (Fx.Light != nullptr)
@@ -705,7 +705,7 @@ void FJumpShipEffect::FinishJump()
         Tunnel->SetState(0);
 
     // The player's ship takes jump_done_effect_player, any other jump_done_effect_nonplayer.
-    bool const bPlayer = static_cast<void*>(static_cast<IObjRW*>(Ship)) == GetPlayerObjRW();
+    bool const bPlayer = static_cast<IObjRW*>(Ship) == GetPlayerObjRW();
     ID_String const& DoneEffect = bPlayer ? Desc->Ids[3] : Desc->Ids[4];
 
     // An empty name returns quietly.

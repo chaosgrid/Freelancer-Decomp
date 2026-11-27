@@ -139,22 +139,22 @@ namespace AlchemyImpl
     // DAT_06257b9c: IFxRuntime +0x24 LAB_0623b6a0 store / +0x28 LAB_0623b740 get+AddRef.
     // Client FUN_004f70d0 writes DAT_00674cdc = FUN_004f67e0 (8-byte, vtable 005d98bc).
     // Not IEngine. Mesh Extra2 is the OUT of factory+0x0C = FUN_004f6810, not this pointer.
-    extern IDAComponent* G_FxMeshFactory;
+    extern IFxMeshFactory* G_FxMeshFactory;
     // IFxRuntime Bind* raw stores (no AddRef): DAT_06257b98 (LAB_0623b670, the IAlchemy),
     // DAT_06257b94 (LAB_0623b680) and DAT_06257b90 (LAB_0623b690, the IFxEffectLibrary).
     // The particle appearance's child-effect spawn FUN_0622f6a0 / FUN_0622fcf0 reads
     // b98 and b90 directly.
-    extern void* G_RuntimeAlchemy;
+    extern IAlchemy* G_RuntimeAlchemy;
     extern void* G_RuntimeUnknown;
-    extern void* G_RuntimeEffectLibrary;
+    extern IFxEffectLibrary* G_RuntimeEffectLibrary;
     extern I3DMathEngine* G_3DMath;    // DAT_06257a6c via FUN_0623e830
     extern IDAComponent* G_RootNode;  // DAT_062578b0 - GetRootNode / Detach root
     extern IDAComponent* G_PipelineOuter;   // DAT_0625790c desc+8
     extern IRenderPipeline* G_RenderPipeline;  // DAT_06257bc0
-    extern IDAComponent* G_TextureLibrary;  // DAT_06257bbc
-    extern IDAComponent* G_RpVertexBuffer;  // DAT_06257bc4
-    extern IDAComponent* G_RpIndexBuffer;   // DAT_06257bc8
-    extern IDAComponent* G_RpDraw;          // DAT_06257bcc
+    extern ITextureLibrary2* G_TextureLibrary;  // DAT_06257bbc
+    extern IRPVertexBuffer* G_RpVertexBuffer;  // DAT_06257bc4
+    extern IRPIndexBuffer* G_RpIndexBuffer;   // DAT_06257bc8
+    extern IRPDraw* G_RpDraw;          // DAT_06257bcc
     extern void* G_VbHandle;                // DAT_0625791c
     extern void* G_IbHandle;
     extern unsigned long G_DrawCookie;            // DAT_06257908
@@ -280,22 +280,22 @@ namespace AlchemyImpl
     // ---- Generic COM/VB call-thunk helpers -----------------------------------
     GENRESULT CallIfaceQi(IDAComponent* Outer, const char* Iid, IDAComponent** Out);
     void ReleaseCachedIface(IDAComponent* Ptr);
-    GENRESULT CallCreateVb(IDAComponent* Vb, unsigned int Fvf, unsigned int Count, void** Out,
+    GENRESULT CallCreateVb(IRPVertexBuffer* Vb, unsigned int Fvf, unsigned int Count, void** Out,
                            unsigned int Flags);
-    GENRESULT CallDestroyVb(IDAComponent* Vb, void** Handle);
-    GENRESULT CallSelectVb(IDAComponent* Vb, void* Handle);
+    GENRESULT CallDestroyVb(IRPVertexBuffer* Vb, void** Handle);
+    GENRESULT CallSelectVb(IRPVertexBuffer* Vb, void* Handle);
     GENRESULT CallGetRenderState(IRenderPipeline* Pipeline, int State, int* Out);
     GENRESULT CallSetRenderState(IRenderPipeline* Pipeline, int State, int Value);
     GENRESULT RecreateAlchemyVertexBuffer();
     void ClearPipelineCache();
-    GENRESULT CallLockVb(IDAComponent* Vb, void* Handle, unsigned int* Offset, void** Out,
+    GENRESULT CallLockVb(IRPVertexBuffer* Vb, void* Handle, unsigned int* Offset, void** Out,
                          unsigned int Count);
-    GENRESULT CallUnlockVb(IDAComponent* Vb, void* Handle);
-    GENRESULT CallLockIb(IDAComponent* Ib, void* Handle, unsigned int* Offset, void** Out,
+    GENRESULT CallUnlockVb(IRPVertexBuffer* Vb, void* Handle);
+    GENRESULT CallLockIb(IRPIndexBuffer* Ib, void* Handle, unsigned int* Offset, void** Out,
                          unsigned int Count);
-    GENRESULT CallUnlockIb(IDAComponent* Ib, void* Handle);
-    GENRESULT CallSelectIb(IDAComponent* Ib, void* Handle, unsigned int BaseVertexIndex);
-    GENRESULT CallDrawIndexed(IDAComponent* Draw, unsigned long Prim, unsigned int MinIndex,
+    GENRESULT CallUnlockIb(IRPIndexBuffer* Ib, void* Handle);
+    GENRESULT CallSelectIb(IRPIndexBuffer* Ib, void* Handle, unsigned int BaseVertexIndex);
+    GENRESULT CallDrawIndexed(IRPDraw* Draw, unsigned long Prim, unsigned int MinIndex,
                               unsigned int NumVerts, unsigned int StartIndex, unsigned int Count);
     // FUN_06208640: Out = I3DMathEngine::MulTransform(A, B), 12-float transforms.
     void ComposeTransform(Transform* Out, const Transform* A, const Transform& B);

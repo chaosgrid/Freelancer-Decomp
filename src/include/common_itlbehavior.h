@@ -64,7 +64,7 @@ public:
     // Slot 1, LAB_062cee70, RET 0xc (.text:062ceea2): BindContext (FUN_062d2090) with all
     // three parameters; on success (`CMP AL,CL; JZ` skips otherwise) clears the cached lane
     // state. Returns BindContext's bool.
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, FUN_062cef10: with a target, SetAvoidanceAllowed(0, 3).
     void TurnOff();

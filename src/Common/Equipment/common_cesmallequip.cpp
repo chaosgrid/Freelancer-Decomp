@@ -57,7 +57,7 @@ CEArmor::~CEArmor()
 
 Archetype::Armor const* CEArmor::ArmorArch() const
 {
-    return (Archetype::Armor const*)Arch;
+    return static_cast<Archetype::Armor const*>(Arch);
 }
 
 CECargoPod::CECargoPod(CEqObj* OwnerObj, unsigned short EquipId, Archetype::CargoPod const* ArchObj,
@@ -109,7 +109,7 @@ CECargoPod* __cdecl CECargoPod::cast(CEquip* Equip)
     // RVA 0x359a0
     if (Equip == nullptr || Equip->GetType() != EquipTypeCargoPod)
         return nullptr;
-    return (CECargoPod*)Equip;
+    return static_cast<CECargoPod*>(Equip);
 }
 
 CECargoPod const* __cdecl CECargoPod::cast(CEquip const* Equip)
@@ -160,7 +160,7 @@ CERepairDroid* __cdecl CERepairDroid::cast(CEquip* Equip)
     // RVA 0x3fc80
     if (Equip == nullptr || Equip->GetType() != EquipTypeRepairDroid)
         return nullptr;
-    return (CERepairDroid*)Equip;
+    return static_cast<CERepairDroid*>(Equip);
 }
 
 CERepairDroid const* __cdecl CERepairDroid::cast(CEquip const* Equip)
@@ -196,7 +196,7 @@ CETradeLaneEquip* __cdecl CETradeLaneEquip::cast(CEquip* Equip)
     // FUN_0629fca0, shared by both overloads.
     if (Equip == nullptr || Equip->GetType() != EquipTypeTradeLane)
         return nullptr;
-    return (CETradeLaneEquip*)Equip;
+    return static_cast<CETradeLaneEquip*>(Equip);
 }
 
 CETradeLaneEquip const* __cdecl CETradeLaneEquip::cast(CEquip const* Equip)
@@ -206,12 +206,12 @@ CETradeLaneEquip const* __cdecl CETradeLaneEquip::cast(CEquip const* Equip)
 
 Archetype::TradeLaneEquip const* CETradeLaneEquip::TradeLaneArch() const
 {
-    return (Archetype::TradeLaneEquip const*)Arch;
+    return static_cast<Archetype::TradeLaneEquip const*>(Arch);
 }
 
 Archetype::RepairDroid const* CERepairDroid::RepairDroidArch() const
 {
-    return (Archetype::RepairDroid const*)Arch;
+    return static_cast<Archetype::RepairDroid const*>(Arch);
 }
 
 CEArmor* __cdecl CEArmor::cast(CEquip* Equip)
@@ -219,7 +219,7 @@ CEArmor* __cdecl CEArmor::cast(CEquip* Equip)
     // RVA 0x35220
     if (Equip == nullptr || Equip->GetType() != EquipTypeArmor)
         return nullptr;
-    return (CEArmor*)Equip;
+    return static_cast<CEArmor*>(Equip);
 }
 
 CEArmor const* __cdecl CEArmor::cast(CEquip const* Equip)

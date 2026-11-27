@@ -64,7 +64,7 @@ FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name)
     }
 
     FVmeshData* Data = (new FVmeshData)->Construct(Name, Size);
-    Data->Header = (FVmeshDataHeader*)Bytes;
+    Data->Header = reinterpret_cast<FVmeshDataHeader*>(Bytes);
     if ((Data->Header->Flags & 1) == 0)
     {
         char Message[0x2000];

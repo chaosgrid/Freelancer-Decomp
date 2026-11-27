@@ -232,12 +232,12 @@ unsigned long DACOM_API FRoomCamera::Release()
 
 const Vector* DACOM_API FRoomCamera::GetPosition()
 {
-    return (const Vector*)Pos;
+    return reinterpret_cast<const Vector*>(Pos);
 }
 
 const Matrix* DACOM_API FRoomCamera::GetOrientation()
 {
-    return (const Matrix*)Orient;
+    return reinterpret_cast<const Matrix*>(Orient);
 }
 
 int const* DACOM_API FRoomCamera::GetViewport()
@@ -313,7 +313,7 @@ void DACOM_API FRoomCamera::Unproject(Vector* OutWorld3, float ScreenX, float Sc
         static_cast<float>((ScreenX - (static_cast<double>(Viewport[0]) + HalfWidth)) / XScale);
     const float B =
         static_cast<float>((ScreenY - (static_cast<double>(Viewport[1]) + HalfHeight)) / YScale);
-    const float* M = (const float*)GetOrientation();
+    const float* M = reinterpret_cast<const float*>(GetOrientation());
 
     // out = M * (A, B, -1), row by row, with retail's temporaries: M1*B, M0*A and M6*A are
     // rounded to floats; M4*B, M3*A and M7*B stay on the x87 stack.
@@ -406,7 +406,7 @@ const Transform* DACOM_API FRoomCamera::GetViewTransform()
     View[9] = -Rotated.x;
     View[10] = -Rotated.y;
     View[11] = -Rotated.z;
-    return (const Transform*)View;
+    return reinterpret_cast<const Transform*>(View);
 }
 
 int DACOM_API FRoomCamera::ProjectVec(Vector* /*Out3*/, const Vector* /*World*/)

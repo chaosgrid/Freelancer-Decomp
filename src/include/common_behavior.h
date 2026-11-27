@@ -98,12 +98,12 @@ float Behavior_GetDistanceTravelled(IObjInspect const* Obj, float Throttle, floa
 // FUN_062e59b0. Chains Behavior_GetSpeed with the GetTimeToAccelerate /
 // GetDistanceTravelled pair (DAT_06399410 = 1.0, DAT_0639c430 = 0.0, DAT_0639c9f0 = 0.001).
 // Ghidra's unaff_retaddr is the Radius parameter (entry ESP+8).
-float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector);
+float Behavior_QueryChainedRadiusEffect(IObjInspect const* Obj, float Radius, int Selector);
 
 // FUN_062e5ab0. Null-guards Obj, returns 0.0f if Speed < 0.001f (DAT_0639e6c8); otherwise
 // get_distance_travelled(0.0f, Speed, 1000.0f (DAT_063a0760), engine): the distance the ship
 // coasts from Speed (SplineMoveIdea's CoastDistance, PathfindManager's coast distances).
-float Behavior_GetCoastDistance(void* Obj, float Speed);
+float Behavior_GetCoastDistance(IObjInspect const* Obj, float Speed);
 
 // FUN_062e5bc0. Null-guards Obj, returns 0.0f if Value is exactly 0.0f, else
 // Obj->get_initial_speed_to_coast_distance(Value, true) (slot 0xdc).
@@ -129,7 +129,7 @@ float Behavior_GetProjectedAxisThrottleXY(IObjInspect const* Obj, float Value);
 
 // FUN_062e61f0. Tail-thunk `Node->get_transform()` (IObjInspect slot 0xc), no null test.
 // Sole caller ThrustManager::SetNudgeDirection (FUN_062e8ce0).
-Transform const* Behavior_GetTransform(void* Node);
+Transform const* Behavior_GetTransform(IObjInspect const* Node);
 
 // FUN_062ecb20 (FollowerDirectiveGateA), FUN_062ecc60 / FUN_062ecce0 (NotifyFormationLeader1 /
 // 2) and FUN_062ecc50 (SetFlagC3) are thiscall on the 0xC8-byte block at SystemManager+0x1364:
@@ -267,7 +267,7 @@ public:
     // manager, its SystemManager). Every retail override starts with the binder FUN_062d2090
     // (BindContext) and returns its result, except NullBehavior's LAB_062d76a0
     // (`MOV AL,1; RET 0xc`).
-    virtual bool SetContext(void* Owner, void* Manager, void* Sys) = 0;
+    virtual bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) = 0;
     // 2 +0x08. `MOV [ECX+0x18],EAX; RET 4` (0x0629afd0, ICF fold labelled
     // CEquip::ConnectServerEquip): setter for +0x18, the behavior's IObjDB. Sole caller
     // ConnectBehaviorManagerObjectDb (FUN_062d2830) hands every dispatch-table entry the
@@ -337,7 +337,7 @@ public:
     virtual bool Slot25(void* Arg) { (void)Arg; return false; }
     // 26 +0x68. Retail body 06325390, `XOR EAX,EAX; RET` (the same ICF body as slot 24, so
     // typed after it).
-    virtual void* GetDockTarget() { return nullptr; }
+    virtual IObjRW* GetDockTarget() { return nullptr; }
 
     // FUN_062d2020 (RET 4), `Behavior::Behavior(int)`, which every derived constructor calls
     // first: the stores listed with the data block below, in retail order.
@@ -349,7 +349,7 @@ public:
     // FUN_062d2090, non-virtual, thiscall, RET 0xc, called by the slot-1 SetContext
     // overrides: Owner && Sys required, else false; then OwnerContext = Owner,
     // OwnerId = Owner->get_id(), SysMgr = Sys, BehaviorMgr = Manager, true.
-    bool BindContext(void* Owner, void* Manager, void* Sys);
+    bool BindContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys);
 
     // FUN_062d21d0, non-virtual, thiscall: forwards both stack arguments to the manager's
     // PathfindManager::SetAvoidanceAllowed (FUN_062dd3d0) via [[this+0x20]+0xc]: Value (low byte)
@@ -447,7 +447,7 @@ public:
     BaseFollowerBehavior& operator=(BaseFollowerBehavior const&) = delete;
 
     // Slot 1, LAB_062cb470 (RET 0xc).
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
     // Slot 3, FUN_062cb540.
     void OnEngage() override;
     // Slot 4, FUN_062cb5e0.

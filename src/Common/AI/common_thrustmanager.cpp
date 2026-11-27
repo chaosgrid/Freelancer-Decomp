@@ -48,7 +48,7 @@ void InitThrustManager(ThrustManager* Self, SystemManager* Owner)
     // A player ship gets no auto-avoidance.
     IObjRW* const Target =
         ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()));
-    if (Target != nullptr && ObjInspectOf(Target)->is_player())
+    if (Target != nullptr && Target->is_player())
         Self->bAutoAvoidance = 0;
 }
 
@@ -134,12 +134,12 @@ void ThrustManager::SetEngineActive(bool bActive)
 
     // SUBOBJ_ID_NONE is .rdata:063a4aa4.
     unsigned short Id = SUBOBJ_ID_NONE;
-    ObjInspectOf(OwnerShip())->find_equipment(&Id, 1, EquipTypeEngine);
+    OwnerShip()->find_equipment(&Id, 1, EquipTypeEngine);
 
     if (Id != SUBOBJ_ID_NONE)
     {
         EquipStatus Status{};
-        ObjInspectOf(OwnerShip())->get_equipment_status(Status, Id);
+        OwnerShip()->get_equipment_status(Status, Id);
         unsigned char const StatusByte = Status.Flags;
 
         // Gate on the status byte just written (Ghidra conflates it with bActive): not
@@ -160,7 +160,7 @@ void ThrustManager::SetAxisThrottle(Vector const& Wanted)
     if (OwnerShip() == nullptr)
         return;
 
-    if (ObjInspectOf(OwnerShip())->get_axis_throttle(AxisThrottle) != 0)
+    if (OwnerShip()->get_axis_throttle(AxisThrottle) != 0)
         return;
 
     // Epsilon = DAT_063a07e4 raw bits (~1.049e-6f).
@@ -186,7 +186,7 @@ void ThrustManager::SetStrafeDir(StrafeDir Dir)
     SetEngineActive(true);
 
     StrafeDir Current = StrafeNone;
-    if (ObjInspectOf(OwnerShip())->get_strafe_dir(Current) != 0)
+    if (OwnerShip()->get_strafe_dir(Current) != 0)
         return;
     if (Current == Dir)
         return;
@@ -199,7 +199,7 @@ void ThrustManager::SetThrustersActive(bool bActive)
 {
     bool bCruise = false;
     bool bTradeLane = false;
-    (void)ObjInspectOf(OwnerShip())->is_cruise_active(bCruise, bTradeLane);
+    (void)OwnerShip()->is_cruise_active(bCruise, bTradeLane);
     if (bCruise && !bTradeLane)
         return;
 
@@ -207,7 +207,7 @@ void ThrustManager::SetThrustersActive(bool bActive)
         SetEngineActive(true);
 
     bool bThrusters = false;
-    (void)ObjInspectOf(OwnerShip())->are_thrusters_active(bThrusters);
+    (void)OwnerShip()->are_thrusters_active(bThrusters);
     if (bThrusters == bActive)
         return;
 
@@ -221,7 +221,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
         return false;
 
     // Retail asks is_player and discards the answer.
-    (void)ObjInspectOf(OwnerShip())->is_player();
+    (void)OwnerShip()->is_player();
 
     float Clamped = (Throttle > MaxThrottle) ? MaxThrottle : Throttle;
     int const EffectiveMode = (bCruiseUnobstructed == 0 && Mode == kThrottleModeCruise) ? kThrottleModeEngine : Mode;
@@ -237,7 +237,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
 
         bool bCruise = false;
         bool bTradeLane = false;
-        (void)ObjInspectOf(OwnerShip())->is_cruise_active(bCruise, bTradeLane);
+        (void)OwnerShip()->is_cruise_active(bCruise, bTradeLane);
 
         // Cruising outside a trade lane: the set_throttle commit moves to the tail.
         bool const bDeferCommitToTail = (bCruise && !bTradeLane);
@@ -250,7 +250,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
 
             bool bCruiseNow = false;
             bool bTradeLaneNow = false;
-            (void)ObjInspectOf(OwnerShip())->is_cruise_active(bCruiseNow, bTradeLaneNow);
+            (void)OwnerShip()->is_cruise_active(bCruiseNow, bTradeLaneNow);
 
             if (!(bCruiseNow && bCruiseEngaged == 1))
             {
@@ -272,7 +272,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
 
     bool bCruise = false;
     bool bTradeLane = false;
-    (void)ObjInspectOf(OwnerShip())->is_cruise_active(bCruise, bTradeLane);
+    (void)OwnerShip()->is_cruise_active(bCruise, bTradeLane);
 
     if (!(!bCruise && bCruiseEngaged == 0))
     {
@@ -307,7 +307,7 @@ void ThrustManager::SetNudgeDirection(Vector const& WorldDir)
 
     // A failed query returns without committing.
     Vector Current;
-    if (ObjInspectOf(OwnerShip())->get_nudge_vec(Current) != 0)
+    if (OwnerShip()->get_nudge_vec(Current) != 0)
         return;
 
     // Commit when any axis differs by more than 1e-6f (DAT_063a07e4) squared; unordered
@@ -337,7 +337,7 @@ void ThrustManager::BlendNudgeDirection(Vector const& WorldDir, float DeltaTime)
 
     // No null test on the owner ship, as in retail.
     Vector NudgeLocal;
-    ObjInspectOf(OwnerShip())->get_nudge_vec(NudgeLocal);
+    OwnerShip()->get_nudge_vec(NudgeLocal);
 
     // The nudge into world space by the own ship's transform (DAT_063fca58 engine cache).
     Vector NudgeWorld;

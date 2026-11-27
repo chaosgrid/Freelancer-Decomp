@@ -108,7 +108,7 @@ void CSolar::init(CreateParms const& Parms)
     // The gate's open animation (Archetype::Solar +0xa0; only its first char is tested).
     if (DestSystem != 0)
     {
-        Archetype::Solar* const SolarArch = (Archetype::Solar*)Archetype;
+        Archetype::Solar* const SolarArch = static_cast<Archetype::Solar*>(Archetype);
         char const* const OpenAnimName = SolarArch->OpenAnim.Value;
         if (OpenAnimName[0] != '\0')
         {
@@ -231,7 +231,7 @@ Vector CSolar::get_velocity() const
 Archetype::Solar const* CSolar::solararch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::Solar const*)Archetype;
+    return static_cast<Archetype::Solar const*>(Archetype);
 }
 
 Vector CSolar::get_angular_velocity() const
@@ -371,7 +371,7 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     }
 
     // No null test on the archetype.
-    Archetype::Solar const* const SolarArch = (Archetype::Solar const*)Archetype;
+    Archetype::Solar const* const SolarArch = static_cast<Archetype::Solar const*>(Archetype);
     Phy.Mass = Archetype->Mass;
     Phy.Type = PhySys::ANIM_TECHNIQUE_GOLEM;
     Phy.SystemId = GetObjectDbSystemId(ObjectDb);
@@ -500,7 +500,7 @@ void CSolar::update_system_gate(float Dt)
 
     case 3:
         // IAnimation2 slot 17 (+0x44).
-        if (DALib::Anim->FilterObjects((void*)GateAnim.Index) == 0)
+        if (DALib::Anim->FilterObjects(reinterpret_cast<void*>(GateAnim.Index)) == 0)
             return;
         GateAnimState = 4;
         Code = 3;
@@ -553,7 +553,7 @@ CEquip* CSolar::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch, 
     {
         // operator new(0x20); a null block falls through to CEqObj::alloc_equip.
         CETradeLaneEquip* const Equip = new CETradeLaneEquip(
-            this, EquipId, (Archetype::TradeLaneEquip const*)Arch, bMissionFlag);
+            this, EquipId, static_cast<Archetype::TradeLaneEquip const*>(Arch), bMissionFlag);
         if (Equip != nullptr)
             return Equip;
     }

@@ -66,7 +66,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API EnumerateNodes(FNodeLibraryEnumCallback Callback, void* Context) override;
         GENRESULT DACOM_API ClearNodeLibrary() override;
         // FUN_062277e0: MakeUniqueName-style "#N" collision avoidance.
-        GENRESULT DACOM_API MakeUniqueName(void* Name, void* Out) override;
+        GENRESULT DACOM_API MakeUniqueName(const char* Name, const char** Out) override;
         // LAB_06227710: find prototype by hash, then CloneNode(Out).
         GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) override;
         // LAB_06227770: find CRC, write stored ptr, AddRef.
@@ -74,22 +74,22 @@ namespace AlchemyImpl
 
         GENRESULT DACOM_API CreateVertexBuffer() override;
         GENRESULT DACOM_API ReleaseVertexBuffer() override;
-        GENRESULT DACOM_API ComposeNodeTransforms(void* A, void* B) override;
-        GENRESULT DACOM_API UpdateNodes(void* A, void* B) override;
-        GENRESULT DACOM_API DrawNodes(void* Cookie, void* StartNode) override;
+        GENRESULT DACOM_API ComposeNodeTransforms(void* A, IDAComponent* B) override;
+        GENRESULT DACOM_API UpdateNodes(void* A, IDAComponent* B) override;
+        GENRESULT DACOM_API DrawNodes(void* Cookie, IDAComponent* StartNode) override;
         GENRESULT DACOM_API GetDrawCookie() override
         {
             return static_cast<GENRESULT>(G_DrawCookie);
         }
         GENRESULT DACOM_API CreateNamedNode(const char* Name, void* Unused) override;
-        GENRESULT DACOM_API AttachNode(void* ParentRaw, void* ChildRaw) override;
-        GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) override;
-        GENRESULT DACOM_API DetachNode(void* Node) override;
-        GENRESULT DACOM_API SubmitNode(void* Node) override;
-        GENRESULT DACOM_API SubmitChildNodes(void* Node) override;
-        GENRESULT DACOM_API GetRootNode(void** Out) override;
+        GENRESULT DACOM_API AttachNode(IDAComponent* ParentRaw, IDAComponent* ChildRaw) override;
+        GENRESULT DACOM_API AttachNodeFiltered(void* A, IDAComponent* B) override;
+        GENRESULT DACOM_API DetachNode(IDAComponent* Node) override;
+        GENRESULT DACOM_API SubmitNode(IDAComponent* Node) override;
+        GENRESULT DACOM_API SubmitChildNodes(IDAComponent* Node) override;
+        GENRESULT DACOM_API GetRootNode(IDAComponent** Out) override;
         // FUN_06202180: Out is written through; StartNode is never read.
-        GENRESULT DACOM_API FindNode(void* Out, void* SearchKey, void* StartNode) override;
+        GENRESULT DACOM_API FindNode(IDAComponent** Out, void* SearchKey, IDAComponent* StartNode) override;
         GENRESULT DACOM_API SetUpdateCallback(void* Fn) override;
         GENRESULT DACOM_API SetFilterCallback(void* Fn) override;
 
@@ -105,13 +105,13 @@ namespace AlchemyImpl
         {
             return static_cast<GENRESULT>(G_Defaults.bUseMaterialBatcher);
         }
-        GENRESULT DACOM_API EnqueueAppearance(void* ListIndexRaw, void* AppearanceRaw) override;
+        GENRESULT DACOM_API EnqueueAppearance(void* ListIndexRaw, IDAComponent* AppearanceRaw) override;
         void* DACOM_API GetVertexBufferHandle() override
         {
             return G_VbHandle;
         }
-        GENRESULT DACOM_API SetDrawFlags(void* Pair) override;
-        GENRESULT DACOM_API CopyCounters(void* Out9Dwords) override;
+        GENRESULT DACOM_API SetDrawFlags(unsigned char* Pair) override;
+        GENRESULT DACOM_API CopyCounters(unsigned char* Out9Dwords) override;
 
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
 

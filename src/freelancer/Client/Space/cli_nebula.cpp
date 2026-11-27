@@ -225,7 +225,7 @@ namespace
         if (NebulaVolume::DrivesNebulaLight(Nebula))
             return;
 #endif
-        FEngineLight* const Light = (FEngineLight*)GLight;
+        FEngineLight* const Light = GLight;
         // Return when the period is <= 0; a NaN period goes on.
         float const Period = Nebula->DynLightningDuration;
         if (Period <= 0.0f)
@@ -517,7 +517,7 @@ namespace
     // +0x34) and the TexturePanels update (visibility = panels +0x70, manager = null).
     // Each puff drifts by its velocity; its lightning timer runs while lightning_duration is
     // positive (FNebulaCloudPuff).
-    void LocalNebulaCloudsUpdate(FNebulaClouds* Clouds, void* Camera, float Dt, float Visibility,
+    void LocalNebulaCloudsUpdate(FNebulaClouds* Clouds, ICamera* Camera, float Dt, float Visibility,
                                  Exclusion::NebulaExclusionZoneMgr* ExclusionMgr)
     {
         if (Clouds->bLoaded == 0)
@@ -543,7 +543,7 @@ namespace
         else
             Clouds->Fade = Visibility / FullVisibility;
 
-        ICamera* const Cam = static_cast<ICamera*>(Camera);
+        ICamera* const Cam = Camera;
         float const Radius = Clouds->CloudRadius;
         float const Ahead = Clouds->NearFadeReach + Radius;
         Clouds->CentreAhead = Ahead;
@@ -1526,7 +1526,7 @@ namespace
     }
 
     // FUN_005529b0 — the lightning flash draw.
-    void LightningDraw(FNebulaLightning* Lightning, void* Camera)
+    void LightningDraw(FNebulaLightning* Lightning, ICamera* Camera)
     {
         // Nothing unless active (+0x14c) and the countdown +0x00 is not below zero (only an
         // ordered "less" returns).
@@ -1549,8 +1549,7 @@ namespace
         float const Blue = static_cast<float>(
             static_cast<double>(static_cast<float>(Lightning->Color[2] * Jitter)) * Intensity);
 
-        ICamera* const Cam = static_cast<ICamera*>(Camera);
-        Win3DApplyCamera(Cam);
+        Win3DApplyCamera(Camera);
 
         Win3DBindTexture(Lightning->Texture->GetGpuHandle(0));
 
@@ -1562,7 +1561,7 @@ namespace
         for (int I = 0; I < 8; ++I)
         {
             if (Lightning->SegmentAge[I] < 3)
-                LightningDrawSegment(&Lightning->Segments[I], (const float*)Cam->GetPosition());
+                LightningDrawSegment(&Lightning->Segments[I], (const float*)Camera->GetPosition());
         }
 
         Win3DEnd();
@@ -1603,7 +1602,7 @@ void FNebulaClouds::RegenExcluded(void* ExclusionCtx)
     LocalNebulaCloudsRegenExcluded(this, ExclusionCtx);
 }
 
-void FNebulaClouds::Update(void* Camera, float Dt, float Visibility,
+void FNebulaClouds::Update(ICamera* Camera, float Dt, float Visibility,
                            Exclusion::NebulaExclusionZoneMgr* ExclusionMgr)
 {
     LocalNebulaCloudsUpdate(this, Camera, Dt, Visibility, ExclusionMgr);
@@ -1744,12 +1743,12 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                 Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
             This->DynamicLight = Light;
             // Type 3 = directional.
-            ((FEngineLight*)Light)->SetType(kLightDirectional, false);
+            Light->SetType(kLightDirectional, false);
             Vector Zero = {0.0f, 0.0f, 0.0f};
-            ((FEngineLight*)Light)->SetPosition(&Zero);
+            Light->SetPosition(&Zero);
             unsigned char White[3] = {0xff, 0xff, 0xff};
-            ((FEngineLight*)Light)->SetColorBytesAlt(White);
-            ((FEngineLight*)Light)->SetRangeRaw(500000.0f);
+            Light->SetColorBytesAlt(White);
+            Light->SetRangeRaw(500000.0f);
             // Success turns it straight off again when its flag bit 3 is set (FUN_005097c0's
             // flicker enables it).
             if (!Light->FGameLight::Enable())
@@ -1773,12 +1772,12 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
 
 // LAB_00508b00 — screen fog fade overlay, then the lightning (+0x100). No test of `this` or
 // Camera.
-void FNebulaEffect::DrawFogOverlay(void* Camera)
+void FNebulaEffect::DrawFogOverlay(FSpaceCamera* Camera)
 {
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
         return;
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
+    ICamera* const Cam = Camera;
 
     // Both are called and their results dropped.
     (void)This->Zone->GetPos();
@@ -1813,7 +1812,7 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
     {
         // Copied before the state calls.
         float const Alpha = *FadePtr;
-        Win3DSetOrtho2DForCamera(static_cast<FSpaceCamera*>(Camera));
+        Win3DSetOrtho2DForCamera(Camera);
         Win3DDisable(kWin3DLightingCap);
         Win3DSetDepthWrite(0);
         Win3DDisable(kWin3DDepthTest);
@@ -1846,7 +1845,7 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
 
 // LAB_00508cf0 — fog shell (fill sheets) under the MaterialBatcher / depth gate. No test of
 // `this`, Camera, the MaterialBatcher or the Pipeline.
-void FNebulaEffect::DrawFogShell(void* Camera)
+void FNebulaEffect::DrawFogShell(FSpaceCamera* Camera)
 {
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
@@ -1864,7 +1863,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);
 
     // 12 dwords: the 3x3 axes and, at +0x24, the position.
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
+    ICamera* const Cam = Camera;
     Transform Xform;
     memcpy(&Xform, Cam->GetOrientation(), sizeof(Xform));
     // The passed camera, not the active space camera.
@@ -1886,7 +1885,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
 // FUN_00508e00 — fog render states + FNebulaEffect::DrawExteriorBits under the MaterialBatcher / depth gate.
 // No null tests on This, the Pipeline or the MaterialBatcher, and no guard on a zero +0x298
 // (retail divides straight through).
-void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
+void FNebulaEffect::DrawExteriorBitsPass(FSpaceCamera* Camera)
 {
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
@@ -1924,7 +1923,7 @@ void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
 
 // LAB_00508f20 — exclusion-shell mesh draw, only while Update found a shell for the current
 // exclusion zone (+0x2c / +0x30).
-void FNebulaEffect::DrawExclusionShell(void* Camera)
+void FNebulaEffect::DrawExclusionShell(FSpaceCamera* Camera)
 {
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
@@ -1984,7 +1983,7 @@ void FNebulaEffect::DrawExclusionShell(void* Camera)
 }
 
 // LAB_005091a0 — the clouds list (+0xf8) through FUN_00551500.
-void FNebulaEffect::DrawCloudsPanels(void* Camera)
+void FNebulaEffect::DrawCloudsPanels(FSpaceCamera* Camera)
 {
     FNebulaEffect* const This = this;
     NebulaDrawCloudsPanels(This, Camera);
@@ -2228,15 +2227,15 @@ float FNebulaEffect::GetZoneCenterRadius(float* OutPos3)
 
 FNebulaEffectCompanion::FNebulaEffectCompanion()
 {
-    Values[0] = nullptr;
-    Values[1] = nullptr;
-    Values[2] = nullptr;
-    Values[3] = nullptr;
+    EffectArch = nullptr;
+    Sound = nullptr;
+    Effect = nullptr;
+    Light = nullptr;
 }
 
 FNebulaEffectCompanion::~FNebulaEffectCompanion()
 {
-    CliEffectCompanionClear(Values);
+    CliEffectCompanionClear(this);
 }
 
 FNebulaCloudsListStorage::FNebulaCloudsListStorage()
@@ -2644,7 +2643,7 @@ void FNebulaEffect::Rebuild()
     NebulaBitShrink(this, Bit, BottomLen);
 }
 
-void FNebulaEffect::Update(void* Camera, float Dt)
+void FNebulaEffect::Update(FSpaceCamera* Camera, float Dt)
 {
     FNebulaEffect* const Nebula = this;
     // LAB_00506f20 — vtable +0x08.
@@ -2669,7 +2668,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
         Nebula->bReachPending = 0;
     }
 
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
+    ICamera* const Cam = Camera;
     const Vector* const CamPosPtr = Cam->GetPosition();
     Vector CamPos;
     CamPos.x = CamPosPtr->x;
@@ -2677,7 +2676,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     CamPos.z = CamPosPtr->z;
     // The camera's cut flag, byte +0xbc of the camera object (FSpaceCamera::FlagBC, raised by
     // FUN_0054bd50 when the view jumps); retail reads it raw.
-    unsigned char const CameraCut = static_cast<unsigned char const*>(Camera)[0xbc];
+    unsigned char const CameraCut = Camera->FlagBC;
 
     // Not yet fully inside (>= and unordered skip): re-orient the exterior bits when the +0x58
     // timer is above 1.0 or the camera cut, then restart that timer.
@@ -3047,7 +3046,7 @@ void FNebulaEffect::DrawFillSheets(float CamX, float CamY, float CamZ)
     Win3DEnable(kWin3DCullFace);
 }
 
-void FNebulaEffect::DrawExteriorBits(void* Camera)
+void FNebulaEffect::DrawExteriorBits(FSpaceCamera* Camera)
 {
     // FUN_00507ed0 — the exterior bit billboards. Nothing once +0x294 is not below 1.0
     // (unordered also exits).
@@ -3056,7 +3055,7 @@ void FNebulaEffect::DrawExteriorBits(void* Camera)
     if (!(InsideFade < 1.0))
         return;
 
-    ICamera* const Cam = static_cast<ICamera*>(Camera);
+    ICamera* const Cam = Camera;
     Transform View;
     memcpy(&View, Cam->GetOrientation(), sizeof(View));
     Vector const CamPos = { View.Translation.x, View.Translation.y, View.Translation.z };
@@ -3072,7 +3071,7 @@ void FNebulaEffect::DrawExteriorBits(void* Camera)
         AcquireNebulaMath()->InverseTransform(ZoneView, View, ZoneWorld);
         float const Center[3] = { ZoneView.x, ZoneView.y, ZoneView.z };
         float const ZoneRadius = Zone->GetRadius();
-        if (static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)Center, ZoneRadius)) < kSphereStraddling)
+        if (static_cast<unsigned short>(Cam->ClassifySphere(reinterpret_cast<const Vector*>(Center), ZoneRadius)) < kSphereStraddling)
             return;
     }
 
@@ -3288,7 +3287,7 @@ void FNebulaEffect::DrawExteriorBits(void* Camera)
     Win3DEnable(kWin3DCullFace);
 
     // The effect at +0xec (the companion's, released by Shutdown).
-    FEffectBase* const Effect = static_cast<FEffectBase*>(Companion.Values[2]);
+    FEffectBase* const Effect = Companion.Effect;
     if (Effect != nullptr)
     {
         Effect->SetIntensity(static_cast<float>(1.0 - InsideFade));

@@ -267,7 +267,7 @@ void CArchGroup::GetCollisionGroupDesc(CollisionGroupDesc& Out) const
 CacheString const& CArchGroup::Name() const
 {
     // FUN_062a06b0. CollisionGroup's "obj" CacheString at +0x08. No null check on Arch.
-    return *(CacheString const*)&Arch->ObjName;
+    return *reinterpret_cast<CacheString const*>(&Arch->ObjName);
 }
 
 unsigned short CArchGroup::GetID() const
@@ -301,7 +301,7 @@ bool CArchGroup::GetVelocity(Vector& Out) const
     Out.z = 0.0f;
     if (State == STATE_DESTROYED || RootIndex == -1)
         return false;
-    Out = PhySys::GetVelocity((CObject const*)DALib::Engine->GetInstanceUserData(RootIndex));
+    Out = PhySys::GetVelocity(static_cast<CObject const*>(DALib::Engine->GetInstanceUserData(RootIndex)));
     return true;
 }
 

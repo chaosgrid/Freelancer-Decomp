@@ -171,11 +171,11 @@ static void LinkAndProbeNode(FSystemContainer* Container, FComponentNode* Node)
     Container->Tail = Node;
 
     if (Node->Inner->QueryInterface(Iids::SystemComponent,
-                                    (void**)(&Node->SystemComponent)) == GR_OK)
+                                    reinterpret_cast<void**>(&Node->SystemComponent)) == GR_OK)
         Node->SystemComponent->Release();
 
     if (Node->Inner->QueryInterface(Iids::AggregateComponent,
-                                    (void**)(&Node->Aggregate)) == GR_OK)
+                                    reinterpret_cast<void**>(&Node->Aggregate)) == GR_OK)
         Node->Aggregate->Release();
 }
 
@@ -202,13 +202,13 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
         if (strcmp(Table[Index].Iid, Iid) != 0)
             continue;
 
-        unsigned char* Base = (unsigned char*)(Outer);
+        unsigned char* Base = reinterpret_cast<unsigned char*>(Outer);
         unsigned long Offset = Table[Index].ByteOffset;
         IDAComponent* Face = nullptr;
         if ((Offset & FQiEntry::kIndirect) != 0)
-            Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
+            Face = *reinterpret_cast<IDAComponent**>(Base + (Offset & ~FQiEntry::kIndirect));
         else
-            Face = (IDAComponent*)(Base + Offset);
+            Face = reinterpret_cast<IDAComponent*>(Base + Offset);
         Face->AddRef();
         *Out = Face;
         return GR_OK;
@@ -318,7 +318,7 @@ GENRESULT DACOM_API FSystemContainer::Initialize()
 
 GENRESULT DACOM_API FSystemContainer::Shutdown()
 {
-    GENRESULT Result = (GENRESULT)((intptr_t)((ISystemContainer*)(this)));
+    GENRESULT Result = (GENRESULT)((intptr_t)(static_cast<ISystemContainer*>(this)));
     FComponentNode* Node = Head;
     while (Node != nullptr)
     {
@@ -338,7 +338,7 @@ GENRESULT DACOM_API FSystemContainer::LoadSystemComponents()
         return GR_OK;
 
     IProfileParser* Parser = nullptr;
-    if (GDacom->QueryInterface(Iids::ProfileParser, (void**)(&Parser)) == GR_OK)
+    if (GDacom->QueryInterface(Iids::ProfileParser, reinterpret_cast<void**>(&Parser)) == GR_OK)
     {
         void* Section = Parser->OpenSection(kSystemSection, 3);
         if (Section != nullptr)
@@ -377,7 +377,7 @@ GENRESULT DACOM_API FSystemContainer::LoadSystemComponents()
                 Node->Next = nullptr;
 
                 Desc.Name = Name;
-                Desc.Outer = (ISystemContainer*)(this);
+                Desc.Outer = static_cast<ISystemContainer*>(this);
                 Desc.InnerOut = &Node->Inner;
                 Desc.Extra = Extra;
 
@@ -389,8 +389,8 @@ GENRESULT DACOM_API FSystemContainer::LoadSystemComponents()
                     *Token = '\0';
 
                 const char* Status = nullptr;
-                if (GDacom->CreateInstance((AGGDESC*)(&Desc),
-                                           (void**)(&Node->Object)) != GR_OK)
+                if (GDacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
+                                           reinterpret_cast<void**>(&Node->Object)) != GR_OK)
                 {
                     Status = kStatusFailed;
                     ReleaseNodeInner(Node);
@@ -442,7 +442,7 @@ GENRESULT DACOM_API FSystemContainer::AddComponent(AGGDESC* Desc)
     if (Desc == nullptr)
         return GR_INVALID_PARMS;
 
-    FSystemAggDesc* SystemDesc = (FSystemAggDesc*)(Desc);
+    FSystemAggDesc* SystemDesc = reinterpret_cast<FSystemAggDesc*>(Desc);
     IDAComponent* SavedOuter = SystemDesc->Outer;
     IDAComponent** SavedInnerOut = SystemDesc->InnerOut;
 
@@ -452,9 +452,9 @@ GENRESULT DACOM_API FSystemContainer::AddComponent(AGGDESC* Desc)
     Node->Inner = nullptr;
     Node->Next = nullptr;
 
-    SystemDesc->Outer = (ISystemContainer*)(this);
+    SystemDesc->Outer = static_cast<ISystemContainer*>(this);
     SystemDesc->InnerOut = &Node->Inner;
-    GENRESULT Result = GDacom->CreateInstance(Desc, (void**)(&Node->Object));
+    GENRESULT Result = GDacom->CreateInstance(Desc, reinterpret_cast<void**>(&Node->Object));
     if (Result != GR_OK)
     {
         SystemDesc->Outer = SavedOuter;
@@ -484,7 +484,7 @@ GENRESULT DACOM_API FSystemContainer::FindConnectionPoint(const char* Iid, void*
             Cached = nullptr;
         }
         if (Node->Inner->QueryInterface(Iids::DAConnectionPointContainer,
-                                        (void**)(&Cached)) == GR_OK)
+                                        reinterpret_cast<void**>(&Cached)) == GR_OK)
         {
             Result = Cached->FindConnectionPoint(Iid, Out);
             if (Result == GR_OK)
@@ -511,7 +511,7 @@ GENRESULT DACOM_API FSystemContainer::EnumConnectionPoints(void* Arg0, void* Arg
             Cached = nullptr;
         }
         if (Node->Inner->QueryInterface(Iids::DAConnectionPointContainer,
-                                        (void**)(&Cached)) == GR_OK)
+                                        reinterpret_cast<void**>(&Cached)) == GR_OK)
         {
             Result = Cached->EnumConnectionPoints(Arg0, Arg1);
             if (Result == GR_OK)
@@ -545,7 +545,7 @@ FSystemContainerFactory::FSystemContainerFactory() : FDacomComponentFactory(kCom
 // LAB_06f118a0.
 GENRESULT DACOM_API FSystemContainerFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 {
-    FSystemAggDesc* SystemDesc = (FSystemAggDesc*)(Desc);
+    FSystemAggDesc* SystemDesc = reinterpret_cast<FSystemAggDesc*>(Desc);
     if (SystemDesc->Size != kAggDescSize || strcmp(SystemDesc->Name, Name) != 0)
     {
         *Instance = nullptr;
@@ -570,7 +570,7 @@ GENRESULT DACOM_API FSystemContainerFactory::CreateInstance(AGGDESC* Desc, void*
         return Result;
     }
 
-    *Instance = (ISystemContainer*)(Object);
+    *Instance = static_cast<ISystemContainer*>(Object);
     return Result;
 }
 
@@ -580,7 +580,7 @@ static void RegisterSystemContainer(ICOManager* Dacom)
     FSystemContainerFactory* Factory = new (std::nothrow) FSystemContainerFactory();
     if (Factory == nullptr)
         return;
-    Dacom->RegisterComponent(Factory, kComponentName, (void*)(kRegisterPriority));
+    Dacom->RegisterComponent(Factory, kComponentName, reinterpret_cast<void*>(kRegisterPriority));
     Factory->Release();
 }
 

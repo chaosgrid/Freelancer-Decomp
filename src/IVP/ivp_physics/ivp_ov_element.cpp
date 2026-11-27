@@ -322,8 +322,8 @@ IVP_Collision* IVP_Collision_Delegator_Root_Mindist::delegate_collisions_for_obj
                                                                                  IVP_Real_Object* CollidingElement)
 {
     // Surface manager slot 0 on each object: the single convex ledge, or null.
-    IVP_Compact_Ledge* Ledge0 = static_cast<IVP_Compact_Ledge*>(BaseObject->surface_manager->get_single_convex());
-    IVP_Compact_Ledge* Ledge1 = static_cast<IVP_Compact_Ledge*>(CollidingElement->surface_manager->get_single_convex());
+    IVP_Compact_Ledge* Ledge0 = BaseObject->surface_manager->get_single_convex();
+    IVP_Compact_Ledge* Ledge1 = CollidingElement->surface_manager->get_single_convex();
 
     IVP_Collision* Collision = nullptr;
     if (Ledge0 != nullptr && Ledge1 != nullptr)
@@ -740,7 +740,7 @@ float IVP_OV_Tree_Manager::insert_ov_element(IVP_OV_Element* Element,
 
     // Does the cell exist? Tag and comparator argument are both the embedded
     // QueryCell (CRC of its first 20 bytes; LAB_06369240 compares four dwords).
-    IVP_OV_Node* Node = (IVP_OV_Node*)NodeHash->FindElem(&QueryCell, IVP_OV_HashNodeKey(&QueryCell)); // FUN_06352580
+    IVP_OV_Node* Node = static_cast<IVP_OV_Node*>(NodeHash->FindElem(&QueryCell, IVP_OV_HashNodeKey(&QueryCell))); // FUN_06352580
 
     if (Node != nullptr)
     {
@@ -1221,8 +1221,7 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
         IVP_Real_Object* NewObj = NewPartners.elems[B];
         for (int32_t D = static_cast<int32_t>(environment->collision_delegator_roots.n_elems) - 1; D >= 0; --D)
         {
-            IVP_Collision_Delegator_Root* Delegator =
-                static_cast<IVP_Collision_Delegator_Root*>(environment->collision_delegator_roots.elems[D]);
+            IVP_Collision_Delegator_Root* Delegator = environment->collision_delegator_roots.elems[D];
             IVP_Collision* Claimed =
                 Delegator->delegate_collisions_for_object(Object, NewObj); // slot 5
             if (Claimed != nullptr)

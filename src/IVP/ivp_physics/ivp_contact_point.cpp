@@ -1588,8 +1588,7 @@ IVP_Contact_Point* IVP_Ledge_Mindist::try_to_generate_managed_friction(IVP_ListM
     {
         // 06356d15-06356d9f.
         Fs = Info0->FrictionSystem;
-        Info1 = static_cast<IVP_Friction_Info_For_Core*>(
-            Core1->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Fs)))); // FUN_06347c40
+        Info1 = Core1->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Fs))); // FUN_06347c40
         if (Info1 == nullptr)
         {
             IVP_Friction_Info_For_Core* const Other =

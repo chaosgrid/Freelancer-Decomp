@@ -56,7 +56,7 @@ public:
     LootBehavior& operator=(LootBehavior const&) = delete;
 
     // Slot 1, LAB_062ce550 (RET 0xc).
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
     // Slot 3, LAB_062cd5d0: `JMP FUN_062d20d0`.
     void OnEngage() override;
     // Slot 4, FUN_062ce660.

@@ -100,7 +100,7 @@ void CUniverseChatDlg::OnDestroy()
 // target the "universe" id, system -1.
 void CUniverseChatDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 {
-	const MSGFILTER* Filter = (const MSGFILTER*)Header;
+	const MSGFILTER* Filter = reinterpret_cast<const MSGFILTER*>(Header);
 	if (Filter->wParam != VK_RETURN)
 	{
 		*Result = 0;

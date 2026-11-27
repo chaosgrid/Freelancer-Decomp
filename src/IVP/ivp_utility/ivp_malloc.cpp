@@ -16,10 +16,10 @@
 // never read back. Retail does not test the malloc result.
 void* __cdecl ivp_malloc_aligned(unsigned Size, unsigned Align)
 {
-    unsigned char* Raw = (unsigned char*)malloc(Size + Align + 8);                           // FUN_06343f70
-    unsigned char* Aligned = (unsigned char*)(((uintptr_t)Raw + Align + 7) & (0 - (uintptr_t)Align));
-    *(unsigned*)Raw = 0x65981234;
-    ((void**)Aligned)[-1] = Raw;
+    unsigned char* Raw = static_cast<unsigned char*>(malloc(Size + Align + 8));                           // FUN_06343f70
+    unsigned char* Aligned = reinterpret_cast<unsigned char*>(((uintptr_t)Raw + Align + 7) & (0 - (uintptr_t)Align));
+    *reinterpret_cast<unsigned*>(Raw) = 0x65981234;
+    (reinterpret_cast<void**>(Aligned))[-1] = Raw;
     return Aligned;
 }
 
@@ -27,6 +27,6 @@ void* __cdecl ivp_malloc_aligned(unsigned Size, unsigned Align)
 // PhyArch::Part::~Part 0627f9fc, Part::clear 0627fa41).
 void __cdecl ivp_free_aligned(void* AlignedPtr)
 {
-    void* RawPtr = ((void**)AlignedPtr)[-1];
+    void* RawPtr = (static_cast<void**>(AlignedPtr))[-1];
     free(RawPtr);                            // FUN_06343fb0
 }

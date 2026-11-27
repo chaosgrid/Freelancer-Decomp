@@ -17,6 +17,7 @@
 #include <cstddef>
 
 struct FGameLight; // engine_light.h
+class FClientGameobj; // client_gameobj.h
 
 // Retail ParticleEffect — RTTI / Effect.cpp. Vtable PTR_FUN_005d9ad4.
 // Same 0x84 footprint as BeamEffect, but +0x04 = VisEffect*, +0x6c = IFxEffect*,
@@ -149,7 +150,7 @@ struct FCameraParticles : FEffectBase
     float Timer;                   // +0x6c  ctor: 0.4f + 0.4f (.rdata 0x005d9a74 doubled)
     unsigned char bStartOpaque;    // +0x70  ctor 1; Start: distance factor <= 0.0f
     unsigned char Pad71[3];
-    void* Camera;                  // +0x74  ctor 0; Start: FUN_0040f130 (the listener camera)
+    FSpaceCamera* Camera;          // +0x74  ctor 0; Start: FUN_0040f130 (the listener camera)
 };
 static_assert(sizeof(FCameraParticles) == 0x78, "CameraParticles 0x78 (LAB_004f6e40)");
 static_assert(offsetof(FCameraParticles, Timer) == 0x6c, "Timer @ +0x6c");
@@ -172,9 +173,9 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal);
 // FUN_00503070 — createeffect one-shot (particle, sound and light). A non-null ListOwner gets
 // the companion inserted into its effect list (FUN_004fcea0 on ListOwner+0x28).
 // This wrapper is FUN_00503070 on DAT_00674c60, the factory almost every caller passes.
-unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
+unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, FClientGameobj* ListOwner,
                                      int EngineIndex, Transform const* LocalXform,
-                                     void* CompanionOut);
+                                     FEffectCompanion* CompanionOut);
 
 struct FCliEffectFactory;
 
@@ -199,15 +200,15 @@ struct FCliEffectFactory
 
     // FUN_00503070 with its `this` factory explicit. Callers on another factory: FUN_00514750
     // (DAT_006751cc) and FUN_00514070, which forwards its own factory (DAT_006751cc or DAT_00674c60).
-    unsigned char CreateEffectOneShotOn(FEffectArch* EffectArch, void* ListOwner, int EngineIndex,
-                                        Transform const* LocalXform, void* CompanionOut) const;
+    unsigned char CreateEffectOneShotOn(FEffectArch* EffectArch, FClientGameobj* ListOwner, int EngineIndex,
+                                        Transform const* LocalXform, FEffectCompanion* CompanionOut) const;
 
     // FUN_00503f40 (on Factory) — world-space one-shot (no ListOwner attach).
     // Copies 0x30 LocalXform into particle+0x10 / light+0xf0 (or EngineLightSetTransform when
     // light EngIndex==-1); Pos3 → particle+0x4c / sound SetVelocity / GameLight+0x120.
     // CompanionOut may be null (tradelane player leave/approach). No FUN_004fcea0.
     unsigned char CreateEffectWorldOneShotOn(FEffectArch* EffectArch, Transform const* LocalXform,
-                                             float const* Pos3, void* CompanionOut) const;
+                                             float const* Pos3, FEffectCompanion* CompanionOut) const;
 };
 
 struct FStandardCliEffectFactory : FCliEffectFactory
@@ -246,4 +247,4 @@ extern FTunnelCliEffectFactory const G_CliEffectFactoryTunnel;
 // FUN_00503f40 on DAT_00674c60 (the explosion's factory, among others). The DAT_00674c5c
 // callers go through FCliEffectFactory::CreateEffectWorldOneShotOn with G_CliEffectFactoryCameraParticles.
 unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
-                                          float const* Pos3, void* CompanionOut);
+                                          float const* Pos3, FEffectCompanion* CompanionOut);

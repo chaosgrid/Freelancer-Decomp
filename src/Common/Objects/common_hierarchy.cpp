@@ -116,7 +116,7 @@ void __cdecl CompoundInstanceAnalyze(long Instance, void (__cdecl* Callback)(lon
 // FUN_06303550
 static void __cdecl CompoundInstanceCount_AnalyzeCallback(long /*Instance*/, void* Context)
 {
-    int* const Count = (int*)Context;
+    int* const Count = static_cast<int*>(Context);
     ++*Count;
 }
 
@@ -164,7 +164,7 @@ namespace
     // FUN_06303680
     void __cdecl CountMatchingName(long Instance, void* Context)
     {
-        FNameScan* const Scan = (FNameScan*)Context;
+        FNameScan* const Scan = static_cast<FNameScan*>(Context);
         if (Scan->Predicate(Instance, Scan->Name))
             *Scan->MatchCount += 1;
     }
@@ -172,7 +172,7 @@ namespace
     // FUN_063036a0
     void __cdecl AppendMatchingName(long Instance, void* Context)
     {
-        FNameScan* const Scan = (FNameScan*)Context;
+        FNameScan* const Scan = static_cast<FNameScan*>(Context);
         if (!Scan->Predicate(Instance, Scan->Name))
             return;
         *Scan->Cursor = Instance;
@@ -182,7 +182,7 @@ namespace
     // FUN_063035b0
     void __cdecl AppendInstance(long Instance, void* Context)
     {
-        long** const Cursor = (long**)Context;
+        long** const Cursor = static_cast<long**>(Context);
         **Cursor = Instance;
         *Cursor += 1;
     }
@@ -315,7 +315,7 @@ COMMON_API CObject* __cdecl GetRoot(CObject const* Obj)
             ParentInst = Inst;
             Inst = DALib::Engine->GetInstanceParent(ParentInst);
         } while (Inst != -1);
-        return (CObject*)DALib::Engine->GetInstanceUserData(ParentInst);
+        return static_cast<CObject*>(DALib::Engine->GetInstanceUserData(ParentInst));
     }
     return const_cast<CObject*>(Obj);
 }
@@ -357,7 +357,7 @@ namespace
     // EnumerateHardpoints; this wrapper has that callback's signature.
     void __cdecl NumHardpoints_CountCallback(char const* /*Name*/, void* Context)
     {
-        int* const Count = (int*)Context;
+        int* const Count = static_cast<int*>(Context);
         ++*Count;
     }
 }
@@ -423,7 +423,7 @@ COMMON_API bool __cdecl JointEnumCallback(long Param1, long Param2, struct Joint
     else
         memset(JointCopy, 0, sizeof(JointCopy));
 
-    JointEnumContext* const Ctx = (JointEnumContext*)Context;
+    JointEnumContext* const Ctx = static_cast<JointEnumContext*>(Context);
     JointEnumNode* const HeadNode = Ctx->Head;
     JointEnumNode* const OldPrev = HeadNode->Prev;
     JointEnumNode* const NewNode = new JointEnumNode;

@@ -1470,7 +1470,7 @@ GENRESULT FTextureLibrary::LoadTextureRecord(IFileSystem* RootFileSystem, FFileS
         return GR_OK;
     }
     IFileSystem* TextureFileSystem = nullptr;
-    const GENRESULT CreateResult = RootFileSystem->CreateInstance((AGGDESC*)Desc,
+    const GENRESULT CreateResult = RootFileSystem->CreateInstance(reinterpret_cast<AGGDESC*>(Desc),
                                              (void**)&TextureFileSystem);
     if (CreateResult < 0)
     {
@@ -1507,10 +1507,10 @@ GENRESULT FTextureLibrary::LoadTextureRecord(IFileSystem* RootFileSystem, FFileS
     return Result;
 }
 
-GENRESULT DACOM_API FTextureLibrary::LoadTextureLibrary(void* FileSystem, const char* Name)
+GENRESULT DACOM_API FTextureLibrary::LoadTextureLibrary(IFileSystem* FileSystem, const char* Name)
 {
     RefreshDeviceAbilities();
-    IFileSystem* Source = AsFileSystem(FileSystem);
+    IFileSystem* Source = FileSystem;
     const int Opened = Source->OpenNode("Texture library");
     FFileSystemDesc Desc = MakeTextureDescriptor(Name);
     FTextureEntry* Entry;
@@ -1520,9 +1520,9 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureLibrary(void* FileSystem, const 
     return Result;
 }
 
-GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* OutGroupId)
+GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(IFileSystem* FileSystem, int* OutGroupId)
 {
-    IFileSystem* Source = AsFileSystem(FileSystem);
+    IFileSystem* Source = FileSystem;
     if (Source == nullptr)
     {
         FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
@@ -1657,7 +1657,7 @@ GENRESULT DACOM_API FTextureLibrary::GetFrame(int Id, int Frame, unsigned long* 
 GENRESULT DACOM_API FTextureLibrary::GetTextureFrame(void* Tex, int Frame, unsigned long* Out)
 {
     // LAB_06ec2ee0: canonical source; only -2 selects the last frame.
-    FTextureEntry* Source = (FTextureEntry*)Tex;
+    FTextureEntry* Source = static_cast<FTextureEntry*>(Tex);
     if (Source != nullptr)
     {
         const unsigned int Count = (unsigned int)Source->Frames.size();
@@ -1773,7 +1773,7 @@ GENRESULT DACOM_API FTextureLibrary::TickAllPlayback(int Unused, float DeltaSeco
 GENRESULT DACOM_API FTextureLibrary::GetGroupPixelFormat(void* Record, void* Unused, int* OutFormat)
 {
     (void)Unused;
-    FTextureEntry* Entry = (FTextureEntry*)Record;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Record);
     if (Entry != nullptr && !Entry->Frames.empty())
     {
         const unsigned long Handle = Entry->Children[0]->GpuHandle;
@@ -1830,7 +1830,7 @@ GENRESULT DACOM_API FTextureLibrary::CreatePlaybackGroup(void* SourceRecord, int
     // LAB_06ec3050: canonical retention precedes optional ID allocation.
     if (OutId != nullptr)
         *OutId = -1;
-    FTextureEntry* Source = (FTextureEntry*)SourceRecord;
+    FTextureEntry* Source = static_cast<FTextureEntry*>(SourceRecord);
     if (Source == nullptr)
         return GR_GENERIC;
     AddRefEntryRecursive(Source);
@@ -1853,7 +1853,7 @@ GENRESULT DACOM_API FTextureLibrary::ReleaseTextureRecord(void* Record)
     // LAB_06ec2870. Record is a pointer from FindTextureByCrc, not an id.
     if (Record == nullptr)
         return GR_GENERIC;
-    ReleaseEntryReference((FTextureEntry*)Record);
+    ReleaseEntryReference(static_cast<FTextureEntry*>(Record));
     return GR_OK;
 }
 
@@ -1893,7 +1893,7 @@ GENRESULT DACOM_API FTextureLibrary::CopyName(void* Node, char* Buf, unsigned lo
 {
     // LAB_06ec2890: clear first, then copy only min(strlen, unsigned(Size-1)).
     *Buf = '\0';
-    FTextureEntry* Entry = (FTextureEntry*)Node;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Node);
     if (Entry == nullptr)
         return GR_GENERIC;
     const char* Source = Entry->GetName();
@@ -1921,7 +1921,7 @@ static FTextureFrame* FindMutableFrame(FTextureEntry* Entry, int Index)
 GENRESULT DACOM_API FTextureLibrary::SetFrameHandle(void* Record, int Index, unsigned long Handle)
 {
     // LAB_06ec2bf0: the first word is a child index, never a GPU handle.
-    FTextureFrame* Frame = FindMutableFrame((FTextureEntry*)Record, Index);
+    FTextureFrame* Frame = FindMutableFrame(static_cast<FTextureEntry*>(Record), Index);
     if (Frame == nullptr)
         return GR_GENERIC;
     Frame->ChildIndex = Handle;
@@ -1931,7 +1931,7 @@ GENRESULT DACOM_API FTextureLibrary::SetFrameHandle(void* Record, int Index, uns
 GENRESULT DACOM_API FTextureLibrary::SetFrameRect(void* Record, int Index, float U0, float V0,
                                                   float U1, float V1)
 {
-    FTextureFrame* Frame = FindMutableFrame((FTextureEntry*)Record, Index);
+    FTextureFrame* Frame = FindMutableFrame(static_cast<FTextureEntry*>(Record), Index);
     if (Frame == nullptr)
         return GR_GENERIC;
     Frame->Uv[0] = U0;
@@ -1944,7 +1944,7 @@ GENRESULT DACOM_API FTextureLibrary::SetFrameRect(void* Record, int Index, float
 GENRESULT DACOM_API FTextureLibrary::SetTileRate(void* Record, float Value)
 {
     // LAB_06ec2fc0 (retail record +0xC).
-    FTextureEntry* Entry = (FTextureEntry*)Record;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Record);
     if (Entry == nullptr)
         return GR_GENERIC;
     Entry->TileRate = Value;
@@ -1955,7 +1955,7 @@ GENRESULT DACOM_API FTextureLibrary::GetTileRate(void* Record, float* Out)
 {
     // LAB_06ec2fe0.
     *Out = 0.0f;
-    FTextureEntry* Entry = (FTextureEntry*)Record;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Record);
     if (Entry == nullptr)
         return GR_GENERIC;
     *Out = Entry->TileRate;
@@ -1966,7 +1966,7 @@ GENRESULT DACOM_API FTextureLibrary::GetFrameCount(void* Record, int* Out)
 {
     // LAB_06ec3000.
     *Out = 0;
-    FTextureEntry* Entry = (FTextureEntry*)Record;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Record);
     if (Entry == nullptr)
         return GR_GENERIC;
     // LAB_06ec3016: null begin returns -1; an allocated empty range succeeds.
@@ -2182,7 +2182,7 @@ GENRESULT DACOM_API FTextureLibrary::SetRecordName(void* Record, const char* Nam
     // LAB_06ec28e0 probes the incoming name, then erases that node before renaming Record.
     const unsigned long Key = DACOM_CRC::GetCRC32(Name);
     const std::map<unsigned long, FTextureEntry*>::iterator Found = CanonicalRecords.find(Key);
-    FTextureEntry* Entry = (FTextureEntry*)Record;
+    FTextureEntry* Entry = static_cast<FTextureEntry*>(Record);
     if (Found == CanonicalRecords.end() || Entry == nullptr)
         return GR_GENERIC;
     CanonicalRecords.erase(Found);
@@ -2193,7 +2193,7 @@ GENRESULT DACOM_API FTextureLibrary::SetRecordName(void* Record, const char* Nam
 
 GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int TextureId)
 {
-    FTextureEntry* Parent = (FTextureEntry*)Record;
+    FTextureEntry* Parent = static_cast<FTextureEntry*>(Record);
     if (Parent == nullptr)
         return GR_GENERIC;
     FTextureEntry* Child = nullptr;

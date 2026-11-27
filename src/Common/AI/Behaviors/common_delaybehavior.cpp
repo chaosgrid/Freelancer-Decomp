@@ -24,7 +24,7 @@ DelayBehavior::~DelayBehavior()
 }
 
 // Slot 1, LAB_062d0a70.
-bool DelayBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool DelayBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     bool const bOk = BindContext(Param1, Param2, Param3);   // FUN_062d2090
     if (bOk)

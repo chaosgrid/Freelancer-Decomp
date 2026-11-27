@@ -102,18 +102,9 @@ namespace
                                                Offset);
     }
 
-    // FUN_0042a7e0 list node -- {Next, Prev, ship id}, 0xc bytes.
-    struct FTlShipListNode
-    {
-        FTlShipListNode* Next;
-        FTlShipListNode* Prev;
-        unsigned ShipId;
-    };
-    static_assert(sizeof(FTlShipListNode) == 0xc, "ship list node 0xc");
-
     FTlShipListNode* TlShipListHead(FTradeLaneRingRuntime* Ring)
     {
-        return static_cast<FTlShipListNode*>(Ring->ShipListSentinel);
+        return Ring->ShipListSentinel;
     }
 
     // FUN_0042a7e0: operator_new(0xc), Next / Prev as given, a null one pointing back at the
@@ -254,20 +245,20 @@ namespace
         *reinterpret_cast<unsigned*>(reinterpret_cast<unsigned char*>(Ship) + kTlShipFlags184) = 0;
     }
 
-    void* TlShipCompanion(FClientGameobj* Ship, unsigned Offset)
+    FEffectCompanion* TlShipCompanion(FClientGameobj* Ship, unsigned Offset)
     {
-        return reinterpret_cast<unsigned char*>(Ship) + Offset;
+        return reinterpret_cast<FEffectCompanion*>(reinterpret_cast<unsigned char*>(Ship) + Offset);
     }
 
     // FUN_0054baf0 -- the player's gameobj (the watchable at DAT_00679744 minus eight) or null.
     FClientGameobj* TlPlayerGameobj()
     {
-        return static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
+        return static_cast<FClientGameobj*>(GetPlayerObjRW());
     }
 
     // FUN_00515640 (on a companion) -- the stop sequence, then the release FUN_00502d90
     // inlined. Also inlined at five other sites.
-    void TlCompanionStopAndClear(void* Companion)
+    void TlCompanionStopAndClear(FEffectCompanion* Companion)
     {
         CliEffectCompanionArmStop(Companion);
         CliEffectCompanionClear(Companion);
@@ -276,8 +267,8 @@ namespace
     // FUN_00514070 (on the factory) -- an empty id gives false; else
     // FUN_00503070 on the same factory with FindEffectArch(Id).
     unsigned char TlCreateEffectFromId(FCliEffectFactory const* Factory, ID_String const* Id,
-                                       void* ListOwner, int EngineIndex, Transform const* Xform,
-                                       void* CompanionOut)
+                                       FClientGameobj* ListOwner, int EngineIndex, Transform const* Xform,
+                                       FEffectCompanion* CompanionOut)
     {
         if (Id->IsEmpty())
             return 0;
@@ -289,7 +280,7 @@ namespace
     // an empty id gives false, else FUN_00503f40 with FindEffectArch(Id).
     unsigned char TlCreateWorldEffectFromId(FCliEffectFactory const* Factory, ID_String const* Id,
                                             Transform const* Xform, float const* Pos3,
-                                            void* CompanionOut)
+                                            FEffectCompanion* CompanionOut)
     {
         if (Id->IsEmpty())
             return 0;
@@ -464,7 +455,7 @@ namespace
     // is one, gets its own vtable slot +0x0c with the glow -- a tail JMP.
     void TlNotifyGlowScale(FTradeLaneRingRuntime* Ring, float Glow)
     {
-        FEffectBase* const Effect = (FEffectBase*)Ring->EffectSlot2;
+        FEffectBase* const Effect = Ring->EffectCompanion.Effect;
         if (Effect == nullptr)
             return;
         Effect->SetIntensity(Glow);
@@ -495,9 +486,9 @@ namespace
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
-        void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
         if (CreateEffectCompanionAlive(Lane) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(Ship) + 0x28, Lane);
+            CliEffectListRemove(&Ship->EffectList, Lane);
         TlShipClearFlags(Ship);
         TlShipRingPtr(Ship) = nullptr;
     }
@@ -626,9 +617,9 @@ namespace
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
-        void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
         if (CreateEffectCompanionAlive(Lane) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(Ship) + 0x28, Lane);
+            CliEffectListRemove(&Ship->EffectList, Lane);
         if (bPlayer && !TlCompanionId(Companion, kTlPlayerExit)->IsEmpty())
         {
             TlPlayerCameraOneShot(Ship, TlCompanionId(Companion, kTlPlayerExit));
@@ -661,9 +652,9 @@ namespace
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
             TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
         }
-        void* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
         if (CreateEffectCompanionAlive(Lane) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(Ship) + 0x28, Lane);
+            CliEffectListRemove(&Ship->EffectList, Lane);
         FClientSolarGameobj const* const ShipRingGo =
             static_cast<FClientSolarGameobj const*>(TlWatchedGameobj(TlShipRingPtr(Ship)));
         if (ShipRingGo->bTradeLaneIdle != 0)
@@ -862,7 +853,7 @@ namespace
         if (Nearest != nullptr)
         {
             ProbeShip = &Nearest->get_position();
-            if (CreateEffectCompanionAlive(&Ring->EffectSlot0) == 0 && Ring->bActive != 0)
+            if (CreateEffectCompanionAlive(&Ring->EffectCompanion) == 0 && Ring->bActive != 0)
             {
                 Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
                 Vector Hp;
@@ -872,7 +863,7 @@ namespace
                 FClientGameobj* const Owner = TlWatchedGameobj(Ring);
                 long const Index = TlWatchedGameobj(Ring)->get_index();
                 TlCreateEffectFromId(&G_CliEffectFactoryC60, TlCompanionId(Companion, kTlRingActive),
-                                     Owner, static_cast<int>(Index), &Xform, &Ring->EffectSlot0);
+                                     Owner, static_cast<int>(Index), &Xform, &Ring->EffectCompanion);
             }
         }
 
@@ -911,7 +902,7 @@ namespace
                 Node = Head->Next;
             }
         }
-        TlCompanionStopAndClear(&Ring->EffectSlot0);
+        TlCompanionStopAndClear(&Ring->EffectCompanion);
     }
 
     // FUN_00515730 -- the node's destructor: the FUN_005137c0 ship pass
@@ -932,8 +923,8 @@ namespace
                 Node = Head->Next;
             }
         }
-        TlCompanionStopAndClear(&Ring->EffectSlot0);
-        CliEffectCompanionClear(&Ring->EffectSlot0); // the member's own release
+        TlCompanionStopAndClear(&Ring->EffectCompanion);
+        CliEffectCompanionClear(&Ring->EffectCompanion); // the member's own release
         Ring->RingWatcher.set(nullptr);
         FTlShipListNode* const Head = TlShipListHead(Ring);
         FTlShipListNode* Node = Head->Next;
@@ -1078,7 +1069,7 @@ FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,
         Ring->RingWatcher.set(nullptr);
         Ring->bActive = 1;
         TlGlowCtor(Ring);
-        CliEffectCompanionInit(&Ring->EffectSlot0, nullptr, nullptr, nullptr, nullptr);
+        CliEffectCompanionInit(&Ring->EffectCompanion, nullptr, nullptr, nullptr, nullptr);
     }
     else
     {
@@ -1285,7 +1276,7 @@ void TradeLaneShutdown()
                 Entry = Head->Next;
             }
         }
-        TlCompanionStopAndClear(&Node->EffectSlot0);
+        TlCompanionStopAndClear(&Node->EffectCompanion);
     }
 
     FTradeLaneRingRuntime* FreeAfter = nullptr;
@@ -1409,7 +1400,7 @@ unsigned char TradeLaneSolarLaneSwitch(FClientGameobj* SolarGo, unsigned char bS
     // Ships still on it: the host's effect list is cleared of the effects whose arch holds 0x28;
     // none left: the lane one-shots again (FUN_00516d10).
     if (*ShipCount != 0)
-        CliEffectListClear(reinterpret_cast<unsigned char*>(Wrapper->Host) + 0x28,
+        CliEffectListClear(&Wrapper->Host->EffectList,
                            reinterpret_cast<void*>(static_cast<std::uintptr_t>(0x28)));
     else
         CliTradeLaneEquipFxAttachLaneEffects(Wrapper);
@@ -1428,8 +1419,8 @@ unsigned char TradeLaneSolarLaneSwitch(FClientGameobj* SolarGo, unsigned char bS
         Ring->bActive = bNoShips;
         if (bNoShips != 0)
             continue;
-        if (CreateEffectCompanionAlive(&Ring->EffectSlot0) != 0)
-            TlCompanionStopAndClear(&Ring->EffectSlot0);
+        if (CreateEffectCompanionAlive(&Ring->EffectCompanion) != 0)
+            TlCompanionStopAndClear(&Ring->EffectCompanion);
     }
     return bNoShips;
 }

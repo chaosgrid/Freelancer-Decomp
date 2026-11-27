@@ -32,6 +32,7 @@
 #include <vector>
 
 struct IServer;
+class IChatServer;
 class ServerFilter;
 struct FServerInfo;
 
@@ -278,7 +279,7 @@ extern bool G_bServerDisconnected;   // DAT_0067ecbe
 extern bool G_bServerConnected;      // DAT_0067ecbf
 extern bool G_bCommandLineG;         // DAT_0067ecc0 ("+G", main.cpp)
 extern IServer* G_Server;            // DAT_0067ecd0
-extern void* G_ChatServer;           // DAT_0067ecd4
+extern IChatServer* G_ChatServer;     // DAT_0067ecd4
 extern long G_ConnectResult;         // DAT_0067ea50 (HandleConnectError)
 extern bool G_bWaitingForServer;     // DAT_0067ea54
 extern char G_LocalServerDll[32];    // .data:00615aec "Server.dll", [Freelancer] local_server

@@ -79,11 +79,10 @@ static void InitializeMaFileDesc(FFileSystemDesc* Desc, const char* Name)
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
-static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
+static void ParseMaKeys(IFileSystem* Fs, FMaKeyBlock* Block)
 {
     // FUN_06ec6a60: scalar reads commit only on success with four bytes;
     // array reads retain their published allocation regardless of read result/size.
-    IFileSystem* Fs = AsFileSystem(FileSystem);
     FFileSystemDesc Desc;
     unsigned long BytesRead;
     unsigned long Scalar;
@@ -118,7 +117,7 @@ static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
             DeltaCount = Fs->GetSize(Handle, 0) / 0x14;
         const unsigned long DeltaBytes = DeltaCount * 0x14;
         // The wrapped byte size may be smaller than a whole array of records.
-        FMaDelta* Deltas = (FMaDelta*)operator new(DeltaBytes);
+        FMaDelta* Deltas = static_cast<FMaDelta*>(operator new(DeltaBytes));
         if (Deltas != nullptr)
         {
             Block->Deltas = Deltas;
@@ -139,7 +138,7 @@ static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
     if (KeyCount == 0)
         KeyCount = Fs->GetSize(Handle, 0) >> 4;
     const unsigned long KeyBytes = KeyCount << 4;
-    FMaKey* Keys = (FMaKey*)operator new(KeyBytes);
+    FMaKey* Keys = static_cast<FMaKey*>(operator new(KeyBytes));
     if (Keys != nullptr)
     {
         Block->Keys = Keys;
@@ -169,7 +168,7 @@ GENRESULT DACOM_API FImaData::QueryInterface(const char* Iid, void** Out)
         return GR_INTERFACE_UNSUPPORTED;
     }
     AddRef();
-    *Out = (IImaData*)this;
+    *Out = static_cast<IImaData*>(this);
     return GR_OK;
 }
 
@@ -226,7 +225,7 @@ GENRESULT DACOM_API FImaInstance::QueryInterface(const char* Iid, void** Out)
         return GR_INTERFACE_UNSUPPORTED;
     }
     AddRef();
-    *Out = (IImaInstance*)this;
+    *Out = static_cast<IImaInstance*>(this);
     return GR_OK;
 }
 
@@ -362,9 +361,9 @@ GENRESULT DACOM_API FMaterialAnimationController::QueryInterface(const char* Iid
     // LAB_06ec8020: interface table DAT_06ed2c00 (IMatAnimLibrary +0, IAggregateComponent +4).
     IDAComponent* Face;
     if (std::strcmp(Iid, Iids::MatAnimLibrary) == 0)
-        Face = (IMatAnimLibrary*)Owner;
+        Face = static_cast<IMatAnimLibrary*>(Owner);
     else if (std::strcmp(Iid, Iids::AggregateComponent) == 0)
-        Face = (IAggregateComponent*)&Owner->Aggregate;
+        Face = static_cast<IAggregateComponent*>(&Owner->Aggregate);
     else
     {
         *Out = nullptr;
@@ -465,10 +464,10 @@ void FMaterialAnimation::StoreData(unsigned long Crc, FImaData* Data)
         Data->AddRef();
 }
 
-void* DACOM_API FMaterialAnimation::LoadAnimationGroup(void* FileSystem)
+void* DACOM_API FMaterialAnimation::LoadAnimationGroup(IFileSystem* FileSystem)
 {
     // LAB_06ec6e40: each subdirectory is read through a child filesystem.
-    IFileSystem* Fs = AsFileSystem(FileSystem);
+    IFileSystem* Fs = FileSystem;
     if (Fs->OpenNode("MaterialAnim") == 0)
         return nullptr;
 
@@ -490,7 +489,7 @@ void* DACOM_API FMaterialAnimation::LoadAnimationGroup(void* FileSystem)
                 Desc.FindHandle = (unsigned long)Find;
                 IFileSystem* ChildFs = nullptr;
                 const GENRESULT Result = Fs->CreateInstance(
-                    (AGGDESC*)&Desc, (void**)&ChildFs);
+                    reinterpret_cast<AGGDESC*>(&Desc), (void**)&ChildFs);
                 if (Result >= 0)
                 {
                     // ParseMaKeys always succeeds in retail, including missing key files.
@@ -522,7 +521,7 @@ GENRESULT DACOM_API FMaterialAnimation::UnloadAnimationGroup(void* Arg)
     if (Arg == nullptr || Arg == (void*)(uintptr_t)-1)
         return GR_OK;
 
-    FMatAnimLoadGroup* Group = (FMatAnimLoadGroup*)Arg;
+    FMatAnimLoadGroup* Group = static_cast<FMatAnimLoadGroup*>(Arg);
     // LAB_06ec70c0: remove every live CRC before releasing any group reference.
     for (size_t EntryIndex = 0; EntryIndex < Group->Entries.size(); ++EntryIndex)
     {

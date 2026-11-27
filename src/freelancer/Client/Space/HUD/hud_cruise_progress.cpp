@@ -54,7 +54,7 @@ bool HUD_CruiseProgress::Create(Win3D* NewParent, void* Data)
 
     // The label's Font::String goes multi-line (and its layout is dropped) unless it already
     // is. The factory's result is not tested, as in retail.
-    FFontString* const Text = static_cast<NnTextControl*>(CruiseProgressText)->GetFontString();
+    FFontString* const Text = CruiseProgressText->GetFontString();
     if (Text->bMultiLine != 1)
     {
         Text->bMultiLine = 1;   // +0x30
@@ -105,7 +105,7 @@ void HUD_CruiseProgress::Draw()
     {
         return;
     }
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
     if (Player == nullptr)
     {
         return;
@@ -152,7 +152,7 @@ void HUD_CruiseProgress::Draw()
     float const Ratio =
         static_cast<float>(static_cast<double>(Elapsed) / static_cast<double>(ChargeTime));
 
-    NnTextControl* const Text = static_cast<NnTextControl*>(CruiseProgressText);
+    NnTextControl* const Text = CruiseProgressText;
     wchar_t Line[0x3c];
 
     if (Ratio < 0.0f)

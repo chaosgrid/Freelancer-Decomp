@@ -189,7 +189,7 @@ void EngineObject::set_transform(Transform const& Xform)
 Transform const& EngineObject::get_transform() const
 {
     // this+0x08: Orientation followed by WorldPosition, one Transform.
-    return *(Transform const*)&Orientation;
+    return *reinterpret_cast<Transform const*>(&Orientation);
 }
 
 Matrix const& EngineObject::get_orientation() const

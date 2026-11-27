@@ -52,7 +52,7 @@ namespace
     // through the possibly-null result with no test.
     CEqObj* EqObjOrNull(CObject* Obj)
     {
-        return (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj) ? (CEqObj*)Obj : nullptr;
+        return (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj) ? static_cast<CEqObj*>(Obj) : nullptr;
     }
 }
 
@@ -200,7 +200,7 @@ void LaunchAction::Start()
 
     PhySys::Controller::Register(this, Docked);
 
-    Archetype::EqObj* Arch = (Archetype::EqObj*)BaseObj->Archetype;
+    Archetype::EqObj* Arch = static_cast<Archetype::EqObj*>(BaseObj->Archetype);
     bNoDockingCamera = !Arch->bDockingCamera;
 }
 
@@ -260,7 +260,7 @@ bool LaunchAction::update(float /*Dt*/)
     if (!SinglePlayer())
     {
         // IObjInspect slot 47 (+0xbc), is_player.
-        bool const bIsServer = ObjInspectOf(Dock)->is_player();
+        bool const bIsServer = Dock->is_player();
 
         if (bIsServer)
         {
@@ -268,7 +268,7 @@ bool LaunchAction::update(float /*Dt*/)
             // [-pi/8, pi/8) (pi/4 double DAT_0639e5c8, pi/8 DAT_0639e5c0) turn the x/z, then y/z
             // columns, and the object is beamed to its centre of mass (slot 5). cos is rounded
             // to float, sin and every product are not.
-            Matrix Orient = ObjInspectOf(Dock)->get_transform().Rotation;
+            Matrix Orient = Dock->get_transform().Rotation;
 
             double Angle = (double)((float)rand() * 3.0517578125e-05f) *
                            0.78539818525314331 - 0.39269909262657166;
@@ -295,7 +295,7 @@ bool LaunchAction::update(float /*Dt*/)
                 Orient.E[Row][2] = (float)((double)Cos * Z - Y * Sin);
             }
 
-            Vector Center = ObjInspectOf(Dock)->get_center_of_mass();
+            Vector Center = Dock->get_center_of_mass();
             Docked->beam_object(Center, Orient, false);
         }
     }
@@ -416,7 +416,7 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
     Field60 = 10.0f;
 
     // Retail quirk kept: Target is dereferenced with no null test (a non-ship crashes).
-    CShip* TargetShip = (CShip*)Target;
+    CShip* TargetShip = static_cast<CShip*>(Target);
     TargetShip->enable_collisions_r(false);
     TargetShip->Throttle = 0.0f;
 
@@ -478,7 +478,7 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
 
     CObject* Target = (CObject*)Watched->cobject();   // slot 84 (+0x150)
     CShip* TargetShip = (Target != nullptr && (Target->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-        ? (CShip*)Target : nullptr;
+        ? static_cast<CShip*>(Target) : nullptr;
 
     // FST: the float is stored, the unrounded sum feeds the compare and the ease.
     double const Elapsed = (double)JumpElapsed + EventSim->delta_time;

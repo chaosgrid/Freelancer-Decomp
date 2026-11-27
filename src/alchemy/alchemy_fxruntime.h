@@ -54,13 +54,13 @@ namespace AlchemyImpl
         IDAComponent* InnerUnknown() { return &Inner_; }
         GENRESULT InitializeFromFactory(AGGDESC*) { return GR_OK; }
 
-        GENRESULT DACOM_API BindAlchemy(void* Alchemy) override;
+        GENRESULT DACOM_API BindAlchemy(IAlchemy* Alchemy) override;
         GENRESULT DACOM_API BindUnknown(void* Value) override;
-        GENRESULT DACOM_API BindEffectLibrary(void* Library) override;
+        GENRESULT DACOM_API BindEffectLibrary(IFxEffectLibrary* Library) override;
         GENRESULT DACOM_API GetAlchemy(void** Out) override;
         GENRESULT DACOM_API GetUnknown(void** Out) override;
         GENRESULT DACOM_API GetEffectLibrary(void** Out) override;
-        GENRESULT DACOM_API BindMeshFactory(void* Factory) override;
+        GENRESULT DACOM_API BindMeshFactory(IFxMeshFactory* Factory) override;
         GENRESULT DACOM_API GetMeshFactory(void** Out) override;
 
     private:

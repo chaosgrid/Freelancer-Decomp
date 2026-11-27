@@ -380,8 +380,8 @@ private:
 };
 
 // DAT_006748f8 -- the live HUD_Receiver, or null (set by its ctor, cleared by its dtor).
-void* GetHudCommInstance();
-void SetHudCommInstance(void* Instance);
+HUD_Receiver* GetHudCommInstance();
+void SetHudCommInstance(HUD_Receiver* Instance);
 
 // FUN_004cc880 -- with a live HUD_Receiver: true when the CSimple channel B watches, else the
 // one channel A watches, has id ObjectId. Callers include HUD_ContactList and

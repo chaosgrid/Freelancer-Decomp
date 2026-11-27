@@ -71,7 +71,7 @@ public:
     // (Owner, Sys, Manager) in member order, DodgeIdea seeded ConeAngle = pi/2,
     // DodgeDistance = 50.0f, IntervalTime = 6.0f right after its own SetContext, then +0x2a8 = 10.0f and
     // +0x2b0 = 0. Returns the binder's result.
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, LAB_062c8260: re-arms the evade from the personality's EvadeDodge /
     // EvadeBreak blocks (see the .cpp).

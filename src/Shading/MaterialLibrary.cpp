@@ -228,9 +228,10 @@ GENRESULT DACOM_API FMaterialLibrary::AllocateGroup(unsigned long* OutId)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void* Extra)
+GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(IFileSystem* FileSystem, void* Extra)
 {
     unsigned long* OutGroupId = (unsigned long*)Extra;
+    IFileSystem* Files = FileSystem;
     const char* SourceFile = "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialLibrary.cpp";
     if (FileSystem == nullptr)
     {
@@ -238,7 +239,7 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
               "IFileSystem argument is NULL in MaterialLibrary::load_library");
         return (GENRESULT)-1;
     }
-    if (FileSystemOpenNode(FileSystem, "Material library") == 0)
+    if (FileSystemOpenNode(Files, "Material library") == 0)
     {
         if (OutGroupId != nullptr)
             *OutGroupId = (unsigned long)-1;
@@ -254,19 +255,19 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
     Desc.Creation = OPEN_EXISTING;
     Desc.Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
     Desc.FindHandle = 0xFFFFFFFF;
-    const int CountHandle = FileSystemOpenByDesc(FileSystem, &Desc);
+    const int CountHandle = FileSystemOpenByDesc(Files, &Desc);
     if (CountHandle != -1)
     {
         unsigned long MaterialCount;
         unsigned long BytesRead;
-        FileSystemRead(FileSystem, (unsigned long)CountHandle,
+        FileSystemRead(Files, (unsigned long)CountHandle,
                        &MaterialCount, 4, &BytesRead);
-        FileSystemClose(FileSystem, (unsigned long)CountHandle);
+        FileSystemClose(Files, (unsigned long)CountHandle);
     }
 
     std::vector<unsigned long> LoadedMembers;
     WIN32_FIND_DATAA FindData;
-    const int FindHandle = FileSystemFindFirst(FileSystem, "*.*", &FindData);
+    const int FindHandle = FileSystemFindFirst(Files, "*.*", &FindData);
     if (FindHandle != -1)
     {
         do
@@ -287,28 +288,28 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
                 }
                 continue;
             }
-            if (FileSystemOpenNode(FileSystem, ChildName) == 0)
+            if (FileSystemOpenNode(Files, ChildName) == 0)
                 continue;
 
             Desc.Path = "Type";
-            const int TypeHandle = FileSystemOpenByDesc(FileSystem, &Desc);
+            const int TypeHandle = FileSystemOpenByDesc(Files, &Desc);
             char Type[0x104];
             bool bTypeRead = false;
             if (TypeHandle != -1)
             {
-                unsigned long Size = FileSystemGetSize(FileSystem,
+                unsigned long Size = FileSystemGetSize(Files,
                     (unsigned long)TypeHandle);
                 if (Size >= 0x103)
                     Size = 0x103;
                 unsigned long BytesRead;
-                const int ReadResult = FileSystemRead(FileSystem,
+                const int ReadResult = FileSystemRead(Files,
                     (unsigned long)TypeHandle, Type, Size, &BytesRead);
                 if (ReadResult != 0 && BytesRead == Size)
                 {
                     Type[BytesRead] = '\0';
                     bTypeRead = true;
                 }
-                FileSystemClose(FileSystem, (unsigned long)TypeHandle);
+                FileSystemClose(Files, (unsigned long)TypeHandle);
             }
             if (bTypeRead)
             {
@@ -338,12 +339,12 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
                     }
                 }
             }
-            FileSystemOpenNode(FileSystem, "..");
+            FileSystemOpenNode(Files, "..");
         }
-        while (FileSystemFindNext(FileSystem, FindHandle, &FindData) != 0);
-        FileSystemFindClose(FileSystem, FindHandle);
+        while (FileSystemFindNext(Files, FindHandle, &FindData) != 0);
+        FileSystemFindClose(Files, FindHandle);
     }
-    FileSystemOpenNode(FileSystem, "..");
+    FileSystemOpenNode(Files, "..");
     if (OutGroupId != nullptr)
     {
         FMaterialGroup* Group = &Groups[NextGroupId];
@@ -741,7 +742,7 @@ struct FGlobalMaterialRecordBuffer
 
     FGlobalMaterialRecord* Record(unsigned long Index) const
     {
-        return (FGlobalMaterialRecord*)((uintptr_t)Data + Index * 8UL);
+        return reinterpret_cast<FGlobalMaterialRecord*>(((uintptr_t)Data + Index * 8UL));
     }
 };
 
@@ -966,7 +967,7 @@ FMaterialLibraryRecord* FMaterialLibrary::CreateGenericRecord(const char* Name, 
     IMaterial* Material = nullptr;
     FMaterialLibraryRecord* Record = nullptr;
     const GENRESULT Result = DACOM_Acquire()->CreateInstance(
-        (AGGDESC*)&Desc, (void**)&Created);
+        reinterpret_cast<AGGDESC*>(&Desc), (void**)&Created);
     if (Result < 0)
     {
         char Message[0x2000];
@@ -1042,7 +1043,7 @@ FMaterialLibraryRecord* DACOM_API FMaterialLibrary::CreateAfterMap(const char* N
     IMaterial* Material = nullptr;
     IBatchedMaterial* Batched = nullptr;
     FMaterialLibraryRecord* Record = nullptr;
-    if (DACOM_Acquire()->CreateInstance((AGGDESC*)&Desc,
+    if (DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                       (void**)&Created) >= 0)
     {
         if (Created->QueryInterface(Iids::Material, (void**)&Material) >= 0)

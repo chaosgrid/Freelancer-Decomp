@@ -40,9 +40,10 @@ IServerImpl::IServerImpl(const IServerImpl& Other) { Serializer = Other.Serializ
 IServerImpl& IServerImpl::operator=(const IServerImpl& Other) { Serializer = Other.Serializer; return *this; }
 void IServerImpl::GetServerStats(ServerStats& Stats) {}
 void IServerImpl::HandlePacket(CDAPacket* Packet) {
-    extern void HandlePacket(unsigned int, CDAPacket*);
-    HandlePacket(1, Packet);
-    reinterpret_cast<FPacketBase*>(Packet)->Release();
+    extern void HandlePacket(unsigned int, FPacketBase*);
+    FPacketBase* Wire = reinterpret_cast<FPacketBase*>(Packet);
+    HandlePacket(1, Wire);
+    Wire->Release();
 }
 
 FRpcRefObject::~FRpcRefObject() {}

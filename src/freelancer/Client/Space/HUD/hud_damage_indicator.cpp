@@ -364,7 +364,7 @@ void HUD_DamageIndicator::Draw()
 void HUD_DamageIndicator::FlashFromPosition(Vector const* WorldPos)
 {
     // FUN_004d6d40.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -427,7 +427,7 @@ void HUD_DamageIndicator::FlashTowardsPoint(Vector const* Point, int /*Unused*/)
 void HUD_DamageIndicator::FlashTowards(Vector const* Point)
 {
     // FUN_004d6f10.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;

@@ -141,26 +141,26 @@ static int CompareBatchKeys(float A, float B, bool bAscending)
 
 static int __cdecl CompareBatchDispatchAscending(const void* A, const void* B)
 {
-    return CompareBatchKeys(((const FBatchDispatch*)A)->Key,
-                            ((const FBatchDispatch*)B)->Key, true);
+    return CompareBatchKeys((static_cast<const FBatchDispatch*>(A))->Key,
+                            (static_cast<const FBatchDispatch*>(B))->Key, true);
 }
 
 static int __cdecl CompareBatchDispatchDescending(const void* A, const void* B)
 {
-    return CompareBatchKeys(((const FBatchDispatch*)A)->Key,
-                            ((const FBatchDispatch*)B)->Key, false);
+    return CompareBatchKeys((static_cast<const FBatchDispatch*>(A))->Key,
+                            (static_cast<const FBatchDispatch*>(B))->Key, false);
 }
 
 static int __cdecl CompareBatchTriangleAscending(const void* A, const void* B)
 {
-    return CompareBatchKeys(((const FBatchTriangle*)A)->Key,
-                            ((const FBatchTriangle*)B)->Key, true);
+    return CompareBatchKeys((static_cast<const FBatchTriangle*>(A))->Key,
+                            (static_cast<const FBatchTriangle*>(B))->Key, true);
 }
 
 static int __cdecl CompareBatchTriangleDescending(const void* A, const void* B)
 {
-    return CompareBatchKeys(((const FBatchTriangle*)A)->Key,
-                            ((const FBatchTriangle*)B)->Key, false);
+    return CompareBatchKeys((static_cast<const FBatchTriangle*>(A))->Key,
+                            (static_cast<const FBatchTriangle*>(B))->Key, false);
 }
 
 static double ComputeBatchPositionDepth(const FBatchRecord& Record, const float* Position)
@@ -572,7 +572,7 @@ void FMaterialBatcher::FlushOne(FBatchBin* Bin, unsigned char Clear)
 
 void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
 {
-    FBatchDispatch* Dispatch = (FBatchDispatch*)AllocateScratch(Bin->RecordCount * sizeof(FBatchDispatch));
+    FBatchDispatch* Dispatch = static_cast<FBatchDispatch*>(AllocateScratch(Bin->RecordCount * sizeof(FBatchDispatch)));
     BuildBatchDispatch(Bin, Dispatch);
     const bool bSortTriangles = Bin->SortKind == kBatchSortAscendingTriangles || Bin->SortKind == kBatchSortDescendingTriangles;
     if (Bin->SortKind == kBatchSortAscending || Bin->SortKind == kBatchSortAscendingTriangles)
@@ -581,7 +581,7 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
         std::qsort(Dispatch, Bin->RecordCount, sizeof(FBatchDispatch), CompareBatchDispatchDescending);
 
     IBatchedMaterial* Active = nullptr;
-    void* PreviousContext = nullptr;
+    FMaterialSubmitContext* PreviousContext = nullptr;
     void* ActiveRecordTag = nullptr;
     for (unsigned long Index = 0; Index < Bin->RecordCount; ++Index)
     {
@@ -593,7 +593,7 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
             const FRpVertexSrcDesc& Source = *Record.Context.SourceVertices;
             const float* Positions = (const float*)Source.Position.Base;
             const unsigned long* Remap = Source.Position.IndexArray;
-            FBatchTriangle* Triangles = (FBatchTriangle*)AllocateScratch(TriangleCount * sizeof(FBatchTriangle));
+            FBatchTriangle* Triangles = static_cast<FBatchTriangle*>(AllocateScratch(TriangleCount * sizeof(FBatchTriangle)));
             const unsigned short* Indices = Record.Context.Indices + Record.IbStart;
             for (unsigned long TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
             {
@@ -785,7 +785,7 @@ GENRESULT DACOM_API FMaterialBatcher::FlushAll(unsigned char Clear)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context, unsigned long PrimType,
+GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, FMaterialSubmitContext* Context, unsigned long PrimType,
                                               unsigned long Start, unsigned long Count,
                                               unsigned long IbStart, unsigned long IndexSpan,
                                               void* SortDepth, unsigned long Flags)
@@ -813,7 +813,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     FBatchQueuedRecord& Queued = Records.back();
     FBatchRecord& Record = Queued.Retail;
     // Construct in place: all subobject pointers remain valid for the queue lifetime.
-    const FMaterialSubmitContext* Source = (const FMaterialSubmitContext*)Context;
+    const FMaterialSubmitContext* Source = Context;
     Record.PrimType = PrimType;
     Record.Flags = Flags;
     Record.SortDepth = SortDepth;
@@ -836,7 +836,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
         Desc.Size = sizeof(Desc);
         Desc.InterfaceName = "3DMathEngine";
         Desc.Implementation = nullptr;
-        DACOM_Acquire()->CreateInstance((AGGDESC*)&Desc,
+        DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                         (void**)&GBatchMathEngine);
     }
     Transform Combined;
@@ -892,7 +892,7 @@ GENRESULT DACOM_API FMaterialBatcher::NoOp(void* /*Arg*/)
 GENRESULT DACOM_API FMaterialBatcher::SetEvents(void* NewValue)
 {
     // LAB_06ec99f0: AddRef the new value, swap into this+0x74, Release the old.
-    IMaterialBatcherEvents* NewRef = (IMaterialBatcherEvents*)NewValue;
+    IMaterialBatcherEvents* NewRef = static_cast<IMaterialBatcherEvents*>(NewValue);
     IMaterialBatcherEvents* Old = CachedInterface;
     CachedInterface = NewRef;
     if (NewRef != nullptr)
@@ -906,7 +906,7 @@ GENRESULT DACOM_API FMaterialBatcher::GetEvents(void* Arg)
 {
     // LAB_06ec9a20: publish the initial reference, then reload it for AddRef.
     IMaterialBatcherEvents* Initial = CachedInterface;
-    *(IMaterialBatcherEvents**)Arg = Initial;
+    *static_cast<IMaterialBatcherEvents**>(Arg) = Initial;
     if (Initial != nullptr)
         CachedInterface->AddRef();
     return GR_OK;

@@ -293,7 +293,7 @@ HardpointInfo const* HardpointSummary::get_info_by_name(char const* Name) const
 void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
 {
     (void)Name;
-    HardpointSummary* const Self = (HardpointSummary*)Context;
+    HardpointSummary* const Self = static_cast<HardpointSummary*>(Context);
     Self->Count++;
 }
 
@@ -316,7 +316,7 @@ void HardpointSummary::count_hardpoints(long Instance)
 // bounds or null tests.
 void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 {
-    HardpointSummary* const Self = (HardpointSummary*)Context;
+    HardpointSummary* const Self = static_cast<HardpointSummary*>(Context);
     malloc_strcpy(const_cast<char**>(&Self->Names[Self->FillCursor]), Name);
 
     FHardpointKey Query;
@@ -335,7 +335,7 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
 {
     const ArchetypeIndex Part = DALib::Engine->GetInstanceArchetype(Instance);
-    HardpointSummary* const Self = (HardpointSummary*)Context;
+    HardpointSummary* const Self = static_cast<HardpointSummary*>(Context);
     Self->FillInstance = Instance;
     Self->FillPart = Part;
     DALib::Hardpoint->EnumerateHardpoints(&hardpoint_callback2, Part, Context);

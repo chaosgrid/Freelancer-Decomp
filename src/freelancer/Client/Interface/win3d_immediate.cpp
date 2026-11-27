@@ -636,12 +636,12 @@ void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float 
 
     if (PipelineState != 0)
     {
-        Pipe->SetModelview((const Transform*)GWin3DModelview);
+        Pipe->SetModelview(reinterpret_cast<const Transform*>(GWin3DModelview));
     }
     else
     {
-        Pipe->SetWorld((const Transform*)GWin3DModelview);
-        Pipe->SetView((const Transform*)GWin3DModelview);
+        Pipe->SetWorld(reinterpret_cast<const Transform*>(GWin3DModelview));
+        Pipe->SetView(reinterpret_cast<const Transform*>(GWin3DModelview));
     }
 
     if (G_bProjectionCacheEnabled != 0)
@@ -798,7 +798,7 @@ void Win3DEnd()
         Pipe->GetRenderState(kRsLighting, &SavedLighting);
         Pipe->SetRenderState(kRsLighting, G_bLighting);
 
-        Pipe->SetModelview((const Transform*)GWin3DModelview);
+        Pipe->SetModelview(reinterpret_cast<const Transform*>(GWin3DModelview));
 
         const unsigned VertexCount = static_cast<unsigned>(G_VertexCount);
 
@@ -1031,7 +1031,7 @@ void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows)
     }
 }
 
-void Win3DDrawWireSphere(void* Camera, Transform const* Xform, float Radius, int Cols, int Rows)
+void Win3DDrawWireSphere(ICamera* Camera, Transform const* Xform, float Radius, int Cols, int Rows)
 {
     // FUN_00423180. DAT_006649c8 is a function static with an empty destructor; 0x3000 bytes,
     // 0x400 points.

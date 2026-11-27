@@ -18,6 +18,7 @@
 namespace Archetype
 {
     struct FCliMaterialEntry;
+    struct ISound;
 }
 
 // Retail VisEffect (Client\cmn\VisEffectArch.cpp), 0x38 bytes, held by value in the map
@@ -82,7 +83,7 @@ struct FEffectArch
     char const* VisEffectName;           // +0x0C  CacheString: the found VisEffect's first field
     FVisEffectArch* VisGeneric;          // +0x10
     FBeamEffectArch* VisBeam;            // +0x14
-    void* SndEffect;                     // +0x18  SoundArch* (LookupClientSoundArch / FUN_0042ae40)
+    Archetype::ISound* SndEffect;        // +0x18  SoundArch* (LookupClientSoundArch / FUN_0042ae40)
     unsigned LgtEffectLen;               // +0x1C
     char LgtEffect[0x20];                // +0x20
     float LgtRangeScale;                 // +0x40

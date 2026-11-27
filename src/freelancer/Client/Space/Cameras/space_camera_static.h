@@ -25,7 +25,7 @@ struct FStaticCamera : FGameCamera
 {
     bool Activate(int const* ViewRect4) override;
     void Deactivate() override;
-    int HandleCommand74(void* Command) override;
+    int HandleCommand74(FSpaceCommand* Command) override;
 
 };
 

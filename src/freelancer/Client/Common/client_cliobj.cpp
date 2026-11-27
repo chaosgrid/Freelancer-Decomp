@@ -197,9 +197,9 @@ namespace Archetype
             unsigned* EffectIdCap;   // +0x10
             unsigned char LiveCookie; // +0x14  IDPMsgHandler this for live vector
             unsigned char LivePad[3];
-            void** LiveBegin;        // +0x18  EffectArch*
-            void** LiveEnd;          // +0x1C
-            void** LiveCap;          // +0x20
+            FEffectArch** LiveBegin; // +0x18  EffectArch*
+            FEffectArch** LiveEnd;   // +0x1C
+            FEffectArch** LiveCap;   // +0x20
         };
 
         static_assert(sizeof(FCliDistanceRecord) == 0x24, "distance record stride 0x24");
@@ -247,7 +247,7 @@ namespace Archetype
             bool PreloadMaterials(bool bApplyNow) { return BuildMaterialCache(bApplyNow); }
 
             // FUN_00407450 — not a vtable slot; distance-threshold pick into record payload.
-            void* PickDistanceRecord(float Distance);
+            FEffectArch* PickDistanceRecord(float Distance);
 
             // FUN_00406c50 — recompute LodPick from BoundRoot; keeps stale value if !is_loaded.
             void RecomputeLodPick(float const* BlendSource);
@@ -601,7 +601,7 @@ namespace Archetype
 
             // FUN_00409f10 -- not a vtable slot; the shield-hit twin of PickDistanceRecord over
             // the +0x60 list. Retail callers 0x0052e81a / 0x0052e96a.
-            void* PickShieldHitEffect(float Distance);
+            FEffectArch* PickShieldHitEffect(float Distance);
 
         protected:
             void DestroyMostDerived() override;
@@ -753,12 +753,12 @@ namespace Archetype
 
         FCliShip* AsCliShip(ICliObj* Companion)
         {
-            return reinterpret_cast<FCliShip*>(Companion);
+            return static_cast<FCliShip*>(Companion);
         }
 
         FCliSolar* AsCliSolar(ICliObj* Companion)
         {
-            return reinterpret_cast<FCliSolar*>(Companion);
+            return static_cast<FCliSolar*>(Companion);
         }
 
         // --- MaterialLib path cache (DAT_006166d8 / DAT_006166ec) ---
@@ -909,9 +909,9 @@ namespace Archetype
                 Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
                 Desc.FindHandle = 0xffffffffu;
 
-                void* FsOut = nullptr;
+                IFileSystem* FsOut = nullptr;
                 GENRESULT const OpenResult = static_cast<IFileSystem*>(DALib::Data)->CreateInstance(
-                    reinterpret_cast<AGGDESC*>(&Desc), &FsOut);
+                    reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FsOut));
                 if (OpenResult < 0)
                 {
                     // Retail quirk: the error and NOTHING else -- the empty entry stays in the
@@ -922,7 +922,7 @@ namespace Archetype
                 }
                 else
                 {
-                    IFileSystem* const Filesys = static_cast<IFileSystem*>(FsOut);
+                    IFileSystem* const Filesys = FsOut;
 
                     bool const bTexOk = LoadMaterialTextures(Filesys, Entry, Arg);
 
@@ -952,7 +952,7 @@ namespace Archetype
                 }
 
                 if (FsOut != nullptr)
-                    static_cast<IFileSystem*>(FsOut)->Release();
+                    FsOut->Release();
             }
 
             if (Entry == nullptr)
@@ -1423,7 +1423,7 @@ namespace Archetype
         // registry in vis_effect_arch.cpp.
 
         // FUN_00555810 — random pick from live EffectArch* vector.
-        void* ActivateDistanceRecord(FCliDistanceRecord* Record)
+        FEffectArch* ActivateDistanceRecord(FCliDistanceRecord* Record)
         {
             if (Record->LiveBegin == nullptr)
                 return nullptr;
@@ -1444,11 +1444,11 @@ namespace Archetype
             // A null live begin is an empty range (retail FUN_005559c0 just finds begin == end).
             if (Record->LiveBegin == nullptr)
                 return;
-            void** It = Record->LiveBegin;
-            void** End = Record->LiveEnd;
+            FEffectArch** It = Record->LiveBegin;
+            FEffectArch** End = Record->LiveEnd;
             while (It != End)
             {
-                (static_cast<FEffectArch*>(*It))->Release();
+                (*It)->Release();
                 It += 1;
             }
             Record->LiveEnd = Record->LiveBegin;
@@ -1472,9 +1472,9 @@ namespace Archetype
                 int NewCap = IdCount;
                 if (NewCap < 0)
                     NewCap = 0;
-                void** NewBuf = nullptr;
+                FEffectArch** NewBuf = nullptr;
                 if (NewCap > 0)
-                    NewBuf = new void*[static_cast<unsigned>(NewCap)];
+                    NewBuf = new FEffectArch*[static_cast<unsigned>(NewCap)];
 
                 // Retail copies old live entries then OnReceive-destroys old buffer — after
                 // ClearLiveEffects the live range is empty, so just swap buffers.
@@ -1656,7 +1656,7 @@ namespace Archetype
             unsigned LiveCount = 0;
             if (Src->LiveBegin != nullptr)
                 LiveCount = static_cast<unsigned>(Src->LiveEnd - Src->LiveBegin);
-            void** Live = new void*[LiveCount];
+            FEffectArch** Live = new FEffectArch*[LiveCount];
             J = 0;
             while (J < LiveCount)
             {
@@ -1960,7 +1960,7 @@ namespace Archetype
         void FCliObj::Redefine(ICliObj* Donor)
         {
             // Retail does not test Donor for null.
-            FCliObj* Src = reinterpret_cast<FCliObj*>(Donor);
+            FCliObj* Src = static_cast<FCliObj*>(Donor);
 
             CopyLodChain(&LodHead, Src->LodHead);
             if (Src->DistanceRender != DistanceRender)
@@ -2017,7 +2017,7 @@ namespace Archetype
         void FCliObj::Inherit(ICliObj* Donor)
         {
             // Retail does not test Donor for null.
-            FCliObj* Src = reinterpret_cast<FCliObj*>(Donor);
+            FCliObj* Src = static_cast<FCliObj*>(Donor);
             int SavedRef = RefCount;
 
             // Retail first writes LodHead shallow, then FUN_00402500 deep-copies at the end.
@@ -2243,7 +2243,7 @@ namespace Archetype
         // The body shared by FUN_00407450 (CliRoot, the +0x40 list) and FUN_00409f10
         // (CliEQShieldGenerator, the +0x60 list): null begin or empty list -> 0; the first record
         // whose threshold is above Distance (strictly, ordered) selects the record before it, or 0 when it is the first; no such record -> the last.
-        void* PickRecordByDistance(FCliVc6Vector<FCliDistanceRecord> const* Records, float Distance)
+        FEffectArch* PickRecordByDistance(FCliVc6Vector<FCliDistanceRecord> const* Records, float Distance)
         {
             if (Records->Begin == nullptr)
                 return nullptr;
@@ -2269,13 +2269,13 @@ namespace Archetype
             return ActivateDistanceRecord(Records->End - 1);
         }
 
-        void* FCliObj::PickDistanceRecord(float Distance)
+        FEffectArch* FCliObj::PickDistanceRecord(float Distance)
         {
             // FUN_00407450
             return PickRecordByDistance(&DistanceRecords, Distance);
         }
 
-        void* FCliShieldGenerator::PickShieldHitEffect(float Distance)
+        FEffectArch* FCliShieldGenerator::PickShieldHitEffect(float Distance)
         {
             // FUN_00409f10
             return PickRecordByDistance(&ShieldHitEffects, Distance);
@@ -2604,7 +2604,7 @@ namespace Archetype
 
         void AdoptCompanion(ICliObj** Out, FCliObj* Obj)
         {
-            *Out = reinterpret_cast<ICliObj*>(Obj);
+            *Out = Obj;
             Obj->AddRef();
         }
 
@@ -2683,7 +2683,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliProj* Src = reinterpret_cast<FCliProj*>(Donor);
+            FCliProj* Src = static_cast<FCliProj*>(Donor);
             if (Src->ConstEffectDelay != ConstEffectDelay)
                 ConstEffectDelay = Src->ConstEffectDelay;
             if (Src->ConstEffect.Id != ConstEffect.Id)
@@ -2740,7 +2740,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliEQAttachedFX* Src = reinterpret_cast<FCliEQAttachedFX*>(Donor);
+            FCliEQAttachedFX* Src = static_cast<FCliEQAttachedFX*>(Donor);
             if (Src->Particles.Id != Particles.Id)
                 Particles.Id = Src->Particles.Id;
             if (Src->bUseThrottle != bUseThrottle)
@@ -2751,7 +2751,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54 dword and +0x58 byte copied, RefCount restored.
         void FCliEQAttachedFX::Inherit(ICliObj* Donor)
         {
-            FCliEQAttachedFX* Src = reinterpret_cast<FCliEQAttachedFX*>(Donor);
+            FCliEQAttachedFX* Src = static_cast<FCliEQAttachedFX*>(Donor);
             int SavedRef = RefCount;
 
             AssignRootMembers(Src);
@@ -2765,7 +2765,7 @@ namespace Archetype
         // CliRoot::operator= inlined, RefCount restored. Nothing else.
         void FCliAsteroid::Inherit(ICliObj* Donor)
         {
-            FCliAsteroid* Src = reinterpret_cast<FCliAsteroid*>(Donor);
+            FCliAsteroid* Src = static_cast<FCliAsteroid*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             RefCount = SavedRef;
@@ -2800,7 +2800,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54 dword and +0x58 byte copied, RefCount restored.
         void FCliDynamicAsteroid::Inherit(ICliObj* Donor)
         {
-            FCliDynamicAsteroid* Src = reinterpret_cast<FCliDynamicAsteroid*>(Donor);
+            FCliDynamicAsteroid* Src = static_cast<FCliDynamicAsteroid*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             ParticleEffect.Id = Src->ParticleEffect.Id;
@@ -2854,7 +2854,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliTractor* Src = reinterpret_cast<FCliTractor*>(Donor);
+            FCliTractor* Src = static_cast<FCliTractor*>(Donor);
             if (Src->Color[0] != Color[0] || Src->Color[1] != Color[1] || Src->Color[2] != Color[2])
             {
                 Color[0] = Src->Color[0];
@@ -2867,7 +2867,7 @@ namespace Archetype
         // CliRoot::operator= inlined, three color bytes, +0x58, +0x5c, RefCount restored.
         void FCliTractor::Inherit(ICliObj* Donor)
         {
-            FCliTractor* Src = reinterpret_cast<FCliTractor*>(Donor);
+            FCliTractor* Src = static_cast<FCliTractor*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             Color[0] = Src->Color[0];
@@ -2947,7 +2947,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54 and +0x58 copied, RefCount restored.
         void FCliEQThruster::Inherit(ICliObj* Donor)
         {
-            FCliEQThruster* Src = reinterpret_cast<FCliEQThruster*>(Donor);
+            FCliEQThruster* Src = static_cast<FCliEQThruster*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             Particles.Id = Src->Particles.Id;
@@ -3086,7 +3086,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliEQLight* Src = reinterpret_cast<FCliEQLight*>(Donor);
+            FCliEQLight* Src = static_cast<FCliEQLight*>(Donor);
             if (!(Src->Color[0] == Color[0]) || !(Src->Color[1] == Color[1]) ||
                 !(Src->Color[2] == Color[2]))
             {
@@ -3132,7 +3132,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54..+0x94 copied, RefCount restored.
         void FCliEQLight::Inherit(ICliObj* Donor)
         {
-            FCliEQLight* Src = reinterpret_cast<FCliEQLight*>(Donor);
+            FCliEQLight* Src = static_cast<FCliEQLight*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             Color[0] = Src->Color[0];
@@ -3202,7 +3202,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliInternalFx* Src = reinterpret_cast<FCliInternalFx*>(Donor);
+            FCliInternalFx* Src = static_cast<FCliInternalFx*>(Donor);
             if (Src->UseSound.Id != UseSound.Id)
                 UseSound.Id = Src->UseSound.Id;
             if (!(Src->InsideSoundCone == InsideSoundCone))
@@ -3217,7 +3217,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54..+0x60 copied, RefCount restored.
         void FCliInternalFx::Inherit(ICliObj* Donor)
         {
-            FCliInternalFx* Src = reinterpret_cast<FCliInternalFx*>(Donor);
+            FCliInternalFx* Src = static_cast<FCliInternalFx*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             UseSound.Id = Src->UseSound.Id;
@@ -3393,7 +3393,7 @@ namespace Archetype
         // +0x60 string pointer copied when unequal. +0x5c is not touched.
         void FCliMunition::Redefine(ICliObj* Donor)
         {
-            FCliMunition* Src = reinterpret_cast<FCliMunition*>(Donor);
+            FCliMunition* Src = static_cast<FCliMunition*>(Donor);
 
             CopyLodChain(&LodHead, Src->LodHead);
             if (Src->DistanceRender != DistanceRender)
@@ -3414,7 +3414,7 @@ namespace Archetype
         // pointer copy, no AddRef and no release of what was there), RefCount restored.
         void FCliMunition::Inherit(ICliObj* Donor)
         {
-            FCliMunition* Src = reinterpret_cast<FCliMunition*>(Donor);
+            FCliMunition* Src = static_cast<FCliMunition*>(Donor);
             int SavedRef = RefCount;
 
             AssignRootMembers(Src);
@@ -3466,7 +3466,7 @@ namespace Archetype
         // CliRoot::operator= inlined, +0x54 copied, RefCount restored.
         void FCliRepairDroid::Inherit(ICliObj* Donor)
         {
-            FCliRepairDroid* Src = reinterpret_cast<FCliRepairDroid*>(Donor);
+            FCliRepairDroid* Src = static_cast<FCliRepairDroid*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             ActiveEffect.Id = Src->ActiveEffect.Id;
@@ -3559,7 +3559,7 @@ namespace Archetype
         // assigned when the two differ; RefCount restored.
         void FCliShieldGenerator::Inherit(ICliObj* Donor)
         {
-            FCliShieldGenerator* Src = reinterpret_cast<FCliShieldGenerator*>(Donor);
+            FCliShieldGenerator* Src = static_cast<FCliShieldGenerator*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             CollapseParticle.Id = Src->CollapseParticle.Id;
@@ -3662,7 +3662,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliLauncher* Src = reinterpret_cast<FCliLauncher*>(Donor);
+            FCliLauncher* Src = static_cast<FCliLauncher*>(Donor);
             if (!(Src->FlashRadius == FlashRadius))
                 FlashRadius = Src->FlashRadius;
             if (strcmp(Src->LightAnim, LightAnim) != 0)
@@ -3676,7 +3676,7 @@ namespace Archetype
         // string assigned from the donor's, +0x80, RefCount restored.
         void FCliLauncher::Inherit(ICliObj* Donor)
         {
-            FCliLauncher* Src = reinterpret_cast<FCliLauncher*>(Donor);
+            FCliLauncher* Src = static_cast<FCliLauncher*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             FlashParticle.Id = Src->FlashParticle.Id;
@@ -3734,7 +3734,7 @@ namespace Archetype
         // plus +0x84; RefCount restored.
         void FCliGun::Inherit(ICliObj* Donor)
         {
-            FCliGun* Src = reinterpret_cast<FCliGun*>(Donor);
+            FCliGun* Src = static_cast<FCliGun*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             FlashParticle.Id = Src->FlashParticle.Id;
@@ -3915,7 +3915,7 @@ namespace Archetype
         {
             FCliObj::Redefine(Donor);
 
-            FCliEngine* Src = reinterpret_cast<FCliEngine*>(Donor);
+            FCliEngine* Src = static_cast<FCliEngine*>(Donor);
             if (Src->RumblePitchRange[0] != RumblePitchRange[0] ||
                 Src->RumblePitchRange[1] != RumblePitchRange[1])
             {
@@ -3940,7 +3940,7 @@ namespace Archetype
         // CliRoot::operator= inlined, every dword +0x54..+0xa8 copied, RefCount restored.
         void FCliEngine::Inherit(ICliObj* Donor)
         {
-            FCliEngine* Src = reinterpret_cast<FCliEngine*>(Donor);
+            FCliEngine* Src = static_cast<FCliEngine*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             InsideSoundCone = Src->InsideSoundCone;
@@ -4082,7 +4082,7 @@ namespace Archetype
 
             FCliObj::Redefine(Donor);
 
-            FCliTradeLane* Src = reinterpret_cast<FCliTradeLane*>(Donor);
+            FCliTradeLane* Src = static_cast<FCliTradeLane*>(Donor);
             char const* const File = "E:\\FL\\Scratch\\Source\\Client\\cmn\\CliArch.cpp";
             if (!(Src->SpinMax == SpinMax))
             {
@@ -4124,7 +4124,7 @@ namespace Archetype
         // and the five effect pointers +0xb4..+0xc4 copied raw (no AddRef), RefCount restored.
         void FCliTradeLane::Inherit(ICliObj* Donor)
         {
-            FCliTradeLane* Src = reinterpret_cast<FCliTradeLane*>(Donor);
+            FCliTradeLane* Src = static_cast<FCliTradeLane*>(Donor);
             int SavedRef = RefCount;
             AssignRootMembers(Src);
             memcpy(&PlayerEnter, &Src->PlayerEnter, 0xc8 - 0x54);
@@ -4364,16 +4364,15 @@ namespace Archetype
     {
         // FUN_00407450, thiscall on the archetype's companion; GameObject slot 104 passes the
         // companion or null with no test, so a null companion reaches the callee as in retail.
-        return static_cast<FEffectArch*>(static_cast<FCliObj*>(Companion)->PickDistanceRecord(Distance));
+        return static_cast<FCliObj*>(Companion)->PickDistanceRecord(Distance);
     }
 
     FEffectArch* CliShieldGeneratorPickHitEffect(ICliObj* Companion, float Distance)
     {
         // FUN_00409f10 on a shield generator's companion (the factory builds CliEQShieldGenerator
         // for that equipment type).
-        return static_cast<FEffectArch*>(
-            static_cast<FCliShieldGenerator*>(static_cast<FCliObj*>(Companion))
-                ->PickShieldHitEffect(Distance));
+        return static_cast<FCliShieldGenerator*>(static_cast<FCliObj*>(Companion))
+            ->PickShieldHitEffect(Distance);
     }
 
     FEffectArch* CliMunitionPickLiveEffect(ICliObj* Companion)

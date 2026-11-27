@@ -137,7 +137,7 @@ private:
     float m_MinRadius;          // +0x0c: smallest leaf radius so far; 0.0f (DAT_063a53d4) means "unset".
     int32_t m_LeafByteTotal;    // +0x10: += 0x28 per leaf built; never read.
 
-    void* m_BuildTreeScratch;                   // +0x14: calloc(n+1, sizeof(BuildTreeScratchEntry)) from BuildLeafNodes(); walked by CompileTree(), freed by FreeBuildState().
+    BuildTreeScratchEntry* m_BuildTreeScratch;                   // +0x14: calloc(n+1, sizeof(BuildTreeScratchEntry)) from BuildLeafNodes(); walked by CompileTree(), freed by FreeBuildState().
     IVP_U_Vector<IVP_Compact_Ledge> m_Ledges;   // +0x18: the inserted ledges.
     IVP_U_Vector<BuildNode> m_HullNodes;        // +0x20: always empty in retail (only writer: FUN_0636a1e0).
     IVP_U_Vector<BuildNode> m_LeafNodes;        // +0x28: one leaf per ledge, appended by BuildLeafNodes().
@@ -148,10 +148,10 @@ private:
     uint32_t m_Unknown58;                       // +0x58: unidentified.
     IVP_U_Vector<void> m_VectorD;                // +0x5c: never used (see the class comment).
     IVP_U_Vector<void> m_VectorE;                // +0x64: never used.
-    void* m_CompileOptions;                     // +0x6c: the 4-dword options block; Compile() defaults a null one to {0,1,0,1} (both retail callers pass null).
+    const int32_t* m_CompileOptions;                // +0x6c: the 4-dword options block; Compile() defaults a null one to {0,1,0,1} (both retail callers pass null).
 
-    void* m_VertexWriteCursor;   // +0x70: blob + 0x30 seeded by BuildCompactSurface(); read once by MergeLedgesIntoSurface() and never written back.
-    void* m_VertexDedupBase;     // +0x74: welded-point pool (weld path only); zeroed otherwise.
+    uint8_t* m_VertexWriteCursor; // +0x70: blob + 0x30 seeded by BuildCompactSurface(); read once by MergeLedgesIntoSurface() and never written back.
+    uint8_t* m_VertexDedupBase;   // +0x74: welded-point pool (weld path only); zeroed otherwise.
     uint32_t m_VertexDedupCount;  // +0x78: welded-point count (weld path only); zeroed otherwise.
     IVP_VHash* m_VertexDedupIndex; // +0x7c: point hash (vtable 063a58f8, 0x10 bytes) built by BuildCompactSurface() when more than one ledge is merged with options[2]==0 and options[3] in {1,2}; deleted (slot 1, flag 1) after MergeLedgesIntoSurface().
 
@@ -208,7 +208,7 @@ private:
     // without a vertex hash it copies the whole ledge ((hdr[+8]>>8)<<4 bytes);
     // with one it copies header+triangles only and welds the points into the
     // shared pool at m_VertexDedupBase.
-    uint32_t CopyLedgeIntoSurface(const void* sourceLedge, void* destCursor);
+    uint32_t CopyLedgeIntoSurface(const IVP_Compact_Ledge* sourceLedge, IVP_Compact_Ledge* destCursor);
 
     // Retail FUN_0636a190: depth-first collection of the source ledges below
     // a build node (a node with a ledge is a leaf; otherwise Child0 is

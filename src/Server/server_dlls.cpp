@@ -261,7 +261,7 @@ unsigned int Server_ControllerCreate(const char* dll_path, const char* instance_
               "E:\\FL\\Scratch\\Source\\Server\\dlls.cpp", 0xa7, dll_path);
     }
 
-    FControllerNode* node = (FControllerNode*)malloc(sizeof(FControllerNode));
+    FControllerNode* node = static_cast<FControllerNode*>(malloc(sizeof(FControllerNode)));
     node->InterfacePtr = nullptr;
     node->ModuleHandle = hMod;
     node->HeartbeatAccum = 0.0f;

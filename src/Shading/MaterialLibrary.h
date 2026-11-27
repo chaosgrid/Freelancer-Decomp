@@ -57,7 +57,7 @@ public:
                                   char* OutType) override;
     GENRESULT DACOM_API RemoveMapRule(int Key, const char* Pattern) override;
     GENRESULT DACOM_API AllocateGroup(unsigned long* OutId) override;
-    GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem, void* Extra) override;
+    GENRESULT DACOM_API LoadFromFileSystem(IFileSystem* FileSystem, void* Extra) override;
     GENRESULT DACOM_API UnsupportedOperation(void* Arg1, void* Arg2) override;
     GENRESULT DACOM_API DeleteGroup(int GroupId) override;
     GENRESULT DACOM_API ApplyVerifyGroup(int GroupId, void* Context, void* Extra) override;

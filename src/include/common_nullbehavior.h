@@ -45,7 +45,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1: returns true, touches nothing (no BindContext call).
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 7: returns 2.
     int Update();

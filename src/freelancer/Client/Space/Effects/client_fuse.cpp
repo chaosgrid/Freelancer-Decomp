@@ -378,10 +378,10 @@ StartEffectAction::StartEffectAction()
 {
     // The companion via FUN_005154a0(0,0,0,0).
     Effect.clear();
-    Companion[0] = nullptr;
-    Companion[1] = nullptr;
-    Companion[2] = nullptr;
-    Companion[3] = nullptr;
+    Companion.EffectArch = nullptr;
+    Companion.Sound = nullptr;
+    Companion.Effect = nullptr;
+    Companion.Light = nullptr;
 }
 
 StartEffectAction::~StartEffectAction()
@@ -389,8 +389,8 @@ StartEffectAction::~StartEffectAction()
     // FUN_0052b510. Retail runs the FUN_00502d90 release twice -- the class body's, then the
     // companion member's destructor, which finds everything null. Then the hardpoint vector and
     // ~FuseAction.
-    CliEffectCompanionClear(Companion);
-    CliEffectCompanionClear(Companion);
+    CliEffectCompanionClear(&Companion);
+    CliEffectCompanionClear(&Companion);
 }
 
 FuseAction* StartEffectAction::Clone() const
@@ -586,7 +586,7 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             if (!Effect.IsEmpty())
             {
                 CliCreateEffectOneShot(FindEffectArch(&Effect.Id), Host,
-                                       static_cast<int>(EngineIndex), &Local, Companion);
+                                       static_cast<int>(EngineIndex), &Local, &Companion);
             }
         }
         else if (bFound)
@@ -623,8 +623,8 @@ void StartEffectAction::UnTrigger(unsigned short SubObjId)
         return;
     // The companion comes off the host's effect list; when it was not on it, it is released
     // right here (the FUN_00502d90 sequence inlined).
-    if (!CliEffectListRemove(&Host->EffectList, Companion))
-        CliEffectCompanionClear(Companion);
+    if (!CliEffectListRemove(&Host->EffectList, &Companion))
+        CliEffectCompanionClear(&Companion);
     bTriggered = false;
 }
 

@@ -20,6 +20,8 @@
 class CPlayerTradeOffer;   // common_tradeoffer.h (PlayerData::trade_offer, +0x3CC)
 class Vector;              // common_ini.h (PlayerData::check_position_bound)
 class CCharacterSet;       // server_characterset.h (PlayerData::build_character_set)
+class CPlayerGroup;        // common_server.h (PlayerData::group_ptr)
+class CAccount;            // server_playerdb.h (PlayerData::account_ptr)
 
 // ---------------------------------------------------------------------------
 // PlayerData — retail's `struct PlayerData` (0x418 bytes, stride of the Server.dll
@@ -135,7 +137,7 @@ struct PlayerData {
     float relative_health;             // -0x1b0 (+0x268): normalized hull health (0..1)
 
     // Group pointer (CPlayerGroup*)
-    void* group_ptr;                   // -0x14: CPlayerGroup* (nullptr if no group)
+    CPlayerGroup* group_ptr;           // -0x14: nullptr if no group
 
     // Group mission state. Retail keeps it PER PLAYER, not on CPlayerGroup:
     // CPlayerGroup::GetMissionID (0x06d5c330) walks its member set and returns
@@ -230,7 +232,7 @@ struct PlayerData {
     unsigned int last_base_id;         // +0x3F0: the base `last_base` names
 
     // Account pointer (retail offset -0x18)
-    void* account_ptr;                 // -0x18 (+0x400): CAccount* for this player
+    CAccount* account_ptr;             // -0x18 (+0x400): the account of this player
 
     // +0x00: the login account name; the internal-login helper FUN_06d48e80 wcscpy's it into
     // the slot base. 0x50 bytes (40 wide characters): +0x50 is the saved-characters map,
@@ -554,7 +556,7 @@ struct PlayerData {
 typedef PlayerData PlayerSlot;
 
 // The layout is not retail's (see the struct comment), so only the cash width is pinned.
-static_assert(sizeof(((PlayerData*)nullptr)->cash) == 4, "PlayerData::cash must stay a 4-byte int");
+static_assert(sizeof(static_cast<PlayerData*>(nullptr)->cash) == 4, "PlayerData::cash must stay a 4-byte int");
 
 // Common.dll exports for Server.dll (C++ linkage to match COMMON_API)
 #ifdef COMMON_EXPORTS

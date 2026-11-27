@@ -143,13 +143,13 @@ public:
     virtual ~FEyeMaterialImpl();
 
     GENRESULT DACOM_API Initialize(IDAComponent* Outer) override;             // FUN_065fe1b0
-    GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem) override;        // LAB_065fe320
-    GENRESULT DACOM_API SaveProperties(void* FileSystem) override;            // FUN_065fe680
+    GENRESULT DACOM_API LoadFromFileSystem(IFileSystem* FileSystem) override;        // LAB_065fe320
+    GENRESULT DACOM_API SaveProperties(IFileSystem* FileSystem) override;            // FUN_065fe680
     GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) override;     // FUN_065fe960
     GENRESULT DACOM_API ResolveTextures(float Delta) override;                  // LAB_065fe9a0
-    GENRESULT DACOM_API Bind(void* Context) override;                         // FUN_06600af0
-    GENRESULT DACOM_API Teardown(void* Context) override;                     // LAB_06600b40
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                         // FUN_06600af0
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                     // LAB_06600b40
+    GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                unsigned long Count, unsigned long IbStart,
                                unsigned long IndexSpan, unsigned long Flags) override; // LAB_065fea00
     GENRESULT DACOM_API SetName(const char* InName) override;                 // LAB_065fec10
@@ -214,8 +214,8 @@ public:
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override; // LAB_06600a00
     unsigned long DACOM_API AddRef() override;                                // LAB_06600a10
     unsigned long DACOM_API Release() override;                               // LAB_06600a20
-    GENRESULT DACOM_API Bind(void* Context) override;                         // LAB_065fff20
-    GENRESULT DACOM_API Teardown(void* Context) override;                     // LAB_06600270
+    GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) override;                         // LAB_065fff20
+    GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) override;                     // LAB_06600270
     GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;          // LAB_065ffef0
     const char* __thiscall ClassName() override;                              // LAB_065fff10
     unsigned long __thiscall GetParameterTable(void** OutBase) override;      // LAB_065ff750

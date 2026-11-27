@@ -143,7 +143,7 @@ unsigned int RpcDecodeWireEmpty(FPacketBase& Packet, const unsigned char* Buffer
 unsigned int RpcEncodeWireDword(FPacketBase& Packet, unsigned char** BufferHolder,
                                 unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerDword* Wire =
-        reinterpret_cast<const FPayloadServerDword*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerDword>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -160,7 +160,7 @@ unsigned int RpcEncodeWireDword(FPacketBase& Packet, unsigned char** BufferHolde
 // 0x06db03f0 -- Decode.
 unsigned int RpcDecodeWireDword(FPacketBase& Packet, const unsigned char* Buffer,
                                 unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerDword* Wire = reinterpret_cast<FPayloadServerDword*>(Packet.Payload());
+    FPayloadServerDword* Wire = Packet.PayloadAs<FPayloadServerDword>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -192,7 +192,7 @@ unsigned int RpcDecodeWireDword(FPacketBase& Packet, const unsigned char* Buffer
 unsigned int RpcEncodeWireFloat(FPacketBase& Packet, unsigned char** BufferHolder,
                                 unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerFloat* Wire =
-        reinterpret_cast<const FPayloadServerFloat*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerFloat>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -216,7 +216,7 @@ unsigned int RpcEncodeWireFloat(FPacketBase& Packet, unsigned char** BufferHolde
 unsigned int RpcEncodeWireByte(FPacketBase& Packet, unsigned char** BufferHolder,
                                unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerByte* Wire =
-        reinterpret_cast<const FPayloadServerByte*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerByte>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -232,7 +232,7 @@ unsigned int RpcEncodeWireByte(FPacketBase& Packet, unsigned char** BufferHolder
 // 0x06da83c0 -- Decode.
 unsigned int RpcDecodeWireByte(FPacketBase& Packet, const unsigned char* Buffer,
                                unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerByte* Wire = reinterpret_cast<FPayloadServerByte*>(Packet.Payload());
+    FPayloadServerByte* Wire = Packet.PayloadAs<FPayloadServerByte>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -267,7 +267,7 @@ unsigned int RpcDecodeWireByte(FPacketBase& Packet, const unsigned char* Buffer,
 unsigned int RpcEncodeWireDwordPair(FPacketBase& Packet, unsigned char** BufferHolder,
                                     unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerDwordPair* Wire =
-        reinterpret_cast<const FPayloadServerDwordPair*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerDwordPair>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -288,7 +288,7 @@ unsigned int RpcEncodeWireDwordPair(FPacketBase& Packet, unsigned char** BufferH
 unsigned int RpcDecodeWireDwordPair(FPacketBase& Packet, const unsigned char* Buffer,
                                     unsigned int Size, unsigned int* OutLength) {
     FPayloadServerDwordPair* Wire =
-        reinterpret_cast<FPayloadServerDwordPair*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerDwordPair>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -325,7 +325,7 @@ unsigned int RpcDecodeWireDwordPair(FPacketBase& Packet, const unsigned char* Bu
 unsigned int RpcEncodeWireDwordByte(FPacketBase& Packet, unsigned char** BufferHolder,
                                     unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerDwordByte* Wire =
-        reinterpret_cast<const FPayloadServerDwordByte*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerDwordByte>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -346,7 +346,7 @@ unsigned int RpcEncodeWireDwordByte(FPacketBase& Packet, unsigned char** BufferH
 unsigned int RpcDecodeWireDwordByte(FPacketBase& Packet, const unsigned char* Buffer,
                                     unsigned int Size, unsigned int* OutLength) {
     FPayloadServerDwordByte* Wire =
-        reinterpret_cast<FPayloadServerDwordByte*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerDwordByte>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -385,7 +385,7 @@ unsigned int RpcDecodeWireDwordByte(FPacketBase& Packet, const unsigned char* Bu
 unsigned int RpcEncodeWireThreeDwords(FPacketBase& Packet, unsigned char** BufferHolder,
                                       unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerThreeDwords* Wire =
-        reinterpret_cast<const FPayloadServerThreeDwords*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerThreeDwords>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -410,7 +410,7 @@ unsigned int RpcEncodeWireThreeDwords(FPacketBase& Packet, unsigned char** Buffe
 unsigned int RpcDecodeWireThreeDwords(FPacketBase& Packet, const unsigned char* Buffer,
                                       unsigned int Size, unsigned int* OutLength) {
     FPayloadServerThreeDwords* Wire =
-        reinterpret_cast<FPayloadServerThreeDwords*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerThreeDwords>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -451,7 +451,7 @@ unsigned int RpcDecodeWireThreeDwords(FPacketBase& Packet, const unsigned char* 
 unsigned int RpcEncodeWireDwordBlock12(FPacketBase& Packet, unsigned char** BufferHolder,
                                        unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerFourDwords* Wire =
-        reinterpret_cast<const FPayloadServerFourDwords*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerFourDwords>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -473,7 +473,7 @@ unsigned int RpcEncodeWireDwordBlock12(FPacketBase& Packet, unsigned char** Buff
 unsigned int RpcDecodeWireDwordBlock12(FPacketBase& Packet, const unsigned char* Buffer,
                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadServerFourDwords* Wire =
-        reinterpret_cast<FPayloadServerFourDwords*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerFourDwords>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -512,7 +512,7 @@ unsigned int RpcDecodeWireDwordBlock12(FPacketBase& Packet, const unsigned char*
 unsigned int RpcEncodeWireBlobSizeFirst(FPacketBase& Packet, unsigned char** BufferHolder,
                                         unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerBlob* Wire =
-        reinterpret_cast<const FPayloadServerBlob*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerBlob>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -533,7 +533,7 @@ unsigned int RpcEncodeWireBlobSizeFirst(FPacketBase& Packet, unsigned char** Buf
 // 0x06d978f0 -- Decode.
 unsigned int RpcDecodeWireBlobSizeFirst(FPacketBase& Packet, const unsigned char* Buffer,
                                         unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerBlob* Wire = reinterpret_cast<FPayloadServerBlob*>(Packet.Payload());
+    FPayloadServerBlob* Wire = Packet.PayloadAs<FPayloadServerBlob>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
@@ -574,7 +574,7 @@ unsigned int RpcDecodeWireBlobSizeFirst(FPacketBase& Packet, const unsigned char
 unsigned int RpcEncodeWireBlobBufferFirst(FPacketBase& Packet, unsigned char** BufferHolder,
                                           unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerBlobReversed* Wire =
-        reinterpret_cast<const FPayloadServerBlobReversed*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadServerBlobReversed>();
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -662,7 +662,7 @@ unsigned int FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM::Decode(const unsigned char* 
 unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* Buffer,
                                       unsigned int Size, unsigned int* OutLength) {
     FPayloadCommonBuffer* Wire =
-        reinterpret_cast<FPayloadCommonBuffer*>(Packet.Payload());
+        Packet.PayloadAs<FPayloadCommonBuffer>();
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {

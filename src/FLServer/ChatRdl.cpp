@@ -14,7 +14,7 @@ void AppendChatRdlNode(RenderDisplayList& Rdl, const FChatRdlNodeHolder& Value)
 {
 	FRdlListNode* const Sentinel = Rdl.NodeList;
 	FRdlListNode* const Tail = Sentinel->Prev;
-	FRdlListNode* const Cell = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+	FRdlListNode* const Cell = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
 	Cell->Next = Sentinel;
 	Cell->Prev = Tail != nullptr ? Tail : Cell;
 	Sentinel->Prev = Cell;

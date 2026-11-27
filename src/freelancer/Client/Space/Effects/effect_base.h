@@ -17,6 +17,8 @@
 struct FEffectArch;
 struct FVisEffectArch;
 struct FSpaceCamera;
+struct FGameLight;   // Common/engine_light.h
+struct ISoundSource; // soundmanager.h
 
 // FEffectBase::Flags08 (+0x08).
 enum EEffectFlag
@@ -79,6 +81,35 @@ static_assert(offsetof(FEffectBase, EngineIndex) == 0x40, "EngineIndex");
 static_assert(offsetof(FEffectBase, RefCount) == 0x58, "RefCount");
 static_assert(offsetof(FEffectBase, EffectTypeId) == 0x5c, "EffectTypeId");
 
+// The 0x10-byte effect companion every client object keeps its live effects in (filled by
+// FUN_005154a0, cleared by FUN_00502d90): the effect's arch, its sound, the effect itself (a
+// particle, a beam or a CliEquipLight) and its light.
+struct FEffectCompanion
+{
+    union
+    {
+        struct
+        {
+            FEffectArch* EffectArch; // +0x00
+            ISoundSource* Sound;     // +0x04
+            FEffectBase* Effect;     // +0x08
+            FGameLight* Light;       // +0x0c
+        };
+        void* Slot[4]; // the same four words by index (the tractor wrapper's init loop)
+    };
+};
+static_assert(sizeof(FEffectCompanion) == 0x10, "effect companion 0x10");
+
+// The 0x18-byte node of the GameObject+0x28 effect list (a VC6 std::list): the links and a copy
+// of one companion (FUN_004fd480).
+struct FEffectListNode
+{
+    FEffectListNode* Next;      // +0x00
+    FEffectListNode* Prev;      // +0x04
+    FEffectCompanion Companion; // +0x08
+};
+static_assert(sizeof(FEffectListNode) == 0x18, "effect list node 0x18");
+
 // FUN_004f79a0 — size==0x84 → Heap::Malloc on the pool DAT_00674ccc; else malloc.
 void* EffectAlloc(unsigned Size);
 
@@ -92,7 +123,7 @@ void EffectSystemShutdown();
 
 // The object the effect's watcher holds (+0x44 minus 8), or null. Retail spells this inline
 // everywhere: `[+0x44] == 0 → null; [+0x44] - 8 == 0 → null`.
-void* EffectWatchedObject(FEffectBase const* This);
+IObjRW* EffectWatchedObject(FEffectBase const* This);
 
 // FUN_004f7b50 (callers 0x0050c484 and the tractor beam's slot +0x14 LAB_005133f0) — the
 // effect's own slot +8 (world position and radius), the camera's view transform (slot +0x40) applied through I3DMathEngine +0x28

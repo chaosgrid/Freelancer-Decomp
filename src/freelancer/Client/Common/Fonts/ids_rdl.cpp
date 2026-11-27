@@ -31,7 +31,7 @@ void RdlAppendNode(RenderDisplayList& Rdl, RDLNode* Node)
     // FUN_0046bb00 / FUN_0046c800 (insert before the sentinel; a null tail gives the VC6
     // _Buynode self-link). No test of the list or the node. Cells are malloc'd like every cell
     // Common's RenderDisplayList makes and frees.
-    void** const Sentinel = (void**)Rdl.NodeList;
+    void** const Sentinel = reinterpret_cast<void**>(Rdl.NodeList);
     void** const Tail = static_cast<void**>(Sentinel[1]);
     void** const Cell = static_cast<void**>(malloc(kCellBytes));
     Cell[0] = Sentinel;
@@ -45,7 +45,7 @@ void RdlAppendNode(RenderDisplayList& Rdl, RDLNode* Node)
 void RdlClear(RenderDisplayList& Rdl)
 {
     // FUN_0046bb50 (fastcall on the list). The sentinel stays; nothing else is tested.
-    void** const Sentinel = (void**)Rdl.NodeList;
+    void** const Sentinel = reinterpret_cast<void**>(Rdl.NodeList);
     void** Cur = static_cast<void**>(Sentinel[0]);
     while (Cur != Sentinel)
     {
@@ -69,7 +69,7 @@ bool RdlRemoveLastParagraph(RenderDisplayList& Rdl)
     // FUN_0057eb40: scans from the tail (vt+0x38 = operator ParagraphNode*), stops after the
     // head. Retail returns whatever is left in EAX; every call site ignores it. The port
     // reports found / not found.
-    void** const Sentinel = (void**)Rdl.NodeList;
+    void** const Sentinel = reinterpret_cast<void**>(Rdl.NodeList);
     void** Cur = static_cast<void**>(Sentinel[1]);
 
     while (Cur != Sentinel)

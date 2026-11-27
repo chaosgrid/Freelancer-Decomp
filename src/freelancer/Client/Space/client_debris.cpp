@@ -268,7 +268,7 @@ void FClientDebrisGameobj::update(float Dt)
     }
 }
 
-unsigned* FClientDebrisGameobj::PickLod(unsigned* OutLod, void* Camera,
+unsigned* FClientDebrisGameobj::PickLod(unsigned* OutLod, FSpaceCamera* Camera,
                                         unsigned const* CachedLod)
 {
     // FUN_005300f0: GameObject's pick FUN_00539820 into a local, its return value ignored.

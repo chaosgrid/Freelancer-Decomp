@@ -81,7 +81,7 @@ namespace
             for (;;)
             {
                 // The payload of the minimum entry.
-                IVP_Listener_Hull* Listener = (IVP_Listener_Hull*)Hull->PoolEntries[Hull->PoolLiveIndex].Payload;
+                IVP_Listener_Hull* Listener = static_cast<IVP_Listener_Hull*>(Hull->PoolEntries[Hull->PoolLiveIndex].Payload);
                 Listener->hull_limit_exceeded_event(Hull, DeltaStored);
                 const int32_t Previous = LoopsLeft;
                 --LoopsLeft;

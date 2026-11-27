@@ -135,7 +135,7 @@ double CECloakingDevice::cloak_percent() const
 
 Archetype::CloakingDevice const* CECloakingDevice::CloakArch() const
 {
-    return (Archetype::CloakingDevice const*)(Arch);
+    return static_cast<Archetype::CloakingDevice const*>(Arch);
 }
 
 CECloakingDevice* __cdecl CECloakingDevice::cast(CEquip* Equip)
@@ -143,7 +143,7 @@ CECloakingDevice* __cdecl CECloakingDevice::cast(CEquip* Equip)
     // RVA 0x34860
     if (Equip == nullptr || Equip->GetType() != EquipTypeCloak)
         return nullptr;
-    return (CECloakingDevice*)(Equip);
+    return static_cast<CECloakingDevice*>(Equip);
 }
 
 CECloakingDevice const* __cdecl CECloakingDevice::cast(CEquip const* Equip)

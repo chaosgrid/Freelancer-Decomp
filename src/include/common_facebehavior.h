@@ -77,7 +77,7 @@ public:
     // Slot 1, LAB_062c8ac0. The binder; on success SetContext(Param1, Param3, Param2) on
     // Face and Afterburner (not Move), then
     // Field1cc = Behavior_GetAngularSpeedXY(OwnerContext, 0, 1.0f) (FUN_062e5b20).
-    bool SetContext(void* Param1, void* Param2, void* Param3) override;
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3) override;
 
     // Slot 3, FUN_062c9320: Behavior::OnEngage (FUN_062d20d0), zeroes
     // Flag1c5/EngineKillStateElapsed/Flag1b4/FaceAxisX/Y/Z/AfterburnerElapsed,

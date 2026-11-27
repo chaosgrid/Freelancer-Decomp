@@ -390,7 +390,7 @@ CObject* __cdecl CObject::Find(unsigned const& Id, Class ObjectClass)
         CObject* const Obj = *It;
         if (!ClassHasSimpleId(Obj->ObjectClass))
             continue;
-        CSimple* const Simple = (CSimple*)Obj;
+        CSimple* const Simple = static_cast<CSimple*>(Obj);
         if (Simple->Id == Id)
         {
             Obj->AddRef();
@@ -501,7 +501,7 @@ namespace
         long Child = DALib::Engine->GetRelatedInstance(InstHandle, 1, (intptr_t)-1);
         while (Child != -1)
         {
-            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData(Child);
+            CObject* const Obj = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Child));
             if (Obj == Parent)
             {
                 CollectHierarchyObjects(Parent, Child, Set);
@@ -743,7 +743,7 @@ COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj)
     // FUN_062d4ba0. Creates the manager on demand for a CEqObj.
     if (Obj == nullptr)
         return nullptr;
-    CEqObj* const EqObj = (CEqObj*)const_cast<CObject*>(Obj->cobject());
+    CEqObj* const EqObj = static_cast<CEqObj*>(const_cast<CObject*>(Obj->cobject()));
     if (EqObj == nullptr || (EqObj->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         return nullptr;
     IBehaviorManager* const Manager = EqObj->get_behavior_interface();

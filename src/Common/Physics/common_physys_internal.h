@@ -179,7 +179,7 @@ namespace CmnPhySys
     // IEngine +0x80 GetInstanceUserData: the CObject PhySys stored on the instance, or null.
     inline CObject* PhySys_InstanceObject(long Instance)
     {
-        return (CObject*)DALib::Engine->GetInstanceUserData(Instance);
+        return static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Instance));
     }
 
     // IEngine +0x7c SetInstanceUserData.

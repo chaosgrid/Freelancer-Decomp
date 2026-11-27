@@ -45,7 +45,7 @@ void Heap::Free(void* Ptr)
     memset(Ptr, 0xCD, ElementSize);
 
     ++CurrentFreeCount;
-    FFreeBlock* const Block = (FFreeBlock*)Ptr;
+    FFreeBlock* const Block = static_cast<FFreeBlock*>(Ptr);
     Block->Next = FreeList;
     FreeList = Block;
 }

@@ -28,7 +28,7 @@ public:
     explicit IVP_U_Vector(int Size)
         : memsize((unsigned short)Size)
         , n_elems(0)
-        , elems(Size != 0 ? (T**)malloc((size_t)Size * 4u) : nullptr)
+        , elems(Size != 0 ? static_cast<T**>(malloc((size_t)Size * 4u)) : nullptr)
     {
     }
 
@@ -147,7 +147,7 @@ protected:
     // retail tests `elems == this+8` before freeing.
     T** InlineBuffer()
     {
-        return (T**)(this + 1);
+        return reinterpret_cast<T**>(this + 1);
     }
 
     // FUN_063441a0: malloc(memsize * 8 + 8) bytes, i.e. room for 2 * memsize + 2
@@ -156,7 +156,7 @@ protected:
     void Realloc()
     {
         unsigned int NewByteCount = ((unsigned int)memsize * 8) + 8;
-        T** NewBuffer = (T**)malloc(NewByteCount);                  // FUN_06343f70
+        T** NewBuffer = static_cast<T**>(malloc(NewByteCount));                  // FUN_06343f70
 
         unsigned short NewMemsize = (unsigned short)((memsize << 1) + 1);
         memsize = NewMemsize;

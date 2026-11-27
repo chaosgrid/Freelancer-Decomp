@@ -94,7 +94,7 @@ bool FMeshArchetype::LoadFaceGroups(IFileSystem* Fs)
     }
     int* Block = (int*)new unsigned char[(size_t)Count * sizeof(FFaceGroup) + 4];
     *Block = Count;
-    FFaceGroup* Groups = (FFaceGroup*)(Block + 1);
+    FFaceGroup* Groups = reinterpret_cast<FFaceGroup*>((Block + 1));
     int GroupIndex = 0;
     while (GroupIndex < Count)
     {
@@ -115,7 +115,7 @@ bool FMeshArchetype::LoadFaceGroups(IFileSystem* Fs)
             FFileSystemDesc ChildDesc;
             FillFileDesc(&ChildDesc, FindData.cFileName);
             ChildDesc.FindHandle = (unsigned long)Finder;
-            if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
+            if (Fs->CreateInstance(reinterpret_cast<AGGDESC*>(&ChildDesc),
                                    (void**)(&Child)) < 0)
             {
                 char Message[0x2000];
@@ -428,7 +428,7 @@ bool FMeshArchetype::LoadGeometry(IFileSystem* Fs)
     const unsigned long* Weights = (const unsigned long*)WeightNode.View;
 
     const unsigned int PairCount = (unsigned int)(IdNode.Size >> 2);
-    SkinPairs = (FSkinPair*)new unsigned char[(size_t)PairCount * 8];
+    SkinPairs = reinterpret_cast<FSkinPair*>(new unsigned char[(size_t)PairCount * 8]);
     for (unsigned int Index = 0; Index < PairCount; ++Index)
     {
         unsigned long* Pair = (unsigned long*)(&SkinPairs[Index]);
@@ -437,7 +437,7 @@ bool FMeshArchetype::LoadGeometry(IFileSystem* Fs)
     }
 
     FSkinPair* Cursor = SkinPairs;
-    SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)this->VertexCount * 8];
+    SkinTable = reinterpret_cast<FSkinVertex*>(new unsigned char[(size_t)(unsigned int)this->VertexCount * 8]);
     for (unsigned int Index = 0; Index < (unsigned int)this->VertexCount; ++Index)
     {
         const unsigned long Influence = BoneCounts[Index];
@@ -561,7 +561,7 @@ bool FMeshArchetype::LoadUvDeformTables(IFileSystem* Fs)
     UvDeformCount = (int)(BoneIdNode.Size >> 2);
     if (UvDeformCount != 0)
     {
-        UvDeform = (FUvDeformRecord*)new unsigned char[(size_t)(unsigned int)UvDeformCount * 0x24];
+        UvDeform = reinterpret_cast<FUvDeformRecord*>(new unsigned char[(size_t)(unsigned int)UvDeformCount * 0x24]);
         for (unsigned int Index = 0; Index < (unsigned int)UvDeformCount; ++Index)
         {
             unsigned long* Row = (unsigned long*)(&UvDeform[Index]);
@@ -590,7 +590,7 @@ static void BuildBoneVertexLists(FMeshArchetype* Arch, FLodHolder* Holder, IFile
     const unsigned char AllocatorByte = (unsigned char)((uintptr_t)Fs);
     unsigned char* Block = new unsigned char[(size_t)BoneCount * sizeof(FBoneVertexList) + sizeof(int)];
     *(int*)Block = BoneCount;
-    FBoneVertexList* Lists = (FBoneVertexList*)(Block + sizeof(int));
+    FBoneVertexList* Lists = reinterpret_cast<FBoneVertexList*>((Block + sizeof(int)));
     int ListIndex = 0;
     while (ListIndex < BoneCount)
     {

@@ -147,7 +147,7 @@ void SpaceDustShutdown()
     G_SystemDustAtFullDetail = 0;
 }
 
-void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
+void SpaceDustUpdate(Universe::ISystem const* System, ICamera* Camera)
 {
     // FUN_0054beb0
 
@@ -170,7 +170,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
     Offset.Translation.y = 0.0f;
     Offset.Translation.z = static_cast<float>(kSpaceDustOffsetZ);
     Transform const* const CamXform =
-        (Transform const*)((ICamera*)Camera)->GetOrientation();
+        reinterpret_cast<Transform const*>(Camera->GetOrientation());
     Transform DustXform;
     ComposeDustXform(CamXform, &DustXform, &Offset);
     Vector const& DustPos = DustXform.Translation;

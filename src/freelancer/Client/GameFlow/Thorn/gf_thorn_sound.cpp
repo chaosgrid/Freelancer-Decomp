@@ -114,13 +114,13 @@ void FThornSound::BindTemplate(char const* InTemplate, unsigned char bInVoice)
     if (_stricmp(InTemplate, "BackgroundAmbient") == 0)
     {
         bAmbient = 1;
-        BindClientBackgroundAmbient(reinterpret_cast<void**>(&Handle));
+        BindClientBackgroundAmbient(&Handle);
         return;
     }
     if (_stricmp(InTemplate, "BackgroundMusic") == 0)
     {
         bMusic = 1;
-        BindClientBackgroundMusic(reinterpret_cast<void**>(&Handle));
+        BindClientBackgroundMusic(&Handle);
         return;
     }
     if (bVoice == 0 && Template != nullptr && Template[0] != '\0')
@@ -160,12 +160,12 @@ bool FThornSound::IsHoldingScript() const
 // The receiver of FUN_00445720 is Actor as it came back from the spawn table's FindActor (only
 // Thorn_Deformable answers with one: its CharacterObject); with no actor retail calls it on a
 // null receiver, and so does the port -- no guard.
-void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
+void FThornSound::ResolveVoice(void* VoiceId, FCharacterObject* Actor)
 {
     if (bVoice != 1 || Template == nullptr || Template[0] == '\0')
         return;
 
-    FCharacterObject const* const Talker = static_cast<FCharacterObject const*>(Actor);
+    FCharacterObject const* const Talker = Actor;
     char const* MessageName = Template;
     if (_stricmp(Template, "$BGCS_Base_Name") == 0 || _stricmp(Template, "$BGCS_Base_Run_By") == 0 ||
         _stricmp(Template, "$BGCS_My_Faction_ML") == 0 ||
@@ -250,11 +250,10 @@ GENRESULT DACOM_API FThornSound::StartSound(void* Desc, int TimeMs)
 
     if (Arch != nullptr)
     {
-        Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(Arch);
+        Archetype::ISound* const SoundArch = Arch;
         if (SoundArch->IsStreamer() != 0)
         {
-            Handle = static_cast<ISoundSource*>(
-                Owner->PlayStreamedSoundEvent(Event->Common.UniqueId, Offset));
+            Handle = Owner->PlayStreamedSoundEvent(Event->Common.UniqueId, Offset);
         }
         else
         {
@@ -268,7 +267,7 @@ GENRESULT DACOM_API FThornSound::StartSound(void* Desc, int TimeMs)
             Key.Flags = Flags;
             Key.Offset = static_cast<unsigned>(Offset);
             PlayClientSoundArch(Arch, reinterpret_cast<unsigned*>(&Key),
-                                reinterpret_cast<void**>(&Handle), 0);
+                                &Handle, 0);
         }
     }
     RefreshSound();
@@ -412,7 +411,7 @@ void FThornSound::SetSpawnTable(FThornComponent** Table, int Count)
     if (bVoice != 1)
         return;
     void* VoiceId = nullptr;
-    void* Actor = nullptr;
+    FCharacterObject* Actor = nullptr;
     bool bFound = false;
     int Index = 0;
     for (Index = 0; Index < Count; ++Index)

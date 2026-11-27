@@ -64,7 +64,7 @@ FaceBehavior::~FaceBehavior()
 }
 
 // Slot 1, LAB_062c8ac0.
-bool FaceBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool FaceBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     if (!BindContext(Param1, Param2, Param3))   // FUN_062d2090
         return false;
@@ -75,7 +75,7 @@ bool FaceBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     Afterburner.SetContext(Param1, Param3, Param2);
 
     // FUN_062e5b20.
-    Field1cc = Behavior_GetAngularSpeedXY(ObjInspectOf(OwnerContext), 0.0f, 1.0f);
+    Field1cc = Behavior_GetAngularSpeedXY(OwnerContext, 0.0f, 1.0f);
 
     return true;
 }
@@ -137,7 +137,7 @@ int FaceBehavior::OnEvaluateReadiness(float Unused)
         if (!(Pathfind->CachedObstacleId != 0 && Pathfind->bHasCachedObstacle))
         {
             IObjInspect* const Closest = Sys->Timers.FindClosestHostileTarget(Sys->PersonalityData.EngineKillParams.EngineKillMaxTargetDistance);
-            Watcher30.set(static_cast<Watchable const*>(static_cast<IObjRW*>(Closest)));
+            Watcher30.set(static_cast<IObjRW*>(Closest));
 
             IObjRW* const Watched = GetWatchedRawBlock();
             if (Watched != nullptr)
@@ -232,7 +232,7 @@ int FaceBehavior::Update()
     {
         // Four gates in retail's evaluation order; any failure goes to the re-validation
         // block at LAB_062c8f0a.
-        void* const WatchedBlock = GetWatchedRawBlock();
+        IObjRW* const WatchedBlock = GetWatchedRawBlock();
 
         bool bStillTurning = false;
         if (Watcher30.target() != nullptr && WatchedBlock != nullptr)
@@ -294,7 +294,7 @@ int FaceBehavior::Update()
         {
             // Retail re-reads the watcher here, after the Commit() above, instead of reusing
             // the earlier value.
-            void* const FreshBlock = GetWatchedRawBlock();
+            IObjRW* const FreshBlock = GetWatchedRawBlock();
             TargetKind2c = kFaceKindObject;
 
             // Retail expands the watcher-to-block idiom three more times and branches on

@@ -49,6 +49,7 @@ class IFont;
 struct FSpaceCamera;
 struct IObjRW;
 class CEquip;
+class NnTextControl;
 struct CObject;
 struct CShip;
 struct CSimple;
@@ -503,8 +504,8 @@ private:
     void DrawScanSweep();
 
 public:
-    WinControl* ShipName;                  // +0x500 "TargetShipName"
-    WinControl* SubtargetName;             // +0x504 "SubtargetName"
+    NnTextControl* ShipName;               // +0x500 "TargetShipName"
+    NnTextControl* SubtargetName;          // +0x504 "SubtargetName"
     WinControl* ScanButton;                // +0x508 "TargetScanButton"
     WinControl* TractorButton;             // +0x50c "TargetTractorButton"
     WinControl* TradeButton;               // +0x510 "TargetTradeButton"

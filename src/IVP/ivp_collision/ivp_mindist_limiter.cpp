@@ -85,7 +85,7 @@ namespace
         M->StateFlags = (M->StateFlags & 0xfffdf7ffu) | 0x10400u;
         for (int32_t I = 0; I < 2; ++I)
         {
-            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->controller_phantom);
+            IVP_Controller_Phantom* const Phantom = M->synapse[I].l_obj->controller_phantom;
             if (Phantom != nullptr)
                 Phantom->mindist_entered_volume(M); // FUN_06344400
         }
@@ -100,7 +100,7 @@ namespace
         M->StateFlags &= 0xfffcf3ffu;
         for (int32_t I = 0; I < 2; ++I)
         {
-            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->controller_phantom);
+            IVP_Controller_Phantom* const Phantom = M->synapse[I].l_obj->controller_phantom;
             if (Phantom != nullptr)
                 Phantom->mindist_left_volume(M); // FUN_06344580
         }
@@ -388,10 +388,8 @@ IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
         {
             IVP_Core* Core = Other->RegisteredCores[I];
 
-            IVP_Friction_Info_For_Core* OtherEntry = static_cast<IVP_Friction_Info_For_Core*>(
-                Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Other))));
-            IVP_Friction_Info_For_Core* TargetEntry = static_cast<IVP_Friction_Info_For_Core*>(
-                Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Target))));
+            IVP_Friction_Info_For_Core* OtherEntry = Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Other)));
+            IVP_Friction_Info_For_Core* TargetEntry = Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Target)));
 
             if (TargetEntry != nullptr)
             {
@@ -1532,9 +1530,9 @@ void IVP_Mindist_Manager::insert_lazy_mindist(IVP_Ledge_Mindist* Mindist)
     }
 
     int32_t PhantomFlag = 0;
-    const IVP_Controller_Phantom* Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->controller_phantom);
+    const IVP_Controller_Phantom* Phantom = Mindist->synapse[0].l_obj->controller_phantom;
     if (Phantom == nullptr)
-        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->controller_phantom);
+        Phantom = Mindist->synapse[1].l_obj->controller_phantom;
     if (Phantom != nullptr)
     {
         PhantomFlag = static_cast<int32_t>(reinterpret_cast<intptr_t>(Phantom->client_data));
@@ -1677,7 +1675,7 @@ void IVP_Mindist_Manager::recalc_exact_mindist(IVP_Ledge_Mindist* Mindist)
         Value = -Mindist->SeparationGap;
     }
 
-    const IVP_Controller_Phantom* const Phantom0 = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->controller_phantom);
+    const IVP_Controller_Phantom* const Phantom0 = Mindist->synapse[0].l_obj->controller_phantom;
     const IVP_Controller_Phantom* Phantom = Phantom0;
     if (Phantom0 != nullptr)
     {
@@ -1686,7 +1684,7 @@ void IVP_Mindist_Manager::recalc_exact_mindist(IVP_Ledge_Mindist* Mindist)
     }
     else
     {
-        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->controller_phantom); // no null test
+        Phantom = Mindist->synapse[1].l_obj->controller_phantom; // no null test
     }
 
     const float Slack = (float)((double)(Value) + Phantom->exit_policy_extra_radius);

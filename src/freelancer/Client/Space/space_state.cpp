@@ -138,7 +138,7 @@ namespace
         {
             // The object the active camera (not tested again after the frame's own test)
             // watches through its +0xc0 BaseWatcher, minus eight; null when nothing is watched.
-            FGameCamera* const Cam = reinterpret_cast<FGameCamera*>(GetActiveSpaceCamera());
+            FGameCamera* const Cam = GetActiveSpaceCamera();
             Watchable const* const Watched = Cam->Watched.target();
             void const* const WatchedObjRW =
                 Watched != nullptr ? reinterpret_cast<unsigned char const*>(Watched) - 8
@@ -154,7 +154,7 @@ namespace
                 if (State->bDockingPending != 0)
                 {
                     // IServer slot 57, no test on the server.
-                    static_cast<IServer*>(GetLocalServerInterface())
+                    GetLocalServerInterface()
                         ->SPRequestInvincibility(static_cast<CSimple*>(EqObj)->Id, true,
                                                  INVINCIBILITY_DOCKING,
                                                  GetPlayerConnectionId());
@@ -190,11 +190,10 @@ namespace
         // While docking with a player object, the ship Gameobj's +0x158 state (FUN_005437d0)
         // steers +0xbab: raised once the state leaves 0, and when it is back at 0 with +0xbab
         // raised both bytes drop.
-        void* const PlayerObjRW = GetPlayerObjRW();
+        IObjRW* const PlayerObjRW = GetPlayerObjRW();
         if (State->bDockingPending != 0 && PlayerObjRW != nullptr)
         {
-            FClientShipGameobj const* const Ship = static_cast<FClientShipGameobj const*>(
-                static_cast<IObjRW const*>(PlayerObjRW));
+            FClientShipGameobj const* const Ship = static_cast<FClientShipGameobj const*>(PlayerObjRW);
             int const DockState = Ship->JumpState;
             if (State->bDockingActive != 0)
             {
@@ -339,7 +338,7 @@ void SpaceApp::Slot10()
 // apply). No active camera: nothing.
 void SpaceApp::Resize(int Width, int Height)
 {
-    FSpaceCamera* const Active = ActiveCamera;
+    FGameCamera* const Active = ActiveCamera;
     if (Active == nullptr)
         return;
     int ViewRect[4];
@@ -347,7 +346,7 @@ void SpaceApp::Resize(int Width, int Height)
     ViewRect[1] = 0;
     ViewRect[2] = Width - 1;
     ViewRect[3] = Height - 1;
-    ((FGameCamera*)Active)->ApplyViewport(ViewRect);
+    Active->ApplyViewport(ViewRect);
 }
 
 namespace
@@ -416,7 +415,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         {
             // The player's behaviour manager drops its steering direction.
             IBehaviorManager* const Manager =
-                GetBehaviorManager(static_cast<IObjRW*>(GetPlayerObjRW()));
+                GetBehaviorManager(GetPlayerObjRW());
             if (Manager != nullptr)
                 Manager->reset_current_behavior_direction();
             if (App->bCameraReady != 0)
@@ -448,7 +447,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         }
         // Released -- only when the rear-view camera is the active one
         // does the view go back.
-        if (App->ActiveCamera != SpaceCameraOf(&App->RearView))
+        if (App->ActiveCamera != &App->RearView)
         {
             GetHudStatus()->UpdateSpecialModeCaptions();
             return true;
@@ -459,7 +458,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
     case USER_REARVIEW_CAMERA_MODE_OFF:
         // Rear view off; the same tail as 0x38's release.
         GetHudStatus()->bRearView = 0;
-        if (App->ActiveCamera != SpaceCameraOf(&App->RearView))
+        if (App->ActiveCamera != &App->RearView)
         {
             GetHudStatus()->UpdateSpecialModeCaptions();
             return true;
@@ -492,7 +491,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         if (DockTarget == 0)
             return false;
         const unsigned Connection = GetPlayerConnectionId();
-        static_cast<IServer*>(GetLocalServerInterface())->Dock(DockTarget, Connection);
+        GetLocalServerInterface()->Dock(DockTarget, Connection);
         return true;
     }
 
@@ -515,9 +514,9 @@ void SpaceAppLoadCamerasIni(SpaceApp* App)
         if (Reader.is_header("WinCamera"))
             Camera = Win3DGetCamera();
         else if (Reader.is_header("CockpitCamera"))
-            Camera = SpaceCameraOf(&App->FirstPerson);
+            Camera = &App->FirstPerson;
         else if (Reader.is_header("ThirdPersonCamera"))
-            Camera = SpaceCameraOf(&App->ThirdPerson);
+            Camera = &App->ThirdPerson;
         else if (Reader.is_header("TurretCamera"))
             Camera = SpaceCameraOf(&App->Turret);
         else if (Reader.is_header("RearViewCamera"))
@@ -556,7 +555,7 @@ void SpaceAppArmDeathCamera()
 
     // The client ObjDB's spatial bucket (slot 0xc, mask 0xfdff).
     ISpatialPartition* const Bucket =
-        static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
+        GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
     bool bCrowded = false;
     if (Bucket != nullptr)
     {
@@ -594,14 +593,14 @@ void SpaceAppArmDeathCamera()
 
     // A first-person view goes to "third_person" on the player's object first.
     Death->DriftDamping = 0.5f;
-    if (G_SpaceApp.ActiveCamera == SpaceCameraOf((FHudCamera*)&G_SpaceApp.FirstPerson))
+    if (G_SpaceApp.ActiveCamera == &G_SpaceApp.FirstPerson)
         SwitchSpaceCameraMode("third_person", GetPlayerObjRW());
 
     // The listener camera's (FUN_0040f130) transform into the death camera's World, its 3x3
     // into the shake matrix, its position into the drift accumulator.
     FSpaceCamera* const Listener = static_cast<FSpaceCamera*>(GetClientSoundListenerObject());
     const float* const Src = (const float*)AsCamera(Listener)->GetOrientation();
-    FSpaceCamera* const DeathBase = SpaceCameraOf((FGameCamera*)Death);
+    FSpaceCamera* const DeathBase = Death;
     DeathBase->bViewDirty = 1;
     memcpy(&DeathBase->World, Src, 9 * sizeof(float));
     memcpy(&DeathBase->WorldPos, Src + 9, 3 * sizeof(float));
@@ -625,7 +624,7 @@ void SpaceAppArmDeathCamera()
 void SetStaticCameraTransform(const float* Csys12)
 {
     // FUN_0054bb50. The Csys and the view-dirty byte are written before the guard.
-    FSpaceCamera* const Static = SpaceCameraOf((FGameCamera*)&G_SpaceApp.Static);
+    FSpaceCamera* const Static = &G_SpaceApp.Static;
     Static->bViewDirty = 1;
     memcpy(&Static->World, Csys12, 9 * sizeof(float));
     memcpy(&Static->WorldPos, Csys12 + 9, 3 * sizeof(float));
@@ -665,7 +664,7 @@ namespace
         {
             // The player's object when its class has bit 0 set, else null -- used below with no
             // test.
-            IObjRW* const PlayerRW = static_cast<IObjRW*>(GetPlayerObjRW());
+            IObjRW* const PlayerRW = GetPlayerObjRW();
             CObject* Object = nullptr;
             if (PlayerRW != nullptr)
             {
@@ -739,7 +738,7 @@ namespace
             Object->remake_physical(Parms, 0.0f);
 
             // IServer slot 47.
-            static_cast<IServer*>(GetLocalServerInterface())
+            GetLocalServerInterface()
                 ->SystemSwitchOutComplete(GetPlayerShipId(), GetPlayerConnectionId());
 
             G_PendingJumpFlag = 0;
@@ -803,7 +802,7 @@ bool SpaceApp::Init(int Param)
     RegisterAcceleratorGroup("IDR_SPACE");
 
     // IServer slot 64, no test on the server.
-    static_cast<IServer*>(GetLocalServerInterface())->RequestCreateShip(GetPlayerConnectionId());
+    GetLocalServerInterface()->RequestCreateShip(GetPlayerConnectionId());
 
     ClearPlayerCreateShipResponse();
     WaitForServerResponse(GetPlayerCreateShipAnsweredByte(), 5.0f, 60.0f);
@@ -851,7 +850,7 @@ bool SpaceApp::Init(int Param)
 
     // IServer slot 11.
     RefreshLoadingProgress();
-    static_cast<IServer*>(GetLocalServerInterface())->Update();
+    GetLocalServerInterface()->Update();
     RefreshLoadingProgress();
 
     // The cockpit ini, the four cockpit camera loaders, FUN_004c73d0.
@@ -974,9 +973,9 @@ int SpaceApp::Update(float DeltaSeconds)
         UpdateSpaceDocking(this);
 
         // The active camera's slot 0x6c, re-read and tested.
-        FSpaceCamera* const Cam = GetActiveSpaceCamera();
+        FGameCamera* const Cam = GetActiveSpaceCamera();
         if (Cam != nullptr)
-            ((FGameCamera*)Cam)->Update(DeltaSeconds);
+            Cam->Update(DeltaSeconds);
 
         StarSysUpdate(DeltaSeconds);
         TickMaterialAnimationPlayback(DeltaSeconds); // FUN_0041b2e0
@@ -987,9 +986,9 @@ int SpaceApp::Update(float DeltaSeconds)
     // FUN_00428040. No null test: the camera was checked on entry.
     {
         FClientTickScope SoundProfile(EClientTickSection::Sound);
-        FSpaceCamera* const Cam = GetActiveSpaceCamera();
+        FGameCamera* const Cam = GetActiveSpaceCamera();
         SetClientAudioMode(
-            ((FGameCamera*)Cam)->GetSoundMode());
+            Cam->GetSoundMode());
         TickClientSoundMixer(GetActiveSpaceCamera(), DeltaSeconds);
     }
 
@@ -1005,12 +1004,12 @@ int SpaceApp::Update(float DeltaSeconds)
         HudTargetableObjectsHideAlertsInLetterbox();
 
         // FUN_0051b4b0 (letterbox, clear, viewport, Win3D camera) and the camera's slot 0x78.
-        FSpaceCamera* const Cam = GetActiveSpaceCamera();
+        FGameCamera* const Cam = GetActiveSpaceCamera();
         if (Cam != nullptr)
         {
-            reinterpret_cast<FGameCamera*>(Cam)->BeginFrame();
-            FSpaceCamera* const DrawCam = GetActiveSpaceCamera();
-            ((FGameCamera*)DrawCam)->DrawScene(0xffffu, 0u);
+            Cam->BeginFrame();
+            FGameCamera* const DrawCam = GetActiveSpaceCamera();
+            DrawCam->DrawScene(0xffffu, 0u);
         }
 
         Win3DImmedBatchFlushAll();    // FUN_005a2a20
@@ -1040,11 +1039,11 @@ int SpaceApp::Update(float DeltaSeconds)
 
     // The player's last position and orientation (FUN_004c4a30 / FUN_004c4a60).
     {
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (Player != nullptr)
         {
             SetPlayerLastPositionRetail(&Player->get_position().x);
-            IObjRW* const Again = static_cast<IObjRW*>(GetPlayerObjRW());
+            IObjRW* const Again = GetPlayerObjRW();
             SetPlayerLastOrientationRetail(&Again->get_transform().Rotation.E[0][0]);
         }
     }
@@ -1053,11 +1052,11 @@ int SpaceApp::Update(float DeltaSeconds)
     // the player ship is gone -- FUN_00471e80 once, latched in +0x09 -- or the camera returns to
     // "player", attached to the player object, and +0xba8 drops.
     {
-        FSpaceCamera* const Cam = GetActiveSpaceCamera();
+        FGameCamera* const Cam = GetActiveSpaceCamera();
         if (Cam != nullptr &&
-            ((FGameCamera*)Cam)->IsFinished())
+            Cam->IsFinished())
         {
-            void* const Player = GetPlayerObjRW();
+            IObjRW* const Player = GetPlayerObjRW();
             if (Player == nullptr)
             {
                 if (bPlayerLostHandled == 0)

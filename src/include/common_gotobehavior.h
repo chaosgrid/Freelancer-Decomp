@@ -144,7 +144,7 @@ public:
     int OnUpdate() override { return Update(); }
 
     // ---- Retail's own slots of .rdata:063a2284 (bodies in common_gotobehavior.cpp).
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;   //  1 LAB_062fd890 (RET 0xc)
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;   //  1 LAB_062fd890 (RET 0xc)
     void OnEngage() override;                                             //  3 FUN_062fd920
     void OnDisengage() override;                                             //  4 FUN_062fd9c0
     int OnEvaluateReadiness(float Value) override;                                   //  5 LAB_062fda20 (RET 4)

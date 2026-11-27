@@ -28,6 +28,7 @@
 #include "NeuroNet/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
 #include "NeuroNet/nn_modal.h"               // NnMainButtonOnModalOpen (FUN_0045a460), G_bNnScreenUp, NnFloatBits
 #include "NeuroNet/nn_repair.h"              // NnRepair::PlayerNeedsRepair (FUN_004b4510)
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_tooltip.h"             // NnToolTipHideGlobal (FUN_004be390)
 #include "GameFlow/room_control.h"
 #include "GameFlow/room_control_hotspot.h"  // EHotspotBehavior
@@ -151,7 +152,7 @@ namespace
     // FUN_0043a460 / FUN_00438c00 (identical bodies) -- the current room's runtime.
     FRoomRuntime* CurrentRoomRuntime()
     {
-        return static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
+        return GetClientCurrentLocationRuntime();
     }
 
     // FUN_0043b630 then its first dword -- the id of the base the player is at.

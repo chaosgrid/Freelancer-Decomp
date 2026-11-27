@@ -63,7 +63,7 @@ namespace
     {
         // The result goes straight into GetBehaviorManager, null included -- Common's own entry
         // test is what turns a missing ship into a null manager.
-        return GetBehaviorManager(static_cast<IObjRW*>(GetPlayerObjRW()));
+        return GetBehaviorManager(GetPlayerObjRW());
     }
 
     // Shared preamble of FUN_004c7b90 / FUN_004c7be0: the player's CEqObj read directly (not
@@ -98,14 +98,14 @@ namespace
     }
 }
 
-void* GetPlayerObjRW()
+IObjRW* GetPlayerObjRW()
 {
     // FUN_0054baf0. A null watchable yields a null object rather than the address -8.
     void* const Watched = GetPlayerShipWatcher();
     if (Watched == nullptr)
         return nullptr;
 
-    return static_cast<unsigned char*>(Watched) - kWatchableOffset;
+    return reinterpret_cast<IObjRW*>(static_cast<unsigned char*>(Watched) - kWatchableOffset);
 }
 
 void ResetPlayerBehaviorDirection()
@@ -203,7 +203,7 @@ float GetLastPlayerThrottle()
     if (GetPlayerObjRW() == nullptr)
         return 0.0f;
 
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     Player->get_throttle(G_PlayerThrottle);
     return G_PlayerThrottle;
 }

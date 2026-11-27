@@ -76,7 +76,7 @@ PhysicalSystem::PhysicalSystem(unsigned InSystemId)
 // LAB_0628c300. The object's client data is the CObject; a null one is skipped.
 void PhysicalSystem::event_object_deleted(IVP_Environment_Object_Notify_Event* Event)
 {
-    CObject* const Object = (CObject*)Event->Object->client_data;
+    CObject* const Object = static_cast<CObject*>(Event->Object->client_data);
     if (Object == nullptr)
         return;
     MovingObjects.erase(Object);
@@ -85,7 +85,7 @@ void PhysicalSystem::event_object_deleted(IVP_Environment_Object_Notify_Event* E
 // LAB_0628c5b0: a null client is skipped, otherwise a unique insert.
 void PhysicalSystem::event_object_revived(IVP_Environment_Object_Notify_Event* Event)
 {
-    CObject* const Object = (CObject*)Event->Object->client_data;
+    CObject* const Object = static_cast<CObject*>(Event->Object->client_data);
     if (Object == nullptr)
         return;
     MovingObjects.insert(Object);
@@ -95,7 +95,7 @@ void PhysicalSystem::event_object_revived(IVP_Environment_Object_Notify_Event* E
 // (normally absent).
 void PhysicalSystem::event_object_frozen(IVP_Environment_Object_Notify_Event* Event)
 {
-    CObject* const Object = (CObject*)Event->Object->client_data;
+    CObject* const Object = static_cast<CObject*>(Event->Object->client_data);
     MovingObjects.erase(Object);
 }
 
@@ -107,8 +107,8 @@ void PhysicalSystem::event_pre_collision(IVP_Event_Collision* Event)
         return;
 
     IVP_Contact_Situation* const Situation = Event->contact_situation;
-    CObject* const ObjectA = (CObject*)Situation->objects[0]->client_data;
-    CObject* const ObjectB = (CObject*)Situation->objects[1]->client_data;
+    CObject* const ObjectA = static_cast<CObject*>(Situation->objects[0]->client_data);
+    CObject* const ObjectB = static_cast<CObject*>(Situation->objects[1]->client_data);
 
     if (ObjectA != nullptr)
     {
@@ -201,7 +201,7 @@ static void PhySys_SyncObjectFromBody(CObject* Object)
 
     // CSimple-derived classes re-cache their physical properties.
     if (((unsigned)Object->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
-        ((CSimple*)Object)->cache_physical_props();
+        static_cast<CSimple*>(Object)->cache_physical_props();
 }
 
 // FUN_0628c900
@@ -345,7 +345,7 @@ void PhysicalSystem::GenerateCollisions(CBeam* Beam, Vector const& Direction, fl
 
     for (;;)
     {
-        IVP_Ray_Hit* const Hit = (IVP_Ray_Hit*)Solver.min_hash.find_min_elem();
+        IVP_Ray_Hit* const Hit = static_cast<IVP_Ray_Hit*>(Solver.min_hash.find_min_elem());
         if (Hit == nullptr)
             return;
         IVP_Real_Object* const HitObject = Hit->hit_real_object;
@@ -365,7 +365,7 @@ void PhysicalSystem::GenerateCollisions(CBeam* Beam, Vector const& Direction, fl
         }
 
         // The distance is the min hash element's key.
-        CObject* const Client = (CObject*)HitObject->client_data;
+        CObject* const Client = static_cast<CObject*>(HitObject->client_data);
         const float Distance = Solver.min_hash.stadium[1]->value;
         PhySys::CollisionEvent Event;
         Event.ObjectA = Client;
@@ -576,11 +576,11 @@ int PhysicalSystem::FindRayCollisions(Vector const& From, Vector const& To, PhyS
     PhySys::RayHit* Out = Hits;
     for (;;)
     {
-        IVP_Ray_Hit* const Hit = (IVP_Ray_Hit*)Solver.min_hash.find_min_elem();
+        IVP_Ray_Hit* const Hit = static_cast<IVP_Ray_Hit*>(Solver.min_hash.find_min_elem());
         if (Hit == nullptr || Count >= MaxHits)
             break;
 
-        CObject* const Client = (CObject*)Hit->hit_real_object->client_data;
+        CObject* const Client = static_cast<CObject*>(Hit->hit_real_object->client_data);
         if (Client != nullptr)
         {
             Out->Object = Client;
@@ -640,7 +640,7 @@ int PhysicalSystem::FindSphereCollisions(Vector const& Center, float Radius, COb
         {
             break;
         }
-        CObject* const Client = (CObject*)Query.Found.elems[i]->client_data;
+        CObject* const Client = static_cast<CObject*>(Query.Found.elems[i]->client_data);
         if (Client != nullptr)
         {
             OutObjects[Count] = Client;

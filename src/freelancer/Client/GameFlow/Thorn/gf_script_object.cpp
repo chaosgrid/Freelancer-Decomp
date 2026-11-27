@@ -262,7 +262,7 @@ void FGfScript::StartScriptSounds()
         FGfScriptSoundEvent& Node = *It;
         if (Node.bStarted != 0)
             continue;
-        Archetype::ISound* const Arch = static_cast<Archetype::ISound*>(Node.Arch);
+        Archetype::ISound* const Arch = Node.Arch;
         if (Arch != nullptr)
         {
             if (Arch->IsStreamer() == 0)
@@ -274,8 +274,9 @@ void FGfScript::StartScriptSounds()
                 FScriptSoundKey Key;
                 memset(&Key, 0, sizeof(Key));
                 Key.Flags = MakeKeyFlags(Arch->IsStreamer(), Node.bSpatial, Node.bLoop);
-                void* Handle = nullptr;
-                PlayClientSoundArch(Arch, reinterpret_cast<unsigned*>(&Key), &Handle, 1);
+                ISoundSource* Handle = nullptr;
+                PlayClientSoundArch(Arch, reinterpret_cast<unsigned*>(&Key),
+                                    &Handle, 1);
                 Node.Handle = Handle;
             }
         }
@@ -311,7 +312,7 @@ void FGfScript::StopScriptSounds()
         FGfScriptSoundEvent& Node = *It;
         if (Node.bStarted == 0)
             continue;
-        Archetype::ISound* const Arch = static_cast<Archetype::ISound*>(Node.Arch);
+        Archetype::ISound* const Arch = Node.Arch;
         if (Arch != nullptr)
         {
             if (Arch->IsStreamer() == 0)
@@ -320,7 +321,7 @@ void FGfScript::StopScriptSounds()
             }
             else if (Node.Handle != nullptr)
             {
-                ISoundSource* const Handle = static_cast<ISoundSource*>(Node.Handle);
+                ISoundSource* const Handle = Node.Handle;
                 Handle->Stop();
                 Handle->Release();
                 Node.Handle = nullptr;
@@ -331,7 +332,7 @@ void FGfScript::StopScriptSounds()
 }
 
 // FUN_0044f5c0.
-void FGfScript::RemoveSoundEvent(void* Handle)
+void FGfScript::RemoveSoundEvent(ISoundSource* Handle)
 {
     if (Handle == nullptr)
         return;
@@ -348,9 +349,9 @@ void FGfScript::RemoveSoundEvent(void* Handle)
 
 // FUN_0044f610. A held handle is restarted (FUN_0042a2a0, result dropped). Otherwise a new
 // source is started (FUN_00428680, bAltStart 0) and answered, not stored in any node.
-void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
+ISoundSource* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
 {
-    void* Result = nullptr;
+    ISoundSource* Result = nullptr;
     std::list<FGfScriptSoundEvent>::iterator It = SoundEvents.begin();
     for (; It != SoundEvents.end(); ++It)
     {
@@ -358,7 +359,7 @@ void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
             continue;
         if (It->Handle != nullptr)
         {
-            ISoundSource* const Handle = static_cast<ISoundSource*>(It->Handle);
+            ISoundSource* const Handle = It->Handle;
             RestartClientStreamedSound(Handle, It->Arch, Offset);
             It->bStarted = 0;
             return Handle;
@@ -370,7 +371,7 @@ void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
     memset(&Local, 0, sizeof(Local));
     if (CollectSoundEvent(EventId, &Local))
     {
-        Archetype::ISound* const Arch = static_cast<Archetype::ISound*>(Local.Arch);
+        Archetype::ISound* const Arch = Local.Arch;
         FScriptSoundKey Key;
         memset(&Key, 0, sizeof(Key));
         Key.Flags = MakeKeyFlags(Arch->IsStreamer(), Local.bSpatial, Local.bLoop);
@@ -863,7 +864,7 @@ void FGfScriptSequence::Setup()
 {
     RefreshLoadingProgress();
     ICamera* const Camera = GetRoomRuntimeCamera(Room);
-    const float* const Transform = (const float*)Camera->GetOrientation();
+    const float* const Transform = reinterpret_cast<const float*>(Camera->GetOrientation());
     int Index = 0;
     for (Index = 0; Index < 3; ++Index)
         CameraPos[Index] = Transform[9 + Index];

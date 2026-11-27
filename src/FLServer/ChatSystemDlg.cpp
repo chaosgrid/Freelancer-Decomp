@@ -116,7 +116,7 @@ void CChatSystemDlg::OnCloseButton()
 // target the "system" id and this window's system id.
 void CChatSystemDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 {
-	const MSGFILTER* Filter = (const MSGFILTER*)Header;
+	const MSGFILTER* Filter = reinterpret_cast<const MSGFILTER*>(Header);
 	if (Filter->wParam != VK_RETURN)
 	{
 		*Result = 0;

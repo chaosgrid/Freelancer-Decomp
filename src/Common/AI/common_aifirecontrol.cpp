@@ -157,7 +157,7 @@ int SystemManagerGunGroupManager::CanFireLauncherAtTarget(unsigned short Hardpoi
         CObject* Obj = (CObject*)OwnShip()->cobject();
         if (Obj == nullptr || (Obj->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
             Obj = nullptr;
-        CEqObj* const EqObj = (CEqObj*)Obj;
+        CEqObj* const EqObj = static_cast<CEqObj*>(Obj);
         CELauncher* const Launcher = CELauncher::cast(EqObj->EquipManager.FindByID(HardpointId));
         if (Launcher == nullptr)
             return 0;
@@ -252,7 +252,7 @@ bool SystemManagerGunGroupManager::IsLineOfFireBlocked(IObjRW* Target, unsigned 
     CObject* Own = (CObject*)OwnShip()->cobject();
     if (Own == nullptr || ((unsigned)Own->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         Own = nullptr;
-    CELauncher* const Launcher = CELauncher::cast(((CEqObj*)Own)->EquipManager.FindByID(HardpointId));
+    CELauncher* const Launcher = CELauncher::cast(static_cast<CEqObj*>(Own)->EquipManager.FindByID(HardpointId));
     if (Launcher == nullptr)
         return Slot.bBlocked != 0;
 
@@ -343,7 +343,7 @@ void SystemManagerGunGroupManager::ComputeLeadFirePosition(Vector* OutPos, IObjR
             CObject const* const Obj = OwnShip()->cobject();
             bool bGot = false;
             if (Obj != nullptr && ((unsigned)Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-                bGot = ((CShip const*)Obj)->get_tgt_lead_fire_pos(LeadPos);
+                bGot = static_cast<CShip const*>(Obj)->get_tgt_lead_fire_pos(LeadPos);
             if (!bGot)
                 LeadPos = Target->get_position();
         }
@@ -516,7 +516,7 @@ int SystemManagerGunGroupManager::UpdateGunFireState()
     CObject const* const Obj = OwnShip()->cobject();
     bool bGot = false;
     if (Obj != nullptr && ((unsigned)Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-        bGot = ((CShip const*)Obj)->get_tgt_lead_fire_pos(TargetPos);
+        bGot = static_cast<CShip const*>(Obj)->get_tgt_lead_fire_pos(TargetPos);
     if (!bGot)
         TargetPos = PositionSource->get_position();
 

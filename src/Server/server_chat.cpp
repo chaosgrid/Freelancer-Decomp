@@ -179,7 +179,7 @@ static void ChatGroup_Invite(unsigned int Inviter, unsigned int Invitee, const w
         return;
 
     // A groupless inviter founds one, joining it first.
-    CPlayerGroup* Group = static_cast<CPlayerGroup*>(InviterSlot.group_ptr);
+    CPlayerGroup* Group = InviterSlot.group_ptr;
     if (Group == nullptr) {
         Group = new CPlayerGroup();                            // operator new(0x30)
         Group->AddMember(Inviter);
@@ -202,7 +202,7 @@ static void ChatGroup_Invite(unsigned int Inviter, unsigned int Invitee, const w
         return;
     }
     // Retail re-reads the inviter's group_ptr here rather than reusing the local.
-    static_cast<CPlayerGroup*>(InviterSlot.group_ptr)->AddInvite(InviteeSlot.client_id);
+    InviterSlot.group_ptr->AddInvite(InviteeSlot.client_id);
     ChatGroup_Send(Inviter, kGroupMsgInviteSent, InviteeSlot.client_id);
     ChatGroup_Send(InviteeSlot.client_id, kGroupMsgInviteReceived, Inviter);
 }
@@ -221,8 +221,8 @@ static void ChatGroup_Join(unsigned int Joiner, unsigned int Inviter, const wcha
         _wcsicmp(Name, InviterSlot.get_character_name()) != 0)
         return;
 
-    CPlayerGroup* const OldGroup = static_cast<CPlayerGroup*>(JoinerSlot.group_ptr);
-    CPlayerGroup* const Group = static_cast<CPlayerGroup*>(InviterSlot.group_ptr);
+    CPlayerGroup* const OldGroup = JoinerSlot.group_ptr;
+    CPlayerGroup* const Group = InviterSlot.group_ptr;
 
     if (JoinerSlot.client_id == InviterSlot.client_id) {
         ChatGroup_Send(Joiner, kGroupMsgCannotJoinOwnGroup, JoinerSlot.client_id);
@@ -256,7 +256,7 @@ static void ChatGroup_Join(unsigned int Joiner, unsigned int Inviter, const wcha
 static void ChatGroup_Leave(unsigned int Player)
 {
     PlayerData& Slot = Players[Player];                        // unchecked
-    CPlayerGroup* const Group = static_cast<CPlayerGroup*>(Slot.group_ptr);
+    CPlayerGroup* const Group = Slot.group_ptr;
     if (Group != nullptr) {
         Group->DelMember(Slot.client_id);
         return;
@@ -287,14 +287,14 @@ typedef bool (__cdecl* FChatCommandFn)(FChatCommandContext* Ctx, std::vector<std
 // PlayerData::report_cheat (server_playerdb.cpp).
 void Server_RdlAppend(RenderDisplayList& Rdl, const RDLNode& Node) {
     RDLNode* Copy = Node.Clone();
-    void** Sentinel = (void**)Rdl.NodeList;
-    void** Tail = static_cast<void**>(Sentinel[1]);
-    void** Entry = static_cast<void**>(malloc(0xC));
-    Entry[0] = Sentinel;   // next
-    Entry[1] = Tail;       // prev
-    Entry[2] = Copy;
-    Sentinel[1] = Entry;
-    Tail[0] = Entry;
+    FRdlListNode* Sentinel = Rdl.NodeList;
+    FRdlListNode* Tail = Sentinel->Prev;
+    FRdlListNode* Entry = static_cast<FRdlListNode*>(malloc(0xC));
+    Entry->Next = Sentinel;
+    Entry->Prev = Tail;
+    Entry->Node = Copy;
+    Sentinel->Prev = Entry;
+    Tail->Next = Entry;
     Rdl.Count++;
 }
 
@@ -682,7 +682,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
     // 9. Universe: admins and the console only.
     if (Target.Id == GChatIdUniverse) {
         if (SenderSlot != nullptr &&
-            !static_cast<CAccount*>(SenderSlot->account_ptr)->m_bAdmin) {   // CAccount +0x32
+            !SenderSlot->account_ptr->m_bAdmin) {   // CAccount +0x32
             ChatNotice(0x31e, "Universe chat attempted from an account without the proper rights.\n");
             return;
         }
@@ -743,7 +743,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
     // 12. Group.
     if (Target.Id == GChatIdGroup) {
         if (SenderSlot != nullptr && SenderSlot->group_ptr != nullptr) {
-            static_cast<CPlayerGroup*>(SenderSlot->group_ptr)->DeliverChat(EncodedSize, GChatSendBuffer);
+            SenderSlot->group_ptr->DeliverChat(EncodedSize, GChatSendBuffer);
         } else {
             ChatNotice(0x37a, "Console group chat attempted. Feature is not implemented.\n");
         }

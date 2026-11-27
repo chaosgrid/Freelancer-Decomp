@@ -8439,13 +8439,13 @@ namespace
 
 }
 
-GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComContext,
+GENRESULT FThornScene::SaveToFileSystem(IFileSystem* FileSystem, IThornComContext* ComContext,
                                        unsigned int SavedDurationMs)
 {
     if (FileSystem == nullptr)
         return GR_GENERIC;
 
-    FThornSaveBuf Buf(static_cast<IFileSystem*>(FileSystem));
+    FThornSaveBuf Buf(FileSystem);
 
     SaveBufAppendUnsignedMilliseconds(&Buf, "duration = %.3f;\r\n\r\n",
                                       SavedDurationMs);

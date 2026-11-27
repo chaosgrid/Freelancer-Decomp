@@ -54,12 +54,8 @@ static void RpcCh2SetFloatBits(float& Out, unsigned int Bits) {
     std::memcpy(&Out, &Bits, sizeof(Bits));
 }
 
-// The payload at packet+0x20, written with no size test. Senders store field by field rather
+// The payload at packet+0x20 (PayloadAs), written with no size test. Senders store field by field rather
 // than via RpcPayloadWrite, which would also write the pad bytes retail leaves untouched.
-template<typename T>
-static T* Ch2Payload(FPacketBase* Packet) {
-    return reinterpret_cast<T*>(Packet->Payload());
-}
 
 // ===========================================================================
 // Generic marshallers. Retail repeats these shapes across dozens of types; the codec
@@ -68,7 +64,7 @@ static T* Ch2Payload(FPacketBase* Packet) {
 
 // payload+0x00 = the 2nd argument, by value.
 static bool MarshalCh2Dword(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadServerDword* Wire = Ch2Payload<FPayloadServerDword>(Packet);
+    FPayloadServerDword* Wire = Packet->PayloadAs<FPayloadServerDword>();
     Wire->Field_0x00 = Args[1];
     return true;
 }
@@ -100,7 +96,7 @@ static bool MarshalCh2ByteByRef(FPacket_FLPACKET_SERVER_LOGINRESPONSE& Packet,
 // payload+0x00 = 2nd argument, payload+0x04 = 3rd argument.
 static bool MarshalCh2DwordPair(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     // Some senders (0x06d88930, 0x06d889c0) store the two in the other order; same bytes.
-    FPayloadServerDwordPair* Wire = Ch2Payload<FPayloadServerDwordPair>(Packet);
+    FPayloadServerDwordPair* Wire = Packet->PayloadAs<FPayloadServerDwordPair>();
     Wire->Field_0x00 = Args[1];
     Wire->Field_0x04 = Args[2];
     return true;
@@ -109,7 +105,7 @@ static bool MarshalCh2DwordPair(FPacketBase* Packet, const unsigned int* Args, u
 // FUN_06d97b00: payload+0x00 = size (3rd argument), payload+0x04 = an owned copy of the
 // buffer at the 2nd argument.
 static bool MarshalCh2Blob(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadServerBlob* Wire = Ch2Payload<FPayloadServerBlob>(Packet);
+    FPayloadServerBlob* Wire = Packet->PayloadAs<FPayloadServerBlob>();
     Wire->Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire->Size = Args[2];
     return true;

@@ -194,6 +194,6 @@ char const* File::get_name() const
 File& File::operator=(File const& Other)
 {
     // FUN_06262e10: a raw 0x8C-byte copy; the copy shares the source's FILE* (retail).
-    memmove((void*)this, &Other, sizeof(File)); // memmove: self-assignment
+    memmove(static_cast<void*>(this), &Other, sizeof(File)); // memmove: self-assignment
     return *this;
 }

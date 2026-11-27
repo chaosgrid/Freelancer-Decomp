@@ -44,6 +44,8 @@ struct CSimple;
 class FClientGameobj;
 class INI_Reader;
 class IFont;
+class NnButtonControl;
+class NnTextControl;
 class UiScroll;
 struct FButtonMontageTile;
 struct FFontString;
@@ -151,9 +153,9 @@ public:
 
     FButtonMontageTile* Tiles[16];     // +0x368 (WinControl +0x330) per-kind icon tile
     FButtonMontageTile* ChatTile;      // +0x3a8 (+0x370) "interface\HUD\HUD_chat.3db"
-    WinControl* Icons[8];              // +0x3ac (+0x374) "ContactListIcon%d"
-    WinControl* RangeTexts[8];         // +0x3cc (+0x394) "ContactListRangeText%d"
-    WinControl* NameTexts[8];          // +0x3ec (+0x3b4) "ContactListNameText%d"
+    NnButtonControl* Icons[8];         // +0x3ac (+0x374) "ContactListIcon%d"
+    NnTextControl* RangeTexts[8];      // +0x3cc (+0x394) "ContactListRangeText%d"
+    NnTextControl* NameTexts[8];       // +0x3ec (+0x3b4) "ContactListNameText%d"
     UiScroll* Scroll;                  // +0x40c (+0x3d4) "ContactListScroll"
     // +0x410 (+0x3d8) -- retail VC6 std::list<entry> (allocator byte, head +0x414, size
     // +0x418, 0xc bytes). The port's std::list has another size, so the offsets below are the

@@ -91,7 +91,7 @@ struct FVoiceProfile : Archetype::IVoice
     // slot 1 LAB_004314e0 — "0x%X" of the msg id when the profile has a .utf.
     char const* GetSoundFile(unsigned int MsgId) override;
     // slot 2 LAB_00431590 — DALib::Data CreateInstance("FileSystem"/"UTF", UtfPath).
-    void* OpenScriptFileSystem() override;
+    IFileSystem* OpenScriptFileSystem() override;
     // slot 3 LAB_004313f0.
     unsigned int GetId() const override { return Id.Id; }
     // slot 4 LAB_00431400 — ID_String::get_string, i.e. the hex id, not Name.

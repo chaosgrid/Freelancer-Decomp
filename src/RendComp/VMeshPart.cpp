@@ -107,7 +107,7 @@ public:
     unsigned long DACOM_API Release() override;
     bool DACOM_API Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags, const Transform* Xform,
                         IMaterial* Override) override;
-    bool DACOM_API Prepare(void* Listing, void* Scratch) override;
+    bool DACOM_API Prepare(FVbListing* Listing, FIbScratch* Scratch) override;
     FVmeshRef* DACOM_API GetRef() override;
     FVmeshDataHeader* DACOM_API GetHeader() override;
 
@@ -167,27 +167,27 @@ GENRESULT DACOM_API FVMeshPart::QueryInterface(const char* Iid, void** Out)
 {
     if (std::strcmp(Iid, Iids::VMeshLibrary) == 0)
     {
-        *Out = (IVMeshPart*)this;
+        *Out = static_cast<IVMeshPart*>(this);
         return 0;
     }
     if (std::strcmp(Iid, Iids::Mesh) == 0)
     {
-        *Out = (IMesh*)(&Mesh);
+        *Out = static_cast<IMesh*>(&Mesh);
         return 0;
     }
     if (std::strcmp(Iid, Iids::MatHookUp) == 0)
     {
-        *Out = (IMatHookUp*)(&Hook);
+        *Out = static_cast<IMatHookUp*>(&Hook);
         return 0;
     }
     if (std::strcmp(Iid, Iids::RenderableMesh) == 0)
     {
-        *Out = (IRenderableMesh*)(&Renderable);
+        *Out = static_cast<IRenderableMesh*>(&Renderable);
         return 0;
     }
     if (std::strcmp(Iid, Iids::DAComponent) == 0)
     {
-        *Out = (IMesh*)(&Mesh);
+        *Out = static_cast<IMesh*>(&Mesh);
         return 0;
     }
     return -1;
@@ -220,7 +220,7 @@ FVmeshDataHeader* DACOM_API FVMeshPart::GetHeader()
 
 const FVmeshFacegroup* FVMeshPart::Facegroups() const
 {
-    return (const FVmeshFacegroup*)(
+    return reinterpret_cast<const FVmeshFacegroup*>(
         (const unsigned char*)Data->Header + 0x10);
 }
 
@@ -259,7 +259,7 @@ int FVMeshPart::Claim(IFileSystem* File)
     if (Handle != -1)
     {
         const unsigned long Size = File->GetSize((unsigned long)Handle, 0);
-        FVmeshRef* Buffer = (FVmeshRef*)new unsigned char[(Size / sizeof(FVmeshRef)) * sizeof(FVmeshRef)];
+        FVmeshRef* Buffer = reinterpret_cast<FVmeshRef*>(new unsigned char[(Size / sizeof(FVmeshRef)) * sizeof(FVmeshRef)]);
         unsigned long ReadCount = 0;
         if (File->Read((unsigned long)Handle, Buffer, Size, &ReadCount, 0) != 0)
             Ref = Buffer;
@@ -336,10 +336,10 @@ int FVMeshPart::HookUp()
 // FUN_06c31950 (thiscall, RET 8) -> AL. The group's VB must select (FUN_06c2d4a0); the
 // listing gets {VB, FVF, base vertex + VMeshRef.VertexStart}; the IB is made current with
 // that base vertex (FUN_06c2d5a0) and the scratch gets {IB, start index + IndexStart}.
-bool DACOM_API FVMeshPart::Prepare(void* ListingArg, void* ScratchArg)
+bool DACOM_API FVMeshPart::Prepare(FVbListing* ListingArg, FIbScratch* ScratchArg)
 {
-    FVbListing* Listing = (FVbListing*)ListingArg;
-    FIbScratch* Scratch = (FIbScratch*)ScratchArg;
+    FVbListing* Listing = ListingArg;
+    FIbScratch* Scratch = ScratchArg;
     int Result = -1;
     if (Data == nullptr || Data->Group == nullptr)
         return Result >= 0;
@@ -366,7 +366,7 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned lo
     if (Data == nullptr)
         return false;
     const Transform* View = (Camera->GetViewTransform());
-    const Transform* World = (const Transform*)(G_Engine->GetInstanceTransform(Inst));
+    const Transform* World = static_cast<const Transform*>(G_Engine->GetInstanceTransform(Inst));
     if ((Flags & 0x200) == 0)
     {
         int State = 1;
@@ -826,7 +826,7 @@ public:
             return GR_INTERFACE_UNSUPPORTED;
         }
         AddRef();
-        *Out = (IRenderComponent*)this;
+        *Out = static_cast<IRenderComponent*>(this);
         return GR_OK;
     }
 
@@ -849,9 +849,9 @@ public:
         return 0;
     }
 
-    int DACOM_API Claim(void* FileArg) override
+    int DACOM_API Claim(IFileSystem* FileArg) override
     {
-        IFileSystem* File = (IFileSystem*)FileArg;
+        IFileSystem* File = FileArg;
         int Handle = -1;
         if (File->OpenNode("VMeshPart") == 0)
             return Handle;
@@ -894,14 +894,14 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return -1;
-        return ((FVMeshPart*)Handle)->QueryInterface(Iid, Out);
+        return static_cast<FVMeshPart*>(Handle)->QueryInterface(Iid, Out);
     }
 
     int DACOM_API CreateMeshInstance(InstanceIndex InstId, void* Handle) override
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        FVMeshPart* Part = (FVMeshPart*)Handle;
+        FVMeshPart* Part = static_cast<FVMeshPart*>(Handle);
         Part->UseCount += 1;
         Part->AddRef();
         // Retail passes the Handle argument's own stack slot as the radius out-parameter
@@ -926,7 +926,7 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        FVMeshPart* Part = (FVMeshPart*)Handle;
+        FVMeshPart* Part = static_cast<FVMeshPart*>(Handle);
         Part->UseCount -= 1;
         if (Part->UseCount <= 0 && Part->Data != nullptr && Part->Data->Group != nullptr)
         {
@@ -954,17 +954,17 @@ public:
         return 0;
     }
 
-    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* D,
+    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, int* D,
                          void* /*E*/) override
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        FVMeshPart* Part = (FVMeshPart*)Handle;
+        FVMeshPart* Part = static_cast<FVMeshPart*>(Handle);
         if (Part->Data == nullptr)
             return 0;
         const int Mode = (int)((intptr_t)A);
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
-        int* Out = (int*)D;
+        int* Out = D;
         if (Mode != 0 && Mode != 2 && Mode != 3)
             return 0;
         if ((Flags & 0xFFF) != 3 || (Flags & 0x4000) == 0 || Out == nullptr)
@@ -977,11 +977,11 @@ public:
     }
 
     // LAB_06c2d8f0 -> AL: FUN_06c310a0 copies VMeshRef +0x14 (6 dwords).
-    int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* Out) override
+    int DACOM_API GetBounds(void* Handle, float /*Lod*/, float* Out) override
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Bounds, 6 * sizeof(unsigned long));
+        std::memcpy(Out, static_cast<FVMeshPart*>(Handle)->Ref->Bounds, 6 * sizeof(unsigned long));
         return 1;
     }
 
@@ -990,12 +990,12 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        std::memcpy(Out, &((FVMeshPart*)Handle)->Ref->Center, 3 * sizeof(float));
+        std::memcpy(Out, &static_cast<FVMeshPart*>(Handle)->Ref->Center, 3 * sizeof(float));
         return 1;
     }
 
     // LAB_06c2d850: returns false.
-    int DACOM_API SplitByPlane(void* /*Handle*/, void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/,
+    int DACOM_API SplitByPlane(void* /*Handle*/, float* /*A*/, void* /*B*/, void** /*C*/, void** /*D*/,
                          void* /*E*/, void* /*F*/) override
     {
         return 0;
@@ -1013,7 +1013,7 @@ public:
             PartFlags |= 2;
         if ((Flags & 0x8000) != 0)
             PartFlags |= 0x80;
-        return Bound->Draw(Camera, Inst, PartFlags, Xform, (IMaterial*)Extra) ? 1 : 0;
+        return Bound->Draw(Camera, Inst, PartFlags, Xform, static_cast<IMaterial*>(Extra)) ? 1 : 0;
     }
 
     // LAB_06c2dac0: invalid handle -> -1, else bind it.
@@ -1021,7 +1021,7 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return -1;
-        Bound = (FVMeshPart*)Handle;
+        Bound = static_cast<FVMeshPart*>(Handle);
         return 0;
     }
 };
@@ -1031,7 +1031,7 @@ public:
 // then requires AGGDESC +8 and +0xC to be set, otherwise the object is freed, *Out = 0, -2.
 GENRESULT DACOM_API VMeshPluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
-    FRenderPluginDesc* Extended = (FRenderPluginDesc*)Desc;
+    FRenderPluginDesc* Extended = reinterpret_cast<FRenderPluginDesc*>(Desc);
     if (Extended->Size != 0x10 || std::strcmp(Extended->Name, This->Name) != 0)
     {
         *Out = nullptr;

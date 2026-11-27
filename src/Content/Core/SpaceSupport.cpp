@@ -562,7 +562,7 @@ namespace
 
         if (MessageId == EMessage::CommComplete || MessageId == EMessage::ObjectDestroyed ||
             MessageId == EMessage::TimerExpired)
-            GNpcShipEvents.HandleMessage(MessageId, Parms);                   // FUN_06f683e0
+            GNpcShipEvents.HandleMessage(MessageId, Msg);                     // FUN_06f683e0
 
         switch (MessageId)
         {
@@ -572,7 +572,7 @@ namespace
             FSystemInfo* System = FindSystemInfo(&Msg[1]);
             if (System != nullptr)
                 System->SendPendingComms(Msg[2], Msg[0], Msg[3]);             // FUN_06f72980
-            GGcsConversations.OnMessage(Parms);                               // FUN_06ee8bd0
+            GGcsConversations.OnMessage(Msg);                                 // FUN_06ee8bd0
             break;
         }
         case EMessage::ObjectDamaged:

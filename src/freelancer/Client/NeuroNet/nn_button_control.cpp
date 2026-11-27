@@ -765,7 +765,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         {
             ID_String SoundId;
             SoundId.Id = CreateID(SoundName.c_str());
-            void* const Arch = LookupClientSoundArch(&SoundId); // FUN_0042ae40
+            Archetype::ISound* const Arch = LookupClientSoundArch(&SoundId); // FUN_0042ae40
             PlayClientSoundArchIfIdle(Arch, nullptr, nullptr);          // FUN_004285f0
         }
 
@@ -1144,10 +1144,10 @@ void NnToggleButtonControl::SetOrientation(Matrix const* NewOrientation)
     // FUN_0051a140 into +0x3c, onto the main instance, then the main instance's transform onto
     // the +0x378 one.
     bAttached = 1; // +0x328
-    float Attach[9];
-    GetAttachOrientation(reinterpret_cast<Matrix*>(Attach));
+    Matrix Attach;
+    GetAttachOrientation(&Attach);
     float Result[9];
-    CockpitMulMatrix(Result, &NewOrientation->E[0][0], Attach); // FUN_0051a140
+    CockpitMulMatrix(Result, &NewOrientation->E[0][0], &Attach.E[0][0]); // FUN_0051a140
     memcpy(&Orientation, Result, sizeof(Orientation));
     if (HasInstance(this))
     {

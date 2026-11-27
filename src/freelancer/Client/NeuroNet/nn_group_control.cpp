@@ -14,6 +14,7 @@
 //   FUN_004632f0 AddTradeRequest FUN_00463630 HandleInviteMessage
 //   DAT_0066d8f4 WINFACTORY<NN_GroupControl> (registrar FUN_0046bf90, create FUN_0046c000)
 
+#include "NeuroNet/nn_button_control.h"
 #include "NeuroNet/nn_group_control.h"
 
 #include "Space/client_gameobj.h"
@@ -111,7 +112,7 @@ namespace
 void NnGroupSendWireMessage(unsigned Opcode, CHAT_ID Player)
 {
     // FUN_0045e360 (cdecl).
-    IChatServer* const ChatServer = static_cast<IChatServer*>(G_ChatServer);
+    IChatServer* const ChatServer = G_ChatServer;
     if (ChatServer == nullptr)
         return;
     FNnGroupWireMessage Message;
@@ -239,8 +240,8 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     {
         Vector const Position = {-0.11f, -0.03f, 0.0f};
         Vector const Half = {0.089f, 0.021f, 0.0f};
-        BtnAccept = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "BtnAccept", "ui_select_item", &Position, &Half, 0, 0, 0x1b80, 0, 0, 0));
+        BtnAccept = CreateRichTextWireButtonControl(
+            "BtnAccept", "ui_select_item", &Position, &Half, 0, 0, 0x1b80, 0, 0, 0);
         RDLRefNode Ref(Texts[kNnGroupTextAccept]);
         (*BtnAccept->TextWinRef)->AppendNode(Ref);
     }
@@ -248,8 +249,8 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     {
         Vector const Position = {0.12f, -0.03f, 0.0f};
         Vector const Half = {0.089f, 0.021f, 0.0f};
-        BtnDecline = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-            "BtnDecline", "ui_select_item", &Position, &Half, 0, 0, 0x1b81, 0, 0, 0));
+        BtnDecline = CreateRichTextWireButtonControl(
+            "BtnDecline", "ui_select_item", &Position, &Half, 0, 0, 0x1b81, 0, 0, 0);
         RDLRefNode Ref(Texts[kNnGroupTextDecline]);
         (*BtnDecline->TextWinRef)->AppendNode(Ref);
     }
@@ -258,8 +259,8 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
         Vector const Position = {G_GroupBtnLeaveX, -0.1f, 0.0f};
         Vector const Half = {0.089f, 0.021f, 0.0f};
         RichTextWireButtonControl* const Leave =
-            static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
-                "BtnLeave", "ui_select_item", &Position, &Half, 0, 0, 0x1b82, 0, 0, 0));
+            CreateRichTextWireButtonControl(
+                "BtnLeave", "ui_select_item", &Position, &Half, 0, 0, 0x1b82, 0, 0, 0);
         BtnLeave = Leave;
         RDLRefNode Ref(Texts[kNnGroupTextLeaveGroup]);
         (*Leave->TextWinRef)->AppendNode(Ref);
@@ -369,7 +370,7 @@ intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (ShownShipId == 0)
         {
             // Accept the group invitation (opcode 2).
-            IChatServer* const ChatServer = static_cast<IChatServer*>(G_ChatServer);
+            IChatServer* const ChatServer = G_ChatServer;
             if (ChatServer != nullptr)
             {
                 FNnGroupWireMessage Message;
@@ -421,7 +422,7 @@ intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (Clicked == BtnLeave)
     {
         // Leave the group (opcode 1, own connection id).
-        IChatServer* const ChatServer = static_cast<IChatServer*>(G_ChatServer);
+        IChatServer* const ChatServer = G_ChatServer;
         if (ChatServer != nullptr)
         {
             unsigned const ConnWord = GetPlayerConnectionId() & 0xffffu;
@@ -716,11 +717,11 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         HUD_Maneuvers* const Hud = GetHudManeuvers();
         if (Hud != nullptr)
         {
-            void* const PlayerRw = GetPlayerObjRW();
+            IObjRW* const PlayerRw = GetPlayerObjRW();
             if (PlayerRw != nullptr)
             {
                 FClientGameobj* const PlayerGo =
-                    static_cast<FClientGameobj*>(static_cast<IObjRW*>(PlayerRw));
+                    static_cast<FClientGameobj*>(PlayerRw);
                 CObject* const Obj = PlayerGo->GetObject();
                 if (Obj != nullptr &&
                     (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)

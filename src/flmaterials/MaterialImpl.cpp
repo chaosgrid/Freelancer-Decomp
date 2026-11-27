@@ -550,7 +550,7 @@ namespace
         }
         if (OldType == kMaterialParamComponent)
         {
-            IDAComponent* Old = (IDAComponent*)(Slot[1]);
+            IDAComponent* Old = reinterpret_cast<IDAComponent*>((Slot[1]));
             Slot[1] = 0;
             if (Old != nullptr)
                 Old->Release();
@@ -581,7 +581,7 @@ namespace
     // Release-ing the old one.
     void FlmAssignInterface(unsigned long* Slot, IDAComponent* NewIface)
     {
-        IDAComponent* Old = (IDAComponent*)(Slot[1]);
+        IDAComponent* Old = reinterpret_cast<IDAComponent*>((Slot[1]));
         Slot[1] = (unsigned long)(NewIface);
         if (NewIface != nullptr)
             NewIface->AddRef();
@@ -620,7 +620,7 @@ namespace
 
     void FlmAssignInterfaceRaw(void** Slot, IDAComponent* NewIface)
     {
-        IDAComponent* Old = (IDAComponent*)(*Slot);
+        IDAComponent* Old = static_cast<IDAComponent*>((*Slot));
         *Slot = NewIface;
         if (NewIface != nullptr)
             NewIface->AddRef();
@@ -661,7 +661,7 @@ namespace
             FlmAssignString((unsigned long*)Dest, (const char*)Src->Payload0);
             break;
         case kMaterialParamComponent:
-            FlmAssignInterface((unsigned long*)Dest, (IDAComponent*)Src->Payload0);
+            FlmAssignInterface((unsigned long*)Dest, reinterpret_cast<IDAComponent*>(Src->Payload0));
             break;
         default:
             break;
@@ -765,36 +765,36 @@ namespace
         return Desc;
     }
 
-    unsigned long FsOpen(void* FileSystem, const char* Path)
+    unsigned long FsOpen(IFileSystem* FileSystem, const char* Path)
     {
         FFileSystemDesc Desc;
         FlmBuildFileSystemDesc(&Desc, Path);
-        return (unsigned long)(((IFileSystem*)(FileSystem))
+        return (unsigned long)(FileSystem
             ->OpenByDesc(&Desc)); // +0x7C
     }
 
-    bool FsRead(void* FileSystem, unsigned long Handle, void* Buffer, unsigned long Size)
+    bool FsRead(IFileSystem* FileSystem, unsigned long Handle, void* Buffer, unsigned long Size)
     {
         unsigned long BytesRead = 0;
-        const int Result = ((IFileSystem*)(FileSystem))
+        const int Result = FileSystem
                                ->Read(Handle, Buffer, Size, &BytesRead, 0); // +0x14
         return Result != 0 && BytesRead == Size;
     }
 
-    void FsClose(void* FileSystem, unsigned long Handle)
+    void FsClose(IFileSystem* FileSystem, unsigned long Handle)
     {
-        ((IFileSystem*)(FileSystem))->CloseFile(Handle); // +0x10
+        FileSystem->CloseFile(Handle); // +0x10
     }
 
-    unsigned long FsGetSize(void* FileSystem, unsigned long Handle)
+    unsigned long FsGetSize(IFileSystem* FileSystem, unsigned long Handle)
     {
         if (FileSystem == nullptr)
             return 0;
-        return ((IFileSystem*)(FileSystem))->GetSize(Handle, 0); // +0x28
+        return FileSystem->GetSize(Handle, 0); // +0x28
     }
 
     // Load one property by path through the supplied file system.
-    bool FlmLoadParameterFromFileSystem(void* FileSystem, const char* Path, unsigned long Type,
+    bool FlmLoadParameterFromFileSystem(IFileSystem* FileSystem, const char* Path, unsigned long Type,
                                         void* OutValue)
     {
         if (FileSystem == nullptr || Path == nullptr || OutValue == nullptr)
@@ -914,26 +914,26 @@ namespace
         Desc->FindHandle = 0xFFFFFFFF;
     }
 
-    unsigned long FsOpenForWrite(void* FileSystem, const char* Path)
+    unsigned long FsOpenForWrite(IFileSystem* FileSystem, const char* Path)
     {
         FFileSystemDesc Desc;
         FlmBuildFileSystemDescForWrite(&Desc, Path);
-        return (unsigned long)(((IFileSystem*)(FileSystem))
+        return (unsigned long)(FileSystem
             ->OpenByDesc(&Desc)); // +0x7C
     }
 
-    bool FsWrite(void* FileSystem, unsigned long Handle, const void* Buffer, unsigned long Size)
+    bool FsWrite(IFileSystem* FileSystem, unsigned long Handle, const void* Buffer, unsigned long Size)
     {
         unsigned long BytesWritten = 0;
         // +0x18: typed source, byte-count output, optional position override.
-        const int Result = ((IFileSystem*)(FileSystem))
+        const int Result = FileSystem
                                ->Write(Handle, Buffer, Size, &BytesWritten, nullptr);
         return Result != 0 && BytesWritten == Size;
     }
 
     // FUN_066f3160: UTF create/write descriptor; the third argument is
     // the caller's four-byte buffer, passed unchanged through Write.
-    unsigned long FlmWriteSmallConfigValue(void* FileSystem, const char* Path,
+    unsigned long FlmWriteSmallConfigValue(IFileSystem* FileSystem, const char* Path,
                                             const unsigned long* Value)
     {
         const unsigned long Handle = FsOpenForWrite(FileSystem, Path);
@@ -953,7 +953,7 @@ namespace
 
     // FUN_066f1fc0: typed load result is committed through Slot26 only
     // after successful I/O. Type6/default cases still commit their zero value.
-    bool FlmLoadDeclaredParameter(FMaterialImpl* Material, void* FileSystem,
+    bool FlmLoadDeclaredParameter(FMaterialImpl* Material, IFileSystem* FileSystem,
                                   unsigned char* Entry, unsigned long Index)
     {
         FFlmScopedTypedValue Value;
@@ -963,7 +963,7 @@ namespace
         {
             const char* Path = *(const char* const*)(Entry + 4);
             unsigned long RawValue;
-            if (FlmReadPackedWord((IFileSystem*)FileSystem, Path, &RawValue) < 0)
+            if (FlmReadPackedWord(FileSystem, Path, &RawValue) < 0)
                 return false;
             const unsigned long Flags = *(const unsigned long*)Entry;
             const int FieldIndex = (Flags & kMaterialParamFlagAddressU) == 0 && (Flags & kMaterialParamFlagAddressV) != 0 ? 1 : 0;
@@ -976,7 +976,7 @@ namespace
             const char* Path = *(const char* const*)(Entry + 4);
             FFileSystemDesc Desc;
             FlmBuildFileSystemDesc(&Desc, Path);
-            IFileSystem* Fs = (IFileSystem*)FileSystem;
+            IFileSystem* Fs = FileSystem;
             const unsigned long Handle = Fs->OpenByDesc(&Desc);
             if (Handle == (unsigned long)-1)
                 return false;
@@ -1011,7 +1011,7 @@ namespace
         return true;
     }
 
-    bool FlmSaveParameterToFileSystem(FMaterialImpl* Material, void* FileSystem,
+    bool FlmSaveParameterToFileSystem(FMaterialImpl* Material, IFileSystem* FileSystem,
                                       const unsigned char* Entry, unsigned long Index)
     {
         FFlmScopedTypedValue Value;
@@ -1034,7 +1034,7 @@ namespace
             FlmAssignString(Value.Words, (const char*)(Raw[0]));
             break;
         case kMaterialParamComponent:
-            FlmAssignInterface(Value.Words, (IDAComponent*)(Raw[0]));
+            FlmAssignInterface(Value.Words, reinterpret_cast<IDAComponent*>((Raw[0])));
             break;
         default:
             break;
@@ -1061,7 +1061,7 @@ namespace
         if (Type == kMaterialParamAddressMode)
         {
             unsigned long Packed = 0;
-            FlmReadPackedWord((IFileSystem*)(FileSystem), Path, &Packed);
+            FlmReadPackedWord(FileSystem, Path, &Packed);
             const unsigned long Flags = *(const unsigned long*)(Entry);
             const int FieldIndex = (Flags & kMaterialParamFlagAddressU) == 0 && (Flags & kMaterialParamFlagAddressV) != 0 ? 1 : 0;
             FlmPackTwoBitField(&Packed, Value.Words[1], FieldIndex);
@@ -1103,7 +1103,7 @@ namespace
         {
             if (Object != nullptr)
             {
-                ((IDAComponent*)(Object))->Release();
+                (static_cast<IDAComponent*>(Object))->Release();
                 Object = nullptr;
             }
         }
@@ -1116,19 +1116,6 @@ namespace
     const unsigned long kNomadColorLo = 0x000AEAF5;
     const unsigned long kNomadColorHi = 0x000AFFE6;
     I3DMathEngine* G_NomadMath = nullptr;
-
-    struct FNomadContext
-    {
-        InstanceIndex Inst;
-        const Transform* World;
-        const Transform* View;
-        const FRpVertexSrcDesc* Mesh;
-        unsigned short* Indices;
-        FVbListing* VbListing;
-        void* IbWrapper;
-        // Borrowed candidate material used for inherited opacity.
-        void* Candidate;
-    };
 
     int FvfXyzSize(unsigned long Fvf)
     {
@@ -1259,12 +1246,12 @@ namespace
     void NomadInverseLight(const Transform* World, const Transform* View, Vector* OutLight)
     {
         float Combined[12];
-        NomadComposeViewWorld(World, View, (Transform*)Combined);
+        NomadComposeViewWorld(World, View, reinterpret_cast<Transform*>(Combined));
         // Retail re-reads the cache after MulTransform, independently of its helper.
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
         const Vector MinusZ = {0.0f, 0.0f, -1.0f};
-        G_NomadMath->InverseRotate(*OutLight, *(const Transform*)Combined, MinusZ);
+        G_NomadMath->InverseRotate(*OutLight, *reinterpret_cast<const Transform*>(Combined), MinusZ);
     }
 
     // LAB_066f95b0 / FUN_066f95c0. The two default texture cursors start with stride 8.
@@ -1392,7 +1379,7 @@ namespace
     };
 
     // Resolve the root instance before looking up its fade value.
-    float FlmRootInstanceValue(void* Context, float Default)
+    float FlmRootInstanceValue(FMaterialSubmitContext* Context, float Default)
     {
         if (Context == nullptr)
             return Default;
@@ -1402,7 +1389,7 @@ namespace
         int RootId = InstanceId;
         if (G_FlmEngineOuter != nullptr)
         {
-            InstanceIndex Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(
+            InstanceIndex Root = G_FlmEngineOuter->GetInstanceRoot(
                 (intptr_t)(InstanceId));
             RootId = (int)((intptr_t)(Root));
         }
@@ -1419,13 +1406,13 @@ namespace
 
     // 066f8c84: the engine is captured before the root lookup; a non-null Context always
     // calls slot 49 (GetInstanceRelative), result unused.
-    float NomadFadeLookup(void* Context)
+    float NomadFadeLookup(FMaterialSubmitContext* Context)
     {
-        IEngine* Engine = (IEngine*)(G_FlmEngineOuter);
+        IEngine* Engine = G_FlmEngineOuter;
         const float Value = FlmRootInstanceValue(Context, 1.0f);
         if (Context != nullptr)
         {
-            FNomadContext* Raw = (FNomadContext*)(Context);
+            FMaterialSubmitContext* Raw = Context;
             Engine->GetInstanceRelative(Raw->Inst);
         }
         return Value;
@@ -1433,12 +1420,12 @@ namespace
 
     GENRESULT SubmitNomadGeometry(const unsigned char& bSecondTexture, const float& Elapsed,
                           const unsigned long& Stage, IVertexBufferManager* const& VbMgr,
-                          IRenderPipeline* const& Pipeline, void* Context,
+                          IRenderPipeline* const& Pipeline, FMaterialSubmitContext* Context,
                           unsigned long Prim, unsigned long Start, unsigned long Count,
                           unsigned long IbStart, unsigned long IndexSpan)
     {
         const double Fade = NomadFadeFromValue(NomadFadeLookup(Context));
-        FNomadContext* Submit = (FNomadContext*)(Context);
+        FMaterialSubmitContext* Submit = Context;
         unsigned long Color;
         float Phase;
         if (bSecondTexture == 0)
@@ -1476,7 +1463,7 @@ namespace
         TextureOut[1].Stride = Stride;
         Vector Light;
         NomadInverseLight(Submit->World, Submit->View, &Light);
-        NomadCopyMesh(Submit->Mesh, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, &Light);
+        NomadCopyMesh(Submit->SourceVertices, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, &Light);
         VbMgr->UnlockVertexMemory(&LockOut);
 
         FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
@@ -1493,15 +1480,15 @@ namespace
     }
 
     // Lock, copy through the vertex manager, unlock, then draw with the granted buffer offset.
-    GENRESULT FlmFillMeshAndDraw(IRenderPipeline* Pipeline, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT FlmFillMeshAndDraw(IRenderPipeline* Pipeline, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                                 unsigned long Prim, unsigned long Start, unsigned long Count,
                                 unsigned long IbStart, unsigned long IndexSpan, unsigned long /*Flags*/)
     {
         // 066f60d0: all pointers required, and lock/draw results pass through.
-        FNomadContext* Submit = (FNomadContext*)(Context);
+        FMaterialSubmitContext* Submit = Context;
         IVertexBufferManager* Manager = VbMgr;
         const unsigned long RequestedFvf =
-            Submit->Mesh->SrcFvf;
+            Submit->SourceVertices->SrcFvf;
         FVertexMemoryLock LockOut;
         const GENRESULT Result = Manager->LockVertexMemory(RequestedFvf, Count, &LockOut);
         if (Result < 0)
@@ -1530,7 +1517,7 @@ namespace
             FvfNormalSize(GrantedFvf) + FvfColorSize(GrantedFvf)) + TextureBytes;
         void* DestBase = (void*)((uintptr_t)(LockOut.Vertices) -
             Stride * Start);
-        Manager->CopyVertexData(DestBase, GrantedFvf, Submit->Mesh,
+        Manager->CopyVertexData(DestBase, GrantedFvf, Submit->SourceVertices,
             Start, Count);
         Manager->UnlockVertexMemory(&LockOut);
         void* Indices = (void*)((uintptr_t)(Submit->Indices) +
@@ -1540,15 +1527,14 @@ namespace
     }
 
     // Try the direct draw and existing vertex listing before copying vertices.
-    GENRESULT FlmMeshDrawPass(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT FlmMeshDrawPass(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                               unsigned long Prim, unsigned long Start, unsigned long Count,
                               unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
+        FMaterialSubmitContext* Submit = Context;
         if ((Flags & kMaterialSubmitUseBuffers) != 0)
         {
-            const uintptr_t IbBase = *(const uintptr_t*)(
-                (const unsigned char*)(Submit->IbWrapper) + 4);
+            const uintptr_t IbBase = Submit->IbScratch->Bias;
             const GENRESULT Result = RpDrawIndexed(RpDraw, Prim, Start, Count,
                 (const void*)(IbBase + IbStart), IndexSpan);
             if (Result >= 0)
@@ -1565,7 +1551,7 @@ namespace
                 (void*)((uintptr_t)(Submit->Indices) + IbStart * 2),
                 IndexSpan, 0);
         }
-        if (Result >= 0 || Submit->Mesh == nullptr || Count == 0 || IndexSpan == 0)
+        if (Result >= 0 || Submit->SourceVertices == nullptr || Count == 0 || IndexSpan == 0)
             return Result;
         return FlmFillMeshAndDraw(Pipeline, VbMgr, Context, Prim, Start, Count, IbStart,
                                  IndexSpan, Flags);
@@ -1577,7 +1563,7 @@ namespace
         D3DRS_SRCBLEND, D3DBLEND_SRCALPHA, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA, 0};
 
     // FUN_066f9ea0: normal and EH paths restore 0x17 before 0x0e.
-    GENRESULT SubmitPlanetWaterGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT SubmitPlanetWaterGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                                 unsigned long Prim, unsigned long Start, unsigned long Count,
                                 unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
@@ -1596,7 +1582,7 @@ namespace
 
     // LAB_066f3370: same draw core, with inline granted-FVF fill in retail.
     // FlmFillMeshAndDraw preserves that complete calculation and call sequence.
-    GENRESULT SubmitRpDrawGeometry(IRPDraw* RpDraw, IRenderPipeline* Pipeline, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT SubmitRpDrawGeometry(IRPDraw* RpDraw, IRenderPipeline* Pipeline, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                                  unsigned long Prim, unsigned long Start, unsigned long Count,
                                  unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
@@ -1607,7 +1593,7 @@ namespace
     // LAB_06700260: both initial gates return zero before reading Context.
     // Enabled HUDAnim then uses the complete shared granted-FVF draw sequence.
     GENRESULT SubmitHudAnimatedGeometry(unsigned long HudAnimFlag, IRPDraw* RpDraw, IRenderPipeline* Pipeline,
-                            IVertexBufferManager* VbMgr, void* Context, unsigned long Prim, unsigned long Start,
+                            IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start,
                             unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                             unsigned long Flags)
     {
@@ -1792,28 +1778,28 @@ namespace
     // 066fb540: mandatory Context, optional mesh/count/engine gates.
     // QI owners and state savers unwind in reverse construction order.
     GENRESULT SubmitWireGeometry(const unsigned long& WireColor, IRenderPipeline* Pipeline, IVertexBufferManager* VertexBufferManager,
-                        unsigned long* GroupCursor, void* Context, unsigned long StartArg,
+                        unsigned long* GroupCursor, FMaterialSubmitContext* Context, unsigned long StartArg,
                         unsigned long CountArg, unsigned long IndexSpanArg)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
-        if (Submit->Mesh == nullptr || CountArg == 0 || IndexSpanArg == 0 || G_FlmEngineOuter == nullptr)
+        FMaterialSubmitContext* Submit = Context;
+        if (Submit->SourceVertices == nullptr || CountArg == 0 || IndexSpanArg == 0 || G_FlmEngineOuter == nullptr)
             return (GENRESULT)(-1);
         FScopedComponentReference WireReference;
-        IEngine* Engine = (IEngine*)(G_FlmEngineOuter);
+        IEngine* Engine = G_FlmEngineOuter;
         if (Engine->QueryInstance(Submit->Inst, Iids::VMeshWire, &WireReference.Object) >= 0)
         {
             if (StartArg == 0)
             {
                 FScopedWireRenderState Lighting(Pipeline, D3DRS_LIGHTING, TRUE);
                 FScopedWireRenderState Color(Pipeline, D3DRS_AMBIENT, WireColor);
-                ((IVMeshWire*)WireReference.Object)->Draw();
+                (static_cast<IVMeshWire*>(WireReference.Object))->Draw();
             }
             return GR_OK;
         }
         FScopedComponentReference MeshReference;
         if (Engine->QueryInstance(Submit->Inst, Iids::Mesh, &MeshReference.Object) < 0)
             return (GENRESULT)(-1);
-        IMesh* Mesh = (IMesh*)(MeshReference.Object);
+        IMesh* Mesh = static_cast<IMesh*>(MeshReference.Object);
         if (!MeshSelectAndAdvanceCursor(Mesh, GroupCursor))
             return GR_OK;
         return WireDrawEdges(Pipeline, VertexBufferManager, Mesh, WireColor, 0, false);
@@ -1821,17 +1807,17 @@ namespace
 
     // 066fc150: only IMesh QI, same status/cursor cleanup, twelve output vertices per edge.
     GENRESULT SubmitWire2Geometry(const unsigned long& ColorFromP0, const unsigned long& ColorFromP1, IRenderPipeline* Pipeline,
-                         IVertexBufferManager* VertexBufferManager, unsigned long* GroupCursor, void* Context,
+                         IVertexBufferManager* VertexBufferManager, unsigned long* GroupCursor, FMaterialSubmitContext* Context,
                          unsigned long CountArg, unsigned long IndexSpanArg)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
-        if (Submit->Mesh == nullptr || CountArg == 0 || IndexSpanArg == 0 || G_FlmEngineOuter == nullptr)
+        FMaterialSubmitContext* Submit = Context;
+        if (Submit->SourceVertices == nullptr || CountArg == 0 || IndexSpanArg == 0 || G_FlmEngineOuter == nullptr)
             return (GENRESULT)(-1);
         FScopedComponentReference MeshReference;
-        IEngine* Engine = (IEngine*)(G_FlmEngineOuter);
+        IEngine* Engine = G_FlmEngineOuter;
         if (Engine->QueryInstance(Submit->Inst, Iids::Mesh, &MeshReference.Object) < 0)
             return (GENRESULT)(-1);
-        IMesh* Mesh = (IMesh*)(MeshReference.Object);
+        IMesh* Mesh = static_cast<IMesh*>(MeshReference.Object);
         if (!MeshSelectAndAdvanceCursor(Mesh, GroupCursor))
             return GR_OK;
         return WireDrawEdges(Pipeline, VertexBufferManager, Mesh, ColorFromP0, ColorFromP1, true);
@@ -1841,15 +1827,15 @@ namespace
     // is borrowed by reference because retail reloads it after draw/query calls.
     GENRESULT SubmitEnvMapGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr,
                               unsigned long EnvMapFlag, const unsigned long& EnvMapResolvedHandle,
-                              void* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
+                              FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
                               unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
+        FMaterialSubmitContext* Submit = Context;
         // 066f5dc7: Context is mandatory; Candidate has the actual null branch.
-        if (Submit->Candidate == nullptr)
+        if (Submit->ReplacedMaterial == nullptr)
             return (GENRESULT)(-1);
         if (EnvMapFlag == 0)
-            return ((IMaterial*)(Submit->Candidate))->Submit(Context, Prim, Start, Count,
+            return Submit->ReplacedMaterial->Submit(Context, Prim, Start, Count,
                                                                       IbStart, IndexSpan, Flags);
 
         Pipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
@@ -1888,7 +1874,7 @@ namespace
     }
 
     // 066f6b40: engine/userdata may be null, Context and material are mandatory.
-    GENRESULT SubmitExclusionGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT SubmitExclusionGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                                  unsigned long PrimArg, unsigned long StartArg, unsigned long CountArg,
                                  unsigned long IbStartArg, unsigned long IndexSpanArg, unsigned long FlagsArg,
                                  float* MaterialBlock)
@@ -1906,8 +1892,8 @@ namespace
 
         if (G_FlmEngineOuter != nullptr)
         {
-            FNomadContext* Submit = (FNomadContext*)(Context);
-            void* Result = ((IEngine*)(G_FlmEngineOuter))->GetInstanceUserData(Submit->Inst);
+            FMaterialSubmitContext* Submit = Context;
+            void* Result = G_FlmEngineOuter->GetInstanceUserData(Submit->Inst);
             if (Result != nullptr)
             {
                 const unsigned char* Bytes = (const unsigned char*)(Result);
@@ -1926,7 +1912,7 @@ namespace
     }
 
     // Glass-family draw path shares the same argument contract.
-    GENRESULT SubmitGlassGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
+    GENRESULT SubmitGlassGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, FMaterialSubmitContext* Context,
                              unsigned long PrimArg, unsigned long StartArg, unsigned long CountArg, unsigned long IbStartArg,
                              unsigned long IndexSpanArg, unsigned long FlagsArg)
     {
@@ -2250,7 +2236,7 @@ GENRESULT DACOM_API FHudAnimMaterial::Initialize(IDAComponent* Outer)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::LoadFromFileSystem(void* FileSystem)
+GENRESULT DACOM_API FMaterialImpl::LoadFromFileSystem(IFileSystem* FileSystem)
 {
     // LAB_066f13e0: bit0 skips loading; failed mandatory (bit2) entries
     // report a diagnostic, while the loop and final success continue.
@@ -2276,7 +2262,7 @@ GENRESULT DACOM_API FMaterialImpl::LoadFromFileSystem(void* FileSystem)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::SaveProperties(void* FileSystem)
+GENRESULT DACOM_API FMaterialImpl::SaveProperties(IFileSystem* FileSystem)
 {
     // LAB_066f14f0: save each descriptor with bit 0 clear. A failed write is
     // reported, but the loop continues and returns -1 after the last entry.
@@ -2461,7 +2447,7 @@ GENRESULT DACOM_API FHudAnimMaterial::ResolveTextures(float /*Delta*/)
                     MatAnim_->Release();
                     MatAnim_ = nullptr;
                 }
-                ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
+                (static_cast<IMatAnimLibrary*>(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
             }
         }
         else if (MatAnim_ != nullptr)
@@ -2491,7 +2477,7 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float /*Delta*/)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
+GENRESULT DACOM_API FMaterialImpl::Teardown(FMaterialSubmitContext* Context)
 {
     // 066f3330: per-vertex colour is reset only when the context enabled it. The pipeline (+0x4)
     // is never null-tested in flmaterials.dll: a failed QI in Initialize fails the creation.
@@ -2500,31 +2486,31 @@ GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FBackdropMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FBackdropMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     return TeardownBackdrop(Context);
 }
 
-GENRESULT DACOM_API FShadowMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FShadowMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     return ShadowCandidateDispatch(Context);
 }
 
-GENRESULT DACOM_API FCloakMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FCloakMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     // LAB_066f42e0.
     TeardownCandidateIgnoringResult(Context);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FColorizeMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FColorizeMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     // LAB_066f5010.
     TeardownCandidateIgnoringResult(Context);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEnvMapMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FEnvMapMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     // EnvMap restores its dynamic stage state using the retained texture handle.
     if (EnvMapTextureRecord_ != 0)
@@ -2538,14 +2524,14 @@ GENRESULT DACOM_API FEnvMapMaterial::Teardown(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FNomadMaterial::Teardown(void* /*Context*/)
+GENRESULT DACOM_API FNomadMaterial::Teardown(FMaterialSubmitContext* /*Context*/)
 {
     // 066f8bd0: unconditional.
     PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FPlanetWaterMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FPlanetWaterMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     // 066f9e50.
     if (MatAnim_ != nullptr)
@@ -2553,7 +2539,7 @@ GENRESULT DACOM_API FPlanetWaterMaterial::Teardown(void* Context)
     return FMaterialImpl::Teardown(Context);
 }
 
-GENRESULT DACOM_API FHudAnimMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FHudAnimMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     // 06700200: nothing is reset unless the animated bind ran.
     if (HudAnimFlag_ != 0)
@@ -2566,12 +2552,12 @@ GENRESULT DACOM_API FHudAnimMaterial::Teardown(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FVisibleCounterMaterial::Teardown(void* /*Context*/)
+GENRESULT DACOM_API FVisibleCounterMaterial::Teardown(FMaterialSubmitContext* /*Context*/)
 {
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FMaterialImpl::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                           unsigned long Flags)
 {
@@ -2579,7 +2565,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
     return SubmitRpDrawGeometry(RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FVisibleCounterMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FVisibleCounterMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                                     unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                                     unsigned long Flags)
 {
@@ -2590,14 +2576,14 @@ GENRESULT DACOM_API FVisibleCounterMaterial::Submit(void* Context, unsigned long
     return GR_OK;
 }
 
-GENRESULT DACOM_API FShadowMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FShadowMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                             unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                             unsigned long Flags)
 {
     return DrawShadow(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FNomadMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FNomadMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                            unsigned long Flags)
 {
@@ -2605,7 +2591,7 @@ GENRESULT DACOM_API FNomadMaterial::Submit(void* Context, unsigned long PrimType
                        Pipeline_, Context, PrimType, Start, Count, IbStart, IndexSpan);
 }
 
-GENRESULT DACOM_API FHudAnimMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FHudAnimMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                              unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                              unsigned long Flags)
 {
@@ -2614,7 +2600,7 @@ GENRESULT DACOM_API FHudAnimMaterial::Submit(void* Context, unsigned long PrimTy
                          IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FPlanetWaterMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FPlanetWaterMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                                  unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                                  unsigned long Flags)
 {
@@ -2622,7 +2608,7 @@ GENRESULT DACOM_API FPlanetWaterMaterial::Submit(void* Context, unsigned long Pr
     return SubmitPlanetWaterGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FWireMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FWireMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                           unsigned long Flags)
 {
@@ -2630,7 +2616,7 @@ GENRESULT DACOM_API FWireMaterial::Submit(void* Context, unsigned long PrimType,
                       Count, IndexSpan);
 }
 
-GENRESULT DACOM_API FWire2Material::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FWire2Material::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                            unsigned long Flags)
 {
@@ -2639,19 +2625,19 @@ GENRESULT DACOM_API FWire2Material::Submit(void* Context, unsigned long PrimType
                        &WireGroupIndex_, Context, Count, IndexSpan);
 }
 
-GENRESULT DACOM_API FBackdropMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FBackdropMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                               unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                               unsigned long Flags)
 {
     return DrawBackdrop(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FCloakMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FCloakMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                            unsigned long Flags)
 {
     // 066f4258 reads the material's +64 flag, not the context.
-    if (Context == nullptr || ((FNomadContext*)(Context))->Candidate == nullptr)
+    if (Context == nullptr || Context->ReplacedMaterial == nullptr)
         return GR_OK;
     unsigned long ForwardFlags = Flags;
     if (bAlphaBlend_ != 0)
@@ -2660,7 +2646,7 @@ GENRESULT DACOM_API FCloakMaterial::Submit(void* Context, unsigned long PrimType
                                   ForwardFlags);
 }
 
-GENRESULT DACOM_API FEnvMapMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FEnvMapMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                             unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                             unsigned long Flags)
 {
@@ -2668,7 +2654,7 @@ GENRESULT DACOM_API FEnvMapMaterial::Submit(void* Context, unsigned long PrimTyp
                            EnvMapResolvedHandle_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FExclusionZoneMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FExclusionZoneMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                                    unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                                    unsigned long Flags)
 {
@@ -2676,7 +2662,7 @@ GENRESULT DACOM_API FExclusionZoneMaterial::Submit(void* Context, unsigned long 
                               MaterialBlock_);
 }
 
-GENRESULT DACOM_API FGlassMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+GENRESULT DACOM_API FGlassMaterial::Submit(FMaterialSubmitContext* Context, unsigned long PrimType, unsigned long Start,
                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
                                            unsigned long Flags)
 {
@@ -2821,8 +2807,8 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterDescriptor(unsigned long Index, v
     if (Count <= Index)
         return (GENRESULT)-1;
 
-    const FShadingPropertyRecord* Entry = (const FShadingPropertyRecord*)Base + Index;
-    FShadingPropertyRecord* Out = (FShadingPropertyRecord*)OutDesc;
+    const FShadingPropertyRecord* Entry = static_cast<const FShadingPropertyRecord*>(Base) + Index;
+    FShadingPropertyRecord* Out = static_cast<FShadingPropertyRecord*>(OutDesc);
     // Preserve the four ordered stores even when the output aliases the source.
     Out->Flags = Entry->Flags;
     Out->Name = Entry->Name;
@@ -2843,10 +2829,10 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterValue(unsigned long Index, void* 
     if (Count <= Index)
         return (GENRESULT)-1;
 
-    const FShadingPropertyRecord* Entry = (const FShadingPropertyRecord*)Base + Index;
+    const FShadingPropertyRecord* Entry = static_cast<const FShadingPropertyRecord*>(Base) + Index;
     const unsigned long RealType = Entry->Current.Type;
 
-    FShadingPropertyValue* Result = (FShadingPropertyValue*)InOutDesc;
+    FShadingPropertyValue* Result = static_cast<FShadingPropertyValue*>(InOutDesc);
     if (Result->Type != RealType)
         FlmReleaseTypedValue((unsigned long*)Result);
     Result->Type = RealType;
@@ -2882,7 +2868,7 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterValue(unsigned long Index, void* 
         FlmAssignString((unsigned long*)Result, (const char*)RawWords[0]);
         return GR_OK;
     case kMaterialParamComponent:
-        FlmAssignInterface((unsigned long*)Result, (IDAComponent*)RawWords[0]);
+        FlmAssignInterface((unsigned long*)Result, reinterpret_cast<IDAComponent*>(RawWords[0]));
         return GR_OK;
     default:
         return GR_OK;
@@ -2897,7 +2883,7 @@ GENRESULT DACOM_API FMaterialImpl::SetParameterValue(unsigned long Index, void* 
     if (Count <= Index)
         return (GENRESULT)-1;
 
-    FShadingPropertyRecord* Entry = (FShadingPropertyRecord*)Base + Index;
+    FShadingPropertyRecord* Entry = static_cast<FShadingPropertyRecord*>(Base) + Index;
     if (!ValueWithinDeclaredRange(Index, Entry, Value))
         return (GENRESULT)-1;
     StoreParameterValue(Index, Entry, Value);
@@ -2934,7 +2920,7 @@ GENRESULT __thiscall FNomadMaterial::InitializeFromDescriptor(void* Arg)
     // Both accumulators are reset before the required name lookup.
     NomadElapsed_ = 0.0f;
     NomadBendElapsed_ = 0.0f;
-    const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
+    const FMaterialAggregateDesc* Agg = static_cast<const FMaterialAggregateDesc*>(Arg);
     bNomadRegular_ = std::strcmp(Agg->NameAt4, G_NameNomadNoBendy) == 0 ? 0 : 1;
     bSecondTexture_ = 1;
     return GR_OK;
@@ -2942,7 +2928,7 @@ GENRESULT __thiscall FNomadMaterial::InitializeFromDescriptor(void* Arg)
 
 GENRESULT __thiscall FBackdropMaterial::InitializeFromDescriptor(void* Arg)
 {
-    const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
+    const FMaterialAggregateDesc* Agg = static_cast<const FMaterialAggregateDesc*>(Arg);
     bBackdrop_ = std::strcmp(Agg->NameAt4, G_NameBackdropMaterial) == 0 ? 1 : 0;
     bBackdropNameMatchCopy_ = bBackdrop_; // Retail stores the same predicate twice.
     return GR_OK;
@@ -3061,8 +3047,8 @@ GENRESULT __thiscall FMaterialImpl::Setup()
 bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, void* Entry, void* Value)
 {
     // Require the declared type, then check the type-specific range.
-    const FShadingPropertyRecord* Record = (const FShadingPropertyRecord*)(Entry);
-    const FShadingPropertyValue* Typed = (const FShadingPropertyValue*)(Value);
+    const FShadingPropertyRecord* Record = static_cast<const FShadingPropertyRecord*>(Entry);
+    const FShadingPropertyValue* Typed = static_cast<const FShadingPropertyValue*>(Value);
     const unsigned long EntryType = Record->Current.Type; // +0x10
     if (EntryType != Typed->Type)
         return false;
@@ -3128,7 +3114,7 @@ GENRESULT __thiscall FWireMaterial::StoreParameterValue(unsigned long Index, voi
             break;
         case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
-                                  (IDAComponent*)(SrcWords[1]));
+                                  reinterpret_cast<IDAComponent*>((SrcWords[1])));
             break;
         default:
             break;
@@ -3208,7 +3194,7 @@ GENRESULT __thiscall FWire2Material::StoreParameterValue(unsigned long Index, vo
             break;
         case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
-                                  (IDAComponent*)(SrcWords[1]));
+                                  reinterpret_cast<IDAComponent*>((SrcWords[1])));
             break;
         default:
             break;
@@ -3298,7 +3284,7 @@ GENRESULT __thiscall FColorizeMaterial::StoreParameterValue(unsigned long Index,
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
         case kMaterialParamComponent:
-            FlmAssignInterfaceRaw((void**)(Raw), (IDAComponent*)(SrcWords[1]));
+            FlmAssignInterfaceRaw((void**)(Raw), reinterpret_cast<IDAComponent*>((SrcWords[1])));
             break;
         default:
             break;
@@ -3353,7 +3339,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
             break;
         case kMaterialParamComponent:
             FlmAssignInterfaceRaw((void**)(Raw),
-                                  (IDAComponent*)(SrcWords[1]));
+                                  reinterpret_cast<IDAComponent*>((SrcWords[1])));
             break;
         default:
             break;
@@ -3595,11 +3581,11 @@ unsigned long FMaterialImpl::TextureHandleAt(const unsigned long* Block) const
     return Block[2];
 }
 
-bool FMaterialImpl::ContextWantsColorVertex(void* Context) const
+bool FMaterialImpl::ContextWantsColorVertex(FMaterialSubmitContext* Context) const
 {
     if (Context == nullptr)
         return false;
-    const FRpVertexSrcDesc* Source = ((const FMaterialSubmitContext*)Context)->SourceVertices;
+    const FRpVertexSrcDesc* Source = (Context)->SourceVertices;
     if (Source == nullptr)
         return false;
     return Source->Diffuse.Base != nullptr;
@@ -3610,7 +3596,7 @@ float FMaterialImpl::GetDiffuseAlpha() const
     return MaterialBlock_[3];
 }
 
-GENRESULT DACOM_API FGlassMaterial::Bind(void* Context)
+GENRESULT DACOM_API FGlassMaterial::Bind(FMaterialSubmitContext* Context)
 {
     if (GetDiffuseAlpha() < kGlassRaiseThreshold)
     {
@@ -3628,7 +3614,7 @@ GENRESULT DACOM_API FGlassMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FNomadMaterial::Bind(void* /*Context*/)
+GENRESULT DACOM_API FNomadMaterial::Bind(FMaterialSubmitContext* /*Context*/)
 {
     StageCounter_ = 0;
     PipelineApplyRsTable(Pipeline_, kNomadRs);
@@ -3655,7 +3641,7 @@ GENRESULT DACOM_API FNomadMaterial::Bind(void* /*Context*/)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FHudIconMaterial::Bind(void* Context)
+GENRESULT DACOM_API FHudIconMaterial::Bind(FMaterialSubmitContext* Context)
 {
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
@@ -3663,9 +3649,9 @@ GENRESULT DACOM_API FHudIconMaterial::Bind(void* Context)
     PipelineApplyTssTable(Pipeline_, 1, kGlassTss1);
     if (Context != nullptr && G_FlmEngineOuter != nullptr)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
+        FMaterialSubmitContext* Submit = Context;
         const float* InstanceValues = (const float*)(
-            ((IEngine*)(G_FlmEngineOuter))->GetInstanceUserData(Submit->Inst));
+            G_FlmEngineOuter->GetInstanceUserData(Submit->Inst));
         if (InstanceValues != nullptr)
         {
             std::memcpy(&MaterialBlock_[4], InstanceValues, 4 * sizeof(float));
@@ -3681,7 +3667,7 @@ GENRESULT DACOM_API FHudIconMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FHudAnimMaterial::Bind(void* Context)
+GENRESULT DACOM_API FHudAnimMaterial::Bind(FMaterialSubmitContext* Context)
 {
     // LAB_06700070: the enabled flag gates the entire bind, including COLORVERTEX.
     if (HudAnimFlag_ == 0)
@@ -3706,7 +3692,7 @@ GENRESULT DACOM_API FHudAnimMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
+GENRESULT DACOM_API FColorizeMaterial::Bind(FMaterialSubmitContext* Context)
 {
     // FUN_066f4d20: preserve the separately stored Ac.W through either branch.
     float Opacity = ColorizeExtraW_;
@@ -3722,16 +3708,16 @@ GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
     {
         if (Context == nullptr)
             return (GENRESULT)(-1);
-        FNomadContext* Submit = (FNomadContext*)(Context);
-        if (Submit->Candidate == nullptr)
+        FMaterialSubmitContext* Submit = Context;
+        if (Submit->ReplacedMaterial == nullptr)
             return (GENRESULT)(-1);
 
         FScopedComponentReference Batched;
-        if (((IMaterial*)(Submit->Candidate))->QueryInterface(
+        if (Submit->ReplacedMaterial->QueryInterface(
                 Iids::BatchedMaterial, &Batched.Object) >= 0)
-            ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
+            (static_cast<IBatchedMaterial*>(Batched.Object))->Bind(Context);
         else
-            ((IMaterial*)(Submit->Candidate))->Bind(Context);
+            Submit->ReplacedMaterial->Bind(Context);
 
         // The descriptor owns three typed values. Retail constructs it after
         // binding, then destroys range/default/current before releasing Batched.
@@ -3741,8 +3727,7 @@ GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
             ~FScopedParameterDescriptor() noexcept(false) { FlmResetDescriptorEntry(Words); }
         } Descriptor;
 
-        const GENRESULT DescriptorResult = ((IMaterial*)(
-            Submit->Candidate))->GetParameterDescriptor(5, Descriptor.Words);
+        const GENRESULT DescriptorResult = Submit->ReplacedMaterial->GetParameterDescriptor(5, Descriptor.Words);
         if (DescriptorResult == GR_OK)
         {
             const char* ShortTag = (const char*)(Descriptor.Words[1]);
@@ -3754,7 +3739,7 @@ GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
                     unsigned long Words[5] = {2, 0, 0, 0, 0};
                     ~FScopedParameterValue() noexcept(false) { FlmReleaseTypedValue(Words); }
                 } Value;
-                ((IMaterial*)(Submit->Candidate))->GetParameterValue(5, Value.Words);
+                Submit->ReplacedMaterial->GetParameterValue(5, Value.Words);
                 float CandidateOpacity;
                 std::memcpy(&CandidateOpacity, &Value.Words[1], sizeof(CandidateOpacity));
                 // Multiply in x87 precision, then round.
@@ -3773,14 +3758,14 @@ GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FCloakMaterial::Bind(void* Context)
+GENRESULT DACOM_API FCloakMaterial::Bind(FMaterialSubmitContext* Context)
 {
     // Cloak inherits opacity from the root-instance value and candidate material.
     float Base = FlmRootInstanceValue(Context, 1.0f); // 0x3f800000
 
-    IDAComponent* Candidate = nullptr;
+    IMaterial* Candidate = nullptr;
     if (Context != nullptr)
-        Candidate = static_cast<const FMaterialSubmitContext*>(Context)->ReplacedMaterial;
+        Candidate = Context->ReplacedMaterial;
 
     if (Candidate != nullptr)
     {
@@ -3789,11 +3774,11 @@ GENRESULT DACOM_API FCloakMaterial::Bind(void* Context)
         if (Candidate->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
         {
             // Retail pushes Context ahead of the branch, so both slots receive it.
-            ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
+            (static_cast<IBatchedMaterial*>(Batched.Object))->Bind(Context);
         }
         else
         {
-            ((IMaterial*)(Candidate))->Bind(Context);
+            Candidate->Bind(Context);
         }
 
         // Read back the candidate material before composing opacity.
@@ -3826,7 +3811,7 @@ GENRESULT DACOM_API FCloakMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FWireMaterial::Bind(void* /*Context*/)
+GENRESULT DACOM_API FWireMaterial::Bind(FMaterialSubmitContext* /*Context*/)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if ((double)(WireColorA_) < kWireBlendThreshold)
@@ -3838,7 +3823,7 @@ GENRESULT DACOM_API FWireMaterial::Bind(void* /*Context*/)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FWire2Material::Bind(void* Context)
+GENRESULT DACOM_API FWire2Material::Bind(FMaterialSubmitContext* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
@@ -3846,7 +3831,7 @@ GENRESULT DACOM_API FWire2Material::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FExclusionZoneMaterial::Bind(void* /*Context*/)
+GENRESULT DACOM_API FExclusionZoneMaterial::Bind(FMaterialSubmitContext* /*Context*/)
 {
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
@@ -3856,20 +3841,20 @@ GENRESULT DACOM_API FExclusionZoneMaterial::Bind(void* /*Context*/)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
+GENRESULT DACOM_API FEnvMapMaterial::Bind(FMaterialSubmitContext* Context)
 {
     // 066f5af0: HRESULTs are tested only for QI and Slot22.
     EnvMapFlag_ = 0;
     const char* Name = nullptr;
-    IDAComponent* Candidate = Context != nullptr
-        ? static_cast<const FMaterialSubmitContext*>(Context)->ReplacedMaterial
+    IMaterial* Candidate = Context != nullptr
+        ? Context->ReplacedMaterial
         : nullptr;
     if (Candidate != nullptr)
     {
         FScopedComponentReference Batched;
         if (Candidate->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
         {
-            ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
+            (static_cast<IBatchedMaterial*>(Batched.Object))->Bind(Context);
         }
         else
         {
@@ -3879,9 +3864,8 @@ GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
                 G_EnvMapGlassCrc = DACOM_CRC::GetCRC32("GlassMaterial");
                 std::atexit(FlmDestroyEnvMapGlassCrc);
             }
-            IMaterial* Material = (IMaterial*)(Candidate);
-            EnvMapFlag_ = DACOM_CRC::GetCRC32(Material->ClassName()) == G_EnvMapGlassCrc;
-            Material->Bind(Context);
+            EnvMapFlag_ = DACOM_CRC::GetCRC32(Candidate->ClassName()) == G_EnvMapGlassCrc;
+            Candidate->Bind(Context);
         }
         if (EnvMapFlag_ != 0)
         {
@@ -3889,10 +3873,10 @@ GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
         }
         else
         {
-            InstanceIndex Root = static_cast<const FMaterialSubmitContext*>(Context)->Inst;
+            InstanceIndex Root = Context->Inst;
             // 066fc970 returns DAT_06704630, published by 066fca80.
             if (G_FlmEngineOuter != nullptr)
-                Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(Root);
+                Root = G_FlmEngineOuter->GetInstanceRoot(Root);
             void* Found = nullptr;
             if (FlmLookupIdValue((int)((intptr_t)(Root)), &Found))
                 Name = (const char*)(Found);
@@ -3968,14 +3952,14 @@ namespace
         {
             if (Object != nullptr)
             {
-                ((IDAComponent*)(Object))->Release();
+                (static_cast<IDAComponent*>(Object))->Release();
                 Object = nullptr;
             }
         }
     };
 }
 
-GENRESULT DACOM_API FShadowMaterial::Bind(void* Context)
+GENRESULT DACOM_API FShadowMaterial::Bind(FMaterialSubmitContext* Context)
 {
     // LAB_066fa3f0: cache only on the first bind; failure does not reset the latch.
     if (!bShadowTextureInitialized_)
@@ -4000,24 +3984,24 @@ GENRESULT DACOM_API FShadowMaterial::Bind(void* Context)
     }
     if (Context != nullptr)
     {
-        FNomadContext* Submit = (FNomadContext*)(Context);
-        if (Submit->Candidate != nullptr)
+        FMaterialSubmitContext* Submit = Context;
+        if (Submit->ReplacedMaterial != nullptr)
         {
             int LayerCount = (int)((intptr_t)(Context));
-            ((IMaterial*)(Submit->Candidate))->GetPassCount(&LayerCount);
+            Submit->ReplacedMaterial->GetPassCount(&LayerCount);
             if ((unsigned long)(LayerCount) != ShadowLayerCount_)
                 ShadowLayerCount_ = (unsigned long)(LayerCount);
             FShadowBatchedReference Batched;
-            if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-                ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
+            if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+                (static_cast<IBatchedMaterial*>(Batched.Object))->Bind(Context);
             else
-                ((IMaterial*)(Submit->Candidate))->Bind(Context);
+                Submit->ReplacedMaterial->Bind(Context);
         }
     }
     return (GENRESULT)(-1);
 }
 
-GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigned long Start,
+GENRESULT FShadowMaterial::DrawShadow(FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start,
                                     unsigned long Count, unsigned long IbStart,
                                     unsigned long IndexSpan, unsigned long Flags)
 {
@@ -4036,16 +4020,16 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
     Pipeline_->SetTextureStageState(Stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
     Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
     Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3 | D3DTTFF_PROJECTED);
-    FNomadContext* Submit = (FNomadContext*)(Context);
+    FMaterialSubmitContext* Submit = Context;
     GENRESULT Result = (GENRESULT)(-1);
-    if (Submit != nullptr && Submit->Candidate != nullptr)
+    if (Submit != nullptr && Submit->ReplacedMaterial != nullptr)
     {
         FShadowBatchedReference Batched;
-        if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-            Result = ((IBatchedMaterial*)(Batched.Object))->Submit(Context, Prim, Start,
+        if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+            Result = (static_cast<IBatchedMaterial*>(Batched.Object))->Submit(Context, Prim, Start,
                 Count, IbStart, IndexSpan, Flags);
         else
-            Result = ((IMaterial*)(Submit->Candidate))->Submit(Context, Prim, Start,
+            Result = Submit->ReplacedMaterial->Submit(Context, Prim, Start,
                 Count, IbStart, IndexSpan, Flags);
     }
     if (ShadowLayerCount_ > 1)
@@ -4055,7 +4039,7 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
         bool bDrawn = false;
         if ((Flags & kMaterialSubmitUseBuffers) != 0)
         {
-            const unsigned long IbBase = static_cast<const FIbScratch*>(Submit->IbWrapper)->Bias;
+            const unsigned long IbBase = Submit->IbScratch->Bias;
             Result = RpDraw_->DrawIndexedPrimitive(Prim, Start, Count,
                 IbBase + IbStart, IndexSpan);
             bDrawn = Result >= 0;
@@ -4070,9 +4054,9 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
                     (void*)((uintptr_t)(Submit->Indices) + IbStart * 2),
                     IndexSpan, 0);
             }
-            if (Result < 0 && Submit->Mesh != nullptr && Count != 0 && IndexSpan != 0)
+            if (Result < 0 && Submit->SourceVertices != nullptr && Count != 0 && IndexSpan != 0)
             {
-                const unsigned long RequestedFvf = Submit->Mesh->SrcFvf;
+                const unsigned long RequestedFvf = Submit->SourceVertices->SrcFvf;
                 FVertexMemoryLock LockOut;
                 Result = VertexBufferManager_->LockVertexMemory(
                     RequestedFvf, Count, &LockOut);
@@ -4082,7 +4066,7 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
                     const unsigned long Stride = (unsigned long)(FvfStride(GrantedFvf));
                     void* DestBase = (void*)((uintptr_t)(LockOut.Vertices) - Stride * Start);
                     VertexBufferManager_->CopyVertexData(DestBase,
-                        GrantedFvf, Submit->Mesh,
+                        GrantedFvf, Submit->SourceVertices,
                         Start, Count);
                     VertexBufferManager_->UnlockVertexMemory(&LockOut);
                     Result = Pipeline_->DrawIndexedPrimitiveVb(Prim, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
@@ -4099,51 +4083,51 @@ GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigne
     return Result;
 }
 
-GENRESULT FShadowMaterial::ShadowCandidateDispatch(void* Context)
+GENRESULT FShadowMaterial::ShadowCandidateDispatch(FMaterialSubmitContext* Context)
 {
     if (Context == nullptr)
         return (GENRESULT)(-1);
-    FNomadContext* Submit = (FNomadContext*)(Context);
-    if (Submit->Candidate == nullptr)
+    FMaterialSubmitContext* Submit = Context;
+    if (Submit->ReplacedMaterial == nullptr)
         return (GENRESULT)(-1);
     FShadowBatchedReference Batched;
-    if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-        return ((IBatchedMaterial*)(Batched.Object))->Teardown(Context);
-    return ((IMaterial*)(Submit->Candidate))->Teardown(Context);
+    if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+        return (static_cast<IBatchedMaterial*>(Batched.Object))->Teardown(Context);
+    return Submit->ReplacedMaterial->Teardown(Context);
 }
 
-void FMaterialImpl::TeardownCandidateIgnoringResult(void* Context)
+void FMaterialImpl::TeardownCandidateIgnoringResult(FMaterialSubmitContext* Context)
 {
     // 066f42e0 / 066f5010 / 066f6240: optional candidate, result discarded.
     if (Context == nullptr)
         return;
-    FNomadContext* Submit = (FNomadContext*)(Context);
-    if (Submit->Candidate == nullptr)
+    FMaterialSubmitContext* Submit = Context;
+    if (Submit->ReplacedMaterial == nullptr)
         return;
     FShadowBatchedReference Batched;
-    if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-        ((IBatchedMaterial*)(Batched.Object))->Teardown(Context);
+    if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+        (static_cast<IBatchedMaterial*>(Batched.Object))->Teardown(Context);
     else
-        ((IMaterial*)(Submit->Candidate))->Teardown(Context);
+        Submit->ReplacedMaterial->Teardown(Context);
 }
 
-GENRESULT FMaterialImpl::SubmitCandidateGeometry(void* Context, unsigned long PrimType,
+GENRESULT FMaterialImpl::SubmitCandidateGeometry(FMaterialSubmitContext* Context, unsigned long PrimType,
                                                 unsigned long Start, unsigned long Count,
                                                 unsigned long IbStart,
                                                 unsigned long IndexSpan,
                                                 unsigned long Flags)
 {
     // 066f4220: caller owns the optional candidate checks and material flag.
-    FNomadContext* Submit = (FNomadContext*)(Context);
+    FMaterialSubmitContext* Submit = Context;
     FShadowBatchedReference Batched;
-    if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-        return ((IBatchedMaterial*)(Batched.Object))->Submit(Context, PrimType, Start,
+    if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+        return (static_cast<IBatchedMaterial*>(Batched.Object))->Submit(Context, PrimType, Start,
             Count, IbStart, IndexSpan, Flags);
-    return ((IMaterial*)(Submit->Candidate))->Submit(Context, PrimType, Start,
+    return Submit->ReplacedMaterial->Submit(Context, PrimType, Start,
         Count, IbStart, IndexSpan, Flags);
 }
 
-GENRESULT DACOM_API FEngineGlowMaterial::Bind(void* Context)
+GENRESULT DACOM_API FEngineGlowMaterial::Bind(FMaterialSubmitContext* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
@@ -4154,44 +4138,44 @@ GENRESULT DACOM_API FEngineGlowMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FVisibleCounterMaterial::Bind(void* /*Context*/)
+GENRESULT DACOM_API FVisibleCounterMaterial::Bind(FMaterialSubmitContext* /*Context*/)
 {
     return GR_OK;
 }
 
-GENRESULT DACOM_API FBackdropMaterial::Bind(void* Context)
+GENRESULT DACOM_API FBackdropMaterial::Bind(FMaterialSubmitContext* Context)
 {
     if (Context == nullptr)
         return (GENRESULT)(-1);
-    FNomadContext* Submit = (FNomadContext*)(Context);
-    if (Submit->Candidate == nullptr)
+    FMaterialSubmitContext* Submit = Context;
+    if (Submit->ReplacedMaterial == nullptr)
         return (GENRESULT)(-1);
     FShadowBatchedReference Batched;
-    if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-        ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
+    if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+        (static_cast<IBatchedMaterial*>(Batched.Object))->Bind(Context);
     else
-        ((IMaterial*)(Submit->Candidate))->Bind(Context);
+        Submit->ReplacedMaterial->Bind(Context);
     return (GENRESULT)(-1);
 }
 
-GENRESULT FBackdropMaterial::TeardownBackdrop(void* Context)
+GENRESULT FBackdropMaterial::TeardownBackdrop(FMaterialSubmitContext* Context)
 {
     // FUN_066f2e30 has no Context/Candidate null checks.
-    FNomadContext* Submit = (FNomadContext*)(Context);
+    FMaterialSubmitContext* Submit = Context;
     FShadowBatchedReference Batched;
-    if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-        return ((IBatchedMaterial*)(Batched.Object))->Teardown(Context);
-    return ((IMaterial*)(Submit->Candidate))->Teardown(Context);
+    if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+        return (static_cast<IBatchedMaterial*>(Batched.Object))->Teardown(Context);
+    return Submit->ReplacedMaterial->Teardown(Context);
 }
 
-GENRESULT FBackdropMaterial::DrawBackdrop(void* Context, unsigned long Prim, unsigned long Start,
+GENRESULT FBackdropMaterial::DrawBackdrop(FMaterialSubmitContext* Context, unsigned long Prim, unsigned long Start,
                                       unsigned long Count, unsigned long IbStart,
                                       unsigned long IndexSpan, unsigned long Flags)
 {
     if (Context == nullptr)
         return (GENRESULT)(-1);
-    FNomadContext* Submit = (FNomadContext*)(Context);
-    if (Submit->Candidate == nullptr)
+    FMaterialSubmitContext* Submit = Context;
+    if (Submit->ReplacedMaterial == nullptr)
         return (GENRESULT)(-1);
 
     // 066f2ef9: capture each pipeline anew; arm only after the corresponding force.
@@ -4207,11 +4191,11 @@ GENRESULT FBackdropMaterial::DrawBackdrop(void* Context, unsigned long Prim, uns
     GENRESULT Result;
     {
         FShadowBatchedReference Batched;
-        if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
-            Result = ((IBatchedMaterial*)(Batched.Object))->Submit(Context, Prim, Start,
+        if (Submit->ReplacedMaterial->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
+            Result = (static_cast<IBatchedMaterial*>(Batched.Object))->Submit(Context, Prim, Start,
                 Count, IbStart, IndexSpan, Flags);
         else
-            Result = ((IMaterial*)(Submit->Candidate))->Submit(Context, Prim, Start,
+            Result = Submit->ReplacedMaterial->Submit(Context, Prim, Start,
                 Count, IbStart, IndexSpan, Flags);
     }
     // Reverse construction order on normal and EH paths.
@@ -4221,7 +4205,7 @@ GENRESULT FBackdropMaterial::DrawBackdrop(void* Context, unsigned long Prim, uns
     return Result;
 }
 
-GENRESULT DACOM_API FPlanetWaterMaterial::Bind(void* Context)
+GENRESULT DACOM_API FPlanetWaterMaterial::Bind(FMaterialSubmitContext* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))

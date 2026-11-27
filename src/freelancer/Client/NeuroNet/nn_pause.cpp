@@ -23,6 +23,7 @@
 #include "NeuroNet/nn_inventory.h"          // IsPlayerDockedRetail (FUN_004c4810)
 #include "NeuroNet/nn_modal.h"              // G_bNnScreenUp, NnMainButtonOnModalOpen, NnFloatBits
 #include "NeuroNet/nn_rollover.h"           // NnRolloverHideGlobal (FUN_004b65a0)
+#include "NeuroNet/nn_text_control.h"
 #include "Space/player_behavior.h"       // GetPlayerObjRW (FUN_0054baf0)
 #include "Interface/win3d.h"
 #include "Interface/win3d_renderables.h"     // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
@@ -154,7 +155,7 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         // The last box flushes the line batchers after its Draw (+0x35d |= 1, no null test).
         if (Index == Count - 1)
         {
-            WireButtonControl* const Wire = static_cast<WireButtonControl*>(ButtonBox[Index]);
+            WireButtonControl* const Wire = ButtonBox[Index];
             Wire->WireState2 = static_cast<unsigned char>(Wire->WireState2 | kWire2FlushBatchers);
         }
 

@@ -344,7 +344,7 @@ PhyArch::Part const* __cdecl PhyArch::GetDefaultPart()
         IVP_Compact_Ledge* const Hull = IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_ledge(&Points);
         Soup.InsertLedge(Hull);
         const int32_t CompileOptions[4] = { 0, 1, 0, 1 };
-        G_DefaultPartStorage.Surface = (IVP_Compact_Surface*)Soup.Compile(CompileOptions);
+        G_DefaultPartStorage.Surface = static_cast<IVP_Compact_Surface*>(Soup.Compile(CompileOptions));
 
         // bNotFixed keeps the constructor's 1; the hardpoint list stays empty.
         G_DefaultPartStorage.ExtentsMin.x = -0.5f;

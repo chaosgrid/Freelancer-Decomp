@@ -283,7 +283,7 @@ namespace
         // FUN_0041a140 -- the letterbox update for the room camera (the twin of FUN_0041a420,
         // which the space camera uses).
         UpdateRoomLetterbox(
-            static_cast<FRoomCamera*>(static_cast<ICamera*>(GetClientRoomCamera())), Dt);
+            static_cast<FRoomCamera*>(GetClientRoomCamera()), Dt);
         UpdateFade(Dt);              // FUN_00412360
         RefreshHoveredHotspot();     // FUN_00558f80
 
@@ -299,7 +299,7 @@ namespace
         if (!(GetFadeLevel() == 0.0f))
             return;
         // FUN_00438c00: FUN_0043a460's lookup through the controller's static +0x38.
-        FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
+        FRoomRuntime* const Runtime = GetClientCurrentLocationRuntime();
         if (Runtime == nullptr)
             return;
         if (Runtime->IsCameraMoving() != 0)
@@ -338,7 +338,7 @@ namespace
             Win3DSetDepthFunc(4);                           // FUN_00422120
             Win3DDrawAll();                                 // FUN_0059e300
             if (!IsClientServerTickPaused())                // FUN_0042d730
-                DrawFade(static_cast<ICamera*>(GetClientRoomCamera())); // FUN_00412430
+                DrawFade(GetClientRoomCamera()); // FUN_00412430
             EndClientRenderScene();                         // FUN_00425080
             PresentClientRenderFrame();                     // FUN_00425140
         }
@@ -694,7 +694,7 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
 
     // The arrival caption, unless the room runtime's +0x517 is set or the base was entered from
     // the intro. A runtime whose FUN_0044ab60 is false zeroes the delay first.
-    FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
+    FRoomRuntime* const Runtime = GetClientCurrentLocationRuntime();
     bool const bShowCaption = !bFromIntro;
     if ((Runtime == nullptr || RoomControlStartScriptRan(Runtime) == 0) && bShowCaption)
     {
@@ -780,12 +780,12 @@ void RequestMissionBriefingContinue()
 void ResetGameflowRoomLetterbox()
 {
     // FUN_00558d60.
-    void* const Camera = GetClientRoomCamera();
+    ICamera* const Camera = GetClientRoomCamera();
     if (Camera == nullptr)
         return;
     ForgetLetterboxCamera(); // FUN_0041a3d0
     // FUN_0041a140(Camera, 0.0f).
-    UpdateRoomLetterbox(static_cast<FRoomCamera*>(static_cast<ICamera*>(Camera)), 0.0f);
+    UpdateRoomLetterbox(static_cast<FRoomCamera*>(Camera), 0.0f);
 }
 
 void ResetHotspotTracking()

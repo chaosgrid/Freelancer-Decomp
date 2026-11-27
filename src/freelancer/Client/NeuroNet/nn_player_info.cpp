@@ -31,6 +31,9 @@
 #include "Interface/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ...
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"

@@ -26,7 +26,7 @@ namespace AlchemyImpl
         // LAB_062043a0: only IFxRuntime and IAggregateComponent are listed.
         if (Iids::EqualNoNullTest(Iid, Iids::FxRuntime))
         {
-            IFxRuntime* const Interface = static_cast<IFxRuntime*>(Owner_);
+            IFxRuntime* const Interface = Owner_;
             Interface->AddRef();
             *Out = Interface;
             return GR_OK;
@@ -77,7 +77,7 @@ namespace AlchemyImpl
         return Controller_->Release();
     }
 
-    GENRESULT DACOM_API FFxRuntime::BindAlchemy(void* Alchemy)
+    GENRESULT DACOM_API FFxRuntime::BindAlchemy(IAlchemy* Alchemy)
     {
         // LAB_0623b670 (DAT_06257b98): raw store, no AddRef / no Release of the
         // previous value.
@@ -90,7 +90,7 @@ namespace AlchemyImpl
         G_RuntimeUnknown = Value;
         return GR_OK;
     }
-    GENRESULT DACOM_API FFxRuntime::BindEffectLibrary(void* Library)
+    GENRESULT DACOM_API FFxRuntime::BindEffectLibrary(IFxEffectLibrary* Library)
     {
         // LAB_0623b690 (DAT_06257b90): raw store, no AddRef / no Release.
         G_RuntimeEffectLibrary = Library;
@@ -102,7 +102,7 @@ namespace AlchemyImpl
         // AddRef, since the bound object's callback may change the binding.
         if (G_RuntimeAlchemy == nullptr)
             return GR_GENERIC;
-        static_cast<IDAComponent*>(G_RuntimeAlchemy)->AddRef();
+        G_RuntimeAlchemy->AddRef();
         *Out = G_RuntimeAlchemy;
         return GR_OK;
     }
@@ -120,14 +120,14 @@ namespace AlchemyImpl
         // LAB_0623b710: miss does not write Out; hit reloads after AddRef.
         if (G_RuntimeEffectLibrary == nullptr)
             return GR_GENERIC;
-        static_cast<IDAComponent*>(G_RuntimeEffectLibrary)->AddRef();
+        G_RuntimeEffectLibrary->AddRef();
         *Out = G_RuntimeEffectLibrary;
         return GR_OK;
     }
-    GENRESULT DACOM_API FFxRuntime::BindMeshFactory(void* Factory)
+    GENRESULT DACOM_API FFxRuntime::BindMeshFactory(IFxMeshFactory* Factory)
     {
         // LAB_0623b6a0: raw store, no AddRef / no Release of the previous.
-        G_FxMeshFactory = static_cast<IDAComponent*>(Factory);
+        G_FxMeshFactory = Factory;
         return GR_OK;
     }
     GENRESULT DACOM_API FFxRuntime::GetMeshFactory(void** Out)

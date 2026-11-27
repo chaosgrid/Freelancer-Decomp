@@ -45,7 +45,7 @@ BaseWatcher::BaseWatcher(Watchable* const* Src)
     // FUN_062ed070. Dereferences Src once (no +8 adjustment, unlike the IObjRW* overload
     // above) and also treats the literal pointer value 0x8 as a sentinel alongside null.
     Watchable* V = *Src;
-    if (V != nullptr && V != (Watchable*)8)
+    if (V != nullptr && V != reinterpret_cast<Watchable*>(8))
         set_pointer(V);
 }
 

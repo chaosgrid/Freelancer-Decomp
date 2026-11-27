@@ -86,12 +86,12 @@ namespace
         // 3..31 of dword 1 as stack garbage; the port has 0. Dwords 0, 2..5 are 0.
         unsigned PlayKey[6] = {};
         PlayKey[1] = static_cast<unsigned>((Entry->bKeyBit2 << 2) & 4);
-        void* Handle = nullptr;
-        PlayClientSoundArchIfIdle(static_cast<Archetype::ISound*>(Msg), PlayKey, &Handle);
+        ISoundSource* Handle = nullptr;
+        PlayClientSoundArchIfIdle(Msg, PlayKey, &Handle);
         // FUN_004285f0 writes the out pointer only when it starts a source.
         if (Handle != nullptr)
         {
-            Entry->Source = static_cast<ISoundSource*>(Handle);
+            Entry->Source = Handle;
         }
         // Category 5: voice.
         if (Entry->Source != nullptr)

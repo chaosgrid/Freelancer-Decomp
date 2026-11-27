@@ -366,7 +366,7 @@ bool INI_Reader::FBiniFile::Init()
             unsigned int Take = Size - Start;
             if (Take > BiniHeaderBytes)
                 Take = BiniHeaderBytes;
-            BINI_Header const* const Read = (BINI_Header const*)(View + Start);
+            BINI_Header const* const Read = reinterpret_cast<BINI_Header const*>((View + Start));
             Cursor = Start + Take;
             if (Take == BiniHeaderBytes && Read->Magic == BiniMagic && Read->StringTableOffset < Size)
                 Candidate = Read;
@@ -378,7 +378,7 @@ bool INI_Reader::FBiniFile::Init()
     FileHeader = Candidate;
     if (Candidate == nullptr)
         return false;
-    StringBase = (char const*)Candidate + Candidate->StringTableOffset;
+    StringBase = reinterpret_cast<char const*>(Candidate) + Candidate->StringTableOffset;
     Block = nullptr;
     Value = nullptr;
     return true;
@@ -650,7 +650,7 @@ bool INI_Reader::ReadBiniHeader()
         while (Bini.ValueIndex < Bini.Block->ValueCount)
         {
             unsigned int Got = 3;
-            Bini.Value = (BINI_Value const*)Bini.request_pointer(Got);
+            Bini.Value = static_cast<BINI_Value const*>(Bini.request_pointer(Got));
             if (Got != 3)
                 Bini.Value = nullptr;
             else
@@ -665,7 +665,7 @@ bool INI_Reader::ReadBiniHeader()
         return false;
 
     unsigned int Got = 4;
-    Bini.Block = (BINI_Block const*)Bini.request_pointer(Got);
+    Bini.Block = static_cast<BINI_Block const*>(Bini.request_pointer(Got));
     if (Got != 4)
     {
         Bini.Block = nullptr;
@@ -737,7 +737,7 @@ bool INI_Reader::read_value()
         return false;
 
     unsigned int Got = 3;
-    Bini.Value = (BINI_Value const*)Bini.request_pointer(Got);
+    Bini.Value = static_cast<BINI_Value const*>(Bini.request_pointer(Got));
     if (Got != 3)
     {
         Bini.Value = nullptr;
@@ -745,7 +745,7 @@ bool INI_Reader::read_value()
     }
 
     unsigned int ParamBytes = Bini.Value->ParamCount * BiniParamBytes;
-    Bini.Params = (FBiniParam const*)Bini.request_pointer(ParamBytes);
+    Bini.Params = static_cast<FBiniParam const*>(Bini.request_pointer(ParamBytes));
     ++Bini.ValueIndex;
     return true;
 }
@@ -1072,10 +1072,10 @@ void INI_Reader::set_state(State const& In)
     {
         std::uintptr_t const Base = (std::uintptr_t)Bini.View;
         Bini.seek(In.Cursor);
-        Bini.Block = (BINI_Block const*)(Base + In.Bini.BlockOffset);
+        Bini.Block = reinterpret_cast<BINI_Block const*>((Base + In.Bini.BlockOffset));
         Bini.ValueIndex = In.Bini.ValueIndex;
-        Bini.Value = (BINI_Value const*)(Base + In.Bini.ValueOffset);
-        Bini.Params = (FBiniParam const*)(Base + In.Bini.ParamsOffset);
+        Bini.Value = reinterpret_cast<BINI_Value const*>((Base + In.Bini.ValueOffset));
+        Bini.Params = reinterpret_cast<FBiniParam const*>((Base + In.Bini.ParamsOffset));
         return;
     }
 

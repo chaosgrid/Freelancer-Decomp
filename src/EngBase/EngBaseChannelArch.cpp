@@ -147,18 +147,17 @@ GENRESULT DACOM_API FChannelArchetypeObject::Load(IFileSystem* FileSystem)
 {
     if (FileSystem == nullptr)
         return GR_INVALID_PARMS;
-    IFileSystem* Fs = AsFileSystem(FileSystem);
 
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, G_NameHeader, G_NameDos);
-    const int HeaderHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+    const int HeaderHandle = FileSystem->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     if (HeaderHandle == -1)
         return (GENRESULT)0xFFFFFFFA;
     unsigned long Header[3];
     unsigned long BytesRead = 0;
-    const int HeaderOk = Fs->Read((unsigned long)HeaderHandle, Header, 0xC,
+    const int HeaderOk = FileSystem->Read((unsigned long)HeaderHandle, Header, 0xC,
                                   &BytesRead, 0); // +0x14
-    Fs->CloseFile((unsigned long)HeaderHandle); // +0x10
+    FileSystem->CloseFile((unsigned long)HeaderHandle); // +0x10
     if (HeaderOk == 0 || BytesRead != 0xC)
         return (GENRESULT)0xFFFFFFFA;
 
@@ -168,13 +167,13 @@ GENRESULT DACOM_API FChannelArchetypeObject::Load(IFileSystem* FileSystem)
     Stride = ChannelStrideFromHeader(Flags, SampleRate);
 
     Desc.DataPath = G_NameFrames;
-    const int FramesHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+    const int FramesHandle = FileSystem->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     if (FramesHandle == -1)
         return (GENRESULT)0xFFFFFFFA;
-    const unsigned long FileSize = Fs->GetSize((unsigned long)FramesHandle, 0); // +0x28
+    const unsigned long FileSize = FileSystem->GetSize((unsigned long)FramesHandle, 0); // +0x28
     if (Flags != G_ChannelFlagScalarOnly && FileSize != FrameCount * Stride)
     {
-        Fs->CloseFile((unsigned long)FramesHandle); // +0x10
+        FileSystem->CloseFile((unsigned long)FramesHandle); // +0x10
         return GR_GENERIC;
     }
     if ((Flags & (G_ChannelFlagZeroPos | G_ChannelFlagIdentQuat | G_ChannelFlagCompQuat3 | G_ChannelFlagCompAxis)) != 0 || (Flags & G_ChannelFlagCompQuat4) != 0)
@@ -192,9 +191,9 @@ GENRESULT DACOM_API FChannelArchetypeObject::Load(IFileSystem* FileSystem)
     }
     if (Frames == nullptr)
         return GR_OUT_OF_MEMORY;
-    const int FramesOk = Fs->Read((unsigned long)FramesHandle, Frames, FileSize,
+    const int FramesOk = FileSystem->Read((unsigned long)FramesHandle, Frames, FileSize,
                                   &BytesRead, 0); // +0x14
-    Fs->CloseFile((unsigned long)FramesHandle); // +0x10
+    FileSystem->CloseFile((unsigned long)FramesHandle); // +0x10
     if (FramesOk == 0 || BytesRead != FileSize)
         return (GENRESULT)0xFFFFFFFA;
 
@@ -612,7 +611,7 @@ GENRESULT DACOM_API ChannelArchetypeFactoryCreateInstance(FDacomFactory* This, A
     }
 
     FChannelArchetypeObject* Object =
-        (FChannelArchetypeObject*)(std::calloc(1, sizeof(FChannelArchetypeObject)));
+        static_cast<FChannelArchetypeObject*>(std::calloc(1, sizeof(FChannelArchetypeObject)));
     if (Object == nullptr)
     {
         *Out = nullptr;

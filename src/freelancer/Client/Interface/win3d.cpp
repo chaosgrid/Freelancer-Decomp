@@ -1260,16 +1260,16 @@ void Win3DStartupManager(int Width, int Height)
     Desc.Creation = OPEN_EXISTING;
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
-    void* FsOut = nullptr;
+    IFileSystem* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
-                                                               &FsOut) >= 0)
+                                                               reinterpret_cast<void**>(&FsOut)) >= 0)
     {
         G_InterfaceGenericMaterial = Archetype::ResolveMaterialEntryFromFs(
-            static_cast<IFileSystem*>(FsOut), Desc.DataPath, true, 0xffffffffu);
+            FsOut, Desc.DataPath, true, 0xffffffffu);
     }
     // Released whenever the out pointer is non-null, whatever the create returned.
     if (FsOut != nullptr)
-        static_cast<IFileSystem*>(FsOut)->Release();
+        FsOut->Release();
 }
 
 void Win3DShutdownManager()

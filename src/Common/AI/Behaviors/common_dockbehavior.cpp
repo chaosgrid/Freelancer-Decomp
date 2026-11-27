@@ -31,12 +31,11 @@ static float BitsToFloat(unsigned int Bits)
 
 // The "-8 header" idiom: a watcher's payload pointer sits 8 bytes into the object, and
 // retail reaches the object by subtracting 8, treating null either side as "no object".
-static void* HeaderBlockFromWatched(Watchable const* Watched)
+static IObjRW* HeaderBlockFromWatched(Watchable const* Watched)
 {
     if (Watched == nullptr)
         return nullptr;
-    return const_cast<void*>(
-        static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8));
+    return reinterpret_cast<IObjRW*>(const_cast<char*>(reinterpret_cast<char const*>(Watched) - 8));
 }
 
 // DockBehavior; layout notes are in common_dockbehavior.h. Ghidra misreads register reuse in
@@ -93,14 +92,14 @@ int DockBehavior::SetModeFromFlags()
 // Slots 13/14 (LAB_062c5650 / LAB_062c5670): forward to the nav pilot when present.
 void DockBehavior::set_throttle(float Throttle)
 {
-    Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
+    Behavior* const Pilot = GotoDirective.NavPilotPtr;
     if (Pilot != nullptr)
         Pilot->set_throttle(Throttle);
 }
 
 void DockBehavior::set_cruise(bool bOn)
 {
-    Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
+    Behavior* const Pilot = GotoDirective.NavPilotPtr;
     if (Pilot != nullptr)
         Pilot->set_cruise(bOn);
 }
@@ -127,12 +126,9 @@ bool DockBehavior::IsClearanceState() const
 }
 
 // Slots 24/26, LAB_062c2fe0.
-void* DockBehavior::GetWatchedRawBlock() const
+IObjRW* DockBehavior::GetWatchedRawBlock() const
 {
-    char const* Watched = reinterpret_cast<char const*>(Watcher324.target());
-    if (Watched == nullptr)
-        return nullptr;
-    return const_cast<char*>(Watched) - 8;
+    return ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()));
 }
 
 // Slot 7, LAB_062c3b70.
@@ -222,7 +218,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
 
         DockPortIndex = Param3;   // outer+0x43c
 
-        void const* Watched = Watcher324.target();
+        Watchable const* Watched = Watcher324.target();
         bool const bInvalidBlock =
             (Watched == nullptr) || (reinterpret_cast<char const*>(Watched) - 8 == nullptr);
 
@@ -269,7 +265,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
 }
 
 // Slot 1, LAB_062c31c0.
-bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool DockBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     bool const bOk = BindContext(Param1, Param2, Param3);          // FUN_062d2090
     if (!bOk)
@@ -297,7 +293,7 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // get_hardpoint (IObjInspect +0xc0) returns non-zero when there is no such hardpoint;
     // then the +0x430 offset is zeroed.
     Vector HpPos;   // left uninitialised by retail
-    if (ObjInspectOf(OwnerContext)->get_hardpoint("hpmount", &HpPos, nullptr) != 0)
+    if (OwnerContext->get_hardpoint("hpmount", &HpPos, nullptr) != 0)
     {
         HpMountOffset.x = 0.0f;
         HpMountOffset.y = 0.0f;
@@ -343,7 +339,7 @@ void DockBehavior::RecomputeApproach()
 
     Behavior::OnEngage();   // FUN_062d20d0
 
-    void const* Watched = Watcher324.target();
+    Watchable const* Watched = Watcher324.target();
     bool const bInvalidBlock =
         (Watched == nullptr) || (reinterpret_cast<char const*>(Watched) - 8 == nullptr);
     if (bInvalidBlock)
@@ -358,7 +354,7 @@ void DockBehavior::RecomputeApproach()
     // FUN_062e5af0 (engine speed) rounded to float, FUN_062e5ab0 (coast distance), times
     // 1.4f (DAT_0639f510).
     {
-        float const Speed = Behavior_GetSpeed(ObjInspectOf(OwnerContext), 1.0f,
+        float const Speed = Behavior_GetSpeed(OwnerContext, 1.0f,
                                                          IObject::ThrustEquipEngine);
         BrakingDistance = static_cast<float>(
             static_cast<double>(Behavior_GetCoastDistance(OwnerContext, Speed)) * 1.4f);
@@ -370,20 +366,16 @@ void DockBehavior::RecomputeApproach()
     if (static_cast<signed char>(StateFlags32c) < 0)
     {
         // IObjInspect +0x138 on the watched object (target - 8, or null).
-        IObjInspect const* const WatchedObj = ObjInspectOf(Watched != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
-            : nullptr);
-        ObjInspectOf(OwnerContext)->get_lane_start(
-            WatchedObj, *static_cast<IObjInspect const**>(static_cast<void*>(&LaneNextRing)),
+        IObjInspect const* const WatchedObj = HeaderBlockFromWatched(Watched);
+        OwnerContext->get_lane_start(
+            WatchedObj, LaneNextRing,
             DestPoint3cc, Facing38c);
         OrientMatrix3d8 = LookMatrixYup(Facing38c);
         // FUN_062d4e50 with the re-read watched object's id; on a null target retail calls
         // through a null pointer, reproduced literally.
         Watchable const* const Watched2 = Watcher324.target();
-        void const* const Obj2 = Watched2 != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Watched2) - 8)
-            : nullptr;
-        Move.PublishTargetId(ObjInspectOf(Obj2)->get_id());
+        IObjRW const* const Obj2 = HeaderBlockFromWatched(Watched2);
+        Move.PublishTargetId(Obj2->get_id());
     }
     else if ((StateFlags32c & OBJ_JUMP_GATE) != 0)
     {
@@ -399,16 +391,14 @@ void DockBehavior::RecomputeApproach()
     float const kApproachRangeSq = 10000.0f * 10000.0f;   // DAT_063fc518 == 1e8f exactly
 
     int NextState = kDockStateGoto;
-    IObjInspect const* const ThreatObject = ObjInspectOf(OwnerContext);
+    IObjInspect const* const ThreatObject = OwnerContext;
     if (ThreatObject->is_player())
     {
         // Owner position first, then the object's (target - 8, or null, no test).
         Watchable const* const Watched3 = Watcher324.target();
-        void const* const Obj3 = Watched3 != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Watched3) - 8)
-            : nullptr;
+        IObjRW const* const Obj3 = HeaderBlockFromWatched(Watched3);
         Vector const& ThreatPos = ThreatObject->get_position();
-        Vector const& WatchedPos = ObjInspectOf(Obj3)->get_position();
+        Vector const& WatchedPos = Obj3->get_position();
 
         // Kept on the x87 stack, hence double.
         double const Dx = static_cast<double>(WatchedPos.x) - ThreatPos.x;
@@ -453,7 +443,7 @@ void DockBehavior::Disengage()
 
     if (GotoDirective.NavPilotPtr != nullptr)
     {
-        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
+        GotoDirective.NavPilotPtr->OnDisengage();
         GotoDirective.NavPilotPtr->ReleaseDirectiveTarget();  // FUN_062d21c0
         GotoDirective.NavPilotPtr = nullptr;
     }
@@ -465,7 +455,7 @@ void DockBehavior::Disengage()
         // request_exit_tradelane is called on a possibly-null CShip, as retail.
         if (AbortFlag398 != 0 && Flag399 == 0)
         {
-            CObject const* const Obj = ObjInspectOf(OwnerContext)->cobject(); // +0x150
+            CObject const* const Obj = OwnerContext->cobject(); // +0x150
             CShip* Ship = nullptr;
             if (Obj != nullptr && (Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
                 Ship = const_cast<CShip*>(static_cast<CShip const*>(Obj));
@@ -511,10 +501,8 @@ void DockBehavior::CancelOwnerRequest(int RequestType)
     if (Watched != nullptr && reinterpret_cast<char const*>(Watched) - 8 != nullptr)
     {
         Watchable const* const Again = Watcher324.target();
-        void const* const Obj = Again != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Again) - 8)
-            : nullptr;
-        Id = ObjInspectOf(Obj)->get_id();
+        IObjRW const* const Obj = HeaderBlockFromWatched(Again);
+        Id = Obj->get_id();
     }
     ObjAffectOf(OwnerContext)->request_cancel(RequestType, &Id, 0);
 }
@@ -526,7 +514,7 @@ int DockBehavior::CheckClearanceProgress()
         return 1;
 
     IObjRW* Candidate = nullptr;
-    ObjInspectOf(OwnerContext)->get_target(Candidate);
+    OwnerContext->get_target(Candidate);
     if (Candidate == nullptr)
         return 2;
 
@@ -572,7 +560,7 @@ int DockBehavior::CheckClearanceProgress()
 // case 1 loads it), so its +0x30 / +0x28 calls are set_direction / OnApplyDirective.
 void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
 {
-    Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
+    Behavior* const Pilot = GotoDirective.NavPilotPtr;
     if (Pilot == nullptr)
         return;
 
@@ -591,9 +579,9 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
     pub::AI::DirectiveGotoOp Op;
     Op.ArrivalRange = 1000.0f;                       // .data:DAT_063ebdb4
     Op.bFlyThrough = 1;
-    void* const ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
+    IObjRW const* const ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
     if (ProxObj != nullptr)
-        Op.TetherObjectId = ObjInspectOf(ProxObj)->get_id();
+        Op.TetherObjectId = ProxObj->get_id();
     else
         Op.TetherObjectId = 0;
     Op.TetherNearRange = ProxWatcher450.NearDistance;
@@ -609,10 +597,8 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
         // The watched object (target - 8) is not null-tested.
         Op.GotoKind = kGotoKindObject;
         Watchable const* const Watched = Watcher324.target();
-        void const* const Obj = Watched != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
-            : nullptr;
-        Op.TargetId = static_cast<int32_t>(ObjInspectOf(Obj)->get_id());
+        IObjRW const* const Obj = HeaderBlockFromWatched(Watched);
+        Op.TargetId = static_cast<int32_t>(Obj->get_id());
     }
 
     Pilot->OnApplyDirective(&Op);
@@ -630,14 +616,12 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         // No null test on the payload or on the watched object.
         if (Payload[0] != 0)
             return;
-        if (ObjInspectOf(OwnerContext)->get_id() !=
+        if (OwnerContext->get_id() !=
             *reinterpret_cast<unsigned int const*>(Payload + 0xc))
             return;
         Watchable const* const Watched = Watcher324.target();
-        void const* const Obj = Watched != nullptr
-            ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
-            : nullptr;
-        if (ObjInspectOf(Obj)->get_id() != *reinterpret_cast<unsigned int const*>(Payload + 0x10))
+        IObjRW const* const Obj = HeaderBlockFromWatched(Watched);
+        if (Obj->get_id() != *reinterpret_cast<unsigned int const*>(Payload + 0x10))
             return;
         Flag399 = 1;
         EnterState(kDockStateDone);
@@ -666,7 +650,7 @@ void DockBehavior::EnterState(int NewState)
     if (NewState != kDockStateGoto && ModeState320 == kDockStateGoto)
     {
         // No null test on the pilot in retail.
-        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
+        GotoDirective.NavPilotPtr->OnDisengage();
         GotoDirective.NavPilotPtr->ReleaseDirectiveTarget();   // FUN_062d21c0
         GotoDirective.NavPilotPtr = nullptr;
         SysMgr->Thrust.engage_cruise(false);
@@ -687,10 +671,10 @@ void DockBehavior::EnterState(int NewState)
         Op.ArrivalRange = 1000.0f;   // .data:DAT_063ebdb4
         Op.bFlyThrough = 1;
 
-        void* ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
+        IObjRW* ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
         if (ProxObj != nullptr)
         {
-            Op.TetherObjectId = ((IObjRW*)ProxObj)->get_id();
+            Op.TetherObjectId = ProxObj->get_id();
         }
         else
         {
@@ -716,7 +700,7 @@ void DockBehavior::EnterState(int NewState)
 
         // All on [this+0x2f0] with no null test.
         GotoBehavior* const Pilot = static_cast<GotoBehavior*>(
-            static_cast<Behavior*>(GotoDirective.NavPilotPtr));
+            GotoDirective.NavPilotPtr);
         Pilot->OnApplyDirective(&Op);
         Pilot->OnEngage();
         Pilot->Flag36c = 0;
@@ -1022,7 +1006,7 @@ int DockBehavior::UpdateApproachTail()
     {
         // Hand the tick delta to the Goto pilot, then its slot 7; anything but 2 leaves
         // through the default case. NavPilotPtr is never null-tested.
-        Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
+        Behavior* const Pilot = GotoDirective.NavPilotPtr;
         Pilot->DeltaTime = DeltaTime;
         if (Pilot->OnUpdate() != kBehaviorUpdateFinished)
             return UpdateResult;
@@ -1049,10 +1033,9 @@ int DockBehavior::UpdateApproachTail()
     }
 
     {
-        void* ProxWatched = const_cast<void*>(
-            static_cast<void const*>(ProxWatcher450.Watcher.target()));
+        Watchable const* ProxWatched = ProxWatcher450.Watcher.target();
         if (bAborted ||
-            ((ProxWatched != nullptr) && (ProxWatched != reinterpret_cast<void*>(8)) &&
+            ((ProxWatched != nullptr) && (ProxWatched != reinterpret_cast<Watchable const*>(8)) &&
              ((ProxWatcher450.Flags14 & kProxZoneNear) == 0)))
         {
             Move.SetField44(kMoveStopThrottleCut);     // FUN_062d88b0
@@ -1077,7 +1060,7 @@ int DockBehavior::UpdateApproachTail()
     {
         // In retail's order; OwnerContext is not null-tested.
         if ((LaneNextRing == nullptr) &&
-            !ObjInspectOf(OwnerContext)->is_player() &&
+            !OwnerContext->is_player() &&
             (static_cast<char>(StateFlags32c) < 0))
         {
             EnterState(kDockStateDone);
@@ -1125,7 +1108,7 @@ int DockBehavior::UpdateApproachTail()
         {
             SavedPosition3fc = DestPoint3cc;
             // LaneNextRing is not null-tested.
-            TargetQuery = static_cast<int>(ObjInspectOf(LaneNextRing)->get_id());
+            TargetQuery = static_cast<int>(LaneNextRing->get_id());
             SlotMode = kRequestEventTradelane;
         }
         if (ApproachClearedFlag334 != 0)
@@ -1139,8 +1122,7 @@ int DockBehavior::UpdateApproachTail()
         Flag39a = 1;
 
         // The docking object is not null-tested.
-        int const EngineQuery = static_cast<int>(
-            ObjInspectOf(HeaderBlockFromWatched(Watcher324.target()))->get_id());
+        int const EngineQuery = static_cast<int>(HeaderBlockFromWatched(Watcher324.target())->get_id());
 
         // IObjAffect slot 23 (+0x5c) with this+0x2c, our own RequestCB base, last; the shape
         // is fixed by Server.dll's Ship body .text:06d02670. Result unused; no null test on
@@ -1148,7 +1130,7 @@ int DockBehavior::UpdateApproachTail()
         (void)ObjAffectOf(OwnerContext)->request_event(
             SlotMode, reinterpret_cast<unsigned const*>(&EngineQuery),
             reinterpret_cast<unsigned const*>(&TargetQuery), 0,
-            static_cast<IObjAffect::RequestCB*>(this));
+            this);
         UpdateResult = kBehaviorUpdateRunning;
         return UpdateResult;
     }
@@ -1220,7 +1202,7 @@ int DockBehavior::UpdateApproachTail()
                 float const BackZ = static_cast<float>(static_cast<double>(Facing38c.z) * -25.0);
                 RetreatPoint.z = static_cast<float>(static_cast<double>(BackZ) + SavedPosition3fc.z);
                 // FUN_062e53e0.
-                if (!IsPointOutsideHeadingCone(RetreatPoint, ObjInspectOf(OwnerContext), 0.0f))
+                if (!IsPointOutsideHeadingCone(RetreatPoint, OwnerContext, 0.0f))
                     break;
             }
 
@@ -1230,10 +1212,8 @@ int DockBehavior::UpdateApproachTail()
             (void)ObjAffectOf(OwnerContext)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
 
             // IObjAffect slot 25; a non-zero result enters state 0xd.
-            void* EngineObj = HeaderBlockFromWatched(Watcher324.target());
-            if (ObjAffectOf(OwnerContext)->go_tradelane(
-                    static_cast<IObjInspect const*>(EngineObj),
-                    static_cast<IObjInspect const*>(LaneNextRing), false, 0.0f) != 0)
+            IObjRW* EngineObj = HeaderBlockFromWatched(Watcher324.target());
+            if (ObjAffectOf(OwnerContext)->go_tradelane(EngineObj, LaneNextRing, false, 0.0f) != 0)
             {
                 EnterState(kDockStateFailed);
                 return UpdateResult;
@@ -1265,7 +1245,7 @@ int DockBehavior::UpdateApproachTail()
     {
         StateTimer340 += DeltaTime;
         float Threshold = 3.0f;
-        if (!SinglePlayer() && ObjInspectOf(OwnerContext)->is_player())
+        if (!SinglePlayer() && OwnerContext->is_player())
         {
             // .rdata:DAT_0639e884 (00 00 20 41); the listing mis-slices it into a string.
             // No null test on OwnerContext.
@@ -1412,7 +1392,7 @@ void DockBehavior::BuildFinalApproachSpline()
     bool const bHasLeader = Sys->FormationLeaders.GetFormationLeader() != nullptr;
     if (!bHasLeader)
     {
-        ObjInspectOf(OwnerContext)->get_formation_offset(FormationOffset);
+        OwnerContext->get_formation_offset(FormationOffset);
         Transform const& ShipXform = Sys->SelfTarget.Iface->get_transform();
         Vector Rotated;
         Acquire3DMathEngine()->TransformMatrix(Rotated, ShipXform.Rotation, FormationOffset);
@@ -1520,7 +1500,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     ModeState320 = kDockStateIdle;
     StateFlags32c = 0;
     IObjRW* const Dock = static_cast<IObjRW*>(
-        ObjDb->FindVerifiedObject((unsigned const*)&DockOp.DockObjectId));
+        ObjDb->FindVerifiedObject(&DockOp.DockObjectId));
     Watcher324.set(Dock != nullptr ? static_cast<Watchable const*>(Dock) : nullptr);
     IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()));
     if (Watched == nullptr)
@@ -1532,11 +1512,11 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     // An object docking at that base replaces it (FUN_062e7400).
     IObjRW* const Docking = ObjDb->FindObjectDockingAtBase(Watched);
     if (Docking != nullptr)
-        Watcher324.set(static_cast<Watchable const*>(Docking));
+        Watcher324.set(Docking);
 
     StateFlags32c = GetObjectTypeOrZero(   // FUN_062e6200
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target())));
-    LaneNextRing = ObjDb->FindVerifiedObject((unsigned const*)&DockOp.NextRingId);   // stored raw
+    LaneNextRing = ObjDb->FindVerifiedObject(reinterpret_cast<unsigned const*>(&DockOp.NextRingId));   // stored raw
     ApproachClearedFlag334 = DockOp.bHasDockPortIndex;
     DockPointRadius = -1.0f;
     if (DockOp.bHasDockPortIndex != 0)
@@ -1552,7 +1532,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     }
 
     IObjRW* const Prox = static_cast<IObjRW*>(
-        ObjDb->FindVerifiedObject((unsigned const*)&DockOp.TetherObjectId));
+        ObjDb->FindVerifiedObject(reinterpret_cast<unsigned const*>(&DockOp.TetherObjectId)));
     ProxWatcher450.NearDistance = DockOp.TetherNearRange;
     ProxWatcher450.FarDistance = DockOp.TetherFarRange;
     ProxWatcher450.Watcher.set(Prox != nullptr ? static_cast<Watchable const*>(Prox) : nullptr);
@@ -1574,9 +1554,9 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
             SystemManager* const Sys = SysMgr;
             IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
             float const OwnSpeed = Behavior_GetSpeed(
-                ObjInspectOf(Self), 1.0f, IObject::ThrustEquipCruise);
+                Self, 1.0f, IObject::ThrustEquipCruise);
             double const ProxSpeed = Behavior_GetSpeed(
-                ObjInspectOf(ProxObj), 1.0f, IObject::ThrustEquipEngine);
+                ProxObj, 1.0f, IObject::ThrustEquipEngine);
             ProxWatcher450.CruiseSpeedRatio = static_cast<float>(OwnSpeed / ProxSpeed);
         }
         // Kept on >= 1.0f or unordered.

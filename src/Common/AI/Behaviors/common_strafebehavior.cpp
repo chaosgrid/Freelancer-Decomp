@@ -47,7 +47,7 @@ namespace
     // null receiver -- retail dispatches through it either way.
     IObjInspect const* WatchedSelf(SystemManager* Sys)
     {
-        return ObjInspectOf(ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target())));
+        return ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
     }
 
     // The SystemManager+0x14fc self record (an FAiTarget, see common_aitarget.cpp).
@@ -93,7 +93,7 @@ StrafeBehavior::~StrafeBehavior()
 // ----------------------------------------------------------------------------
 // Slot 1, LAB_062c9660. The ideas get the raw Owner/Sys arguments, FaceIdea first.
 // ----------------------------------------------------------------------------
-bool StrafeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool StrafeBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bOk = BindContext(Owner, Manager, Sys);
     if (!bOk)
@@ -174,7 +174,7 @@ void StrafeBehavior::OnEngage()
     Behavior::OnEngage();
     SetAvoidanceAllowed(1, kAvoidanceObstacleNudge | kAvoidancePoint);                                            // FUN_062d21d0
 
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+    IObjInspect const* const Owner = OwnerContext;
     SystemManager* const Sys = SysMgr;
 
     // Step starts at 0.1f and grows by 0.1f (DAT_0639d20c) after each call; the 10.0 bound
@@ -352,7 +352,7 @@ int StrafeBehavior::OnUpdate()
     }
     else if (StrafeMode48 == kStrafeModeStart)
     {
-        SelectStrafePoint(kStrafeModeAttack, ObjInspectOf(Target));
+        SelectStrafePoint(kStrafeModeAttack, Target);
     }
 
     (void)Move.Update(DeltaTime);

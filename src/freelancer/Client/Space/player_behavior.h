@@ -15,7 +15,9 @@
 // callers, and the docking camera's attach slot uses two of them.
 
 // FUN_0054baf0: the player's IObjRW, i.e. the watchable at DAT_00679744 minus eight, or null.
-void* GetPlayerObjRW();
+struct IObjRW;
+
+IObjRW* GetPlayerObjRW();
 
 // FUN_004c7950 -- IBehaviorManager::reset_current_behavior_direction.
 void ResetPlayerBehaviorDirection();

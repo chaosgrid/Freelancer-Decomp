@@ -7,6 +7,7 @@
 #pragma once
 
 #include "Space/Effects/beam_effect.h"
+#include "Space/Effects/effect_base.h"       // FEffectCompanion
 #include "Space/Effects/client_equip_fx.h" // FClientEquip
 #include "Common/Graphics/vis_effect_arch.h"
 #include "x86math.h"
@@ -20,6 +21,8 @@
 #include <cstddef>
 
 class FClientGameobj;     // client_gameobj.h
+struct FGameobjEffectListStorage; // client_gameobj.h
+struct IObjAffect; // common_iface.h
 class FClientBeamGameobj; // client_gameobj.h -- retail Beam (0xd4, FUN_0052dde0 alloc)
 struct FParticleEffect;   // particle_effect.h
 struct ISoundSource;      // soundmanager.h
@@ -56,9 +59,8 @@ struct FLauncherAnimHandle
 };
 
 // The +0x30 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*}.
-struct FLauncherEffectCompanion
+struct FLauncherEffectCompanion : FEffectCompanion
 {
-    void* Slots[4];
     // FUN_00502d90 (CliEffectCompanionClear).
     ~FLauncherEffectCompanion();
 };
@@ -70,12 +72,12 @@ struct FCliLauncherFx : FClientEquip
 
     // Fields as FUN_0052c830 fills them and FUN_0052caa0 releases them.
     FLauncherAnimHandle AnimJointIndex;        // +0x10  use_animation PlayScript handle, -1 none
-    void* DryFireSoundArch;                    // +0x14  launcher companion +0x80, Acquired
-    void* OneShotSoundArch;                    // +0x18  munition companion +0x5c, Acquired
+    Archetype::ISound* DryFireSoundArch;       // +0x14  launcher companion +0x80, Acquired
+    Archetype::ISound* OneShotSoundArch;       // +0x18  munition companion +0x5c, Acquired
     ISoundSource* FireVoice;                   // +0x1c  made on first shot by FUN_0052ced0
     FEffectArch* ConstEffectArch;              // +0x20  munition companion +0x58, AddRef'd
     Archetype::Explosion* MunitionExplosion;   // +0x24  munition explosion_arch, AddRef'd
-    void* MuzzleEffect;                        // +0x28  live particle (PlayMuzzleFx)
+    FParticleEffect* MuzzleEffect;             // +0x28  live particle (PlayMuzzleFx)
     FEffectArch* DefaultEffectArch;            // +0x2c  "multi_sparks02" (DAT_00675448)
     // +0x30 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} the
     // Update fills with "multi_sparks02" (FUN_00503070).
@@ -167,11 +169,11 @@ struct FCliGunFx : FCliLauncherFx
 static_assert(sizeof(FCliGunFx) == 0x44, "CliGunFx 0x44");
 
 // FUN_0052d570 — MineDropper (base + Mine vtable stamp).
-FCliLauncherFx* CliMineEquipFxConstruct(CEquip* Equip, void* Host);
+FCliLauncherFx* CliMineEquipFxConstruct(CEquip* Equip, FClientGameobj* Host);
 // FUN_0052d6e0 — CmDropper.
-FCliLauncherFx* CliCmEquipFxConstruct(CEquip* Equip, void* Host);
+FCliLauncherFx* CliCmEquipFxConstruct(CEquip* Equip, FClientGameobj* Host);
 // FUN_0052d880 — Gun arm (TurretVoice Source3D via CreateClientSoundSource3D).
-FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, void* Host);
+FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, FClientGameobj* Host);
 
 // Gun archetype Companion (ICliObj) — muzzle fields used by FUN_0052cfd0.
 // Retail Gun::ReadUnknown: flash_particle_name@+0x54, flash_radius@+0x58,
@@ -222,42 +224,42 @@ static_assert(sizeof(FCliEquipFirePacket) == 0x28, "fire pkt 0x28 (10 dwords)");
 // FUN_005154a0 (on the 0x10 companion) -- +0x00 Arch, +0x04 Sound,
 // +0x08 Particle, +0x0c Light (retail argument order: Arch, Particle, Sound, Light), AddRef
 // each non-null one. Callers: Beam activate FUN_0053f340 (Beam +0xc0) and the effect paths.
-void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle,
+void CliEffectCompanionInit(FEffectCompanion* Companion, FEffectArch* Arch, FEffectBase* Particle,
                             ISoundSource* Sound, FGameLight* Light);
 
 // FUN_004fcea0 — insert payload (0x10) into intrusive list at ListOwner+0x28.
 // Payload layout matches FUN_004fd480: [0] arch/slot0, [1] sound, [2] particle/beam, [3] light.
-void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16);
+void CliEffectListInsert(FGameobjEffectListStorage* List, void const* Payload);
 
 // FUN_004fcef0 — find matching payload in list at ListOwner+0x28, ArmDeath/stop/release,
 // clear companion (FUN_00502d90), return 1 if found.
-unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16);
+unsigned char CliEffectListRemove(FGameobjEffectListStorage* List, FEffectCompanion* Payload);
 
 // FUN_00502d90 — release particle(+8)/sound(+4)/light(+0xc) and zero 0x10 companion.
-void CliEffectCompanionClear(void* Companion16);
+void CliEffectCompanionClear(FEffectCompanion* Companion);
 
 // The inline stop sequence that precedes a companion clear (FUN_004fcef0, FUN_005139d0,
 // FUN_005137c0, FUN_00503a80): particle ArmDeath, sound SetPose(-1, identity) and Stop, light
 // FUN_005379b0 then disable.
-void CliEffectCompanionArmStop(void* Companion16);
+void CliEffectCompanionArmStop(FEffectCompanion* Companion);
 
 // FUN_004fd0d0 (on the list at ListOwner+0x28) — stop and release every node's companion (or,
 // with a non-null ArchFilter, only the nodes whose slot 0 is non-null and holds ArchFilter in its
 // first dword), then erase EVERY node. Callers: GameObject's dtor, the list's own dtor
 // FUN_005393e0 and slot 108.
-void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter);
+void CliEffectListClear(FGameobjEffectListStorage* List, void* ArchFilter);
 
 // FUN_004fd230 (on the list at ListOwner+0x28) — every node whose engine
 // instance is PartIndex or a descendant leaves the list: with NewOwner, a still-alive one is
 // moved to the end of NewOwner's list (FUN_004fd420 + FUN_004f7d80); the rest are stopped and
 // released. Callers: EquippedObj notify 5/6/7/8, FUN_00533d10.
-void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameobj* NewOwner);
+void CliEffectListDetachPart(FGameobjEffectListStorage* List, long PartIndex, FClientGameobj* NewOwner);
 
 // FUN_004fd480 — copy 4 pointers + AddRef particle(+8) / sound(+4) / light(+0xc).
-void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots);
+void CliEffectListCopyPayload(FEffectCompanion* Dst, FEffectCompanion const* Src);
 
 // FUN_005377c0 — explosion FX local transform (when SlotExplosionFx non-null).
-void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform const* LocalXform);
+void CliExplosionAttachLocalXform(FGameLight* ExplosionFx, int EngineIndex, Transform const* LocalXform);
 
 // The fire hooks FUN_0052d410 / FUN_0052d280 / FUN_0052d510 / FUN_0052dd00 / FUN_0052dd40 are
 // the FCliLauncherFx / FCliGunFx virtuals TryFire / FireBarrelAim / FireDirect above.
@@ -267,19 +269,19 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform 
 // IServer::FireWeapon, another player's take slot 5 (multiplayer: sub-target re-aim and the
 // target-relative point turned into world space); then shared one-shot sounds play once.
 // Returns 0.
-unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointIds,
+unsigned CliShipFireWeapons(IObjAffect* AdjustorThis, unsigned short const* HardpointIds,
                             unsigned HardpointCount, Vector const* TargetPos, int PlayerId);
 
 // LAB_00535330 — EquippedObj adjustor vt+0x4c ActivateEquip(id*, bOn, playerId). Returns 0 on
 // every path.
-int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
+int CliShipActivateEquip(IObjAffect* AdjustorThis, unsigned short const* HardpointId,
                          unsigned char bOn, int PlayerId);
 
 // LAB_005468e0 — CShip IObjAffect vt+0x48 set_target(target, sub, player).
 // AdjustorThis = Host+4.
-int CliShipSetTarget(void* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId);
+int CliShipSetTarget(IObjAffect* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId);
 
 // FUN_005351d0 — EquippedObj IObjAffect vt+0x44 (hp*, target, sub, player).
 // AdjustorThis = Host+4.
-int CliEquippedObjSetGunTarget(void* AdjustorThis, unsigned short const* HardpointId,
+int CliEquippedObjSetGunTarget(IObjAffect* AdjustorThis, unsigned short const* HardpointId,
                                IObjRW* Target, unsigned short SubId, int PlayerId);

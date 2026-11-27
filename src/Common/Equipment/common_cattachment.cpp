@@ -154,7 +154,7 @@ namespace
                                 Joint.Max = ChildData.Max;
                             }
                             DALib::Engine->CreateJoint(ParentInst, ChildInst,
-                                                       (unsigned long const*)&Joint);
+                                                       reinterpret_cast<unsigned long const*>(&Joint));
                         }
                         else
                         {
@@ -230,7 +230,7 @@ CObject* CNonPhysAttachment::GetPhysicsOwner() const
     // FUN_062937c0: only -1 means "no instance".
     if (EngineInstanceId == -1)
         return nullptr;
-    return (CObject*)DALib::Engine->GetInstanceUserData(EngineInstanceId);
+    return static_cast<CObject*>(DALib::Engine->GetInstanceUserData(EngineInstanceId));
 }
 
 void CNonPhysAttachment::EnableCollisions(bool bEnable)
@@ -260,7 +260,7 @@ void CNonPhysAttachment::EnableCollisions(bool bEnable)
 bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
 {
     // FUN_062938c0
-    Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
+    Archetype::AttachedEquipment* Arch = static_cast<Archetype::AttachedEquipment*>(Equip->Arch);
     EngineInstanceId = Arch->create_instance(nullptr);
     DALib::Engine->UpdateInstance(EngineInstanceId, 0, nullptr);
     if (EngineInstanceId == -1)
@@ -281,7 +281,7 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     void* ParentUser = DALib::Engine->GetInstanceUserData(Equip->GetParentConnector(false));
     DALib::Engine->SetInstanceUserData(EngineInstanceId, ParentUser);
 
-    AppendPartMapEntry((CObject*)ParentUser, HpCrc, EngineInstanceId, false);
+    AppendPartMapEntry(static_cast<CObject*>(ParentUser), HpCrc, EngineInstanceId, false);
 
     InstanceIndex Child = DALib::Engine->GetRelatedInstance(EngineInstanceId, 0, -1);
     while (Child != InvalidInstanceIndex)
@@ -300,7 +300,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
     if (bMakeDebris)
     {
         InstanceIndex Inst = EngineInstanceId;
-        CObject* ParentObj = (CObject*)DALib::Engine->GetInstanceUserData(Inst);
+        CObject* ParentObj = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Inst));
         if (ParentObj != nullptr)
         {
             // Erase the first PartMap entry whose PartId (hardpoint CRC) is HpCrc.
@@ -423,7 +423,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
 {
     // FUN_06293d90
     CEqObj* ParentObj = Equip->Owner;
-    Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
+    Archetype::AttachedEquipment* Arch = static_cast<Archetype::AttachedEquipment*>(Equip->Arch);
 
     // create_instance writes the instance through IEngineInstance; the returned id is not stored.
     EquipObject = CObject::Alloc(CObject::ClassEquipmentObj);

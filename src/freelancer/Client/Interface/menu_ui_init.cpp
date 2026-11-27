@@ -78,7 +78,7 @@ namespace
     };
 
     // DAT_0067a4a8 -- cached SoundArch pointers.
-    void* GUiSoundTable[kUiSoundTableCount] = {};
+    Archetype::ISound* GUiSoundTable[kUiSoundTableCount] = {};
 
 }
 

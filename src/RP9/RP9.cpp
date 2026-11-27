@@ -858,7 +858,7 @@ namespace
             return true;
         }
         IDirect3DCubeTexture9* Cube = Handle->Extra == 1
-                                          ? (IDirect3DCubeTexture9*)(Handle->Texture)
+                                          ? reinterpret_cast<IDirect3DCubeTexture9*>(Handle->Texture)
                                           : nullptr;
         if (Cube != nullptr)
         {
@@ -883,7 +883,7 @@ namespace
         else
         {
             IDirect3DCubeTexture9* Cube =
-                Handle->Extra == 1 ? (IDirect3DCubeTexture9*)(Handle->Texture)
+                Handle->Extra == 1 ? reinterpret_cast<IDirect3DCubeTexture9*>(Handle->Texture)
                                    : nullptr;
             if (Cube != nullptr)
                 Hr = Cube->GetCubeMapSurface((D3DCUBEMAP_FACES)(Level), 0, Out);
@@ -1106,7 +1106,7 @@ GENRESULT DACOM_API FRp9Factory::QueryInterface(const char* Iid, void** Out)
     *Out = nullptr;
     if (!Iids::Equal(Iid, Iids::ComponentFactory))
         return GR_INTERFACE_UNSUPPORTED;
-    *Out = (IComponentFactory*)(this);
+    *Out = static_cast<IComponentFactory*>(this);
     AddRef();
     return GR_OK;
 }
@@ -1138,7 +1138,7 @@ GENRESULT DACOM_API FRp9Factory::CreateInstance(AGGDESC* Desc, void** Instance)
 {
     GENRESULT Result = GR_OK;
     FDirectX9* Object = nullptr;
-    FRp9AggDesc* Ext = (FRp9AggDesc*)(Desc);
+    FRp9AggDesc* Ext = reinterpret_cast<FRp9AggDesc*>(Desc);
     if (Ext->Size != 0x14 || std::strcmp(Ext->Name, Name) != 0)
     {
         Result = GR_INTERFACE_UNSUPPORTED;
@@ -1174,7 +1174,7 @@ GENRESULT DACOM_API FRp9Factory::CreateInstance(AGGDESC* Desc, void** Instance)
             }
         }
     }
-    *Instance = (IRenderPipeline*)(Object);
+    *Instance = static_cast<IRenderPipeline*>(Object);
     return Result;
 }
 
@@ -1256,25 +1256,25 @@ GENRESULT FDirectX9::QueryLocal(const char* Iid, void** Out)
     *Out = nullptr;
     IDAComponent* Face = nullptr;
     if (Iids::Equal(Iid, Iids::RenderPipeline8B))
-        Face = (IRenderPipeline*)(this);
+        Face = static_cast<IRenderPipeline*>(this);
     else if (Iids::Equal(Iid, Iids::VertexBufferManager))
-        Face = (IVertexBufferManager*)(this);
+        Face = static_cast<IVertexBufferManager*>(this);
     else if (Iids::Equal(Iid, Iids::RPDraw))
-        Face = (IRPDraw*)(this);
+        Face = static_cast<IRPDraw*>(this);
     else if (Iids::Equal(Iid, Iids::RPIndexBuffer))
-        Face = (IRPIndexBuffer*)(this);
+        Face = static_cast<IRPIndexBuffer*>(this);
     else if (Iids::Equal(Iid, Iids::RPVertexBuffer))
-        Face = (IRPVertexBuffer*)(this);
+        Face = static_cast<IRPVertexBuffer*>(this);
     else if (Iids::Equal(Iid, Iids::GammaControl))
-        Face = (IGammaControl*)(this);
+        Face = static_cast<IGammaControl*>(this);
     else if (Iids::Equal(Iid, Iids::RPTexture))
-        Face = (IRPTexture*)(this);
+        Face = static_cast<IRPTexture*>(this);
     else if (Iids::Equal(Iid, Iids::AggregateComponent))
-        Face = (IAggregateComponent*)(this);
+        Face = static_cast<IAggregateComponent*>(this);
     else if (Iids::Equal(Iid, Iids::RenderPipelineEx))
-        Face = (IRenderPipelineEx*)(this);
+        Face = static_cast<IRenderPipelineEx*>(this);
     else if (Iids::Equal(Iid, Iids::RPDrawEx))
-        Face = (IRPDrawEx*)(this);
+        Face = static_cast<IRPDrawEx*>(this);
     if (Face == nullptr)
         return GR_INTERFACE_UNSUPPORTED;
     Face->AddRef();
@@ -2153,7 +2153,7 @@ void FRp9TransformCache::Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE 
         return;
     bApplyMarker = 0;
     bCommitted = 1;
-    const HRESULT Hr = Device->SetTransform(Type, (const D3DMATRIX*)Values);
+    const HRESULT Hr = Device->SetTransform(Type, reinterpret_cast<const D3DMATRIX*>(Values));
     bCommitted = Hr >= 0 ? 1 : 0;
 }
 
@@ -2447,7 +2447,7 @@ FRp9Ib* FDirectX9::ResolveIbHandle(void* Handle)
 {
     if (Handle == (void*)((intptr_t)(-1)))
         return &ScratchIb_;
-    return (FRp9Ib*)(Handle);
+    return static_cast<FRp9Ib*>(Handle);
 }
 
 // RP8: FDirectX8::PipelineStateValue
@@ -2516,8 +2516,8 @@ static I3DMathEngine* Rp9CreateMathEngine()
     Desc.Implementation = nullptr;
     void* Instance = nullptr;
     ICOManager* Manager = DACOM_Acquire();
-    Manager->CreateInstance((AGGDESC*)(&Desc), &Instance);
-    return (I3DMathEngine*)(Instance);
+    Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);
+    return static_cast<I3DMathEngine*>(Instance);
 }
 
 static I3DMathEngine* Rp9MathEngine()
@@ -2634,11 +2634,11 @@ void FDirectX9::ApplyIdentityTransforms()
         if (Steps[Index].bFlip)
         {
             Transform Flipped;
-            MulZFlip12(&Flipped, (const Transform*)Identity12);
+            MulZFlip12(&Flipped, reinterpret_cast<const Transform*>(Identity12));
             Block.StoreAffine(&Flipped);
         }
         else
-            Block.StoreAffine((const Transform*)Identity12);
+            Block.StoreAffine(reinterpret_cast<const Transform*>(Identity12));
         Block.bCommitted = 0;
         Block.Commit(Device_, Steps[Index].Type);
         Block.bApplyMarker = 1;
@@ -2702,7 +2702,7 @@ void FDirectX9::ApplyDefaultTextureStages()
         }
 
         FRp9TransformCache& TextureTransform = DeviceStates_.TextureTransforms[Stage];
-        TextureTransform.StoreAffine((const Transform*)Identity12);
+        TextureTransform.StoreAffine(reinterpret_cast<const Transform*>(Identity12));
         TextureTransform.Commit(Device_,
                            (D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + Stage));
         TextureTransform.bApplyMarker = 1;
@@ -2784,7 +2784,7 @@ IDirect3DBaseTexture9* FDirectX9::PipelineTextureFromHandle(void* Handle)
 {
     if (Handle == nullptr)
         return nullptr;
-    return ((FRp9TextureHandle*)(Handle))->Texture;
+    return static_cast<FRp9TextureHandle*>(Handle)->Texture;
 }
 
 // Save stage Stage's cached texture binding and sampler-state entries, then mark them invalid:
@@ -3237,7 +3237,7 @@ GENRESULT DACOM_API FDirectX9::SelectMode(int* Mode, unsigned int* OutIndex)
     const GENRESULT Ready = NeedStartup("select_mode() called outside of startup/shutdown", 1906);
     if (Ready != GR_OK)
         return Ready;
-    FRp9Mode* Desc = (FRp9Mode*)(Mode);
+    FRp9Mode* Desc = reinterpret_cast<FRp9Mode*>(Mode);
     const UINT Count = AdapterModeCount(AdapterIndex_);
     int Found = -1;
     UINT Index = 0;
@@ -3273,7 +3273,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
         NeedStartup("create_buffers() called outside of startup/shutdown", 1991);
     if (Ready != GR_OK)
         return Ready;
-    FRp9Mode* Desc = (FRp9Mode*)(Mode);
+    FRp9Mode* Desc = reinterpret_cast<FRp9Mode*>(Mode);
     // A live device whose TestCooperativeLevel is D3DERR_DEVICELOST -> -1.
     if (Device_ != nullptr &&
         Device_->TestCooperativeLevel() == D3DERR_DEVICELOST)
@@ -3609,7 +3609,7 @@ GENRESULT DACOM_API FDirectX9::ClearBuffers(unsigned long Flags, const void* Rec
     const unsigned long Color = (unsigned long)(PipelineStateValue(PipelineStateClearColor));
     const unsigned long Stencil = (unsigned long)(PipelineStateValue(PipelineStateClearStencil));
     const DWORD Count = (Rects != nullptr) ? 1 : 0;
-    const HRESULT Hr = Device_->Clear(Count, (const D3DRECT*)(Rects), D3dFlags,
+    const HRESULT Hr = Device_->Clear(Count, static_cast<const D3DRECT*>(Rects), D3dFlags,
                                       Color, Z, Stencil);
     if (FAILED(Hr))
         FdumpHr("clear: %s", Hr, 2435);
@@ -3722,7 +3722,7 @@ GENRESULT DACOM_API FDirectX9::VbMgrInit(void* /*A*/, void* /*B*/, void* /*C*/, 
 }
 
 // RP8: FDirectX8::GetModeBlob
-GENRESULT DACOM_API FDirectX9::GetModeBlob(void* OutAdapter, void* OutMode)
+GENRESULT DACOM_API FDirectX9::GetModeBlob(unsigned long* OutAdapter, void* OutMode)
 {
     // LAB_06d098f3 (no C++ name in RP8). Retail's success path has no return statement: EAX
     // still holds AdapterIndex_, reproduced.
@@ -4116,12 +4116,12 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const Transform* M12)
         if (bViewspaceLightsOff)
         {
             Transform Flipped;
-            MulZFlip12(&Flipped, (const Transform*)Identity12);
+            MulZFlip12(&Flipped, reinterpret_cast<const Transform*>(Identity12));
             Transforms_.View.StoreAffine(&Flipped);
         }
         else
         {
-            Transforms_.View.StoreAffine((const Transform*)Identity12);
+            Transforms_.View.StoreAffine(reinterpret_cast<const Transform*>(Identity12));
         }
         Transforms_.View.bApplyMarker = 1;
     }
@@ -4507,7 +4507,7 @@ GENRESULT DACOM_API FDirectX9::DestroyTexture(void* Handle)
         Rp9Fdump(kFdumpWarning, 3217, "WARNING", "destroy_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     // FUN_06d0d997: an invalid handle/texture is reported and teardown carries on; the
     // stage-unbind loop runs only for a live texture.
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
@@ -4533,13 +4533,13 @@ GENRESULT DACOM_API FDirectX9::IsTexture(void* A)
         "is_texture() called outside of device lifetime", 3232);
     if (Ready != GR_OK)
         return Ready;
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(A);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(A);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
         return GR_GENERIC;
     return GR_OK;
 }
 // RP8: FDirectX8::LockTexture
-GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
+GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, unsigned long* C)
 {
     void* Handle = A;
     unsigned long* Out = (unsigned long*)(C);
@@ -4551,7 +4551,7 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
     // FUN_06d0dce3.
     if (Handle == nullptr)
         return GR_INVALID_PARMS;
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     D3DSURFACE_DESC Desc;
     if (!TextureGetDesc(Wrapper, (UINT)(Level), &Desc))
         return GR_GENERIC;
@@ -4595,7 +4595,7 @@ GENRESULT DACOM_API FDirectX9::UnlockTexture(void* A, int Level)
     // FUN_06d0e1af.
     if (Handle == nullptr)
         return GR_INVALID_PARMS;
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     IDirect3DSurface9* Surface = nullptr;
     HRESULT Hr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
     if (Hr < 0)
@@ -4622,7 +4622,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureFormat(void* Handle, int* OutFormat)
                  "get_texture_format() called outside of device lifetime");
         return GR_GENERIC;
     }
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     if (Wrapper == nullptr)
         return GR_INVALID_PARMS;
     if (Wrapper->Texture == nullptr)
@@ -4648,7 +4648,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureDim(void* Handle, unsigned int* OutW, u
         Rp9Fdump(kFdumpWarning, 0xd01, "WARNING", "get_texture_dim() called outside of device lifetime");
         return GR_GENERIC;
     }
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0xd09, "WARNING", "set_texture_dim: invalid texture\n");
@@ -4691,7 +4691,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
     }
     // FUN_06d0ea78. The eighth argument is never read. The texts keep retail's leading space
     // and 'passsed' spelling.
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3363, "WARNING",
@@ -4775,14 +4775,14 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
         return GR_GENERIC;
     }
     // A null handle (or texture) reports retail's set_texture_level_data text.
-    FRp9TextureHandle* DstWrapper = (FRp9TextureHandle*)(DstHandle);
+    FRp9TextureHandle* DstWrapper = static_cast<FRp9TextureHandle*>(DstHandle);
     if (DstWrapper == nullptr || DstWrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3468, "WARNING",
                  " set_texture_level_data: invalid texture handle passsed");
         return GR_INVALID_PARMS;
     }
-    FRp9TextureHandle* SrcWrapper = (FRp9TextureHandle*)(SrcHandle);
+    FRp9TextureHandle* SrcWrapper = static_cast<FRp9TextureHandle*>(SrcHandle);
     if (SrcWrapper == nullptr || SrcWrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3475, "WARNING",
@@ -4955,7 +4955,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTexture(int Stage, void* Handle)
     IDirect3DTexture9* Texture = nullptr;
     if (Handle != nullptr)
     {
-        FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+        FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
         if (Wrapper->Texture == nullptr)
             Rp9Fdump(kFdumpWarning, 0x139, "WARNING", "set_texture_stage_texture: invalid texture\n",
                      kSrcDx8Texture);
@@ -5100,7 +5100,7 @@ GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(unsigned long Prim, void* Vb, uns
     if ((int)PrimCount <= 0)
         return (GENRESULT)Result;
 
-    StreamCache_.SelectVertexStream((FRp9Vb*)Vb, 0);
+    StreamCache_.SelectVertexStream(static_cast<FRp9Vb*>(Vb), 0);
     FlushDrawState(Device_);
     Result = Device_->DrawPrimitive((D3DPRIMITIVETYPE)(Prim), StartVertex, PrimCount);
     if (FAILED(Result))
@@ -5144,7 +5144,7 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* 
         return (GENRESULT)Result;
     }
 
-    StreamCache_.SelectVertexStream((FRp9Vb*)Vb, 0);
+    StreamCache_.SelectVertexStream(static_cast<FRp9Vb*>(Vb), 0);
     StreamCache_.SelectIndices(&ScratchIb_, BaseVertex);
     FlushDrawState(Device_);
     // D3D9: the base vertex index set by the flush above travels with the draw call.
@@ -5164,7 +5164,7 @@ GENRESULT DACOM_API FDirectX9::AddLight(void* Handle)
     if (Ready != GR_OK)
         return Ready;
     LightManager_.FindOrCreate((unsigned long)(uintptr_t)Handle,
-                      (const D3DLIGHT8*)(Handle));
+                      static_cast<const D3DLIGHT8*>(Handle));
     return GR_OK;
 }
 // RP8: FDirectX8::RemoveLight
@@ -5220,7 +5220,7 @@ GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const Transform* M12)
     Scratch[15] = 1.0f;
     const HRESULT Hr = Device_->SetTransform(
         (D3DTRANSFORMSTATETYPE)((unsigned long)WorldIndex + D3DTS_WORLDMATRIX(0)),
-        (D3DMATRIX*)(Scratch));
+        reinterpret_cast<D3DMATRIX*>(Scratch));
     return (GENRESULT)Hr;
 }
 
@@ -5258,7 +5258,7 @@ GENRESULT DACOM_API FDirectX9::LockVertexMemory(unsigned int Fvf, unsigned int C
 GENRESULT DACOM_API FDirectX9::UnlockVertexMemory(FVertexMemoryLock* Out)
 {
     // FUN_06d11877. Out itself is not tested.
-    FRp9Vb* Wrapper = (FRp9Vb*)Out->Listing.VertexBuffer;
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Out->Listing.VertexBuffer);
     if (Wrapper == nullptr)
         return GR_INVALID_PARMS;
     Wrapper->Locked = 0;
@@ -5615,7 +5615,7 @@ namespace
         const unsigned long* TexIdx[8] = {};
         for (unsigned int Index = 0; Index < SrcTexCount && Index < 8; ++Index)
         {
-            const FRpVertexStream* Set = (const FRpVertexStream*)(Base + 0x40 + Index * 0x14);
+            const FRpVertexStream* Set = reinterpret_cast<const FRpVertexStream*>(Base + 0x40 + Index * 0x14);
             TexBase[Index] = Set->Base;
             TexByteSize[Index] = Set->ByteSize;
             TexStride[Index] = Set->Stride;
@@ -5698,7 +5698,7 @@ namespace
         unsigned int TexByteSize[8] = {};
         for (unsigned int Index = 0; Index < SrcTexCount && Index < 8; ++Index)
         {
-            const FRpVertexStream* Set = (const FRpVertexStream*)(Base + 0x40 + Index * 0x14);
+            const FRpVertexStream* Set = reinterpret_cast<const FRpVertexStream*>(Base + 0x40 + Index * 0x14);
             TexByteSize[Index] = Set->ByteSize;
             TexStride[Index] = Set->Stride;
             const unsigned char* SetBase = Set->Base;
@@ -5970,7 +5970,7 @@ GENRESULT DACOM_API FDirectX9::DestroyIb(void** Handle)
     // *H is cleared before the null test.
     if (*Handle == (void*)((intptr_t)-1))
         return GR_GENERIC;
-    FRp9Ib* Wrapper = (FRp9Ib*)(*Handle);
+    FRp9Ib* Wrapper = static_cast<FRp9Ib*>(*Handle);
     *Handle = nullptr;
     if (Wrapper == nullptr)
         return GR_GENERIC;
@@ -5995,14 +5995,14 @@ GENRESULT DACOM_API FDirectX9::DestroyIb(void** Handle)
 // RP8: FDirectX8::ResizeIb
 GENRESULT DACOM_API FDirectX9::ResizeIb(void* A, unsigned int Count)
 {
-    FRp9Ib* Wrapper = (FRp9Ib*)(A);
+    FRp9Ib* Wrapper = static_cast<FRp9Ib*>(A);
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4401, "WARNING", "resize() called outside of device lifetime");
         return GR_GENERIC;
     }
-    if (Wrapper == nullptr || Wrapper == (FRp9Ib*)((intptr_t)-1))
+    if (Wrapper == nullptr || Wrapper == reinterpret_cast<FRp9Ib*>((intptr_t)-1))
         return (GENRESULT)E_FAIL;
     if (Wrapper->Gpu != nullptr && Count == Wrapper->Capacity)
         return GR_OK;
@@ -6221,7 +6221,7 @@ GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
     // *H == -1 -> 0 with the handle untouched.
     if (*Handle == (void*)((intptr_t)-1))
         return GR_OK;
-    FRp9Vb* Wrapper = (FRp9Vb*)(*Handle);
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(*Handle);
     *Handle = nullptr;
     if (Wrapper == nullptr)
         return GR_OK;
@@ -6255,8 +6255,8 @@ GENRESULT DACOM_API FDirectX9::ResizeVb(void* Handle, unsigned int Fvf, unsigned
         Rp9Fdump(kFdumpWarning, 4112, "WARNING", "ressize_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
-    if (Wrapper == (FRp9Vb*)((intptr_t)-1) || Wrapper == nullptr)
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Handle);
+    if (Wrapper == reinterpret_cast<FRp9Vb*>((intptr_t)-1) || Wrapper == nullptr)
         return GR_OK;
     Wrapper->ReleaseGpu();
     Wrapper->Fvf = Fvf;
@@ -6278,7 +6278,7 @@ GENRESULT DACOM_API FDirectX9::ResizeVb(void* Handle, unsigned int Fvf, unsigned
 // RP8: FDirectX8::CopyVertices
 GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffset, const FRpVertexSrcDesc* Src, unsigned int StartVertex, unsigned int Count)
 {
-    FRp9Vb* Wrapper = (FRp9Vb*)Handle;
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Handle);
 
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
@@ -6293,7 +6293,7 @@ GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffse
 
     // node -1 -> the pooled buffer for the source descriptor's FVF ([desc+0x68], read
     // unguarded): find-or-insert, the grow (FUN_06d1b650), FUN_06d1c770 on the stream cache.
-    if (Wrapper == (FRp9Vb*)((intptr_t)-1))
+    if (Wrapper == reinterpret_cast<FRp9Vb*>((intptr_t)-1))
     {
         const unsigned int Fvf = Src->SrcFvf;
         Wrapper = FindOrInsertPoolVb(Fvf);
@@ -6346,8 +6346,8 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
     }
     // A null or -1 node returns E_FAIL with no text.
     HRESULT Hr = E_FAIL;
-    FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
-    if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Handle);
+    if (Wrapper == nullptr || Wrapper == reinterpret_cast<FRp9Vb*>((INT_PTR)-1))
         return (GENRESULT)Hr;
     // The caller's offset is taken as a BYTE offset (it is not scaled); on success the vertex
     // index is written back.
@@ -6418,8 +6418,8 @@ GENRESULT DACOM_API FDirectX9::UnlockVb(void* Handle)
         return GR_GENERIC;
     }
     // FUN_06d12a8b. The buffer pointer is not tested.
-    FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
-    if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Handle);
+    if (Wrapper == nullptr || Wrapper == reinterpret_cast<FRp9Vb*>((INT_PTR)-1))
         return (GENRESULT)E_FAIL;
     Wrapper->Locked = 0;
     return (GENRESULT)(Wrapper->Gpu->Unlock());
@@ -6460,7 +6460,7 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
     if (Handle == (void*)((INT_PTR)-1))
         Wrapper = Cache.VertexBuffer;
     else
-        Wrapper = (FRp9Vb*)(Handle);
+        Wrapper = static_cast<FRp9Vb*>(Handle);
     if (Wrapper == nullptr || Wrapper->Gpu == nullptr)
         return (GENRESULT)E_FAIL;
 
@@ -6479,7 +6479,7 @@ GENRESULT DACOM_API FDirectX9::GetVbInfo(void* Handle, unsigned int* OutFvf, uns
 {
     if (Handle == nullptr || Handle == (void*)((intptr_t)(-1)))
         return (GENRESULT)E_FAIL;
-    FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(Handle);
     if (Wrapper->Gpu == nullptr)
         return (GENRESULT)E_FAIL;
     GENRESULT Result = (GENRESULT)E_FAIL;
@@ -6502,7 +6502,7 @@ GENRESULT DACOM_API FDirectX9::IsVbValid(void* A)
         return GR_OK;
     if (A == (void*)((intptr_t)(-1)))
         return (GENRESULT)(1);
-    FRp9Vb* Wrapper = (FRp9Vb*)(A);
+    FRp9Vb* Wrapper = static_cast<FRp9Vb*>(A);
     return (Wrapper->Gpu != nullptr) ? (GENRESULT)(1) : GR_OK;
 }
 
@@ -6725,7 +6725,7 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
             SetRect(&ClientRect, WindowX_, WindowY_, WindowX_ + WindowW_, WindowY_ + WindowH_);
         }
         GetClientRect(Window, SourceRect);
-        MapWindowPoints(Window, nullptr, (POINT*)(SourceRect), 2);
+        MapWindowPoints(Window, nullptr, reinterpret_cast<POINT*>(SourceRect), 2);
     }
     Hr = Rp9SaveSurfaceToFileA(FileName,
                                (D3DXIMAGE_FILEFORMAT)(Formats[FormatIndex].Format),
@@ -6894,7 +6894,7 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
                  "load_surface_from_file() called outside of device lifetime");
         return GR_GENERIC;
     }
-    FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
+    FRp9TextureHandle* Wrapper = static_cast<FRp9TextureHandle*>(Handle);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1249, "WARNING", "load_tga_surface_data: invalid texture\n");
@@ -6982,7 +6982,7 @@ GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* 
             if (CubeTexture != nullptr)
             {
                 Handle = new FRp9TextureHandle;
-                Handle->Texture = (IDirect3DTexture9*)(CubeTexture);
+                Handle->Texture = reinterpret_cast<IDirect3DTexture9*>(CubeTexture);
                 Handle->Extra = 1;
             }
             *OutHandle = Handle;

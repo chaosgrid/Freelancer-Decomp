@@ -21,7 +21,7 @@ namespace
     bool IsWatchingObject(BaseWatcher const& Watcher)
     {
         Watchable const* const W = Watcher.target();
-        return W != nullptr && W != (Watchable const*)8;
+        return W != nullptr && W != reinterpret_cast<Watchable const*>(8);
     }
 
     IObjRW* WatchedObject(BaseWatcher const& Watcher)
@@ -38,7 +38,7 @@ IObjRW* FFormationLeaderState::GetCurrentLeader() const
     if (bLeaderSuppressed != 0)
         return nullptr;
     Watchable const* Slot = FollowLeaderWatcher.target();
-    if (Slot == nullptr || Slot == (Watchable const*)8)
+    if (Slot == nullptr || Slot == reinterpret_cast<Watchable const*>(8))
         Slot = FormationLeaderWatcher.target();
     return ObjRwFromWatchable(const_cast<Watchable*>(Slot));
 }
@@ -261,7 +261,7 @@ void FFormationLeaderState::SetFormationLeader(IObjRW* Target)
         bLeaderSuppressed = 0;
     }
 
-    FormationLeaderWatcher.set(static_cast<Watchable*>(Target));
+    FormationLeaderWatcher.set(Target);
 }
 
 // FUN_062ec970.
@@ -298,7 +298,7 @@ void FFormationLeaderState::SetFollowLeader(IObjRW* Target)
                 bLeaderSuppressed = 0;
             }
 
-            FollowLeaderWatcher.set(static_cast<Watchable*>(Target));
+            FollowLeaderWatcher.set(Target);
         }
     }
     else
@@ -349,7 +349,7 @@ void FFormationLeaderState::SyncFormationLeader()
                     return;
                 }
 
-                int const* const Directive = (int const*)LeaderMgr->get_current_directive();
+                int const* const Directive = reinterpret_cast<int const*>(LeaderMgr->get_current_directive());
                 bool const bIdleFormation = Directive[0] == 1 && Directive[1] == 0;
                 bReleaseRequested = 0;
                 bLeaderIdleFormation = bIdleFormation ? 1 : 0;

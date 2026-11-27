@@ -2075,7 +2075,7 @@ bool EqObj::damage_group(CArchGroup* Group, float Damage, DamageList& Out)
         double Scaled = Damage;
         CEquip* const Armor = ceqobj()->EquipManager.FindFirst(EquipTypeArmor);
         if (Armor != nullptr)
-            Scaled = (double)Damage / ((CEArmor*)Armor)->ArmorArch()->HitPtsScale;
+            Scaled = (double)Damage / static_cast<CEArmor*>(Armor)->ArmorArch()->HitPtsScale;
 
         // An OWNED object's group then divides by
         // PLAYER_COLLISION_GROUP_HIT_PTS_SCALE (the only rounding to float) and,

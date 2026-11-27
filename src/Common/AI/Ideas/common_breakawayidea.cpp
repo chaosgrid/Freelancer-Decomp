@@ -113,7 +113,7 @@ int BreakAwayIdea::Update(float DeltaTime)
 
     // Handle, its Nav block, the +0x84 owner and Handle + 0x18 are re-derived at
     // every use by retail and never tested.
-    IBehaviorManager* const Manager = static_cast<IBehaviorManager*>(Context);
+    IBehaviorManager* const Manager = Context;
 
     // Volume probe: a zero return means "avoid, go this way instead" and takes over
     // the whole tick. Pathfind is unguarded.

@@ -171,7 +171,7 @@ namespace
     // FUN_062dba00 on a frame whose Dim holds the half extents.
     bool ClampToBoxSurface(FZoneFrame& Frame, Vector const& Src, Vector& Dst)
     {
-        return ClampPointToBoxSurface((unsigned char*)&Frame, &Src, &Dst);
+        return ClampPointToBoxSurface(reinterpret_cast<unsigned char*>(&Frame), &Src, &Dst);
     }
 
     // The frame every shape builds from the zone (its 12 dwords at +0x0c); retail's identity
@@ -1070,7 +1070,7 @@ ZONE::ZONE()
     Interference = 0.0f;
     CachedRadius = -1.0f;
     MusicId = 0;
-    ((CacheString*)&Spacedust)->clear(); // +0x70
+    reinterpret_cast<CacheString*>(&Spacedust)->clear(); // +0x70
     SpacedustMaxParticles = 0;
     FogColor = MakeVector(1.0f, 1.0f, 1.0f);
     OwnedLootEntry = nullptr;
@@ -1139,7 +1139,7 @@ unsigned ZONE::GetSystem() const
 // 062d1ae0 (ICF, also slot +0x14) [+0xc]: the orientation and position as one transform.
 Transform const& ZONE::GetTransform() const
 {
-    return *(Transform const*)&Orientation;
+    return *reinterpret_cast<Transform const*>(&Orientation);
 }
 
 // 063390a0 [+0x30]

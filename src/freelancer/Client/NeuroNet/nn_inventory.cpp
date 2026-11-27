@@ -47,6 +47,9 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"
@@ -1885,19 +1888,19 @@ void NnInventory::CreateControls()
         Vector const FullHalfExtents = {0.06f, 0.014f, 0.0f};
         Vector const ZeroVector = {0.0f, 0.0f, 0.0f};
         FullCargoBar = CreateStaticControl("Full_Cargobar",
-                                       "Interface\\NeuroNet\\Inventory\\cargofull.3db",
-                                       &BarPosition, nullptr, &FullHalfExtents, 0, 0, 0, 1, 0, 0, 1,
-                                       0, 0, 0, &ZeroVector); // +0x4d0
+                                           "Interface\\NeuroNet\\Inventory\\cargofull.3db",
+                                           &BarPosition, nullptr, &FullHalfExtents, 0, 0, 0, 1, 0, 0, 1,
+                                           0, 0, 0, &ZeroVector); // +0x4d0
         FullCargoBar->ToolTipIds = 0x43b;                        // +0xcc, no null test
         EmptyCargoBar = CreateStaticControl("Empty_Cargobar",
-                                       "Interface\\NeuroNet\\Inventory\\cargoempty.3db",
-                                       &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                       0, &ZeroVector); // +0x4cc
+                                            "Interface\\NeuroNet\\Inventory\\cargoempty.3db",
+                                            &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                                            0, &ZeroVector); // +0x4cc
         EmptyCargoBar->SetProperty(kWinPropHide, 1, 0);
         SelectedCargoBar = CreateStaticControl("SelectedCargobar",
-                                       "Interface\\NeuroNet\\Inventory\\cargoselected.3db",
-                                       &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
-                                       0, &ZeroVector); // +0x4d4
+                                               "Interface\\NeuroNet\\Inventory\\cargoselected.3db",
+                                               &BarPosition, nullptr, &ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
+                                               0, &ZeroVector); // +0x4d4
         SelectedCargoBar->SetProperty(kWinPropHide, 1, 0);
         Vector const LabelPosition = {FilterBase[0] + 0.166f, FilterBase[1] - 0.489f,
                                       FilterBase[2]};
@@ -1924,7 +1927,7 @@ void NnInventory::CreateControls()
         {
             Vector const TitlePosition = {0.027f, 0.202f, 0.0f};
             InfoCardTitle = CreateTextControl("Infocard_Title", "SubHeader", &TitlePosition, nullptr,
-                                         0.364f, 0.016f, 1.4f, 0x387, 1, 0, 1); // +0x944
+                                              0.364f, 0.016f, 1.4f, 0x387, 1, 0, 1); // +0x944
         }
         else if (Dealer != nullptr && Dealer->TradeMode != kTradeModeCommodity)
         {
@@ -2459,13 +2462,15 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     case kWinNotifyScrollValue:
+    {
         // A slider moved: the list scroll or the quantity slider.
-        if (reinterpret_cast<WinControl*>(A) == InventoryScroll)
+        WinControl* const Slider = reinterpret_cast<WinControl*>(A);
+        if (Slider == InventoryScroll)
         {
             FirstRow = static_cast<int>(B);
             break;
         }
-        if (reinterpret_cast<WinControl*>(A) == QuantityControl[1])
+        if (Slider == QuantityControl[1])
         {
             JettisonQuantity = static_cast<int>(B);
             if (JettisonQuantity < 0)
@@ -2474,6 +2479,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             QuantityControl[3]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         }
         break;
+    }
 
     case 0x1a:
     case kWinNotifyClick:
@@ -2514,7 +2520,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 EquipDesc* const Item = GetSelectedItem();
                 if (!Item->bEquipped)
                 {
-                    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+                    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
                     if (Player != nullptr)
                     {
                         static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, JettisonQuantity,
@@ -2717,7 +2723,7 @@ void NnInventory::JettisonSelected()
     Item = GetSelectedItem();
     if (Item->bEquipped)
         return;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
     if (Player == nullptr)
         return;
     static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, JettisonQuantity,

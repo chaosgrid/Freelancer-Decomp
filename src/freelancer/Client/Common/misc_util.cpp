@@ -538,7 +538,7 @@ namespace
 // FUN_0041c8d0.
 bool MiscUtilSphereInView(ICamera* Camera, Vector const* Center, float Radius)
 {
-    const float* const View = (const float*)Camera->GetViewTransform();
+    const float* const View = reinterpret_cast<const float*>(Camera->GetViewTransform());
     if (G_MiscUtilMath == nullptr)
         G_MiscUtilMath = Acquire3DMathEngine();
     Vector InView;

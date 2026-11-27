@@ -185,7 +185,7 @@ namespace
     // Retail re-reads +0xc0 each time it needs the object.
     IObjRW* WatchedObject(FThirdPersonCamera* Cam)
     {
-        return static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Cam));
+        return GameCameraGetTarget(Cam);
     }
 
     CEqObj* WatchedShip(FThirdPersonCamera* Cam)
@@ -320,7 +320,7 @@ bool FThirdPersonCamera::Activate(int const* ViewRect4)
     return FHudCamera::Activate(ViewRect4);
 }
 
-void FThirdPersonCamera::Attach(void* Object)
+void FThirdPersonCamera::Attach(IObjRW* Object)
 {
     // LAB_00518af0 (slot 0x58).
     FHudCamera::Attach(Object);
@@ -367,7 +367,7 @@ void FThirdPersonCamera::Attach(void* Object)
         UpAxis.z = TargetOrientA[7];
 
         // Slot 0x10's transform (twelve dwords) to the world transform, view dirty first.
-        FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
+        FSpaceCamera* const Space = SpaceCameraOf(this);
         const float* const Xform =
             reinterpret_cast<const float*>(&WatchedObject(this)->get_orientation());
         Space->bViewDirty = 1;
@@ -419,7 +419,7 @@ void FThirdPersonCamera::Attach(void* Object)
     float View[12];
     MakeIdentityView(View);
     Solve(View, 0.0f, true);
-    FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
+    FSpaceCamera* const Space = SpaceCameraOf(this);
     memcpy(&Space->World, View, 9 * sizeof(float));
     Space->WorldPos.x = View[9];
     Space->WorldPos.y = View[10];
@@ -442,7 +442,7 @@ void FThirdPersonCamera::Update(float DeltaSeconds)
     {
         if (Solve(View, DeltaSeconds, false))
         {
-            FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)this);
+            FSpaceCamera* const Space = SpaceCameraOf(this);
             memcpy(&Space->World, View, 9 * sizeof(float));
             Space->WorldPos.x = View[9];
             Space->WorldPos.y = View[10];
@@ -927,7 +927,7 @@ bool FThirdPersonCamera::Load(const char* CockpitIniPath)
     }
 
     // The 4:3 aspect sanity check, read through the vtable (slots 0x18 and 0x1c).
-    ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)this));
+    ICamera* const Space = AsCamera(SpaceCameraOf(this));
 
     const double TanX = tan(static_cast<double>(Space->GetHalfFovXDeg() * kDegreesToRadians));
     const double TanY = tan(static_cast<double>(Space->GetFovYDeg() * kDegreesToRadians));

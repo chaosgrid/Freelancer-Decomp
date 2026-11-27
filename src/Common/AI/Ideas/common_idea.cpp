@@ -44,14 +44,14 @@ BaseIdea::BaseIdea()
 
 // Slot 0 default implementation -- LAB_062d7920. Shared by 5 siblings (see
 // common_idea.h); StopIdea/MoveIdea/FaceIdea override it.
-bool BaseIdea::SetContext(void* InObject, void* InHandle, void* InContext)
+bool BaseIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext)
 {
     if (InObject == nullptr || InHandle == nullptr)
     {
         return false;
     }
 
-    Handle = (SystemManager*)InHandle;
+    Handle = InHandle;
     Context = InContext;
     Object = InObject;
     Attached = 1;
@@ -61,7 +61,7 @@ bool BaseIdea::SetContext(void* InObject, void* InHandle, void* InContext)
 // FUN_062d4e50; no null tests.
 void BaseIdea::PublishTargetId(unsigned int Id)
 {
-    static_cast<IBehaviorManager*>(Context)->Pathfind->AvoidExcludeId = static_cast<int>(Id);
+    Context->Pathfind->AvoidExcludeId = static_cast<int>(Id);
 }
 
 // ----------------------------------------------------------------------------
@@ -76,7 +76,7 @@ StopIdea::StopIdea()
 
 // Own vtable slot 0 override -- LAB_062d76a0, `MOV AL,1; RET 0xc`.
 // Unconditionally succeeds; ignores all 3 incoming pointers.
-bool StopIdea::SetContext(void* /*InObject*/, void* /*InHandle*/, void* /*InContext*/)
+bool StopIdea::SetContext(IObjRW* /*InObject*/, SystemManager* /*InHandle*/, IBehaviorManager* /*InContext*/)
 {
     return true;
 }

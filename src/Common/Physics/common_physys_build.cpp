@@ -41,7 +41,7 @@ namespace PhySys
         // Slot 5, FUN_06285fa0
         void get_all_terminal_ledges(IVP_SurfaceManager_OutList* OutList) override;
         // Slot 6, FUN_06285e80: Param1 = IVP_Ray_Solver*, Param2 = IVP_Real_Object*.
-        void insert_all_ledges_hitting_ray(void* Param1, void* Param2) override;
+        void insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2) override;
 
         CObject* Owner; // +0x08
     };
@@ -79,7 +79,7 @@ namespace
     {
         for (int32_t Index = OutList->Count - 1; Index >= 0; --Index)
         {
-            IVP_Compact_Ledge const* const Ledge = (IVP_Compact_Ledge const*)OutList->Elems[Index];
+            IVP_Compact_Ledge const* const Ledge = OutList->Elems[Index];
             if (PhySys_LedgeIsAttached(Owner, Ledge))
                 continue;
             for (int32_t Move = Index; Move < OutList->Count - 1; ++Move)
@@ -106,10 +106,10 @@ void PhySys::PhySurfaceManager::get_all_terminal_ledges(IVP_SurfaceManager_OutLi
 }
 
 // Instead of the base's plain IVP_Ray_Solver_Os, a masked one over this manager's surface.
-void PhySys::PhySurfaceManager::insert_all_ledges_hitting_ray(void* Param1, void* Param2)
+void PhySys::PhySurfaceManager::insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2)
 {
     // The IVP base declares the slot with void* parameters (ivp_surman_polygon.h).
-    RaySolver_MaskedSurface Solver((IVP_Ray_Solver*)Param1, (IVP_Real_Object*)Param2, this);
+    RaySolver_MaskedSurface Solver(Param1, Param2, this);
     Solver.check_ray_against_compact_surface(compact_surface);
 }
 

@@ -71,7 +71,7 @@ void PhySys::Phantom::element_added(IVP_U_Set_Active<IVP_Real_Object>* /*Set*/, 
 {
     if (Listener == nullptr)
         return;
-    CObject* const Client = (CObject*)Elem->client_data;
+    CObject* const Client = static_cast<CObject*>(Elem->client_data);
     if (Client == nullptr)
         return;
     Listener->added(Client);
@@ -82,7 +82,7 @@ void PhySys::Phantom::element_removed(IVP_U_Set_Active<IVP_Real_Object>* /*Set*/
 {
     if (Listener == nullptr)
         return;
-    CObject* const Client = (CObject*)Elem->client_data;
+    CObject* const Client = static_cast<CObject*>(Elem->client_data);
     if (Client == nullptr)
         return;
     Listener->deleted(Client);
@@ -110,7 +110,7 @@ namespace
         if (Listener != nullptr)
         {
             NewPhantom->Listener = Listener;
-            ((IVP_Controller_Phantom*)NewPhantom->Body->controller_phantom)->set_of_objects->listeners.Add(NewPhantom);
+            NewPhantom->Body->controller_phantom->set_of_objects->listeners.Add(NewPhantom);
         }
     }
 }
@@ -126,7 +126,7 @@ namespace CmnPhySys
             return 1;
         IVP_U_Quat Rotation;
         IVP_U_Point Position;
-        ((PhySys::Phantom*)Handle)->Body->calc_at_time_AT(&Rotation, &Position);
+        static_cast<PhySys::Phantom*>(Handle)->Body->calc_at_time_AT(&Rotation, &Position);
         OutPosition->x = Position.x;
         OutPosition->y = Position.y;
         OutPosition->z = Position.z;
@@ -139,7 +139,7 @@ namespace CmnPhySys
     {
         if (Handle == nullptr)
             return 1;
-        IVP_Real_Object* const Body = ((PhySys::Phantom*)Handle)->Body;
+        IVP_Real_Object* const Body = static_cast<PhySys::Phantom*>(Handle)->Body;
         IVP_U_Point Target;
         Target.set(NewPosition->x, NewPosition->y, NewPosition->z);
         IVP_U_Quat Rotation;
@@ -190,7 +190,7 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, Vector const& HalfE
         IVP_Compact_Ledge* const Hull = IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_ledge(&Points);
         Soup.InsertLedge(Hull);
         const int32_t CompileOptions[4] = { 0, 1, 0, 1 };
-        NewPhantom->Surface = (IVP_Compact_Surface*)Soup.Compile(CompileOptions);
+        NewPhantom->Surface = static_cast<IVP_Compact_Surface*>(Soup.Compile(CompileOptions));
     }
 
     // The plain IVP_SurfaceManager_Polygon over the new surface.
@@ -286,13 +286,13 @@ void __cdecl PhySys::DestroyPhantom(void* Handle)
 {
     if (Handle == nullptr)
         return;
-    Phantom* const OldPhantom = (Phantom*)Handle;
+    Phantom* const OldPhantom = static_cast<Phantom*>(Handle);
 
     // The phantom leaves the listeners of its controller's object set (Body not tested).
     // Retail quirk kept (inside RemoveElement): a phantom created without a listener is not in
     // the vector, so the search gives -1 and the vector is corrupted. Retail's callers always
     // pass a listener.
-    ((IVP_Controller_Phantom*)OldPhantom->Body->controller_phantom)->set_of_objects->listeners.RemoveElement(OldPhantom);
+    OldPhantom->Body->controller_phantom->set_of_objects->listeners.RemoveElement(OldPhantom);
 
     // The owner's phantom list loses the node directly, not through DetachPhantom (no IVP
     // split). Unlike DetachPhantom this path checks for "not found".
@@ -314,7 +314,7 @@ int __cdecl PhySys::AttachPhantom(CObject* Object, void* Handle)
     // FUN_0628b560. Object is not tested.
     if (Handle == nullptr)
         return 1;
-    Phantom* const AttachedPhantom = (Phantom*)Handle;
+    Phantom* const AttachedPhantom = static_cast<Phantom*>(Handle);
 
     IVP_U_Quat PhantomRotation;
     IVP_U_Point PhantomPosition;
@@ -338,7 +338,7 @@ int __cdecl PhySys::DetachPhantom(void* Handle)
     // FUN_0628b610. The owner is not tested.
     if (Handle == nullptr)
         return 1;
-    Phantom* const DetachedPhantom = (Phantom*)Handle;
+    Phantom* const DetachedPhantom = static_cast<Phantom*>(Handle);
 
     IVP_RealObjectConstructionTemplate Template;
     Template.set_short_name(DetachedPhantom->Owner->BodyPtr->name);
@@ -362,7 +362,7 @@ bool __cdecl PhySys::GetCollisionStatePhantom(void* const Handle)
     // FUN_0628b510: the collision-detection bits (Body->flags & 0x300).
     if (Handle == nullptr)
         return false;
-    IVP_Real_Object* const Body = ((Phantom*)Handle)->Body;
+    IVP_Real_Object* const Body = static_cast<Phantom*>(Handle)->Body;
     if (Body == nullptr)
         return false;
     return (Body->flags & 0x300) != 0;
@@ -373,7 +373,7 @@ void __cdecl PhySys::SetCollisionStatePhantom(void* Handle, bool bEnable)
     // FUN_0628b540. The body is not tested.
     if (Handle == nullptr)
         return;
-    ((Phantom*)Handle)->Body->enable_collision_detection(bEnable);
+    static_cast<Phantom*>(Handle)->Body->enable_collision_detection(bEnable);
 }
 
 // ============================================================================
@@ -540,7 +540,7 @@ enum EPhySysSynapseFeature
 static void PhySys_SlotPointToWorld(IVP_NarrowPhaseCacheSlot* Slot,
                                      IVP_U_Float_Point const* LocalPoint, Vector& OutWorld)
 {
-    Slot->transform_slot_to_world_space((IVP_U_Point const*)LocalPoint, (IVP_U_Point*)&OutWorld);
+    Slot->transform_slot_to_world_space(reinterpret_cast<IVP_U_Point const*>(LocalPoint), reinterpret_cast<IVP_U_Point*>(&OutWorld));
 }
 
 static void PhySys_CalcClosestPointOnSynapse(Vector const& QueryPos, IVP_Synapse_Real const* Syn, Vector& Out)
@@ -732,7 +732,7 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
     // -> false. The out parameters are written only when a closer intruder is found.
     if (Handle == nullptr)
         return false;
-    IVP_Real_Object* const Body = ((Phantom*)Handle)->Body;
+    IVP_Real_Object* const Body = static_cast<Phantom*>(Handle)->Body;
     if (Body->object_type != IVP_BALL)
         return false;
 
@@ -750,11 +750,11 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
         unsigned HashIndex;
         IVP_Mindist_Base* Elem;
     };
-    IVP_Controller_Phantom* const Controller = (IVP_Controller_Phantom*)Body->controller_phantom;
+    IVP_Controller_Phantom* const Controller = Body->controller_phantom;
     float BestDistSq = FLT_MAX;
     for (int Slot = Controller->mindist_set.SizeMm; Slot >= 0; --Slot)
     {
-        IVP_Mindist_Base* const Mindist = ((FVHashSlot*)Controller->mindist_set.Elems)[Slot].Elem;
+        IVP_Mindist_Base* const Mindist = (reinterpret_cast<FVHashSlot*>(Controller->mindist_set.Elems))[Slot].Elem;
         if (Mindist == nullptr)
             continue;
 
@@ -770,12 +770,12 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
 
         // The root of its client must exist, have class bits 3 (a CSimple), share a type bit
         // with FilterA and not carry the id FilterB.
-        CObject* const Root = GetRoot((CObject*)Intruder->client_data);
+        CObject* const Root = GetRoot(static_cast<CObject*>(Intruder->client_data));
         if (Root == nullptr)
             continue;
         if ((uint8_t)((unsigned)Root->ObjectClass & CObject::ClassSimple) != CObject::ClassSimple)
             continue;
-        CSimple* const Simple = (CSimple*)Root;
+        CSimple* const Simple = static_cast<CSimple*>(Root);
         if ((Simple->TypeBits & FilterA) == 0)
             continue;
         if (Simple->Id == FilterB)

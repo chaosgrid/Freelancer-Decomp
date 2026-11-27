@@ -661,6 +661,6 @@ I3DMathEngine* __cdecl Acquire3DMathEngine()
     ICOManager* const Manager = DACOM_Acquire();
     Manager->CreateInstance(&Desc.Base, &Engine);
 
-    CachedEngine = (I3DMathEngine*)Engine;
+    CachedEngine = static_cast<I3DMathEngine*>(Engine);
     return CachedEngine;
 }

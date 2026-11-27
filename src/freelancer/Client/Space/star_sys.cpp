@@ -27,6 +27,7 @@
 #include "Space/space_dust.h"
 #include "Space/space_scene_obj_draw.h"
 #include "Space/space_solar_world.h"
+#include "Space/Cameras/space_camera.h" // FSpaceCamera: the listener camera
 #include "Space/star_sphere.h" // StarSphereDestroyAll (FUN_0050c6e0)
 #include "Common/Graphics/texture_panels.h"
 #include "Common/Graphics/texture_shapes.h"
@@ -127,7 +128,7 @@ namespace
     // CBase::Object.
     IObjRW* PlayerObjRW()
     {
-        return static_cast<IObjRW*>(GetPlayerObjRW());
+        return GetPlayerObjRW();
     }
 
     CObject* PlayerCObject(IObjRW* Player)
@@ -551,8 +552,8 @@ namespace
             return IVP_TRUE;
 
         // IVP_Real_Object::client_data (+0xa4), the CObject back-pointer.
-        CObject* ObjA = (CObject*)A->client_data;
-        CObject* ObjB = (CObject*)B->client_data;
+        CObject* ObjA = static_cast<CObject*>(A->client_data);
+        CObject* ObjB = static_cast<CObject*>(B->client_data);
 
         if (ObjA != nullptr && (static_cast<unsigned>(ObjA->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
             return IVP_TRUE;
@@ -622,7 +623,7 @@ namespace
                 float Extent = 0.0f;
                 Vector Center = {0.0f, 0.0f, 0.0f};
                 DALib::Engine->GetInstanceExtent(Layer->Holder.EngineInstance, 0, &Extent,
-                                                 (Vector*)&Center);
+                                                 &Center);
                 Layer->Holder.SetPosition(&Center); // FUN_00420fd0
                 Layer->Holder.Update();              // FUN_00421070
             }
@@ -634,7 +635,7 @@ namespace
     }
 
     // ------------------------------------------------------------ FUN_00552ea0
-    void StarSphereRender(FStarSphereBackground* This, void* Camera)
+    void StarSphereRender(FStarSphereBackground* This, FSpaceCamera* Camera)
     {
         if (GetGameOption(kGameOptBackgroundGroup) == 0)
             return;
@@ -711,7 +712,7 @@ FStarSphereBackground::~FStarSphereBackground()
     // the helper's vptr; the instance is not destroyed here.
 }
 
-void StarSphereDraw(void* Camera)
+void StarSphereDraw(FSpaceCamera* Camera)
 {
     // FUN_00552e70
     if (GetGameOption(kGameOptBackgroundGroup) != 0 && GetGameOption(kGameOptStars) != 0)
@@ -956,7 +957,7 @@ void StarSysLeaveWithoutPlayer()
 void StarSysUpdate(float Dt)
 {
     // FUN_00554eb0
-    void* const Camera = GetClientSoundListenerObject(); // FUN_0040f130
+    FSpaceCamera* const Camera = static_cast<FSpaceCamera*>(GetClientSoundListenerObject()); // FUN_0040f130
     if (Camera != nullptr)
     {
         SpaceDustUpdate(G_System, Camera); // FUN_0054beb0
@@ -987,10 +988,9 @@ void StarSysUpdate(float Dt)
     }
 
     // ---- music ----
-    void* SourceRaw = nullptr;
-    if (BindClientBackgroundMusic(&SourceRaw)) // FUN_00428ba0 (AddRef'd)
+    ISoundSource* Source = nullptr;
+    if (BindClientBackgroundMusic(&Source)) // FUN_00428ba0 (AddRef'd)
     {
-        ISoundSource* const Source = static_cast<ISoundSource*>(SourceRaw);
         if (Source->IsFinished()) // slot 29 (+0x74)
             StarSysClearMusicOverride();
         Source->Release();
@@ -1028,11 +1028,10 @@ void StarSysUpdate(float Dt)
 
     bool bPlayerFlag = false;
     {
-        void* const Player = GetPlayerObjRW();
+        IObjRW* const Player = GetPlayerObjRW();
         // The player ship Gameobj's jump state (+0x158), read with no class test.
         if (Player != nullptr)
-            bPlayerFlag = static_cast<FClientShipGameobj const*>(
-                              static_cast<IObjRW const*>(Player))->JumpState != 0;
+            bPlayerFlag = static_cast<FClientShipGameobj const*>(Player)->JumpState != 0;
     }
 
     // x87: the sum is stored as a float but the unrounded value is compared with

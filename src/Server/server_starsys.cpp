@@ -118,7 +118,7 @@ static IVP_BOOL __cdecl StarSystem_MpCollisionFilter(IVP_Real_Object* A, IVP_Rea
 // FUN_06d0f3e0(0, 0): the player list's self-linked sentinel. MSVC6's _Buynode allocates a
 // full node (0x50 in retail; sizeof here, since the port's Observer embeds a CRT-sized
 // std::set).
-static void* StarSystem_NewPlayerSentinel()
+static SystemPlayerNode* StarSystem_NewPlayerSentinel()
 {
     SystemPlayerNode* const Node =
         static_cast<SystemPlayerNode*>(::operator new(sizeof(SystemPlayerNode)));
@@ -128,7 +128,7 @@ static void* StarSystem_NewPlayerSentinel()
 }
 
 // The dock queue's self-linked 0x20-byte sentinel (also FUN_06d10aa0 in the copy).
-static void* StarSystem_NewDockSentinel()
+static SystemDockNode* StarSystem_NewDockSentinel()
 {
     SystemDockNode* const Node =
         static_cast<SystemDockNode*>(::operator new(sizeof(SystemDockNode)));
@@ -168,7 +168,7 @@ Universe::ISystem* __thiscall StarSystem::GetZoneDb()
 }
 
 // Slot 3 -- LAB_06d06e90. The mask is ignored.
-void* __thiscall StarSystem::GetBucket(unsigned TypeMask)
+ISpatialPartition* __thiscall StarSystem::GetBucket(unsigned TypeMask)
 {
     (void)TypeMask;
     return Spatial;
@@ -327,7 +327,7 @@ void StarSystem::add_player(unsigned int SessionId)
         return;
 
     // A push_back; no null test on the sentinel (the StarSystem ctor always allocates it).
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
 
     // Retail builds the Observer on the stack, copies it into the node and destroys the
     // temporary at the end of this block.
@@ -562,7 +562,7 @@ void StarSystem::remove_player(unsigned int SessionId)
 {
     // (a) Unlink this session's player node (one match only). Retail dereferences the
     //     head at once, with no null test.
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
     // KNOWN CRASH (intentional, retail-faithful): a fault on a garbage Sentinel coming from
     // PlayerDB_LeaveSystem means `this` is SysMap's unconstructed head node -- a SysMap
     // miss (bad universe.ini system id). See PlayerDB_LeaveSystem.
@@ -645,10 +645,10 @@ bool StarSystem::remove_solar(GameObject* Obj)
     Solars.remove(Node);
 
     // Out of the BSP the load pass bulk-added it to.
-    void* const Bucket = GetBucket(0xfdffu);
+    ISpatialPartition* const Bucket = GetBucket(0xfdffu);
     if (Bucket != nullptr)
     {
-        static_cast<ISpatialPartition*>(Bucket)->Remove(static_cast<IObjRW*>(Obj));
+        Bucket->Remove(static_cast<IObjRW*>(Obj));
     }
 
     // Onto the Deferred list (+0xe8).
@@ -741,8 +741,8 @@ void StarSystem::create_loot(unsigned int SourceObjId, int Mode, FLootRecord con
         }
     }
 
-    SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-    while (Node != static_cast<SystemPlayerNode*>(PlayerListHead)) {
+    SystemPlayerNode* Node = PlayerListHead->Next;
+    while (Node != PlayerListHead) {
         GameObject* const* const First = Spawned.empty() ? nullptr : &Spawned[0];
         GameObject* const* const Last = First + Spawned.size();
         Node->View.create_loot_for_player(&Request, First, Last);
@@ -838,7 +838,7 @@ void StarSystem::create_mine(FServerLaunchRecord const& Rec)
     Info.AngularVelocity = Parms.AngularVelocity;
     Info.OwnerPlayer = 0u;
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
         Player->View.create_mine_for_player(&Info, Obj);
 }
@@ -856,8 +856,8 @@ SrvAsteroid::MedMine* StarSystem::create_med_mine(unsigned int const& ObjId)
 void StarSystem::send_mine_explosion(FMineExplosion const& Rec)
 {
     FMineExplosion Local = Rec;
-    SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-    while (Node != static_cast<SystemPlayerNode*>(PlayerListHead)) {
+    SystemPlayerNode* Node = PlayerListHead->Next;
+    while (Node != PlayerListHead) {
         Node->View.send_mine_explosion(&Local);
         Node = Node->Next;
     }
@@ -931,7 +931,7 @@ void StarSystem::create_counter_measure(FServerLaunchRecord const& Rec)
     Info.AngularVelocity = Parms.AngularVelocity;
     Info.OwnerPlayer = 0u;
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
         Player->View.create_counter_for_player(&Info, Obj);
 }
@@ -1004,7 +1004,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
     Info.SubObjId = Rec.EquipId;
     Info.Pad36 = 0;
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         GameObject* const* const First = &Spawned[0];
@@ -1237,7 +1237,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     Solars.append(Wrapper);
 
     // The spatial partition's single add, with the record load() bulk-adds.
-    void* const Bucket = GetBucket(0xfdffu);
+    ISpatialPartition* const Bucket = GetBucket(0xfdffu);
     if (Bucket != nullptr)
     {
         CObject* const BucketRaw = Wrapper->Object;
@@ -1250,13 +1250,13 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         Entry.Position = Position;
         Entry.Radius = Radius;
         Entry.Object = static_cast<IObjRW*>(Wrapper);
-        static_cast<ISpatialPartition*>(Bucket)->Add(&Entry);
+        Bucket->Add(&Entry);
     }
 
     Cs->enable_collisions_r(true);
 
     // Every player of this system; the request is patched per player.
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         Req.bMarkedBy = Wrapper->is_marked_by(Player->View.PlayerId) ? 1u : 0u;
@@ -1366,7 +1366,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         if (Copy.OwnerPlayer != 0u)
         {
             CPlayerGroup* const Group =
-                static_cast<CPlayerGroup*>(Players[Copy.OwnerPlayer].group_ptr);
+                Players[Copy.OwnerPlayer].group_ptr;
             if (Group != nullptr)
             {
                 unsigned int const GroupId = Group->GetID();
@@ -1391,7 +1391,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         Cs->enable_collisions_r(true);
 
     // Every player of this system but the owner.
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         if (Player->View.PlayerId == Copy.OwnerPlayer)
@@ -1407,8 +1407,8 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
 // with no null test on the narrowing).
 void StarSystem::send_remote_cargo_update(GameObject* Obj)
 {
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next)
     {
         if (Obj->csimple()->OwnerPlayer != Node->View.PlayerId)
             Node->View.send_remote_cargo_update(Obj);
@@ -1449,8 +1449,8 @@ void StarSystem::on_object_destroyed(GameObject* Obj, int Kind)
     // Unconditionally, every player in this system is told. No null test on the sentinel
     // or a node.
     {
-        for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-             Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next) {
+        for (SystemPlayerNode* Node = PlayerListHead->Next;
+             Node != PlayerListHead; Node = Node->Next) {
             Node->View.on_object_destroyed(Obj, Kind);
         }
     }
@@ -1597,8 +1597,8 @@ void StarSystem::sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int Sessio
     Rec.State = Info.State;
 
     // Every player but the sender.
-    for (SystemPlayerNode* Player = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Player != static_cast<SystemPlayerNode*>(PlayerListHead); Player = Player->Next)
+    for (SystemPlayerNode* Player = PlayerListHead->Next;
+         Player != PlayerListHead; Player = Player->Next)
     {
         if (Player->View.PlayerId == SessionId)
             continue;
@@ -1613,7 +1613,7 @@ void StarSystem::sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int Sessio
 unsigned int StarSystem::count_players(unsigned int ExcludeId) const
 {
     unsigned int Count = 0;
-    SystemPlayerNode const* const Sentinel = static_cast<SystemPlayerNode const*>(PlayerListHead);
+    SystemPlayerNode const* const Sentinel = PlayerListHead;
     for (SystemPlayerNode const* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
         if (Node->View.PlayerId != ExcludeId) {
             Count++;
@@ -1643,7 +1643,7 @@ unsigned int StarSystem::scan_objects(unsigned int* OutIds, unsigned int MaxCoun
         return Count;
     }
 
-    void* const Bucket = GetBucket(0xfdffu);
+    ISpatialPartition* const Bucket = GetBucket(0xfdffu);
     if (Bucket == nullptr)
         return Count;
 
@@ -1662,7 +1662,7 @@ unsigned int StarSystem::scan_objects(unsigned int* OutIds, unsigned int MaxCoun
     Found.Count = 0u;
     // ISpatialPartition +0x1c (sphere query); the stack result has the layout of
     // FSpatialQueryResult.
-    static_cast<ISpatialPartition*>(Bucket)->QuerySphere(&Sphere,
+    Bucket->QuerySphere(&Sphere,
                                                          reinterpret_cast<FSpatialQueryResult*>(&Found));
 
     // Each hit while the buffer has room; a non-zero get_type result skips it.
@@ -1723,7 +1723,7 @@ void StarSystem::send_changed_affiliations()
         if (Ship != 0)
         {
             GameObject* const Obj = Server_LookupGameObject(Ship);
-            SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+            SystemPlayerNode* const Head = PlayerListHead;
             for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
             {
                 if (Node->View.is_object_visible(Obj))
@@ -1745,24 +1745,24 @@ void StarSystem::send_changed_affiliations()
 // later duplicate of each item, as retail does.
 void StarSystem::update_near_ships(float Step)
 {
-    void* const Bucket = GetBucket(0xfdffu);
+    ISpatialPartition* const Bucket = GetBucket(0xfdffu);
     if (Bucket == nullptr)
         return;
 
     struct FScanList {
         unsigned int Capacity;
         unsigned int Count;
-        void* Items[0x800];
+        IObjRW* Items[0x800];
     };
     FScanList Scan;                     // on retail's 0x20a0-byte frame
     Scan.Capacity = 0x800;
     Scan.Count = 0;
 
     // ISpatialPartition +0x1c (sphere query); FScanList has the layout of FSpatialQueryResult.
-    ISpatialPartition* const Partition = static_cast<ISpatialPartition*>(Bucket);
+    ISpatialPartition* const Partition = Bucket;
 
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead);
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead;
          Node = Node->Next)
     {
         unsigned int const ShipId = Players[Node->View.PlayerId].ship_object_id;
@@ -1782,7 +1782,7 @@ void StarSystem::update_near_ships(float Step)
             continue;
         if (Scan.Count < Scan.Capacity)
         {
-            Scan.Items[Scan.Count] = static_cast<IObjRW*>(It->Data);
+            Scan.Items[Scan.Count] = It->Data;
             ++Scan.Count;
         }
     }
@@ -1793,7 +1793,7 @@ void StarSystem::update_near_ships(float Step)
         int Kept = 0;
         for (int Index = 0; Index < Count; ++Index)
         {
-            void* const Item = Scan.Items[Index];
+            IObjRW* const Item = Scan.Items[Index];
             if (Item == nullptr)
                 continue;
             for (int Later = Index + 1; Later < Count; ++Later)
@@ -1813,7 +1813,7 @@ void StarSystem::update_near_ships(float Step)
     for (unsigned int Index = 0; Index < Scan.Count; ++Index)
     {
         GameObject* const Obj =
-            dynamic_cast<GameObject*>(static_cast<IObjRW*>(Scan.Items[Index]));
+            dynamic_cast<GameObject*>(Scan.Items[Index]);
         if (Obj != nullptr)
             Obj->update(Step);
     }
@@ -1894,8 +1894,8 @@ unsigned int StarSystem::update(float Dt)
                 std::list<unsigned int> Landed;
 
                 // The end test re-reads the head every pass.
-                SystemDockNode* Node = static_cast<SystemDockNode*>(DockQueueHead)->Next;
-                while (Node != static_cast<SystemDockNode*>(DockQueueHead))
+                SystemDockNode* Node = DockQueueHead->Next;
+                while (Node != DockQueueHead)
                 {
                     GameObject* const Obj = FSystemDockEntry::WatchedObject(Node->Entry.Object);
                     GameObject* const DockTarget = FSystemDockEntry::WatchedObject(Node->Entry.Target);
@@ -1920,8 +1920,8 @@ unsigned int StarSystem::update(float Dt)
                         // Every player in the system is told (FLPACKET_SERVER_LAND, and the
                         // multiplayer autosave of the owner's slot). ObjId is re-read for
                         // each view.
-                        SystemPlayerNode* View = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-                        while (View != static_cast<SystemPlayerNode*>(PlayerListHead))
+                        SystemPlayerNode* View = PlayerListHead->Next;
+                        while (View != PlayerListHead)
                         {
                             unsigned int ObjId = Obj->get_id();
                             View->View.on_object_landed(&ObjId, &TargetId,
@@ -1973,7 +1973,7 @@ unsigned int StarSystem::update(float Dt)
                 }
 
                 Landed.clear();
-                SystemDockNode* const DockHead = static_cast<SystemDockNode*>(DockQueueHead);
+                SystemDockNode* const DockHead = DockQueueHead;
                 erase_docks(DockHead->Next, DockHead);   // FUN_06d0f410
             }
 
@@ -2010,8 +2010,8 @@ unsigned int StarSystem::update(float Dt)
     // original dt as a double.
     if (PlayerListSize != 0)
     {
-        for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-             Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+        for (SystemPlayerNode* Node = PlayerListHead->Next;
+             Node != PlayerListHead; Node = Node->Next)
         {
             Node->View.update(Target);
         }
@@ -2164,7 +2164,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
     Server_ControllerDispatch(0, pub::Controller::EMessage::DockComplete, Msg);
 
     // Every player view hears that the ship left for the dock; both ids fetched per player.
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         unsigned int const DockId = Dock->get_id();
@@ -2244,7 +2244,7 @@ void StarSystem::arrive_ship(GameObject* Obj, GameObject* JumpObj, Vector const&
     Record.Position = Pos;
     Server_MatrixToQuat(Record.Orientation, Orient);
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (!Node->View.is_object_visible(Obj))
@@ -2329,7 +2329,7 @@ void StarSystem::remove_ship(GameObject* Obj, PhySys::CreateParms* OutParms)
     unsigned int const Owner = Obj->csimple()->OwnerPlayer;
 
     // Every view but the owner's.
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         if (Player->View.PlayerId == Owner)
@@ -2386,7 +2386,7 @@ void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector co
     if (Cs != nullptr)
         CShipCreateInfo_Fill(&Info, Cs);                            // FUN_06d07690
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         Info.bMarkedBy = Obj->is_marked_by(Player->View.PlayerId) ? 1 : 0;
@@ -2420,7 +2420,7 @@ void StarSystem::queue_dock(GameObject* Object, GameObject* Target,
     Element.bLand = *bLand;
 
     // A push_back, with MSVC6 _Buynode's null-Prev fallback.
-    SystemDockNode* const Sentinel = static_cast<SystemDockNode*>(DockQueueHead);
+    SystemDockNode* const Sentinel = DockQueueHead;
     SystemDockNode* const Node =
         static_cast<SystemDockNode*>(::operator new(sizeof(SystemDockNode)));
     Node->Next = Sentinel;
@@ -2564,7 +2564,7 @@ bool StarSystem::activate_object(GameObject* Obj, bool bOn, unsigned int Index)
     Rec.bActivate = static_cast<unsigned char>(bOn);
     Rec.ActivateParam = Index;
 
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
     for (SystemPlayerNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
         if (Solar == nullptr && !Node->View.is_object_visible(Obj))
@@ -2646,8 +2646,8 @@ void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsig
         SenderPos = Sender->get_position();
     }
 
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next)
     {
         unsigned int const PlayerId = Node->View.PlayerId;
         if (!Players.is_valid(PlayerId))
@@ -2862,7 +2862,7 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
     Record.TradelaneRing1 = EntranceId;
     Record.TradelaneRing2 = ExitId;
     Record.bMidLane = bFastExit;
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         if (SkipPlayer == Player->View.PlayerId)
@@ -2929,7 +2929,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
         Behavior->OnEvent(&LaneEvent);
     }
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         if (SkipPlayer == Player->View.PlayerId)
@@ -2952,7 +2952,7 @@ void StarSystem::notify_fire_weapon(unsigned int const& ObjId, std::vector<unsig
     Info.Hardpoints = EquipIds;
 
     // Every player but SourceClient that can see the shooter.
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         if (Player->View.PlayerId == static_cast<unsigned int>(SourceClient))
@@ -2974,7 +2974,7 @@ void StarSystem::notify_fire_weapon(unsigned int const& ObjId, std::vector<unsig
 void StarSystem::notify_activate_equip(unsigned int const& ObjId, unsigned short const& EquipId,
                                        bool bActivate, int const& SourceClient)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
@@ -2993,7 +2993,7 @@ void StarSystem::notify_activate_equip(unsigned int const& ObjId, unsigned short
 void StarSystem::notify_cruise(unsigned int const& ObjId, bool bEngage, bool bArg2,
                                int const& SourceClient)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
@@ -3011,7 +3011,7 @@ void StarSystem::notify_cruise(unsigned int const& ObjId, bool bEngage, bool bAr
 // FUN_06d0e600; only caller Ship slot_54.
 void StarSystem::notify_thrusters(unsigned int const& ObjId, bool bActivate, int const& SourceClient)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
@@ -3033,7 +3033,7 @@ void StarSystem::notify_set_target(unsigned int const& ObjId, unsigned short con
                                    int const& SourceClient)
 {
     GameObject* const Obj = Server_LookupGameObject(ObjId);
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
@@ -3056,7 +3056,7 @@ void StarSystem::notify_set_target(unsigned int const& ObjId, unsigned short con
 // FUN_06d0e750.
 void StarSystem::broadcast_fuse(FServerBurnFuseInfo const& Info)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (!Node->View.is_object_id_visible(Info.ObjectId))
@@ -3070,8 +3070,8 @@ void StarSystem::send_tractor_objects(unsigned int const& SkipPlayerId, XTractor
 {
     // Every player but SkipPlayerId that sees the tractoring object gets the target ids it
     // can see (sent even when none survive). The pad word +0x06 is never written.
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next)
     {
         if (Node->View.PlayerId == SkipPlayerId)
             continue;
@@ -3200,7 +3200,7 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
     if (bHaveDesc)
     {
         // Every player that can see the object; no null tests.
-        SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+        SystemPlayerNode* const Sentinel = PlayerListHead;
         {
             for (SystemPlayerNode* Node = Sentinel->Next;
                  Node != Sentinel; Node = Node->Next) {
@@ -3254,8 +3254,8 @@ void StarSystem::remove_cargo(GameObject* Obj, unsigned short EquipId, int Count
     if (SessionId != 0u && Players.is_valid_ship_owner(SessionId, ObjId))
         Players[SessionId].remove_equipment(EquipId, Count, /*bNotify*/false);
 
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next) {
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next) {
         if (!Node->View.is_object_visible(Obj))
             continue;
         // The player id goes by ADDRESS.
@@ -3331,8 +3331,8 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
     Tractored.UnitsTaken = static_cast<unsigned short>(Take);
 
     // Every player that sees the ship.
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next)
     {
         if (!Node->View.is_object_id_visible(Tractored.ShipId))
             continue;
@@ -3381,8 +3381,8 @@ void StarSystem::use_item(GameObject* Obj, unsigned short EquipId, int Count)
     Rec.EquipId = EquipId;
     Rec.Count = static_cast<unsigned short>(Count);
 
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = PlayerListHead->Next;
+         Node != PlayerListHead; Node = Node->Next)
     {
         if (!Node->View.is_object_id_visible(Rec.ObjectId))
             continue;
@@ -3404,7 +3404,7 @@ void StarSystem::notify_jettison(GameObject* Obj, unsigned short EquipId, int Co
     Record.ItemId = EquipId;
     Record.Count = static_cast<unsigned int>(Count);
 
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         if (!Node->View.is_object_id_visible(ObjId))
@@ -3416,7 +3416,7 @@ void StarSystem::notify_jettison(GameObject* Obj, unsigned short EquipId, int Co
 // FUN_06d0f190 (thiscall on the StarSystem).
 void StarSystem::collect_created_owners(unsigned int PlayerId, std::set<unsigned int>* Owners)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next) {
         if (Node->View.PlayerId == PlayerId) {
             Node->View.collect_created_owners(Owners);
@@ -3428,7 +3428,7 @@ void StarSystem::collect_created_owners(unsigned int PlayerId, std::set<unsigned
 // FUN_06d0f1c0 (thiscall on the StarSystem). Callers CPlayerGroup::AddMember and DelMember.
 void StarSystem::send_group_change(unsigned int ObjId)
 {
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
     for (SystemPlayerNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         Node->View.send_group_change(ObjId);
 }
@@ -3459,7 +3459,7 @@ static void StarSystem_DeleteBlock(ObjectList& List)
 void StarSystem::unload()
 {
     // FUN_06d0f390: erase the whole player list (each view destroyed in place, flag 0).
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
     SystemPlayerNode* View = Sentinel->Next;
     while (View != Sentinel) {
         SystemPlayerNode* const Node = View;
@@ -3553,14 +3553,14 @@ StarSystem::~StarSystem()
     VectorEnd = nullptr;
     VectorCapacity = nullptr;
 
-    SystemDockNode* const DockHead = static_cast<SystemDockNode*>(DockQueueHead);
+    SystemDockNode* const DockHead = DockQueueHead;
     erase_docks(DockHead->Next, DockHead);
     ::operator delete(DockQueueHead);
     DockQueueHead = nullptr;
     DockQueueSize = 0;
 
     // FUN_06d0f230.
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Sentinel = PlayerListHead;
     SystemPlayerNode* Node = Sentinel->Next;
     while (Node != Sentinel) {
         SystemPlayerNode* const Current = Node;
@@ -3682,8 +3682,8 @@ StarSystem::StarSystem(StarSystem const& Other)
 
     // FUN_06d109c0: push_back of a copy of every player view.
     {
-        SystemPlayerNode* const End = static_cast<SystemPlayerNode*>(PlayerListHead);
-        SystemPlayerNode* const SrcEnd = static_cast<SystemPlayerNode*>(Other.PlayerListHead);
+        SystemPlayerNode* const End = PlayerListHead;
+        SystemPlayerNode* const SrcEnd = Other.PlayerListHead;
         for (SystemPlayerNode* Src = SrcEnd->Next; Src != SrcEnd; Src = Src->Next) {
             SystemPlayerNode* const Node =
                 static_cast<SystemPlayerNode*>(::operator new(sizeof(SystemPlayerNode)));
@@ -3698,8 +3698,8 @@ StarSystem::StarSystem(StarSystem const& Other)
 
     // FUN_06d10a30: the same for the dock queue (FUN_06d0f830 copies each entry).
     {
-        SystemDockNode* const End = static_cast<SystemDockNode*>(DockQueueHead);
-        SystemDockNode* const SrcEnd = static_cast<SystemDockNode*>(Other.DockQueueHead);
+        SystemDockNode* const End = DockQueueHead;
+        SystemDockNode* const SrcEnd = Other.DockQueueHead;
         for (SystemDockNode* Src = SrcEnd->Next; Src != SrcEnd; Src = Src->Next) {
             SystemDockNode* const Node =
                 static_cast<SystemDockNode*>(::operator new(sizeof(SystemDockNode)));

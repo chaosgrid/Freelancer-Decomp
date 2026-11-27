@@ -161,8 +161,7 @@ namespace
     // (ivp_mindist.h, operator_new(0xc) at .text:063558fd).
     IVP_Friction_Info_For_Core* IVP_FindFrictionInfo(IVP_Core* Core, IVP_ListManager* FrictionSystem)
     {
-        return static_cast<IVP_Friction_Info_For_Core*>(
-            Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(FrictionSystem))));
+        return Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(FrictionSystem)));
     }
 }
 

@@ -27,7 +27,12 @@
 #include "common_csys.h"
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
+struct FCharacterObject;
 struct ISoundSource;
+namespace Archetype
+{
+    struct ISound;
+}
 
 // The Mask bits of ISoundControl::SetAudioProps / GetAudioProps (FThornSound LAB_00457760 /
 // LAB_00457810): bit i selects Props8[i].
@@ -99,7 +104,7 @@ struct FThornSound : FThornComponent
                                    //       faction tokens and "$BGCS_Trent_", 1 for
                                    //       "$BGCS_Faction_Rebuff_*"
     unsigned char Pad79[3];
-    void* Arch;                    // +0x7c Archetype::ISound (or VoiceMsg) to play, or null
+    Archetype::ISound* Arch;                    // +0x7c Archetype::ISound (or VoiceMsg) to play, or null
     ISoundSource* Handle;          // +0x80 the playing source, or null
     unsigned char bUseScriptFade;  // +0x84 the owning script's +0x60, set by the spawn
     unsigned char Pad85[3];
@@ -120,7 +125,7 @@ private:
     // FUN_004570a0 (thiscall, RET 8) -- resolve the voice line for the speaking character:
     // VoiceId is the character's voice (Thorn_Deformable FindActor's first out), Actor the
     // character itself. Caller: SetSpawnTable.
-    void ResolveVoice(void* VoiceId, void* Actor);
+    void ResolveVoice(void* VoiceId, FCharacterObject* Actor);
 };
 
 struct FThornPlayerEngineSound : FThornComponent

@@ -36,6 +36,7 @@
 #include <list>
 
 struct FNebulaEffect;
+struct FSpaceCamera;
 class Vector;
 struct IObjRW;
 struct DamageList;
@@ -83,7 +84,7 @@ struct FStarSphereBackground
 extern FStarSphereBackground G_StarSphereBackground; // DAT_00679900
 
 // FUN_00552e70 -- draw the background when [BACKGROUND] and STARS are on (options 0x19/0x1a).
-void StarSphereDraw(void* Camera);
+void StarSphereDraw(FSpaceCamera* Camera);
 
 // LAB_00552cd0 -- the `star_sphere` perf option (IDS 0x57b): pick the desired quality.
 void StarSphereApplyDetail(float Value);

@@ -152,13 +152,13 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (Msg == kWinNotifyScrollValue)
     {
         // The two scroll bars; any other sender is a click.
-        if (A == reinterpret_cast<uintptr_t>(static_cast<WinControl*>(ObjectiveScroll)))
+        if (A == reinterpret_cast<uintptr_t>(ObjectiveScroll))
         {
             ObjectiveFirstRow = static_cast<int>(B);
             RefreshObjectives(); // FUN_0049f7a0
             return 1;
         }
-        if (A == reinterpret_cast<uintptr_t>(static_cast<WinControl*>(BaseListScroll)))
+        if (A == reinterpret_cast<uintptr_t>(BaseListScroll))
         {
             BaseListFirstRow = static_cast<int>(B);
             RefreshBaseList(); // FUN_004a2930
@@ -676,7 +676,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     Vector MapPos;
     if (!MapPointUnderCursor(&MapPos))
         return true;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
     if (Player == nullptr)
         return true;
     double const InvScale = 1.0 / static_cast<double>(SystemScale);
@@ -1267,7 +1267,7 @@ void NeuroNetNavMap::RefreshBaseList()
     }
 
     // The scroll bar only past fifteen rows (range + 2).
-    WinControl* const Scroll = static_cast<WinControl*>(BaseListScroll);
+    WinControl* const Scroll = BaseListScroll;
     int const Extra = Count - 15;
     if (Extra <= 0)
     {

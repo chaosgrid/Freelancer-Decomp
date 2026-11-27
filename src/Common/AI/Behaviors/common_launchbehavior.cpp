@@ -78,7 +78,7 @@ LaunchBehavior::~LaunchBehavior()
 }
 
 // Slot 1, LAB_062cd790.
-bool LaunchBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool LaunchBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     if (!BindContext(Param1, Param2, Param3))                     // FUN_062d2090
         return false;
@@ -416,7 +416,7 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
 
     Vector HardpointPos;
     Matrix HardpointOrient;
-    if (ObjInspectOf(OwnerContext)->get_hardpoint("hpmount", &HardpointPos,
+    if (OwnerContext->get_hardpoint("hpmount", &HardpointPos,
                                                        &HardpointOrient) != 0)
         return;  // non-zero skips the tail
 

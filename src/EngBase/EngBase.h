@@ -155,8 +155,8 @@ struct FAggDesc18
 {
     unsigned long Size;
     const char* Name;
-    void* Inner;
-    void** Outer;
+    IDAComponent* Inner;
+    IDAComponent** Outer;
     const char* Value;
     void* SystemContainer;
 };
@@ -211,7 +211,7 @@ struct FEngineChildNode
 
 inline IEngineComponent* AsEngineComponent(IDAComponent* Object)
 {
-    return (IEngineComponent*)Object;
+    return static_cast<IEngineComponent*>(Object);
 }
 
 // Caller name wrapper (create_compound / slot 12): Text @ +0, CRC @ +4. FUN_0661f8b0 reads +4.
@@ -489,11 +489,11 @@ struct FEngineObject : IEngine
     void DestroyInstanceBody(FEngineInstance* Instance);
 
     // FUN_066201b0 (thiscall). Defined in EngBaseEngine.cpp.
-    GENRESULT LinkCmpndPartHandle(const char* Name, void* CmpndFs, unsigned long FindHandle,
+    GENRESULT LinkCmpndPartHandle(const char* Name, IFileSystem* CmpndFs, unsigned long FindHandle,
                                   IFileSystem* ParentFs, FArchetypeChild* Child);
 
     // FUN_06620500 (thiscall). Defined in EngBaseEngine.cpp.
-    GENRESULT ParseCmpndChildren(FArchetypeHandle* Handle, void* CmpndFs, IFileSystem* ParentFs);
+    GENRESULT ParseCmpndChildren(FArchetypeHandle* Handle, IFileSystem* CmpndFs, IFileSystem* ParentFs);
 
     // FUN_06622860 (thiscall). Defined in EngBaseEngine.cpp.
     FEngineInstance* CreateInstanceTree(FArchetypeHandle* Handle, IEngineInstance* Callbacks);
@@ -537,7 +537,7 @@ struct FAnimNameEntry
     FAnimNameEntry& operator=(const FAnimNameEntry&) = delete;
 
     // FUN_06611440. Defined in EngBaseAnim.cpp.
-    void LoadScriptMaps(const char* Name, void* FileSystem);
+    void LoadScriptMaps(const char* Name, IFileSystem* FileSystem);
 };
 
 // The script's name map, keyed by CRC32 of the name and compared unsigned; every walk over it
@@ -735,7 +735,7 @@ static_assert(offsetof(FTypedChannel, Instance) - offsetof(FTypedChannel, Kind) 
 static_assert(sizeof(FAnimBindOut) == 0x10, "bind descriptor is 16 bytes");
 inline FAnimBindOut* TypedBindDesc(FTypedChannel* This)
 {
-    return (FAnimBindOut*)(&This->Kind);
+    return reinterpret_cast<FAnimBindOut*>(&This->Kind);
 }
 
 // Live typed channels keyed by pointer, also shared by playback records.
@@ -1172,22 +1172,21 @@ char* FormatFdumpMessage(char* Buffer, const char* Format, ...);
 int DACOM_API EngBaseAggregationHook(void* Desc);
 GENRESULT DACOM_API StubRet8(void* This, void* A);
 GENRESULT DACOM_API StubRetC(void* This, void* A, void* B);
-IFileSystem* AsFileSystem(void* FileSystem);
 bool IsTypedChannelType(unsigned long Type);
 FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner* Owner);
 FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelArchetypeObject* Archetype);
-int FileSystemOpenNode(void* FileSystem, const char* Name);
-int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData);
-int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData);
-void FileSystemFindClose(void* FileSystem, int FindHandle);
+int FileSystemOpenNode(IFileSystem* FileSystem, const char* Name);
+int FileSystemFindFirst(IFileSystem* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData);
+int FileSystemFindNext(IFileSystem* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData);
+void FileSystemFindClose(IFileSystem* FileSystem, int FindHandle);
 void MathMulMatrix3(I3DMathEngine* Math, Matrix* Out, const Matrix* Left, const Matrix* Right);
 void MathTransformVec(I3DMathEngine* Math, Vector* Out, const Matrix* Rotation, const Vector* In);
 
 // EngBaseAnim.cpp
 extern const char* const G_FdumpFileAnim;
 extern FAnimHandleNode* G_AnimHandleHead;
-unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem);
-unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
+unsigned long LoadAnimScriptNames(FAnimScript* Script, IFileSystem* FileSystem);
+unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, IFileSystem* FileSystem,
                                        const char** Names, int Count);
 FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc);
 bool FindAnimHandle(unsigned long Key);

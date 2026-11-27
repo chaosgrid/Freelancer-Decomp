@@ -60,7 +60,7 @@ namespace
     // FUN_0054baf0 -- the player's IObjRW is the player's Gameobj (IObjRW is its first base).
     FClientGameobj* PlayerGameobj()
     {
-        return static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
+        return static_cast<FClientGameobj*>(GetPlayerObjRW());
     }
 }
 

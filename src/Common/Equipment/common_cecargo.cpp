@@ -206,14 +206,14 @@ float CECargo::GetDecayDamagePerSecond() const
     // FUN_06295710; no Arch null test.
     if (Arch->get_class_type() != Archetype::AClassCommodity)
         return 0.0f;
-    return ((Archetype::Commodity*)Arch)->get_decay_per_second();
+    return static_cast<Archetype::Commodity*>(Arch)->get_decay_per_second();
 }
 
 CECargo* __cdecl CECargo::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeCargo)
         return nullptr;
-    return (CECargo*)Equip;
+    return static_cast<CECargo*>(Equip);
 }
 
 CECargo const* __cdecl CECargo::cast(CEquip const* Equip)

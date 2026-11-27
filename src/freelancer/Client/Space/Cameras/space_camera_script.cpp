@@ -61,11 +61,6 @@ namespace
     // The bars slide over a third of a second either way.
     const float kLetterboxSpeed = 3.0f;
 
-    IScriptEngine* ScriptOf(void* Script)
-    {
-        return static_cast<IScriptEngine*>(Script);
-    }
-
     // DAT_006752c8 -- scriptcam.cpp's own lazily acquired 3DMathEngine (FUN_005b73e0). No null
     // test on the result.
     I3DMathEngine* G_ScriptCameraMathEngine = nullptr;
@@ -100,15 +95,14 @@ namespace
     }
 
     // The stored Watchable pointer minus eight (retail's inlined `Watchable::get()`).
-    void* WatchedObjectOf(const BaseWatcher& Watcher)
+    IObjRW* WatchedObjectOf(const BaseWatcher& Watcher)
     {
         if (Watcher.target() == nullptr)
             return nullptr;
-        unsigned char* const Object =
+        return reinterpret_cast<IObjRW*>(
             const_cast<unsigned char*>(
                 reinterpret_cast<const unsigned char*>(Watcher.target())) -
-            kWatchableOffset;
-        return Object;
+            kWatchableOffset);
     }
 
     // The shared head of the setup (0x0051e3b0) and the deactivate (0x0051e660): hand both
@@ -119,7 +113,7 @@ namespace
         if (Cam->Script == nullptr)
             return;
 
-        IScriptEngine* const Script = ScriptOf(Cam->Script);
+        IScriptEngine* const Script = Cam->Script;
 
         // Each handle is returned only if bound, and reset to -1.
         if (Cam->CameraEntity != -1)
@@ -130,11 +124,11 @@ namespace
         if (Cam->ObjectEntity != -1)
         {
             // Retail re-reads Script from the object here rather than reusing the register.
-            ScriptOf(Cam->Script)->DetachEntity(Cam->ObjectEntity);
+            Cam->Script->DetachEntity(Cam->ObjectEntity);
             Cam->ObjectEntity = -1;
         }
 
-        reinterpret_cast<IDAComponent*>(Cam->Script)->Release();
+        Cam->Script->Release();
 
         Cam->Script = nullptr;
         Cam->NameLength = 0;
@@ -247,11 +241,11 @@ GENRESULT DACOM_API FScriptCamObjectTransform::SetOrientation(const Matrix* /*Or
 GENRESULT DACOM_API FScriptCamObjectTransform::GetPosition(Vector* OutPosition3)
 {
     // LAB_0051e250.
-    void* const Object = WatchedObjectOf(Watched);
+    IObjRW* const Object = WatchedObjectOf(Watched);
     if (Object != nullptr)
     {
         // Cached in the sink's SECOND position field.
-        const Vector& World = static_cast<IObjInspect*>(Object)->get_position();
+        const Vector& World = Object->get_position();
         PositionB[0] = World.x;
         PositionB[1] = World.y;
         PositionB[2] = World.z;
@@ -271,11 +265,11 @@ GENRESULT DACOM_API FScriptCamObjectTransform::GetPosition(Vector* OutPosition3)
 GENRESULT DACOM_API FScriptCamObjectTransform::GetOrientation(Matrix* OutOrientation9)
 {
     // LAB_0051e2e0.
-    void* const Object = WatchedObjectOf(Watched);
+    IObjRW* const Object = WatchedObjectOf(Watched);
     if (Object != nullptr)
     {
         // get_transform (slot 3, folded with get_orientation); nine floats cached.
-        const Transform& World = static_cast<IObjInspect*>(Object)->get_transform();
+        const Transform& World = Object->get_transform();
         memcpy(OrientationB, &World, 9 * sizeof(float));
     }
 
@@ -360,7 +354,7 @@ FScriptCamera::~FScriptCamera()
     // keeps that asymmetry deliberately; see docs/re/deviations.md.
 }
 
-void FScriptCamera::Setup(const char* ScriptName, void* Object, const float* Transform12)
+void FScriptCamera::Setup(const char* ScriptName, IObjRW* Object, const float* Transform12)
 {
     // FUN_0051e3b0. No null test on `this` or on the +0x100 sink.
 
@@ -370,7 +364,7 @@ void FScriptCamera::Setup(const char* ScriptName, void* Object, const float* Tra
     // The object sink watches the new object (same short-circuit as FGameCamera::Attach).
     Watchable const* const Target =
         (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
+            ? reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char*>(Object) +
                                                  kWatchableOffset)
             : nullptr;
 
@@ -414,11 +408,11 @@ bool FScriptCamera::IsFinished()
         return true;
 
     // Lets the camera controller take the view back when a cutscene ends.
-    const GENRESULT State = ScriptOf(Script)->GetPlayState();
+    const GENRESULT State = Script->GetPlayState();
     return State == kScriptStateFinished;
 }
 
-void* ScriptCameraWatchedObject(const FScriptCamera* Cam)
+IObjRW* ScriptCameraWatchedObject(const FScriptCamera* Cam)
 {
     if (Cam == nullptr || Cam->ObjectTransform == nullptr)
         return nullptr;
@@ -454,7 +448,7 @@ bool FScriptCamera::Activate(int const* ViewRect4)
     Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);
 
     IDAComponent* const Component = reinterpret_cast<IDAComponent*>(Instance);
-    Component->QueryInterface(Iids::ScriptEngine, &Script);
+    Component->QueryInterface(Iids::ScriptEngine, reinterpret_cast<void**>(&Script));
 
     // Only the queried interface is kept.
     Component->Release();
@@ -467,7 +461,7 @@ bool FScriptCamera::Activate(int const* ViewRect4)
     // The stored name is a DATA-relative path.
     const char* const FullPath = GetFullFilename(this->Name);
 
-    const GENRESULT LoadResult = ScriptOf(Script)->LoadFromPath(FullPath);
+    const GENRESULT LoadResult = Script->LoadFromPath(FullPath);
     if (LoadResult != GR_OK)
     {
         FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ScriptCamera load failed: %s\n",
@@ -478,33 +472,32 @@ bool FScriptCamera::Activate(int const* ViewRect4)
     }
 
     // Walk every entity once and bind the two sinks.
-    const unsigned long EntityCount = ScriptOf(Script)->GetEntityCount();
+    const unsigned long EntityCount = Script->GetEntityCount();
 
     for (int Index = 0; Index < static_cast<int>(EntityCount); ++Index)
     {
         // The FIRST dword is the entity type; dereferenced without a test.
         const int* const Entity =
-            static_cast<const int*>(ScriptOf(Script)->GetEntityDescInOrder(Index));
+            static_cast<const int*>(Script->GetEntityDescInOrder(Index));
 
         if (*Entity == kScriptEntityTypeCamera)
         {
-            ScriptOf(Script)->AttachEntity(Index, CameraTransform);
+            Script->AttachEntity(Index, CameraTransform);
             CameraEntity = Index;
         }
 
         // INDEPENDENTLY of the type (no `else`), an entity carrying `main_object` drives the
         // object sink; the last matching index wins in each case.
-        const char* const MainObject = ThornGetUserString(
-            reinterpret_cast<IScriptEngine*>(Script), Index, kMainObjectProperty);
+        const char* const MainObject = ThornGetUserString(Script, Index, kMainObjectProperty);
         if (MainObject != nullptr)
         {
-            ScriptOf(Script)->AttachEntity(Index, ObjectTransform);
+            Script->AttachEntity(Index, ObjectTransform);
             ObjectEntity = Index;
         }
     }
 
     // The script starts at time zero.
-    ScriptOf(Script)->StartPlayback(0);
+    Script->StartPlayback(0);
 
     // FGameCamera's activate (FUN_0051b450), which also runs the slot-0x5c viewport reset.
     const bool bBaseResult = FGameCamera::Activate(ViewRect4);
@@ -537,13 +530,13 @@ void FScriptCamera::Update(float DeltaSeconds)
 
     // Whole milliseconds, truncated.
     const int DeltaMs = static_cast<int>(static_cast<double>(DeltaSeconds) * kSecondsToMilliseconds);
-    ScriptOf(Script)->TickPlayback(DeltaMs);
+    Script->TickPlayback(DeltaMs);
 
     // The camera sink (+0xfc, no null test) is read back through its slots, not off the fields.
     float LocalPosition[3];
     float LocalOrientation[9];
-    CameraTransform->GetPosition((Vector*)LocalPosition);        // 0x14
-    CameraTransform->GetOrientation((Matrix*)LocalOrientation);  // 0x18
+    CameraTransform->GetPosition(reinterpret_cast<Vector*>(LocalPosition));        // 0x14
+    CameraTransform->GetOrientation(reinterpret_cast<Matrix*>(LocalOrientation));  // 0x18
 
     // The script's transform is composed ONTO the stored starting one, so a script written
     // around the origin lands wherever the setup put the camera.
@@ -553,7 +546,7 @@ void FScriptCamera::Update(float DeltaSeconds)
     Transform World;
     ScriptCameraMathEngine()->MulTransform(World, AsTransform(Orientation), Local);
 
-    FSpaceCamera* const Base = (FSpaceCamera*)this;
+    FSpaceCamera* const Base = this;
     memcpy(&Base->World, &World.Rotation, 9 * sizeof(float));
     memcpy(&Base->WorldPos, &World.Translation, 3 * sizeof(float));
     Base->bViewDirty = 1;

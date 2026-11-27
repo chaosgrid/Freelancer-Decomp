@@ -45,36 +45,36 @@ struct ICamera;
 struct IRenderer2 : IDAComponent
 {
 
-    virtual int DACOM_API QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, void* F,
+    virtual int DACOM_API QueryGeometry(ArchetypeIndex A, float Lod, void* C, void* D, void* E, int* F,
                                 void* G) = 0; // slot 3
-    virtual int DACOM_API GetBounds(ArchetypeIndex Id, float Lod, void* Out) = 0; // slot 4
+    virtual int DACOM_API GetBounds(ArchetypeIndex Id, float Lod, float* Out) = 0; // slot 4
     virtual int DACOM_API GetCentroid(ArchetypeIndex Id, float Lod, void* Out) = 0; // slot 5
     virtual int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F,
                                 void* G) = 0; // slot 6
     virtual int DACOM_API RenderInstance(void* Camera, InstanceIndex Inst, float Threshold, unsigned long Flags,
                                 const Transform* Xform, void* Extra) = 0; // slot 7
-    virtual int DACOM_API GetInstanceLodCount(InstanceIndex Inst, void* Out) = 0; // slot 8
-    virtual int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, void* Out) = 0; // slot 9
+    virtual int DACOM_API GetInstanceLodCount(InstanceIndex Inst, int* Out) = 0; // slot 8
+    virtual int DACOM_API GetInstanceCurrentLod(InstanceIndex Inst, int* Out) = 0; // slot 9
     virtual int DACOM_API SetInstanceLod(InstanceIndex Inst, int Index) = 0; // slot 10
     virtual int DACOM_API GetArchetypeLodCount(ArchetypeIndex Id, int* Out) = 0; // slot 11
     virtual int DACOM_API GetArchetypeCurrentLod(ArchetypeIndex Id, int* Out) = 0; // slot 12
     virtual int DACOM_API SetArchetypeLod(ArchetypeIndex Id, int Index) = 0; // slot 13
-    virtual int DACOM_API GetArchetypeLodRange(ArchetypeIndex Id, int Index, void* OutA, void* OutB) = 0; // slot 14
+    virtual int DACOM_API GetArchetypeLodRange(ArchetypeIndex Id, int Index, float* OutA, float* OutB) = 0; // slot 14
     virtual int DACOM_API SetArchetypeLodRange(ArchetypeIndex Id, int Index, float A, float B) = 0; // slot 15
 
-    virtual int DACOM_API GetInstanceLodRange(InstanceIndex Inst, int Index, void* OutA, void* OutB) = 0; // slot 16
+    virtual int DACOM_API GetInstanceLodRange(InstanceIndex Inst, int Index, float* OutA, float* OutB) = 0; // slot 16
     virtual int DACOM_API SetInstanceLodRange(InstanceIndex Inst, int Index, float A, float B) = 0; // slot 17
-    virtual int DACOM_API QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, void* F,
+    virtual int DACOM_API QueryGeometryAtLod(ArchetypeIndex A, void* B, void* C, void* D, void* E, int* F,
                                  void* G) = 0; // slot 18
     virtual int DACOM_API SetArchetypeRootLodSelection(ArchetypeIndex Id, void* Unused, unsigned long Flags) = 0; // slot 19
     virtual int DACOM_API SetInstanceRootLodSelection(InstanceIndex Id, void* A, void* B) = 0; // slot 20
     virtual int DACOM_API GetArchetypeRootLodSelection(ArchetypeIndex Key, void* Unused, unsigned long* Out) = 0; // slot 21
-    virtual int DACOM_API GetInstanceRootLodSelection(InstanceIndex Id, void* A, void* B) = 0; // slot 22
+    virtual int DACOM_API GetInstanceRootLodSelection(InstanceIndex Id, void* A, unsigned long* B) = 0; // slot 22
 };
 
 struct IRenderComponent : IDAComponent
 {
-    virtual int DACOM_API Claim(void* File) = 0;
+    virtual int DACOM_API Claim(IFileSystem* File) = 0;
     virtual int DACOM_API CloneHandle(void* Handle) = 0; // slot 4
     virtual int DACOM_API DestroyHandle(void* Handle) = 0;
     virtual int DACOM_API QueryHandle(void* Handle, const char* Iid, void** Out) = 0; // slot 6
@@ -83,11 +83,11 @@ struct IRenderComponent : IDAComponent
     virtual int DACOM_API UpdateMeshInstance(InstanceIndex InstId, void* Arg) = 0; // slot 9
     virtual int DACOM_API QueryMeshInstance(InstanceIndex InstId, void* Handle, const char* Iid, void** Out) = 0; // slot 10
     virtual int DACOM_API UpdateMeshInstances(void* InstId) = 0; // slot 11
-    virtual int DACOM_API QueryGeometry(void* Handle, int Mode, void* A, void* B, void* C, void* D,
+    virtual int DACOM_API QueryGeometry(void* Handle, int Mode, void* A, void* B, void* C, int* D,
                                  void* E) = 0; // slot 12
-    virtual int DACOM_API GetBounds(void* Handle, float Lod, void* Out) = 0; // slot 13
+    virtual int DACOM_API GetBounds(void* Handle, float Lod, float* Out) = 0; // slot 13
     virtual int DACOM_API GetCentroid(void* Handle, float Lod, void* Out) = 0; // slot 14
-    virtual int DACOM_API SplitByPlane(void* Handle, void* A, void* B, void* C, void* D, void* E,
+    virtual int DACOM_API SplitByPlane(void* Handle, float* A, void* B, void** C, void** D, void* E,
                                  void* F) = 0; // slot 15
     virtual int DACOM_API RenderInstance(ICamera* Camera, void* Handle, InstanceIndex Inst, unsigned long Flags,
                                  const Transform* Xform, void* Extra) = 0; // slot 16
@@ -121,7 +121,7 @@ struct IVMeshPart : IDAComponent
                                 const Transform* Xform, IMaterial* Override) = 0;
     // +0x10 FUN_06c31950 (RET 8): make the group VB/IB current; fills a 12-byte VB listing
     // {VB, FVF, base vertex} and an 8-byte IB scratch {IB, start index}.
-    virtual bool DACOM_API Prepare(void* Listing, void* Scratch) = 0;
+    virtual bool DACOM_API Prepare(FVbListing* Listing, FIbScratch* Scratch) = 0;
     virtual FVmeshRef* DACOM_API GetRef() = 0;               // +0x14 FUN_06c30900
     virtual FVmeshDataHeader* DACOM_API GetHeader() = 0;     // +0x18 FUN_06c30910 (0 w/o data)
 };
@@ -150,7 +150,7 @@ struct ITriMeshAnim : IDAComponent
 // IVMeshLibrary lives at object+4 (DALib / MaterialLib::Load). 5 slots.
 struct IVMeshLibrary : IDAComponent
 {
-    virtual void* DACOM_API Load(void* File, int LodFilter) = 0;    // +0x0C
+    virtual void* DACOM_API Load(IFileSystem* File, int LodFilter) = 0;    // +0x0C
     virtual void DACOM_API Unload(void* Handle) = 0;                // +0x10
 };
 

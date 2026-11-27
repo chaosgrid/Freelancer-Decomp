@@ -433,7 +433,7 @@ CInternalEquip* __cdecl CInternalEquip::cast(CEquip* Equip)
     // RVA 0x3f320
     if (Equip == nullptr || (Equip->GetType() & kInternalEquipMask) == 0)
         return nullptr;
-    return (CInternalEquip*)(Equip);
+    return static_cast<CInternalEquip*>(Equip);
 }
 
 CInternalEquip const* __cdecl CInternalEquip::cast(CEquip const* Equip)
@@ -619,7 +619,7 @@ CExternalEquip* __cdecl CExternalEquip::cast(CEquip* Equip)
 {
     if (Equip == nullptr || (Equip->GetType() & kExternalEquipMask) == 0)
         return nullptr;
-    return (CExternalEquip*)(Equip);
+    return static_cast<CExternalEquip*>(Equip);
 }
 
 CExternalEquip const* __cdecl CExternalEquip::cast(CEquip const* Equip)
@@ -737,7 +737,7 @@ bool CEquipManager::AddNewEquipment(CEquip* Equip)
     }
 
     if (Equip->GetType() == EquipTypeCargo &&
-        ((CECargo*)Equip)->GetDecayDamagePerSecond() != 0.0f)
+        static_cast<CECargo*>(Equip)->GetDecayDamagePerSecond() != 0.0f)
         DecayingCargoCount += 1;
     return true;
 }
@@ -790,7 +790,7 @@ int CEquipManager::CleanUp(std::list<CEquip*>& List)
             continue;
         }
         if (Equip->GetType() == EquipTypeCargo &&
-            ((CECargo*)Equip)->GetDecayDamagePerSecond() != 0.0f)
+            static_cast<CECargo*>(Equip)->GetDecayDamagePerSecond() != 0.0f)
             DecayingCargoCount -= 1;
         It = List.erase(It);
         delete Equip;
@@ -965,7 +965,7 @@ CExternalEquip* CEquipManager::FindByHardpoint(CacheString const& Hardpoint)
         CEquip* Equip = Traverse(Walk);
         if (Equip == nullptr)
             return nullptr;
-        CExternalEquip* Ext = (CExternalEquip*)(Equip);
+        CExternalEquip* Ext = static_cast<CExternalEquip*>(Equip);
         if (CallDacomStricmp(Ext->GetParentHPName().Value, Hardpoint.Value) == 0)
             return Ext;
     }
@@ -1010,7 +1010,7 @@ unsigned short CEquipManager::InstToSubObjID(long Instance) const
     CEquip* Equip = const_cast<CEquipManager*>(this)->Traverse(Walk);
     while (Equip != nullptr)
     {
-        if (((CAttachedEquip*)Equip)->IsInstOnEquip(Instance))
+        if (static_cast<CAttachedEquip*>(Equip)->IsInstOnEquip(Instance))
             return Equip->Id;
         Equip = const_cast<CEquipManager*>(this)->Traverse(Walk);
     }

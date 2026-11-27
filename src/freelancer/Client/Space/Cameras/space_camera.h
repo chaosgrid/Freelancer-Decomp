@@ -12,6 +12,8 @@
 #include "common_misc.h"
 
 struct FSpaceCamera;
+struct FGameCamera;
+struct IObjRW;
 
 // Slot ids, in bytes, exactly as retail indexes them.
 // Most leaves are __stdcall (this on stack). Exceptions matching ICamera / listing:
@@ -191,17 +193,17 @@ bool SpaceCameraLoadCockpit(const char* CockpitIniPath);
 // FUN_00549e70. ModeName is one of "player", "first_person", "third_person", "turret",
 // "rearview", "death", "script", "static", "docking"; anything else selects nothing and
 // returns null, exactly as retail does. Returns the selected camera.
-FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget);
+FGameCamera* SwitchSpaceCameraMode(const char* ModeName, IObjRW* AttachTarget);
 
 // The camera FUN_00549e70 last selected, or null before the first successful switch.
-FSpaceCamera* GetActiveSpaceCamera();
+FGameCamera* GetActiveSpaceCamera();
 
 // FUN_0054bc30 / FUN_0054bc40 / FUN_0054bc50 (cdecl) -- the addresses of
 // the first-person (0x00678ba4), third-person (0x00678d48) and turret (0x00678f60) cameras
 // inside the in-flight controller. Caller: the tunnel particle's visibility slot 0x005134c0.
-FSpaceCamera* GetFirstPersonSpaceCamera();
-FSpaceCamera* GetThirdPersonSpaceCamera();
-FSpaceCamera* GetTurretSpaceCamera();
+FGameCamera* GetFirstPersonSpaceCamera();
+FGameCamera* GetThirdPersonSpaceCamera();
+FGameCamera* GetTurretSpaceCamera();
 
 // FUN_0054bd50 (cdecl, no arguments) -- `if (DAT_00679738) DAT_00679738->+0xbc = 1`: the active
 // camera's FlagBC raised, the same flag a hard cut raises (FUN_00549bc0). Callers: the jump-in
@@ -251,7 +253,7 @@ void BeginDockingCameraSequence(float Seconds);
 // Transform12 (nine orientation floats then three of position; null keeps the stored one), switch
 // to "script" when the controller exists, and raise the latch below. Caller: the IClient
 // REQUESTSPACESCRIPT handler LAB_0053d9d0 (0x0053d9ff / 0x0053da7f).
-void SetupSpaceScriptCamera(void* Object, const float* Transform12, const char* ScriptName);
+void SetupSpaceScriptCamera(IObjRW* Object, const float* Transform12, const char* ScriptName);
 
 // FUN_0054bc90 -- DAT_00679740 = SpaceApp + 0xba8: set to 1 by FUN_0054bb10, cleared by the
 // space frame (0x0054b1fa), the teardown (0x0054af2e) and the ctor. Reader: FCommChannel::
@@ -276,7 +278,7 @@ bool SpaceCameraIsHardCut(const float* OldOrientation, const float* NewOrientati
 // its clear colour and clear (FUN_0051b500); make it active and the sound listener
 // (FUN_0040f140); raise its +0xbc when the view jumps. Passing null deactivates. bForce
 // reinstalls even when the camera is already the active one.
-void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce);
+void InstallSpaceCamera(FGameCamera* NewCam, bool bForce);
 
 // The camera block of the space teardown FUN_0054aec0 (0x0054aef4): FUN_00518410 on the
 // first-person camera releases its cockpit mesh; the calls on the other three cockpit cameras

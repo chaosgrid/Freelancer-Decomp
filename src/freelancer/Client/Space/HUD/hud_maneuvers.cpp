@@ -24,6 +24,7 @@
 #include "NeuroNet/nn_modal.h"
 #include "NeuroNet/nn_button_control.h"   // NnButtonControl::MontageTile (+0x338)
 #include "NeuroNet/nn_montage_draw.h"     // FindButtonMontageTile (FUN_0055a360)
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_ui_pulse.h"
 #include "Core/perf_options.h"
 #include "Space/player_behavior.h"
@@ -328,7 +329,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         return true;
     }
 
-    CShip* const Ship = PlayerShip(static_cast<IObjRW*>(GetPlayerObjRW()));
+    CShip* const Ship = PlayerShip(GetPlayerObjRW());
     if (Ship == nullptr)
         return false;
     IBehaviorManager* const Behavior = Ship->get_behavior_interface();
@@ -413,7 +414,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
             HudPostCommand(USER_AUTO_TURRET, 0);
             return true;
         }
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (Player == nullptr)
             return true;
         // A non-ship player object gives a null CShip, which retail hands to is_launching as
@@ -625,7 +626,7 @@ intptr_t HUD_Maneuvers::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     (void)B;
     if (Msg != kWinNotifyClick)
         return 0;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return 0;
     // The behaviour manager is fetched and not used (no null test on the ship).
@@ -646,7 +647,7 @@ intptr_t HUD_Maneuvers::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 void HUD_Maneuvers::UpdateButtons()
 {
     // FUN_004d88f0.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return;
     IBehaviorManager* const Behavior = PlayerShip(Player)->get_behavior_interface();
@@ -792,7 +793,7 @@ void HUD_Maneuvers::UpdateTabAndCruise(int BehaviorId)
 bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
 {
     // FUN_004d8e20.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return false;
     // A non-ship player object gives a null CShip, which retail passes to
@@ -996,7 +997,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
 void HUD_Maneuvers::ActivateManeuver(FHudManeuver* Maneuver)
 {
     // FUN_004d9470.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return;
     if (HudIsMousePickBlocked())
@@ -1047,7 +1048,7 @@ void HUD_Maneuvers::SetFrameButtonCount(int Count)
     {
         // Count the maneuvers the manager does not refuse.
         Count = 0;
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (Player == nullptr)
             return;
         IBehaviorManager* const Behavior = PlayerShip(Player)->get_behavior_interface();
@@ -1082,7 +1083,7 @@ void HUD_Maneuvers::SetFrameButtonCount(int Count)
 bool HUD_Maneuvers::IsTargetTradeLaneDisrupted()
 {
     // FUN_004d9750.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return false;
     CShip* const Ship = PlayerShip(Player);

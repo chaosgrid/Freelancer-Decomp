@@ -122,7 +122,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API ClearNodeLibrary() override;
         // FUN_062277e0: "#N" collision-avoidance MakeUniqueName, checked
         // against this object's own table (not FAlchemy's).
-        GENRESULT DACOM_API MakeUniqueName(void* Name, void* Out) override;
+        GENRESULT DACOM_API MakeUniqueName(const char* Name, const char** Out) override;
         // LAB_06227710: find the prototype by hash, then CloneNode(Out).
         // Miss = GR_ALE_CREATE_FAIL (-8), output untouched.
         GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) override;

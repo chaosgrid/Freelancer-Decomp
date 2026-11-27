@@ -56,7 +56,7 @@ public:
     TrailBehavior& operator=(TrailBehavior const&) = delete;
 
     // Slot 1, LAB_062ca570 (RET 0xc).
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
     // Slot 3, LAB_062ca640 (RET 0): re-arm from the personality's TrailUseStruct.
     void OnEngage() override;
     // Slot 4, FUN_062ca7b0 (RET 0): release everything, then Behavior::OnDisengage.

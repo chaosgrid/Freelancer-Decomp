@@ -48,8 +48,8 @@ namespace CmnUniverse
         , SpaceMusicId(0)
     {
         NicknameId = 0;         // +0x4c
-        ((CacheString*)&Nickname)->clear(); // +0x50
-        ((CacheString*)&File)->clear();     // +0x70
+        reinterpret_cast<CacheString*>(&Nickname)->clear(); // +0x50
+        reinterpret_cast<CacheString*>(&File)->clear();     // +0x70
         StridName = 0;          // +0x68
         IdsInfo = 0;            // +0x6c
         Visit = 0;              // +0x64
@@ -153,7 +153,7 @@ namespace CmnUniverse
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
-            Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
+            Universe::IZone const* Zone = static_cast<Universe::IZone const*>(Result.Items[Index]);
             if (SphereCull(*Query, Zone))
                 continue;
             unsigned Flags = Zone->GetProperties();
@@ -189,7 +189,7 @@ namespace CmnUniverse
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
-            Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
+            Universe::IZone const* Zone = static_cast<Universe::IZone const*>(Result.Items[Index]);
             if (!SphereCull(*Query, Zone))
                 Combined |= Zone->GetProperties();
         }
@@ -217,7 +217,7 @@ namespace CmnUniverse
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
-            Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
+            Universe::IZone const* Zone = static_cast<Universe::IZone const*>(Result.Items[Index]);
             if (!Zone->InZone(*Point, 0.0f))
                 continue;
             float Radius = Zone->GetRadius();
@@ -252,7 +252,7 @@ namespace CmnUniverse
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
-            Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
+            Universe::IZone const* Zone = static_cast<Universe::IZone const*>(Result.Items[Index]);
             if (!Zone->HasPhysicalEffect())
                 continue;
             float Radius = Zone->GetRadius();
@@ -288,7 +288,7 @@ namespace CmnUniverse
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
-            Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
+            Universe::IZone const* Zone = static_cast<Universe::IZone const*>(Result.Items[Index]);
             if ((Mask & Zone->GetProperties()) == 0)
                 continue;
             float Radius = Zone->GetRadius();

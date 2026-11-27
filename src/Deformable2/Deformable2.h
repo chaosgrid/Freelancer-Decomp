@@ -278,7 +278,7 @@ struct FAggDesc18
 {
     unsigned long Size;
     const char* NameAt4;
-    void* Outer;
+    IDAComponent* Outer;
     void** InnerOut;
     unsigned long Pad10;
     IDAComponent* SystemAt14;
@@ -558,8 +558,8 @@ struct FIkEvent : IChannelOwner
     int EndJoint;            // +0x14
     void** Channels;         // +0x18
     Quaternion* Quats;       // +0x1C count * 0x10
-    void* TargetA;           // +0x20 desc+0x10
-    void* TargetB;           // +0x24 desc+0x14
+    Vector* TargetA;         // +0x20 desc+0x10
+    Matrix* TargetB;         // +0x24 desc+0x14
     // +0x28 desc+0x0C: bit 0 TargetA is a point (else a direction), 0x20 / 0x40 position /
     // orientation target, 0x80 no rest pull and no joint-limit clamp.
     unsigned long AimFlags;
@@ -664,6 +664,9 @@ static_assert(offsetof(FDeformPart, Ib) == 0x24, "part IB descriptor +0x24");
 static_assert(offsetof(FDeformPart, Flags) == 0x30, "part flags +0x30");
 static_assert(sizeof(FDeformPart) == 0x34, "part is 0x34");
 
+// Callback of FDeformInstance::WalkHardpoints: bone instance, hardpoint name, user data.
+typedef void(__cdecl* FHardpointUserFn)(InstanceIndex, char const*, void*);
+
 // Playback notifications forward to the caller-provided channel sink.
 struct FDeformInstance : IChannelSink
 {
@@ -719,7 +722,7 @@ struct FDeformInstance : IChannelSink
                       void* ArgG, void* ArgH, InstanceIndex Joint);
 
     // FUN_065f59d0. Defined in DeformableObject.cpp.
-    unsigned char WalkHardpoints(void* UserFn, void* UserData);
+    unsigned char WalkHardpoints(FHardpointUserFn UserFn, void* UserData);
 };
 
 static_assert(sizeof(FDeformableFactory) == 0x0C, "factory must be 0xC");

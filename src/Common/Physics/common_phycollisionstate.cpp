@@ -47,7 +47,7 @@ PhySys::PhyCollisionStateManager::~PhyCollisionStateManager()
     IVP_Real_Object* const Body = OwnerObject->BodyPtr;
     if (Body == nullptr)
         return;
-    IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->controller_phantom;
+    IVP_Controller_Phantom* const Phantom = Body->controller_phantom;
     if (Phantom == nullptr)
         return;
     Phantom->remove_listener_phantom(this);
@@ -115,7 +115,7 @@ void PhySys::PhyCollisionStateManager::enable_collisions(bool bEnable, bool bImm
         Template.client_data = (void*)(uintptr_t)1;
         OwnerObject->BodyPtr->convert_to_phantom(&Template);
         IVP_Real_Object* const Converted = OwnerObject->BodyPtr;
-        ((IVP_Controller_Phantom*)Converted->controller_phantom)->add_listener_phantom(this);
+        Converted->controller_phantom->add_listener_phantom(this);
     }
 
     OwnerObject->BodyPtr->enable_collision_detection(true);
@@ -188,7 +188,7 @@ namespace
     // Pair[0]->client_data (+0xa4) is the owner, else Pair[0].
     IVP_Real_Object* PhySys_SelectOther(IVP_Real_Object* const Pair[2], CObject const* Owner)
     {
-        return (Owner == (CObject*)Pair[0]->client_data) ? Pair[1] : Pair[0];
+        return (Owner == Pair[0]->client_data) ? Pair[1] : Pair[0];
     }
 
     // The intruder filter both volume callbacks inline: an object without a client is
@@ -250,7 +250,7 @@ CObject* PhySys::PhyCollisionStateManager::mindist_to_cobject(IVP_Mindist_Base* 
     // FUN_06281970: the non-owner member's client.
     IVP_Real_Object* Pair[2];
     PhySys_GetMindistObjects(MindistBase, Pair);
-    return (CObject*)PhySys_SelectOther(Pair, OwnerObject)->client_data;
+    return static_cast<CObject*>(PhySys_SelectOther(Pair, OwnerObject)->client_data);
 }
 
 // FUN_062817c0
@@ -267,19 +267,19 @@ int PhySys::PhyCollisionStateManager::get_intruding_cobjs(bool bRoot, CheapSet<C
     IVP_Real_Object* const Body = OwnerObject->BodyPtr;
     if (Body != nullptr)
     {
-        IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->controller_phantom;
+        IVP_Controller_Phantom* const Phantom = Body->controller_phantom;
         if (Phantom != nullptr)
         {
             // SizeMm + 1 slots, the bound re-read on every pass.
             for (int Slot = 0; Slot < Phantom->mindist_set.SizeMm + 1; ++Slot)
             {
-                IVP_Mindist_Base* const Mindist = ((FVHashSlot*)Phantom->mindist_set.Elems)[Slot].Elem;
+                IVP_Mindist_Base* const Mindist = (reinterpret_cast<FVHashSlot*>(Phantom->mindist_set.Elems))[Slot].Elem;
                 if (Mindist == nullptr)
                     continue;
 
                 IVP_Real_Object* Pair[2];
                 PhySys_GetMindistObjects(Mindist, Pair);
-                CObject* const Client = (CObject*)PhySys_SelectOther(Pair, OwnerObject)->client_data;
+                CObject* const Client = static_cast<CObject*>(PhySys_SelectOther(Pair, OwnerObject)->client_data);
                 if (Client == nullptr)
                     continue;
 

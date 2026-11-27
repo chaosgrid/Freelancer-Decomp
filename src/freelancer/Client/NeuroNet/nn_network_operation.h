@@ -34,6 +34,8 @@
 
 #include <stddef.h>
 
+class NnTextControl;
+
 class NnNetworkOperation : public WinControl, public EventHandler
 {
 public:
@@ -58,7 +60,7 @@ public:
     void* ResultArg;               // +0x334
     unsigned char bCursorDrawFlag; // +0x338
     unsigned char Pad339[3];       // +0x339
-    WinControl* ExitText;          // +0x33c
+    NnTextControl* ExitText;       // +0x33c
 
     // Port-only helper for the close retail inlines at 0x004723e3, 0x00472463 and in
     // FUN_00473b60: resume, the callback with 0, release the mouse, delete the window.

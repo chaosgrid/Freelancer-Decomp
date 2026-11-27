@@ -42,7 +42,7 @@ public:
     // 101 +0x194 LAB_00525480: Other->OnSurfaceCollisionHit(A, D, this, SUBOBJ_ID_NONE); then
     // an active asteroid hit by a munition ((class & 7) == 7) explodes at A and, when the shot
     // is the player's and the owner's zone is lootable, may drop loot (IServer::MineAsteroid).
-    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 LAB_005255e0: deactivate, collisions off, the companion's effect dropped,
     // then the explosion (process must be 2) at Pos or get_position().
     void Explode(Vector const* Pos) override;

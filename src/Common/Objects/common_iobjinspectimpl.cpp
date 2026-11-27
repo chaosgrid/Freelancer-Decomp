@@ -166,7 +166,7 @@ int IObjInspectImpl::get_good_id(unsigned& OutId) const
     // FUN_062bf230. The loot's contents archetype (+0xec, no null test), not the crate's.
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassLoot) == CObject::ClassLoot)
     {
-        OutId = Arch2Good(((CLoot const*)Object)->ContentsArch->Nickname.Id);
+        OutId = Arch2Good(static_cast<CLoot const*>(Object)->ContentsArch->Nickname.Id);
         return 0;
     }
     return -3;
@@ -539,12 +539,12 @@ int IObjInspectImpl::get_target(IObjRW*& OutTarget) const
 {
     // FUN_062bfc00. No null test on Object; the class is compared exactly, not masked.
     if (Object->ObjectClass == CObject::ClassGuided) {
-        CGuided const* G = (CGuided const*)Object;
+        CGuided const* G = static_cast<CGuided const*>(Object);
         OutTarget = G->get_target();
         return 0;
     }
     if (Object->ObjectClass == CObject::ClassShip) {
-        CShip const* Sh = (CShip const*)Object;
+        CShip const* Sh = static_cast<CShip const*>(Object);
         OutTarget = Sh->get_target();
         return 0;
     }
@@ -995,13 +995,13 @@ int IObjInspectImpl::get_subtarget(unsigned short& OutSub) const
     // FUN_062c0200. As get_target: no null test, exact class compare.
     if (Object->ObjectClass == CObject::ClassGuided)
     {
-        CGuided const* G = (CGuided const*)Object;
+        CGuided const* G = static_cast<CGuided const*>(Object);
         OutSub = G->SubTarget;
         return 0;
     }
     if (Object->ObjectClass == CObject::ClassShip)
     {
-        CShip const* S = (CShip const*)Object;
+        CShip const* S = static_cast<CShip const*>(Object);
         OutSub = S->get_sub_target();
         return 0;
     }
@@ -1062,7 +1062,7 @@ int IObjInspectImpl::get_scanlist(ScanList const*& OutList, uint Type, bool bFla
     OutList = nullptr;
     CEqObj* Eq = InspectEqObj(Object);
     CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(EquipTypeScanner));
-    CEScanner* Scanner = (CEScanner*)Equip;
+    CEScanner* Scanner = static_cast<CEScanner*>(Equip);
     if (Scanner == nullptr)
     {
         return -2;

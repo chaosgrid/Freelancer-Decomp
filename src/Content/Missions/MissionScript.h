@@ -154,32 +154,32 @@ struct FMissionScript : FMissionObject
     void LoadMissionIni(char const* IniPath);
 
     // FUN_06eb8f50 case 1 -> FUN_06eb9dc0: base enter.
-    void OnBaseEnter(void const* MessageParms);
+    void OnBaseEnter(unsigned int const* Parms);
     // FUN_06eb8f50 case 2 -> FUN_06eb9ef0: base exit.
-    void OnBaseExit(void const* MessageParms);
+    void OnBaseExit(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x1b -> FUN_06eba350: character selected in a bar.
-    void OnCharacterSelect(void const* MessageParms);
+    void OnCharacterSelect(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x2a -> FUN_06eba530: location exit.
-    void OnLocationExit(void const* MessageParms);
+    void OnLocationExit(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x2c -> FUN_06eba030: the player's answer to the offer.
     void OnOfferResponse(void const* MessageParms);
     // FUN_06eb8f50 case 0x36 -> FUN_06eba720: space enter (dialog costume hints).
-    void OnSpaceEnter(void const* MessageParms);
+    void OnSpaceEnter(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x39 -> FUN_06ebaae0: object destroyed.
-    void OnObjectDestroyed(void const* MessageParms);
+    void OnObjectDestroyed(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x3b -> FUN_06eba860: system enter.
-    void OnSystemEnter(void const* MessageParms);
+    void OnSystemEnter(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x3b -> FUN_06eba1f0: the reputation offer pop-up.
-    void OnSystemEnterPopUp(void const* MessageParms);
+    void OnSystemEnterPopUp(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x24 -> FUN_06eb9cd0: the player aborts the live mission (state
     // message shown, bPendingDestroy set).
-    void OnAbortMission(void const* MessageParms);
+    void OnAbortMission(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x1005 -> FUN_06eb99a0: the player's ship provoked a victim; the mission
     // fails unless the victim was hostile or carries a friendly-fire-off label.
-    void CheckFriendlyFire(void const* MessageParms);
+    void CheckFriendlyFire(unsigned int const* Parms);
     // FUN_06eb8f50 case 0x100b -> FUN_06eba8f0: restart an unfinished RTC script, resend the
     // first objective.
-    void OnPlayerMissionChanged(void const* MessageParms);
+    void OnPlayerMissionChanged(unsigned int const* Parms);
     // FUN_06ebabb0: the [MissionState] body of the save (message 4).
     void SaveMissionState(FILE* File);
     // FUN_06ebae10: the save load (message 5).

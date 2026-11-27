@@ -121,7 +121,7 @@ void IVP_Environment::fire_event_pre_collision(IVP_Event_Collision* arg)
 {
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_PRE_COLLISION) != 0)
         {
             Listener->event_pre_collision(arg);
@@ -138,7 +138,7 @@ void IVP_Environment::fire_event_object_revived(IVP_Environment_Object_Notify_Ev
 {
     for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_revived(event_data);
+        object_listeners.elems[i]->event_object_revived(event_data);
     }
 }
 
@@ -150,8 +150,7 @@ void IVP_Environment::notify_object_removed_from_collision_detection(IVP_Real_Ob
 {
     for (int i = static_cast<int>(collision_delegator_roots.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Collision_Delegator_Root* Delegator =
-            static_cast<IVP_Collision_Delegator_Root*>(collision_delegator_roots.elems[i]);
+        IVP_Collision_Delegator_Root* Delegator = collision_delegator_roots.elems[i];
         Delegator->object_is_removed_from_collision_detection(arg);
     }
 }
@@ -194,9 +193,9 @@ void IVP_Environment::free_buffer_node_list()
 // ============================================================================
 // FUN_0634ce60
 // ============================================================================
-void IVP_Environment::add_listener_object(void* listener)
+void IVP_Environment::add_listener_object(IVP_Listener_Object* listener)
 {
-    object_listeners.Add(static_cast<IVP_Listener_Object*>(listener));
+    object_listeners.Add(listener);
 }
 
 // ============================================================================
@@ -207,7 +206,7 @@ void IVP_Environment::fire_event_object_deleted(IVP_Environment_Object_Notify_Ev
 {
     for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_deleted(arg);
+        object_listeners.elems[i]->event_object_deleted(arg);
     }
 }
 
@@ -215,7 +214,7 @@ void IVP_Environment::fire_event_object_frozen(IVP_Environment_Object_Notify_Eve
 {
     for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_frozen(arg);
+        object_listeners.elems[i]->event_object_frozen(arg);
     }
 }
 
@@ -224,7 +223,7 @@ void IVP_Environment::fire_event_object_created(IVP_Environment_Object_Notify_Ev
 {
     for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_created(arg);
+        object_listeners.elems[i]->event_object_created(arg);
     }
 }
 
@@ -236,7 +235,7 @@ void IVP_Environment::notify_friction_created(void* arg)
 {
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) != 0)
         {
             Listener->event_friction_created(arg);
@@ -248,7 +247,7 @@ void IVP_Environment::notify_friction_deleted(void* arg)
 {
     for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & IVP_LISTENER_COLLISION_CALLBACK_FRICTION) != 0)
         {
             Listener->event_friction_deleted(arg);
@@ -259,9 +258,9 @@ void IVP_Environment::notify_friction_deleted(void* arg)
 // ============================================================================
 // FUN_0634d050
 // ============================================================================
-void IVP_Environment::add_listener_collision(void* listener)
+void IVP_Environment::add_listener_collision(IVP_Listener_Collision* listener)
 {
-    collision_listeners.Add(static_cast<IVP_Listener_Collision*>(listener));
+    collision_listeners.Add(listener);
 }
 
 // ============================================================================
@@ -342,7 +341,7 @@ void IVP_Environment::destroy()
         // PSI listeners, last to first.
         for (int i = static_cast<int>(psi_listeners.n_elems) - 1; i >= 0; --i)
         {
-            static_cast<IVP_Listener_PSI*>(psi_listeners.elems[i])->environment_will_be_deleted(this);
+            psi_listeners.elems[i]->environment_will_be_deleted(this);
         }
 
         // FUN_06345450: deleting destructor when set.
@@ -427,8 +426,7 @@ void IVP_Environment::destroy()
         // n_elems read once, elems re-read per pass; slot 6 with the environment.
         for (int i = static_cast<int>(collision_delegator_roots.n_elems) - 1; i >= 0; --i)
         {
-            IVP_Collision_Delegator_Root* Delegator =
-                static_cast<IVP_Collision_Delegator_Root*>(collision_delegator_roots.elems[i]);
+            IVP_Collision_Delegator_Root* Delegator = collision_delegator_roots.elems[i];
             Delegator->environment_is_going_to_be_deleted_event(this);
         }
         collision_delegator_roots.Clear();
@@ -500,7 +498,7 @@ void IVP_Environment::fire_event_PSI()
     Event.environment = this;
     for (int32_t I = static_cast<int32_t>(psi_listeners.n_elems) - 1; I >= 0; --I)
     {
-        IVP_Listener_PSI* Listener = static_cast<IVP_Listener_PSI*>(psi_listeners.elems[I]);
+        IVP_Listener_PSI* Listener = psi_listeners.elems[I];
         Listener->event_PSI(&Event);
     }
 }
@@ -827,12 +825,12 @@ void* IVP_Environment_Init_Block34(void* block34)
 // called on IVP_Environment+0x88 (freeze_check_dtime) by the constructor.
 // 0x3e99999a is 0.3f.
 // ============================================================================
-void IVP_Freeze_Manager_Init(void* FreezeManager)
+void IVP_Freeze_Manager_Init(float* FreezeManager)
 {
-    *static_cast<float*>(FreezeManager) = 0.3f;
+    *FreezeManager = 0.3f;
 }
 
-void* IVP_Freeze_Manager_Construct(void* FreezeManager)
+float* IVP_Freeze_Manager_Construct(float* FreezeManager)
 {
     IVP_Freeze_Manager_Init(FreezeManager);
     return FreezeManager;
@@ -928,9 +926,8 @@ void IVP_Sim_Unit_Manager::DestroyContents()
 // IVP_Time_Event_PSI (new(8), vtable 063a574c). The PSI event is scheduled at
 // key 0.0f (TimeBase is still zero).
 // ============================================================================
-void* IVP_SimUnitManager_Construct(void* self)
+IVP_Sim_Unit_Manager* IVP_SimUnitManager_Construct(IVP_Sim_Unit_Manager* Self)
 {
-    IVP_Sim_Unit_Manager* Self = static_cast<IVP_Sim_Unit_Manager*>(self);
     std::memset(Self, 0, sizeof(IVP_Sim_Unit_Manager)); // 7 dwords
 
     Self->EventManager = new IVP_Event_Manager();
@@ -1431,14 +1428,14 @@ IVP_Environment* IVP_Environment::construct(IVP_Environment_Manager* Registry,
         collision_filter = new IVP_Collision_Filter_Coll_Group_Ident(1);
     }
 
-    anomaly_manager = static_cast<IVP_Anomaly_Manager*>(Parms->AnomalyManager);
+    anomaly_manager = Parms->AnomalyManager;
     if (anomaly_manager == nullptr)
     {
         // operator new(8), FUN_06360eb0(1), vtable 063a5784.
         anomaly_manager = new IVP_Anomaly_Manager(1);
     }
 
-    anomaly_limits = static_cast<IVP_Anomaly_Limits*>(Parms->AnomalyLimits);
+    anomaly_limits = Parms->AnomalyLimits;
     if (anomaly_limits == nullptr)
     {
         // operator new(0x14), FUN_06360e30(1), vtable 063a577c.
@@ -1446,13 +1443,13 @@ IVP_Environment* IVP_Environment::construct(IVP_Environment_Manager* Registry,
     }
 
     // Same adopt-or-construct choice, but appended to collision_delegator_roots.
-    void* CollisionDelegatorRoot = Parms->CollisionDelegatorRoot;
+    IVP_Collision_Delegator_Root* CollisionDelegatorRoot = Parms->CollisionDelegatorRoot;
     if (CollisionDelegatorRoot == nullptr)
     {
         // operator new(4), FUN_06360df0: the default delegator (vtable 063a5760).
-        CollisionDelegatorRoot = static_cast<IVP_Collision_Delegator_Root*>(new IVP_Collision_Delegator_Root_Mindist());
+        CollisionDelegatorRoot = new IVP_Collision_Delegator_Root_Mindist();
     }
-    collision_delegator_roots.Add(static_cast<IVP_Collision_Delegator_Root*>(CollisionDelegatorRoot));
+    collision_delegator_roots.Add(CollisionDelegatorRoot);
 
     // Adopted verbatim, never constructed here.
     universe_manager = Parms->UniverseManager;
@@ -1492,9 +1489,9 @@ IVP_Environment* IVP_Environment::construct(IVP_Environment_Manager* Registry,
     cluster_manager = new IVP_Cluster_Manager(this);           // ctor 0634ad70
     sim_units_manager = new IVP_Sim_Units_Manager(this);       // ctor 06349380
     {
-        void* p = ::operator new(0x1C);
+        IVP_Sim_Unit_Manager* p = static_cast<IVP_Sim_Unit_Manager*>(::operator new(0x1C));
         IVP_SimUnitManager_Construct(p);                           // FUN_063608a0
-        sim_unit_manager = static_cast<IVP_Sim_Unit_Manager*>(p);
+        sim_unit_manager = p;
     }
     mindist_manager = new IVP_Mindist_Manager(this);           // ctor 06350390
     ov_tree_manager = new IVP_OV_Tree_Manager();              // ctor 0635c410

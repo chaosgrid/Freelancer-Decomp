@@ -122,12 +122,12 @@ float Behavior_GetDistanceTravelled(IObjInspect const* Obj, float Throttle, floa
 // FUN_062e59b0. Retail inlines the slot calls of Behavior_GetSpeed / GetTimeToAccelerate / GetDistanceTravelled
 // (their null tests and the 0/0 early-out drop away because the arguments are known);
 // the clamps that remain are reproduced in retail's order.
-float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector)
+float Behavior_QueryChainedRadiusEffect(IObjInspect const* Obj, float Radius, int Selector)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
 
-    IObjInspect const* const Inspect = ObjInspectOf(Obj);
+    IObjInspect const* const Inspect = Obj;
     ThrustEquipType const Type = (ThrustEquipType)Selector;
 
     // Value stays on the FPU.
@@ -156,7 +156,7 @@ float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector)
 }
 
 // FUN_062e5ab0. See common_behavior.h.
-float Behavior_GetCoastDistance(void* Obj, float Speed)
+float Behavior_GetCoastDistance(IObjInspect const* Obj, float Speed)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
@@ -164,7 +164,7 @@ float Behavior_GetCoastDistance(void* Obj, float Speed)
         return 0.0f;
 
     // Throttle 0, 1000 s (DAT_063a0760); thrust type fixed to literal 1.
-    return Behavior_GetDistanceTravelled(ObjInspectOf(Obj), 0.0f, Speed, 1000.0f, ThrustEquipEngine);
+    return Behavior_GetDistanceTravelled(Obj, 0.0f, Speed, 1000.0f, ThrustEquipEngine);
 }
 
 // FUN_062e5bc0. Slot 0xdc (get_initial_speed_to_coast_distance). See common_behavior.h.
@@ -205,9 +205,9 @@ float Behavior_GetProjectedAxisThrottleXY(IObjInspect const* Obj, float Value)
 // FUN_062e61f0: a `Node->vtbl[0xc](Node)` tail-thunk, no null test. Slot 0xc is
 // get_transform(); slots 3 and 4 are COMDAT-folded onto one address, so the pointer this hands
 // back is equally the object's orientation Matrix (common_iface.h).
-Transform const* Behavior_GetTransform(void* Node)
+Transform const* Behavior_GetTransform(IObjInspect const* Node)
 {
-    return &ObjInspectOf(Node)->get_transform();
+    return &Node->get_transform();
 }
 
 // ============================================================================
@@ -264,15 +264,15 @@ void Behavior::OnDisengage()
 }
 
 // FUN_062d2090, RET 0xc. get_id is IObjInspect slot 0x20.
-bool Behavior::BindContext(void* Owner, void* Manager, void* Sys)
+bool Behavior::BindContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     if (Owner == nullptr || Sys == nullptr)
         return false;
-    OwnerContext = static_cast<IObjRW*>(Owner);
-    unsigned int const Id = ObjInspectOf(Owner)->get_id();
-    SysMgr = static_cast<SystemManager*>(Sys);
+    OwnerContext = Owner;
+    unsigned int const Id = OwnerContext->get_id();
+    SysMgr = Sys;
     OwnerId = Id;
-    BehaviorMgr = static_cast<IBehaviorManager*>(Manager);
+    BehaviorMgr = Manager;
     return true;
 }
 
@@ -305,10 +305,10 @@ void Behavior::SetAvoidanceAllowed(int Value, int Mask)
 // IBehaviorManager and every subclass.
 void Behavior::set_afterburner(bool bOn)
 {
-    void* const Head = const_cast<Watchable*>(SysMgr->Watcher.target());
+    Watchable* const Head = const_cast<Watchable*>(SysMgr->Watcher.target());
     bool bCruise = false;
     bool bTradeLane = false;
-    (void)ObjInspectOf(ObjRwFromWatchable(Head))->is_cruise_active(bCruise, bTradeLane);
+    (void)ObjRwFromWatchable(Head)->is_cruise_active(bCruise, bTradeLane);
 
     if (bCruise && !bTradeLane)
         return;

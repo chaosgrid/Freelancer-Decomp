@@ -98,7 +98,7 @@ public:
     bool IsClearanceState() const;
 
     // Slots 24 and 26, LAB_062c2fe0: Watcher324's watched pointer minus 8, or null.
-    void* GetWatchedRawBlock() const;
+    IObjRW* GetWatchedRawBlock() const;
 
     // Slot 7, LAB_062c3b70 (RET 0): early outs 2/3, the player-owner docking-target
     // health latch (Flag39b, IObjAffect slot_6c), release of both Ideas while the target
@@ -139,8 +139,8 @@ public:
     // `(Flags28 >> 1) & 1`.
     bool CopyDockOp(pub::AI::DirectiveDockOp* Out) const;
     // 24 / 26: both LAB_062c2fe0 -- Watcher324's object (target - 8) or null.
-    IObjRW const* get_target() override { return static_cast<IObjRW const*>(GetWatchedRawBlock()); }
-    void* GetDockTarget() override { return GetWatchedRawBlock(); }
+    IObjRW const* get_target() override { return GetWatchedRawBlock(); }
+    IObjRW* GetDockTarget() override { return GetWatchedRawBlock(); }
 
     // IObjAffect::RequestCB override, the secondary vtable's only slot (LAB_062c53f0);
     // reaches EnterState and FUN_062c50e0 with this-0x2c.
@@ -151,7 +151,7 @@ public:
     // (OwnerContext, SysMgr, raw Param2), zeroes Opaque444 (+0x444..+0x44c) and
     // Flags28 bit 0x2, and when the "hpmount" hardpoint lookup fails rebuilds
     // OrientMatrix3d8 from the SysMgr's own target. Returns the binder's result.
-    bool SetContext(void* Param1, void* Param2, void* Param3) override;
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3) override;
 
     // Slot 3, LAB_062c3720. Early-outs to `EnterState(0xd)` if
     // Watcher324's watched block is gone; otherwise resets several per-tick
@@ -297,8 +297,8 @@ public:
     // +0x388 (4 bytes, a pointer to a polymorphic object): out-param 1 of
     // OwnerContext->vtbl[0x138] in RecomputeApproach (out-params +0x388 / +0x3cc /
     // +0x38c); UpdateApproachTail null-tests it (.text:062c4a2c) and calls its vtbl+0x20
-    // (062c4c8b). Pointee class not identified.
-    void* LaneNextRing;
+    // (062c4c8b).
+    IObjInspect const* LaneNextRing;
     Vector Facing38c;          // +0x38c (ends +0x398). Out-param 3 of the same call; input to
                                 // LookMatrixYup for OrientMatrix3d8.
     unsigned char AbortFlag398; // +0x398

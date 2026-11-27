@@ -151,7 +151,7 @@ bool CDPClient::ConnectToServer(const wchar_t* Host, const wchar_t* /*Port*/)
         return false;
     }
 
-    HostAddr->BuildFromURLW((WCHAR*)Host);
+    HostAddr->BuildFromURLW((WCHAR*)(Host));
     HostAddr->SetSP(&CLSID_DP8SP_TCPIP);
     DeviceAddr->SetSP(&CLSID_DP8SP_TCPIP);
     if (m_dwSourcePort != 0)
@@ -349,7 +349,7 @@ unsigned long CDPClient::GetSendQueueSize()
 // thread in DispatchMsgs.
 long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long MessageId, void* MsgData)
 {
-    CDPClient* Self = (CDPClient*)UserContext;
+    CDPClient* Self = static_cast<CDPClient*>(UserContext);
     long Result = 0;
 
     switch (MessageId)
@@ -359,7 +359,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         // .text:065c1b33
         if (Self == nullptr)
             break;
-        const DPNMSG_ASYNC_OP_COMPLETE* const Msg = (DPNMSG_ASYNC_OP_COMPLETE*)MsgData;
+        const DPNMSG_ASYNC_OP_COMPLETE* const Msg = static_cast<DPNMSG_ASYNC_OP_COMPLETE*>(MsgData);
         if (Msg->hAsyncOp == Self->PendingConnectHandle)
             Self->PendingConnectHandle = 0;
         break;
@@ -370,7 +370,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         if (Self == nullptr)
             break;
         m_dwLastMsgReceivedTime = timeGetTime();
-        const DPNMSG_CONNECT_COMPLETE* const Msg = (DPNMSG_CONNECT_COMPLETE*)MsgData;
+        const DPNMSG_CONNECT_COMPLETE* const Msg = static_cast<DPNMSG_CONNECT_COMPLETE*>(MsgData);
         CDPMessage* const Message = new CDPMessage();
         Message->Owner = Self;
         Message->Type = kMsgConnectComplete;
@@ -390,7 +390,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         // parsed (inet_addr) nor connected to. Such answers are not queued; the IPv4 answer of
         // the same host arrives on the next enumeration retry.
         {
-            const DPNMSG_ENUM_HOSTS_RESPONSE* const Peek = (DPNMSG_ENUM_HOSTS_RESPONSE*)MsgData;
+            const DPNMSG_ENUM_HOSTS_RESPONSE* const Peek = static_cast<DPNMSG_ENUM_HOSTS_RESPONSE*>(MsgData);
             wchar_t SenderHost[0x400];
             DWORD SenderHostSize = sizeof(SenderHost);
             DWORD SenderHostType = 1; // DPNA_DATATYPE_STRING
@@ -405,11 +405,11 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         Message->Owner = Self;
         Message->Type = kMsgEnumHostsResponse;
 
-        const DPNMSG_ENUM_HOSTS_RESPONSE* const Msg = (DPNMSG_ENUM_HOSTS_RESPONSE*)MsgData;
+        const DPNMSG_ENUM_HOSTS_RESPONSE* const Msg = static_cast<DPNMSG_ENUM_HOSTS_RESPONSE*>(MsgData);
         Msg->pAddressSender->AddRef();
 
         DPNMSG_ENUM_HOSTS_RESPONSE* const Copy =
-            (DPNMSG_ENUM_HOSTS_RESPONSE*)(malloc(sizeof(DPNMSG_ENUM_HOSTS_RESPONSE)));
+            static_cast<DPNMSG_ENUM_HOSTS_RESPONSE*>(malloc(sizeof(DPNMSG_ENUM_HOSTS_RESPONSE)));
         Copy->dwSize = sizeof(DPNMSG_ENUM_HOSTS_RESPONSE);
         Copy->pAddressSender = Msg->pAddressSender;
         Copy->pAddressDevice = nullptr;
@@ -428,7 +428,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         Copy->dwRoundTripLatencyMS = Msg->dwRoundTripLatencyMS;
 
         const DPN_APPLICATION_DESC* const Source = Msg->pApplicationDescription;
-        DPN_APPLICATION_DESC* const Desc = (DPN_APPLICATION_DESC*)(malloc(sizeof(DPN_APPLICATION_DESC)));
+        DPN_APPLICATION_DESC* const Desc = static_cast<DPN_APPLICATION_DESC*>(malloc(sizeof(DPN_APPLICATION_DESC)));
         Desc->dwSize = sizeof(DPN_APPLICATION_DESC);
         Desc->dwFlags = Source->dwFlags;
         Desc->guidInstance = Source->guidInstance;
@@ -436,7 +436,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         Desc->dwMaxPlayers = Source->dwMaxPlayers;
         Desc->dwCurrentPlayers = Source->dwCurrentPlayers;
         const size_t NameBytes = wcslen(Source->pwszSessionName) * sizeof(WCHAR) + sizeof(WCHAR);
-        Desc->pwszSessionName = (WCHAR*)(malloc(NameBytes));
+        Desc->pwszSessionName = static_cast<WCHAR*>(malloc(NameBytes));
         memcpy(Desc->pwszSessionName, Source->pwszSessionName, NameBytes);
         Desc->pwszPassword = nullptr;
         Desc->pvReservedData = nullptr;
@@ -459,7 +459,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
         const DWORD Now = timeGetTime();
         m_dwLastMsgReceivedTime = Now;
 
-        const DPNMSG_RECEIVE* const Msg = (DPNMSG_RECEIVE*)MsgData;
+        const DPNMSG_RECEIVE* const Msg = static_cast<DPNMSG_RECEIVE*>(MsgData);
         if (Msg->dwReceiveDataSize > 1)
         {
             CDPMessage* const Message = new CDPMessage();
@@ -574,7 +574,7 @@ void CDPClient::DispatchMsgs(unsigned long TimeoutMs)
         case kMsgEnumHostsResponse:
         {
             // .text:065c1ff8
-            DPNMSG_ENUM_HOSTS_RESPONSE* const Response = (DPNMSG_ENUM_HOSTS_RESPONSE*)(Msg->Data);
+            DPNMSG_ENUM_HOSTS_RESPONSE* const Response = reinterpret_cast<DPNMSG_ENUM_HOSTS_RESPONSE*>(Msg->Data);
             OnAddHost(Response);
             Response->pAddressSender->Release();
             // SDK exposes a const descriptor; this queue owns its malloc allocation.

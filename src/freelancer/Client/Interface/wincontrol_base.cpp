@@ -42,7 +42,7 @@ namespace
     // pair every WinControl slot below issues after moving its instance.
     void SetInstancePositionAndUpdate(InstanceIndex Instance, Vector* Position)
     {
-        DALib::Engine->SetInstancePosition(Instance, (const Vector*)Position);
+        DALib::Engine->SetInstancePosition(Instance, Position);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
     }
 

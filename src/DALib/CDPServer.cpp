@@ -322,21 +322,21 @@ void CDPServer::CrashCleanup()
 // Retail DALib.dll.c CDPServer::HandleDPServerMsg @ 0x4670 -- DirectPlay8 IO-thread callback.
 long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long MessageId, void* MsgData)
 {
-    CDPServer* Self = (CDPServer*)UserContext;
+    CDPServer* Self = static_cast<CDPServer*>(UserContext);
     long Result = 0;
 
     switch (MessageId)
     {
     case DPN_MSGID_CREATE_PLAYER:
     {
-        const DPNMSG_CREATE_PLAYER* const Msg = (DPNMSG_CREATE_PLAYER*)MsgData;
+        const DPNMSG_CREATE_PLAYER* const Msg = static_cast<DPNMSG_CREATE_PLAYER*>(MsgData);
         if (Msg->pvPlayerContext == nullptr)
         {
             // Server's own local player being created.
             Self->OwnPlayerId = Msg->dpnidPlayer;
             return 0;
         }
-        CDPClientProxy* const Proxy = (CDPClientProxy*)(Msg->pvPlayerContext);
+        CDPClientProxy* const Proxy = static_cast<CDPClientProxy*>(Msg->pvPlayerContext);
         Proxy->PlayerId = Msg->dpnidPlayer;
         CDPMessage* const Message = new CDPMessage();
         Message->Type = kMsgPlayerCreated;
@@ -346,7 +346,7 @@ long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long Mes
     }
     case DPN_MSGID_DESTROY_PLAYER:
     {
-        const DPNMSG_DESTROY_PLAYER* const Msg = (DPNMSG_DESTROY_PLAYER*)MsgData;
+        const DPNMSG_DESTROY_PLAYER* const Msg = static_cast<DPNMSG_DESTROY_PLAYER*>(MsgData);
         if (Msg->pvPlayerContext == nullptr)
         {
             Self->OwnPlayerId = 0;
@@ -360,14 +360,14 @@ long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long Mes
     }
     case DPN_MSGID_ENUM_HOSTS_QUERY:
     {
-        DPNMSG_ENUM_HOSTS_QUERY* const Msg = (DPNMSG_ENUM_HOSTS_QUERY*)MsgData;
+        DPNMSG_ENUM_HOSTS_QUERY* const Msg = static_cast<DPNMSG_ENUM_HOSTS_QUERY*>(MsgData);
         Msg->pvResponseData = Self->EnumResponseSize != 0 ? Self->EnumResponseData : nullptr;
         Msg->dwResponseDataSize = Self->EnumResponseSize;
         break;
     }
     case DPN_MSGID_INDICATE_CONNECT:
     {
-        DPNMSG_INDICATE_CONNECT* const Msg = (DPNMSG_INDICATE_CONNECT*)MsgData;
+        DPNMSG_INDICATE_CONNECT* const Msg = static_cast<DPNMSG_INDICATE_CONNECT*>(MsgData);
         CDPClientProxy* Proxy = Self->CreateClientProxy();
         Proxy->Owner = Self;
         Msg->pvPlayerContext = Proxy;
@@ -379,7 +379,7 @@ long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long Mes
     }
     case DPN_MSGID_INDICATED_CONNECT_ABORTED:
     {
-        const DPNMSG_INDICATED_CONNECT_ABORTED* const Msg = (DPNMSG_INDICATED_CONNECT_ABORTED*)MsgData;
+        const DPNMSG_INDICATED_CONNECT_ABORTED* const Msg = static_cast<DPNMSG_INDICATED_CONNECT_ABORTED*>(MsgData);
         if (Msg->pvPlayerContext != nullptr)
         {
             CDPMessage* const Message = new CDPMessage();
@@ -392,15 +392,15 @@ long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long Mes
     case DPN_MSGID_SEND_COMPLETE:
     {
         // .text:065c48da: the send's user context is the CDPClientProxy SendTo passed.
-        const DPNMSG_SEND_COMPLETE* const Msg = (DPNMSG_SEND_COMPLETE*)MsgData;
-        CDPClientProxy* const Proxy = (CDPClientProxy*)(Msg->pvUserContext);
+        const DPNMSG_SEND_COMPLETE* const Msg = static_cast<DPNMSG_SEND_COMPLETE*>(MsgData);
+        CDPClientProxy* const Proxy = static_cast<CDPClientProxy*>(Msg->pvUserContext);
         if (Proxy != nullptr)
             Proxy->OnMsgSent(Msg->dwSendTime);
         break;
     }
     case DPN_MSGID_RECEIVE:
     {
-        const DPNMSG_RECEIVE* const Msg = (DPNMSG_RECEIVE*)MsgData;
+        const DPNMSG_RECEIVE* const Msg = static_cast<DPNMSG_RECEIVE*>(MsgData);
         if (Msg->pvPlayerContext != nullptr)
         {
             CDPMessage* const Message = new CDPMessage();
@@ -433,7 +433,7 @@ void CDPServer::DispatchMsgs()
     Working.CopyList(IncomingMsgs);
     for (CDPMessage* Msg = Working.GetNextMsg(); Msg != nullptr; Msg = Working.GetNextMsg())
     {
-        CDPClientProxy* const Proxy = (CDPClientProxy*)(Msg->Owner);
+        CDPClientProxy* const Proxy = static_cast<CDPClientProxy*>(Msg->Owner);
         switch (Msg->Type)
         {
         case kMsgReceive:

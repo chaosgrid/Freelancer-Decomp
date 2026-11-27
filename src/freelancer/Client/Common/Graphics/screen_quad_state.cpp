@@ -464,7 +464,7 @@ namespace
             {
                 // The record count is re-read every pass.
                 FScreenQuadGpuVert* Dst =
-                    (FScreenQuadGpuVert*)Lock.Vertices;
+                    static_cast<FScreenQuadGpuVert*>(Lock.Vertices);
                 for (int Index = 0; Index < Node->RecordCount; ++Index)
                 {
                     FScreenQuadRecord const& Rec = Node->Records[Index];
@@ -661,7 +661,7 @@ unsigned char ScreenQuadEnqueueFlare(ICamera* Cam, float const* Position, float 
                                      float const* GlowColor, float BulbSize, float GlowSize)
 {
     // FUN_004038f0 (cdecl). Sole caller FUN_004fdda0. No argument is null-checked in retail.
-    const float* const View = (const float*)Cam->GetViewTransform();
+    const float* const View = reinterpret_cast<const float*>(Cam->GetViewTransform());
     I3DMathEngine* const Math = AcquireScreenQuadMath();
     Vector CamSpace;
     Math->TransformXform(CamSpace, *reinterpret_cast<Transform const*>(View),
@@ -1081,7 +1081,7 @@ unsigned char ScreenQuadProjectObjectExtent(ICamera* Cam, float const* Position,
                                             float* OutInvDepth)
 {
     // FUN_00403350.
-    const float* const View = (const float*)Cam->GetViewTransform();
+    const float* const View = reinterpret_cast<const float*>(Cam->GetViewTransform());
     I3DMathEngine* const Math = AcquireScreenQuadMath();
     Vector CamSpace;
     Math->TransformXform(CamSpace, *reinterpret_cast<Transform const*>(View),

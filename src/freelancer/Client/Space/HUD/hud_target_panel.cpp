@@ -12,6 +12,7 @@
 
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830)
 #include "NeuroNet/Chat/chat_init.h"              // ChatFindPlayerName (FUN_0046b400), ChatAcquireEntry, ...
+#include "NeuroNet/nn_button_control.h"
 #include "Space/client_gameobj.h"         // FClientGameobj
 #include "Space/client_objdb.h"           // ClientObjDb_FindObject (FUN_005416c0)
 #include "Common/Fonts/font_imp.h"               // FindMenuFontImp (FUN_004177b0)
@@ -31,6 +32,7 @@
 #include "NeuroNet/nn_text_scratch.h"        // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60)
 #include "NeuroNet/nn_tooltip.h"             // NnToolTipHideGlobal (FUN_004be390)
 #include "NeuroNet/nn_scanner.h"             // OpenNnScanner (FUN_004b6b60)
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_trade.h"               // NnTradeIsOpen (DAT_006724b4 != 0)
 #include "NeuroNet/nn_ui_pulse.h"            // G_HudChromeColorRgba (DAT_00679bb4)
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
@@ -790,7 +792,7 @@ void HudTarget::DrawViewObject()
         Where = WatchedObjRw(ViewObject)->get_position();
     }
     float Screen[3];
-    if (static_cast<unsigned char>(AsCamera(&ViewCamera)->ProjectVec((Vector*)Screen, &Where)) == 0)
+    if (static_cast<unsigned char>(AsCamera(&ViewCamera)->ProjectVec(reinterpret_cast<Vector*>(Screen), &Where)) == 0)
     {
         return;
     }
@@ -845,8 +847,8 @@ void HudTarget::UpdateLabels()
 
     // The font and the rest position: the home offset (+0x2d4) copied to the offset (+0xa8),
     // a player ship's y lowered by 0.004 (DAT_005d7bf0, subtracted in double, rounded to float).
-    NnTextControl* const Labels[2] = {static_cast<NnTextControl*>(ShipName),
-                                      static_cast<NnTextControl*>(SubtargetName)};
+    NnTextControl* const Labels[2] = {ShipName,
+                                      SubtargetName};
     for (int Index = 0; Index < 2; ++Index)
     {
         NnTextControl* const Label = Labels[Index];
@@ -1022,7 +1024,7 @@ void HudTarget::OnViewObjectChanged()
         HardpointCursor = 0;
 
         bClearPlayerTarget = 0;
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (WatchedObjRw(ViewObject) != nullptr && Player != nullptr)
         {
             // The view's attitude towards the player.
@@ -1091,7 +1093,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
             if (A == reinterpret_cast<uintptr_t>(CommButton))
             {
-                IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+                IObjRW* const Player = GetPlayerObjRW();
                 if (Player != nullptr)
                 {
                     // Evaluated in retail's order: the system id first.
@@ -1201,7 +1203,7 @@ void HudTarget::Update()
         // (single player) or in a group of at least two live members that holds the player
         // (multiplayer, when the player leads or is the group's first member).
         unsigned char bFormation = 0;
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         CObject* const PlayerObject = CObjectOfObjRw(Player);
         if (PlayerObject != nullptr && IsClass(PlayerObject, CObject::ClassShip))
         {
@@ -1514,7 +1516,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
     {
         return false;
     }
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return false;
@@ -1736,7 +1738,7 @@ int HudTarget::GetMode(bool bRaw)
 void HudTarget::OpenScanner()
 {
     // FUN_004e54c0: scan the player's target when it is a ship-like object (get_type & 0x7f0000).
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -1866,7 +1868,7 @@ RankDone:
         CObject* const LootObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
         bool const bLoot = LootObject != nullptr && IsClass(LootObject, CObject::ClassLoot);
         float Distance = kScanDefaultDistance;
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (!bLoot && ViewShip != nullptr && Player != nullptr)
         {
             Distance = PositionDistance(WatchedObjRw(ViewObject)->get_position(),
@@ -1938,7 +1940,7 @@ void HudTarget::UpdateTradeButton()
                                   ? static_cast<CSimple*>(ViewCObject)
                                   : nullptr;
     float Distance = kScanDefaultDistance;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     bool bWithdraw = true;
     if (ViewShip != nullptr && Player != nullptr)
     {
@@ -2187,7 +2189,7 @@ void HudTarget::NextHardpointScreenPos(float* OutScreen)
 
     ICamera* const Camera = AsCamera(&ViewCamera);
     float const WorldPoint[3] = {World.x, World.y, World.z};
-    if (Camera->ProjectVec((Vector*)OutScreen, (const Vector*)WorldPoint) == 0)
+    if (Camera->ProjectVec(reinterpret_cast<Vector*>(OutScreen), reinterpret_cast<const Vector*>(WorldPoint)) == 0)
     {
         // Off screen: the camera's screen centre (+0x68 / +0x6c).
         OutScreen[0] = ViewCamera.ScreenCenterX;

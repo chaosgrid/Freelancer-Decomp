@@ -47,7 +47,7 @@ public:
     // Slot 1, LAB_062d0a70. The binder FUN_062d2090; on success
     // Watcher2c.SetContext(OwnerContext, SysMgr, Param2), then zeroes
     // DelayDuration and DelayElapsed.
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, FUN_062d0ac0: FUN_062d20d0 (Behavior::OnEngage), then DelayElapsed = 0.
     void ResetTickState();

@@ -56,7 +56,7 @@ CEEngine::CEEngine(CShip* OwnerObj, unsigned short EquipId, Archetype::Engine co
     HpName.clear();
     long HpHandle = -1;
     HardpointInfo Info;
-    Archetype::Ship* ShipArch = (Archetype::Ship*)(OwnerObj->Archetype);
+    Archetype::Ship* ShipArch = static_cast<Archetype::Ship*>(OwnerObj->Archetype);
     int const NumNozzles = ShipArch->NumExhaustNozzles;
     for (int Index = 1; Index <= NumNozzles; ++Index)
     {
@@ -107,7 +107,7 @@ CEEngine* __cdecl CEEngine::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeEngine)
         return nullptr;
-    return (CEEngine*)(Equip);
+    return static_cast<CEEngine*>(Equip);
 }
 
 CEEngine const* __cdecl CEEngine::cast(CEquip const* Equip)
@@ -134,7 +134,7 @@ bool CEEngine::IsFunctioning() const
     }
     else
     {
-        Archetype::Engine* EngineArch = (Archetype::Engine*)(Arch);
+        Archetype::Engine* EngineArch = static_cast<Archetype::Engine*>(Arch);
         bHasNozzleOrIndestructible = EngineArch->bIndestructible;
     }
     return IsActive() && !IsDisabled() && !IsDestroyed() && IsControllerEnabled() &&
@@ -178,7 +178,7 @@ namespace
     CShip* OwnerShipOrNull(CEqObj* Owner)
     {
         if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-            return (CShip*)(Owner);
+            return static_cast<CShip*>(Owner);
         return nullptr;
     }
 }
@@ -189,7 +189,7 @@ bool CEEngine::Update(float Dt, unsigned Flags)
     // not-less branches.
     if (IsFunctioning())
     {
-        Archetype::Engine const* const EngineArch = (Archetype::Engine const*)(Arch);
+        Archetype::Engine const* const EngineArch = static_cast<Archetype::Engine const*>(Arch);
         if (bCruiseActive)
         {
             if (CruiseChargeTimeElapsed < EngineArch->CruiseChargeTime)
@@ -251,7 +251,7 @@ bool CEEngine::EngageCruise(bool Engage, bool Instant)
         return bCruiseActive != 0;
     bCruiseActive = Engage;
 
-    Archetype::Engine const* const EngineArch = (Archetype::Engine const*)(Arch);
+    Archetype::Engine const* const EngineArch = static_cast<Archetype::Engine const*>(Arch);
     if (Engage)
     {
         OwnerShipOrNull(Owner)->set_throttle(1.0f);
@@ -321,7 +321,7 @@ void CEEngine::NotifyArchGroupDestroyed(unsigned short SubObjId)
 float CEEngine::GetLinearDrag() const
 {
     Archetype::Equipment* EquipmentArch = Arch;
-    Archetype::Engine* EngineArch = (Archetype::Engine*)(EquipmentArch);
+    Archetype::Engine* EngineArch = static_cast<Archetype::Engine*>(EquipmentArch);
     return EngineArch->LinearDrag;
 }
 
@@ -329,14 +329,14 @@ float CEEngine::GetLinearDrag() const
 // double.
 double CEEngine::GetCruiseDrag() const
 {
-    Archetype::Engine const* const EngineArch = (Archetype::Engine const*)(Arch);
+    Archetype::Engine const* const EngineArch = static_cast<Archetype::Engine const*>(Arch);
     return (double)(EngineArch->LinearDrag) + EngineEquipConsts::CRUISE_DRAG;
 }
 
 // FUN_062961f0. The products stay on the x87 stack until the float return.
 float CEEngine::GetThrust(float Throttle) const
 {
-    Archetype::Engine const* const EngineArch = (Archetype::Engine const*)(Arch);
+    Archetype::Engine const* const EngineArch = static_cast<Archetype::Engine const*>(Arch);
     double Result = Throttle;
     if (Throttle < 0.0f)
         Result = Result * EngineArch->ReverseFraction;
@@ -349,7 +349,7 @@ float CEEngine::GetPowerDraw(float Throttle) const
     if (IsFunctioning())
     {
         Archetype::Equipment* EquipmentArch = Arch;
-        Archetype::Engine* EngineArch = (Archetype::Engine*)(EquipmentArch);
+        Archetype::Engine* EngineArch = static_cast<Archetype::Engine*>(EquipmentArch);
         float AbsThrottle = Throttle;
         if (AbsThrottle < 0.0f)
             AbsThrottle = -AbsThrottle;
@@ -369,7 +369,7 @@ float CEEngine::GetCruiseThrust(float LinearDrag) const
 float CEEngine::GetCruisePowerDraw() const
 {
     Archetype::Equipment* EquipmentArch = Arch;
-    Archetype::Engine* EngineArch = (Archetype::Engine*)(EquipmentArch);
+    Archetype::Engine* EngineArch = static_cast<Archetype::Engine*>(EquipmentArch);
     return EngineArch->CruisePowerUsage;
 }
 
@@ -395,7 +395,7 @@ float CEEngine::GetCruiseChargeTimeElapsed() const
 float CEEngine::GetCruiseChargeTime() const
 {
     Archetype::Equipment* EquipmentArch = Arch;
-    Archetype::Engine* EngineArch = (Archetype::Engine*)(EquipmentArch);
+    Archetype::Engine* EngineArch = static_cast<Archetype::Engine*>(EquipmentArch);
     return EngineArch->CruiseChargeTime;
 }
 
@@ -410,7 +410,7 @@ void CEEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IV
 
     CShip* const Ship = OwnerShipOrNull(Owner);
 
-    Archetype::Engine const* EngineArch = (Archetype::Engine const*)(Arch);
+    Archetype::Engine const* EngineArch = static_cast<Archetype::Engine const*>(Arch);
     float const Dt = EventSim->delta_time;
     float Force;
     double PowerRate;
@@ -468,5 +468,5 @@ void CEEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IV
 
 Archetype::Engine const* CEEngine::EngineArch() const
 {
-    return (Archetype::Engine const*)(Arch);
+    return static_cast<Archetype::Engine const*>(Arch);
 }

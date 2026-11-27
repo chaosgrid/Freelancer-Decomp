@@ -12,6 +12,7 @@
 #include "common_cequip.h" // INotify, CEquip, Archetype::Explosion
 
 class FClientGameobj;
+struct FClientCollisionRecord; // client_gameobj.h
 
 // Retail ClientEquip: the base of every equip-FX wrapper on EquippedObj +0xb8 (vtable
 // PTR_FUN_005de13c). The slot order is retail's -- 0 notify (FUN_00531b20), 1 scalar deleting
@@ -71,11 +72,11 @@ void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units
 // HitInfo is the hit point (+0) and the surface normal (+0xc).
 // Collision: the hit effect by Other's mass * COLLISION_DAMAGE_FACTOR * closing speed; Unused
 // is not read.
-void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, void const* HitInfo,
+void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, FClientCollisionRecord const* HitInfo,
                                   FClientGameobj* Other, void const* Unused);
 // Munition: the hit effect by hull_damage * ShieldEquipConsts::HULL_DAMAGE_FACTOR +
 // energy_damage, then the munition's splash effect.
-void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
+void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, FClientCollisionRecord const* HitInfo,
                                  FClientGameobj* Munition);
 
 // The CliTradeLaneEquip wrapper (FUN_00516c30, EEquipType 0x800000) as the solar's lane switch

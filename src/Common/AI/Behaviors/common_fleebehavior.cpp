@@ -76,7 +76,7 @@ FleeBehavior::~FleeBehavior()
 }
 
 // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
-bool FleeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool FleeBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     return BindContext(Owner, Manager, Sys);
 }
@@ -138,7 +138,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     bool bShieldActive = false;
     {
         IObjRW* const Object = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
-        (void)ObjInspectOf(Object)->get_shield_status(ShieldCur, ShieldMax, bShieldActive);
+        (void)Object->get_shield_status(ShieldCur, ShieldMax, bShieldActive);
     }
 
     // Retail calls get_status twice; the ratio reads HitPts from the first call and MaxHitPts

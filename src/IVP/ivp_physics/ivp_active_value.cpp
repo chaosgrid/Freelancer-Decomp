@@ -202,15 +202,10 @@ int IVP_U_Active_Value_Hash::Compare(void* Elem0, void* Elem1)
 // is deleted at zero; then the base destructor FUN_063522f0.
 IVP_U_Active_Value_Hash::~IVP_U_Active_Value_Hash()
 {
-    struct FElem
-    {
-        unsigned HashIndex;
-        IVP_U_Active_Value* Value;
-    };
-    FElem* Entries = static_cast<FElem*>(Elems);
+    IVP_VHash_Slot* Entries = Elems;
     for (int Index = SizeMm; Index >= 0; --Index)
     {
-        IVP_U_Active_Value* Value = Entries[Index].Value;
+        IVP_U_Active_Value* Value = static_cast<IVP_U_Active_Value*>(Entries[Index].Elem);
         if (Value == nullptr)
             continue;
 
@@ -227,7 +222,7 @@ IVP_U_Active_Value_Hash::~IVP_U_Active_Value_Hash()
 // marker. Retail has no null-name guard (callers gate on FUN_063569c0 first).
 unsigned IVP_U_Active_Value_Hash::GetHashIndex(IVP_U_Active_Value* Value)
 {
-    const unsigned char* s = (const unsigned char*)Value->Name;
+    const unsigned char* s = reinterpret_cast<const unsigned char*>(Value->Name);
     unsigned crc = 0xffffffffu;
     while (*s != 0)
     {

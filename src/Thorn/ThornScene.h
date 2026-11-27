@@ -625,7 +625,7 @@ public:
     GENRESULT UpdateEntityFromDesc(int Index, void* Desc);
     GENRESULT AddEventFromDesc(const void* Desc, int* OutId);
     GENRESULT RemoveEventById(int Id);
-    GENRESULT SaveToFileSystem(void* FileSystem, IThornComContext* ComContext,
+    GENRESULT SaveToFileSystem(IFileSystem* FileSystem, IThornComContext* ComContext,
                                unsigned int SavedDurationMs);
 
     unsigned long EventCount() const { return static_cast<unsigned long>(MasterCount_); }

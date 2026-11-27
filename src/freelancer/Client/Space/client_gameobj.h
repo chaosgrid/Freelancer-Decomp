@@ -8,6 +8,7 @@
 
 #include "Common/Graphics/client_mesh_load.h" // FMeshHolder (Ship +0x108, FUN_00420d40)
 #include "common_archetype.h"
+#include "Space/Effects/effect_base.h" // FEffectCompanion / FEffectListNode
 #include "common_csys.h" // Transform (Ship +0x118)
 #include "common_cequip.h" // ActionDB, INotify
 #include "common_cobject.h"
@@ -24,8 +25,13 @@
 struct FCliEquipFirePacket; // cli_projectile_fx.h
 struct FEffectArch;         // vis_effect_arch.h
 struct FParticleEffect;
+struct FJumpGateEffect;     // Effects/jump_effect.h
+struct FJumpShipEffect;     // Effects/jump_effect.h
+struct FEquipFxListNode;    // Effects/client_equip_fx.h
+struct FFuseBurnNode;       // Effects/client_fuse.h
 struct FStarSphere;         // star_sphere.h (Solar +0xe4)
 struct FNebulaEffect;       // cli_nebula.h (Gameobj +0x38)
+struct FSpaceCamera;        // Cameras/space_camera.h
 struct ISoundSource;
 namespace Archetype { struct ISound; }
 
@@ -106,11 +112,11 @@ struct FGameobjEffectListStorage
 
     // FUN_0053aab0: unlink Where, release its companion (FUN_00502d90's sequence), free the
     // node; returns the next node.
-    void* Erase(void* Where);
+    FEffectListNode* Erase(FEffectListNode* Where);
 
     unsigned char AllocatorByte; // +0x00  the ctor copies the kind's low byte here
     unsigned char Pad01[3];
-    void* Head;                  // +0x04  sentinel node, operator_new(0x18), next/prev = self
+    FEffectListNode* Head;       // +0x04  sentinel node, operator_new(0x18), next/prev = self
     int Count;                   // +0x08
 };
 
@@ -143,7 +149,7 @@ struct FEquipFxList
 
     unsigned char AllocatorByte; // +0x00  the kind's low byte
     unsigned char Pad01[3];
-    void* Head;                  // +0x04  sentinel, operator_new(0xc), next = prev = itself
+    FEquipFxListNode* Head;      // +0x04  sentinel, operator_new(0xc), next = prev = itself
     int Count;                   // +0x08
 };
 static_assert(sizeof(FEquipFxList) == 0x0c, "EquippedObj equip-FX list 0xc");
@@ -160,7 +166,7 @@ struct FEquippedFuseList
 
     unsigned char AllocatorByte; // +0x00  the kind's low byte
     unsigned char Pad01[3];
-    void* Head;                  // +0x04  sentinel, operator_new(0x40), only the links written
+    FFuseBurnNode* Head;         // +0x04  sentinel, operator_new(0x40), only the links written
     int Count;                   // +0x08
 };
 static_assert(sizeof(FEquippedFuseList) == 0x0c, "EquippedObj fuse list 0xc");
@@ -185,6 +191,16 @@ struct FEquipSubTarget
 };
 
 struct FClientEquip;
+
+// The 0x24-byte record FUN_0052fc20 builds for slot 101's first argument (the vectors negated
+// for side A).
+struct FClientCollisionRecord
+{
+    Vector Point;            // +0x00  event +0x10
+    Vector SurfaceNormal;    // +0x0c  event +0x1c
+    Vector RelativeVelocity; // +0x18  event +0x28
+};
+static_assert(sizeof(FClientCollisionRecord) == 0x24, "collision record 0x24");
 
 class FClientGameobj : public IObjInspectImpl
 {
@@ -231,19 +247,19 @@ public:
     // 95 +0x17c FUN_00539820: the LOD pick; returns its first argument. A non-zero low word in
     // *CachedLod is copied straight to *OutLod, otherwise the pick runs. The pick's port is the
     // free function GameobjPickLod in space_scene_obj_draw.cpp.
-    virtual unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod);
+    virtual unsigned* PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsigned const* CachedLod);
     // 96 +0x180 LAB_00401e90: empty (EquippedObj overrides).
     virtual void PreSubmitDraw();
     // 97 +0x184 FUN_00539b40: per-object lighting (FUN_005554d0). Body: the free function
     // FClientGameobj::UpdateDrawLighting in space_scene_obj_draw.cpp.
-    virtual void UpdateDrawLighting(void* Camera);
+    virtual void UpdateDrawLighting(FSpaceCamera* Camera);
     // 98 +0x188 FUN_00539980: draw submit -- PreSubmitDraw, PickLod, the LOD gate (a failed gate
     // writes the LOD to *OutLod and returns), the effect-list sweep, UpdateDrawLighting, the
     // player flags, get_index, the envmap arm, IRenderer2::Slot7(Camera, Inst, 1.0f, Flags,
     // Xform, Extra). A non-null Xform ors 0x120 into the flags; Extra is the IFLAppearance
     // Slot8 out-param when it was null. Body: FClientGameobj::SubmitDraw in
     // space_scene_obj_draw.cpp; the draw drain calls this slot through the node LAB_0051f7a0.
-    virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
+    virtual unsigned* SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod, Transform const* Xform,
                               void* Extra);
     // 99 +0x18c LAB_00524e50: *OutB = NebulaFogFactor (as bits); return CurrentNebula.
     virtual unsigned GetNebula(unsigned* OutB);
@@ -251,7 +267,7 @@ public:
     virtual void ResetNebula();
     // 101 +0x194 FUN_00539c90: the collision pair -- Other->OnSurfaceCollisionHit(A, D, this, B),
     // then this->ReportCollisionToServer(A, B, Other, D).
-    virtual void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D);
+    virtual void OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D);
     // 102 +0x198 LAB_0053e4a0: empty. Simple FUN_005474a0 applies the root entry.
     virtual void ApplyDamageList(DamageList const& Damage);
     // 103 +0x19c FUN_0053a820: DestroyType 0 -> MarkForRemoval(true); 1 -> Flags |= 4 and
@@ -260,23 +276,23 @@ public:
     // 104 +0x1a0 FUN_00539cd0: surface-hit effect (PickDistanceRecord 0x00407450,
     // FUN_00539f90). Contact holds two Vectors: the hit point (+0x00) and the surface normal
     // (+0x0c); B and D are not read.
-    virtual void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    virtual void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                          void const* D);
     // 105 +0x1a4 FUN_00539d80: munition-hit effect (0x00408a70, FUN_0053a230). The munition
     // gameobj is the THIRD argument (Munition's slot 101 pushes `this` last).
-    virtual void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition);
+    virtual void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition);
     // 106 +0x1a8 LAB_0053f780: empty. The arguments are EquippedObj's (FUN_005356c0): a gun
     // hardpoint's sub-object id, the target object id and its sub-object.
     virtual void SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj);
     // 107 +0x1ac FUN_00539e70: multiplayer collision report through the server interface
     // DAT_0067ecd0 vt+0xdc.
-    virtual void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D);
+    virtual void ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D);
     // 108 +0x1b0 FUN_0053a880: explode at Pos (null = get_position()) through Action_Explode
     // (FUN_005361e0) + Actions.add, or MarkForRemoval(true) when there is no explosion.
     virtual void Explode(Vector const* Pos);
     // 109 +0x1b4 FUN_0053a4c0: the hit sound. SourceId keys the per-source voice pool at +0x80;
     // SoundArch is an EffectArch's +0x18 (vt+0x30 tested first). Caller: FUN_00539f90.
-    virtual void PlayHitSound(unsigned SourceId, void* SoundArch, Vector const* Pos);
+    virtual void PlayHitSound(unsigned SourceId, Archetype::ISound* SoundArch, Vector const* Pos);
     // 110 +0x1b8 LAB_0053e4a0: empty.
     virtual void UpdateNebula(float Dt);
 
@@ -303,12 +319,12 @@ public:
     // slots 104/105 pass 0, the shield wrapper's hit slots pass the address of a zeroed local
     // effect companion, which therefore stays empty.
     void SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* EffectArch, Vector const* Pos,
-                               Vector const* Normal, void* CompanionOut);
+                               Vector const* Normal, FEffectCompanion* CompanionOut);
     // FUN_0053a230: the splash-hit one-shot -- EffectArch through FUN_00503070 at Pos with the
     // direction mirrored off Normal. Skipped for the player's ship while SPLASH_HIT_EFFECTS
     // (option 0x39) is off, and when the effect type fails the perf test FUN_004fd570.
     void SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const* Pos, Vector const* Normal,
-                              Vector const* Velocity, void* CompanionOut);
+                              Vector const* Velocity, FEffectCompanion* CompanionOut);
 
     CObject* GetObject() const { return Object; }
 
@@ -487,19 +503,19 @@ public:
     // 93 +0x174 FUN_00534010.
     void update(float Dt) override;
     // 95 +0x17c FUN_00533710.
-    unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
+    unsigned* PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsigned const* CachedLod) override;
     // 96 +0x180 LAB_0051b480.
     void PreSubmitDraw() override;
     // 98 +0x188 FUN_00533780.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
+    unsigned* SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 102 +0x198 FUN_005339e0.
     void ApplyDamageList(DamageList const& Damage) override;
     // 104 +0x1a0 FUN_005340b0.
-    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00534190.
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 106 +0x1a8 FUN_005356c0: SubTargets[SubObj] = {TargetId, TargetSubObj}.
     void SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj) override;
 
@@ -603,13 +619,13 @@ public:
     // 94 +0x178 FUN_00548110.
     float GetPhysicalRadius(Vector& Center) override;
     // 98 +0x188 FUN_00548220.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
+    unsigned* SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 104 +0x1a0 FUN_00548520.
-    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00548570.
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 108 +0x1b0 FUN_005485b0.
     void Explode(Vector const* Pos) override;
 
@@ -629,7 +645,7 @@ public:
     unsigned char Pad1f1[3];
     float BurnColor[3];                // +0x1f4 ctor 1.0f x3; "burn_color" / 255 (ReadIni)
     ID_String JumpEffectId;             // +0x200 ctor ID_String::clear; "jump_effect" CreateID
-    void* JumpGateEffect;                 // +0x204 ctor 0; the dtor runs FUN_00502e40 and frees it
+    FJumpGateEffect* JumpGateEffect;                 // +0x204 ctor 0; the dtor runs FUN_00502e40 and frees it
 };
 static_assert(offsetof(FClientSolarGameobj, DockScript) == 0xe8, "Solar +0xe8 dock_script");
 static_assert(offsetof(FClientSolarGameobj, BurnColor) == 0x1f4, "Solar +0x1f4 burn_color");
@@ -676,17 +692,17 @@ public:
     // 93 +0x174 FUN_00545050.
     void update(float Dt) override;
     // 97 +0x184 FUN_00546480.
-    void UpdateDrawLighting(void* Camera) override;
+    void UpdateDrawLighting(FSpaceCamera* Camera) override;
     // 98 +0x188 FUN_00546050.
-    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, Transform const* Xform,
+    unsigned* SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod, Transform const* Xform,
                       void* Extra) override;
     // 102 +0x198 FUN_00545f50.
     void ApplyDamageList(DamageList const& Damage) override;
     // 104 +0x1a0 FUN_00545e90.
-    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00545ed0.
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 108 +0x1b0 FUN_00545d80.
     void Explode(Vector const* Pos) override;
     // 110 +0x1b8 FUN_005455b0.
@@ -829,7 +845,7 @@ public:
     // +0x188 -- a 0xdc-byte object built by FUN_00543530 (FUN_00503440(this, Arg)) or
     // FUN_00543630 (FUN_005038c0(this)), destroyed by FUN_00503a80 + free (FUN_005437d0 case 0,
     // FUN_00543530, FUN_00543630, the dtor). FUN_005437d0's tail clears its +0x70.
-    void* JumpEffect;
+    FJumpShipEffect* JumpEffect;
     // +0x18c -- flag byte: bit 0 / bit 1 set by slot 105 (FUN_00545ed0), both cleared by slot 92
     // (FUN_005447b0), bit 3 set by FUN_00543b40. The ctor clears bits 0..1 and then stores 0
     // over the whole dword.
@@ -892,7 +908,7 @@ public:
     // down and, on reaching 0, starts the const_effect.
     void update(float Dt) override;
     // 104 +0x1a0 FUN_0053d4f0: empty.
-    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 108 +0x1b0 FUN_00542870: drop the companion's node from the effect list (FUN_004fcef0),
     // then GameObject's slot 108.
@@ -901,7 +917,7 @@ public:
     virtual void GetConstEffectTransform(Transform* Out);
 
     float ConstEffectDelay;     // +0xac  -1.0f = not armed
-    void* OneShotCompanion[4];  // +0xb0  {EffectArch, ISoundSource*, particle, light}
+    FEffectCompanion OneShotCompanion;  // +0xb0  {EffectArch, ISoundSource*, particle, light}
 };
 static_assert(offsetof(FClientProjectileGameobj, ConstEffectDelay) == 0xac, "Projectile +0xac");
 static_assert(offsetof(FClientProjectileGameobj, OneShotCompanion) == 0xb0, "Projectile +0xb0");
@@ -917,7 +933,7 @@ public:
 
     // 101 +0x194 FUN_0053ed80: Other->OnMunitionHit(A, D, this), then
     // this->ReportCollisionToServer(A, B, Other, D).
-    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
 };
 static_assert(sizeof(FClientMunitionGameobj) == 0xc0, "Munition sizeof 0xc0");
 
@@ -944,17 +960,17 @@ public:
     // this->ReportCollisionToServer), the CBeam's +0xf8 velocity zeroed, the beam effect flagged hit
     // (FUN_004fc8f0(1, Other == player)) and released, the companion's node dropped, then
     // Projectile's slot 108 at A.
-    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 105 +0x1a4 LAB_0053f780: empty.
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 107 +0x1ac LAB_0053f790: the munition-collision report to the server,
     // IServer::SPMunitionCollision (slot 53, +0xd4) -- in multiplayer only for the player's
     // own shots.
-    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 111 +0x1bc LAB_0052e130: 0x2000000.
     unsigned GetTypeBits() const override;
 
-    void* Companion[4];       // +0xc0  FUN_005154a0; the effect list gets a copy
+    FEffectCompanion Companion; // +0xc0  FUN_005154a0; the effect list gets a copy
     FBeamEffect* BeamAlloc;   // +0xd0  FUN_0053f340's beam effect
 
     // FUN_0053f340 (on the Beam, non-virtual) -- the Beam's activate: beam effect
@@ -990,7 +1006,7 @@ public:
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053eaa0: only a CBeam (class & 0x67) munition reaches GameObject's
     // munition-hit effect (FUN_00539d80).
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 110 +0x1b8 FUN_0053ea60: while NebulaUpdateTimer is exactly 0, the nebula at the position
     // into CurrentNebula / its fog factor into NebulaFogFactor, and NebulaUpdateTimer = 1.0f.
     void UpdateNebula(float Dt) override;
@@ -1013,7 +1029,7 @@ public:
     // 93 +0x174 FUN_00530000: as Mine's with class & 0x17.
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053f780: empty.
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 110 +0x1b8 FUN_0053ea60: Mine's.
     void UpdateNebula(float Dt) override;
 };
@@ -1035,11 +1051,11 @@ public:
     // 93 +0x174 FUN_0053ecb0: as Mine's with class & 0xa7.
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053eaa0: Mine's (CBeam munitions only).
-    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition) override;
     // 107 +0x1ac LAB_0053ee00: the munition-collision report to the server
     // (IServer::SPMunitionCollision, slot 53) -- in multiplayer only when Other belongs to this
     // connection.
-    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 FUN_0053edc0: the const_effect particle (OneShotCompanion +8) is let go of this
     // gameobj (FUN_004f7d20 with no owner, part -1 and the gameobj's frame), then Projectile's
     // slot 108.

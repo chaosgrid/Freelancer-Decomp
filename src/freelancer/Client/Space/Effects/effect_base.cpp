@@ -15,9 +15,11 @@
 #include "Space/Effects/effect_vertex_batch.h"   // G_EffectMathEngine (DAT_00674f50)
 #include "Common/Graphics/fl_fx_mesh.h"            // G_FLFxMeshFactory (DAT_00674cdc)
 #include "Space/Cameras/space_camera.h"          // AsCamera (FUN_004f7b50)
+#include "Common/Graphics/vis_effect_arch.h"       // FEffectArch::EffectType
 #include "Common/Graphics/texture_shapes.h"        // G_EffectShapeDB (DAT_00674f24)
 
 #include "DALib.h"
+#include "common_iface.h"          // IObjRW (the Watchable at +8)
 #include "alchemy.h"               // IFxMeshFactory (Release)
 #include "common_cobject.h"        // CObject::get_velocity (vt+0x54)
 #include "common_csys.h"           // Acquire3DMathEngine (FUN_005b73e0)
@@ -129,7 +131,7 @@ unsigned char FEffectBase::Start(FEffectArch* Arch)
     {
         // A signed test on the type id.
         if (static_cast<int>(This->EffectTypeId) <= 0)
-            This->EffectTypeId = *(unsigned const*)Arch;
+            This->EffectTypeId = static_cast<unsigned>(Arch->EffectType);
         // Retail's own null test.
         FEffectTypeInfo const* const Info =
             EffectTypeInfoByIndex(static_cast<int>(This->EffectTypeId));
@@ -167,14 +169,14 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, Transform const*
     std::memset(This->FrozenVelocity, 0, sizeof(This->FrozenVelocity));
 }
 
-void* EffectWatchedObject(FEffectBase const* This)
+IObjRW* EffectWatchedObject(FEffectBase const* This)
 {
     // Both an empty watcher and one holding exactly 8 read as "no object".
     unsigned char const* const Held =
         reinterpret_cast<unsigned char const*>(This->Watcher.target());
     if (Held == nullptr)
         return nullptr;
-    return const_cast<unsigned char*>(Held - 8);
+    return reinterpret_cast<IObjRW*>(const_cast<unsigned char*>(Held - 8));
 }
 
 namespace

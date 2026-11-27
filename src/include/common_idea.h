@@ -20,6 +20,8 @@
 // exactly, whichever header a translation unit happens to see first.
 struct COMMON_API ICRSplineSegment;
 class SystemManager;    // BaseIdea::Handle (pointer only)
+struct IObjRW;          // BaseIdea::Object (pointer only)
+class IBehaviorManager; // BaseIdea::Context (pointer only)
 
 // ============================================================================
 // BaseIdea family -- RTTI-identified AI "Idea" decision-object hierarchy.
@@ -69,7 +71,7 @@ public:
 
     // Slot 0, LAB_062d7920: false if InObject or InHandle is null; else stores
     // Handle/Context/Object, sets Attached = 1 and returns true.
-    virtual bool SetContext(void* InObject, void* InHandle, void* InContext);
+    virtual bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext);
 
     // Slot 1.
     virtual int Update(float DeltaTime) = 0;
@@ -96,10 +98,10 @@ public:
     // (FUN_062c6170) and StrafeBehavior (FUN_062ca310). Retail name unknown.
     void PublishTargetId(unsigned int Id);
 
-    void* Object;              // +0x04. SetContext()'s 1st arg (ctor-zeroed).
+    IObjRW* Object;            // +0x04. SetContext()'s 1st arg (ctor-zeroed).
     SystemManager* Handle;      // +0x08. SetContext()'s 2nd arg (ctor-zeroed): the owner's
                                 // SystemManager, the behaviors' +0x24 SysMgr.
-    void* Context;                // +0x0c. SetContext()'s 3rd arg. Retail's ctors leave it
+    IBehaviorManager* Context;    // +0x0c. SetContext()'s 3rd arg. Retail's ctors leave it
                                    // uninitialized; the port zeroes it.
     unsigned char Attached;         // +0x10. Ctor-zeroed; SetContext() sets 1
                                      // on success.
@@ -124,7 +126,7 @@ public:
     StopIdea();
 
     // Slot 0: returns true, touches nothing.
-    bool SetContext(void* InObject, void* InHandle, void* InContext) override;
+    bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext) override;
 
     // Slot 1, LAB_0632b010 (`XOR EAX,EAX; RET 4`, ICF-folded): returns 0.
     int Update(float DeltaTime) override;
@@ -258,7 +260,7 @@ public:
     MoveIdea();
 
     // Slot 0, LAB_062d4f20.
-    bool SetContext(void* InObject, void* InHandle, void* InContext) override;
+    bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext) override;
 
     // Slot 1, LAB_062d4fa0. Returns 0/1/2/3 (see above).
     int Update(float DeltaTime) override;
@@ -435,7 +437,7 @@ public:
     // Slot 0, LAB_062d5b50 (RET 0xc): rejects a null Object or Handle; otherwise
     // stores the three, Attached = 1, and seeds Speed4c / Speed50 from the
     // owner's thrust model (cruise and engine).
-    bool SetContext(void* InObject, void* InHandle, void* InContext) override;
+    bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext) override;
 
     // Slot 1, LAB_062d5ce0 (RET 4, 677 instructions).
     int Update(float DeltaTime) override;
@@ -555,7 +557,7 @@ public:
     // Slot 0, LAB_062d6820: BaseIdea's binding, then AngleWeight98 from the
     // object's angular speed / distance (FUN_062e5b20 / FUN_062e5950), a discarded
     // FUN_062e5b50 query, AngleWeight9c = pi/16 and bUpValid = 0.
-    bool SetContext(void* InObject, void* InHandle, void* InContext) override;
+    bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext) override;
 
     // Slot 1, LAB_062d68b0 (common_faceidea.cpp; helpers shared with
     // DodgeIdea::Update in common_aisteer.cpp).
@@ -711,7 +713,7 @@ public:
     SplineMoveIdea();
 
     // Slot 0, FUN_062d9c80, RET 0xc.
-    bool SetContext(void* InObject, void* InHandle, void* InContext) override;
+    bool SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext) override;
 
     // Slot 1, LAB_062d9d00, RET 4. Follows the spline: steers the embedded Move to its P2
     // and the embedded Face to the far point (or the P2->P3 chord), and commits itself

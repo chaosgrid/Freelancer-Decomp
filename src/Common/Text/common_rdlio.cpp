@@ -640,10 +640,10 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
         return bOk;
     }
 
-    const unsigned char* Cur = (const unsigned char*)Buffer;
+    const unsigned char* Cur = reinterpret_cast<const unsigned char*>(Buffer);
     do
     {
-        const FRdlRecordHeader* const Header = (const FRdlRecordHeader*)Cur;
+        const FRdlRecordHeader* const Header = reinterpret_cast<const FRdlRecordHeader*>(Cur);
         const unsigned int Length = Header->Length;
         if (Length != 0)
         {
@@ -652,7 +652,7 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
             {
             case kRdlRecordTra:
             {
-                const FRdlTraRecord* const Tra = (const FRdlTraRecord*)Cur;
+                const FRdlTraRecord* const Tra = reinterpret_cast<const FRdlTraRecord*>(Cur);
                 TextRenderAttributes Attrs;
                 Attrs.Packed = Tra->Attrs;
                 TRANode Node;
@@ -663,13 +663,13 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
             case kRdlRecordText:
             {
                 TextNode Node;
-                Node.set_text((const wchar_t*)Payload, -1);
+                Node.set_text(reinterpret_cast<const wchar_t*>(Payload), -1);
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
             case kRdlRecordPosition:
             {
-                const FRdlPositionRecord* const Pos = (const FRdlPositionRecord*)Cur;
+                const FRdlPositionRecord* const Pos = reinterpret_cast<const FRdlPositionRecord*>(Cur);
                 PositionNode Node;
                 Node.bRelH = (Pos->Flags & 1) != 0;
                 Node.bRelV = ((Pos->Flags >> 1) & 1) != 0;
@@ -686,7 +686,7 @@ bool BinaryRDLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, un
             }
             case kRdlRecordStyle:
             {
-                StyleNode Node(((const FRdlStyleRecord*)Cur)->StyleId);
+                StyleNode Node(reinterpret_cast<const FRdlStyleRecord*>(Cur)->StyleId);
                 RdlxAppendNode(Rdl, Node);
                 break;
             }
@@ -718,7 +718,7 @@ bool BinaryRDLReader::extract_text_from_buffer(wchar_t* Dest, unsigned int MaxSi
                                                const char* Buffer, unsigned int Size)
 {
     wchar_t* OutBuf = Dest;
-    const unsigned char* Cur = (const unsigned char*)Buffer;
+    const unsigned char* Cur = reinterpret_cast<const unsigned char*>(Buffer);
     unsigned int Written = 0;
     bool Ok = true;
 
@@ -732,14 +732,14 @@ bool BinaryRDLReader::extract_text_from_buffer(wchar_t* Dest, unsigned int MaxSi
 
     while (Size != 0 && Written < MaxSize)
     {
-        const FRdlRecordHeader* const Header = (const FRdlRecordHeader*)Cur;
+        const FRdlRecordHeader* const Header = reinterpret_cast<const FRdlRecordHeader*>(Cur);
         int Type = Header->Type;
         unsigned int Length = Header->Length;
         if (Length != 0)
         {
             if (Type == kRdlRecordText)
             {
-                const wchar_t* Src = (const wchar_t*)(Cur + 8);
+                const wchar_t* Src = reinterpret_cast<const wchar_t*>((Cur + 8));
                 size_t SrcLen = wcslen(Src);
                 unsigned int Count = (unsigned int)(SrcLen + 1);
                 if (MaxSize - Written < Count)
@@ -786,7 +786,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
     {
         RDLNode* Node = Cur->Node;
         char* Rec = Dest + Written;
-        FRdlRecordHeader* const Header = (FRdlRecordHeader*)Rec;
+        FRdlRecordHeader* const Header = reinterpret_cast<FRdlRecordHeader*>(Rec);
 
         TRANode* AsTra = Node->operator TRANode*();
         PositionNode* AsPos = Node->operator PositionNode*();
@@ -803,7 +803,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 OutSize = Written;
                 return false;
             }
-            FRdlTraRecord* const Tra = (FRdlTraRecord*)Rec;
+            FRdlTraRecord* const Tra = reinterpret_cast<FRdlTraRecord*>(Rec);
             Tra->Header.Type = kRdlRecordTra;
             Tra->Header.Length = 8;
             Tra->Attrs = AsTra->Attrs.Packed;
@@ -817,7 +817,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 OutSize = Written;
                 return false;
             }
-            FRdlPositionRecord* const Pos = (FRdlPositionRecord*)Rec;
+            FRdlPositionRecord* const Pos = reinterpret_cast<FRdlPositionRecord*>(Rec);
             Pos->Header.Type = kRdlRecordPosition;
             Pos->Header.Length = 9;
             Pos->Flags = (AsPos->bRelV ? 2 : 0) | (AsPos->bRelH ? 1 : 0);
@@ -872,7 +872,7 @@ bool BinaryRDLWriter::write_buffer(const RenderDisplayList& Rdl, char* Dest, uns
                 OutSize = Written;
                 return false;
             }
-            FRdlStyleRecord* const StyleRec = (FRdlStyleRecord*)Rec;
+            FRdlStyleRecord* const StyleRec = reinterpret_cast<FRdlStyleRecord*>(Rec);
             StyleRec->Header.Length = 2;
             StyleRec->Header.Type = kRdlRecordStyle;
             StyleRec->StyleId = AsStyle->get_style_id();
@@ -998,7 +998,7 @@ bool XMLReader::read_file(RenderDisplayList& Rdl, const char* Filename)
     RDLXParser Handler(Rdl);
     HRESULT Hr = CoCreateInstance(CLSID_SAXXMLReader_Rdlx, nullptr,
                                   CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER,
-                                  IID_ISAXXMLReader_Rdlx, (void**)&Handler.Ctx.Reader);
+                                  IID_ISAXXMLReader_Rdlx, reinterpret_cast<void**>(&Handler.Ctx.Reader));
     // Only a negative HRESULT fails; the reader is then used without a null check.
     if (Hr < 0)
     {
@@ -1040,7 +1040,7 @@ bool XMLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned
     RDLXParser Handler(Rdl);
     HRESULT Hr = CoCreateInstance(CLSID_SAXXMLReader_Rdlx, nullptr,
                                   CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER,
-                                  IID_ISAXXMLReader_Rdlx, (void**)&Handler.Ctx.Reader);
+                                  IID_ISAXXMLReader_Rdlx, reinterpret_cast<void**>(&Handler.Ctx.Reader));
     if (Hr < 0)
     {
         return false;
@@ -1064,8 +1064,8 @@ bool XMLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned
     VARIANT Input;
     memset(&Input, 0, sizeof(Input));
     Input.vt = VT_BSTR;
-    wchar_t* RawChars = (wchar_t*)Raw;
-    Input.bstrVal = SysAllocStringByteLen((const char*)RawChars, SysStringByteLen(RawChars));
+    wchar_t* RawChars = Raw;
+    Input.bstrVal = SysAllocStringByteLen(reinterpret_cast<const char*>(RawChars), SysStringByteLen(RawChars));
     if (Input.bstrVal == nullptr)
     {
         _com_issue_error(E_OUTOFMEMORY);

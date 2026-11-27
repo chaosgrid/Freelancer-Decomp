@@ -94,7 +94,7 @@ void FAnimScriptRef::Release()
     if (Index != -1)
     {
         DALib::Anim->StopPlayback(Index);                          // slot 0x38
-        DALib::Anim->DestroyScript((void*)Index);                  // slot 0x28
+        DALib::Anim->DestroyScript(reinterpret_cast<void*>(Index));                  // slot 0x28
         Index = -1;
     }
 }
@@ -224,7 +224,7 @@ void CShip::init(CreateParms const& Parms)
          Gun = CEGun::cast(EquipManager.Traverse(GunWalk)))
     {
         Archetype::Projectile const* const Proj =
-            (Archetype::Projectile const*)Gun->Projectile;
+            static_cast<Archetype::Projectile const*>(Gun->Projectile);
         if (!Proj->bRequiresAmmo)
             Gun->Activate(true);
     }
@@ -235,7 +235,7 @@ void CShip::init(CreateParms const& Parms)
          Power = EquipManager.Traverse(PowerWalk))
     {
         float const Capacity = Power->IsDestroyed()
-            ? 0.0f : ((Archetype::Power const*)Power->Arch)->ThrustCapacity;
+            ? 0.0f : static_cast<Archetype::Power const*>(Power->Arch)->ThrustCapacity;
         MaxThrustPower = (float)((double)Capacity + MaxThrustPower);
     }
     ThrustPower = MaxThrustPower;
@@ -259,11 +259,11 @@ CEquip* CShip::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
     // retail also falls back to CEqObj::alloc_equip on a null allocation.
     int const ClassType = (int)Arch->get_class_type();
     if (ClassType == Archetype::AClassEngine)
-        return new CEEngine(this, EquipId, (Archetype::Engine const*)Arch, bMissionFlag);
+        return new CEEngine(this, EquipId, static_cast<Archetype::Engine const*>(Arch), bMissionFlag);
     if (ClassType == Archetype::AClassThruster)
-        return new CEThruster(this, EquipId, (Archetype::Thruster const*)Arch, bMissionFlag);
+        return new CEThruster(this, EquipId, static_cast<Archetype::Thruster const*>(Arch), bMissionFlag);
     if (ClassType == Archetype::AClassTractor)
-        return new CETractor(this, EquipId, (Archetype::Tractor const*)Arch, bMissionFlag);
+        return new CETractor(this, EquipId, static_cast<Archetype::Tractor const*>(Arch), bMissionFlag);
     return CEqObj::alloc_equip(EquipId, Arch, bMissionFlag);
 }
 
@@ -310,7 +310,7 @@ bool CShip::get_tgt_lead_fire_pos(Vector& OutPos) const
         IObjInspect const* const TargetInspect = TargetObj;
         return get_tgt_lead_fire_pos(TargetInspect, OutPos);
     }
-    return get_tgt_lead_fire_pos((IObjInspect const*)nullptr, OutPos);
+    return get_tgt_lead_fire_pos(nullptr, OutPos);
 }
 
 unsigned short CShip::get_sub_target() const
@@ -336,14 +336,14 @@ void CShip::set_target(IObjRW* NewTarget)
     {
         CObject* const OldObj = const_cast<CObject*>(OldTarget->cobject()); // slot +0x150
         if (OldObj != nullptr && (OldObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-            ((CShip*)OldObj)->notify_set_target(this, false);
+            static_cast<CShip*>(OldObj)->notify_set_target(this, false);
     }
 
     if (NewTarget != nullptr)
     {
         CObject* const NewObj = const_cast<CObject*>(NewTarget->cobject());
         if (NewObj != nullptr && (NewObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-            ((CShip*)NewObj)->notify_set_target(this, true);
+            static_cast<CShip*>(NewObj)->notify_set_target(this, true);
     }
 
     Target.watch(NewTarget);
@@ -381,10 +381,10 @@ ShipGunStats const& CShip::get_gun_stats() const
             // AI ships skip their auto-turret guns.
             if (Equip->IsFunctioning())
             {
-                Archetype::Gun const* GunArch = (Archetype::Gun const*)Equip->EquipArch();
+                Archetype::Gun const* GunArch = static_cast<Archetype::Gun const*>(Equip->EquipArch());
                 if (bPlayerShip || !GunArch->bAutoTurret)
                 {
-                    CEGun* const Gun = (CEGun*)Equip;
+                    CEGun* const Gun = static_cast<CEGun*>(Equip);
                     // The munition's Seeker (+0x90) tells missiles from guns.
                     if (Gun->MunitionArch()->Seeker == 0)
                     {
@@ -444,7 +444,7 @@ double CShip::get_cargo_hold_remaining() const
          Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk))
     {
         if (Equip->Type == EquipTypeCargo)
-            Used = (float)((double)(((CECargo const*)Equip)->Count) *
+            Used = (float)((double)(static_cast<CECargo const*>(Equip)->Count) *
                                       Equip->Arch->Volume + Used);
         else
             Used = (float)((double)(Used) + Equip->Arch->Volume);
@@ -471,7 +471,7 @@ int CShip::get_repair_kit_capacity_remaining() const
     {
         if (Equip->Arch->get_class_type() == Archetype::AClassRepairKit)
         {
-            int const Count = (int)((CECargo*)Equip)->Count;
+            int const Count = (int)(static_cast<CECargo*>(Equip))->Count;
             if (Count > Limit)
                 return 0;
             return Limit - Count;
@@ -495,7 +495,7 @@ int CShip::get_shield_battery_capacity_remaining() const
     {
         if (Equip->Arch->get_class_type() == Archetype::AClassShieldBattery)
         {
-            int const Count = (int)((CECargo*)Equip)->Count;
+            int const Count = (int)(static_cast<CECargo*>(Equip))->Count;
             if (Count > Limit)
                 return 0;
             return Limit - Count;
@@ -532,7 +532,7 @@ int CShip::get_ammo_capacity_remaining(unsigned EquipArchId) const
             ClassType != Archetype::AClassCounterMeasure)
             return -1;
 
-        int const Count = (int)((CECargo const*)Equip)->Count;
+        int const Count = (int)(static_cast<CECargo const*>(Equip))->Count;
         if (Count > Limit)
             return 0;
         return Limit - Count;
@@ -555,7 +555,7 @@ int CShip::get_space_for_cargo_type(Archetype::Equipment const* CargoArch) const
              Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk))
         {
             if (Equip->Type == EquipTypeCargo)
-                Used = (float)((double)(((CECargo const*)Equip)->Count) *
+                Used = (float)((double)(static_cast<CECargo const*>(Equip)->Count) *
                                           Equip->Arch->Volume + Used);
             else
                 Used = (float)((double)(Used) + Equip->Arch->Volume);
@@ -628,7 +628,7 @@ bool CShip::is_enemy(IObjInspect* OtherInspect)
 
     // Directional: the other's attitude towards this ship.
     int const ThisVibeId = VibeId;
-    int const OtherVibeId = ((CEqObj const*)Delegate)->VibeId;
+    int const OtherVibeId = static_cast<CEqObj const*>(Delegate)->VibeId;
     float Attitude;
     int const Result = Reputation::Vibe::AttitudeTowards(OtherVibeId, ThisVibeId, Attitude);
     if (Result != 0)
@@ -846,7 +846,7 @@ unsigned CShip::get_tradelane_entrance_ring()
     // FUN_062b1810, tail jump to FUN_062c2320. Retail also rejects IAction == 0x10 (a null
     // LaneAction after the -0x10 adjustment).
     IAction* const Action = Actions.find("LaneAction");
-    if (Action == nullptr || Action == (IAction*)0x10)
+    if (Action == nullptr || Action == reinterpret_cast<IAction*>(0x10))
         return 0;
     LaneAction const* const Lane = static_cast<LaneAction const*>(Action);
     if (Lane->EntranceRing == nullptr)
@@ -860,7 +860,7 @@ unsigned CShip::get_tradelane_exit_ring()
     // the current leg starts at, not ExitRing (+0x24). Retail: once under way this is the last
     // ring passed; before the first hop it is the entrance ring.
     IAction* const Action = Actions.find("LaneAction");
-    if (Action == nullptr || Action == (IAction*)0x10)
+    if (Action == nullptr || Action == reinterpret_cast<IAction*>(0x10))
         return 0;
     LaneAction const* const Lane = static_cast<LaneAction const*>(Action);
     if (Lane->LegStartXform.Ring == nullptr)
@@ -1472,7 +1472,7 @@ void CShip::VerifyTarget()
     {
         CObject const* const EqObj = Target.get()->cobject();
         CEqObj const* const Eq = (EqObj != nullptr && (EqObj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
-            ? (CEqObj const*)EqObj : nullptr;
+            ? static_cast<CEqObj const*>(EqObj) : nullptr;
         SubInst = Eq->sub_obj_id_to_inst(SubTargetIndex);
     }
 
@@ -1594,7 +1594,7 @@ void CShip::flush_animations()
     if (BayAnim.Index != -1)
     {
         DALib::Anim->StopPlayback(BayAnim.Index);                         // slot 0x38
-        DALib::Anim->DestroyScript((void*)BayAnim.Index);                 // slot 0x28
+        DALib::Anim->DestroyScript(reinterpret_cast<void*>(BayAnim.Index));                 // slot 0x28
         BayAnim.Index = -1;
     }
 
@@ -1678,7 +1678,7 @@ int CShip::update(float Dt, unsigned Flags)
     if (BayState == BayOpening)
     {
         float const ScriptDuration =
-            DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+            DALib::Anim->GetScriptDuration(reinterpret_cast<void*>(BayAnim.Index));
         float const StoredDuration = DALib::Anim->GetStoredDuration(BayAnim.Index);
         if (StoredDuration >= ScriptDuration)
             BayState = BayOpen;
@@ -1696,7 +1696,7 @@ int CShip::update(float Dt, unsigned Flags)
 
     if (ObjectDb != nullptr && PhySys::GetCollisionState(this))
     {
-        ISpatialPartition* const Bucket = (ISpatialPartition*)ObjectDb->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
+        ISpatialPartition* const Bucket = ObjectDb->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
         if (Bucket != nullptr)
         {
             Geometry::Sphere Query;
@@ -1732,7 +1732,7 @@ int CShip::update(float Dt, unsigned Flags)
         {
             CObject* const TargetObj = const_cast<CObject*>(Target.get()->cobject());
             if (TargetObj != nullptr && (TargetObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-                ((CShip*)TargetObj)->notify_set_target(this, false);
+                static_cast<CShip*>(TargetObj)->notify_set_target(this, false);
             Target.set(nullptr);
         }
         SubTargetIndex = SUBOBJ_ID_NONE;
@@ -1755,7 +1755,7 @@ double CShip::open_bay()
         // Already requested: Script (slot 0x14) - Stored (slot 0x40, fetched first), returned
         // unrounded. No Anim / handle test.
         float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-        float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+        float const Script = DALib::Anim->GetScriptDuration(reinterpret_cast<void*>(BayAnim.Index));
         return (double)Script - Stored;
     }
 
@@ -1772,7 +1772,7 @@ double CShip::open_bay()
                               AsOpaqueDword(1.0f), nullptr);   // slot 0x2c
     AnimDB::Add(BayAnim.Index);
     float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-    float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+    float const Script = DALib::Anim->GetScriptDuration(reinterpret_cast<void*>(BayAnim.Index));
     float const Result = (float)((double)(Script) - Stored);
 
     if (Notify != nullptr)
@@ -1927,7 +1927,7 @@ void CShip::stop_tradelane()
 {
     // FUN_062b17e0. The 0x10 test is the null-LaneAction check, as in get_tradelane_*.
     IAction* Lane = Actions.find("LaneAction");
-    if (Lane == nullptr || Lane == (IAction*)0x10)
+    if (Lane == nullptr || Lane == reinterpret_cast<IAction*>(0x10))
         return;
 
     // IAction is LaneAction's second base, after the 0x10-byte PhySys::Controller.
@@ -1947,7 +1947,7 @@ void CShip::request_exit_tradelane()
     IAction* const Lane = Actions.find("LaneAction");
     if (Lane == nullptr)
         return;
-    if (Lane == (IAction*)0x10)
+    if (Lane == reinterpret_cast<IAction*>(0x10))
         return;
     static_cast<LaneAction*>(Lane)->request_exit();   // FUN_062c2300
 
@@ -2090,7 +2090,7 @@ namespace
         CObject const* const Obj = Object->cobject();
         if (Obj == nullptr || (Obj->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
             return false;
-        int const TheirVibe = ((CEqObj const*)Obj)->VibeId;
+        int const TheirVibe = static_cast<CEqObj const*>(Obj)->VibeId;
         int const OwnVibe = MyVibe;
         float Attitude = 0.0f;
         if (Reputation::Vibe::AttitudeTowards(TheirVibe, OwnVibe, Attitude) != 0)
@@ -2133,7 +2133,7 @@ IObjRW* CShip::next_enemy()
 
     // A missing scanner skips the first pass only.
     CEScanner const* const Scanner =
-        (CEScanner const*)EquipManager.FindFirst(EquipTypeScanner);
+        static_cast<CEScanner const*>(EquipManager.FindFirst(EquipTypeScanner));
 
     // is_dying is slot 0x38.
     if (Scanner != nullptr)
@@ -2183,7 +2183,7 @@ IObjRW* CShip::previous_enemy()
         CurrentDist = (float)(RoundedDistance(Target.get()->get_position(), WorldPosition));
 
     CEScanner const* const Scanner =
-        (CEScanner const*)EquipManager.FindFirst(EquipTypeScanner);
+        static_cast<CEScanner const*>(EquipManager.FindFirst(EquipTypeScanner));
 
     if (Scanner != nullptr)
     {
@@ -2224,7 +2224,7 @@ IObjRW* CShip::next_target(bool bReverse)
 {
     // FUN_062b1a40. The FindFirst result is used as a CEScanner without a cast check.
     CEScanner const* const Scanner =
-        (CEScanner const*)EquipManager.FindFirst(EquipTypeScanner);
+        static_cast<CEScanner const*>(EquipManager.FindFirst(EquipTypeScanner));
     if (Scanner == nullptr)
         return nullptr;
     int const Count = Scanner->Scans.Count;                           // +0x824
@@ -2264,7 +2264,7 @@ IObjRW* CShip::next_target(bool bReverse)
         // TypeBits (+0xe0) is read with no null test: a non-CSimple object faults, as in retail.
         CObject const* const Obj = Candidate->cobject();
         CSimple const* const Simple = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
-            ? (CSimple const*)Obj : nullptr;
+            ? static_cast<CSimple const*>(Obj) : nullptr;
         if (Simple->TypeBits == 0 || Simple->TypeBits == OBJ_ASTEROID)
             continue;
         return ScanEntryOwner(Scanner->Scans.Entries[Index]);
@@ -2319,7 +2319,7 @@ bool CShip::leaving_system_update(unsigned& LeavingObjId)
 Archetype::Ship const* CShip::shiparch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::Ship const*)Archetype;
+    return static_cast<Archetype::Ship const*>(Archetype);
 }
 
 // DAT_0639e574
@@ -2340,6 +2340,6 @@ long CShip::get_renderable_subtarget() const
         return -1;
     CObject const* const EqObj = Target.get()->cobject();
     CEqObj const* const Eq = (EqObj != nullptr && (EqObj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
-        ? (CEqObj const*)EqObj : nullptr;
+        ? static_cast<CEqObj const*>(EqObj) : nullptr;
     return Eq->sub_obj_id_to_inst(SubTargetIndex);
 }

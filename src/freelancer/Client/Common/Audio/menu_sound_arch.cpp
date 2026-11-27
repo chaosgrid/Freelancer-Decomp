@@ -277,7 +277,7 @@ namespace
     int G_AliveSoundSourceCount = 0;
 
     // DAT_006164dc — FUN_0040f130 / FUN_0040f140. Mixer uses GetVelocity (+0x48) for SM slot 16.
-    void* G_SoundListenerObject = nullptr;
+    ICamera* G_SoundListenerObject = nullptr;
 
     // A stream handle of IStreamer2::CreateStream counts only when it is neither 0 nor -1
     // (retail tests both everywhere).
@@ -963,7 +963,7 @@ namespace
         if (Source3dId != -1)
         {
             const InstanceIndex Instance = Source3dId;
-            CObject* const User = (CObject*)DALib::Engine->GetInstanceUserData(Instance);
+            CObject* const User = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Instance));
             if (User == nullptr)
             {
                 Out->x = 0.f;
@@ -2049,7 +2049,7 @@ namespace
         return AttenuationDb <= FadeTargetDb ? 1u : 0u;
     }
 
-    int OpenWavFileSystem(char const* RelPath, void* ParentFs, void** OutFs)
+    int OpenWavFileSystem(char const* RelPath, IFileSystem* ParentFs, void** OutFs)
     {
         if (OutFs != nullptr)
             *OutFs = nullptr;
@@ -2058,7 +2058,7 @@ namespace
         // Only caller is CreateSoundArchWav, which has already required DALib::Data; RelPath
         // goes in untested.
         IComponentFactory* const Factory = ParentFs != nullptr
-            ? static_cast<IComponentFactory*>(static_cast<IFileSystem*>(ParentFs))
+            ? static_cast<IComponentFactory*>(ParentFs)
             : static_cast<IComponentFactory*>(DALib::Data);
 
         FFileSystemAggDesc Desc;
@@ -2346,11 +2346,11 @@ namespace
 
     // FUN_00428ba0 / FUN_00428bc0 body: the caller owns the AddRef'd reference (the StarSys
     // tick releases it). Retail has no null test on OutSource.
-    unsigned char BindSource(FStreamedSource* Source, void** OutSource)
+    unsigned char BindSource(FStreamedSource* Source, ISoundSource** OutSource)
     {
         if (Source == nullptr)
             return 0;
-        *OutSource = static_cast<ISoundSource*>(Source);
+        *OutSource = Source;
         Source->AddRef();
         return 1;
     }
@@ -2377,7 +2377,7 @@ namespace
         {
             if (!Id.IsEmpty())
             {
-                void* const Current = LookupClientSoundArch(&Id);
+                Archetype::ISound* const Current = LookupClientSoundArch(&Id);
                 if (static_cast<void*>((*Slot)->Arch) == Current)
                     return 1;
             }
@@ -2398,12 +2398,12 @@ namespace
         PlayKey[4] = 0;
         memcpy(&PlayKey[5], &SilenceFloat, sizeof(float)); // key +0x14
 
-        void* Handle = nullptr;
-        void* const Arch = LookupClientSoundArch(&Id);
+        ISoundSource* Handle = nullptr;
+        Archetype::ISound* const Arch = LookupClientSoundArch(&Id);
         if (PlayClientSoundArch(Arch, PlayKey, &Handle, 0) == 0)
             return 0;
         FStreamedSource* const Source =
-            static_cast<FStreamedSource*>(static_cast<ISoundSource*>(Handle));
+            static_cast<FStreamedSource*>(Handle);
         *Slot = Source;
         Source->Type = SourceType;
         Source->FadeTargetDb = 0.f;
@@ -2534,7 +2534,7 @@ namespace
     // FUN_0042ae40 on one of the ThrusterEquipConsts ID_Strings.
     Archetype::ISound* ThrusterLookupArch(ID_String const& Name)
     {
-        return static_cast<Archetype::ISound*>(LookupClientSoundArch(&Name));
+        return LookupClientSoundArch(&Name);
     }
 
     // Exterior prefers the exterior archetype, interior the interior one; either falls back on
@@ -2773,7 +2773,7 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
     return static_cast<int>(G_SoundArchs.size() - OldCount);
 }
 
-void* LookupClientSoundArch(ID_String const* Id)
+Archetype::ISound* LookupClientSoundArch(ID_String const* Id)
 {
     // FUN_0042ae40 (cdecl). An empty id warns too. Retail looks up through the scratch key
     // DAT_0067ede0 with FUN_0042c300.
@@ -2836,20 +2836,20 @@ void ShutdownClientSoundArch()
     G_SoundArchs.clear();
 }
 
-unsigned char AcquireClientSoundArch(void* Arch)
+unsigned char AcquireClientSoundArch(Archetype::ISound* Arch)
 {
     // Archetype slot 3. Port-side null test.
     if (Arch == nullptr)
         return 0;
-    return static_cast<Archetype::ISound*>(Arch)->Acquire();
+    return Arch->Acquire();
 }
 
-unsigned char ReleaseClientSoundArch(void* Arch)
+unsigned char ReleaseClientSoundArch(Archetype::ISound* Arch)
 {
     // Archetype slot 4. Port-side null test.
     if (Arch == nullptr)
         return 0;
-    return static_cast<unsigned char>(static_cast<Archetype::ISound*>(Arch)->Release());
+    return static_cast<unsigned char>(Arch->Release());
 }
 
 unsigned char PreloadClientSoundArch(ID_String const* Id)
@@ -2857,7 +2857,7 @@ unsigned char PreloadClientSoundArch(ID_String const* Id)
     // FUN_00427a10. The second stack argument (the StarSys caller pushes 1) is never read.
     if (Id->IsEmpty())
         return 0;
-    void* const Arch = LookupClientSoundArch(Id);
+    Archetype::ISound* const Arch = LookupClientSoundArch(Id);
     if (Arch == nullptr)
         return 0;
     return AcquireClientSoundArch(Arch);
@@ -2868,13 +2868,13 @@ void UnloadClientSoundArch(ID_String const* Id)
     // FUN_00427a40.
     if (Id->IsEmpty())
         return;
-    void* const Arch = LookupClientSoundArch(Id);
+    Archetype::ISound* const Arch = LookupClientSoundArch(Id);
     if (Arch == nullptr)
         return;
     ReleaseClientSoundArch(Arch);
 }
 
-void* CreateClientSoundSource3D()
+ISoundSource* CreateClientSoundSource3D()
 {
     // LAB_00503420: FUN_00428f80(0x64), then FUN_00428790.
     void* const Block = SoundSourceAlloc(0x64u);
@@ -2883,7 +2883,7 @@ void* CreateClientSoundSource3D()
     return static_cast<ISoundSource*>(new (Block) FSpatialSource(BlockFlagByte(Block)));
 }
 
-void* CreateClientSoundSource()
+ISoundSource* CreateClientSoundSource()
 {
     // LAB_00513460: FUN_00428f80(0x30), then FUN_00429040(1).
     void* const Block = SoundSourceAlloc(0x30u);
@@ -2892,7 +2892,7 @@ void* CreateClientSoundSource()
     return static_cast<ISoundSource*>(new (Block) FSoundSource(1, BlockFlagByte(Block)));
 }
 
-void* CreateClientEquipSoundEmitter(void* Arch)
+ISoundSource* CreateClientEquipSoundEmitter(Archetype::ISound* Arch)
 {
     // The caller's FUN_00428f80(0x68) (malloc) with its null test. Every caller passes a found
     // archetype.
@@ -2900,21 +2900,21 @@ void* CreateClientEquipSoundEmitter(void* Arch)
     if (Block == nullptr)
         return nullptr;
     FEquipSoundEmitter* const Emitter = new (Block)
-        FEquipSoundEmitter(BlockFlagByte(Block), static_cast<Archetype::ISound*>(Arch));
-    return static_cast<ISoundSource*>(Emitter);
+        FEquipSoundEmitter(BlockFlagByte(Block), Arch);
+    return Emitter;
 }
 
-void* GetClientEquipSoundEmitterArch(void* Emitter)
+Archetype::ISound* GetClientEquipSoundEmitterArch(ISoundSource* Emitter)
 {
     // The engine emitter's +0x64, read raw by FUN_00528240.
-    return static_cast<FEquipSoundEmitter*>(static_cast<ISoundSource*>(Emitter))->EmitterArch;
+    return static_cast<FEquipSoundEmitter*>(Emitter)->EmitterArch;
 }
 
-unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle,
+unsigned char PlayClientSoundArch(Archetype::ISound* Arch, unsigned* PlayKey, ISoundSource** OutHandle,
                                   unsigned char bAltStart)
 {
     // FUN_00428680 (cdecl). Arch is a SoundImpl or a VoiceMsg (HUD_Comm): table calls only.
-    Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(Arch);
+    Archetype::ISound* const SoundArch = Arch;
     if (SoundArch == nullptr)
         return 0;
 
@@ -2963,20 +2963,20 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
     if (bOk != 0 && OutHandle != nullptr)
     {
         Source->AddRef();
-        *OutHandle = static_cast<ISoundSource*>(Source);
+        *OutHandle = Source;
     }
     Source->Release();
     return bOk;
 }
 
-unsigned char RestartClientStreamedSound(ISoundSource* Handle, void* Arch, int Offset)
+unsigned char RestartClientStreamedSound(ISoundSource* Handle, Archetype::ISound* Arch, int Offset)
 {
     // FUN_0042a2a0 on a Sound::StreamedSource the Gf script started (FUN_0044f610).
     return StreamedRestart(static_cast<FStreamedSource*>(Handle),
-                           static_cast<Archetype::ISound*>(Arch), Offset);
+                           Arch, Offset);
 }
 
-unsigned char PlayClientSoundArchIfIdle(void* Arch, unsigned* PlayKey, void** OutHandle)
+unsigned char PlayClientSoundArchIfIdle(Archetype::ISound* Arch, unsigned* PlayKey, ISoundSource** OutHandle)
 {
     // FUN_004285f0.
     int Count = 0;
@@ -2991,7 +2991,7 @@ unsigned char PlayClientSoundArchIfIdle(void* Arch, unsigned* PlayKey, void** Ou
     return PlayClientSoundArch(Arch, PlayKey, OutHandle, 0);
 }
 
-void PlayOrRewindClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle)
+void PlayOrRewindClientSoundArch(Archetype::ISound* Arch, unsigned* PlayKey, ISoundSource** OutHandle)
 {
     // FUN_00428640.
     FPlayingSourceNode* const Head = G_PlayingSources.Head;
@@ -3006,7 +3006,7 @@ void PlayOrRewindClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle
     PlayClientSoundArch(Arch, PlayKey, OutHandle, 0);
 }
 
-void StopClientSoundArch(void* Arch)
+void StopClientSoundArch(Archetype::ISound* Arch)
 {
     // FUN_004285c0: the next node is loaded before the match test, so a source that Stop
     // unlinks does not break the walk; the head is re-read after the call.
@@ -3020,7 +3020,7 @@ void StopClientSoundArch(void* Arch)
     }
 }
 
-int CountClientSoundArchSources(void* Arch)
+int CountClientSoundArchSources(Archetype::ISound* Arch)
 {
     // FUN_00428000 (cdecl).
     int Count = 0;
@@ -3057,12 +3057,12 @@ void ResumePausedClientSounds()
     }
 }
 
-unsigned char BindClientBackgroundMusic(void** OutSource)
+unsigned char BindClientBackgroundMusic(ISoundSource** OutSource)
 {
     return BindSource(G_BackgroundMusic, OutSource);
 }
 
-unsigned char BindClientBackgroundAmbient(void** OutSource)
+unsigned char BindClientBackgroundAmbient(ISoundSource** OutSource)
 {
     return BindSource(G_BackgroundAmbient, OutSource);
 }
@@ -3149,7 +3149,7 @@ float GetClientSoundDuckingDb()
     return G_DuckCurrentDb;
 }
 
-void StopAllClientSoundsExceptArch(void* KeepArch)
+void StopAllClientSoundsExceptArch(Archetype::ISound* KeepArch)
 {
     // FUN_00428430 (cdecl).
     if (G_BackgroundMusic != nullptr)
@@ -3196,19 +3196,19 @@ void StopAllClientSounds()
     G_StreamedHeap.Shrink();
 }
 
-void* GetClientSoundListenerObject()
+ICamera* GetClientSoundListenerObject()
 {
     // FUN_0040f130.
     return G_SoundListenerObject;
 }
 
-void SetClientSoundListenerObject(void* CameraOrNull)
+void SetClientSoundListenerObject(ICamera* CameraOrNull)
 {
     // FUN_0040f140.
     G_SoundListenerObject = CameraOrNull;
 }
 
-void TickClientSoundMixer(void* Camera, float DeltaSeconds)
+void TickClientSoundMixer(ICamera* Camera, float DeltaSeconds)
 {
     // FUN_00428040 (cdecl Camera, Dt). DAT_00667cb8 = 0 first.
     G_MixerRankedCount = 0;
@@ -3239,7 +3239,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
     ISoundManager* const Sound = DALib::Sound;
     if (Camera != nullptr)
     {
-        ICamera* const Cam = static_cast<ICamera*>(Camera);
+        ICamera* const Cam = Camera;
         const Vector* const Pos = Cam->GetPosition();
         G_MixerListener.x = Pos->x;
         G_MixerListener.y = Pos->y;
@@ -3248,11 +3248,11 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         {
             Sound->SetOrientationFromMatrix(Cam->GetOrientation());
             Sound->SetListenerPosition(&G_MixerListener);
-            void* const VelSrc = G_SoundListenerObject;
+            ICamera* const VelSrc = G_SoundListenerObject;
             if (VelSrc != nullptr)
             {
                 float Vel[3] = {};
-                static_cast<ICamera*>(VelSrc)->GetVelocity((Vector*)Vel);
+                VelSrc->GetVelocity(reinterpret_cast<Vector*>(Vel));
                 Sound->SetListenerVelocity(reinterpret_cast<Vector*>(Vel));
             }
         }
@@ -3334,7 +3334,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
     }
 }
 
-int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
+int CreateSoundArchWav(Archetype::ISound* Arch, IFileSystem* ParentFs)
 {
     // FUN_0042b5e0 (cdecl). One function for both archetype kinds: the SoundImpl (FUN_0042b840)
     // and the VoiceMsg (FUN_00431220) differ only in what their slots 1/10/13 return.
@@ -3425,36 +3425,36 @@ void SetClientAudioVoiceVolume(float Linear)
     G_AudioVoiceDb = LinearToOptionDb(Linear);
 }
 
-GENRESULT GetClientSoundSourceVolumeDb(void* Source, float* OutDb)
+GENRESULT GetClientSoundSourceVolumeDb(ISoundSource* Source, float* OutDb)
 {
     return static_cast<FSoundSource*>(Source)->GetAttenuation(OutDb);
 }
 
-float GetClientSoundSourceMixerScore(void* Source)
+float GetClientSoundSourceMixerScore(ISoundSource* Source)
 {
     FSoundSource* Typed = static_cast<FSoundSource*>(Source);
     return Typed != nullptr ? Typed->MixerScale : kMixerNoScore;
 }
 
-void* GetClientSoundSourceArch(void* Source)
+Archetype::ISound* GetClientSoundSourceArch(ISoundSource* Source)
 {
     // Sound::Source +0x18, the archetype Start (FUN_004291c0) stored. No null test.
     return static_cast<FSoundSource*>(Source)->Arch;
 }
 
-void* GetClientSoundArchLinked(void* Arch)
+Archetype::ISound* GetClientSoundArchLinked(Archetype::ISound* Arch)
 {
     // Archetype slot 12 (+0x30), FUN_0042bf70 for a SoundImpl.
-    return static_cast<Archetype::ISound*>(Arch)->GetLinked();
+    return Arch->GetLinked();
 }
 
-float GetClientSoundArchRandomPitch(void* Arch)
+float GetClientSoundArchRandomPitch(Archetype::ISound* Arch)
 {
     // Archetype slot 11 (+0x2c), LAB_0042bf10 for a SoundImpl.
-    return static_cast<Archetype::ISound*>(Arch)->GetRandomPitch();
+    return Arch->GetRandomPitch();
 }
 
-unsigned GetClientSoundArchId(void* Arch)
+unsigned GetClientSoundArchId(Archetype::ISound* Arch)
 {
     // Archetype +0x04, the nickname id. No null test.
     return ArchFrom(Arch)->NicknameId;
@@ -3478,31 +3478,31 @@ int GetClientSoundLod()
     return G_SoundLod;
 }
 
-void SetClientSoundSourceCone(void* SourcePtr, float InnerAngle, float OuterAngle)
+void SetClientSoundSourceCone(ISoundSource* SourcePtr, float InnerAngle, float OuterAngle)
 {
     // FUN_00429ea0 (thiscall, RET 8) — Sound::Source3D, not a vtable slot; retail calls it
     // directly. Writes +0x54 / +0x58; no test of the source.
     FSpatialSource* const Source =
-        static_cast<FSpatialSource*>(static_cast<ISoundSource*>(SourcePtr));
+        static_cast<FSpatialSource*>(SourcePtr);
     Source->Spatial[9] = InnerAngle;
     Source->Spatial[10] = OuterAngle;
 }
 
-void SetClientSoundSourceConeOutsideVolume(void* SourcePtr, float Volume)
+void SetClientSoundSourceConeOutsideVolume(ISoundSource* SourcePtr, float Volume)
 {
     // FUN_00429f10 (thiscall, RET 4) — Sound::Source3D: writes +0x5c; no test of the source.
     FSpatialSource* const Source =
-        static_cast<FSpatialSource*>(static_cast<ISoundSource*>(SourcePtr));
+        static_cast<FSpatialSource*>(SourcePtr);
     Source->Spatial[11] = Volume;
 }
 
-void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, Transform const* Pose)
+void SetClientSoundSourcePose(ISoundSource* SourcePtr, int AttachHandle, Transform const* Pose)
 {
     // Slot 37 (vt+0x94) on the source.
-    static_cast<ISoundSource*>(SourcePtr)->SetPose(AttachHandle, Pose);
+    SourcePtr->SetPose(AttachHandle, Pose);
 }
 
-void SetClientSoundSourceType(void* SourcePtr, int Type)
+void SetClientSoundSourceType(ISoundSource* SourcePtr, int Type)
 {
     // A plain store into the source's +0x04 (HUD_Comm's FUN_004cae10). No null test: the
     // callers only reach it after a successful FUN_00428680.

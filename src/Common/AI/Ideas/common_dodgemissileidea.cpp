@@ -74,7 +74,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
 
     // Context is the IBehaviorManager; Context+0xc, Handle, Handle+0x14fc, its +0x84
     // owner and Handle+0x18 are all used by retail without a test.
-    IBehaviorManager* const Manager = static_cast<IBehaviorManager*>(Context);
+    IBehaviorManager* const Manager = Context;
     FAiTarget* const Nav = &Handle->SelfTarget;
     FAiTarget* const NavTarget = Nav;
     IObjInspect const* const Owner = Nav->Iface;
@@ -127,7 +127,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
         // out of line.
         NavTarget->RefreshPos();
 
-        Vector const& MissilePos = ObjInspectOf(Missile)->get_position();
+        Vector const& MissilePos = Missile->get_position();
         Vector Delta{ MissilePos.x - NavTarget->CachedPos.x,
                       MissilePos.y - NavTarget->CachedPos.y,
                       MissilePos.z - NavTarget->CachedPos.z };
@@ -165,7 +165,7 @@ int DodgeMissileIdea::Update(float /*DeltaTime*/)
         // The real dodge: fly a frame along the perpendicular escape direction.
         NavTarget->RefreshPos();
 
-        Vector const& MissilePos = ObjInspectOf(Missile)->get_position();
+        Vector const& MissilePos = Missile->get_position();
         Vector Delta{ MissilePos.x - NavTarget->CachedPos.x,
                       MissilePos.y - NavTarget->CachedPos.y,
                       MissilePos.z - NavTarget->CachedPos.z };

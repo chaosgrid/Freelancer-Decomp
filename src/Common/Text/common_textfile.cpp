@@ -95,7 +95,7 @@ bool FileMap::open(char const* Path)
         if (MappingHandle != nullptr)
         {
             Size = GetFileSize(FileHandle, nullptr);
-            View = (char*)MapViewOfFile(MappingHandle, FILE_MAP_READ, 0, 0, Size);
+            View = static_cast<char*>(MapViewOfFile(MappingHandle, FILE_MAP_READ, 0, 0, Size));
             if (View != nullptr)
             {
                 Cursor = 0;
@@ -114,7 +114,7 @@ bool FileMap::open_memory(void const* Buffer, unsigned int Bytes)
     if (Buffer == nullptr || Bytes == 0)
         return false;
 
-    View = (char*)malloc(Bytes);
+    View = static_cast<char*>(malloc(Bytes));
     memcpy(View, Buffer, Bytes);
     Size = Bytes;
     Cursor = 0;
@@ -195,7 +195,7 @@ namespace
     bool ReadBiniPtr(FileMap& Map, T*& Out, unsigned int Want)
     {
         unsigned int Got = Want;
-        Out = (T*)Map.request_pointer(Got);
+        Out = static_cast<T*>(Map.request_pointer(Got));
         if (Got != Want)
         {
             Out = nullptr;

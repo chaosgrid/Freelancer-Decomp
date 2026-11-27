@@ -89,7 +89,7 @@ void CEThruster::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     {
         CObject* Candidate = Owner;
         if ((Candidate->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-            Ship = (CShip*)(Owner);
+            Ship = static_cast<CShip*>(Owner);
     }
 
     Archetype::Thruster const* ThrustArch = ThrusterArch();
@@ -145,7 +145,7 @@ CEThruster* __cdecl CEThruster::cast(CEquip* Equip)
     // RVA 0x3d3a0
     if (Equip == nullptr || Equip->GetType() != EquipTypeThruster)
         return nullptr;
-    return (CEThruster*)(Equip);
+    return static_cast<CEThruster*>(Equip);
 }
 
 CEThruster const* __cdecl CEThruster::cast(CEquip const* Equip)
@@ -156,5 +156,5 @@ CEThruster const* __cdecl CEThruster::cast(CEquip const* Equip)
 
 Archetype::Thruster const* CEThruster::ThrusterArch() const
 {
-    return (Archetype::Thruster const*)(Arch);
+    return static_cast<Archetype::Thruster const*>(Arch);
 }

@@ -102,7 +102,7 @@ namespace
         Desc.FindHandle = 0xFFFFFFFF;
         IFileSystem* FileSystem = nullptr;
         if (DALib::Dacom == nullptr ||
-            DALib::Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&FileSystem)) != GR_OK)
+            DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&FileSystem)) != GR_OK)
             return nullptr;
         return FileSystem;
     }
@@ -317,7 +317,7 @@ void RenderEx::Startup()
     if (DALib::Pipeline == nullptr)
         return;
     IRenderPipelineEx* PipelineEx = nullptr;
-    if (DALib::Pipeline->QueryInterface(Iids::RenderPipelineEx, (void**)(&PipelineEx)) != GR_OK ||
+    if (DALib::Pipeline->QueryInterface(Iids::RenderPipelineEx, reinterpret_cast<void**>(&PipelineEx)) != GR_OK ||
         PipelineEx == nullptr)
     {
         // DirectX8 (RP8.dll): the retail rendering path, nothing else to do.
@@ -326,7 +326,7 @@ void RenderEx::Startup()
         return;
     }
     IRPDrawEx* DrawEx = nullptr;
-    if (DALib::Pipeline->QueryInterface(Iids::RPDrawEx, (void**)(&DrawEx)) != GR_OK ||
+    if (DALib::Pipeline->QueryInterface(Iids::RPDrawEx, reinterpret_cast<void**>(&DrawEx)) != GR_OK ||
         DrawEx == nullptr)
     {
         PipelineEx->Release();

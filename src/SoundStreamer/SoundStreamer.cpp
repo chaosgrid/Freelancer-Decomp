@@ -902,14 +902,14 @@ GENRESULT DACOM_API FStreamerInner::QueryInterface(const char* Iid, void** Out)
     // null checks. The hit is AddRef'd through its own vtable.
     if (Iids::EqualNoNullTest(Iid, Iids::Streamer) || Iids::EqualNoNullTest(Iid, Iids::Streamer2))
     {
-        IStreamer2* Facet = static_cast<IStreamer2*>(Self);
+        IStreamer2* Facet = Self;
         Facet->AddRef();
         *Out = Facet;
         return GR_OK;
     }
     if (Iids::EqualNoNullTest(Iid, Iids::AggregateComponent))
     {
-        IAggregateComponent* Facet = static_cast<IAggregateComponent*>(Self);
+        IAggregateComponent* Facet = Self;
         Facet->AddRef();
         *Out = Facet;
         return GR_OK;

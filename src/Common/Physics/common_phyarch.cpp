@@ -99,7 +99,7 @@ PhyArch::Part& PhyArch::Part::operator=(Part const& Other)
     if (Other.Surface != nullptr)
     {
         unsigned const Size = PhyArch_SurfaceByteSize(Other.Surface);
-        IVP_Compact_Surface* const Copy = (IVP_Compact_Surface*)ivp_malloc_aligned(Size, 0x10); // FUN_06343fc0
+        IVP_Compact_Surface* const Copy = static_cast<IVP_Compact_Surface*>(ivp_malloc_aligned(Size, 0x10)); // FUN_06343fc0
         memcpy(Copy, Other.Surface, Size);
         Surface = Copy;
     }
@@ -143,7 +143,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
     Desc.FindHandle = 0xFFFFFFFF;
     IFileSystem* Filesys = nullptr;
     // FFileSystemDesc begins with AGGDESC's {size, interface name} (readfile.h).
-    if (DALib::Data->CreateInstance((AGGDESC*)&Desc, (void**)&Filesys) != 0)
+    if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&Filesys)) != 0)
     {
         PhyArch_Release(Filesys);
         return false;
@@ -222,7 +222,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
                 unsigned long SurfGot = 0;
                 PhyArch_Read(Filesys, &SurfaceSize, 4, &SurfGot);
                 IVP_Compact_Surface* const SurfaceBlock =
-                    (IVP_Compact_Surface*)ivp_malloc_aligned(SurfaceSize, 0x10); // FUN_06343fc0
+                    static_cast<IVP_Compact_Surface*>(ivp_malloc_aligned(SurfaceSize, 0x10)); // FUN_06343fc0
                 PhyArch_Read(Filesys, SurfaceBlock, SurfaceSize, &SurfGot);
                 Current.Surface = SurfaceBlock;
             }

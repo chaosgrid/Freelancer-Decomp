@@ -946,9 +946,8 @@ namespace
 // that the GCS manager sends itself (FUN_06ee8c50) is an unwritten stack word in retail;
 // the port writes 0 there (FGcsConversationManager::Update, Gcs.cpp), so for those
 // messages the Words[4] test always passes.
-void FNpcShipEventList::HandleMessage(pub::Controller::EMessage MsgId, void const* Parms)
+void FNpcShipEventList::HandleMessage(pub::Controller::EMessage MsgId, unsigned int const* Words)
 {
-    unsigned int const* Words = static_cast<unsigned int const*>(Parms);
     if (MsgId == pub::Controller::EMessage::CommComplete)
     {
         for (std::list<FNpcShipEvent>::iterator It = Events.begin(); It != Events.end(); ++It)

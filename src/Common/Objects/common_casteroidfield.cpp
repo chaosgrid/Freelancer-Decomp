@@ -294,7 +294,7 @@ void CAsteroidField::load(INI_Reader& Reader, int CubeSizeParm)
             // the zone below, whose SetLootableInfo frees the previous one with free(), hence
             // malloc. Retail quirks kept: an entry no zone takes leaks, and a failed allocation
             // crashes on the later stores.
-            LootableZoneEntry* const Entry = (LootableZoneEntry*)std::malloc(sizeof(LootableZoneEntry));
+            LootableZoneEntry* const Entry = static_cast<LootableZoneEntry*>(std::malloc(sizeof(LootableZoneEntry)));
             if (Entry != nullptr)
             {
                 Entry->AsteroidLootContainerId.Id = 0;

@@ -43,7 +43,7 @@ struct FHardpointConnectContext
 // LAB_065f3540 (cdecl: BoneInst, Name, Context).
 static void __cdecl HardpointConnectCallback(InstanceIndex BoneInst, char const* Name, void* Context)
 {
-    FHardpointConnectContext* Ctx = (FHardpointConnectContext*)Context;
+    FHardpointConnectContext* Ctx = static_cast<FHardpointConnectContext*>(Context);
     FHardpointInstancePair Unset;
     Unset.First = InvalidInstanceIndex;
     Unset.Second = InvalidInstanceIndex;
@@ -112,12 +112,12 @@ static FSkeleton* ConstructSkeleton()
 // FUN_065f36c0 (thiscall on the instance: Parts, Arg3, Arg4). Returns 1.
 bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
 {
-    ForwardSink = (IChannelSink*)Arg3;
+    ForwardSink = static_cast<IChannelSink*>(Arg3);
     DefaultScript = Arg4;
     PartCount = Parts[0];
     int* Block = (int*)new unsigned char[(size_t)PartCount * sizeof(FDeformPart) + 4];
     *Block = PartCount;
-    FDeformPart* Array = (FDeformPart*)(Block + 1);
+    FDeformPart* Array = reinterpret_cast<FDeformPart*>((Block + 1));
     int Index = 0;
     while (Index < PartCount)
     {
@@ -126,7 +126,7 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
     }
     PartArray = Array;
 
-    FDeformPartDesc* Descs = *(FDeformPartDesc**)(Parts + 1);
+    FDeformPartDesc* Descs = *reinterpret_cast<FDeformPartDesc**>((Parts + 1));
     int PartIndex = 0;
     while (PartIndex < PartCount)
     {
@@ -143,10 +143,10 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
         IFileSystem* RootFs = nullptr;
         GENRESULT Created = 0;
         if (Factory != nullptr)
-            Created = Factory->CreateInstance((AGGDESC*)(&RootDesc),
+            Created = Factory->CreateInstance(reinterpret_cast<AGGDESC*>(&RootDesc),
                                               (void**)(&RootFs));
         else
-            Created = DACOM_Acquire()->CreateInstance((AGGDESC*)(&RootDesc),
+            Created = DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&RootDesc),
                                                       (void**)(&RootFs));
         if (Created < 0)
         {
@@ -245,7 +245,7 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
                                 MeshDesc.FindHandle = (unsigned long)Finder;
                                 IFileSystem* MeshFs = nullptr;
                                 bool bFull = false;
-                                if (RootFs->CreateInstance((AGGDESC*)(&MeshDesc),
+                                if (RootFs->CreateInstance(reinterpret_cast<AGGDESC*>(&MeshDesc),
                                                            (void**)(&MeshFs)) >= 0)
                                 {
                                     Dot[0] = (char)('0' + LodIndex);
@@ -299,7 +299,7 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
         FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0x2B,
               "Deform: Unable to acquire IID_IHardpoint, unable to continue");
     }
-    WalkHardpoints((void*)(&HardpointConnectCallback), &Context);
+    WalkHardpoints(&HardpointConnectCallback, &Context);
 
     PartIndex = 0;
     while (PartIndex < PartCount)
@@ -368,7 +368,7 @@ void FDeformInstance::Teardown()
         else
         {
             G_Animation->DestroyScript(Node->Event);
-            Node->Event = (FIkEvent*)((ptrdiff_t)-1);
+            Node->Event = reinterpret_cast<FIkEvent*>(((ptrdiff_t)-1));
         }
         Node = Node->Next;
     }
@@ -428,7 +428,7 @@ void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, 
         const Transform* const View = Camera->GetViewTransform();
         Vector ViewCenter;
         AcquireMathEngine()->TransformXform(ViewCenter,
-                                            *(const Transform*)View,
+                                            *View,
                                             Center); // +0x28
         Vector Probe;
         Probe.x = ViewCenter.x;
@@ -492,7 +492,7 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
         Script = DefaultScript;
     const int Handle = (int)(G_Animation->PlayScript(
         Name, BoneHandle, (const char*)Extra,
-        (IChannelSink*)this, Script));
+        this, Script));
     if (Handle == -1)
         return -1;
 
@@ -558,7 +558,7 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
     Transform Xform;
     I3DMathEngine* Math = AcquireMathEngine();
     Math->QuaternionToMatrix(Xform.Rotation,
-                             *(const Quaternion*)Quat); // +0x54
+                             *reinterpret_cast<const Quaternion*>(Quat)); // +0x54
     Xform.Translation.x = Pos.x;
     Xform.Translation.y = Pos.y;
     Xform.Translation.z = Pos.z;
@@ -575,7 +575,7 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
     FIkListNode* Node = new FIkListNode;
     Node->Active = 0;
     LinkListNode(this, Node);
-    Node->Event = (FIkEvent*)((ptrdiff_t)Handle);
+    Node->Event = reinterpret_cast<FIkEvent*>(((ptrdiff_t)Handle));
     std::memcpy(&Node->StartHeight, &Y, sizeof(float));
     return Handle;
 }
@@ -654,8 +654,8 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
         Archetype->Sample(Time, &KeyA, &KeyB, &Alpha);
         Archetype->Release();
         Quaternion Quat;
-        AcquireMathEngine()->QuatSlerp(Quat, *(const Quaternion*)KeyA,
-                                       *(const Quaternion*)KeyB, Alpha);
+        AcquireMathEngine()->QuatSlerp(Quat, *reinterpret_cast<const Quaternion*>(KeyA),
+                                       *reinterpret_cast<const Quaternion*>(KeyB), Alpha);
         ChainQuats.push_back(Quat);
         Cursor = Parent;
     }
@@ -683,8 +683,8 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
     WriteVec3(Accum, Tail[0] + PosA[0], Tail[1] + PosA[1], Tail[2] + PosA[2]);
 
     Quaternion RootQuat;
-    AcquireMathEngine()->QuatSlerp(RootQuat, *(const Quaternion*)(RootA + 0xC),
-                                   *(const Quaternion*)(RootB + 0xC), RootAlpha);
+    AcquireMathEngine()->QuatSlerp(RootQuat, *reinterpret_cast<const Quaternion*>((RootA + 0xC)),
+                                   *reinterpret_cast<const Quaternion*>((RootB + 0xC)), RootAlpha);
     RootArchetype->Release();
 
     Matrix Rot;
@@ -699,13 +699,13 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
         Matrix Mul;
         AcquireMathEngine()->MulMatrix(Mul, Running, Step);
         AcquireMathEngine()->MulMatrix(Rot, Mul,
-                                       *(const Matrix*)(Relative + 0x1C));
+                                       *reinterpret_cast<const Matrix*>((Relative + 0x1C)));
         Vector XfA;
         AcquireMathEngine()->TransformMatrix(XfA, Rot,
-                                             *(const Vector*)(Relative + 0x10));
+                                             *reinterpret_cast<const Vector*>((Relative + 0x10)));
         Vector XfB;
         AcquireMathEngine()->TransformMatrix(XfB, Running,
-                                             *(const Vector*)(Relative + 4));
+                                             *reinterpret_cast<const Vector*>((Relative + 4)));
         const float SumZ =
             (float)((double)XfB.z + (double)Accum[2]);
         const float X = (float)(
@@ -756,7 +756,7 @@ static void DestroyNodePayload(FIkListNode* Node)
         return;
     }
     G_Animation->DestroyScript(Node->Event);
-    Node->Event = (FIkEvent*)((ptrdiff_t)-1);
+    Node->Event = reinterpret_cast<FIkEvent*>(((ptrdiff_t)-1));
 }
 
 // The payload teardown, then the inlined unlink and operator delete.
@@ -942,8 +942,8 @@ struct FAimDesc
     int StartJoint;          // +0x04 the chain root; the walk stops there
     int EndJoint;            // +0x08 the end joint; the walk starts there
     unsigned long Flags;     // +0x0C FIkEvent::AimFlags
-    void* TargetA;           // +0x10 point or direction
-    void* TargetB;           // +0x14 orientation target
+    Vector* TargetA;         // +0x10 point or direction
+    Matrix* TargetB;         // +0x14 orientation target
     float Damping;           // +0x18
     int LockCount;           // +0x1C
     int LockIds[1];          // +0x20 LockCount joint ids
@@ -954,7 +954,7 @@ static_assert(offsetof(FAimDesc, LockIds) == 0x20, "aim desc lock ids +20");
 // FUN_065f5400 (thiscall on the instance: Desc, PlayExtra).
 FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* PlayExtra)
 {
-    const FAimDesc* const Aim = (const FAimDesc*)Desc;
+    const FAimDesc* const Aim = reinterpret_cast<const FAimDesc*>(Desc);
     int BindB = -1;
     if (PartArray != nullptr)
         BindB = (int)((ptrdiff_t)(PartArray[0].Lod->BoneSlots[0].Instance));
@@ -982,7 +982,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
                     }
                     FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0x44D,
                           G_StartAimBlocked);
-                    return (FIkListNode*)((ptrdiff_t)-1);
+                    return reinterpret_cast<FIkListNode*>(((ptrdiff_t)-1));
                 }
                 G_Animation->RegisterHandle((unsigned long)Cursor);
             }
@@ -1012,7 +1012,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     FIkListNode* Node = new FIkListNode;
     std::memset(Node, 0, sizeof(FIkListNode));
     Node->Active = 0;
-    Node->Event = (FIkEvent*)((ptrdiff_t)-1);
+    Node->Event = reinterpret_cast<FIkEvent*>(((ptrdiff_t)-1));
     LinkListNode(this, Node);
     Node->Active = 1;
 
@@ -1030,11 +1030,11 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     if (Count > 0)
         std::memcpy(Event->JointIds, &JointIds[0], Count4);
     Event->Channels = (void**)new unsigned char[Count4];
-    Event->Quats = (Quaternion*)new unsigned char[(size_t)Count * 0x10];
+    Event->Quats = reinterpret_cast<Quaternion*>(new unsigned char[(size_t)Count * 0x10]);
     Event->AimFlags = Aim->Flags;
     Event->StartJoint = Aim->StartJoint;
     Event->EndJoint = Aim->EndJoint;
-    Event->BindMats = (Matrix*)new unsigned char[(size_t)Count * 0x24];
+    Event->BindMats = reinterpret_cast<Matrix*>(new unsigned char[(size_t)Count * 0x24]);
     Event->LockBytes = new unsigned char[(size_t)Count];
     std::memset(Event->LockBytes, 0, (size_t)Count);
     Event->Damping = Aim->Damping;
@@ -1043,7 +1043,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     if (!Event->SetJointCount((unsigned int)Count))
     {
         StopAimNode(Node);
-        return (FIkListNode*)((ptrdiff_t)-1);
+        return reinterpret_cast<FIkListNode*>(((ptrdiff_t)-1));
     }
 
     unsigned long PlayBlob[7];
@@ -1066,7 +1066,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
         const InstanceIndex JointInstance = JointId;
         CreateCookie[3] = (unsigned long)JointId;
         const unsigned long Key = G_Channel->CreateTyped(
-            (IChannelOwner*)Event, 4, CreateCookie, (void*)((ptrdiff_t)BindB));
+            Event, 4, CreateCookie, (void*)((ptrdiff_t)BindB));
         Event->Channels[Index] = (void*)((ptrdiff_t)Key);
         G_Channel->Play(Key, (float*)PlayBlob);
 
@@ -1088,7 +1088,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
         float JointQuat[7];
         G_Engine->GetJointParams(JointInstance, 0, JointQuat);
         Matrix LiveMat;
-        IkMathQuatToMatrix(&LiveMat, (const Quaternion*)JointQuat);
+        IkMathQuatToMatrix(&LiveMat, reinterpret_cast<const Quaternion*>(JointQuat));
         std::memcpy(&Event->BindMats[Index], &LiveMat, sizeof(LiveMat));
 
         const int LockCount = Aim->LockCount;
@@ -1110,7 +1110,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
 // FUN_065f5950 (thiscall; the instance in ECX is never read).
 void StopAimNode(FIkListNode* Node)
 {
-    if (Node == (FIkListNode*)((ptrdiff_t)-1))
+    if (Node == reinterpret_cast<FIkListNode*>(((ptrdiff_t)-1)))
         return;
     Node->Event->StateFlags = (unsigned char)(Node->Event->StateFlags | 1);
     if (G_Animation == nullptr)
@@ -1127,7 +1127,7 @@ void StopAimNode(FIkListNode* Node)
 // Context for the LAB_065f59b0 thunk.
 struct FHardpointWalkCtx
 {
-    void* UserFn;
+    FHardpointUserFn UserFn;
     void* UserData;
     InstanceIndex BoneInst;
 };
@@ -1136,13 +1136,12 @@ struct FHardpointWalkCtx
 // hardpoint's NAME, not a blob (FHardpointEnumProc).
 static void __cdecl HardpointWalkThunk(char const* Name, void* Context)
 {
-    FHardpointWalkCtx* Ctx = (FHardpointWalkCtx*)Context;
-    using FnUser = void(__cdecl*)(InstanceIndex, char const*, void*);
-    ((FnUser)Ctx->UserFn)(Ctx->BoneInst, Name, Ctx->UserData);
+    FHardpointWalkCtx* Ctx = static_cast<FHardpointWalkCtx*>(Context);
+    Ctx->UserFn(Ctx->BoneInst, Name, Ctx->UserData);
 }
 
 // FUN_065f59d0 (thiscall on the instance: UserFn, UserData).
-unsigned char FDeformInstance::WalkHardpoints(void* UserFn, void* UserData)
+unsigned char FDeformInstance::WalkHardpoints(FHardpointUserFn UserFn, void* UserData)
 {
     IHardpoint* Hardpoint = nullptr;
     if (G_Engine->QueryInterface(Iids::Hardpoint, (void**)(&Hardpoint)) < 0)

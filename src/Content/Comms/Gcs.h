@@ -162,7 +162,7 @@ public:
     virtual void Play();
     // Slot 3, LAB_06ed67c0 (RET 4): whether Parms (message 0xb {listener, system, speaker,
     // last text}) is this line's.
-    virtual bool IsDone(void const* Parms);
+    virtual bool IsDone(unsigned int const* Words);
     // Slot 4, LAB_06ed69c0: the summed voice durations of the texts, 5.0 when one is unknown.
     // QueueConversation returns it for event type 7.
     virtual float GetDuration();
@@ -234,7 +234,7 @@ public:
     void Play() override;
     // Slot 3, FUN_06ed6560 (RET 4): Parms' listener (word 0) is the ship of one of the
     // players, and the speaker and last text match (the system is not compared).
-    bool IsDone(void const* Parms) override;
+    bool IsDone(unsigned int const* Words) override;
     // Slot 5, FUN_06ed65c0: new 0x40 copy.
     FGcsCloneableLine* Clone() override;
 
@@ -885,7 +885,7 @@ public:
     // FUN_06ee1f60 (RET 4): the first line that takes Parms is deleted and removed; the
     // next one plays when it CanPlay, otherwise the conversation is finished.
     // False when no line took Parms.
-    virtual bool OnMessage(void const* Parms);
+    virtual bool OnMessage(unsigned int const* Parms);
     // LAB_06ed6da0: +0x14.
     virtual bool IsFinished();
 
@@ -1255,7 +1255,7 @@ public:
 
     // FUN_06ee8bd0 (RET 4): while enabled, the first conversation whose OnMessage takes
     // Parms is deleted once it is finished. SpaceSupport 06f5dc4b.
-    void OnMessage(void const* Parms);
+    void OnMessage(unsigned int const* Parms);
     // FUN_06ee8c50 (RET 4): outside single player, every delayed message whose time is up
     // is sent (message 0xb to the SpaceSupport controller). SpaceSupport heartbeat 06f5d722.
     void Update(float DeltaTime);

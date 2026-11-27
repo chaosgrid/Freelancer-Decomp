@@ -109,14 +109,11 @@ void DeathCameraConstruct(FDeathCamera* Cam)
     // Retail then sets the vptr to PTR_LAB_005e061c.
 }
 
-void FDeathCamera::Attach(void* Object)
+void FDeathCamera::Attach(IObjRW* Object)
 {
     // No null test on `this` in retail.
     Watchable const* const Target =
-        (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
-                                                 kWatchableOffset)
-            : nullptr;
+        (Object != nullptr) ? static_cast<Watchable const*>(Object) : nullptr;
 
     if (Target != this->Watched.target())
         this->Watched.set(Target);
@@ -137,13 +134,13 @@ void FDeathCamera::Attach(void* Object)
         return;
     }
 
-    void* const Watchee = Watched - kWatchableOffset;
+    IObjRW* const Watchee = reinterpret_cast<IObjRW*>(Watched - kWatchableOffset);
 
     // A live SHIP gets a lower speed cap: the IObjRW's CEqObj at +0x10, its type word at +0x4c
     // masked with 0x503, and a non-null field at +0x218 (unidentified; only tested for null).
     // Any link missing leaves the controller's 100.0f.
     unsigned char* const EqObj = *reinterpret_cast<unsigned char**>(
-        static_cast<unsigned char*>(Watchee) + 0x10);
+        reinterpret_cast<unsigned char*>(Watchee) + 0x10);
     if (EqObj != nullptr)
     {
         const unsigned TypeWord = *reinterpret_cast<const unsigned*>(EqObj + 0x4c);
@@ -155,7 +152,7 @@ void FDeathCamera::Attach(void* Object)
         }
     }
 
-    IObjInspect* const Inspect = static_cast<IObjInspect*>(Watchee);
+    IObjInspect* const Inspect = Watchee;
     const Vector& World = Inspect->get_position();
     BasePosition[0] = World.x;
     BasePosition[1] = World.y;
@@ -227,7 +224,7 @@ void FDeathCamera::Update(float DeltaSeconds)
         RotateRowsAboutZ(ShakeOrientation, static_cast<float>(cos(AngleZ)), sin(AngleZ));
     }
 
-    FSpaceCamera* const Base = (FSpaceCamera*)this;
+    FSpaceCamera* const Base = this;
 
     memcpy(&Base->World, ShakeOrientation, 9 * sizeof(float));
 

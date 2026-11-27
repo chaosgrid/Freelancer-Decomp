@@ -72,7 +72,7 @@ bool CEPower::Update(float Dt, unsigned Flags)
         {
             float const ThrustChargeRate =
                 IsDestroyed() ? 0.0f : PowerArch()->ThrustChargeRate;
-            CShip* Ship = (CShip*)(Owner);
+            CShip* Ship = static_cast<CShip*>(Owner);
             double const NewThrust = (double)ThrustChargeRate * Dt + Ship->ThrustPower;
             Ship->ThrustPower = (NewThrust < Ship->MaxThrustPower) ? (float)NewThrust : Ship->MaxThrustPower;
         }
@@ -116,7 +116,7 @@ CEPower* __cdecl CEPower::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypePower)
         return nullptr;
-    return (CEPower*)(Equip);
+    return static_cast<CEPower*>(Equip);
 }
 
 CEPower const* __cdecl CEPower::cast(CEquip const* Equip)
@@ -127,5 +127,5 @@ CEPower const* __cdecl CEPower::cast(CEquip const* Equip)
 
 Archetype::Power const* CEPower::PowerArch() const
 {
-    return (Archetype::Power const*)(Arch);
+    return static_cast<Archetype::Power const*>(Arch);
 }

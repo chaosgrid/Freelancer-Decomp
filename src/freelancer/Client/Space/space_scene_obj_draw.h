@@ -15,6 +15,9 @@
 // LOD: Gameobj vtable +0x17c = FUN_00539820 (not data fields at those offsets).
 
 struct FSpaceCamera;
+struct ICamera;
+struct FNebulaEffect;
+struct FEngineLight; // Common/engine_light.h
 struct IObjInspect;
 struct I3DMathEngine;
 class FClientGameobj;
@@ -32,7 +35,7 @@ double SpaceEffectPerfOneMinus();
 // FUN_005554d0 -- the StarSys per-object lighting: ambient (with the containing nebula's lerp
 // and fog), then the nearby lights. Callers: the cockpit pass, the asteroid ambient and
 // FUN_00539b40.
-void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned NebulaBits,
+void SpaceApplyObjectLighting(float const* Pos3, float Radius, ICamera* Camera, unsigned NebulaBits,
                               unsigned FogFactorBits, unsigned char Flag);
 
 // FUN_00533880 / FUN_00533930 -- DALib::Engine QI for IFLAppearance, then Slot3 (InstId,
@@ -60,7 +63,7 @@ void LightGridRebuild();
 void LightGridReset();
 
 // FUN_00537f40 — nearby light collect from the XZ light grid (max 4 typical).
-int SpaceCollectNearbyLights(void** OutSlots, int MaxSlots, float const* Pos3, float Radius,
+int SpaceCollectNearbyLights(FEngineLight** OutSlots, int MaxSlots, float const* Pos3, float Radius,
                              unsigned char Flag);
 
 // FUN_0051b250(LayerFlags, Param2): watcher gate → FGameCamera::DrawScene → depth clear → HUD.
@@ -78,7 +81,7 @@ void SpaceSetFarClip(float FarClip);
 // DAT_00675244 / DAT_0067524c / DAT_00675248 -- the field controller (a nebula) FUN_0051b730
 // picked for the current camera, how far the camera is inside it (0 none, 1 partial, 2 fully)
 // and its radius squared. Read by the particle visibility test FUN_004f86c0.
-void* GetSpaceFieldController();
+FNebulaEffect* GetSpaceFieldController();
 int GetSpaceFieldEnclosure();
 
 // The values GetSpaceFieldEnclosure answers (DAT_0067524c).

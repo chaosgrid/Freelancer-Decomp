@@ -304,7 +304,7 @@ void IVP_Core::remove_object(IVP_Real_Object* Object)
     {
         if (ObjectHashMap != nullptr)
         {
-            ((IVP_VHash_Store*)ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
+            static_cast<IVP_VHash_Store*>(ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
             free(ObjectHashMap); // FUN_06391d5a
             ObjectHashMap = nullptr;
         }
@@ -831,16 +831,17 @@ void IVP_Core::detach_controller(IVP_Controller* Controller)
 // +0x8 equals Key. FUN_06347c40 has 16 callers, some on other classes (e.g.
 // FUN_06359340 over another class's +0x20); only the IVP_Core ones (e.g.
 // 06356d1d) are ported.
-void* IVP_Core::find_object_hash_entry(unsigned Key) const
+IVP_Friction_Info_For_Core* IVP_Core::find_object_hash_entry(unsigned Key) const
 {
     if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
         if (this->ObjectHashMap == nullptr)
             return nullptr;
-        return ((IVP_VHash_Store*)this->ObjectHashMap)->FindElem((void*)Key); // FUN_06352930
+        return static_cast<IVP_Friction_Info_For_Core*>(
+            static_cast<IVP_VHash_Store*>(this->ObjectHashMap)->FindElem(reinterpret_cast<void*>(Key))); // FUN_06352930
     }
 
-    void* Candidate = this->ObjectHashMap;
+    IVP_Friction_Info_For_Core* Candidate = static_cast<IVP_Friction_Info_For_Core*>(this->ObjectHashMap);
     if (Candidate == nullptr)
         return nullptr;
 
@@ -853,7 +854,7 @@ void* IVP_Core::find_object_hash_entry(unsigned Key) const
 // operator_new(0x14), FUN_063525f0(2) only on a non-null block -- then
 // FUN_063526d0 inserts (key, Candidate). Single-slot mode: ObjectHashMap =
 // Candidate (no free; the slot never owns it).
-void IVP_Core::register_object_hash_entry(void* Candidate)
+void IVP_Core::register_object_hash_entry(IVP_Friction_Info_For_Core* Candidate)
 {
     if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
@@ -865,7 +866,7 @@ void IVP_Core::register_object_hash_entry(void* Candidate)
         }
 
         unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
-        ((IVP_VHash_Store*)this->ObjectHashMap)->AddElem((void*)CandidateKey, Candidate); // FUN_063526d0
+        static_cast<IVP_VHash_Store*>(this->ObjectHashMap)->AddElem(reinterpret_cast<void*>(CandidateKey), Candidate); // FUN_063526d0
     }
     else
     {
@@ -876,12 +877,12 @@ void IVP_Core::register_object_hash_entry(void* Candidate)
 // FUN_06347d20. Hashmap mode: FUN_063527e0 removes the entry keyed by
 // Candidate's +0x8. Single-slot mode: ObjectHashMap = 0 without checking that
 // Candidate is the cached one.
-void IVP_Core::unregister_object_hash_entry(void* Candidate)
+void IVP_Core::unregister_object_hash_entry(IVP_Friction_Info_For_Core* Candidate)
 {
     if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
         unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
-        ((IVP_VHash_Store*)this->ObjectHashMap)->RemoveElem((void*)CandidateKey); // FUN_063527e0
+        static_cast<IVP_VHash_Store*>(this->ObjectHashMap)->RemoveElem(reinterpret_cast<void*>(CandidateKey)); // FUN_063527e0
     }
     else
     {
@@ -1200,7 +1201,7 @@ void IVP_Core::clear_speed_change()
 // not null-check OldSyncInfo either.
 void IVP_Core::restore_fast_sim_snapshot()
 {
-    const IVP_Old_Sync_Rot_Z* Sync = static_cast<const IVP_Old_Sync_Rot_Z*>(OldSyncInfo);
+    const IVP_Old_Sync_Rot_Z* Sync = OldSyncInfo;
 
     RotSpeed.x = Sync->OldSyncRotSpeed.x;
     RotSpeed.y = Sync->OldSyncRotSpeed.y;
@@ -1338,7 +1339,7 @@ int IVP_Core::classify_motion_state(float CurrentTimeBase, float CurrentTimeOffs
 void IVP_Core::notify_objects_and_cache_env_field()
 {
     const uint32_t RawBits = *reinterpret_cast<const uint32_t*>(&Environment->mindist_event_stamp);
-    MindistEventStamp = reinterpret_cast<void*>(static_cast<uintptr_t>(RawBits));
+    MindistEventStamp = RawBits;
 
     for (int32_t I = static_cast<int32_t>(Objects.n_elems) - 1; I >= 0; --I)
     {

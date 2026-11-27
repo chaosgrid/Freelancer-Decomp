@@ -52,12 +52,12 @@ namespace
         {
             List.Capacity = Capacity;
             List.Count = 0;
-            List.Elems = static_cast<void**>(std::malloc(static_cast<size_t>(Capacity) * 4u));
+            List.Elems = static_cast<IVP_Compact_Ledge**>(std::malloc(static_cast<size_t>(Capacity) * 4u));
         }
 
         ~FLedgeSoupLeafList()
         {
-            if (List.Elems != reinterpret_cast<void**>(&List + 1) && List.Elems != nullptr)
+            if (List.Elems != reinterpret_cast<IVP_Compact_Ledge**>(&List + 1) && List.Elems != nullptr)
                 std::free(List.Elems);
         }
 
@@ -267,8 +267,8 @@ void IVP_SurfaceBuilder_Ledge_Soup::BuildLeafNodes()
     m_LeafByteTotal = 0;                                  // :0636a35d
     const int32_t n = m_Ledges.Len();                     // :0636a360 (word)
     m_LeafCount = n;                                      // :0636a36e
-    m_BuildTreeScratch = std::calloc(static_cast<size_t>(n) + 1, sizeof(BuildTreeScratchEntry)); // FUN_06343f80(n+1, 8)
-    BuildTreeScratchEntry* scratch = static_cast<BuildTreeScratchEntry*>(m_BuildTreeScratch);
+    m_BuildTreeScratch = static_cast<BuildTreeScratchEntry*>(std::calloc(static_cast<size_t>(n) + 1, sizeof(BuildTreeScratchEntry))); // FUN_06343f80(n+1, 8)
+    BuildTreeScratchEntry* scratch = m_BuildTreeScratch;
     scratch[0].NextIndexOrCount = 1;                      // :0636a383
 
     const double kExtentScale = (double)(BitsToFloat(0x3B83126Fu)); // DAT_063a54b4
@@ -403,8 +403,8 @@ IVP_Compact_Ledgetree_Node* IVP_SurfaceBuilder_Ledge_Soup::CompileNode(BuildNode
         }
         else
         {
-            dest->offset_compact_ledge = (int32_t)((char*)Ledge - (char*)dest);
-            Ledge->LedgetreeNodeOffset = (int32_t)((char*)dest - (char*)Ledge);
+            dest->offset_compact_ledge = (int32_t)(reinterpret_cast<char*>(Ledge) - reinterpret_cast<char*>(dest));
+            Ledge->LedgetreeNodeOffset = (int32_t)(reinterpret_cast<char*>(dest) - reinterpret_cast<char*>(Ledge));
             Ledge->SizeAndFlags = (Ledge->SizeAndFlags & ~0x2u) | 0x1u;
         }
 
@@ -412,14 +412,14 @@ IVP_Compact_Ledgetree_Node* IVP_SurfaceBuilder_Ledge_Soup::CompileNode(BuildNode
         // offset comes from the second call.
         CompileNode(source->Child0);
         IVP_Compact_Ledgetree_Node* RightSon = CompileNode(source->Child1);
-        dest->offset_right_node = (int32_t)((char*)RightSon - (char*)dest);
+        dest->offset_right_node = (int32_t)(reinterpret_cast<char*>(RightSon) - reinterpret_cast<char*>(dest));
     }
     else
     {
         // Terminal node: its ledge gets has-children = 0.
         IVP_Compact_Ledge* Ledge = source->Ledge;
         Ledge->SizeAndFlags &= ~IVP_Compact_Ledge::kHasChildrenMask;
-        dest->offset_compact_ledge = (int32_t)((char*)Ledge - (char*)dest);
+        dest->offset_compact_ledge = (int32_t)(reinterpret_cast<char*>(Ledge) - reinterpret_cast<char*>(dest));
         dest->offset_right_node = 0;
     }
 
@@ -431,7 +431,7 @@ IVP_Compact_Ledgetree_Node* IVP_SurfaceBuilder_Ledge_Soup::CompileNode(BuildNode
 // ignores it.
 void IVP_SurfaceBuilder_Ledge_Soup::CompileTree()
 {
-    BuildTreeScratchEntry* Scratch = (BuildTreeScratchEntry*)m_BuildTreeScratch;
+    BuildTreeScratchEntry* Scratch = m_BuildTreeScratch;
     const uint16_t RootIndex = (uint16_t)Scratch[0].NextIndexOrCount;
     CompileNode(Scratch[RootIndex].Payload);
 
@@ -681,7 +681,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::FinalizeBuildTree(float /*unusedThreshold*/)
 {
     IVP_U_Vector<BuildNode> localList;
 
-    BuildTreeScratchEntry* scratch = (BuildTreeScratchEntry*)m_BuildTreeScratch;
+    BuildTreeScratchEntry* scratch = m_BuildTreeScratch;
 
     // The chain indices are read zero-extended.
     for (uint16_t idx = (uint16_t)scratch[0].NextIndexOrCount; idx != 0; )
@@ -712,9 +712,9 @@ void IVP_SurfaceBuilder_Ledge_Soup::FinalizeBuildTree(float /*unusedThreshold*/)
 //    index = [+0x78], the point (16 bytes) is copied to base + [+0x78] * 16,
 //    [+0x78]++ and the copy is inserted (FUN_063523d0). Finally
 //    dest.CPointOffset = base - dest and the header size is returned.
-uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const void* sourceLedge, void* destCursor)
+uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const IVP_Compact_Ledge* sourceLedge, IVP_Compact_Ledge* destCursor)
 {
-    const IVP_Compact_Ledge* Source = static_cast<const IVP_Compact_Ledge*>(sourceLedge);
+    const IVP_Compact_Ledge* Source = sourceLedge;
     if (m_VertexDedupIndex == nullptr)
     {
         const uint32_t ByteSize = (Source->SizeAndFlags >> 8) << 4;
@@ -726,8 +726,8 @@ uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const void* sourceL
     std::memcpy(destCursor, sourceLedge, HeaderBytes);
 
     const uint8_t* SourcePoints = reinterpret_cast<const uint8_t*>(Source) + Source->CPointOffset;
-    IVP_Compact_Ledge* Dest = static_cast<IVP_Compact_Ledge*>(destCursor);
-    uint8_t* PointBase = static_cast<uint8_t*>(m_VertexDedupBase);
+    IVP_Compact_Ledge* Dest = destCursor;
+    uint8_t* PointBase = m_VertexDedupBase;
 
     const int32_t TriangleCount = Dest->NTriangles;
     uint32_t* TriangleEdges = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(Dest) + 0x14);
@@ -768,8 +768,8 @@ uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const void* sourceL
 //  - Then m_Ledges is cleared.
 void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
 {
-    const int32_t* options = static_cast<const int32_t*>(m_CompileOptions);
-    uint8_t* cursor = static_cast<uint8_t*>(m_VertexWriteCursor);
+    const int32_t* options = m_CompileOptions;
+    uint8_t* cursor = m_VertexWriteCursor;
 
     if (options[2] == 0)
     {
@@ -777,8 +777,8 @@ void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
         {
             BuildNode* node = m_LeafNodes[i];
             IVP_Compact_Ledge* sourceLedge = node->Ledge;
-            node->Ledge = (IVP_Compact_Ledge*)cursor;
-            const uint32_t size = CopyLedgeIntoSurface(sourceLedge, cursor);
+            node->Ledge = reinterpret_cast<IVP_Compact_Ledge*>(cursor);
+            const uint32_t size = CopyLedgeIntoSurface(sourceLedge, node->Ledge);
             cursor += size;
             if (options[1] == 1 && sourceLedge != nullptr)
                 ivp_free_aligned(sourceLedge); // FUN_06343ff0
@@ -789,8 +789,8 @@ void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
     {
         BuildNode* node = m_HullNodes[i];
         IVP_Compact_Ledge* sourceLedge = node->Ledge;
-        node->Ledge = (IVP_Compact_Ledge*)cursor;
-        const uint32_t size = CopyLedgeIntoSurface(sourceLedge, cursor);
+        node->Ledge = reinterpret_cast<IVP_Compact_Ledge*>(cursor);
+        const uint32_t size = CopyLedgeIntoSurface(sourceLedge, node->Ledge);
         cursor += size;
         if (sourceLedge != nullptr)
             ivp_free_aligned(sourceLedge); // FUN_06343ff0
@@ -807,7 +807,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
 // blob[+0x20].
 bool IVP_SurfaceBuilder_Ledge_Soup::BuildCompactSurface()
 {
-    const int32_t* options = static_cast<const int32_t*>(m_CompileOptions);
+    const int32_t* options = m_CompileOptions;
 
     uint32_t byteTotal = 0;       // EBP: summed (ledge[+8] >> 8) << 4.
     int32_t TriangleTotal = 0;    // EDI: summed ledge NTriangles (MOVSX).
@@ -910,7 +910,7 @@ bool IVP_SurfaceBuilder_Ledge_Soup::BuildCompactSurface()
     *reinterpret_cast<int32_t*>(blobHeader + 0x28) = 0;
     *reinterpret_cast<int32_t*>(blobHeader + 0x2c) = 0;
 
-    m_CompactNodeCursor = (IVP_Compact_Ledgetree_Node*)(blobHeader + treeArrayOffset);
+    m_CompactNodeCursor = reinterpret_cast<IVP_Compact_Ledgetree_Node*>(blobHeader + treeArrayOffset);
 
     return true;
 }
@@ -949,13 +949,13 @@ void IVP_SurfaceBuilder_Ledge_Soup::ComputeBoundingSphereMassPropertiesFallback(
 {
     IVP_U_Point BBoxMin; // local_8c
     IVP_U_Point BBoxMax; // local_9c
-    ComputeLedgeBounds(static_cast<const IVP_Compact_Ledge*>(leaves.Elems[0]), BBoxMin.k, BBoxMax.k);
+    ComputeLedgeBounds(leaves.Elems[0], BBoxMin.k, BBoxMax.k);
 
     for (int32_t i = leaves.Count - 1; i > 0; --i)
     {
         float leafMin[3]; // local_78
         float leafMax[3]; // local_10
-        ComputeLedgeBounds(static_cast<const IVP_Compact_Ledge*>(leaves.Elems[i]), leafMin, leafMax);
+        ComputeLedgeBounds(leaves.Elems[i], leafMin, leafMax);
         ComponentwiseMin3(BBoxMin.k, leafMin);
         ComponentwiseMax3(BBoxMax.k, leafMax);
     }
@@ -1041,7 +1041,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::AccumulateLedgeVolume(FVolumeIntegralAccumul
 void IVP_SurfaceBuilder_Ledge_Soup::AccumulateVolumeIntegral(FVolumeIntegralAccumulator& Acc, const IVP_SurfaceManager_OutList& Leaves)
 {
     for (int32_t I = Leaves.Count - 1; I >= 0; --I)
-        AccumulateLedgeVolume(Acc, static_cast<const IVP_Compact_Ledge*>(Leaves.Elems[I]));
+        AccumulateLedgeVolume(Acc, Leaves.Elems[I]);
 }
 
 // FUN_0636d040, thiscall on the 4-dword {Csys, mass, sumA, sumB}
@@ -1178,7 +1178,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::AccumulateAxisIntegral(const IVP_SurfaceMana
 
     for (int32_t I = Leaves.Count - 1; I >= 0; --I)
     {
-        const IVP_Compact_Ledge* Ledge = static_cast<const IVP_Compact_Ledge*>(Leaves.Elems[I]);
+        const IVP_Compact_Ledge* Ledge = Leaves.Elems[I];
         const IVP_Compact_Triangle* Triangle = Ledge->GetFirstTriangle();
         for (int32_t T = 0; T < static_cast<int32_t>(Ledge->GetNTriangles()); ++T, ++Triangle)
             AccumulateTriangleAxisIntegral(Acc, Ledge, Triangle, AxisA, AxisB, AxisC);
@@ -1345,7 +1345,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::ComputeSurfaceRadii(const void* CompiledSurf
     IVP_Compact_Ledge_Solver::get_all_ledges(static_cast<const IVP_Compact_Surface*>(CompiledSurface), &Leaves.List); // :0635adf2 FUN_0635abf0
 
     for (int32_t i = Leaves.List.Count - 1; i >= 0; --i)
-        AccumulateLeafLedgeRadii(static_cast<const IVP_Compact_Ledge*>(Leaves.List.Elems[i]), centerOfMass,
+        AccumulateLeafLedgeRadii(Leaves.List.Elems[i], centerOfMass,
                                  outUpperLimitRadius, outMaxSurfaceDeviation);
 }
 
@@ -1412,7 +1412,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::CollectNodeLedges(IVP_U_Vector<IVP_Compact_L
 // FUN_063449d0 (EH state 0 -> RAII here).
 void IVP_SurfaceBuilder_Ledge_Soup::BuildRootConvexHull()
 {
-    const BuildTreeScratchEntry* Scratch = static_cast<const BuildTreeScratchEntry*>(m_BuildTreeScratch);
+    const BuildTreeScratchEntry* Scratch = m_BuildTreeScratch;
     const uint16_t RootIndex = static_cast<uint16_t>(Scratch[0].NextIndexOrCount);
     BuildNode* Root = Scratch[RootIndex].Payload;
 
@@ -1433,7 +1433,7 @@ void* IVP_SurfaceBuilder_Ledge_Soup::Compile(const void* options)
     const int32_t defaultOptions[4] = { 0, 1, 0, 1 };
     if (options == nullptr)
         options = defaultOptions;
-    m_CompileOptions = const_cast<void*>(options);
+    m_CompileOptions = static_cast<const int32_t*>(options);
 
     if (m_Ledges.Len() == 0)
         return nullptr;
@@ -1443,7 +1443,7 @@ void* IVP_SurfaceBuilder_Ledge_Soup::Compile(const void* options)
 
     // options[0] != 0 and more than one ledge (unsigned compare) ->
     // FUN_0636a1e0.
-    const int32_t* optArr = static_cast<const int32_t*>(m_CompileOptions);
+    const int32_t* optArr = m_CompileOptions;
     if (optArr[0] != 0 && m_Ledges.n_elems > 1)
         BuildRootConvexHull();
 

@@ -9,6 +9,7 @@
 
 #include "NeuroNet/NavMap/nn_navmap.h"
 #include "NeuroNet/Economy/best_path.h"               // BestPathGetWaypointCount (FUN_004c4fb0)
+#include "NeuroNet/nn_button_control.h"
 #include "Interface/Pages/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "Common/Fonts/font_string.h"             // FFontString (the item label's dtor)
 #include "GameFlow/gameflow.h"                // IsMissionBriefingNavMapUp / RequestMissionBriefingContinue
@@ -16,6 +17,7 @@
 #include "Common/Fonts/ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Network/login_mgr.h"               // G_Server (DAT_0067ecd0)
 #include "NeuroNet/nn_modal.h"                // NnFloatBits
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_text_control.h"         // NnTextControl (+0x334 Font::String)
 #include "NeuroNet/nn_text_scratch.h"         // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "NeuroNet/nn_ui_pulse.h"             // palette colours DAT_00679ba4 / DAT_00679bb0
@@ -25,6 +27,7 @@
 #include "Interface/win3d.h"                   // Win3DReparent, Win3DDeleteTree
 #include "Interface/win3d_engine_submit.h"     // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 #include "x86math.h"                 // Transform, I3DMathEngine
 #include "common_csys.h"             // Acquire3DMathEngine (FUN_005b73e0)
 #include "common_id.h"               // CreateID
@@ -275,18 +278,18 @@ NeuroNetNavMap::NeuroNetNavMap()
                                         reinterpret_cast<unsigned char*>(&Zero), 4);
     }
 
-    TradeLaneVertices = static_cast<unsigned char*>(operator new(0x6000));
+    TradeLaneVertices = static_cast<FNavMapTexVertex*>(operator new(0x6000));
     TradeLaneIndices = static_cast<unsigned short*>(operator new(0x1800));
     TradeLaneVertexCount = 0;
     TradeLaneIndexCount = 0;
-    TerrainVertices = static_cast<unsigned char*>(operator new(0x9000));
+    TerrainVertices = static_cast<FNavMapTexVertex*>(operator new(0x9000));
     TerrainIndices = static_cast<unsigned short*>(operator new(0x2400));
     TerrainVertexCount = 0;
     TerrainIndexCount = 0;
     TerrainZoneCount = 0;
     ShadeZoneCount = 0;
     TerrainRecheckTimer = 1.0f; // DAT_005d2ecc
-    ShadeVertices = static_cast<unsigned char*>(operator new(0x17700));
+    ShadeVertices = static_cast<FNavMapColorVertex*>(operator new(0x17700));
     ShadeIndices = static_cast<unsigned short*>(operator new(0x8ca0));
     ShadeVertexCount = 0;
     ShadeIndexCount = 0;

@@ -32,7 +32,7 @@ struct IVP_Hash_Elem
     // +0x08: the KeyLength key bytes follow inline.
     unsigned char* KeyBytes()
     {
-        return (unsigned char*)(this + 1);
+        return reinterpret_cast<unsigned char*>(this + 1);
     }
 };
 static_assert(sizeof(IVP_Hash_Elem) == 0x8, "IVP_Hash_Elem key bytes start at +0x08");
@@ -58,7 +58,7 @@ IVP_Hash::IVP_Hash(int32_t Size, int32_t KeySize, unsigned NotFoundValue)
     BucketCount = Size;
     KeyLength = KeySize;
     DefaultValue = NotFoundValue;
-    Buckets = (IVP_Hash_Elem**)calloc(4, (size_t)Size); // FUN_06343f80
+    Buckets = static_cast<IVP_Hash_Elem**>(calloc(4, (size_t)Size)); // FUN_06343f80
 }
 
 // FUN_06356a70: frees every node, then the bucket array (and nulls it). The
@@ -85,7 +85,7 @@ IVP_Hash::~IVP_Hash()
 // FUN_06356ac0
 unsigned IVP_Hash::Find(const void* Key)
 {
-    const unsigned char* KeyBytes = (const unsigned char*)Key;
+    const unsigned char* KeyBytes = static_cast<const unsigned char*>(Key);
     const unsigned Hash = HashKeyBytes(KeyBytes, KeyLength);
     IVP_Hash_Elem* Node = Buckets[Hash % (unsigned)BucketCount]; // unsigned DIV
     while (Node != nullptr)
@@ -103,11 +103,11 @@ unsigned IVP_Hash::Find(const void* Key)
 // and leaks the earlier node, as in retail).
 void IVP_Hash::Add(const void* Key, unsigned Value)
 {
-    const unsigned char* KeyBytes = (const unsigned char*)Key;
+    const unsigned char* KeyBytes = static_cast<const unsigned char*>(Key);
     const unsigned Hash = HashKeyBytes(KeyBytes, KeyLength);
     const unsigned BucketIndex = Hash % (unsigned)BucketCount;
 
-    IVP_Hash_Elem* Node = (IVP_Hash_Elem*)malloc((size_t)KeyLength + 0xc); // FUN_06343f70
+    IVP_Hash_Elem* Node = static_cast<IVP_Hash_Elem*>(malloc((size_t)KeyLength + 0xc)); // FUN_06343f70
     memcpy(Node->KeyBytes(), KeyBytes, (size_t)KeyLength);
 
     Node->Next = Buckets[BucketIndex];
@@ -130,8 +130,8 @@ int IVP_CompareStringsNullsLast(const char* First, const char* Second)
     {
         return -1;
     }
-    const unsigned char* A = (const unsigned char*)First;
-    const unsigned char* B = (const unsigned char*)Second;
+    const unsigned char* A = reinterpret_cast<const unsigned char*>(First);
+    const unsigned char* B = reinterpret_cast<const unsigned char*>(Second);
     for (;;)
     {
         if (A[0] != B[0])

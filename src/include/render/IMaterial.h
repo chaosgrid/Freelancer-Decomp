@@ -13,6 +13,7 @@
 #include <cstddef>
 
 struct FRpVertexSrcDesc;
+struct FMaterialSubmitContext;
 
 // Flags argument of IMaterial::Submit and IMaterialBatcher2::Submit.
 enum EMaterialSubmitFlag
@@ -29,14 +30,14 @@ enum EMaterialSubmitFlag
 struct IMaterial : IDAComponent
 {
     virtual GENRESULT DACOM_API Initialize(IDAComponent* Outer) = 0;
-    virtual GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem) = 0;
-    virtual GENRESULT DACOM_API SaveProperties(void* FileSystem) = 0;
+    virtual GENRESULT DACOM_API LoadFromFileSystem(IFileSystem* FileSystem) = 0;
+    virtual GENRESULT DACOM_API SaveProperties(IFileSystem* FileSystem) = 0;
     virtual GENRESULT DACOM_API ApplyVerify(void* Context, void* Extra) = 0;
     // Refresh texture handles; animated materials also advance by Delta.
     virtual GENRESULT DACOM_API ResolveTextures(float Delta) = 0;
-    virtual GENRESULT DACOM_API Bind(void* Context) = 0;
-    virtual GENRESULT DACOM_API Teardown(void* Context) = 0;
-    virtual GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType,
+    virtual GENRESULT DACOM_API Bind(FMaterialSubmitContext* Context) = 0;
+    virtual GENRESULT DACOM_API Teardown(FMaterialSubmitContext* Context) = 0;
+    virtual GENRESULT DACOM_API Submit(FMaterialSubmitContext* Context, unsigned long PrimType,
                                        unsigned long Start, unsigned long Count,
                                        unsigned long IbStart, unsigned long IndexSpan,
                                        unsigned long Flags) = 0;

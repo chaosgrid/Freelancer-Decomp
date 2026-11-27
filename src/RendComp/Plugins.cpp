@@ -88,7 +88,7 @@ public:
             *Out = nullptr;
             return GR_INTERFACE_UNSUPPORTED;
         }
-        IRenderComponent* Interface = (IRenderComponent*)this;
+        IRenderComponent* Interface = static_cast<IRenderComponent*>(this);
         Interface->AddRef();
         *Out = Interface;
         return GR_OK;
@@ -122,7 +122,7 @@ public:
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
             return -1;
-        IDAComponent* Object = (IDAComponent*)Handle;
+        IDAComponent* Object = static_cast<IDAComponent*>(Handle);
         return Object->QueryInterface(Iid, Out);
     }
 
@@ -158,7 +158,7 @@ public:
         return 0;
     }
 
-    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
+    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, int* Out,
                          void* /*E*/) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -170,7 +170,7 @@ public:
         return 1;
     }
 
-    int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* /*Out*/) override
+    int DACOM_API GetBounds(void* Handle, float /*Lod*/, float* /*Out*/) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
             return 0;
@@ -185,7 +185,7 @@ public:
     }
 
     // As SphereMesh LAB_06c29bc0, whose FUN_06c2aef0 always fails: 0 either way.
-    int DACOM_API SplitByPlane(void* Handle, void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/, void* /*E*/,
+    int DACOM_API SplitByPlane(void* Handle, float* /*A*/, void* /*B*/, void** /*C*/, void** /*D*/, void* /*E*/,
                          void* /*F*/) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -509,22 +509,22 @@ public:
     {
         if (Iids::Equal(Iid, Iids::Mesh))
         {
-            *Out = (IMesh*)this;
+            *Out = static_cast<IMesh*>(this);
             return GR_OK;
         }
         if (Iids::Equal(Iid, Iids::MatHookUp))
         {
-            *Out = (IMatHookUp*)(&HookFacet);
+            *Out = static_cast<IMatHookUp*>(&HookFacet);
             return GR_OK;
         }
         if (Iids::Equal(Iid, Iids::DAComponent))
         {
-            *Out = (IMesh*)this;
+            *Out = static_cast<IMesh*>(this);
             return GR_OK;
         }
         if (Iids::Equal(Iid, Iids::TriMeshAnim))
         {
-            *Out = (ITriMeshAnim*)(&AnimFacet);
+            *Out = static_cast<ITriMeshAnim*>(&AnimFacet);
             return GR_OK;
         }
         return (GENRESULT)-1;
@@ -761,8 +761,8 @@ int DACOM_API FRenderPlugin::BindMeshInstance(InstanceIndex InstId, void* Handle
         return -1;
     if (Anim->MeshLive != Anim->Mesh)
         return -1;
-    Anim->Mesh = (FTriMeshArch*)Handle;
-    Anim->MeshLive = (FTriMeshArch*)Handle;
+    Anim->Mesh = static_cast<FTriMeshArch*>(Handle);
+    Anim->MeshLive = static_cast<FTriMeshArch*>(Handle);
     return 0;
 }
 
@@ -800,7 +800,7 @@ public:
         if (Handle == (void*)G_HandleFail || Handle == nullptr)
             return (int)G_HandleFail;
         FTriMeshArch* Clone = nullptr;
-        if (((FTriMeshArch*)Handle)->Clone(&Clone) < 0 || Clone == nullptr)
+        if (static_cast<FTriMeshArch*>(Handle)->Clone(&Clone) < 0 || Clone == nullptr)
             return (int)G_HandleFail;
         return (int)((intptr_t)Clone);
     }
@@ -812,7 +812,7 @@ public:
         LookupCount += 1;
         if (FindInstance((void*)InstId) != nullptr)
             return 1;
-        FTriMeshArch* Arch = (FTriMeshArch*)Handle;
+        FTriMeshArch* Arch = static_cast<FTriMeshArch*>(Handle);
         FTriMeshAnim* Anim = nullptr;
         if (Arch->CreateInstance(InstId, &Anim) < 0)
             return 0;
@@ -842,11 +842,11 @@ public:
         return 0;
     }
 
-    int DACOM_API Claim(void* File) override
+    int DACOM_API Claim(IFileSystem* File) override
     {
         FTriMeshArch* Arch = new FTriMeshArch();
         if (Arch->ResetMesh() >= 0 &&
-            Arch->Load((IFileSystem*)File, G_Pipeline, G_VbManager,
+            Arch->Load(File, G_Pipeline, G_VbManager,
                        G_MaterialLibrary, Tristrips) >= 0)
             return (int)((intptr_t)Arch);
         delete Arch;
@@ -864,7 +864,7 @@ public:
     }
 
     // LAB_06c215a0: mode 0 / 2 = triangle count (FUN_06c26220), 3 = vertex count (FUN_06c26260).
-    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
+    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, int* Out,
                          void* /*E*/) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -873,8 +873,8 @@ public:
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
         if (QueryGeometryCanWrite(QueryMode, Flags, Out) == 0)
             return 0;
-        FTriMeshArch* Mesh = (FTriMeshArch*)Handle;
-        int* CountOut = (int*)Out;
+        FTriMeshArch* Mesh = static_cast<FTriMeshArch*>(Handle);
+        int* CountOut = Out;
         if (QueryMode == 3)
             *CountOut = Mesh->VertexCount();
         else
@@ -883,11 +883,11 @@ public:
     }
 
     // LAB_06c21620; the FUN_06c25790 result is not checked.
-    int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* Out) override
+    int DACOM_API GetBounds(void* Handle, float /*Lod*/, float* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        ((FTriMeshArch*)Handle)->GetBox((float*)Out);
+        static_cast<FTriMeshArch*>(Handle)->GetBox(Out);
         return 1;
     }
 
@@ -896,15 +896,15 @@ public:
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        ((FTriMeshArch*)Handle)->GetCenter((Vector*)Out);
+        static_cast<FTriMeshArch*>(Handle)->GetCenter(static_cast<Vector*>(Out));
         return 1;
     }
 
-    int DACOM_API SplitByPlane(void* Handle, void* A, void* B, void* C, void* D, void* E, void* /*F*/) override
+    int DACOM_API SplitByPlane(void* Handle, float* A, void* B, void** C, void** D, void* E, void* /*F*/) override
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        FTriMeshArch* Mesh = (FTriMeshArch*)Handle;
+        FTriMeshArch* Mesh = static_cast<FTriMeshArch*>(Handle);
         float PlaneD = 0.0f;
         std::memcpy(&PlaneD, &B, sizeof(PlaneD));
         const unsigned char SplitFlags = (unsigned char)((uintptr_t)E);
@@ -915,11 +915,11 @@ public:
         void* FrontValue = Front;
         if (FrontValue == nullptr)
             FrontValue = (void*)((intptr_t)-1);
-        *(void**)C = FrontValue;
+        *C = FrontValue;
         void* BackValue = Back;
         if (BackValue == nullptr)
             BackValue = (void*)((intptr_t)-1);
-        *(void**)D = BackValue;
+        *D = BackValue;
         return 1;
     }
 
@@ -937,7 +937,7 @@ public:
             Remapped |= 0x2;
         if ((Flags & 0x8000) != 0)
             Remapped |= 0x80;
-        return Anim->Draw(Camera, Remapped, Xform, (IMaterial*)Extra);
+        return Anim->Draw(Camera, Remapped, Xform, static_cast<IMaterial*>(Extra));
     }
 };
 
@@ -1060,7 +1060,7 @@ public:
 
         if (Sides != 0)
         {
-            Materials = (IMaterial**)new unsigned char[Sides * 4];
+            Materials = reinterpret_cast<IMaterial**>(new unsigned char[Sides * 4]);
             std::memset(Materials, 0, Sides * 4);
             MaterialNames = (char**)new unsigned char[Sides * 4];
             std::memset(MaterialNames, 0, Sides * 4);
@@ -1140,7 +1140,7 @@ public:
                             else if (Value.Type == kMaterialParamComponent)
                             {
                                 IDAComponent* Component =
-                                    (IDAComponent*)Value.Payload0;
+                                    reinterpret_cast<IDAComponent*>(Value.Payload0);
                                 Value.Payload0 = 0;
                                 if (Component != nullptr)
                                     Component->Release();
@@ -1159,7 +1159,7 @@ public:
     {
         if (Iids::Equal(Iid, Iids::MatHookUp))
         {
-            *Out = (IMatHookUp*)this;
+            *Out = static_cast<IMatHookUp*>(this);
             return GR_OK;
         }
         return (GENRESULT)-1;
@@ -1849,7 +1849,7 @@ public:
             return false;
         const Transform* View = (Camera->GetViewTransform());
         const Transform* World =
-            (const Transform*)(G_Engine->GetInstanceTransform(InstId));
+            static_cast<const Transform*>(G_Engine->GetInstanceTransform(InstId));
 
         Transform Modelview;
         if (Mat != nullptr)
@@ -2076,12 +2076,12 @@ public:
     {
         if (Iids::Equal(Iid, Iids::SphereMesh))
         {
-            *Out = (ISphereMesh*)this;
+            *Out = static_cast<ISphereMesh*>(this);
             return GR_OK;
         }
         if (Iids::Equal(Iid, Iids::MatHookUp))
         {
-            *Out = (IMatHookUp*)(&Hook);
+            *Out = static_cast<IMatHookUp*>(&Hook);
             return GR_OK;
         }
         return (GENRESULT)-1;
@@ -2274,7 +2274,7 @@ public:
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
             return 0;
-        FSphereHandle* Sphere = (FSphereHandle*)Handle;
+        FSphereHandle* Sphere = static_cast<FSphereHandle*>(Handle);
         // FUN_06c2af00: operator new(0xBC) (null -> -1) + FUN_06c2b110, then FUN_06c2b230 Init;
         // a failed Init returns -1 WITHOUT freeing the instance (retail leaks it, so does the port).
         FSphereAnim* Anim = new (std::nothrow) FSphereAnim();
@@ -2317,13 +2317,13 @@ public:
         return 0;
     }
 
-    int DACOM_API Claim(void* File) override
+    int DACOM_API Claim(IFileSystem* File) override
     {
         FSphereHandle* Handle = new (std::nothrow) FSphereHandle();
         if (Handle == nullptr)
             return -1;
         if (Handle->ResetChecked() >= 0 &&
-            Handle->Load((IFileSystem*)File, G_Pipeline, G_VbManager,
+            Handle->Load(File, G_Pipeline, G_VbManager,
                          G_MaterialLibrary) >= 0)
             return (int)((intptr_t)Handle);
         delete Handle;
@@ -2340,7 +2340,7 @@ public:
         return 0;
     }
 
-    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
+    int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, int* Out,
                          void* /*E*/) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -2349,16 +2349,16 @@ public:
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
         if (QueryGeometryCanWrite(QueryMode, Flags, Out) == 0)
             return 0;
-        *(int*)Out = 0;
+        *Out = 0;
         return 1;
     }
 
-    int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* Out) override
+    int DACOM_API GetBounds(void* Handle, float /*Lod*/, float* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        FSphereHandle* Sphere = (FSphereHandle*)Handle;
-        float* Box = (float*)Out;
+        FSphereHandle* Sphere = static_cast<FSphereHandle*>(Handle);
+        float* Box = Out;
         if (Sphere->Radius >= 0.0f)
         {
             const float Extent = Sphere->Scale * Sphere->Radius;
@@ -2383,7 +2383,7 @@ public:
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
-        Vector* CenterOut = (Vector*)Out;
+        Vector* CenterOut = static_cast<Vector*>(Out);
         CenterOut->z = 0.0f;
         CenterOut->y = 0.0f;
         CenterOut->x = 0.0f;
@@ -2398,7 +2398,7 @@ public:
         if (Anim == nullptr)
             return 0;
         return Anim->Draw(Camera, Xform,
-                          (IMaterial*)Extra)
+                          static_cast<IMaterial*>(Extra))
                    ? 1
                    : 0;
     }
@@ -2427,7 +2427,7 @@ GENRESULT FRenderPluginDesc::CreateTriMesh(void** Out) const
         *Out = nullptr;
         return Result;
     }
-    *Out = (IRenderComponent*)Plugin;
+    *Out = static_cast<IRenderComponent*>(Plugin);
     return Result;
 }
 
@@ -2450,6 +2450,6 @@ GENRESULT CreateSphereMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
         *Out = nullptr;
         return Result;
     }
-    *Out = (IRenderComponent*)Plugin;
+    *Out = static_cast<IRenderComponent*>(Plugin);
     return Result;
 }

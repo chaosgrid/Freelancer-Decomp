@@ -47,7 +47,7 @@ namespace
 Transform ResolveTractorSourceXform(CEqObj const* Owner, Transform const& LocalXform)
 {
     Transform const* OwnerXform =
-        (Transform const*)((unsigned char const*)Owner + offsetof(EngineObject, Orientation));
+        reinterpret_cast<Transform const*>((reinterpret_cast<unsigned char const*>(Owner) + offsetof(EngineObject, Orientation)));
 
     Transform Result;
     Acquire3DMathEngine()->MulTransform(Result, *OwnerXform,
@@ -71,7 +71,7 @@ CETractor::CETractor(CShip* OwnerObj, unsigned short EquipId, Archetype::Tractor
 
     if (OwnerObj != nullptr && ((unsigned)OwnerObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
-        Archetype::Ship const* ShipArch = (Archetype::Ship const*)OwnerObj->Archetype;
+        Archetype::Ship const* ShipArch = static_cast<Archetype::Ship const*>(OwnerObj->Archetype);
         long DiscardHandle = 0;
         HardpointInfo Info;
         if (FindHardpoint_PS(OwnerObj->EngineInstanceId, ShipArch->HpTractorSource.Value,
@@ -120,7 +120,7 @@ bool CETractor::Update(float Dt, unsigned Flags)
 // FUN_0629e790
 float CETractor::GetRange() const
 {
-    return ((Archetype::Tractor const*)EquipArch())->MaxLength;
+    return static_cast<Archetype::Tractor const*>(EquipArch())->MaxLength;
 }
 
 int CETractor::CountActiveArms() const
@@ -215,7 +215,7 @@ TractorFailureCode CETractor::VerifyTarget(CLoot const* Target) const
     // null test.
     CShip* ShipOwner = nullptr;
     if (Owner != nullptr && ((unsigned)Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
-        ShipOwner = (CShip*)Owner;
+        ShipOwner = static_cast<CShip*>(Owner);
 
     Archetype::Equipment const* ContentsArch = Target->contents_arch();   // [Target+0xec]
     // Only a positive volume is tested; full only when the unrounded remainder is strictly below.
@@ -280,7 +280,7 @@ TractorArm const* CETractor::GetTractorArm(unsigned TargetId) const
 
 Archetype::Tractor const* CETractor::TractorArch() const
 {
-    return (Archetype::Tractor const*)(Arch);
+    return static_cast<Archetype::Tractor const*>(Arch);
 }
 
 CETractor* __cdecl CETractor::cast(CEquip* Equip)
@@ -288,7 +288,7 @@ CETractor* __cdecl CETractor::cast(CEquip* Equip)
     // FUN_0629e7e0
     if (Equip == nullptr || Equip->GetType() != EquipTypeTractor)
         return nullptr;
-    return (CETractor*)(Equip);
+    return static_cast<CETractor*>(Equip);
 }
 
 CETractor const* __cdecl CETractor::cast(CEquip const* Equip)

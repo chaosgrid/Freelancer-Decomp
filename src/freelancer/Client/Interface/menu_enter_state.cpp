@@ -789,8 +789,7 @@ int FMenuNavState::Update(float DeltaSeconds)
     }
 
     // The material animation tick takes the uncapped argument.
-    UpdateRoomLetterbox(static_cast<FRoomCamera*>(static_cast<ICamera*>(GetClientRoomCamera())),
-                        DtFloat);
+    UpdateRoomLetterbox(static_cast<FRoomCamera*>(GetClientRoomCamera()), DtFloat);
     UpdateFade(DtFloat);
     TickMaterialAnimationPlayback(DeltaSeconds);
 
@@ -813,7 +812,7 @@ int FMenuNavState::Update(float DeltaSeconds)
         ClearWin3DBuffers(kWin3DClearDepth);
         Win3DDrawAll();
         if (!IsClientServerTickPaused())
-            DrawFade(static_cast<ICamera*>(GetClientRoomCamera()));
+            DrawFade(GetClientRoomCamera());
         Sleep(0);
         EndClientRenderScene();
         PresentClientRenderFrame();

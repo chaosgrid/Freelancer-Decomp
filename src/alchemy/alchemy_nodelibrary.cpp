@@ -386,11 +386,11 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::MakeUniqueName(void* NameRaw, void* OutRaw)
+    GENRESULT DACOM_API FFxNodeLibrary::MakeUniqueName(const char* NameRaw, const char** OutRaw)
     {
         // 062277e0: borrowed original name or the independent DAT_06257d80 buffer.
-        const char* CurrentName = static_cast<const char*>(NameRaw);
-        const char** Out = static_cast<const char**>(OutRaw);
+        const char* CurrentName = NameRaw;
+        const char** Out = OutRaw;
         char Base[256];
         char Ext[32];
         int Suffix = 0;

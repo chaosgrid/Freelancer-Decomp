@@ -28,6 +28,7 @@
 #include "Interface/wincontrol_base.h"
 
 class INI_Reader;
+class NnTextControl;
 
 class HUD_CruiseProgress : public HUDItem, public WinControl
 {
@@ -50,7 +51,7 @@ public:
     // cruise charge.
     void Draw() override;
 
-    WinControl* CruiseProgressText;  // +0x364 (WinControl +0x32c) "CruiseProgressText"
+    NnTextControl* CruiseProgressText; // +0x364 (WinControl +0x32c) "CruiseProgressText"
     wchar_t ChargingCaption[0x30];   // +0x368 (+0x330) ids 0x585, "%s - %d%%" while charging
     wchar_t CountdownCaption[0x30];  // +0x3c8 (+0x390) ids 0x64f, "%s - %d%" before the charge
     // +0x428 (+0x3f0) -- set while the "charging" caption is up; the first frame that sets it

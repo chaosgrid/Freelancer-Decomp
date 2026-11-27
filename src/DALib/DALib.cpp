@@ -92,7 +92,7 @@ namespace
     {
         if (Global != nullptr)
         {
-            GLastReleaseCount = ((IDAComponent*)Global)->Release();
+            GLastReleaseCount = reinterpret_cast<IDAComponent*>(Global)->Release();
             Global = nullptr;
         }
     }
@@ -142,7 +142,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
     {
         FNamedAggDesc Desc = {0x14, "SystemContainer", nullptr, nullptr, nullptr};
         IDAComponent* System = nullptr;
-        if (Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&System)) ==
+        if (Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)(&System)) ==
             GR_OK)
         {
             IAggregateComponent* Aggregate = nullptr;
@@ -219,7 +219,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
     // Container is NULL here when the SystemContainer failed.
     {
         FNamedAggDesc Desc = {8, "Engine", nullptr, nullptr, nullptr};
-        if (Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&Engine)) ==
+        if (Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)(&Engine)) ==
             GR_OK)
         {
             Engine->LoadEngineComponents(Container);
@@ -235,7 +235,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
     // No Alchemy check -- a NULL Alchemy is passed through.
     {
         FNamedAggDesc Desc = {8, "FxEffectLibrary", nullptr, nullptr, nullptr};
-        if (Dacom->CreateInstance((AGGDESC*)(&Desc),
+        if (Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                   (void**)(&FxEffectLibrary)) == GR_OK)
         {
             FxEffectLibrary->BindAlchemy(Alchemy, Alchemy);
@@ -262,7 +262,7 @@ void __cdecl DALib::OpenData(const char* DataPath)
     Desc.Creation = OPEN_EXISTING;
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
-    Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&Data));
+    Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)(&Data));
 }
 
 // Retail .text:065c1690 DALib::CloseData.

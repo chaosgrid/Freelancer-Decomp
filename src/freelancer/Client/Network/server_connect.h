@@ -15,18 +15,19 @@
 // G_Server / G_ChatServer (.data:0067ecd0 / 0067ecd4, login_mgr.h).
 
 struct IServer;
+class IChatServer;
 
 IServer* LoadServerModule(char const* DllName);
 IServer* GetLoadedServer();
-void* GetLoadedChatServer();
+IChatServer* GetLoadedChatServer();
 void FreeServerModule();
 
 bool StartServer(char const* IniPath);
 void ShutdownServerConnection();
 
 // Accessors for the port's callers that still take untyped pointers (G_Server / G_ChatServer).
-void* GetLocalServerInterface();
-void* GetLocalChatServerInterface();
+IServer* GetLocalServerInterface();
+IChatServer* GetLocalChatServerInterface();
 
 // The server half of retail FUN_005b2890: when G_Server is set and FUN_0042d740 does not hold
 // the local server, Update (+0x2c) then ElapseTime (+0x30).

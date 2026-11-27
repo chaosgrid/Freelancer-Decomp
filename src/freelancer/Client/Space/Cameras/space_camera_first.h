@@ -30,7 +30,7 @@ struct FFirstPersonCamera : FHudCamera
 {
     void ScaleEnvironmentEffects() override;
     char const* GetName() override;
-    void Attach(void* Object) override;
+    void Attach(IObjRW* Object) override;
     void Deactivate() override;
     void Update(float DeltaSeconds) override;
     void DrawScene(unsigned LayerFlags, unsigned Param2) override;

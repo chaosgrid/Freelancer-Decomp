@@ -31,7 +31,7 @@
 
 struct FDockingCamera : FGameCamera
 {
-    void Attach(void* Object) override;
+    void Attach(IObjRW* Object) override;
     bool IsFinished() override;
     bool Activate(int const* ViewRect4) override;
     void Deactivate() override;

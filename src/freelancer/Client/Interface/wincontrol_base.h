@@ -42,6 +42,17 @@
 class RichTextWin;
 class RichTextEditWin;
 class UiScroll;
+class CargoBarControl;
+class NnButtonControl;
+class NnEditControl;
+class NnStaticControl;
+class NnTextControl;
+class NnToggleButtonControl;
+class RichTextWireButtonControl;
+class ScrollControl;
+class ShipViewControl;
+class WireButtonControl;
+class WireStaticControl;
 
 // The property ids WinControl's own SetProperty (slot 42, FUN_005a13c0) handles. Subclasses add
 // their own ids above 11 and pass these down.
@@ -301,22 +312,22 @@ public:
     // arguments land at +0xd0 (mesh), +0x350 (string), +0x360 (sound, slot at +0x374), the
     // FUN_0055a490 key lookup (+0x34c / +0xcc), +0xa8 (position), +0x1d0 (hardpoint), +0xb4
     // (half extents), +0x331 bit 0, +0x330 bits 3 and 5, +0x2d1, +0xcc, +0x32c and +0x34c.
-    WinControl* CreateButtonControl(char const* Name, char const* MeshPath, char const* Mesh2,
-                                    char const* SoundName, char const* KeyCommandName,
-                                    Vector const* Position, char const* Hardpoint,
-                                    Vector const* HalfExtents, unsigned char bNoMeshRender,
-                                    unsigned char bActionButton, unsigned char bNoColorChange,
-                                    unsigned char bNoZEnable, int ToolTipIds, int ToolTip2Ids,
-                                    int CommandId);
+    NnButtonControl* CreateButtonControl(char const* Name, char const* MeshPath, char const* Mesh2,
+                                         char const* SoundName, char const* KeyCommandName,
+                                         Vector const* Position, char const* Hardpoint,
+                                         Vector const* HalfExtents, unsigned char bNoMeshRender,
+                                         unsigned char bActionButton, unsigned char bNoColorChange,
+                                         unsigned char bNoZEnable, int ToolTipIds, int ToolTip2Ids,
+                                         int CommandId);
     // FUN_005a0d00 (RET 0x24) -- "WireButtonControl" + WireButtonControl::Init FUN_005a3ee0.
-    WinControl* CreateWireButtonControl(char const* Name, char const* SoundName,
-                                        Vector const* Position, Vector const* HalfExtents,
-                                        unsigned char bAlwaysWhite, unsigned char bNoZEnable,
-                                        int ToolTipIds, int CommandId, int EdgeMask);
+    WireButtonControl* CreateWireButtonControl(char const* Name, char const* SoundName,
+                                               Vector const* Position, Vector const* HalfExtents,
+                                               unsigned char bAlwaysWhite, unsigned char bNoZEnable,
+                                               int ToolTipIds, int CommandId, int EdgeMask);
     // FUN_005a0d60 (RET 0x1c) -- "WireStaticControl" + WireStaticControl::Init FUN_005a3360.
-    WinControl* CreateWireStaticControl(char const* Name, Vector const* Position,
-                                        Vector const* HalfExtents, unsigned char bAlwaysWhite,
-                                        unsigned char bNoZEnable, int ToolTipIds, int EdgeMask);
+    WireStaticControl* CreateWireStaticControl(char const* Name, Vector const* Position,
+                                               Vector const* HalfExtents, unsigned char bAlwaysWhite,
+                                               unsigned char bNoZEnable, int ToolTipIds, int EdgeMask);
     // FUN_005a17e0 (RET 0x20) -- "UIScroll" with the FUiPayloadScrollCycle {Width, Height,
     // float(Min), float(Max), float(Page), 1.0f, bHorizontal}; on a non-null result
     // SetScrollOffset(Position) FUN_005972d0, SetValue(0) FUN_00595db0 and SetHorizontal
@@ -338,62 +349,62 @@ public:
     RichTextEditWin* CreateUiTextEdit(char const* Name, Vector const* AttachOffset, float Width,
                                       float Height, wchar_t* Caption);
     // FUN_005a1950 (RET 0x28) -- "RichTextWireButtonControl" + FUN_005a4810.
-    WinControl* CreateRichTextWireButtonControl(char const* Name, char const* SoundName,
-                                                Vector const* Position, Vector const* HalfExtents,
-                                                unsigned char bAlwaysWhite, unsigned char bNoZEnable,
-                                                int ToolTipIds, unsigned CaptionIds,
-                                                int CommandId, int EdgeMask);
+    RichTextWireButtonControl* CreateRichTextWireButtonControl(char const* Name, char const* SoundName,
+                                                               Vector const* Position, Vector const* HalfExtents,
+                                                               unsigned char bAlwaysWhite, unsigned char bNoZEnable,
+                                                               int ToolTipIds, unsigned CaptionIds,
+                                                               int CommandId, int EdgeMask);
     // FUN_005a0db0 (RET 0x40) -- "StaticControl" + StaticControl::Init FUN_00588540.
-    WinControl* CreateStaticControl(char const* Name, char const* MeshPath, Vector const* Position,
-                                    char const* Hardpoint, Vector const* HalfExtents,
-                                    unsigned char bNoZEnable, unsigned char bZClear,
-                                    unsigned char bNoMeshRender, unsigned char bNoWireRender,
-                                    unsigned char bNoColoring, unsigned char bRenderToWindow,
-                                    unsigned char bNoClearRender, int ForceRadius,
-                                    int RotationSpeed, unsigned char bEnableRotation,
-                                    Vector const* StartYpr);
+    NnStaticControl* CreateStaticControl(char const* Name, char const* MeshPath, Vector const* Position,
+                                         char const* Hardpoint, Vector const* HalfExtents,
+                                         unsigned char bNoZEnable, unsigned char bZClear,
+                                         unsigned char bNoMeshRender, unsigned char bNoWireRender,
+                                         unsigned char bNoColoring, unsigned char bRenderToWindow,
+                                         unsigned char bNoClearRender, int ForceRadius,
+                                         int RotationSpeed, unsigned char bEnableRotation,
+                                         Vector const* StartYpr);
     // FUN_005a0e30 (RET 0x2c) -- "TextControl" + TextControl::Init FUN_0058a110. The arguments
     // follow TextControl's ini keys (font, offset, hardpoint, width, height, font_scale,
     // stringID, justification, tooltip); FontScale is never read. bTopLeftAnchor (+0x378) set:
     // Position is the text rectangle's upper-left corner; clear: its centre.
-    WinControl* CreateTextControl(char const* Name, char const* StyleName, Vector const* Position,
-                                  char const* Hardpoint, float Width, float Height,
-                                  float FontScale, unsigned Ids, int Justification,
-                                  int TextToolTipIds, unsigned char bTopLeftAnchor);
+    NnTextControl* CreateTextControl(char const* Name, char const* StyleName, Vector const* Position,
+                                     char const* Hardpoint, float Width, float Height,
+                                     float FontScale, unsigned Ids, int Justification,
+                                     int TextToolTipIds, unsigned char bTopLeftAnchor);
     // FUN_005a1080 (RET 0x24) -- "CargoBarControl" + CargoBarControl::Init FUN_0055ee80
     // (cargo_bar_control.cpp). Color / HighlightColor are RGBA byte quads in a dword.
-    WinControl* CreateCargoBarControl(char const* Name, char const* MeshPath,
-                                      Vector const* NewOffset, char const* Hardpoint,
-                                      Vector const* NewHalfExtents, unsigned char bHorizontal,
-                                      int ToolTip2Ids, unsigned Color, unsigned HighlightColor);
+    CargoBarControl* CreateCargoBarControl(char const* Name, char const* MeshPath,
+                                           Vector const* NewOffset, char const* Hardpoint,
+                                           Vector const* NewHalfExtents, unsigned char bHorizontal,
+                                           int ToolTip2Ids, unsigned Color, unsigned HighlightColor);
     // FUN_005a1020 (RET 0x28) -- "ShipViewControl" + ShipViewControl::Init FUN_005842a0
     // (ship_view_control.cpp). RectColor / WireColor point at RGBA byte quads.
-    WinControl* CreateShipViewControl(char const* Name, Vector const* RotSpeed,
-                                      Vector const* NewOffset, Vector const* Ypr,
-                                      Vector const* NewViewSize, char const* Hardpoint,
-                                      bool bShowRect, bool bShowWire, unsigned const* RectColor,
-                                      unsigned const* WireColor);
+    ShipViewControl* CreateShipViewControl(char const* Name, Vector const* RotSpeed,
+                                           Vector const* NewOffset, Vector const* Ypr,
+                                           Vector const* NewViewSize, char const* Hardpoint,
+                                           bool bShowRect, bool bShowWire, unsigned const* RectColor,
+                                           unsigned const* WireColor);
     // FUN_005a0e90 (RET 0x28) -- "EditControl" + FUN_0058a110 (TextControl::Init) with the
     // helper's arguments 2..10 and a trailing 0 for Init's last (byte +0x378) argument.
-    WinControl* CreateEditControl(char const* Name, char const* StyleName, Vector const* Position,
-                                  char const* Hardpoint, float Width, float Height,
-                                  float FontScale, unsigned Ids, int Justification,
-                                  int TextToolTipIds);
+    NnEditControl* CreateEditControl(char const* Name, char const* StyleName, Vector const* Position,
+                                     char const* Hardpoint, float Width, float Height,
+                                     float FontScale, unsigned Ids, int Justification,
+                                     int TextToolTipIds);
     // FUN_005a0fb0 (RET 0x38) -- "ToggleButtonControl" + ToggleButtonControl::Init FUN_0055c1c0
     // with arguments 2..14. That Init sets byte +0x335 = 1, runs ButtonControl::Init
     // FUN_0055ac30(MeshPath, AltMeshPath, SoundName, KeyCommandName, Position, Hardpoint,
     // HalfExtents, bNoMeshRender, bActionButton, bNoColorChange, bNoZEnable, ToolTipIds,
     // ToolTip2Ids, 0) and loads AltMeshPath into a second mesh holder at +0x378.
-    WinControl* CreateToggleButtonControl(char const* Name, char const* MeshPath,
-                                          char const* AltMeshPath, char const* SoundName,
-                                          char const* KeyCommandName, Vector const* Position,
-                                          char const* Hardpoint, Vector const* HalfExtents,
-                                          unsigned char bNoMeshRender, unsigned char bActionButton,
-                                          unsigned char bNoColorChange, unsigned char bNoZEnable,
-                                          int ToolTipIds, int ToolTip2Ids);
+    NnToggleButtonControl* CreateToggleButtonControl(char const* Name, char const* MeshPath,
+                                                     char const* AltMeshPath, char const* SoundName,
+                                                     char const* KeyCommandName, Vector const* Position,
+                                                     char const* Hardpoint, Vector const* HalfExtents,
+                                                     unsigned char bNoMeshRender, unsigned char bActionButton,
+                                                     unsigned char bNoColorChange, unsigned char bNoZEnable,
+                                                     int ToolTipIds, int ToolTip2Ids);
     // FUN_005a0ef0 (RET 0x70) -- "ScrollControl" + ScrollControl::Init FUN_00582120
     // (scroll_control.cpp) with the other 27 arguments. Callers: 0x004bf4ec, 0x004c1093.
-    WinControl* CreateScrollControl(
+    ScrollControl* CreateScrollControl(
         char const* Name, char const* BackMesh, Vector const* BackOffset, char const* BackHp,
         Vector const* BackMouse, bool bBackNoMeshRender, char const* NextMesh,
         Vector const* NextOffset, char const* NextHp, Vector const* NextMouse,

@@ -291,7 +291,7 @@ void ObstacleAvoidance::Update(float Dt)
         {
             continue;
         }
-        CSimple const* const HitSimple = (CSimple const*)HitObject;
+        CSimple const* const HitSimple = static_cast<CSimple const*>(HitObject);
         unsigned const HitType = HitSimple->TypeBits;
         if ((HitType & (OBJ_SATELLITE | OBJ_JUMP_GATE | OBJ_STATION | OBJ_NON_TARGETABLE | OBJ_MISSION_SATELLITE | OBJ_CAPITAL)) == 0 || HitType == OwnType)
         {
@@ -966,7 +966,7 @@ int PathfindManager::ClassifyObstaclePhase()
     FSpatialQueryResult Nearby;
     Nearby.Count = 0;
     Nearby.Capacity = 0x800;
-    ISpatialPartition* const Bucket = (ISpatialPartition*)Owner->ObjectDb->GetBucket(7);
+    ISpatialPartition* const Bucket = Owner->ObjectDb->GetBucket(7);
     if (Bucket != nullptr)
     {
         Geometry::Sphere Query;
@@ -995,7 +995,7 @@ int PathfindManager::ClassifyObstaclePhase()
             }
             else
             {
-                Candidate = (IObjRW*)Nearby.Items[Index];
+                Candidate = static_cast<IObjRW*>(Nearby.Items[Index]);
                 TypeMask = OBJ_MOON | OBJ_PLANET | OBJ_SUN;
             }
 

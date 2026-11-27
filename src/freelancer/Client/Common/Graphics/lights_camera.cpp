@@ -28,18 +28,18 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
     Vis = InVis;
     Vis->AddRef();
 
-    void* Node = nullptr;
+    IDAComponent* Node = nullptr;
     AGGDESC Desc = {8, "FxNode"};
     bool bFailed = true;
-    if (DALib::Dacom->CreateInstance(&Desc, &Node) == GR_OK)
+    if (DALib::Dacom->CreateInstance(&Desc, reinterpret_cast<void**>(&Node)) == GR_OK)
     {
         if (DALib::FxEffectLibrary->CreateEffect(Node, reinterpret_cast<void*>(Vis->EffectCrc),
                                                  &Effect) == GR_OK)
         {
-            void* Root = nullptr;
+            IDAComponent* Root = nullptr;
             DALib::Alchemy->GetRootNode(&Root);
             DALib::Alchemy->AttachNode(Root, Node);
-            static_cast<IDAComponent*>(Root)->Release();
+            Root->Release();
             bCreated = true;
             bFailed = false;
         }
@@ -80,7 +80,7 @@ void FLightsCameraParticles::Draw(ICamera* Camera)
         return;
 
     float Scratch[5];
-    Effect->GetTransform(0, (Transform**)&Scratch[0]);
+    Effect->GetTransform(0, reinterpret_cast<Transform**>(&Scratch[0]));
     if (Effect->GetBoundingSphere(&Scratch[1]) < 0)
         return;
     if (!MiscUtilSphereInView(Camera, reinterpret_cast<Vector const*>(&Scratch[1]), Scratch[4]))

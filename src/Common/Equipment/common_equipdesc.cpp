@@ -67,7 +67,7 @@ unsigned short EquipDesc::get_id() const
 CacheString const& EquipDesc::get_hardpoint() const
 {
     // Retail returns the field's address: a CacheString is exactly the one char const* there.
-    return *(CacheString const*)&Hardpoint;
+    return *reinterpret_cast<CacheString const*>(&Hardpoint);
 }
 
 float EquipDesc::get_status() const

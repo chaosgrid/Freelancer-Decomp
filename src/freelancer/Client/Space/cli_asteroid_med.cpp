@@ -54,7 +54,7 @@ bool FCliMedAsteroidGameobj::find(unsigned const& Id)
     return Object != nullptr;
 }
 
-void FCliMedAsteroidGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+void FCliMedAsteroidGameobj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     // Retail also tests Other's CBase (+0xc), never null for a live Other. class & 0x503 is a
@@ -62,14 +62,14 @@ void FCliMedAsteroidGameobj::OnSurfaceCollisionHit(void const* Contact, void con
     if (bWatchListed != 0 && Other != nullptr && Other->GetObject() != nullptr &&
         (static_cast<unsigned>(Other->GetObject()->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
     {
-        Explode(static_cast<Vector const*>(Contact));
+        Explode(&Contact->Point);
         return;
     }
     // Retail tail-jumps to GameObject's FUN_00539cd0.
     FClientGameobj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FCliMedAsteroidGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
+void FCliMedAsteroidGameobj::ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     if (bWatchListed == 0)
@@ -102,7 +102,7 @@ void FCliMedAsteroidGameobj::ReportCollisionToServer(void const* A, void const* 
     Info.ObjectId = Other->get_id();
     Info.SubObjId = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
     Info.Pad_0x0a = 0;
-    static_cast<IServer*>(GetLocalServerInterface())
+    GetLocalServerInterface()
         ->SPBadLandsObjCollision(Info, GetPlayerConnectionId());
 }
 

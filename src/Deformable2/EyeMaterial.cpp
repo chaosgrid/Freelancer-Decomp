@@ -338,7 +338,7 @@ void FMaterialParamValue::Clear()
     }
     if (Type == kMaterialParamComponent)
     {
-        IDAComponent* const Com = (IDAComponent*)(DwordToPointer(Value[0]));
+        IDAComponent* const Com = static_cast<IDAComponent*>((DwordToPointer(Value[0])));
         Value[0] = 0;
         if (Com != nullptr)
         {
@@ -367,7 +367,7 @@ void FMaterialParamValue::DupString(const char* Src)
 
 void FMaterialParamValue::SwapCom(IDAComponent* NewCom)
 {
-    IDAComponent* const Old = (IDAComponent*)(DwordToPointer(Value[0]));
+    IDAComponent* const Old = static_cast<IDAComponent*>((DwordToPointer(Value[0])));
     Value[0] = PointerToDword(NewCom);
     if (NewCom != nullptr)
         NewCom->AddRef();
@@ -404,7 +404,7 @@ FMaterialParamValue& FMaterialParamValue::operator=(const FMaterialParamValue& S
         DupString((const char*)(DwordToPointer(Src.Value[0])));
         break;
     case kMaterialParamComponent:
-        SwapCom((IDAComponent*)(DwordToPointer(Src.Value[0])));
+        SwapCom(static_cast<IDAComponent*>((DwordToPointer(Src.Value[0]))));
         break;
     default:
         break;
@@ -442,7 +442,7 @@ void FMaterialParamValue::Set(int InType, unsigned long Arg)
         DupString((const char*)(DwordToPointer(Arg)));
         break;
     case kMaterialParamComponent:
-        SwapCom((IDAComponent*)(DwordToPointer(Arg)));
+        SwapCom(static_cast<IDAComponent*>((DwordToPointer(Arg))));
         break;
     default:
         break;
@@ -599,9 +599,9 @@ GENRESULT DACOM_API FEyeMaterialImpl::Initialize(IDAComponent* Outer)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
+GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(IFileSystem* FileSystem)
 {
-    IFileSystem* const Fs = (IFileSystem*)(FileSystem);
+    IFileSystem* const Fs = FileSystem;
     FMaterialParamDesc* Table = nullptr;
     const unsigned long Count = GetParameterTable((void**)(&Table));
     unsigned long Index = 0;
@@ -667,9 +667,9 @@ GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
+GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(IFileSystem* FileSystem)
 {
-    IFileSystem* const Fs = (IFileSystem*)(FileSystem);
+    IFileSystem* const Fs = FileSystem;
     FMaterialParamDesc* Table = nullptr;
     const unsigned long Count = GetParameterTable((void**)(&Table));
     GENRESULT Result = GR_OK;
@@ -710,7 +710,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                     Cell.DupString((const char*)(DwordToPointer(Address[0])));
                     break;
                 case kMaterialParamComponent:
-                    Cell.SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
+                    Cell.SwapCom(static_cast<IDAComponent*>((DwordToPointer(Address[0]))));
                     break;
                 default:
                     break;
@@ -808,27 +808,27 @@ static bool ContextHasDiffuseStream(const FMaterialSubmitContext* Context)
     return Source != nullptr && Source->Diffuse.Base != nullptr;
 }
 
-GENRESULT DACOM_API FEyeMaterialImpl::Bind(void* Context)
+GENRESULT DACOM_API FEyeMaterialImpl::Bind(FMaterialSubmitContext* Context)
 {
-    Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors);
-    if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
+    Pipeline->SetMaterial(reinterpret_cast<const D3DMATERIAL8*>(&Colors));
+    if (ContextHasDiffuseStream(Context))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEyeMaterialImpl::Teardown(void* Context)
+GENRESULT DACOM_API FEyeMaterialImpl::Teardown(FMaterialSubmitContext* Context)
 {
-    if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
+    if (ContextHasDiffuseStream(Context))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimType,
+GENRESULT DACOM_API FEyeMaterialImpl::Submit(FMaterialSubmitContext* Context, unsigned long PrimType,
                                           unsigned long Start, unsigned long Count,
                                           unsigned long IbStart, unsigned long IndexSpan,
                                           unsigned long Flags)
 {
-    FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
+    FMaterialSubmitContext* const Ctx = Context;
     GENRESULT Result;
     if ((Flags & kMaterialSubmitUseBuffers) != 0)
     {
@@ -955,7 +955,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterDescriptor(unsigned long Index
     if (GetParameterTable((void**)(&Table)) <= Index)
         return GR_GENERIC;
     const FMaterialParamDesc* const Entry = &Table[Index];
-    FMaterialParamDesc* const Out = (FMaterialParamDesc*)(OutDesc);
+    FMaterialParamDesc* const Out = static_cast<FMaterialParamDesc*>(OutDesc);
     Out->Flags = Entry->Flags;
     Out->Key = Entry->Key;
     Out->Name = Entry->Name;
@@ -973,7 +973,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, voi
     FMaterialParamDesc* Table = nullptr;
     if (GetParameterTable((void**)(&Table)) <= Index)
         return GR_GENERIC;
-    FMaterialParamValue* const Out = (FMaterialParamValue*)(InOutDesc);
+    FMaterialParamValue* const Out = static_cast<FMaterialParamValue*>(InOutDesc);
     const int Type = Table[Index].Value.Type;
     if (Out->Type != Type)
         Out->Clear();
@@ -1003,7 +1003,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, voi
         Out->DupString((const char*)(DwordToPointer(Address[0])));
         break;
     case kMaterialParamComponent:
-        Out->SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
+        Out->SwapCom(static_cast<IDAComponent*>((DwordToPointer(Address[0]))));
         break;
     default:
         break;
@@ -1114,8 +1114,8 @@ GENRESULT __thiscall FEyeMaterialImpl::Setup()
 bool __thiscall FEyeMaterialImpl::ValueWithinDeclaredRange(unsigned long /*Index*/, void* Entry,
                                                         void* Value)
 {
-    const FMaterialParamDesc* const Desc = (const FMaterialParamDesc*)(Entry);
-    const FMaterialParamValue* const Cell = (const FMaterialParamValue*)(Value);
+    const FMaterialParamDesc* const Desc = static_cast<const FMaterialParamDesc*>(Entry);
+    const FMaterialParamValue* const Cell = static_cast<const FMaterialParamValue*>(Value);
     if (Cell->Type != Desc->Value.Type)
         return false;
     int Components = 0;
@@ -1146,7 +1146,7 @@ bool __thiscall FEyeMaterialImpl::ValueWithinDeclaredRange(unsigned long /*Index
 GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, void* Entry,
                                                         void* Value)
 {
-    const FMaterialParamValue* const Cell = (const FMaterialParamValue*)(Value);
+    const FMaterialParamValue* const Cell = static_cast<const FMaterialParamValue*>(Value);
     unsigned long* const Address = (unsigned long*)(GetParameterAddress(Index));
     if (Address != nullptr)
     {
@@ -1187,9 +1187,9 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
         }
         case kMaterialParamComponent:
         {
-            IDAComponent** const Slot = (IDAComponent**)(Address);
+            IDAComponent** const Slot = reinterpret_cast<IDAComponent**>(Address);
             IDAComponent* const Old = *Slot;
-            IDAComponent* const NewCom = (IDAComponent*)(DwordToPointer(Cell->Value[0]));
+            IDAComponent* const NewCom = static_cast<IDAComponent*>((DwordToPointer(Cell->Value[0])));
             *Slot = NewCom;
             if (NewCom != nullptr)
                 NewCom->AddRef();
@@ -1202,7 +1202,7 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
         }
     }
 
-    const char* const Key = ((const FMaterialParamDesc*)(Entry))->Key;
+    const char* const Key = (static_cast<const FMaterialParamDesc*>(Entry))->Key;
     if (Key[0] == 'D' && Key[1] == 'c' && Key[2] == '\0')
     {
         int Component = 0;
@@ -1262,9 +1262,9 @@ GENRESULT DACOM_API FEyeMaterialInner::QueryInterface(const char* Iid, void** Ou
             unsigned char* const Base = (unsigned char*)(Owner);
             IDAComponent* Face;
             if ((Offset & 0x80000000u) != 0)
-                Face = *(IDAComponent**)(Base + (Offset & 0x7FFFFFFFu));
+                Face = *reinterpret_cast<IDAComponent**>((Base + (Offset & 0x7FFFFFFFu)));
             else
-                Face = (IDAComponent*)(Base + Offset);
+                Face = reinterpret_cast<IDAComponent*>((Base + Offset));
             Face->AddRef();
             *Out = Face;
             return GR_OK;
@@ -1390,10 +1390,10 @@ unsigned long DACOM_API FEyeMaterial::Release()
     return Controlling->Release();
 }
 
-GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
+GENRESULT DACOM_API FEyeMaterial::Bind(FMaterialSubmitContext* Context)
 {
-    FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
-    Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors); // +0xAC
+    FMaterialSubmitContext* const Ctx = Context;
+    Pipeline->SetMaterial(reinterpret_cast<const D3DMATERIAL8*>(&Colors)); // +0xAC
     if (ContextHasDiffuseStream(Ctx))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, TRUE);
 
@@ -1419,7 +1419,7 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
 
     if (Ctx == nullptr)
         return GR_OK;
-    FUvDeformBinding* const Binding = (FUvDeformBinding*)(Ctx->MaterialContext);
+    FUvDeformBinding* const Binding = static_cast<FUvDeformBinding*>(Ctx->MaterialContext);
     if (Binding == nullptr || Binding->Record == nullptr)
         return GR_OK;
     const FBoneRuntime* const Bone = Binding->Bone;
@@ -1454,12 +1454,12 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEyeMaterial::Teardown(void* Context)
+GENRESULT DACOM_API FEyeMaterial::Teardown(FMaterialSubmitContext* Context)
 {
     if (Context == nullptr)
         return GR_OK;
     Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
-    if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
+    if (ContextHasDiffuseStream(Context))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, FALSE);
     return GR_OK;
 }
@@ -1563,7 +1563,7 @@ namespace
 GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Out)
 {
     // LAB_065fe070. The desc is {0x14, name, outer, inner-out}.
-    FAGGDESC14* const Aggregate = (FAGGDESC14*)(Desc);
+    FAGGDESC14* const Aggregate = reinterpret_cast<FAGGDESC14*>(Desc);
     if (Aggregate->Size != sizeof(FAGGDESC14) || std::strcmp(Aggregate->NameAt4, Name) != 0)
     {
         *Out = nullptr;
@@ -1585,7 +1585,7 @@ GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Ou
     const GENRESULT Result = Object->InitializeFromDescriptor(Desc); // +0x58
     if (Result == GR_OK)
     {
-        *Out = (IMaterial*)(Object);
+        *Out = static_cast<IMaterial*>(Object);
         return GR_OK;
     }
     if (Aggregate->InnerUnknown != nullptr)
@@ -1612,7 +1612,7 @@ bool RegisterEyeMaterialFactory()
     Factory->RefCount = 1;
     Factory->Name = G_EyeMaterialName;
     ICOManager* const Dacom = DACOM_Acquire();
-    Dacom->RegisterComponent((IDAComponent*)(Factory), G_EyeMaterialName,
+    Dacom->RegisterComponent(Factory, G_EyeMaterialName,
                              (void*)(0x80000000));
     Factory->Release();
     return true;

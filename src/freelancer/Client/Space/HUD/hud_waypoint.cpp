@@ -191,7 +191,7 @@ void HUD_Waypoint::UpdateInactive()
 void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
 {
     // LAB_004f3de0.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return;
     Scale = 1.0f;
@@ -450,7 +450,7 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     bReached = 0;
 
     // Already within 100 m (at most 100) counts as reached.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player != nullptr)
     {
         Vector const& WaypointPos = WatchedObjRw(Waypoint)->get_position();
@@ -510,7 +510,7 @@ void HudWaypointOnPlayerWaypointsCleared()
     // FUN_004f4cd0.
     if (G_HudWaypoint == nullptr)
         return;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
         return;
     if (WatchedObjRw(G_HudWaypoint->Waypoint) == nullptr)

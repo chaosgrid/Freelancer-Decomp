@@ -42,6 +42,7 @@
 #include "Common/input_manager.h"    // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
 #include "Common/Audio/menu_sound_arch.h"  // GetClientSoundListenerObject (FUN_0040f130)
 #include "NeuroNet/nn_montage_draw.h"  // FindButtonMontageTile (FUN_0055a360)
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_text_control.h"  // NnTextControl (+0x334 Font::String, FUN_0058a5d0 / FUN_0058a5e0)
 #include "NeuroNet/nn_ui_pulse.h"      // G_NnPaletteRed
 #include "Space/player_behavior.h"  // GetPlayerObjRW, IsMouseFlightHoldThresholdReached, IsMouseFlightLocked
@@ -467,7 +468,7 @@ bool HudTargetableObjects::ProjectContact(Vector const* World, float Radius, Vec
                                           float* OutScreenRadius, float* OutDistance)
 {
     // FUN_004ecfd0. The listener camera (FUN_0040f130).
-    ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());
+    ICamera* const Camera = GetClientSoundListenerObject();
     const float* const View = (const float*)Camera->GetViewTransform();
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();           // FUN_005b73e0
@@ -514,7 +515,7 @@ bool HudTargetableObjects::ProjectContact(Vector const* World, float Radius, Vec
     }
 
     // The distance to the player, summed as x*x + z*z + y*y in double and stored every time.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     Vector const& PlayerPos = Player->get_position();
     double const Dx = static_cast<double>(PlayerPos.x) - static_cast<double>(World->x);
     double const Dy = static_cast<double>(PlayerPos.y) - static_cast<double>(World->y);
@@ -547,7 +548,7 @@ void HudTargetableObjects::RebuildContacts()
     Contacts.clear();
 
     // The player (kept for the tail) and its ship.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     CShip* PlayerShip = nullptr;
     if (Player != nullptr)
     {
@@ -936,7 +937,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
     PickSubObjId = SUBOBJ_ID_NONE;
     PickId = 0;
 
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player == nullptr)
         return false;
     CObject* const PlayerShip = CObjectOfObjRW(Player);
@@ -1039,7 +1040,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
     }
 
     // The camera ray from the cursor, past the player's ship and over fully cloaked ships.
-    ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+    ICamera* const Camera = GetClientSoundListenerObject();   // FUN_0040f130
     FCameraRayHit Hit;
     CameraRayPick(&Hit, Camera, static_cast<float>(CursorX), static_cast<float>(CursorY),
                   PlayerShip, true);
@@ -1101,7 +1102,7 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
     *OutId = 0;
     *OutSubObjId = SUBOBJ_ID_NONE;
 
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player == nullptr)
         return;
     CObject* const PlayerShip = CObjectOfObjRW(Player);
@@ -1255,7 +1256,7 @@ FClientGameobj* HudTargetableObjects::FindPickableNearCursor()
 IObjRW* HudTargetableObjects::FindHostileContactNearCursor()
 {
     // FUN_004f1c20.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player == nullptr)
         return nullptr;
 
@@ -1388,13 +1389,13 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     // The camera ray under the cursor, past the player's object (any class with bit 0), with
     // fully cloaked ships passed over.
     G_HudHoverRecord = nullptr;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     CObject* const IgnoreObject = PlayerObjectOfClass(Player, CObject::ClassObject);
     int CursorX = 0;
     int CursorY = 0;
     int CursorZ = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, &CursorZ);
-    ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+    ICamera* const Listener = GetClientSoundListenerObject();   // FUN_0040f130
     CameraRayPick(&RayHit, Listener, static_cast<float>(CursorX), static_cast<float>(CursorY),
                   IgnoreObject, true);
 
@@ -1887,7 +1888,7 @@ void HudTargetableObjects::DrawContactBracket(FHudContactRecord const* Record,
 void HudTargetableObjects::DrawContactMarkers()
 {
     // FUN_004ebf70.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Scanner == nullptr || Player == nullptr)
         return;
     CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
@@ -2020,7 +2021,7 @@ void HudTargetableObjects::DrawContactMarkers()
         LeadScreen.x = 0.0f;
         LeadScreen.y = 0.0f;
         LeadScreen.z = 0.0f;
-        ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+        ICamera* const Camera = GetClientSoundListenerObject();   // FUN_0040f130
         Camera->ProjectVec(&LeadScreen, &Lead);
         LeadMarkers.emplace_back();
         FHudLeadMarker& Marker = LeadMarkers.back();
@@ -2109,7 +2110,7 @@ void HudTargetableObjects::DrawTargetReticle()
 
     // Without a scanner or a player the text is hidden again; without a player ship nothing
     // else happens -- not even that.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Scanner == nullptr || Player == nullptr)
     {
         ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
@@ -2348,7 +2349,7 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
 
     // The waypoint in the listener camera's frame: its orientation and position (read as one
     // transform) inverted onto World by DAT_00674b6c.
-    ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+    ICamera* const Listener = GetClientSoundListenerObject();   // FUN_0040f130
     const float* const Frame = (const float*)Listener->GetOrientation();
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();   // FUN_005b73e0
@@ -2522,7 +2523,7 @@ void HudTargetableObjects::DrawRangeLabel(void const* /*Unused1*/, float Radius,
         sprintf(Text, "%d.%d K", Range / 1000, (Range % 1000) / 100); // s_%d.%d_K_005d9620
 
     // FUN_0058a580: Text goes through a Font::NumberString as a printf format.
-    static_cast<NnTextControl*>(ReticleRangeText)->SetNumberText(Text);
+    ReticleRangeText->SetNumberText(Text);
 
     ReticleRangeText->SetProperty(kWinPropPosition, reinterpret_cast<uintptr_t>(Point), 0);
     ReticleRangeText->Draw();
@@ -2553,7 +2554,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         TypeBits = OBJ_WAYPOINT;
         bWaypointObject = true;
     }
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     bool const bWatched = HudCommIsWatchedObjectId(Object->get_id());
     bool const bHat = Record->bWatchListed != 0 || Record->bIsBestPath != 0;
 
@@ -2992,7 +2993,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         if (PlayerShip->get_tgt_lead_fire_pos(Object, Lead))
         {
             Vector LeadScreen = MakeVector(0.0f, 0.0f, 0.0f);
-            ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+            ICamera* const Camera = GetClientSoundListenerObject();   // FUN_0040f130
             Camera->ProjectVec(&LeadScreen, &Lead);
             LeadMarkers.emplace_back();
             FHudLeadMarker& Marker = LeadMarkers.back();
@@ -3028,11 +3029,11 @@ unsigned long* HudTargetMarkerColor(unsigned long* OutArgb, IObjRW* Object)
         else
         {
             // The player in ObjDB bucket 1 -- its reputation colour of Object (FUN_0045a4e0).
-            void* const Player = GetPlayerObjRW();
+            IObjRW* const Player = GetPlayerObjRW();
             if (Player != nullptr && static_cast<FClientGameobj*>(Player)->ManagerKind == EClientGameobjKind::Ship)
             {
                 unsigned long Reputation = 0;
-                HudReputationColor(&Reputation, static_cast<IObjRW*>(Player), Object);
+                HudReputationColor(&Reputation, Player, Object);
                 Color = Reputation;
             }
         }
@@ -3164,7 +3165,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     // The contact's attitude towards the player, 0 without one.
     float Attitude = 0.0f;
     if (GetPlayerObjRW() != nullptr)
-        Object->get_attitude_towards(Attitude, static_cast<IObjRW*>(GetPlayerObjRW()));
+        Object->get_attitude_towards(Attitude, GetPlayerObjRW());
 
     if (!bIsTarget)
     {
@@ -3230,7 +3231,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
 
     // The contact's centre in the listener camera's frame (its orientation read as a transform)
     // through DAT_00674b6c's InverseTransform.
-    ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject());
+    ICamera* const Listener = GetClientSoundListenerObject();
     Vector const Center = Object->get_center_of_mass();
     const float* const Frame = (const float*)Listener->GetOrientation();
     if (G_HudObjectsMath == nullptr)
@@ -3506,10 +3507,10 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
 void HudTargetableObjects::CollectLeadMarkers()
 {
     // FUN_004f1dd0.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player == nullptr)
         return;
-    ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+    ICamera* const Camera = GetClientSoundListenerObject();   // FUN_0040f130
     int const LastColumn = static_cast<int>(G_RenderSurfaceWidth) - 1;   // DAT_00610850
     int const LastRow = static_cast<int>(G_RenderSurfaceHeight) - 1;     // DAT_00610854
 
@@ -3576,7 +3577,7 @@ void HudTargetableObjects::CollectLeadMarkers()
         Marker.LeadScreen.x = 0.0f;
         Marker.LeadScreen.y = 0.0f;
         Marker.LeadScreen.z = 0.0f;
-        ICamera* const LeadCamera = static_cast<ICamera*>(GetClientSoundListenerObject());
+        ICamera* const LeadCamera = GetClientSoundListenerObject();
         LeadCamera->ProjectVec(&Marker.LeadScreen, &Marker.LeadWorld);
     }
 }
@@ -3586,7 +3587,7 @@ void HudTargetableObjects::DrawLeadMarkers()
     // FUN_004f2070. FUN_0040f130's result is not used; the player is not null-tested (Render
     // calls this only for a player ship).
     GetClientSoundListenerObject();
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     IObjRW* PlayerTarget = nullptr;
     Player->get_target(PlayerTarget);
 
@@ -3641,7 +3642,7 @@ void HudTargetableObjects::DrawLeadMarkers()
 void HudTargetableObjects::UpdateAimPoint()
 {
     // FUN_004f2220.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player == nullptr)
         return;
     FireAttitude = 0;
@@ -3675,7 +3676,7 @@ void HudTargetableObjects::UpdateAimPoint()
     // The cursor as a fraction of the surface from its centre (as FindHostileContactNearCursor),
     // and the depth to beat: FLT_MAX, or the ray hit's distance squared when the ray object
     // counted.
-    ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
+    ICamera* const Camera = GetClientSoundListenerObject();   // FUN_0040f130
     int CursorX = 0;
     int CursorY = 0;
     int CursorZ = 0;
@@ -3823,7 +3824,7 @@ void HudTargetableObjects::UpdateMissileAlert()
     // "incoming_missile".
     float Nearest = 1.0e12f;
     bool bAny = false;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW();   // FUN_0054baf0
     if (Player != nullptr)
     {
         for (int Index = 0; Index < ScanEntries->Count; ++Index)
@@ -3907,7 +3908,7 @@ void HudTargetableObjects::UpdateTrailAlert()
     // closest trailing ship is nearer than 500 (DAT_005d8ef8; ordered <) and the phase is off.
     uintptr_t bHide = 1;
     CEqObj* const PlayerShip =
-        static_cast<CEqObj*>(PlayerObjectOfClass(static_cast<IObjRW*>(GetPlayerObjRW()), CObject::ClassShip));
+        static_cast<CEqObj*>(PlayerObjectOfClass(GetPlayerObjRW(), CObject::ClassShip));
     if (PlayerShip != nullptr)
     {
         IBehaviorManager* const Behavior = PlayerShip->get_behavior_interface();

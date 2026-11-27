@@ -116,7 +116,7 @@ bool Action_Land::update(float Dt)
 
     // The player's Ship asks the space frame for the base (FUN_00548ef0); any other Ship is
     // removed. The action stays on the list either way.
-    if (static_cast<void*>(static_cast<IObjRW*>(Gameobj)) == GetPlayerObjRW())
+    if (static_cast<IObjRW*>(Gameobj) == GetPlayerObjRW())
         SetPendingLandBase(&BaseId);
     else
         Gameobj->MarkForRemoval(true);
@@ -191,7 +191,7 @@ Action_JumpOut::Action_JumpOut(FClientShipGameobj* InShip, float InDuration, uns
         reinterpret_cast<Transform const&>(Ship->get_orientation());
     std::memcpy(&StartXform, &ShipXform, sizeof(Transform));
     std::memcpy(&EndXform, &ShipXform, sizeof(Transform));
-    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Ship->JumpEffect);
+    FJumpShipEffect* const Effect = Ship->JumpEffect;
     if (Effect != nullptr)
         std::memcpy(&EndXform, &Effect->GateHardpointFrame, sizeof(Transform));
 

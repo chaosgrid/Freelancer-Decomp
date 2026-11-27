@@ -9,7 +9,9 @@
 #include "NeuroNet/nn_dealer.h"
 
 #include "NeuroNet/Economy/client_base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510), the market
+#include "NeuroNet/nn_button_control.h"
                                     // queries FUN_00438060 / 00438160 / 004381c0 / 00438220
+#include "Interface/cargo_bar_control.h"
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830),
                                     // GetPlayerBaseIdRetail (DAT_00673358 via FUN_004c4900),
                                     // GetPlayerRepVibeRetail (FUN_004c4670)
@@ -23,6 +25,7 @@
 #include "GameFlow/nav_bar.h"                // NavBarOpenButton (FUN_00442200), NavBarRefreshRepairTab (FUN_004427e0)
 #include "NeuroNet/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
 #include "NeuroNet/nn_modal.h"               // NnFloatBits
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "NeuroNet/nn_text_control.h"        // NnTextControl::GetFontString (Font::String +0x334)
 #include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteGreen (DAT_00679bac)
@@ -668,7 +671,7 @@ void NnDealer::Update()
     else
     {
         TransferItemGoodDeal->SetProperty(kWinPropHide, HideTransfer, 0);
-        static_cast<WireStaticControl*>(BuySellTradeButton)->SoundSlot = bOwnSelection ? 0x25 : 0;
+        BuySellTradeButton->SoundSlot = bOwnSelection ? 0x25 : 0;
     }
 
     QuantityPrompt->SetProperty(kWinPropHide, HideTransfer, 0);
@@ -1047,13 +1050,15 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     case kWinNotifyScrollValue:
+    {
         // A slider moved -- the list scroll or the quantity slider.
-        if (reinterpret_cast<WinControl*>(A) == InventoryScroll) // +0x3d0
+        WinControl* const Slider = reinterpret_cast<WinControl*>(A);
+        if (Slider == InventoryScroll) // +0x3d0
         {
             FirstRow = static_cast<int>(B);
             return 0;
         }
-        if (reinterpret_cast<WinControl*>(A) != QuantitySlider) // +0x9b8
+        if (Slider != QuantitySlider) // +0x9b8
             return 0;
         Quantity = static_cast<int>(B);
         if (Quantity < 0)
@@ -1061,6 +1066,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4
         QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         return 0;
+    }
 
     case kWinNotifyEditChanged:
     {

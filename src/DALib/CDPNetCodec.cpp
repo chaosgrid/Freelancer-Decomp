@@ -25,9 +25,9 @@ bool CDPNetCodec::Compress(const void* Input, unsigned int InputSize, void* Outp
     if (InputSize < 0x20)
         return false;
 
-    DeflateStream.next_in = (Bytef*)((void*)Input);
+    DeflateStream.next_in = static_cast<Bytef*>((void*)Input);
     DeflateStream.avail_in = InputSize;
-    DeflateStream.next_out = (Bytef*)Output;
+    DeflateStream.next_out = static_cast<Bytef*>(Output);
     DeflateStream.avail_out = OutputCapacity;
     const int Result = deflate(&DeflateStream, Z_FINISH);
     LastCompressedSize = DeflateStream.total_out;
@@ -37,9 +37,9 @@ bool CDPNetCodec::Compress(const void* Input, unsigned int InputSize, void* Outp
 
 bool CDPNetCodec::Decompress(const void* Input, unsigned int InputSize, void* Output, unsigned int OutputCapacity)
 {
-    InflateStream.next_in = (Bytef*)((void*)Input);
+    InflateStream.next_in = static_cast<Bytef*>((void*)Input);
     InflateStream.avail_in = InputSize;
-    InflateStream.next_out = (Bytef*)Output;
+    InflateStream.next_out = static_cast<Bytef*>(Output);
     InflateStream.avail_out = OutputCapacity;
     const int Result = inflate(&InflateStream, Z_FINISH);
     LastDecompressedSize = InflateStream.total_out;

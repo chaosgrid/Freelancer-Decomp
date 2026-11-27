@@ -24,6 +24,7 @@
 
 struct ICamera;
 class RoomData;
+class BaseData;
 struct IRenderPipeline;
 
 struct FRoomRuntime;
@@ -275,7 +276,7 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
 
     unsigned BaseId;                   // +0x34 FUN_004496b0 argument 1
     unsigned RoomId;                    // +0x38 FUN_004496b0 argument 2
-    void* LocationBase;                 // +0x3C BaseData* of BaseId (FUN_0043a2b0)
+    BaseData* LocationBase;             // +0x3C the BaseData of BaseId (FUN_0043a2b0)
     RoomData* Room;                     // +0x40 FUN_0043a3d0
     // +0x44 / +0x48: -1 from FUN_004496b0, then FUN_0044a030 takes them from the prop whose
     // RoomPropInfo +0x3f is set: its slot-6 engine instance and its script table's +0x0c script.

@@ -38,7 +38,7 @@ int LoadResourceString(HMODULE Module, unsigned int Id, wchar_t* Buf, int BufCha
 		HGLOBAL Loaded = ::LoadResource(Module, Resource);
 		if (Loaded != nullptr)
 		{
-			Entry = (const wchar_t*)::LockResource(Loaded);
+			Entry = static_cast<const wchar_t*>(::LockResource(Loaded));
 		}
 	}
 	if (Entry == nullptr)

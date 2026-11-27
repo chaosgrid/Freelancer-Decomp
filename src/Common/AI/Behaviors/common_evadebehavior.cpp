@@ -40,11 +40,11 @@ namespace
     }
 
     // FUN_062e53e0 on the watched object's position against the owner's heading cone.
-    bool WatchedOutsideCone(BaseWatcher const& Watcher, void* Owner, float Cos)
+    bool WatchedOutsideCone(BaseWatcher const& Watcher, IObjRW* Owner, float Cos)
     {
         IObjRW* const Watched = WatchedObject(Watcher);
         return IsPointOutsideHeadingCone(Watched->get_position(),
-                                         static_cast<IObjInspect const*>(static_cast<IObjRW*>(Owner)),
+                                         Owner,
                                          Cos);
     }
 }
@@ -83,7 +83,7 @@ EvadeBehavior::~EvadeBehavior()
 // ----------------------------------------------------------------------------
 // Slot 1, LAB_062c79d0.
 // ----------------------------------------------------------------------------
-bool EvadeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool EvadeBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bOk = BindContext(Owner, Manager, Sys);              // FUN_062d2090
     if (!bOk)
@@ -146,7 +146,7 @@ void EvadeBehavior::OnEngage()
     {
         // The owner's get_throttle result is unread; its out-param (preset 1.0f) is used.
         float Throttle = 1.0f;
-        static_cast<IObjInspect const*>(OwnerContext)->get_throttle(Throttle);
+        OwnerContext->get_throttle(Throttle);
         Dodge.Throttle = Throttle;
         BreakAway.Throttle = Throttle;
     }
@@ -269,7 +269,7 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
     }
 
     IObjInspect* const Closest = Sys->Timers.FindClosestHostileTarget(Sys->PersonalityData.EvadeDodgeParams.EvadeActivateRange);
-    Watcher2a0.set(static_cast<Watchable const*>(static_cast<IObjRW*>(Closest)));
+    Watcher2a0.set(static_cast<IObjRW*>(Closest));
 
     if (IsWatching(Watcher2a0))
     {

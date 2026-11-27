@@ -107,7 +107,7 @@ public:
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    void* DACOM_API LoadAnimationGroup(void* FileSystem) override;
+    void* DACOM_API LoadAnimationGroup(IFileSystem* FileSystem) override;
     GENRESULT DACOM_API UnloadAnimationGroup(void* Arg) override;
     GENRESULT DACOM_API CreateAnimationInstance(int Unused, void* Query, IImaInstance** OutInstance) override;
     GENRESULT DACOM_API TickAnimationInstances(int Filter, float Dt) override;

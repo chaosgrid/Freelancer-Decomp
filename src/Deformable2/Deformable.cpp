@@ -109,7 +109,7 @@ bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
             FillFileDesc(&ChildDesc, FindData.cFileName);
             ChildDesc.FindHandle = (unsigned long)Finder;
             IFileSystem* Child = nullptr;
-            if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
+            if (Fs->CreateInstance(reinterpret_cast<AGGDESC*>(&ChildDesc),
                                    (void**)(&Child)) >= 0)
             {
                 const int bSkeletonNode = Child->OpenNode("DFMSkeleton");
@@ -292,7 +292,7 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel)
     Skel = Skeleton;
     const int Count = Skel->BoneCount;
     FBoneRuntime* Slots =
-        (FBoneRuntime*)new unsigned char[(size_t)Count * sizeof(FBoneRuntime)];
+        reinterpret_cast<FBoneRuntime*>(new unsigned char[(size_t)Count * sizeof(FBoneRuntime)]);
     int Index = 0;
     while (Index < Count)
     {
@@ -827,7 +827,7 @@ GENRESULT DACOM_API FDeformable::Create(void** OutInstance, int* Parts, void* Ar
 
 GENRESULT DACOM_API FDeformable::Destroy(void* InInstance)
 {
-    FDeformInstance* Instance = (FDeformInstance*)InInstance;
+    FDeformInstance* Instance = static_cast<FDeformInstance*>(InInstance);
     // FUN_065f1ed0. FUN_065f3ed0, then the dtor FUN_065f3640 runs it again (a no-op on the
     // emptied instance).
     if (Instance == nullptr)
@@ -842,7 +842,7 @@ GENRESULT DACOM_API FDeformable::Play(void* Instance, int* Out, void* Name, void
                                                void* ArgC, void* ArgD, void* ArgE, void* ArgF,
                                                void* ArgG, void* ArgH, void* Script)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f1f00 -> FUN_065f41d0.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -858,7 +858,7 @@ GENRESULT DACOM_API FDeformable::PlayAlt(void* Instance, int* Out, void* Name, v
                                                 void* ArgC, void* ArgD, void* ArgE, void* ArgF,
                                                 void* ArgG, void* ArgH, InstanceIndex Joint)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f1f50 -> FUN_065f4660.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -872,7 +872,7 @@ GENRESULT DACOM_API FDeformable::PlayAlt(void* Instance, int* Out, void* Name, v
 
 GENRESULT DACOM_API FDeformable::DestroyAll(void* Instance)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f1fa0 → FUN_065f4c80.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -882,7 +882,7 @@ GENRESULT DACOM_API FDeformable::DestroyAll(void* Instance)
 
 GENRESULT DACOM_API FDeformable::DestroyHandle(void* Instance, int Handle)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f1fc0 → FUN_065f4d30.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -893,22 +893,22 @@ GENRESULT DACOM_API FDeformable::DestroyHandle(void* Instance, int Handle)
 GENRESULT DACOM_API FDeformable::StartAim(void* Instance, void** Out, unsigned char* AimDesc,
                                                  void* Arg3)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f1fe0 -> FUN_065f5400 start_aim. Only DeformInstance is tested.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
 
     FIkListNode* Node = DeformInstance->AllocAimEvent(AimDesc, Arg3);
     *Out = Node;
-    if (Node == (FIkListNode*)((ptrdiff_t)-1))
+    if (Node == reinterpret_cast<FIkListNode*>(((ptrdiff_t)-1)))
         return GR_GENERIC;
     return GR_OK;
 }
 
 GENRESULT DACOM_API FDeformable::StopAim(void* Instance, void* Node)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
-    FIkListNode* AimNode = (FIkListNode*)Node;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
+    FIkListNode* AimNode = static_cast<FIkListNode*>(Node);
     // LAB_065f2010 → FUN_065f5950 stop_aim (node, not Event). Both null tests are retail.
     if (DeformInstance == nullptr || AimNode == nullptr)
         return GR_GENERIC;
@@ -918,7 +918,7 @@ GENRESULT DACOM_API FDeformable::StopAim(void* Instance, void* Node)
 
 GENRESULT DACOM_API FDeformable::SetLod(void* Instance, float Dt, int* LodIds)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2040 -> FUN_065f3fd0(LodIds, Dt).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -949,7 +949,7 @@ GENRESULT DACOM_API FDeformable::SetLod(void* Instance, float Dt, int* LodIds)
 GENRESULT DACOM_API FDeformable::Draw(void* Instance, void* Camera, void* UnusedB,
                                               void* RenderArg, int* OutLod, unsigned int Flags)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2070 -> FUN_065f4070(inst, B, A, D, C, E). A null DeformInstance still stores 0
     // to *OutLod (no test).
     if (DeformInstance == nullptr)
@@ -957,13 +957,13 @@ GENRESULT DACOM_API FDeformable::Draw(void* Instance, void* Camera, void* Unused
         *OutLod = 0;
         return GR_GENERIC;
     }
-    DeformInstance->DrawParts(UnusedB, (ICamera*)Camera, OutLod, RenderArg, Flags);
+    DeformInstance->DrawParts(UnusedB, static_cast<ICamera*>(Camera), OutLod, RenderArg, Flags);
     return GR_OK;
 }
 
 GENRESULT DACOM_API FDeformable::GetFirstBone(void* Instance, int* Out)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f20b0. Out is never tested.
     if (DeformInstance == nullptr)
     {
@@ -982,7 +982,7 @@ GENRESULT DACOM_API FDeformable::GetFirstBone(void* Instance, int* Out)
 
 GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, const Vector* Pos)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f20f0 -> FUN_065f4f00(Pos).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -1036,7 +1036,7 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, const Vector* Pos)
 
 GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, const Matrix* Ori)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2110 -> FUN_065f5050(Ori).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -1055,7 +1055,7 @@ GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, const Matrix* Ori)
 
 GENRESULT DACOM_API FDeformable::GetOffset(void* Instance, float* Out)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2130. Out is not tested.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -1065,7 +1065,7 @@ GENRESULT DACOM_API FDeformable::GetOffset(void* Instance, float* Out)
 
 GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2150 -> FUN_065f50b0(Height).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
@@ -1122,7 +1122,7 @@ GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height)
 
 GENRESULT DACOM_API FDeformable::GetListCount(void* Instance, int* Out)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2170 -> FUN_065f51d0. Out is never tested.
     if (DeformInstance == nullptr)
     {
@@ -1136,7 +1136,7 @@ GENRESULT DACOM_API FDeformable::GetListCount(void* Instance, int* Out)
 
 GENRESULT DACOM_API FDeformable::CopyList(void* Instance, int* Out)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f21a0 -> FUN_065f51e0. Both null tests are retail.
     if (DeformInstance == nullptr || Out == nullptr)
         return GR_GENERIC;
@@ -1153,17 +1153,17 @@ GENRESULT DACOM_API FDeformable::CopyList(void* Instance, int* Out)
 
 GENRESULT DACOM_API FDeformable::WalkHardpoints(void* Instance, void* UserFn, void* UserData)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f21d0 -> FUN_065f59d0.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
-    DeformInstance->WalkHardpoints(UserFn, UserData);
+    DeformInstance->WalkHardpoints(reinterpret_cast<FHardpointUserFn>(UserFn), UserData);
     return GR_OK;
 }
 
 GENRESULT DACOM_API FDeformable::GetMeshStats(void* Instance, unsigned int* Out)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f21f0 tests the instance, FUN_065f5ae0 Out (retail).
     if (DeformInstance == nullptr || Out == nullptr)
         return GR_GENERIC;
@@ -1207,7 +1207,7 @@ GENRESULT DACOM_API FDeformable::GetMeshStats(void* Instance, unsigned int* Out)
 GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius,
                                                       Vector* OutCenter)
 {
-    FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
+    FDeformInstance* DeformInstance = static_cast<FDeformInstance*>(Instance);
     // LAB_065f2220 -> FUN_065f5bc0.
     if (DeformInstance == nullptr || DeformInstance->PartCount <= 0)
         return GR_GENERIC;
@@ -1262,7 +1262,7 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
         FDeformableComponentFactory* Factory = new FDeformableComponentFactory();
         Factory->RefCount = 1;
         Factory->Name = G_DeformableComponentName;
-        Dacom->RegisterComponent((IDAComponent*)Factory, G_DeformableComponentName,
+        Dacom->RegisterComponent(Factory, G_DeformableComponentName,
                                  (void*)0x80000000);
         Factory->Release();
         Dacom->Release();
@@ -1375,7 +1375,7 @@ GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, v
     FDeformableFactory* This = this;
     // FUN_065f22f0. operator new(0x18) returns null on failure (VC6 MSVCRT), which retail tests.
     // No test of This, Desc, Out or either name.
-    FAggDesc18* Extended = (FAggDesc18*)Desc;
+    FAggDesc18* Extended = reinterpret_cast<FAggDesc18*>(Desc);
     if (Extended->Size != sizeof(FAggDesc18) || std::strcmp(Extended->NameAt4, This->Name) != 0)
     {
         *Out = nullptr;
@@ -1400,7 +1400,7 @@ GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, v
     else
     {
         // InnerOut is not tested here (only the failure path tests it).
-        Object->Controlling = (IDAComponent*)Extended->Outer;
+        Object->Controlling = Extended->Outer;
         *Extended->InnerOut = InnerUnknown;
     }
 
@@ -1449,9 +1449,9 @@ GENRESULT DACOM_API FDeformableInner::QueryInterface(const char* Iid, void** Out
             const int Offset = G_InnerIidTable[Index].Offset;
             IDAComponent* Facet = nullptr;
             if (Offset < 0)
-                Facet = *(IDAComponent**)(OwnerBytes + (Offset & 0x7fffffff));
+                Facet = *reinterpret_cast<IDAComponent**>((OwnerBytes + (Offset & 0x7fffffff)));
             else
-                Facet = (IDAComponent*)(OwnerBytes + Offset);
+                Facet = reinterpret_cast<IDAComponent*>((OwnerBytes + Offset));
             Facet->AddRef();
             *Out = Facet;
             return GR_OK;

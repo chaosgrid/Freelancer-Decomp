@@ -158,7 +158,7 @@ namespace AlchemyImpl
     //   Otherwise Desc = {8, "FxEffect" (0x06256054), Archetype, Param1}; Result = effect
     //   +0x48 Initialize(&Desc); if Out != 0, *Out = effect -- whatever Result is; the
     //   archetype reference is released; return Result.
-    GENRESULT DACOM_API FFxEffectLibrary::CreateEffect(void* Param1, void* Key, IFxEffect** Out)
+    GENRESULT DACOM_API FFxEffectLibrary::CreateEffect(IDAComponent* Param1, void* Key, IFxEffect** Out)
     {
         FFxEffectObject* const Effect = new FFxEffectObject();
         IFxEffectArchetype* Archetype = nullptr;
@@ -174,7 +174,7 @@ namespace AlchemyImpl
         Desc.Size = 8;
         Desc.NameAt4 = "FxEffect";
         Desc.Archetype = Archetype;
-        Desc.RootParent = static_cast<IDAComponent*>(Param1);
+        Desc.RootParent = Param1;
         const GENRESULT Result = Effect->Initialize(reinterpret_cast<AGGDESC*>(&Desc));
         if (Out != nullptr)
             *Out = Effect;

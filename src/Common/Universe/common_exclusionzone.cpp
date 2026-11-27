@@ -225,7 +225,7 @@ namespace
             int Capacity = (int)(Size + Grow);
             if (Capacity < 0)
                 Capacity = 0;
-            TZone** const Block = (TZone**)(operator new((size_t)(Capacity) * sizeof(TZone*)));
+            TZone** const Block = static_cast<TZone**>((operator new((size_t)(Capacity) * sizeof(TZone*))));
             TZone** Out = Block;
             for (TZone** In = First; In != Last; ++In, ++Out)
                 *Out = *In;
@@ -248,7 +248,7 @@ namespace
         int Count = (OtherFirst == nullptr) ? 0 : (int)(OtherLast - OtherFirst);
         if (Count < 0)
             Count = 0;
-        First = (TZone**)(operator new((size_t)(Count) * sizeof(TZone*)));
+        First = static_cast<TZone**>((operator new((size_t)(Count) * sizeof(TZone*))));
         TZone** Out = First;
         for (TZone** In = OtherFirst; In != OtherLast; ++In, ++Out)
             *Out = *In;
@@ -289,7 +289,7 @@ namespace
         int Count = (OtherFirst == nullptr) ? 0 : (int)(OtherLast - OtherFirst);
         if (Count < 0)
             Count = 0;
-        First = (TZone**)(operator new((size_t)(Count) * sizeof(TZone*)));
+        First = static_cast<TZone**>((operator new((size_t)(Count) * sizeof(TZone*))));
         TZone** Out = First;
         for (TZone** In = OtherFirst; In != OtherLast; ++In, ++Out)
             *Out = *In;

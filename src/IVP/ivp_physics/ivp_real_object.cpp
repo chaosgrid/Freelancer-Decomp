@@ -793,7 +793,7 @@ void IVP_Real_Object::enable_collision_detection(bool bEnable)
 // operator new(0x44); a failed allocation stores null.
 IVP_Controller_Phantom* IVP_Real_Object::convert_to_phantom(const IVP_Template_Phantom* Template)
 {
-    delete static_cast<IVP_Controller_Phantom*>(controller_phantom);
+    delete controller_phantom;
     controller_phantom = nullptr;
     IVP_Controller_Phantom* const Phantom = new IVP_Controller_Phantom(this, Template);
     controller_phantom = Phantom;
@@ -808,7 +808,7 @@ int32_t IVP_Real_Object::convert_phantom_to_object()
 
     enable_collision_detection(false);
 
-    delete static_cast<IVP_Controller_Phantom*>(controller_phantom);
+    delete controller_phantom;
     controller_phantom = nullptr;
 
     if (static_cast<uint8_t>(flags) == 0x9)
@@ -906,7 +906,7 @@ void IVP_Real_Object::TeardownMindistListenersAndCandidates()
 IVP_Real_Object::~IVP_Real_Object()
 {
     // The phantom (+0x1c): 063442c0 + operator delete.
-    IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(controller_phantom);
+    IVP_Controller_Phantom* const Phantom = controller_phantom;
     if (Phantom != nullptr)
     {
         delete Phantom;
@@ -1295,7 +1295,7 @@ void IVP_Real_Object::SetLocalCsysFromQuatAndPosition(const IVP_U_Quat* Orientat
 
 // The append slots 4 and 5 open-code: count >= capacity (signed) grows through
 // FUN_0635d3e0, then elems[count++] = Element. No null tests.
-static void IVP_SurfaceManagerOutListAppend(IVP_SurfaceManager_OutList* OutList, void* Element)
+static void IVP_SurfaceManagerOutListAppend(IVP_SurfaceManager_OutList* OutList, IVP_Compact_Ledge* Element)
 {
     if (OutList->Count >= OutList->Capacity)
         OutList->grow();
@@ -1311,11 +1311,11 @@ IVP_SurfaceManager::~IVP_SurfaceManager()
 
 // Slots 7 and 8: the shared `RET 4` at 062ed730, in both tables (a base
 // default the derived class inherits).
-void IVP_SurfaceManager::add_reference_to_ledge(void* /*Param1*/)
+void IVP_SurfaceManager::add_reference_to_ledge(IVP_Compact_Ledge* /*Param1*/)
 {
 }
 
-void IVP_SurfaceManager::remove_reference_to_ledge(void* /*Param1*/)
+void IVP_SurfaceManager::remove_reference_to_ledge(IVP_Compact_Ledge* /*Param1*/)
 {
 }
 
@@ -1323,8 +1323,8 @@ void IVP_SurfaceManager::remove_reference_to_ledge(void* /*Param1*/)
 // and zero-fills it, with no null test.
 IVP_SurfaceManager_Default::IVP_SurfaceManager_Default()
 {
-    GeometryBlock = ivp_malloc_aligned(kIVPSurfaceManagerGeometryBlockSize,
-                                       kIVPSurfaceManagerGeometryBlockAlign); // FUN_06343fc0
+    GeometryBlock = static_cast<IVP_Compact_Ledge*>(ivp_malloc_aligned(kIVPSurfaceManagerGeometryBlockSize,
+                                                                       kIVPSurfaceManagerGeometryBlockAlign)); // FUN_06343fc0
     std::memset(GeometryBlock, 0, kIVPSurfaceManagerGeometryBlockSize);
 }
 
@@ -1339,7 +1339,7 @@ IVP_SurfaceManager_Default::~IVP_SurfaceManager_Default()
 }
 
 // Slot 0
-void* IVP_SurfaceManager_Default::get_single_convex()
+IVP_Compact_Ledge* IVP_SurfaceManager_Default::get_single_convex()
 {
     return GeometryBlock;
 }
@@ -1355,7 +1355,7 @@ float* IVP_SurfaceManager_Default::get_mass_center(float* OutVec3)
 }
 
 // Slot 2, LAB_063623f0: traps.
-void IVP_SurfaceManager_Default::get_radius_and_radius_dev_to_given_center(void* /*Param1*/, void* /*Param2*/, void* /*Param3*/)
+void IVP_SurfaceManager_Default::get_radius_and_radius_dev_to_given_center(void* /*Param1*/, float* /*Param2*/, float* /*Param3*/)
 {
     IVP_CoreTrap(); // 063623f0
 }
@@ -1393,7 +1393,7 @@ void IVP_SurfaceManager_Default::get_all_terminal_ledges(IVP_SurfaceManager_OutL
 }
 
 // Slot 6, LAB_063624a0: traps.
-void IVP_SurfaceManager_Default::insert_all_ledges_hitting_ray(void* /*Param1*/, void* /*Param2*/)
+void IVP_SurfaceManager_Default::insert_all_ledges_hitting_ray(IVP_Ray_Solver* /*Param1*/, IVP_Real_Object* /*Param2*/)
 {
     IVP_CoreTrap(); // 063624a0
 }

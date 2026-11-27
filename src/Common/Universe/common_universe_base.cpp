@@ -39,8 +39,8 @@ namespace CmnUniverse
     BASE::BASE()
     {
         NicknameId = 0;
-        ((CacheString*)&Nickname)->clear();
-        ((CacheString*)&File)->clear();
+        reinterpret_cast<CacheString*>(&Nickname)->clear();
+        reinterpret_cast<CacheString*>(&File)->clear();
         SystemId = 0;
         StridName = 0;
         ShipSml[0] = 0;

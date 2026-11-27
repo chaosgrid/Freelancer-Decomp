@@ -853,15 +853,16 @@ void BaseRichTextWin::EnsureSurface()
         Desc.Pitch = static_cast<unsigned long>(Pitch);
         Desc.DrawTile = &ScreenQuadDrawBigImageTile;
 
-        void* Instance = nullptr;
-        if (DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance) == 0)
+        IDAComponent* Instance = nullptr;
+        if (DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
+                                         reinterpret_cast<void**>(&Instance)) == 0)
         {
             if (Image != nullptr)
             {
                 Image->Release();
                 Image = nullptr;
             }
-            if (static_cast<IDAComponent*>(Instance)->QueryInterface(
+            if (Instance->QueryInterface(
                     Iids::BigImage2, reinterpret_cast<void**>(&Image)) != 0)
                 FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x3c7,
                       "Failed to query IBigImage2 interface.\n");
@@ -874,7 +875,7 @@ void BaseRichTextWin::EnsureSurface()
         operator delete(Buffer);
         if (Instance != nullptr)
         {
-            static_cast<IDAComponent*>(Instance)->Release();
+            Instance->Release();
             Instance = nullptr;
         }
     }
@@ -1031,7 +1032,7 @@ void RichTextWin::CreateWithText(Win3D* NewParent, wchar_t const* Text, float Wi
     RdlAppendNode(Content, Clone->Clone());
     delete Clone;
     // The tail cell's node (sentinel[1][2]) gets the text.
-    void** const Sentinel = (void**)Content.NodeList;
+    void** const Sentinel = reinterpret_cast<void**>(Content.NodeList);
     RDLNode* const Back = static_cast<RDLNode*>(static_cast<void**>(Sentinel[1])[2]);
     static_cast<TextNode*>(Back)->set_text(Text, -1);
 }
@@ -1051,7 +1052,7 @@ void RichTextWin::AppendContent(RenderDisplayList const& Source)
     // FUN_0057b3e0 (RET 4).
     if (Source.Count == 0)
         return;
-    void** const Sentinel = (void**)Source.NodeList;
+    void** const Sentinel = reinterpret_cast<void**>(Source.NodeList);
     for (void** Cell = static_cast<void**>(Sentinel[0]); Cell != Sentinel;
          Cell = static_cast<void**>(Cell[0]))
     {

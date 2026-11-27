@@ -13,6 +13,9 @@
 
 #include "common_ini.h" // Vector
 
+struct CShip;
+struct Watchable;
+
 class FClientShipGameobj;
 
 // DAT_00672978 -- one of the player's 99 waypoint records (stride 0x18), counted by
@@ -76,11 +79,11 @@ unsigned GetPlayerConnectionId();        // retail DAT_00673344
 void SetPlayerConnectionId(unsigned Id);
 // The watched pointer of the BaseWatcher DAT_00679744: the player gameobj's Watchable
 // (IObjRW+8), or null once that gameobj is gone. FUN_0054baf0 subtracts eight from it.
-void* GetPlayerShipWatcher();
+Watchable* GetPlayerShipWatcher();
 // The SpaceApp ctor's step on DAT_00679744: unhook it when it holds something.
 void ClearPlayerShipWatcher();
 // NOT RETAIL (port accessor): the CShip of the watched player gameobj, or null.
-void* GetPlayerShipObject();
+CShip* GetPlayerShipObject();
 // NOT RETAIL (port accessor): that CShip's world position, zero without one.
 void GetPlayerShipWorldPosition3(float OutPos3[3]);
 // DAT_00678b96: cleared by the spawn before IServer::PlayerLaunch, set by the IClient launch

@@ -14,9 +14,11 @@
 #include "NeuroNet/nn_main_button.h"     // G_bNnKeepPanelOpen (DAT_0066d359)
 #include "NeuroNet/nn_modal.h"
 #include "NeuroNet/nn_story_star.h"      // StoryStarOnMissionMessage (FUN_004b9c60)
+#include "NeuroNet/nn_text_control.h"
 #include "Interface/win3d.h"
 #include "Interface/win3d_renderables.h"  // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 
 #include "common_text.h"        // FmtStr
 

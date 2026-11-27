@@ -848,10 +848,10 @@ public:
     // FUN_06f148f0: offer the message to every enabled random encounter.
     void NotifyRandEncs(pub::Controller::EMessage MessageId, void const* MessageParms);
     // FUN_06f14e80: attach a newly created NPC to its random-encounter formation.
-    void AttachRandEncNpc(void const* MessageParms);
+    void AttachRandEncNpc(FContentNpcShip* const* NpcParms);
     // FUN_06f14780 (prefix): register a newly created NPC (map +0xa4, invulnerable and
     // decloaked lists).
-    void RegisterNpc(void const* MessageParms);
+    void RegisterNpc(FContentNpcShip* const* NpcParms);
     // FUN_06f19b80: the mission object with SpaceObj id ObjId (NPC +0xa4, solar +0xc4, loot
     // +0xd0) carries the label *LabelId.
     bool HasObjectLabel(unsigned int ObjId, unsigned int const* LabelId);

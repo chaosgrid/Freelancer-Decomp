@@ -54,13 +54,13 @@ const char* RearViewCameraGetName()
 void FRearViewCamera::Update(float DeltaSeconds)
 {
     // LAB_0051b0d0 (slot 0x6c).
-    FHudCamera* const Hud = (FHudCamera*)this;
+    FHudCamera* const Hud = this;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // Only with a watched client ship (CObject mask 0x503); HUDCamera's update runs either way.
     if (GameCameraWatchedShip(Hud) != nullptr)
     {
-        IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
+        IObjRW* const Object = GameCameraGetTarget(Hud);
 
         Matrix Orientation;
         memcpy(&Orientation, &Object->get_transform().Rotation.E[0][0], sizeof(Orientation));

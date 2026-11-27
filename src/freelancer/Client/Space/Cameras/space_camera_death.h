@@ -28,7 +28,7 @@
 
 struct FDeathCamera : FGameCamera
 {
-    void Attach(void* Object) override;
+    void Attach(IObjRW* Object) override;
     bool IsFinished() override;
     void Update(float DeltaSeconds) override;
 

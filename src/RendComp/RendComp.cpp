@@ -62,52 +62,45 @@ void RendCompFdumpAt(int Flags, const char* File, int Line, const char* Message)
     FDUMP(Flags, Format, File, Line, Message);
 }
 
-// RendComp carries the FileSystem component as void*; this is the single place that says
-// what it actually is, so every helper below calls ReadFile's published interface.
-static IFileSystem* AsFileSystem(void* File)
-{
-    return (IFileSystem*)File;
-}
-
-int FileOpenNode(void* File, const char* Name)
+int FileOpenNode(IFileSystem* File, const char* Name)
 {
     if (File == nullptr || Name == nullptr)
         return 0;
-    return AsFileSystem(File)->OpenNode(Name); // +0x60
+    return File->OpenNode(Name); // +0x60
 }
 
 // Retail closes every handle it opened with vt+0x10 directly (e.g. FUN_06c249d0 after
 // its vt+0x7c open). There is no "handle 0 means leave the node" rule and no null test:
 // ReadFile's handle 0 names the current file, and an open never returns it.
-int FileClose(void* File, int Handle)
+int FileClose(IFileSystem* File, int Handle)
 {
-    return AsFileSystem(File)->CloseFile((unsigned long)Handle); // +0x10
+    return File->CloseFile((unsigned long)Handle); // +0x10
 }
 
-int FileRead(void* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut)
+int FileRead(IFileSystem* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut)
 {
     if (File == nullptr)
         return -1;
-    return AsFileSystem(File)->Read((unsigned long)Handle, Buffer, Size,
+    return File->Read((unsigned long)Handle, Buffer, Size,
                                     ReadOut, 0); // +0x14
 }
 
-unsigned long FileGetSize(void* File, int Handle)
+unsigned long FileGetSize(IFileSystem* File, int Handle)
 {
     if (File == nullptr)
         return 0;
-    return AsFileSystem(File)->GetSize((unsigned long)Handle, 0); // +0x28
+    return File->GetSize((unsigned long)Handle, 0); // +0x28
 }
 
-int FileGetCurrentPath(void* File, char* Out, unsigned long MaxChars)
+int FileGetCurrentPath(IFileSystem* File, char* Out, unsigned long MaxChars)
 {
     if (File == nullptr || Out == nullptr || MaxChars == 0)
         return 0;
     Out[0] = '\0';
-    return AsFileSystem(File)->GetCurrentPath(MaxChars, Out); // +0x5C
+    return File->GetCurrentPath(MaxChars, Out); // +0x5C
 }
 
-int FileOpenByName(void* File, const char* ChildName)
+int FileOpenByName(IFileSystem* File, const char* ChildName)
 {
     if (File == nullptr || ChildName == nullptr)
         return -1;
@@ -138,7 +131,7 @@ int FileOpenByName(void* File, const char* ChildName)
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xFFFFFFFF;
     const int Handle =
-        AsFileSystem(File)->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+        File->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     if (Handle != -1)
         return Handle;
     // UTF +0x7C is a stub: OpenNode + current handle 0 (EngBase FileSystemReadNamed).
@@ -188,8 +181,8 @@ I3DMathEngine* AcquireMathEngine()
     Desc.InterfaceName = "3DMathEngine";
     Desc.Implementation = nullptr;
     void* Math = nullptr;
-    Manager->CreateInstance((AGGDESC*)(&Desc), &Math);
-    return (I3DMathEngine*)Math;
+    Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Math);
+    return static_cast<I3DMathEngine*>(Math);
 }
 
 void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraXform,
@@ -197,13 +190,13 @@ void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraX
 {
     const Transform* CameraView = (Camera->GetViewTransform());
     const Transform* World =
-        (const Transform*)(G_Engine->GetInstanceTransform(Inst));
+        static_cast<const Transform*>(G_Engine->GetInstanceTransform(Inst));
     *OutCameraView = CameraView;
     *OutWorld = World;
     int State = 1;
     G_Pipeline->GetPipelineState(Render::PipelineStateViewspaceLights, &State);
 
-    const Transform* Extra = (const Transform*)ExtraXform;
+    const Transform* Extra = static_cast<const Transform*>(ExtraXform);
     if (State != 0)
     {
         Transform Modelview;
@@ -265,7 +258,7 @@ Vector* TransformPoint3(Vector* Dest, const Transform* Xform, const Vector* Poin
 
 GENRESULT DACOM_API PluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
-    FRenderPluginDesc* Extended = (FRenderPluginDesc*)Desc;
+    FRenderPluginDesc* Extended = reinterpret_cast<FRenderPluginDesc*>(Desc);
     if (Extended->Size != 0x10 || std::strcmp(Extended->Name, This->Name) != 0)
     {
         *Out = nullptr;
@@ -325,7 +318,7 @@ namespace
         Factory->RefCount = 1;
         Factory->Name = Name != nullptr ? Name : Iid;
         ICOManager* Manager = DACOM_Acquire();
-        Manager->RegisterComponent(static_cast<IComponentFactory*>(Factory), Name,
+        Manager->RegisterComponent(Factory, Name,
                                    (void*)G_RegisterPriority);
         Factory->Release();
     }
@@ -338,7 +331,7 @@ namespace
         Factory->Name = Name != nullptr ? Name : Iid;
         ICOManager* Manager = DACOM_Acquire();
         if (Manager != nullptr)
-            Manager->RegisterComponent(static_cast<IComponentFactory*>(Factory), Name,
+            Manager->RegisterComponent(Factory, Name,
                                        (void*)G_RegisterPriority);
         return Factory;
     }

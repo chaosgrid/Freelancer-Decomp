@@ -16,7 +16,10 @@
 #include "Interface/rich_text_win.h"
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_text_control.h"
 
 #include "common_text.h"     // FmtStr, RenderDisplayList, StyleNode
 

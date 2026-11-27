@@ -108,7 +108,7 @@ IVP_SurfaceManager_Polygon::~IVP_SurfaceManager_Polygon()
 }
 
 // 0634ad40.
-void* IVP_SurfaceManager_Polygon::get_single_convex()
+IVP_Compact_Ledge* IVP_SurfaceManager_Polygon::get_single_convex()
 {
     const IVP_Compact_Ledgetree_Node* Root = compact_surface->get_compact_ledge_tree_root();
     if (Root->offset_right_node == 0)
@@ -132,11 +132,11 @@ float* IVP_SurfaceManager_Polygon::get_mass_center(float* OutVec3)
 // *radius = float(d + upper_limit_radius);
 // *radius_dev = float(d + max_factor_surface_deviation * upper_limit_radius * 0.004f), the
 // deviation byte loaded as a 64-bit integer.
-void IVP_SurfaceManager_Polygon::get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3)
+void IVP_SurfaceManager_Polygon::get_radius_and_radius_dev_to_given_center(void* Param1, float* Param2, float* Param3)
 {
     const IVP_U_Point* Center = static_cast<const IVP_U_Point*>(Param1);
-    float* OutRadius = static_cast<float*>(Param2);
-    float* OutRadiusDev = static_cast<float*>(Param3);
+    float* OutRadius = Param2;
+    float* OutRadiusDev = Param3;
 
     const double Dx = (double)(compact_surface->mass_center[0]) - Center->k[0];
     const double Dy = (double)(compact_surface->mass_center[1]) - Center->k[1];
@@ -197,9 +197,9 @@ void IVP_SurfaceManager_Polygon::get_all_terminal_ledges(IVP_SurfaceManager_OutL
 
 // 0634ab60 (RET 8): an IVP_Ray_Solver_Os on the stack (0634a500), then 0634a4e0 on the
 // surface -- the non-virtual compact-surface entry.
-void IVP_SurfaceManager_Polygon::insert_all_ledges_hitting_ray(void* Param1, void* Param2)
+void IVP_SurfaceManager_Polygon::insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2)
 {
-    IVP_Ray_Solver_Os RaySolverOs(static_cast<IVP_Ray_Solver*>(Param1), static_cast<IVP_Real_Object*>(Param2));
+    IVP_Ray_Solver_Os RaySolverOs(Param1, Param2);
     RaySolverOs.check_ray_against_compact_surface(compact_surface);
 }
 

@@ -31,7 +31,10 @@
 #include "Space/star_sys.h"               // GetAttitudeClass (FUN_0045a490)
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_text_control.h"
 
 #include "common_cobject.h"         // CObject::ObjectClass
 #include "common_goods.h"           // Arch2Good / Good2Arch, EquipDesc, CBase
@@ -371,7 +374,7 @@ void NeuroNetMissionMessage::Update()
     // (FUN_0045a490 == -1) sets the count to 20 at once, so any running frame time closes it.
     if (Kind != kKindScanNotice)
         return;
-    IObjRW const* const Player = static_cast<IObjRW const*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW const* const Player = GetPlayerObjRW(); // FUN_0054baf0
     FClientGameobj* const Scanner = ClientObjDb_FindObject(G_NnMissionMessageScanner, 0);
     bool bScannerOk = false;
     if (Scanner != nullptr && Player != nullptr)
@@ -417,7 +420,7 @@ intptr_t NeuroNetMissionMessage::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Arch != 0)
         {
             EquipDesc* const Desc = FindPlayerNonMissionEquipRetail(Arch); // FUN_004c45d0
-            IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+            IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
             if (Desc != nullptr && !Desc->bEquipped && Player != nullptr)
             {
                 IObjAffect* const Affect = Player;

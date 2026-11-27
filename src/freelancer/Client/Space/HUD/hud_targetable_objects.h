@@ -46,6 +46,7 @@ struct ICamera;
 struct FSpaceCamera;
 struct FButtonMontageTile;
 class FClientGameobj;
+class NnTextControl;
 
 // -------------------------------------------------------------------------------------------
 // The per-contact record, 0x34 bytes. HUD_Targetable_Objects keeps a std::vector of them at
@@ -254,7 +255,7 @@ private:
     float HotScreenRadius;                       // +0x3ec its bracket radius (1e8 when none)
     FCameraRayHit RayHit;                        // +0x3f0 FUN_0051dd20 under the mouse
     CSimple* RayObject;                          // +0x408 unscanned object under the mouse
-    WinControl* ReticleRangeText;                // +0x40c TextControl
+    NnTextControl* ReticleRangeText;             // +0x40c TextControl
     WinControl* MissileAlert;                    // +0x410 StaticControl
     WinControl* TrailAlert;                      // +0x414
     WinControl* RadiationAlert;                  // +0x418

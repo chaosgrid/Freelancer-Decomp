@@ -140,7 +140,7 @@ void CFLSummaryForm::Refresh()
 		ShowBannerText(this, Banner, ShownServerName.c_str());
 	}
 
-	CFLServerDoc* Document = (CFLServerDoc*)m_pDocument;
+	CFLServerDoc* Document = static_cast<CFLServerDoc*>(m_pDocument);
 	if (Document == NULL)
 	{
 		return;

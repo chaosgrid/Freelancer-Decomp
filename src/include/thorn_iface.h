@@ -631,8 +631,8 @@ struct IThornSaveParser
 struct IScriptEngine : IDAComponent
 {
     virtual GENRESULT DACOM_API Slot3(void* A, void* B) = 0;                          // 3  RET 0xC, returns 0
-    virtual GENRESULT DACOM_API Load(void* FileSystem) = 0;                      // 4  RET 0x8
-    virtual GENRESULT DACOM_API Save(void* FileSystem) = 0;                      // 5  RET 0x8, FUN_06f2aa10
+    virtual GENRESULT DACOM_API Load(IFileSystem* FileSystem) = 0;                      // 4  RET 0x8
+    virtual GENRESULT DACOM_API Save(IFileSystem* FileSystem) = 0;                      // 5  RET 0x8, FUN_06f2aa10
     virtual unsigned long DACOM_API GetEntityCount() = 0;                             // 6  RET 0x4
     virtual void* DACOM_API GetEntityHandle(int Order) = 0;                           // 7  RET 0x8, in-order walk
     virtual void* DACOM_API GetEntityDescInOrder(int Order) = 0;                      // 8  RET 0x8, same walk

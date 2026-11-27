@@ -77,7 +77,7 @@ int CProjectile::update(float Dt, unsigned Flags)
 Archetype::Projectile const* CProjectile::projarch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::Projectile const*)Archetype;
+    return static_cast<Archetype::Projectile const*>(Archetype);
 }
 
 void CProjectile::set_dead()
@@ -117,14 +117,14 @@ CMunition::~CMunition()
 Archetype::Munition const* CBeam::munitionarch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::Munition const*)Archetype;
+    return static_cast<Archetype::Munition const*>(Archetype);
 }
 
 Archetype::Munition const* CMunition::munitionarch() const
 {
     // FUN_06262d50, folded with the other arch accessors (Ghidra labels it
     // CAsteroid::asteroidarch). No null check.
-    return (Archetype::Munition const*)Archetype;
+    return static_cast<Archetype::Munition const*>(Archetype);
 }
 
 CGuided::CGuided(Class ObjectClass)

@@ -26,9 +26,9 @@
 
 namespace
 {
-    PathfindManager* MatchPathfindOf(void* Context)
+    PathfindManager* MatchPathfindOf(IBehaviorManager* Context)
     {
-        return static_cast<IBehaviorManager*>(Context)->Pathfind;
+        return Context->Pathfind;
     }
 
     IObjRW* MatchWatched(BaseWatcher const& Watcher)
@@ -39,7 +39,7 @@ namespace
     // The shared tail of FUN_062d65f0 / FUN_062d6670: the watcher is re-read with no
     // null test (a null watch faults in retail) and its position copied to
     // Pathfind+0x200.
-    void MirrorWatchedPosition(void* Context, BaseWatcher const& Watcher)
+    void MirrorWatchedPosition(IBehaviorManager* Context, BaseWatcher const& Watcher)
     {
         PathfindManager* const Pathfind = MatchPathfindOf(Context);
         Pathfind->CachedTargetPosition = MatchWatched(Watcher)->get_position();
@@ -74,17 +74,17 @@ MatchThrottle2Idea::MatchThrottle2Idea()
 }
 
 // Slot 0, LAB_062d5b50 (RET 0xc).
-bool MatchThrottle2Idea::SetContext(void* InObject, void* InHandle, void* InContext)
+bool MatchThrottle2Idea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext)
 {
     if (InObject == nullptr || InHandle == nullptr)
         return false;
 
-    Handle = (SystemManager*)InHandle;
+    Handle = InHandle;
     Object = InObject;
     Context = InContext;
     Attached = 1;
 
-    IObjInspect const* const Owner = static_cast<IObjInspect const*>(static_cast<IObjRW*>(Object));
+    IObjInspect const* const Owner = Object;
 
     // Retail shares one argument frame between the two calls: get_speed's result is
     // stored over a pushed dword and reused as FUN_062e5850's third argument.
@@ -182,7 +182,7 @@ int MatchThrottle2Idea::Update(float DeltaTime)
     if (Watched == nullptr || Object == nullptr)
         return 3;
 
-    IObjRW* const Owner = static_cast<IObjRW*>(Object);
+    IObjRW* const Owner = Object;
     SystemManager* const Sys = Handle;
     FAiTarget* const Nav = &Handle->SelfTarget;
 

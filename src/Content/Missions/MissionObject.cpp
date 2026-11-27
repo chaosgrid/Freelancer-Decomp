@@ -1755,7 +1755,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
 
     case EMessage::NpcShipCreated:
     {
-        FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
+        FContentNpcShip* const* NpcParms = static_cast<FContentNpcShip* const*>(MessageParms);
+        FContentNpcShip* Npc = *NpcParms;
         // NPC +0x170 is its controller.
         if (Npc->ControllerId != ControllerId)
             break;
@@ -1784,7 +1785,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             Jumpers.push_back(Jumper);
             Jumpers.back().Npc = Npc;
         }
-        AttachRandEncNpc(MessageParms);
+        AttachRandEncNpc(NpcParms);
         // Every label id on the NPC (+0x17c) goes into the +0xec multimap.
         std::list<unsigned int>::iterator FormIt = Npc->LabelIds.begin();
         for (; FormIt != Npc->LabelIds.end(); ++FormIt)
@@ -2450,9 +2451,9 @@ FMissionRandEnc::FMissionRandEnc()
 // (NPC +0x1bc = 24.0f, DAT_06fb8588). Once all of the encounter's ships exist, an encounter
 // with an arrival object (Params +0x8c) regroups them into a formation picked by weight, then
 // message 0x100c (Cnd_EncLaunched) goes out.
-void FMissionObject::AttachRandEncNpc(void const* MessageParms)
+void FMissionObject::AttachRandEncNpc(FContentNpcShip* const* NpcParms)
 {
-    FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
+    FContentNpcShip* Npc = *NpcParms;
     std::list<FMissionRandEnc>::iterator EncIt = RandEncs.begin();
     for (; EncIt != RandEncs.end(); ++EncIt)
     {
@@ -3212,9 +3213,9 @@ void FMissionObject::DestroyMissionObjects()
 }
 
 // The prefix of FUN_06f14780.
-void FMissionObject::RegisterNpc(void const* MessageParms)
+void FMissionObject::RegisterNpc(FContentNpcShip* const* NpcParms)
 {
-    FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
+    FContentNpcShip* Npc = *NpcParms;
     unsigned int NpcId = Npc->SpaceObjId;
     NpcObjects.emplace(NpcId, Npc);
 

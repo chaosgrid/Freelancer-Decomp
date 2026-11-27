@@ -41,12 +41,12 @@ public:
     // 104 +0x1a0 LAB_00524f20: an instant-kill asteroid (bWatchListed) touched by a ship
     // ((class & 0x503) == 0x503) explodes at the contact point; anything else goes to
     // GameObject's handler with the same arguments.
-    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 107 +0x1ac LAB_00524f80: an ordinary asteroid reports through GameObject's handler; an
     // instant-kill one sends IServer::SPBadLandsObjCollision -- in multiplayer only for
     // objects the local player owns.
-    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 FUN_00525040: explode once (no action pending) with the explosion archetype,
     // whose process must be 2; FDUMP warnings otherwise.
     void Explode(Vector const* Pos) override;

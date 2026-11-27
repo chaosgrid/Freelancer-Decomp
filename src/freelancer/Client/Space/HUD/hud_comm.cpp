@@ -83,7 +83,7 @@ FCommDuck G_CommDuck = {0.0f, 0.0f, -1.0f, 0}; // DAT_006735a4..DAT_006735b0 (XC
 namespace
 {
     // DAT_006748f8.
-    void* G_HudCommInstance = nullptr;
+    HUD_Receiver* G_HudCommInstance = nullptr;
 
     // The static initializer LAB_004cc850: DAT_00673578, UHUD_Receiver::HUDFACTORY ("Receiver").
     HUDFACTORY<HUD_Receiver> G_HudReceiverFactory("Receiver");
@@ -132,12 +132,12 @@ namespace
     // (FUN_00548eb0, DAT_00679774): a different test, hence a different name.
     bool IsPlayerObjRwId(unsigned ObjectId)
     {
-        void* const Player = GetPlayerObjRW();
+        IObjRW* const Player = GetPlayerObjRW();
         if (Player == nullptr)
         {
             return false;
         }
-        return static_cast<IObjRW*>(Player)->get_id() == ObjectId;
+        return Player->get_id() == ObjectId;
     }
 
     // The inlined lookup every speaker site repeats: the gameobj's CObject, kept only when the
@@ -193,10 +193,9 @@ namespace
     // Archetype::ISound) as the sound archetype, with the alternate-start byte 0.
     unsigned char PlayVoiceMsgArch(FVoiceMsg* Msg, unsigned* PlayKey, ISoundSource** OutSource)
     {
-        void* Handle = nullptr;
-        unsigned char const bOk = PlayClientSoundArch(static_cast<Archetype::ISound*>(Msg),
-                                                      PlayKey, &Handle, 0);
-        *OutSource = static_cast<ISoundSource*>(Handle);
+        ISoundSource* Handle = nullptr;
+        unsigned char const bOk = PlayClientSoundArch(Msg, PlayKey, &Handle, 0);
+        *OutSource = Handle;
         return bOk;
     }
 
@@ -340,9 +339,9 @@ void ClientSendComm(unsigned PlayerId, unsigned Sender, unsigned Receiver, unsig
 
     // The player's inbox when the player's ship sends or receives it.
     FCommInbox* Inbox = &G_CommInboxOther;
-    void* const Player = GetPlayerObjRW();
-    if (Player != nullptr && (static_cast<IObjRW*>(Player)->get_id() == Sender ||
-                              static_cast<IObjRW*>(Player)->get_id() == Receiver))
+    IObjRW* const Player = GetPlayerObjRW();
+    if (Player != nullptr && (Player->get_id() == Sender ||
+                              Player->get_id() == Receiver))
     {
         Inbox = &G_CommInboxPlayer;
     }
@@ -623,10 +622,10 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
     {
         ID_String StaticId;
         StaticId.Id = CreateID("comm_static_1");
-        void* const StaticArch = LookupClientSoundArch(&StaticId);
-        void* Handle = nullptr;
+        Archetype::ISound* const StaticArch = LookupClientSoundArch(&StaticId);
+        ISoundSource* Handle = nullptr;
         unsigned char const bStarted = PlayClientSoundArch(StaticArch, nullptr, &Handle, 0);
-        Static = static_cast<ISoundSource*>(Handle);
+        Static = Handle;
         if (bStarted != 0)
         {
             SetClientSoundSourceType(Static, kSoundSourceVoice);
@@ -1248,7 +1247,7 @@ bool FCommChannel::TickVoice(float Dt)
         float PanValue = 0.0f;
         if (!GetSpaceScriptCameraLatch() && bPositional == 1)
         {
-            ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject()); // FUN_0040f130
+            ICamera* const Listener = GetClientSoundListenerObject(); // FUN_0040f130
             CSimple const* const SpeakerSimple = SimpleOfWatchable(Speaker.target());
             if (SpeakerSimple != nullptr && Listener != nullptr)
             {
@@ -2041,12 +2040,12 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
 // Free functions
 // ============================================================================================
 
-void* GetHudCommInstance()
+HUD_Receiver* GetHudCommInstance()
 {
     return G_HudCommInstance;
 }
 
-void SetHudCommInstance(void* Instance)
+void SetHudCommInstance(HUD_Receiver* Instance)
 {
     G_HudCommInstance = Instance;
 }
@@ -2054,7 +2053,7 @@ void SetHudCommInstance(void* Instance)
 bool HudCommIsWatchedObjectId(unsigned ObjectId)
 {
     // FUN_004cc880.
-    HUD_Receiver const* const Instance = static_cast<HUD_Receiver const*>(G_HudCommInstance);
+    HUD_Receiver const* const Instance = G_HudCommInstance;
     if (Instance == nullptr)
     {
         return false;
@@ -2079,7 +2078,7 @@ bool HudCommIsWatchedObjectId(unsigned ObjectId)
 bool HudCommIsWindowOpen()
 {
     // FUN_004cc8d0: the window byte masked by !FUN_0041a3e0().
-    HUD_Receiver const* const Instance = static_cast<HUD_Receiver const*>(G_HudCommInstance);
+    HUD_Receiver const* const Instance = G_HudCommInstance;
     if (Instance == nullptr)
     {
         return false;

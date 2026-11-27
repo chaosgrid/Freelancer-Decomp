@@ -148,10 +148,8 @@ void IVP_Friction_Solver::SetupCoordsMindists(IVP_ListManager* FrictionSystem)
         }
 
         ++Position;
-        LongTerm->FrictionInfos[0] = static_cast<IVP_Friction_Info_For_Core*>(
-            Dist->Object1->core->find_object_hash_entry(IVP_FrictionKey(FrictionSystem)));
-        LongTerm->FrictionInfos[1] = static_cast<IVP_Friction_Info_For_Core*>(
-            Dist->Object2->core->find_object_hash_entry(IVP_FrictionKey(FrictionSystem)));
+        LongTerm->FrictionInfos[0] = Dist->Object1->core->find_object_hash_entry(IVP_FrictionKey(FrictionSystem));
+        LongTerm->FrictionInfos[1] = Dist->Object2->core->find_object_hash_entry(IVP_FrictionKey(FrictionSystem));
         LongTerm->GapDistance = Dist->GapDistance;
         LongTerm->HasNegativePullSince = Dist->HasNegativePullSince;
         DistsOfSystem.Add(LongTerm);
@@ -579,10 +577,8 @@ void IVP_ListManager::RemoveDistFromSystem(IVP_Contact_Point* Dist)
         union_find_necessary = 1;
     }
 
-    IVP_Friction_Info_For_Core* Info1 = static_cast<IVP_Friction_Info_For_Core*>(
-        Core1->find_object_hash_entry(IVP_FrictionKey(this)));
-    IVP_Friction_Info_For_Core* Info2 = static_cast<IVP_Friction_Info_For_Core*>(
-        Core2->find_object_hash_entry(IVP_FrictionKey(this)));
+    IVP_Friction_Info_For_Core* Info1 = Core1->find_object_hash_entry(IVP_FrictionKey(this));
+    IVP_Friction_Info_For_Core* Info2 = Core2->find_object_hash_entry(IVP_FrictionKey(this));
 
     Info1->FrDists.RemoveElement(Dist); // 06355310
     if (Info1->FrDists.n_elems == 0)    // 06355370

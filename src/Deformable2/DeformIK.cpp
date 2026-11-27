@@ -810,14 +810,14 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
         Trans.E[2][2] = Local.E[2][2];
         AcquireMathEngine()->MulMatrix(Local,
                                        Trans,
-                                       *(const Matrix*)Event->TargetB);
+                                       *Event->TargetB);
     }
     else
     {
         const Vector* Pos = G_Engine->GetInstancePosition(Joint);
         Vector P;
         IkCopy3(&P, Pos);
-        const Vector* Target = (const Vector*)Event->TargetA;
+        const Vector* Target = Event->TargetA;
         Vector Diff;
         const Vector* Src = Target;
         if ((Event->AimFlags & kIkAimTargetIsPoint) != 0)
@@ -871,7 +871,7 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
 int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* BindDesc, float Time)
 {
     int MatchId = (int)ChannelKey;
-    FIkApplyGate* Gate = (FIkApplyGate*)BindDesc;
+    FIkApplyGate* Gate = static_cast<FIkApplyGate*>(BindDesc);
     (void)Time;
     if ((StateFlags & kIkStateStopped) != 0)
     {
@@ -909,7 +909,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
     {
         if ((int)Channels[Index] == MatchId)
         {
-            IkCopy4((Quaternion*)OutQuat, &Quats[Index]);
+            IkCopy4(reinterpret_cast<Quaternion*>(OutQuat), &Quats[Index]);
             return 0;
         }
     }
@@ -1349,7 +1349,7 @@ static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta,
         IkMathMulMatrix(&Rotated, &StepM, &G_IkCurRot[Joint + 1]);
         IkCopy9(&G_IkNewRot[Joint + 1], &Rotated);
         Vector Arm;
-        IkMathTransform(&Arm, &G_IkNewRot[Joint], (const Vector*)(Bone + 1));
+        IkMathTransform(&Arm, &G_IkNewRot[Joint], reinterpret_cast<const Vector*>((Bone + 1)));
         G_IkNewPos[Joint + 1].x = (float)((double)Arm.x +
                                                       (double)G_IkNewPos[Joint].x);
         G_IkNewPos[Joint + 1].y = (float)((double)Arm.y +
@@ -1519,9 +1519,9 @@ void FIkEvent::SolveDls()
 
     Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(&Frame.TargetPos, (const Vector*)TargetA);
+        IkCopy3(&Frame.TargetPos, TargetA);
     if (Frame.bOri)
-        IkCopy9(&Frame.TargetMat, (const Matrix*)TargetB);
+        IkCopy9(&Frame.TargetMat, TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
@@ -1565,7 +1565,7 @@ void FIkEvent::SolveDls()
                 {
                     const float* Bone = (const float*)(
                         G_Engine->GetInstanceRelative(JointIds[Link]));
-                    IkMathTransform(&Arm, &G_IkCurRot[Link], (const Vector*)(Bone + 1));
+                    IkMathTransform(&Arm, &G_IkCurRot[Link], reinterpret_cast<const Vector*>((Bone + 1)));
                 }
                 if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
@@ -1612,9 +1612,9 @@ void FIkEvent::SolveDlsAlt()
 
     Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(&Frame.TargetPos, (const Vector*)TargetA);
+        IkCopy3(&Frame.TargetPos, TargetA);
     if (Frame.bOri)
-        IkCopy9(&Frame.TargetMat, (const Matrix*)TargetB);
+        IkCopy9(&Frame.TargetMat, TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
@@ -1651,7 +1651,7 @@ void FIkEvent::SolveDlsAlt()
                 const float* Bone = (const float*)(
                     G_Engine->GetInstanceRelative(JointIds[Link]));
                 Vector Arm;
-                IkMathTransform(&Arm, &G_IkCurRot[Link], (const Vector*)(Bone + 1));
+                IkMathTransform(&Arm, &G_IkCurRot[Link], reinterpret_cast<const Vector*>((Bone + 1)));
                 if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
                 else

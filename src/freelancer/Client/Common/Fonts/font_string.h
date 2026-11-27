@@ -147,6 +147,8 @@ static_assert(sizeof(FontStringChild) == 0x2c, "FontString child 0x2c");
 // that interface into this class, whose only user is FontStringSetNumberText. The text is a VC6
 // vector<char> of glyph indices (0..16 into "-.0123456789MK%/" plus NUL), drawn one quad per
 // glyph out of a per-font face atlas (FNumberFace).
+struct FNumberFace;
+
 class NumberStringChild final : public FontStringElement
 {
 public:
@@ -195,7 +197,7 @@ public:
     int LayoutGen_;              // +0x24 vs G_FontLayoutGeneration (GetSize cache)
     int Width_;                  // +0x28 sum of advances
     int Height_;                 // +0x2c face glyph height
-    void* FaceCache_;            // +0x30 FUN_00413710 face* (FNumberFace*)
+    FNumberFace* FaceCache_;     // +0x30 FUN_00413710 face*
 };
 
 static_assert(offsetof(NumberStringChild, GlyphFirst_) == 0x08, "NumberString glyphs +0x08");

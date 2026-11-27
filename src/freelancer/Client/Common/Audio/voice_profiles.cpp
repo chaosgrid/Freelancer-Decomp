@@ -36,11 +36,11 @@ namespace
     // (DAT_005cad38) and returns it; the caller must copy before the next call.
     char GVoiceFileScratch[32];
 
-    void ReleaseFileSystem(void* Component)
+    void ReleaseFileSystem(IFileSystem* Component)
     {
         if (Component == nullptr)
             return;
-        static_cast<IFileSystem*>(Component)->Release();
+        Component->Release();
     }
 }
 
@@ -64,7 +64,7 @@ unsigned char FVoiceMsg::Acquire()
     if (SmArchId == -1)
     {
         // The wav is read out of the profile .utf when there is one.
-        void* ScriptFs = Owner->OpenScriptFileSystem();
+        IFileSystem* ScriptFs = Owner->OpenScriptFileSystem();
         SmArchId = CreateSoundArchWav(this, ScriptFs);
         if (ScriptFs != nullptr)
             ReleaseFileSystem(ScriptFs);
@@ -119,7 +119,7 @@ char const* FVoiceProfile::GetSoundFile(unsigned int MsgId)
     return It->second.c_str();
 }
 
-void* FVoiceProfile::OpenScriptFileSystem()
+IFileSystem* FVoiceProfile::OpenScriptFileSystem()
 {
     // LAB_00431590 — same AGGDESC as DALib::OpenData, backend "UTF". The only test is the
     // string's length; DALib::Data is called untested.
@@ -138,10 +138,10 @@ void* FVoiceProfile::OpenScriptFileSystem()
     Desc.Flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
     Desc.FindHandle = 0xffffffffu;
 
-    void* Out = nullptr;
+    IFileSystem* Out = nullptr;
     // +0x0C IComponentFactory::CreateInstance -- the FileSystem desc stands in for AGGDESC.
     if (static_cast<IFileSystem*>(DALib::Data)
-            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Out) != 0)
+            ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&Out)) != 0)
         return nullptr;
     return Out;
 }

@@ -81,15 +81,6 @@ namespace
     // .rdata:005dff40 -- FUN_00543b40's FDUMP file argument.
     char const kShipSourceFile[] = "E:\\FL\\Scratch\\Source\\Client\\space\\ship.cpp";
 
-    // The 0x18-byte node of the GameObject effect list (next, prev, 0x10 companion) -- the
-    // head and the list's own teardown live here; cli_projectile_fx.cpp owns the operations.
-    struct FGameobjEffectListHead
-    {
-        FGameobjEffectListHead* Next;
-        FGameobjEffectListHead* Prev;
-        void* Companion[4];
-    };
-    static_assert(sizeof(FGameobjEffectListHead) == 0x18, "effect list node 0x18");
 }
 
 // ===========================================================================
@@ -100,23 +91,23 @@ FGameobjEffectListStorage::FGameobjEffectListStorage(unsigned char InAllocatorBy
 {
     // Inlined in FUN_005392d0.
     AllocatorByte = InAllocatorByte;
-    FGameobjEffectListHead* const NewHead =
-        static_cast<FGameobjEffectListHead*>(::operator new(sizeof(FGameobjEffectListHead)));
+    FEffectListNode* const NewHead =
+        static_cast<FEffectListNode*>(::operator new(sizeof(FEffectListNode)));
     NewHead->Next = NewHead;
     NewHead->Prev = NewHead;
     Head = NewHead;
     Count = 0;
 }
 
-void* FGameobjEffectListStorage::Erase(void* Where)
+FEffectListNode* FGameobjEffectListStorage::Erase(FEffectListNode* Where)
 {
     // FUN_0053aab0. Next is read before the unlink; the companion teardown is FUN_00502d90's
     // sequence inlined.
-    FGameobjEffectListHead* const Node = static_cast<FGameobjEffectListHead*>(Where);
-    FGameobjEffectListHead* const Next = Node->Next;
+    FEffectListNode* const Node = Where;
+    FEffectListNode* const Next = Node->Next;
     Node->Prev->Next = Node->Next;
     Node->Next->Prev = Node->Prev;
-    CliEffectCompanionClear(Node->Companion);
+    CliEffectCompanionClear(&Node->Companion);
     ::operator delete(Node);
     Count = Count - 1;
     return Next;
@@ -125,8 +116,8 @@ void* FGameobjEffectListStorage::Erase(void* Where)
 FGameobjEffectListStorage::~FGameobjEffectListStorage()
 {
     // FUN_0053aa40 (also inlined in FUN_005393e0 and FUN_005394b0).
-    FGameobjEffectListHead* const ListHead = static_cast<FGameobjEffectListHead*>(Head);
-    void* Node = ListHead->Next;
+    FEffectListNode* const ListHead = Head;
+    FEffectListNode* Node = ListHead->Next;
     while (Node != ListHead)
         Node = Erase(Node);
     ::operator delete(Head);
@@ -192,7 +183,7 @@ namespace
     // The server interface every multiplayer path talks to: DAT_0067ecd0.
     IServer* LocalServer()
     {
-        return static_cast<IServer*>(GetLocalServerInterface());
+        return GetLocalServerInterface();
     }
 
     // DAT_00613e60 (.data, 3; read only by FUN_00539f90): how many HitEffects slots it scans.
@@ -434,7 +425,7 @@ void FClientGameobj::ResetNebula()
     NebulaUpdateTimer = 10.0f;
 }
 
-void FClientGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D)
+void FClientGameobj::OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D)
 {
     // FUN_00539c90. No null test on Other.
     Other->OnSurfaceCollisionHit(A, D, this, B);
@@ -464,13 +455,13 @@ void FClientGameobj::Destroy(int DestroyType)
     FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kGameobjSourceFile, 0x2a4, "Invalid DestroyType!");
 }
 
-void FClientGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientGameobj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                              void const* D)
 {
     // FUN_00539cd0. B and D are not read.
     (void)B;
     (void)D;
-    Vector const* const Hit = static_cast<Vector const*>(Contact);
+    Vector const* const Hit = &Contact->Point;
     float const Speed = sqrtf(Hit->x * Hit->x + Hit->y * Hit->y + Hit->z * Hit->z);
     // Other's mass is read first.
     float const OtherMass = Other->get_mass();
@@ -479,15 +470,15 @@ void FClientGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, F
     // FUN_00407450 picks the distance record for the damage.
     FEffectArch* const Effect =
         Archetype::CliObjPickDistanceRecord(CompanionOfObjectArchetype(Object), Damage);
-    SpawnSurfaceHitEffect(Other->get_id(), Effect, Hit, Hit + 1, nullptr);
+    SpawnSurfaceHitEffect(Other->get_id(), Effect, Hit, &Contact->SurfaceNormal, nullptr);
 }
 
-void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // FUN_00539d80. A points at the hit point and the surface normal (+0x0c); B is not read.
     // None of the narrowed munition objects below is tested for null.
     (void)B;
-    Vector const* const Hit = static_cast<Vector const*>(A);
+    Vector const* const Hit = &A->Point;
     Archetype::Munition const* const MunArch =
         static_cast<Archetype::Munition const*>(NarrowObject(Munition, CObject::ClassProjectile)->Archetype);
     // FUN_00407450: the distance record for the munition's hull_damage.
@@ -495,12 +486,12 @@ void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj*
         Archetype::CliObjPickDistanceRecord(CompanionOfObjectArchetype(Object), MunArch->HullDamage);
     // Keyed by the shot's owner.
     CProjectile const* const Shot = static_cast<CProjectile const*>(NarrowObject(Munition, 0x27u));
-    SpawnSurfaceHitEffect(Shot->OwnerId, HullEffect, Hit, Hit + 1, nullptr);
+    SpawnSurfaceHitEffect(Shot->OwnerId, HullEffect, Hit, &A->SurfaceNormal, nullptr);
     // FUN_00408a70: a random live effect of the munition's companion.
     FEffectArch* const LiveEffect = Archetype::CliMunitionPickLiveEffect(
         NarrowObject(Munition, CObject::ClassProjectile)->Archetype->Companion);
     Vector const Velocity = NarrowObject(Munition, CObject::ClassObject)->get_velocity();
-    SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
+    SpawnSplashHitEffect(LiveEffect, Hit, &A->SurfaceNormal, &Velocity, nullptr);
 }
 
 void FClientGameobj::SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj)
@@ -511,7 +502,7 @@ void FClientGameobj::SetSubTarget(unsigned short SubObj, unsigned TargetId, unsi
     (void)TargetSubObj;
 }
 
-void FClientGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D)
+void FClientGameobj::ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other, void const* D)
 {
     // FUN_00539e70. A is not read; B and D are sub-object ids (low words).
     (void)A;
@@ -568,7 +559,7 @@ void FClientGameobj::Explode(Vector const* Pos)
     Actions.add(Action_Explode::Create(ExplosionArch, this, &Copy));
 }
 
-void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector const* Pos)
+void FClientGameobj::PlayHitSound(unsigned SourceId, Archetype::ISound* SoundArch, Vector const* Pos)
 {
     // FUN_0053a4c0. SoundArch is a client sound archetype (SoundArch.cpp); one whose slot 12
     // (+0x30, the lod link) is null plays nothing.
@@ -586,8 +577,8 @@ void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector con
         FGameobjSound* const Entry = &SoundsBegin[Index];
         if (Entry->SourceId != SourceId)
             continue;
-        void* const VoiceArch = GetClientSoundSourceArch(Entry->Source);
-        void* const Linked = GetClientSoundArchLinked(SoundArch);
+        Archetype::ISound* const VoiceArch = GetClientSoundSourceArch(Entry->Source);
+        Archetype::ISound* const Linked = GetClientSoundArchLinked(SoundArch);
         if (GetClientSoundArchId(VoiceArch) == GetClientSoundArchId(Linked))
         {
             Voice = Entry->Source;
@@ -614,7 +605,7 @@ void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector con
     // the VC6 vector insert at end, growing by max(size, 1).
     if (Voice == nullptr)
     {
-        Voice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
+        Voice = CreateClientSoundSource3D();
         Transform Pose;
         Pose.Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
         Pose.Translation.x = 0.0f;
@@ -662,11 +653,11 @@ void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector con
 
 void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* EffectArch,
                                            Vector const* Pos, Vector const* Normal,
-                                           void* CompanionOut)
+                                           FEffectCompanion* CompanionOut)
 {
     // FUN_00539f90. CompanionOut is never read.
     (void)CompanionOut;
-    if (static_cast<void*>(this) == GetPlayerObjRW() &&
+    if (static_cast<IObjRW*>(this) == GetPlayerObjRW() &&
         GetGameOption(kGameOptSurfaceHitEffects) == 0)
         return;
     if (EffectArch == nullptr)
@@ -734,10 +725,10 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
 
 void FClientGameobj::SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const* Pos,
                                           Vector const* Normal, Vector const* Velocity,
-                                          void* CompanionOut)
+                                          FEffectCompanion* CompanionOut)
 {
     // FUN_0053a230
-    if (static_cast<void*>(this) == GetPlayerObjRW() &&
+    if (static_cast<IObjRW*>(this) == GetPlayerObjRW() &&
         GetGameOption(kGameOptSplashHitEffects) == 0)
         return;
     if (EffectArch == nullptr)
@@ -795,7 +786,7 @@ int FClientGameobj::GetCachedAttitude()
     // 8 when the countdown was exactly 0, 1 when it was negative (the ctor's -1: the first
     // call refreshes again soon).
     AttitudeCountdown = (Countdown >= 0) ? 8 : 1;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         CachedAttitude = 0;
@@ -916,18 +907,6 @@ void FClientSimpleGameobj::SetWatchListed(int Unused, int bWatch)
 // EquippedObj
 // ===========================================================================
 
-namespace
-{
-    // The 0xc-byte node of the equip-FX list.
-    struct FEquipFxNode
-    {
-        FEquipFxNode* Next;
-        FEquipFxNode* Prev;
-        INotify* Wrapper;
-    };
-    static_assert(sizeof(FEquipFxNode) == 0xc, "equip-FX node 0xc");
-}
-
 FEquippedFuseList::FEquippedFuseList(unsigned char InAllocatorByte)
 {
     // Inlined in FUN_00532bc0. Only the head's links are written; its ClientFuse payload stays
@@ -944,7 +923,7 @@ FEquippedFuseList::~FEquippedFuseList()
 {
     // FUN_005359c0. Retail calls the fuse's destructor (vt+0 with 0) and frees the node;
     // `delete Node` does the same two steps.
-    FFuseBurnNode* const ListHead = static_cast<FFuseBurnNode*>(Head);
+    FFuseBurnNode* const ListHead = Head;
     FFuseBurnNode* Node = ListHead->Next;
     while (Node != ListHead)
     {
@@ -964,7 +943,7 @@ FEquipFxList::FEquipFxList(unsigned char InAllocatorByte)
 {
     // Inlined in FUN_00532bc0.
     AllocatorByte = InAllocatorByte;
-    FEquipFxNode* const NewHead = static_cast<FEquipFxNode*>(::operator new(sizeof(FEquipFxNode)));
+    FEquipFxListNode* const NewHead = static_cast<FEquipFxListNode*>(::operator new(sizeof(FEquipFxListNode)));
     NewHead->Next = NewHead;
     NewHead->Prev = NewHead;
     Head = NewHead;
@@ -974,11 +953,11 @@ FEquipFxList::FEquipFxList(unsigned char InAllocatorByte)
 FEquipFxList::~FEquipFxList()
 {
     // FUN_004a2d30, the shared pointer-list destructor: the wrappers are not touched.
-    FEquipFxNode* const ListHead = static_cast<FEquipFxNode*>(Head);
-    FEquipFxNode* Node = ListHead->Next;
+    FEquipFxListNode* const ListHead = Head;
+    FEquipFxListNode* Node = ListHead->Next;
     while (Node != ListHead)
     {
-        FEquipFxNode* const Next = Node->Next;
+        FEquipFxListNode* const Next = Node->Next;
         Node->Prev->Next = Node->Next;
         Node->Next->Prev = Node->Prev;
         ::operator delete(Node);
@@ -1156,8 +1135,8 @@ void FClientEquippedObj::update(float Dt)
     // The equip-FX list (FEquipFxListNode, client_equip_fx.h), the head re-read at every loop
     // test. A wrapper whose Update answers false is deleted and its node freed; the walk goes
     // on from the old Next.
-    FEquipFxListNode* Node = static_cast<FEquipFxListNode*>(EquipFx.Head)->Next;
-    while (Node != static_cast<FEquipFxListNode*>(EquipFx.Head))
+    FEquipFxListNode* Node = EquipFx.Head->Next;
+    while (Node != EquipFx.Head)
     {
         if (Node->Wrapper->Update(Dt))
         {
@@ -1173,12 +1152,12 @@ void FClientEquippedObj::update(float Dt)
         Node = Next;
     }
 
-    FFuseBurnNode* const FuseListHead = static_cast<FFuseBurnNode*>(Fuses.Head);
+    FFuseBurnNode* const FuseListHead = Fuses.Head;
     for (FFuseBurnNode* Node = FuseListHead->Next; Node != FuseListHead; Node = Node->Next)
         Node->Live.Burn(Dt);
 }
 
-unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
+unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsigned const* CachedLod)
 {
     // FUN_00533710. The narrowed CEqObj is read with no null test. A fully cloaked object
     // (>= 1.0f; below and unordered draw) gets LOD {1, 0xffff}, i.e. not drawn.
@@ -1252,7 +1231,7 @@ void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
     static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->EquipManager.CleanUp();
 }
 
-void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientEquippedObj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // FUN_005340b0. B is the hit sub-object id (its low word).
@@ -1275,7 +1254,7 @@ void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* 
     FClientGameobj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FClientEquippedObj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientEquippedObj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // FUN_00534190. B is the hit sub-object id (its low word).
     unsigned short const SubObj = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(B));
@@ -1393,7 +1372,7 @@ void FClientEquippedObj::Explode(Vector const* Pos)
 bool FClientEquippedObj::UnLightFuse(ID_String const* FuseId, unsigned short SubObjId, float AtT)
 {
     // FUN_005343d0
-    FFuseBurnNode* const Sentinel = static_cast<FFuseBurnNode*>(Fuses.Head);
+    FFuseBurnNode* const Sentinel = Fuses.Head;
     bool bFound = false;
     for (FFuseBurnNode* Node = Sentinel->Next; Node != Sentinel && !bFound; Node = Node->Next)
     {
@@ -1409,7 +1388,7 @@ bool FClientEquippedObj::UnLightFuse(ID_String const* FuseId, unsigned short Sub
 bool FClientEquippedObj::IsDeathFuseBurning()
 {
     // FUN_00534420
-    FFuseBurnNode* const Sentinel = static_cast<FFuseBurnNode*>(Fuses.Head);
+    FFuseBurnNode* const Sentinel = Fuses.Head;
     for (FFuseBurnNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
         if (Node->Live.IsDeathFuse() && !Node->Live.IsSpent())
@@ -1443,7 +1422,7 @@ int FClientEquippedObj::fire_weapons(unsigned short const* EquipIds, unsigned Co
 {
     // FUN_00534870 -- ported as CliShipFireWeapons (cli_projectile_fx.cpp), which takes the
     // IObjAffect sub-object (this + 4) as retail's adjustor this.
-    return static_cast<int>(CliShipFireWeapons(static_cast<IObjAffect*>(this), EquipIds, Count,
+    return static_cast<int>(CliShipFireWeapons(this, EquipIds, Count,
                                                TargetPos, SourceClient));
 }
 
@@ -1544,14 +1523,14 @@ int FClientEquippedObj::set_gun_target(unsigned short const* EquipId, IObjRW* Ta
                                 unsigned short SubTarget, int SourceClient)
 {
     // FUN_005351d0 -- ported as CliEquippedObjSetGunTarget (cli_projectile_fx.cpp).
-    return CliEquippedObjSetGunTarget(static_cast<IObjAffect*>(this), EquipId, Target, SubTarget,
+    return CliEquippedObjSetGunTarget(this, EquipId, Target, SubTarget,
                                       SourceClient);
 }
 
 int FClientEquippedObj::toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient)
 {
     // LAB_00535330 -- ported as CliShipActivateEquip (cli_projectile_fx.cpp); 0 on every path.
-    return CliShipActivateEquip(static_cast<IObjAffect*>(this), EquipId,
+    return CliShipActivateEquip(this, EquipId,
                                 static_cast<unsigned char>(bActivate), SourceClient);
 }
 
@@ -1637,7 +1616,7 @@ FClientSolarGameobj::~FClientSolarGameobj()
 {
     // FUN_00547680. The JumpGateEffect field (dtor FUN_00502e40) is not written back.
     if (JumpGateEffect != nullptr)
-        delete static_cast<FJumpGateEffect*>(JumpGateEffect);
+        delete JumpGateEffect;
     // Disconnect from the ObjDB (DAT_00678a2c) and from this INotify; no null test on the
     // narrowed object.
     if (Object != nullptr)
@@ -1682,7 +1661,7 @@ void FClientSolarGameobj::update(float Dt)
     FClientEquippedObj::update(Dt);
 
     if (JumpGateEffect != nullptr)
-        static_cast<FJumpGateEffect*>(JumpGateEffect)->Update(Dt); // FUN_00502f00
+        JumpGateEffect->Update(Dt); // FUN_00502f00
 
     // The star's slot 2 (LAB_00511690).
     if (StarSphere != nullptr)
@@ -1730,7 +1709,7 @@ float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
     return FClientGameobj::GetPhysicalRadius(Center);
 }
 
-unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod,
                                        Transform const* Xform, void* Extra)
 {
     // LAB_00548220 -- the solar draw. Every path that draws nothing returns LOD {0, 0xffff}.
@@ -1819,7 +1798,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
     // (DAT_005e04d4).
     unsigned long Color = G_NnPaletteViolet;
     float Size = 1.0f;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player != nullptr)
     {
         Vector const& PlayerPos = Player->get_position();
@@ -1870,7 +1849,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
     return OutLod;
 }
 
-void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientSolarGameobj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                                   void const* D)
 {
     // LAB_00548520: a solar of type bits 0..3 ignores the hit (no null test on the narrowed
@@ -1880,7 +1859,7 @@ void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const*
     FClientEquippedObj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FClientSolarGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientSolarGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00548570: the same test.
     if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN | OBJ_BLACKHOLE)) != 0)
@@ -2031,7 +2010,7 @@ FClientShipGameobj::~FClientShipGameobj()
     // Dtor FUN_00503a80.
     if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        delete JumpEffect;
         JumpEffect = nullptr;
     }
     // The ObjDB disconnect happens in single player only for a ship the local player owns (a
@@ -2053,10 +2032,10 @@ FClientShipGameobj::~FClientShipGameobj()
         static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->disconnect(static_cast<INotify*>(this));
     }
     // The +0x160 member's destructor (FUN_00544710, inlined): +0x174 first, then +0x164.
-    CliEffectCompanionClear(TradeLaneTunnelCompanion);
-    CliEffectCompanionClear(TradeLaneShipCompanion);
+    CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(TradeLaneTunnelCompanion));
+    CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(TradeLaneShipCompanion));
     // (FUN_00420d10 on +0x108 only restores the holder's vptr.)
-    CliEffectCompanionClear(AtmosphereBurnCompanion);
+    CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(AtmosphereBurnCompanion));
 }
 
 namespace
@@ -2090,16 +2069,16 @@ namespace
     {
         explicit FScopedEffectCompanion(FEffectArch* Arch)
         {
-            Slots[0] = Arch;
-            Slots[1] = nullptr;
-            Slots[2] = nullptr;
-            Slots[3] = nullptr;
+            Slots.EffectArch = Arch;
+            Slots.Sound = nullptr;
+            Slots.Effect = nullptr;
+            Slots.Light = nullptr;
         }
         ~FScopedEffectCompanion()
         {
-            CliEffectCompanionClear(Slots); // FUN_00502d90
+            CliEffectCompanionClear(&Slots); // FUN_00502d90
         }
-        void* Slots[4];
+        FEffectCompanion Slots;
 
     private:
         FScopedEffectCompanion(FScopedEffectCompanion const&) = delete;
@@ -2137,9 +2116,9 @@ namespace
         FGameLight* const Light = static_cast<FGameLight*>(Companion[3]);
         if (Light != nullptr)
         {
-            ((FEngineLight*)Light)->SetType(kLightPoint, true);
-            ((FEngineLight*)Light)->SetColorBytesAlt(&Arch->LgtColorR);
-            ((FEngineLight*)Light)->SetRadius(Arch->LgtRadius);
+            Light->SetType(kLightPoint, true);
+            Light->SetColorBytesAlt(&Arch->LgtColorR);
+            Light->SetRadius(Arch->LgtRadius);
             if (!Light->FGameLight::Enable())
             {
                 ID_String Name;
@@ -2183,22 +2162,22 @@ namespace
             return;
 
         FScopedEffectCompanion Scoped(Arch); // FUN_005154a0; FUN_00502d90 at scope exit
-        void** const Companion = Scoped.Slots;
+        FEffectCompanion* const Companion = &Scoped.Slots;
         if (GetGameOption(kGameOptParticles) != 0 && Arch->VisEffect != nullptr &&
             Arch->VisEffect->Nickname[0] != '\0')
-            Companion[2] = ParticleEffectCreate();
+            Companion->Effect = ParticleEffectCreate();
         if (Arch->SndEffect != nullptr)
-            Companion[1] = CreateClientSoundSource3D();
+            Companion->Sound = CreateClientSoundSource3D();
         if (Arch->LgtRadius > 0.0f)
-            Companion[3] = GameLightConstruct(static_cast<FGameLight*>(GameLightHeapAlloc(0x12c)));
+            Companion->Light = GameLightConstruct(static_cast<FGameLight*>(GameLightHeapAlloc(0x12c)));
 
-        if (Companion[2] != nullptr)
-            static_cast<FParticleEffect*>(Companion[2])->Attach(Go, EngineIndex,
-                                                                  Pose);
-        if (Companion[1] != nullptr)
-            static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, Pose);
-        if (Companion[3] != nullptr)
-            CliExplosionAttachLocalXform(Companion[3], EngineIndex,
+        if (Companion->Effect != nullptr)
+            Companion->Effect->Attach(Go, EngineIndex,
+                                      Pose);
+        if (Companion->Sound != nullptr)
+            Companion->Sound->SetPose(EngineIndex, Pose);
+        if (Companion->Light != nullptr)
+            CliExplosionAttachLocalXform(Companion->Light, EngineIndex,
                                          Pose);
 
         if (CreateEffectStart(Companion, Arch))
@@ -2351,18 +2330,18 @@ void FClientShipGameobj::notify(Event Code, void* Param)
         break;
     case INotify::EquipExpired:
         // The player's ship only; FUN_00489e80 is the NN voice queue.
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
             NnVoiceEnqueue(G_ShipVoiceWeaponExpiredId, 0);
         break;
     case INotify::CargoExpired:
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
             NnVoiceEnqueue(G_ShipVoiceCargoExpiredId, 0);
         break;
     case INotify::ArchGroupDamaged:
     {
         // The player's ship, a CArchGroup whose collision group type has an engine bit and
         // whose relative health is below double 0.05 (DAT_005d5b58; equal and NaN stop).
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) != GetPlayerObjRW())
             break;
         CArchGroup* const Group = static_cast<CArchGroup*>(Param);
         if (Group == nullptr)
@@ -2445,7 +2424,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect != nullptr)
-                    static_cast<FJumpGateEffect*>(JumpGateEffect)->Fire();
+                    JumpGateEffect->Fire();
             }
         }
         else if (Sub == 3)
@@ -2453,7 +2432,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect != nullptr)
-                    delete static_cast<FJumpGateEffect*>(JumpGateEffect);
+                    delete JumpGateEffect;
                 JumpGateEffect = nullptr;
             }
         }
@@ -2676,7 +2655,7 @@ void FClientShipGameobj::update(float Dt)
 
     // The player's ship follows the DISABLE_COLLIDE option (0x37), latched on first use
     // (DAT_00678b08, guard DAT_00678b0c).
-    if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+    if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
     {
         static int SDisableCollide = GetGameOption(kGameOptDisableCollide);
         if (SDisableCollide != GetGameOption(kGameOptDisableCollide))
@@ -2719,7 +2698,7 @@ void FClientShipGameobj::update(float Dt)
     // The jump.
     if (JumpState != kJumpStateNone && JumpEffect != nullptr)
     {
-        FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(JumpEffect);
+        FJumpShipEffect* const JumpFx = JumpEffect;
         // The step is clamped to 0.1f (DAT_005d3ee0); a NaN Dt is kept.
         float JumpDt = Dt;
         if (Dt > 0.1f)
@@ -2775,7 +2754,7 @@ void FClientShipGameobj::update(float Dt)
         // The effect, when it survived the switch (state 0 frees it), gets the same clamped
         // step (FUN_00503cd0).
         if (JumpEffect != nullptr)
-            static_cast<FJumpShipEffect*>(JumpEffect)->Update(JumpDt);
+            JumpEffect->Update(JumpDt);
     }
 
     // The object is not narrowed here.
@@ -2790,7 +2769,7 @@ void FClientShipGameobj::update(float Dt)
         // It leaves the effect list once the ship stops colliding, leaves the atmosphere or is
         // landing (+0x18c bit 3).
         if (!bCollides || Atmosphere == nullptr || (ShipFlags & kShipFlagLanding) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(this) + 0x28, AtmosphereBurnCompanion);
+            CliEffectListRemove(&EffectList, reinterpret_cast<FEffectCompanion*>(AtmosphereBurnCompanion));
     }
     else if (bCollides && Atmosphere != nullptr && (ShipFlags & kShipFlagLanding) == 0)
     {
@@ -2808,9 +2787,9 @@ void FClientShipGameobj::update(float Dt)
         int const Index = static_cast<int>(get_index());
         if (!BurnEffect.IsEmpty())
             CliCreateEffectOneShot(FindEffectArch(&BurnEffect.Id), this, Index, &Local,
-                                   AtmosphereBurnCompanion);
+                                   reinterpret_cast<FEffectCompanion*>(AtmosphereBurnCompanion));
 
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
         {
             unsigned const TypeBits = Atmosphere->TypeBits;
             if ((TypeBits & OBJ_SUN) != 0)
@@ -2837,14 +2816,14 @@ void FClientShipGameobj::update(float Dt)
         FireFailedCooldown = FireFailedCooldown - Dt;
 }
 
-void FClientShipGameobj::UpdateDrawLighting(void* Camera)
+void FClientShipGameobj::UpdateDrawLighting(FSpaceCamera* Camera)
 {
     // LAB_00546480. Only the player's ship in the tunnel (jump states 2 / 3) lights itself.
     if ((JumpState == kJumpStateJumpOutTunnel || JumpState == kJumpStateJumpInTunnel) &&
         this == GetPlayerObjRW())
     {
         EngineLightClearRegisteredList(); // FUN_004101e0
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
+        FJumpShipEffect* const Effect = JumpEffect;
         if (Effect == nullptr)
             return;
         // The jump_ambient bytes into D3DRS_AMBIENT.
@@ -2856,9 +2835,9 @@ void FClientShipGameobj::UpdateDrawLighting(void* Camera)
         FGameLight* const Light = Effect->Tunnel->Light;
         if (Light == nullptr)
             return;
-        ((FEngineLight*)Light)->SetPosition(&Pos);
-        FEngineLight* const Lights[1] = {(FEngineLight*)Light};
-        EngineLightApplyList(Lights, 1u, static_cast<ICamera*>(Camera), &Pos.x);
+        Light->SetPosition(&Pos);
+        FEngineLight* const Lights[1] = {Light};
+        EngineLightApplyList(Lights, 1u, Camera, &Pos.x);
         return;
     }
     FClientGameobj::UpdateDrawLighting(Camera);
@@ -2904,7 +2883,7 @@ namespace
     }
 }
 
-unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, FSpaceCamera* Camera, unsigned CachedLod,
                                       Transform const* Xform, void* Extra)
 {
     // LAB_00546050 -- the ship draw. From the cockpit camera the player's own ship is not
@@ -3009,7 +2988,7 @@ void FClientShipGameobj::ApplyDamageList(DamageList const& Damage)
     StarSysNoteDamage(this, &Damage); // FUN_00553250
 }
 
-void FClientShipGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientShipGameobj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_00545e90
@@ -3020,10 +2999,10 @@ void FClientShipGameobj::OnSurfaceCollisionHit(void const* Contact, void const* 
     HUD_DamageIndicator* const Indicator = GetHudDamageIndicator();
     if (Indicator == nullptr)
         return;
-    Indicator->FlashFromPosition(static_cast<Vector const*>(Contact));
+    Indicator->FlashFromPosition(&Contact->Point);
 }
 
-void FClientShipGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientShipGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00545ed0
     FClientEquippedObj::OnMunitionHit(A, B, Munition);
@@ -3039,14 +3018,14 @@ void FClientShipGameobj::OnMunitionHit(void const* A, void const* B, FClientGame
     if (GetHudDamageIndicator() == nullptr)
         return;
     Vector const Velocity = Munition->get_velocity();
-    GetHudDamageIndicator()->FlashAlongRay(static_cast<Vector const*>(A), &Velocity);
+    GetHudDamageIndicator()->FlashAlongRay(&A->Point, &Velocity);
 }
 
 void FClientShipGameobj::Explode(Vector const* Pos)
 {
     // LAB_00545d80. Retail inlines the companion's stop and release here.
-    CliEffectCompanionArmStop(AtmosphereBurnCompanion);
-    CliEffectCompanionClear(AtmosphereBurnCompanion);
+    CliEffectCompanionArmStop(reinterpret_cast<FEffectCompanion*>(AtmosphereBurnCompanion));
+    CliEffectCompanionClear(reinterpret_cast<FEffectCompanion*>(AtmosphereBurnCompanion));
     FClientEquippedObj::Explode(Pos);
 }
 
@@ -3188,7 +3167,7 @@ void FClientShipGameobj::PlayFireFailedSound()
     // Looked up once.
     if (FireFailedSoundArch == nullptr)
     {
-        FireFailedSoundArch = (Archetype::ISound*)LookupClientSoundArch(&FIRE_FAILED_SOUND);
+        FireFailedSoundArch = LookupClientSoundArch(&FIRE_FAILED_SOUND);
         if (FireFailedSoundArch != nullptr)
             AcquireClientSoundArch(FireFailedSoundArch);
     }
@@ -3199,7 +3178,7 @@ void FClientShipGameobj::PlayFireFailedSound()
         if (FireFailedSound == nullptr)
         {
             // FUN_00428680 creates the source.
-            PlayClientSoundArch(FireFailedSoundArch, nullptr, reinterpret_cast<void**>(&FireFailedSound), 0);
+            PlayClientSoundArch(FireFailedSoundArch, nullptr, &FireFailedSound, 0);
             FireFailedCooldown = FIRE_FAILED_DELAY;
             return;
         }
@@ -3320,7 +3299,7 @@ int FClientShipGameobj::jettison_cargo(unsigned short EquipId, int Count, int So
 int FClientShipGameobj::set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient)
 {
     // LAB_005468e0 -- ported as CliShipSetTarget (cli_projectile_fx.cpp).
-    return CliShipSetTarget(static_cast<IObjAffect*>(this), Target, SubTarget, SourceClient);
+    return CliShipSetTarget(this, Target, SubTarget, SourceClient);
 }
 
 int FClientShipGameobj::toggle_cruise(bool bEngage, bool bArg2, int SourceClient)
@@ -3626,7 +3605,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
         static_cast<IObjAffect*>(this)->set_axis_throttle(Zero);
 
         // The camera only follows the watched player ship.
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) != GetPlayerObjRW())
             return;
 
         // Unless the docking camera already has the view, it goes to the dock's "HPDockCam"
@@ -3654,7 +3633,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
     }
 
     // No dock.
-    if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+    if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
     {
         // The player's ship: an ERROR for base 0, the base asked for anyway, and the hard cut
         // to a covered screen.
@@ -3687,12 +3666,12 @@ void FClientShipGameobj::SetJumpState(int State)
     {
         if (JumpEffect != nullptr)
         {
-            delete static_cast<FJumpShipEffect*>(JumpEffect);
+            delete JumpEffect;
             JumpEffect = nullptr;
         }
         // Leaving state 5 on the player's ship.
         if (JumpState == kJumpStateArrived &&
-            static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+            static_cast<IObjRW*>(this) == GetPlayerObjRW())
         {
             static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_control_exclusion(0);
             G_bNnScreenUp = false; // DAT_0067dcc8
@@ -3702,11 +3681,11 @@ void FClientShipGameobj::SetJumpState(int State)
     case kJumpStateJumpOut:
     {
         if (JumpEffect != nullptr)
-            static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpOut(); // FUN_00503ea0
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+            JumpEffect->StartJumpOut(); // FUN_00503ea0
+        if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
             RequestSpaceCameraMode("player");
         // Control exclusion 7 (after a 0 when 7 is already set).
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
         {
             CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
             if (Ship->is_control_excluded(7))
@@ -3721,14 +3700,14 @@ void FClientShipGameobj::SetJumpState(int State)
     case kJumpStateJumpOutTunnel:
     {
         if (JumpEffect != nullptr)
-            static_cast<FJumpShipEffect*>(JumpEffect)->EnterTunnel(); // FUN_00504210
+            JumpEffect->EnterTunnel(); // FUN_00504210
         IAction* const JumpOut = Actions.find("JumpOut");
         if (JumpOut != nullptr)
             Actions.remove(JumpOut);
         // Any ship but the player's is removed; in single player its CShip also gets an
         // AddRef/Release probe, and -- when that Release does not return 1 -- no owner and no
         // control exclusion.
-        if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
+        if (static_cast<IObjRW*>(this) != GetPlayerObjRW())
         {
             MarkForRemoval(true);
             if (SinglePlayer())
@@ -3752,7 +3731,7 @@ void FClientShipGameobj::SetJumpState(int State)
         // jump system (FUN_00548ed0).
         if (JumpEffect != nullptr)
         {
-            unsigned const DestSystem = static_cast<FJumpShipEffect*>(JumpEffect)->DestSystem;
+            unsigned const DestSystem = JumpEffect->DestSystem;
             SetPendingJumpSystem(&DestSystem, false);
         }
         break;
@@ -3761,7 +3740,7 @@ void FClientShipGameobj::SetJumpState(int State)
     {
         // The player's character jumps in at the effect's exit frame and the effect's jump-in
         // hook runs; any other ship is just beamed there.
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
+        FJumpShipEffect* const Effect = JumpEffect;
         if (Effect != nullptr)
         {
             if (get_id() == GetPlayerCharacterId())
@@ -3770,7 +3749,7 @@ void FClientShipGameobj::SetJumpState(int State)
                 static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))
                     ->jump_in(static_cast<IObjRW*>(this), Effect->JumpInPosition,
                               Effect->JumpInOrientation, Speed);
-                static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpIn();
+                JumpEffect->StartJumpIn();
             }
             else
             {
@@ -3786,7 +3765,7 @@ void FClientShipGameobj::SetJumpState(int State)
     {
         // FUN_00504640 with no null test; the player's character gets the arrival caption
         // (FUN_0045b310).
-        static_cast<FJumpShipEffect*>(JumpEffect)->FinishJump();
+        JumpEffect->FinishJump();
         if (get_id() == GetPlayerCharacterId())
             NnArrivalTextShow();
         break;
@@ -3798,7 +3777,7 @@ void FClientShipGameobj::SetJumpState(int State)
     }
 
     if (JumpEffect != nullptr)
-        static_cast<FJumpShipEffect*>(JumpEffect)->Clock = 0.0f;
+        JumpEffect->Clock = 0.0f;
     JumpState = State;
 }
 
@@ -3807,7 +3786,7 @@ void FClientShipGameobj::BeginJumpOut(FClientGameobj* Gate)
     // FUN_00543530
     if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        delete JumpEffect;
         JumpEffect = nullptr;
     }
     // operator new(0xdc) + FUN_00503440; null on a failed new.
@@ -3820,7 +3799,7 @@ void FClientShipGameobj::BeginJumpOut(FClientGameobj* Gate)
     SetJumpState(kJumpStateJumpOut);
 
     // Action_JumpOut (FUN_00542f10); the effect is not null-tested.
-    Actions.add(new Action_JumpOut(this, static_cast<FJumpShipEffect*>(JumpEffect)->JumpOutTime,
+    Actions.add(new Action_JumpOut(this, JumpEffect->JumpOutTime,
                                    GateType));
 }
 
@@ -3831,9 +3810,9 @@ void FClientShipGameobj::BeginJumpIn(Vector const* Pos, Matrix const* Orient)
 
     // The player's ship: its effect (no null test) takes the exit frame and the active
     // camera's cut flag is raised (FUN_0054bd50).
-    if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
+    if (static_cast<IObjRW*>(this) == GetPlayerObjRW())
     {
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
+        FJumpShipEffect* const Effect = JumpEffect;
         Effect->JumpInPosition = *Pos;
         Effect->JumpInOrientation = *Orient;
         RaiseActiveSpaceCameraCut();
@@ -3843,11 +3822,11 @@ void FClientShipGameobj::BeginJumpIn(Vector const* Pos, Matrix const* Orient)
     // Any other ship gets a fresh no-gate effect (FUN_005038c0; not null-tested).
     if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        delete JumpEffect;
         JumpEffect = nullptr;
     }
     JumpEffect = new (std::nothrow) FJumpShipEffect(this);
-    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
+    FJumpShipEffect* const Effect = JumpEffect;
     Effect->JumpInPosition = *Pos;
     Effect->JumpInOrientation = *Orient;
     SetJumpState(kJumpStateJumpIn);
@@ -3894,7 +3873,7 @@ void FClientShipGameobj::LaunchFromDock(FClientGameobj* DockGo, int LaunchIndex)
     StarSysSuppressPlayerCollisions(7.0);
 
     // The camera only follows the watched player ship.
-    if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
+    if (static_cast<IObjRW*>(this) != GetPlayerObjRW())
         return;
 
     // Initialised once, before the first lookup. Both get_hardpoint calls write into the same
@@ -3946,18 +3925,18 @@ FClientProjectileGameobj::FClientProjectileGameobj(EClientGameobjKind Kind)
 {
     // FUN_00542550
     ConstEffectDelay = -1.0f;
-    OneShotCompanion[0] = nullptr;
-    OneShotCompanion[1] = nullptr;
-    OneShotCompanion[2] = nullptr;
-    OneShotCompanion[3] = nullptr;
+    OneShotCompanion.EffectArch = nullptr;
+    OneShotCompanion.Sound = nullptr;
+    OneShotCompanion.Effect = nullptr;
+    OneShotCompanion.Light = nullptr;
 }
 
 FClientProjectileGameobj::~FClientProjectileGameobj()
 {
     // FUN_005425f0: retail releases the companion in the destructor body and again in the
     // member's own destructor.
-    CliEffectCompanionClear(OneShotCompanion);
-    CliEffectCompanionClear(OneShotCompanion);
+    CliEffectCompanionClear(&OneShotCompanion);
+    CliEffectCompanionClear(&OneShotCompanion);
 }
 
 namespace
@@ -3972,7 +3951,7 @@ namespace
             return;
         CliCreateEffectOneShot(FindEffectArch(&Effect->Id), Self, EngineIndex,
                                &Xform,
-                               Self->OneShotCompanion);
+                               &Self->OneShotCompanion);
     }
 }
 
@@ -4021,7 +4000,7 @@ void FClientProjectileGameobj::update(float Dt)
                                Xform);
 }
 
-void FClientProjectileGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B,
+void FClientProjectileGameobj::OnSurfaceCollisionHit(FClientCollisionRecord const* Contact, void const* B,
                                        FClientGameobj* Other, void const* D)
 {
     // FUN_0053d4f0: empty.
@@ -4034,7 +4013,7 @@ void FClientProjectileGameobj::OnSurfaceCollisionHit(void const* Contact, void c
 void FClientProjectileGameobj::Explode(Vector const* Pos)
 {
     // FUN_00542870
-    CliEffectListRemove(&EffectList, OneShotCompanion);
+    CliEffectListRemove(&EffectList, &OneShotCompanion);
     FClientGameobj::Explode(Pos);
 }
 
@@ -4062,7 +4041,7 @@ FClientMunitionGameobj::~FClientMunitionGameobj()
     // The thunk FUN_0053d470 -> FUN_005425f0: nothing of its own.
 }
 
-void FClientMunitionGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
+void FClientMunitionGameobj::OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     // FUN_0053ed80
@@ -4078,10 +4057,10 @@ FClientBeamGameobj::FClientBeamGameobj()
     : FClientMunitionGameobj(EClientGameobjKind::Beam)
 {
     // Inlined in FUN_0052dde0. FUN_005154a0 with four nulls.
-    Companion[0] = nullptr;
-    Companion[1] = nullptr;
-    Companion[2] = nullptr;
-    Companion[3] = nullptr;
+    Companion.EffectArch = nullptr;
+    Companion.Sound = nullptr;
+    Companion.Effect = nullptr;
+    Companion.Light = nullptr;
     BeamAlloc = nullptr;
 }
 
@@ -4089,13 +4068,13 @@ FClientBeamGameobj::~FClientBeamGameobj()
 {
     // FUN_0053f1e0: the companion is released, then the beam effect, then the companion again
     // by its member destructor.
-    CliEffectCompanionClear(Companion);
+    CliEffectCompanionClear(&Companion);
     if (BeamAlloc != nullptr)
     {
         BeamAlloc->Release();
         BeamAlloc = nullptr;
     }
-    CliEffectCompanionClear(Companion);
+    CliEffectCompanionClear(&Companion);
 }
 
 void FClientBeamGameobj::create(Archetype::Root* Arch)
@@ -4126,7 +4105,7 @@ void FClientBeamGameobj::update(float Dt)
         MarkForRemoval(true);
 }
 
-void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
+void FClientBeamGameobj::OnCollision(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_0053f690
@@ -4134,7 +4113,7 @@ void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameob
         return;
     Other->OnMunitionHit(A, D, this);
     ReportCollisionToServer(A, B, Other, D);
-    bool const bOtherIsPlayer = static_cast<void*>(static_cast<IObjRW*>(Other)) == GetPlayerObjRW();
+    bool const bOtherIsPlayer = static_cast<IObjRW*>(Other) == GetPlayerObjRW();
     // The CBeam's velocity (+0xf8) zeroed -- no null test.
     CBeam* const BeamObj = static_cast<CBeam*>(NarrowObject(this, CObject::ClassBeam));
     BeamObj->Velocity.x = 0.0f;
@@ -4146,11 +4125,11 @@ void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameob
         BeamAlloc->Release();
         BeamAlloc = nullptr;
     }
-    CliEffectListRemove(&EffectList, Companion);
-    FClientProjectileGameobj::Explode(static_cast<Vector const*>(A));
+    CliEffectListRemove(&EffectList, &Companion);
+    FClientProjectileGameobj::Explode(&A->Point);
 }
 
-void FClientBeamGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientBeamGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053f780: empty.
     (void)A;
@@ -4158,7 +4137,7 @@ void FClientBeamGameobj::OnMunitionHit(void const* A, void const* B, FClientGame
     (void)Munition;
 }
 
-void FClientBeamGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
+void FClientBeamGameobj::ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_0053f790. B is not read.
@@ -4172,7 +4151,7 @@ void FClientBeamGameobj::ReportCollisionToServer(void const* A, void const* B, F
             return;
     }
     CObject* const Obj = NarrowObject(this, CObject::ClassProjectile);
-    Vector const* const HitPos = static_cast<Vector const*>(A);
+    Vector const* const HitPos = &A->Point;
     SSPMunitionCollisionInfo Info;
     Info.ProjectileArchId = Obj->Archetype->Nickname.Id;
     Info.AttackerId = static_cast<CProjectile const*>(Obj)->OwnerId;
@@ -4293,7 +4272,7 @@ void FClientMineGameobj::update(float Dt)
     GameobjOwnerUpdate(this, CObject::ClassMine, Dt);
 }
 
-void FClientMineGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientMineGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053eaa0
     if (!IsBeamMunition(Munition))
@@ -4343,7 +4322,7 @@ void FClientCounterMeasureGameobj::update(float Dt)
     GameobjOwnerUpdate(this, CObject::ClassCounterMeasure, Dt);
 }
 
-void FClientCounterMeasureGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientCounterMeasureGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053f780: empty.
     (void)A;
@@ -4394,7 +4373,7 @@ void FClientGuidedGameobj::update(float Dt)
     GameobjOwnerUpdate(this, CObject::ClassGuided, Dt);
 }
 
-void FClientGuidedGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
+void FClientGuidedGameobj::OnMunitionHit(FClientCollisionRecord const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053eaa0 -- Mine's slot 105.
     if (!IsBeamMunition(Munition))
@@ -4402,7 +4381,7 @@ void FClientGuidedGameobj::OnMunitionHit(void const* A, void const* B, FClientGa
     FClientGameobj::OnMunitionHit(A, B, Munition);
 }
 
-void FClientGuidedGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
+void FClientGuidedGameobj::ReportCollisionToServer(FClientCollisionRecord const* A, void const* B, FClientGameobj* Other,
                                    void const* D)
 {
     // LAB_0053ee00. B is not read.
@@ -4419,7 +4398,7 @@ void FClientGuidedGameobj::ReportCollisionToServer(void const* A, void const* B,
     }
     // No null test on the narrowed object.
     CObject* const Obj = NarrowObject(this, CObject::ClassProjectile);
-    Vector const* const HitPos = static_cast<Vector const*>(A);
+    Vector const* const HitPos = &A->Point;
     SSPMunitionCollisionInfo Info;
     Info.AttackerId = static_cast<CProjectile const*>(Obj)->OwnerId;
     Info.ProjectileArchId = Obj->Archetype->Nickname.Id;
@@ -4437,7 +4416,7 @@ void FClientGuidedGameobj::Explode(Vector const* Pos)
     // FUN_0053edc0. The const_effect particle is let go (no owner, no part) at this gameobj's
     // frame. Slot 4 (get_orientation) is ICF-folded with slot 3 (get_transform) in retail
     // (both are Common 0x5F1F0), so the pointer it hands over is the object's whole Transform.
-    FParticleEffect* const Particle = static_cast<FParticleEffect*>(OneShotCompanion[2]);
+    FEffectBase* const Particle = OneShotCompanion.Effect;
     if (Particle != nullptr)
     {
         Transform const& Frame = get_transform();

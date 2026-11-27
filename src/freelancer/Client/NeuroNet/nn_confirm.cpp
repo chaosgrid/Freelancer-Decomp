@@ -11,10 +11,12 @@
 #include "Common/Fonts/font_string.h"        // FFontString (+0x28 LayoutGen, +0x30 bMultiLine)
 #include "Common/Fonts/ids_strings.h"        // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "NeuroNet/nn_modal.h"           // NnFloatBits
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_text_control.h"
 #include "Interface/win3d.h"
 #include "Interface/win3d_renderables.h"  // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/win_factory.h"
+#include "Interface/wire_controls.h"
 
 #include "dacom.h"              // FDUMP
 
@@ -77,7 +79,7 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
 
     // The text's Font::String goes multi-line (re-laid out) unless it already is. No null test
     // on the text.
-    FFontString* const Font = static_cast<NnTextControl*>(Text)->GetFontString();
+    FFontString* const Font = Text->GetFontString();
     if (Font->bMultiLine != 1)
     {
         Font->bMultiLine = 1;

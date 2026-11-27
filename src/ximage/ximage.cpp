@@ -192,7 +192,7 @@ namespace
         // OutHandle receives a pointer to RP8's 8-byte wrapper, not IDirect3DTexture8*.
         // Every retail call passes Levels = 1, Flags = 0.
         return Pipeline->CreateTexture((int)(Width), (int)(Height),
-                                                   (unsigned int*)(Format), 1, 0,
+                                                   reinterpret_cast<unsigned int*>(Format), 1, 0,
                                                    OutHandle);
     }
 
@@ -208,7 +208,7 @@ namespace
         // Every retail call: level 0, trailing two arguments 0.
         return Pipeline->SetTextureLevelData(
             Handle, 0, (int)(SrcW), (int)(SrcH),
-            (unsigned int)(Pitch), (unsigned int*)(Format), Pixels,
+            (unsigned int)(Pitch), reinterpret_cast<unsigned int*>(Format), Pixels,
             nullptr, nullptr);
     }
 
@@ -259,8 +259,8 @@ namespace
                 }
             }
             // Delete the byte arrays through their allocation type.
-            delete[] (unsigned char*)Handles_;
-            delete[] (unsigned char*)Uvs_;
+            delete[] reinterpret_cast<unsigned char*>(Handles_);
+            delete[] reinterpret_cast<unsigned char*>(Uvs_);
             ReleaseInterface(&TextureLibrary_);
             ReleaseInterface(&Pipeline_);
         }
@@ -285,13 +285,13 @@ namespace
             {
                 if (std::strcmp(Table[Index].Iid, Iid) == 0)
                 {
-                    unsigned char* Base = (unsigned char*)(this);
+                    unsigned char* Base = reinterpret_cast<unsigned char*>(this);
                     const unsigned long Offset = Table[Index].ByteOffset;
                     IDAComponent* Face = nullptr;
                     if ((Offset & FQiEntry::kIndirect) != 0)
-                        Face = *(IDAComponent**)(Base + (Offset & ~FQiEntry::kIndirect));
+                        Face = *reinterpret_cast<IDAComponent**>(Base + (Offset & ~FQiEntry::kIndirect));
                     else
-                        Face = (IDAComponent*)(Base + Offset);
+                        Face = reinterpret_cast<IDAComponent*>(Base + Offset);
                     Face->AddRef();
                     *Out = Face;
                     return GR_OK;
@@ -465,7 +465,7 @@ namespace
             const unsigned long Blue = (unsigned long)(FtolLow((double)(Rgb[2]) * 255.0)) & 0xFFu;
             Packed = Packed | Blue;
             PackedRgb_ = Packed;
-            return (GENRESULT)((intptr_t)((IBigImage2*)(this)));
+            return (GENRESULT)((intptr_t)(static_cast<IBigImage2*>(this)));
         }
 
         // LAB_06f826f0.
@@ -500,7 +500,7 @@ namespace
             if (TileCount_ == 0)
                 return GR_OK;
 
-            const unsigned char* Base = (const unsigned char*)(Pixels);
+            const unsigned char* Base = static_cast<const unsigned char*>(Pixels);
             long Index = 0;
             long Row = 0;
             long Col = 0;
@@ -595,7 +595,7 @@ namespace
 
             ReleaseInterface(&TextureLibrary_);
             if (Pipeline_->QueryInterface(Iids::TextureLibraryA,
-                                          (void**)(&TextureLibrary_)) < 0)
+                                          reinterpret_cast<void**>(&TextureLibrary_)) < 0)
                 return Result;
 
             int bUploaded = 0;
@@ -670,11 +670,11 @@ namespace
                 return 1;
 
             // Byte arrays preserve the wrapped DWORD extents; only handles are zeroed.
-            Uvs_ = (float*)new unsigned char[TileCount_ * 32];
-            Handles_ = (void**)new unsigned char[TileCount_ * 4];
+            Uvs_ = reinterpret_cast<float*>(new unsigned char[TileCount_ * 32]);
+            Handles_ = reinterpret_cast<void**>(new unsigned char[TileCount_ * 4]);
             std::memset(Handles_, 0, TileCount_ * 4);
 
-            const unsigned char* Base = (const unsigned char*)(Pixels);
+            const unsigned char* Base = static_cast<const unsigned char*>(Pixels);
             long Index = 0;
             long Row = 0;
             long Col = 0;
@@ -935,7 +935,7 @@ namespace
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Out) override
         {
-            FBigImageDesc* Big = (FBigImageDesc*)(Desc);
+            FBigImageDesc* Big = reinterpret_cast<FBigImageDesc*>(Desc);
             if (Big->Size != kBigImageDescSize || std::strcmp(Big->Name, Name) != 0)
             {
                 *Out = nullptr;
@@ -956,7 +956,7 @@ namespace
                 *Out = nullptr;
                 return Result;
             }
-            *Out = (IBigImage2*)(Image);
+            *Out = static_cast<IBigImage2*>(Image);
             return Result;
         }
     };

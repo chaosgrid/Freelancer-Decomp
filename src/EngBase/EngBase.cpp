@@ -134,13 +134,6 @@ GENRESULT DACOM_API StubRetC(void* This, void* A, void* B)
     return GR_GENERIC;
 }
 
-// EngBase plumbs the FileSystem component around as void*; this is the one place that
-// states what it really is, so every call below goes through ReadFile's published ABI.
-IFileSystem* AsFileSystem(void* FileSystem)
-{
-    return (IFileSystem*)FileSystem;
-}
-
 bool IsTypedChannelType(unsigned long Type)
 {
     return Type == G_TypedTypeScalar || Type == G_TypedTypeVector || Type == G_TypedTypeQuat ||
@@ -206,7 +199,7 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
         return 0;
     }
     const Transform* Block = Header->Transform;
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(this->Instance));
+    FEngineInstance* Instance = reinterpret_cast<FEngineInstance*>((size_t)(this->Instance));
     if (Header->StartTime == 0.0f || (Header->LoopFlags & 0x40) != 0)
     {
         if (Block != nullptr)
@@ -249,7 +242,7 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
     else
     {
         Matrix QuatMatrix;
-        MathQuatToMatrix(Math, &QuatMatrix, (const Quaternion*)(Pose + 3));
+        MathQuatToMatrix(Math, &QuatMatrix, reinterpret_cast<const Quaternion*>(Pose + 3));
         Matrix Transposed;
         Transposed.E[0][0] = QuatMatrix.E[0][0];
         Transposed.E[0][1] = QuatMatrix.E[1][0];
@@ -447,7 +440,7 @@ unsigned long FQuatTypedChannel::InterpolatePose(float* Out, const float* Left, 
     Result.x = 0.0f;
     Result.y = 0.0f;
     Result.z = 0.0f;
-    MathQuatSlerp(Math, &LeftCopy, &Result, (const Quaternion*)Out, Scale);
+    MathQuatSlerp(Math, &LeftCopy, &Result, reinterpret_cast<const Quaternion*>(Out), Scale);
     Out[0] = LeftCopy.w;
     Out[1] = LeftCopy.x;
     Out[2] = LeftCopy.y;
@@ -728,15 +721,14 @@ unsigned long FTypedChannel::Tick(float Dt)
         Result = Collect(OldTime, Time, G_CollectIncludeStart | G_CollectIncludeEnd, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)
             return Result;
-        void* Sink = (void*)((size_t)(this->Sink));
+        IChannelSink* Sink = reinterpret_cast<IChannelSink*>(this->Sink);
         if (Sink == nullptr)
             return Result;
         FChannelKeyBatch Batch;
         Batch.Count = KeyCount;
         // Retail copies (count & 0x1FFFFFFF) * 2 dwords.
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
-        IChannelSink* KeySink = (IChannelSink*)Sink;
-        KeySink->OnKeys((unsigned long)((size_t)this),
+        Sink->OnKeys((unsigned long)((size_t)this),
                         (void*)((size_t)(SinkContext)),
                         &Batch);
         return Result;
@@ -778,18 +770,17 @@ unsigned long FTypedChannel::Tick(float Dt)
                     (const float*)FrameData,
                     (double)Dt);
                 // Retail reads +0x78 / +0x84 straight off the object, whatever its class.
-                FPosQuatTypedChannel* Pose = (FPosQuatTypedChannel*)this;
+                FPosQuatTypedChannel* Pose = static_cast<FPosQuatTypedChannel*>(this);
                 Frame.Translation.x = Pose->AppliedPos.x;
                 Frame.Translation.y = Pose->AppliedPos.y;
                 Frame.Translation.z = Pose->AppliedPos.z;
                 I3DMathEngine* Math = Acquire3DMathEngine();
                 Math->QuaternionToMatrix(Rebuilt, Pose->AppliedQuat);
                 std::memcpy(&Frame.Rotation, &Rebuilt, sizeof(Matrix));
-                void* Sink = (void*)((size_t)(this->Sink));
+                IChannelSink* Sink = reinterpret_cast<IChannelSink*>(this->Sink);
                 if (Sink != nullptr)
                 {
-                    IChannelSink* LoopSink = (IChannelSink*)Sink;
-                    LoopSink->OnLoop((unsigned long)((size_t)this),
+                    Sink->OnLoop((unsigned long)((size_t)this),
                                      &Frame,
                                      (void*)((size_t)(SinkContext)));
                 }
@@ -898,7 +889,7 @@ unsigned long FPosQuatTypedChannel::InterpolatePose(float* Out, const float* Lef
     const float Blend = (float)Alpha;
     I3DMathEngine* Math = Acquire3DMathEngine();
     Quaternion Quat;
-    MathQuatSlerp(Math, &Quat, (const Quaternion*)(Left + 3), (const Quaternion*)(Right + 3), Blend);
+    MathQuatSlerp(Math, &Quat, reinterpret_cast<const Quaternion*>(Left + 3), reinterpret_cast<const Quaternion*>(Right + 3), Blend);
     Out[3] = Quat.w;
     Out[4] = Quat.x;
     Out[5] = Quat.y;
@@ -919,7 +910,7 @@ unsigned long FPosQuatTypedChannel::Interpolate(float* Out, const float* Left, c
     I3DMathEngine* Math = Acquire3DMathEngine();
     const Quaternion Identity = { 1.0f, 0.0f, 0.0f, 0.0f };
     Quaternion Slerped;
-    MathQuatSlerp(Math, &Slerped, &Identity, (const Quaternion*)(Out + 3), Scale);
+    MathQuatSlerp(Math, &Slerped, &Identity, reinterpret_cast<const Quaternion*>(Out + 3), Scale);
     Out[3] = Slerped.w;
     Out[4] = Slerped.x;
     Out[5] = Slerped.y;
@@ -960,7 +951,7 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
         Quaternion Composed;
         Math->MulQuat(Composed,
                               MatrixQuat,
-                              *(const Quaternion*)(Local + 3));   // +0x18
+                              *reinterpret_cast<const Quaternion*>(Local + 3));   // +0x18
         AppliedQuat.w = Composed.w;
         AppliedQuat.x = Composed.x;
         AppliedQuat.y = Composed.y;
@@ -1287,7 +1278,7 @@ unsigned long FPosQuatTypedChannel::SetOverlayExtra(const Matrix* Orient)
     Quat.x = Pose[4];
     Quat.y = Pose[5];
     Quat.z = Pose[6];
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(this->Instance));
+    FEngineInstance* Instance = reinterpret_cast<FEngineInstance*>((size_t)(this->Instance));
     const Matrix* InstanceOrient = G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
     Matrix Transposed;                                         // FUN_0661caa0
     Transposed.E[0][0] = InstanceOrient->E[0][0];
@@ -1437,26 +1428,26 @@ FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelArchetyp
 
 // The IFileSystem calls every EngBase site makes inline through the vtable, without testing
 // the pointer or the arguments.
-int FileSystemOpenNode(void* FileSystem, const char* Name)
+int FileSystemOpenNode(IFileSystem* FileSystem, const char* Name)
 {
-    return AsFileSystem(FileSystem)->OpenNode(Name); // +0x60
+    return FileSystem->OpenNode(Name); // +0x60
 }
 
-int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData)
+int FileSystemFindFirst(IFileSystem* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData)
 {
-    return AsFileSystem(FileSystem)->FindFirst(Pattern, // +0x48
+    return FileSystem->FindFirst(Pattern, // +0x48
                                             FindData);
 }
 
-int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData)
+int FileSystemFindNext(IFileSystem* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData)
 {
-    return AsFileSystem(FileSystem)->FindNext((unsigned long)FindHandle, // +0x4C
+    return FileSystem->FindNext((unsigned long)FindHandle, // +0x4C
                                             FindData);
 }
 
-void FileSystemFindClose(void* FileSystem, int FindHandle)
+void FileSystemFindClose(IFileSystem* FileSystem, int FindHandle)
 {
-    AsFileSystem(FileSystem)->FindClose((unsigned long)FindHandle); // +0x50
+    FileSystem->FindClose((unsigned long)FindHandle); // +0x50
 }
 
 void MathMulMatrix3(I3DMathEngine* Math, Matrix* Out, const Matrix* Left, const Matrix* Right)
@@ -1478,8 +1469,8 @@ I3DMathEngine* Create3DMathEngine()
     Desc.Size = G_AggDescSizeMath;
     Desc.Name = G_Name3DMathEngine;
     void* Created = nullptr;
-    DACOM_Acquire()->CreateInstance((AGGDESC*)(&Desc), &Created);
-    return (I3DMathEngine*)Created;
+    DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Created);
+    return static_cast<I3DMathEngine*>(Created);
 }
 
 // Shared with EngBaseMixer.cpp; see EngBase.h for the per-site caches retail keeps instead.
@@ -1532,7 +1523,7 @@ static void RegisterFactory(FDacomFactory* Factory, const char* Name, unsigned l
     ICOManager* Dacom = DACOM_Acquire();
     if (Dacom != nullptr)
     {
-        Dacom->RegisterComponent((IDAComponent*)Factory, Name,
+        Dacom->RegisterComponent(Factory, Name,
                                  (void*)Priority);
         Factory->Release();
     }
@@ -1545,13 +1536,13 @@ static void RegisterFactory(FDacomFactory* Factory, const char* Name, unsigned l
 void RegisterEngBaseComponents()
 {
     FAnimationFactory* Animation =
-        (FAnimationFactory*)(std::calloc(1, sizeof(FAnimationFactory)));
+        static_cast<FAnimationFactory*>(std::calloc(1, sizeof(FAnimationFactory)));
     if (Animation != nullptr)
     {
         new (Animation) FAnimationFactory();
         RegisterFactory(Animation, G_NameAnimation, G_PriorityAnimation);
     }
-    FChannelArchetypeFactory* ChannelArch = (FChannelArchetypeFactory*)(
+    FChannelArchetypeFactory* ChannelArch = static_cast<FChannelArchetypeFactory*>(
         std::calloc(1, sizeof(FChannelArchetypeFactory)));
     if (ChannelArch != nullptr)
     {
@@ -1559,13 +1550,13 @@ void RegisterEngBaseComponents()
         RegisterFactory(ChannelArch, G_NameChannelArchetype, G_PriorityChannelArchetype);
     }
     FHardpointFactory* Hardpoint =
-        (FHardpointFactory*)(std::calloc(1, sizeof(FHardpointFactory)));
+        static_cast<FHardpointFactory*>(std::calloc(1, sizeof(FHardpointFactory)));
     if (Hardpoint != nullptr)
     {
         new (Hardpoint) FHardpointFactory();
         RegisterFactory(Hardpoint, G_NameHardpoint, G_PriorityHardpoint);
     }
-    FEngineFactory* Engine = (FEngineFactory*)(std::calloc(1, sizeof(FEngineFactory)));
+    FEngineFactory* Engine = static_cast<FEngineFactory*>(std::calloc(1, sizeof(FEngineFactory)));
     if (Engine != nullptr)
     {
         new (Engine) FEngineFactory();

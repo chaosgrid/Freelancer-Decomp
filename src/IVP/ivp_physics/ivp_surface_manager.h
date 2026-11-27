@@ -9,6 +9,10 @@
 #include <cstddef>
 #include <cstdint>
 
+class IVP_Compact_Ledge; // ivp_compact_ledge.h
+class IVP_Ray_Solver;     // ivp_ray_solver.h
+class IVP_Real_Object;    // ivp_real_object.h
+
 // ============================================================================
 // IVP_SurfaceManager: the interface through which an object presents its
 // ledge geometry to collision detection (IVP_Real_Object::surface_manager,
@@ -48,12 +52,12 @@
 
 // Growable pointer array used by slots 4 and 5. Not IVP_U_Vector: 32-bit
 // fields (capacity +0x00, count +0x04, elems +0x08), grown by FUN_0635d3e0 to
-// 2*old+1. The element type is caller-defined.
+// 2*old+1. Every list holds compact ledges.
 struct IVP_SurfaceManager_OutList
 {
     int32_t Capacity; // +0x00
     int32_t Count;    // +0x04
-    void**  Elems;    // +0x08
+    IVP_Compact_Ledge** Elems; // +0x08
 
     // 0x0635d3e0: grow to 2*capacity+1,
     // copying the live elements; the old buffer is freed unless it is the inline
@@ -79,7 +83,7 @@ public:
     // Slot names: the Ipion IVP_SurfaceManager API, matched slot-for-slot against the bodies
     // of IVP_SurfaceManager_Polygon (vtable 0639c2dc, RTTI-proven; see ivp_surman_polygon.h).
     // Slot 0 -- the single convex ledge.
-    virtual void* get_single_convex() = 0;
+    virtual IVP_Compact_Ledge* get_single_convex() = 0;
 
     // Slot 1 -- writes a 3-float vector through OutVec3 and returns it.
     virtual float* get_mass_center(float* OutVec3) = 0;
@@ -87,7 +91,7 @@ public:
     // Slot 2 -- three arguments. The default traps; IVP_SurfaceManager_Polygon
     // implements it as (const IVP_U_Point* In, float* OutA, float* OutB), see
     // IVP_Real_Object::init_core_rest_state_and_damping. Parameter types stay generic.
-    virtual void get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3) = 0;
+    virtual void get_radius_and_radius_dev_to_given_center(void* Param1, float* Param2, float* Param3) = 0;
 
     // Slot 3 -- one argument. As slot 2: the polygon manager writes an
     // IVP_U_Point through it.
@@ -102,11 +106,11 @@ public:
     virtual void get_all_terminal_ledges(IVP_SurfaceManager_OutList* OutList) = 0;
 
     // Slot 6
-    virtual void insert_all_ledges_hitting_ray(void* Param1, void* Param2) = 0;
+    virtual void insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2) = 0;
 
     // Slots 7 and 8 -- the shared `RET 4` default (not pure).
-    virtual void add_reference_to_ledge(void* Param1);
-    virtual void remove_reference_to_ledge(void* Param1);
+    virtual void add_reference_to_ledge(IVP_Compact_Ledge* Param1);
+    virtual void remove_reference_to_ledge(IVP_Compact_Ledge* Param1);
 
     // Slot 9 -- pure in the base yet with a body (FUN_0635d440), which is what
     // MSVC emits for a pure virtual destructor with a definition.
@@ -126,15 +130,15 @@ public:
     IVP_SurfaceManager_Default();
     ~IVP_SurfaceManager_Default() override;
 
-    void*   get_single_convex() override;
+    IVP_Compact_Ledge*   get_single_convex() override;
     float*  get_mass_center(float* OutVec3) override;
-    void    get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3) override;
+    void    get_radius_and_radius_dev_to_given_center(void* Param1, float* Param2, float* Param3) override;
     void    get_rotation_inertia(void* Param1) override;
     void    get_all_ledges_within_radius(const float* Center3, float Radius, void* Param3,
                                          void* Param4, void* Param5,
                                          IVP_SurfaceManager_OutList* OutList) override;
     void    get_all_terminal_ledges(IVP_SurfaceManager_OutList* OutList) override;
-    void    insert_all_ledges_hitting_ray(void* Param1, void* Param2) override;
+    void    insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2) override;
     int32_t get_type() override;
 
     // +0x04: a zero-filled 0x20-byte block, 16-byte aligned, from the module's
@@ -142,7 +146,7 @@ public:
     // base and the raw pointer at [aligned-4]); freed with FUN_06343ff0. Never
     // written again in this module: slot 0 returns it and slots 4/5 append it
     // to the caller's list. Contents opaque.
-    void* GeometryBlock;
+    IVP_Compact_Ledge* GeometryBlock;
 };
 static_assert(sizeof(IVP_SurfaceManager) == 0x04, "IVP_SurfaceManager size mismatch (vptr only)");
 static_assert(sizeof(IVP_SurfaceManager_Default) == 0x08, "IVP_SurfaceManager_Default size mismatch");

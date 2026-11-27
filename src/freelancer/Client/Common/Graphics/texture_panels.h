@@ -42,9 +42,9 @@ class IPlanetRing : public Universe::IZoneImmersion
 public:
     virtual void Load(char const* IniPath, char const* Nickname) = 0; // +0x04
     virtual void Clear() = 0;                                      // +0x08
-    virtual void Update(void* Camera, float Dt) = 0;                // +0x0c
-    virtual void DrawPiece(void* Camera, int PieceIndex) = 0;       // +0x10
-    virtual void DrawPanels(void* Camera) = 0;                      // +0x14
+    virtual void Update(ICamera* Camera, float Dt) = 0;                // +0x0c
+    virtual void DrawPiece(ICamera* Camera, int PieceIndex) = 0;       // +0x10
+    virtual void DrawPanels(ICamera* Camera) = 0;                      // +0x14
     virtual int GetPieceCount() = 0;                               // +0x18
     virtual float const* GetPiece(int Index) = 0;                   // +0x1c
     virtual float GetPieceFloat(int Index) = 0;                     // +0x20
@@ -62,9 +62,9 @@ struct FTexturePanels : IPlanetRing
     double GetImmersion(Vector const& Point) const override;
     void Load(char const* IniPath, char const* Nickname) override;
     void Clear() override;
-    void Update(void* Camera, float Dt) override;
-    void DrawPiece(void* Camera, int PieceIndex) override;
-    void DrawPanels(void* Camera) override;
+    void Update(ICamera* Camera, float Dt) override;
+    void DrawPiece(ICamera* Camera, int PieceIndex) override;
+    void DrawPanels(ICamera* Camera) override;
     int GetPieceCount() override;
     float const* GetPiece(int Index) override;
     float GetPieceFloat(int Index) override;
@@ -131,13 +131,13 @@ FTexturePanelsGlobalNode* TexturePanelsListSentinel();
 
 // The StarSys tick's walk (FUN_00554eb0 via FUN_00509f20 = &DAT_0067505c): slot 3 update
 // (camera, dt) on every live TexturePanels.
-void TexturePanelsUpdateAll(void* Camera, float Dt);
+void TexturePanelsUpdateAll(ICamera* Camera, float Dt);
 
 // FUN_00509f60 — DAT_00613324 = Detail, then slot 12 ApplyDetail on every live TexturePanels.
 void TexturePanelsApplyDetailAll(float Detail);
 
 // FUN_00509f30 — slot 5 DrawPanels(camera) on every live TexturePanels (space draw pass).
-void TexturePanelsDrawAll(void* Camera);
+void TexturePanelsDrawAll(ICamera* Camera);
 
 // FUN_00552420 / 00552440 / 00552480 — FVF / texture-format helpers used by DrawClouds.
 unsigned char TexturePanelsFormatHasAlpha(int FormatId);
@@ -145,4 +145,4 @@ int TexturePanelsFvfPositionBytes(unsigned char FvfLow);
 int TexturePanelsFvfDiffuseNormalBytes(unsigned char FvfLow);
 
 // Nebula vtable slot 7 LAB_005091a0.
-void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera);
+void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, ICamera* Camera);

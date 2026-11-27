@@ -77,7 +77,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1, LAB_062cff40 (RET 0xc).
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, LAB_062cffa0.
     void OnEngage() override;

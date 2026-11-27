@@ -579,7 +579,7 @@ void __cdecl DeviceTRC::set_image_root(const char* Path)
     // that read is reproduced through a volatile pointer.
     GImageRoot = Path;
     const uintptr_t Buffer = GImageRoot.empty() ? 0 : (uintptr_t)GImageRoot.data();
-    const volatile char* const Last = (const volatile char*)(Buffer + GImageRoot.size() - 1);
+    const volatile char* const Last = reinterpret_cast<const volatile char*>((Buffer + GImageRoot.size() - 1));
     if (*Last != '\\')
     {
         GImageRoot += '\\';
@@ -846,7 +846,7 @@ void DeviceTRC::execute_image(const Image* Img, bool bDraw)
     // .text:06328370. Both axes are scaled by the one image scale (DAT_063ed66c). No null checks
     // on the image, its DC or this DC. Every image this context draws came from its own
     // create_image.
-    const BMPImage* const DevImg = (const BMPImage*)Img;
+    const BMPImage* const DevImg = static_cast<const BMPImage*>(Img);
     if (bDraw)
     {
         StretchBlt(MHdc, OriginH + PosH, OriginV + PosV,

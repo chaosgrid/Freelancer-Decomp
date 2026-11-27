@@ -95,9 +95,9 @@ void MixerBlendPosQuat(float* Out, const float* A, const float* B, float T)
     Out[1] = Local[1];
     Out[2] = Local[2];
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662b0f8
-    Math->QuatSlerp(*(Quaternion*)(Local),
-                    *(const Quaternion*)(A + 3),
-                    *(const Quaternion*)(B + 3), T);
+    Math->QuatSlerp(*reinterpret_cast<Quaternion*>(Local),
+                    *reinterpret_cast<const Quaternion*>(A + 3),
+                    *reinterpret_cast<const Quaternion*>(B + 3), T);
     Out[3] = Local[0];
     Out[4] = Local[1];
     Out[5] = Local[2];
@@ -159,7 +159,7 @@ void MixerInsertBefore(FMixerList* List, FMixerNode* Where, FMixerNode* Node)
 void MixerMarkDropped(FMixerNode* Node)
 {
     if (Node->Type == MixerLeafNode)
-        ((FMixerLeaf*)(Node))->Typed->PlayFlags |= G_ChannelBlendFlag;
+        static_cast<FMixerLeaf*>(Node)->Typed->PlayFlags |= G_ChannelBlendFlag;
 }
 } // namespace
 
@@ -259,7 +259,7 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
 
     if (Leaf != nullptr)
     {
-        FTypedChannel* Typed = ((FMixerLeaf*)(Leaf))->Typed;
+        FTypedChannel* Typed = static_cast<FMixerLeaf*>(Leaf)->Typed;
         // Typed slot 0x0C.
         Typed->InterpolatePose(Out, LeftValue, RightValue,
                                              (double)(Weight));
@@ -312,8 +312,8 @@ void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
     // Two overlays, switched on the left one's value count.
     if (Left->Type != MixerOverlayNode || Right->Type != MixerOverlayNode)
         return;
-    const FMixerOverlay* LeftOverlay = (const FMixerOverlay*)(Left);
-    const FMixerOverlay* RightOverlay = (const FMixerOverlay*)(Right);
+    const FMixerOverlay* LeftOverlay = static_cast<const FMixerOverlay*>(Left);
+    const FMixerOverlay* RightOverlay = static_cast<const FMixerOverlay*>(Right);
     const double W = (double)(Weight);
     switch (LeftOverlay->Count)
     {
@@ -578,10 +578,10 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         {
             if (Node->Type == MixerBlendNode)
             {
-                FMixerBlend* Blend = (FMixerBlend*)(Node);
+                FMixerBlend* Blend = static_cast<FMixerBlend*>(Node);
                 if ((Blend->Flags & G_MixerFlagPose) != 0)
                 {
-                    FTypedChannel* PrevTyped = ((FMixerLeaf*)(Blend->Prev))->Typed;
+                    FTypedChannel* PrevTyped = static_cast<FMixerLeaf*>(Blend->Prev)->Typed;
                     const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance);
                     PrevTyped->SetOverlayPos(Position);
                 }
@@ -609,7 +609,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
             }
             else if (Node->Type == MixerLeafNode)
             {
-                FMixerLeaf* Leaf = (FMixerLeaf*)(Node);
+                FMixerLeaf* Leaf = static_cast<FMixerLeaf*>(Node);
                 FMixerNode* Next = Node->Next;
                 if (Next != nullptr)
                 {
@@ -691,11 +691,11 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
             G_AnimEngine->SetJointParams((InstanceIndex)Desc->Instance, 0, Out);
         else if (Desc->Kind == G_BindKindObject)
         {
-            G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, (const Vector*)Out); // IEngine+0x8C
+            G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, reinterpret_cast<const Vector*>(Out)); // IEngine+0x8C
             Matrix Mat;
             I3DMathEngine* Math = Acquire3DMathEngine();                   // DAT_0662ace8
             Math->QuaternionToMatrix(Mat,
-                                     *(const Quaternion*)(Out + 3)); // +0x54
+                                     *reinterpret_cast<const Quaternion*>(Out + 3)); // +0x54
             G_AnimEngine->SetInstanceOrientation((InstanceIndex)Desc->Instance, &Mat); // IEngine+0x94
         }
     }
@@ -739,7 +739,7 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
     FMixerNode* Walk = List->Head;
     while (Walk != nullptr)
     {
-        if (Walk->Type == MixerLeafNode && ((FMixerLeaf*)(Walk))->Typed == Typed)
+        if (Walk->Type == MixerLeafNode && static_cast<FMixerLeaf*>(Walk)->Typed == Typed)
             return;
         Walk = Walk->Next;
     }
@@ -850,7 +850,7 @@ void MixerUnbindTyped(FAnimationObject* Animation, FTypedChannel* Typed)
     FMixerNode* Leaf = List->Head;
     while (Leaf != nullptr)
     {
-        if (Leaf->Type == MixerLeafNode && ((FMixerLeaf*)(Leaf))->Typed == Typed)
+        if (Leaf->Type == MixerLeafNode && static_cast<FMixerLeaf*>(Leaf)->Typed == Typed)
             break;
         Leaf = Leaf->Next;
     }
@@ -865,7 +865,7 @@ void MixerUnbindTyped(FAnimationObject* Animation, FTypedChannel* Typed)
             FMixerOverlay* Overlay = new FMixerOverlay(&Entry->first);
             MixerInsertBefore(List, Leaf->Next, Overlay);
             if (Overlay->Next != nullptr)
-                ((FMixerBlend*)(Overlay->Next->Next))->Flags |= 1;
+                static_cast<FMixerBlend*>(Overlay->Next->Next)->Flags |= 1;
         }
         else if (After != nullptr && After->Type == MixerBlendNode)
         {
@@ -907,7 +907,7 @@ unsigned char MixerHasLeaf(FAnimationObject* Animation, FTypedChannel* Typed)
     FMixerNode* Node = Entry->second.Head;
     while (Node != nullptr)
     {
-        if (Node->Type == MixerLeafNode && ((FMixerLeaf*)(Node))->Typed == Typed)
+        if (Node->Type == MixerLeafNode && static_cast<FMixerLeaf*>(Node)->Typed == Typed)
             return 1;
         Node = Node->Next;
     }
@@ -1002,7 +1002,7 @@ void FAnimPlayback::WriteOverlayPos(const Vector* Pos, FMixerDescMap* Inner)
                 {
                     if (Node->Type == MixerOverlayNode)
                     {
-                        FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
+                        FMixerOverlay* Overlay = static_cast<FMixerOverlay*>(Node);
                         Overlay->Values[0] = Pos->x;
                         Overlay->Values[1] = Pos->y;
                         Overlay->Values[2] = Pos->z;
@@ -1038,7 +1038,7 @@ void FAnimPlayback::WriteOverlayOrient(const Matrix* Mat, FMixerDescMap* Inner)
                 {
                     if (Node->Type == MixerOverlayNode)
                     {
-                        FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
+                        FMixerOverlay* Overlay = static_cast<FMixerOverlay*>(Node);
                         Overlay->Values[3] = Quat.w;
                         Overlay->Values[4] = Quat.x;
                         Overlay->Values[5] = Quat.y;
@@ -1070,7 +1070,7 @@ void FAnimPlayback::AddOverlayPos(const Vector* Delta, FMixerDescMap* Inner)
                 {
                     if (Node->Type == MixerOverlayNode)
                     {
-                        FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
+                        FMixerOverlay* Overlay = static_cast<FMixerOverlay*>(Node);
                         Overlay->Values[0] = (float)((double)(Delta->x) + Overlay->Values[0]);
                         Overlay->Values[1] = (float)((double)(Delta->y) + Overlay->Values[1]);
                         Overlay->Values[2] = (float)((double)(Delta->z) + Overlay->Values[2]);

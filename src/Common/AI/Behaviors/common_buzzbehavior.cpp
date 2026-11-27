@@ -72,7 +72,7 @@ BuzzBehavior::~BuzzBehavior()
 // ----------------------------------------------------------------------------
 // Slot 1, LAB_062c5cf0.
 // ----------------------------------------------------------------------------
-bool BuzzBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool BuzzBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     if (!BindContext(Param1, Param2, Param3))   // FUN_062d2090
         return false;
@@ -332,7 +332,7 @@ int BuzzBehavior::Update()
     // record LargeShipBehavior::Update builds. Only Init's stores happen; every other slice is
     // behind a cache guard Init clears.
     FAiTarget Record;
-    Record.Init(ObjInspectOf(OwnerContext), Handle);
+    Record.Init(OwnerContext, Handle);
 
     // Retail writes the record's interface pointers before testing either.
     if (OwnerContext == nullptr || Handle == nullptr)

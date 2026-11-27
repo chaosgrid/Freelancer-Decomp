@@ -302,7 +302,7 @@ RoomData* LookupClientLocationRoom(unsigned LocationId)
     return It->second->Room;
 }
 
-void* LookupClientLocationBase(unsigned BaseId)
+BaseData* LookupClientLocationBase(unsigned BaseId)
 {
     // FUN_0043a2b0 -- the same inlined body as FUN_00439590.
     return FindLocationBaseEntry(BaseId)->Base;
@@ -426,7 +426,7 @@ namespace
 
         Entry->Runtime->MissionOffers.bComplete = 0;
         Entry->Runtime->News.bComplete = 0;
-        IServer* const Server = static_cast<IServer*>(GetLocalServerInterface());
+        IServer* const Server = GetLocalServerInterface();
         if (Server != nullptr)
             Server->BaseInfoRequest(BaseId, GetPlayerConnectionId(), true);
 
@@ -491,7 +491,7 @@ namespace
         // With a server: the first object of the player's system (not null-tested) whose base
         // (+0x88) is this one; none, or no server -> 0.
         unsigned SolarId = 0;
-        if (static_cast<IServer*>(GetLocalServerInterface()) != nullptr)
+        if (GetLocalServerInterface() != nullptr)
         {
             Universe::ISystem const* const System =
                 Universe::get_system(GetPlayerStarSystemIdRetail());
@@ -537,7 +537,7 @@ namespace
     {
         if (G_bLocationNoServerNotify)
             return nullptr;
-        return static_cast<IServer*>(GetLocalServerInterface());
+        return GetLocalServerInterface();
     }
 
     // FUN_00439b50 -- the server told the base's info is no longer wanted, RoomData::unload on
@@ -778,14 +778,14 @@ bool IsClientLocationRoomLoaded(unsigned LocationId)
     return Entry->Room->bLoaded;
 }
 
-void* GetClientCurrentLocationRuntime()
+FRoomRuntime* GetClientCurrentLocationRuntime()
 {
     // FUN_0043a460. Only the low 30 bits are tested, but the map is searched with the whole
     // value.
     if ((G_LocationCurrentRoom & 0x3fffffffu) == 0)
         return nullptr;
     FLocationRoomEntry* const Entry = FindLocationRoomEntry(G_LocationCurrentRoom);
-    return static_cast<void*>(Entry->Runtime);
+    return Entry->Runtime;
 }
 
 void UnloadClientLocationRoomState(unsigned LocationId)
@@ -804,7 +804,7 @@ void UnloadClientLocationRoomState(unsigned LocationId)
     Entry->State = nullptr;
 }
 
-void* GetClientRoomCamera()
+ICamera* GetClientRoomCamera()
 {
     // FUN_00438c90 (cdecl on DAT_00668708's fields: +0x38 is DAT_00668740, the room map
     // DAT_00668714). Same low-30-bit test as FUN_0043a460.
@@ -964,7 +964,7 @@ void EnterClientLocationBase(unsigned BaseId)
     unsigned StartLocation = FindLocationBaseEntry(BaseId)->Runtime->StartLocationId;
     if (StartLocation == 0)
     {
-        if (static_cast<IServer*>(GetLocalServerInterface()) != nullptr)
+        if (GetLocalServerInterface() != nullptr)
         {
             FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x405,
                   "Failed to get start location\n");

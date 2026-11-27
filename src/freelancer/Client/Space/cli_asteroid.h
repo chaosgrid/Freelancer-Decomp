@@ -428,7 +428,7 @@ static_assert(offsetof(FCliDynamicAsteroid, InvDetailScale) == 0xE4, "Dyn InvDet
 bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname);
 // FUN_00520130 — StarSys tick: with ASTEROIDS on, FCliAsteroid::Update on every field. Camera is
 // the FSpaceCamera FUN_0040f130 hands out.
-void CliAsteroidUpdateFields(void* Camera, float Dt);
+void CliAsteroidUpdateFields(FSpaceCamera* Camera, float Dt);
 // FUN_005200b0 — every registered field destroyed and freed, then the list emptied. Called
 // from the StarSys system unload.
 void CliAsteroidDestroyAll();

@@ -68,7 +68,7 @@ public:
     // kept in a register across the bind), FUN_062d5980(&Move, 0), the same SetContext
     // on Face, and LaunchTimeout = NestedNavQuery0xbc() ? 15.0f : 60.0f
     // (0x41700000 / 0x42700000).
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, FUN_062cd830: Behavior::OnEngage (FUN_062d20d0); CachedSystemId170 =
     // FetchSystemId(); TargetType174 = GetObjectTypeOrZero (FUN_062e6200) of Watcher168's

@@ -45,14 +45,14 @@ public:
 
     // Slot 0, 0634ad40: the root's ledge when the root is terminal, otherwise the root's
     // hull ledge if it has one, otherwise null. Returns const IVP_Compact_Ledge*.
-    void* get_single_convex() override;
+    IVP_Compact_Ledge* get_single_convex() override;
 
     // Slot 1, 0634ac70: copies IVP_Compact_Surface::mass_center (3 floats) to OutVec3.
     float* get_mass_center(float* OutVec3) override;
 
     // Slot 2, 0634acb0: Param1 = const IVP_U_Point* center, Param2 = float* radius,
     // Param3 = float* radius_deviation.
-    void get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3) override;
+    void get_radius_and_radius_dev_to_given_center(void* Param1, float* Param2, float* Param3) override;
 
     // Slot 3, 0634ac90: Param1 = float* out (3 floats of rotation_inertia).
     void get_rotation_inertia(void* Param1) override;
@@ -68,7 +68,7 @@ public:
     void get_all_terminal_ledges(IVP_SurfaceManager_OutList* OutList) override;
 
     // Slot 6, 0634ab60: Param1 = IVP_Ray_Solver*, Param2 = IVP_Real_Object*.
-    void insert_all_ledges_hitting_ray(void* Param1, void* Param2) override;
+    void insert_all_ledges_hitting_ray(IVP_Ray_Solver* Param1, IVP_Real_Object* Param2) override;
 
     // Slot 10, 06325390.
     int32_t get_type() override;

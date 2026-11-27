@@ -306,7 +306,7 @@ void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 void IVP_Impact_System::add_pushed_core_with_pairs_except(IVP_Core* Core, IVP_ListManager_CorePairEntry* PairNot)
 {
     PushedCores.Add(Core);
-    static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem = 1;
+    Core->OldSyncInfo->WasPushedDuringImpactSystem = 1;
 
     for (int32_t Index = static_cast<int32_t>(AssociatedFs->CorePairEntries.n_elems) - 1; Index >= 0; --Index)
     {
@@ -404,7 +404,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
         {
             continue;
         }
-        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem == 0)
+        if (Core->OldSyncInfo->WasPushedDuringImpactSystem == 0)
         {
             add_pushed_core_with_pairs_except(Core, BestPair); // FUN_063590e0
         }
@@ -421,8 +421,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::clear_processed_state_of_core_dists(IVP_Core* Core)
 {
-    IVP_Friction_Info_For_Core* const Info = static_cast<IVP_Friction_Info_For_Core*>(
-        Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(AssociatedFs))));
+    IVP_Friction_Info_For_Core* const Info = Core->find_object_hash_entry(static_cast<unsigned>(reinterpret_cast<uintptr_t>(AssociatedFs)));
     for (int32_t Index = static_cast<int32_t>(Info->FrDists.n_elems) - 1; Index >= 0; --Index)
     {
         Info->FrDists.elems[Index]->Owner->StateProcessed = 0;
@@ -438,7 +437,7 @@ void IVP_Impact_System::recalc_all_affected_cores()
     for (int32_t Index = static_cast<int32_t>(SyncedCores.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Core* const Core = SyncedCores.elems[Index];
-        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem == 0)
+        if (Core->OldSyncInfo->WasPushedDuringImpactSystem == 0)
         {
             Core->restore_fast_sim_snapshot(); // FUN_063473b0
         }

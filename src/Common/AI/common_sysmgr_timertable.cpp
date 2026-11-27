@@ -107,18 +107,6 @@ bool SystemManagerTimerTable::MissileWithinReaction08() const
     return Best <= Owner->PersonalityData.MissileReaction.EvadeAfterburnMissileReactionTime;   // +0x17bc
 }
 
-namespace
-{
-    // Doubly-linked circular list node: {next, prev, embedded BaseWatcher}, 0x10 bytes (the
-    // size of both retail operator new calls, sentinel and node).
-    struct SystemManagerTimerListNode
-    {
-        SystemManagerTimerListNode* Next;  // +0x00
-        SystemManagerTimerListNode* Prev;  // +0x04
-        unsigned char Watcher[8];          // +0x08, BaseWatcher-sized payload
-    };
-}
-
 // ============================================================================
 // SystemManagerTimerTable -- FUN_062e6af0.
 // ============================================================================
@@ -154,8 +142,7 @@ namespace
     // is {Next, Prev, BaseWatcher}.
     void DestroySystemManagerTimerList(SystemManagerTimerTable* Self)
     {
-        SystemManagerTimerListNode* const Head =
-            static_cast<SystemManagerTimerListNode*>(Self->ListHeadNode);
+        SystemManagerTimerListNode* const Head = Self->ListHeadNode;
         SystemManagerTimerListNode* Node = Head->Next;
         while (Node != Head)
         {
@@ -210,7 +197,7 @@ void SystemManagerTimerTable::AppendTimerListEntry(void* Source)
     }
 
     // std::list _Buynode(Head, Head->Prev): a null Prev means the new node itself.
-    SystemManagerTimerListNode* const Head = static_cast<SystemManagerTimerListNode*>(ListHeadNode);
+    SystemManagerTimerListNode* const Head = ListHeadNode;
     SystemManagerTimerListNode* Prev = Head->Prev;
 
     SystemManagerTimerListNode* const NewNode =
@@ -282,16 +269,16 @@ bool SystemManagerTimerTable::Arm(SystemManager* Owner)
     // Retail re-reads the watcher here.
     IObjRW* const Object = ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()));
     // The scanner equipment id the AI target list rebuild is gated on.
-    if (static_cast<IObjInspect*>(Object)->find_equipment(&ScannerEquipId, 1, EquipTypeScanner) != 0)
+    if (Object->find_equipment(&ScannerEquipId, 1, EquipTypeScanner) != 0)
         return false;
 
     float HitPts = 0.0f;
     float MaxHitPts = 0.0f;
-    (void)static_cast<IObjInspect*>(Object)->get_status(HitPts, MaxHitPts);
+    (void)Object->get_status(HitPts, MaxHitPts);
 
     float MaxShield = 0.0f;
     bool bShieldActive = false;
-    (void)static_cast<IObjInspect*>(Object)->get_shield_status(HitPts, MaxShield, bShieldActive);
+    (void)Object->get_shield_status(HitPts, MaxShield, bShieldActive);
 
     bBuilt = 0;
     bKeepCache = 0;
@@ -394,8 +381,7 @@ void SystemManagerTimerTable::UpdateCandidateScan(float /*UnusedArg*/)
         return;
     }
 
-    SystemManagerTimerListNode* const Head =
-        static_cast<SystemManagerTimerListNode*>(ListHeadNode);
+    SystemManagerTimerListNode* const Head = ListHeadNode;
     SystemManagerTimerListNode* Cur = Head->Next;
     if (Cur == Head)
     {
@@ -440,7 +426,7 @@ void SystemManagerTimerTable::UpdateCandidateScan(float /*UnusedArg*/)
                     Owner->SelfTarget.CachedRadius, Owner->SelfTarget.CachedPos);
             }
 
-            Vector const& CandidatePos = ObjInspectOf(Candidate)->get_position();
+            Vector const& CandidatePos = Candidate->get_position();
             Vector Delta;
             Vec3Assign(&Delta,
                 Owner->SelfTarget.CachedPos.x - CandidatePos.x,
@@ -448,7 +434,7 @@ void SystemManagerTimerTable::UpdateCandidateScan(float /*UnusedArg*/)
                 Owner->SelfTarget.CachedPos.z - CandidatePos.z);
 
             // Keep only candidates closing on the owner (strictly positive, unrounded dot).
-            Vector const CandidateVelocity = ObjInspectOf(Candidate)->get_velocity();
+            Vector const CandidateVelocity = Candidate->get_velocity();
             double const Along = ((double)Delta.z * CandidateVelocity.z +
                                   (double)Delta.y * CandidateVelocity.y) +
                                  (double)Delta.x * CandidateVelocity.x;
@@ -466,7 +452,7 @@ void SystemManagerTimerTable::UpdateCandidateScan(float /*UnusedArg*/)
                 if (Distance < MaxRange && Distance < BestDistance)
                 {
                     BestDistance = (float)Distance;
-                    BestCandidateVelocity = ObjInspectOf(Candidate)->get_velocity();
+                    BestCandidateVelocity = Candidate->get_velocity();
                     BestWatcher->set(Watched);
                     bFound = true;
                 }

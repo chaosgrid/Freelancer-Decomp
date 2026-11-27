@@ -489,7 +489,7 @@ void FThornDeformable::Stop()
 }
 
 // LAB_00452df0. Hands out the character's +0x1b4 (voice id) and the character itself.
-bool FThornDeformable::FindActor(char const* InActorName, void** OutActorField, void** OutActor)
+bool FThornDeformable::FindActor(char const* InActorName, void** OutActorField, FCharacterObject** OutActor)
 {
     if (InActorName == nullptr)
         return false;

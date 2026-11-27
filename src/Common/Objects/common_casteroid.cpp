@@ -298,7 +298,7 @@ void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
         // create_instance's result is discarded (the engine writes the id through
         // initialize_instance).
         CObject* NewObj = CObject::Alloc(CObject::ClassAsteroid);
-        CAsteroid* NewAsteroid = (CAsteroid*)NewObj;
+        CAsteroid* NewAsteroid = static_cast<CAsteroid*>(NewObj);
         NewAsteroid->SystemId = SystemId;
         NewAsteroid->open(Entry.Arch);
         Entry.Arch->create_instance(NewObj);
@@ -322,7 +322,7 @@ asteroid_marker* CAsteroidCube::get_changes()
     asteroid_marker* Prev = nullptr;
     for (std::list<CObject*>::iterator It = Asteroids.begin(); It != Asteroids.end(); ++It)
     {
-        CAsteroid* const Rock = (CAsteroid*)*It;
+        CAsteroid* const Rock = static_cast<CAsteroid*>(*It);
         asteroid_marker* Marker = new asteroid_marker();
         Marker->CubeId = CubeId;
         Marker->AsteroidId = Rock->AsteroidId;
@@ -421,13 +421,13 @@ void CAsteroidSystem::update(IObjDB* ObjDb, float Dt)
 
             // Objects on a trade lane are skipped.
             bool bUsingTradelane = false;
-            (void)ObjInspectOf(Candidate)->is_using_tradelane(&bUsingTradelane);
+            (void)Candidate->is_using_tradelane(&bUsingTradelane);
             if (bUsingTradelane)
                 continue;
 
-            Vector Pos = ObjInspectOf(Candidate)->get_position();
+            Vector Pos = Candidate->get_position();
             // Dir is the negated third column of the rotation.
-            Matrix const& Rotation = ObjInspectOf(Candidate)->get_transform().Rotation;
+            Matrix const& Rotation = Candidate->get_transform().Rotation;
             Vector Dir;
             Dir.x = -Rotation.E[0][2];
             Dir.y = -Rotation.E[1][2];

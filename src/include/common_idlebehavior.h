@@ -50,7 +50,7 @@ public:
 
     // Slot 1, LAB_062cd590: BindContext (FUN_062d2090); on success
     // Watcher2c.SetContext(OwnerContext, SysMgr, Param2).
-    bool SetContext(void* Param1, void* Param2, void* Param3);
+    bool SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3);
 
     // Slot 3, LAB_062cd5d0: Behavior::OnEngage.
     void ResetTickState();

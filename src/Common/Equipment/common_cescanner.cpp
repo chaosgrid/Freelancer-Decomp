@@ -73,7 +73,7 @@ ScanList::ScanList(ScanList const& Other)
     for (int Index = 0; Index < 256; ++Index)
     {
         Watchable const* SrcWatched = Other.Entries[Index].target();
-        if (SrcWatched != nullptr && SrcWatched != (Watchable const*)8)
+        if (SrcWatched != nullptr && SrcWatched != reinterpret_cast<Watchable const*>(8))
             Entries[Index].set(SrcWatched);
     }
 }
@@ -85,7 +85,7 @@ ScanList& ScanList::operator=(ScanList const& Other)
     for (int Index = 0; Index < 256; ++Index)
     {
         Watchable const* SrcWatched = Other.Entries[Index].target();
-        if (SrcWatched == (Watchable const*)8)
+        if (SrcWatched == reinterpret_cast<Watchable const*>(8))
             SrcWatched = nullptr;
         Entries[Index].set(SrcWatched);
     }
@@ -145,7 +145,7 @@ int ScanList::add_in_range(Vector const& Pos, float Range, IObjDB* Db, unsigned 
 
     if (TypeMask & OBJ_SOLAR_NO_WAYPOINT_MASK)
     {
-        void* Bucket = Db->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
+        ISpatialPartition* Bucket = Db->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
         if (Bucket != nullptr)
         {
             Geometry::Sphere Sphere;
@@ -155,12 +155,12 @@ int ScanList::add_in_range(Vector const& Pos, float Range, IObjDB* Db, unsigned 
             Query.Capacity = 0x800;
             Query.Count = 0;
 
-            int Result = ((ISpatialPartition*)Bucket)->QuerySphere(&Sphere, &Query);
+            int Result = Bucket->QuerySphere(&Sphere, &Query);
             if (Result != 0 && Query.Count != 0)
             {
                 for (unsigned Index = 0; Index < Query.Count; ++Index)
                 {
-                    IObjRW* Candidate = (IObjRW*)Query.Items[Index];
+                    IObjRW* Candidate = static_cast<IObjRW*>(Query.Items[Index]);
                     if (Count >= Capacity)
                         break;
                     if (Filt->add_obj(Candidate))
@@ -216,7 +216,7 @@ namespace
             return false;
         if ((Owner->ObjectClass & CObject::ClassSolar) != CObject::ClassSolar)
             return false;
-        return !((CSolar const*)Owner)->bDynamic;
+        return !static_cast<CSolar const*>(Owner)->bDynamic;
     }
 }
 
@@ -451,7 +451,7 @@ CEScanner::ScanResult CEScanner::ScanCargo(CEqObj* Target)
 // RVA 0x3fb90 (ICF-shared).
 Archetype::Scanner const* CEScanner::ScannerArch() const
 {
-    return (Archetype::Scanner const*)(Arch);
+    return static_cast<Archetype::Scanner const*>(Arch);
 }
 
 // RVA 0x3fba0, shared by both overloads.
@@ -459,12 +459,12 @@ CEScanner* __cdecl CEScanner::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeScanner)
         return nullptr;
-    return (CEScanner*)(Equip);
+    return static_cast<CEScanner*>(Equip);
 }
 
 CEScanner const* __cdecl CEScanner::cast(CEquip const* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeScanner)
         return nullptr;
-    return (CEScanner const*)(Equip);
+    return static_cast<CEScanner const*>(Equip);
 }

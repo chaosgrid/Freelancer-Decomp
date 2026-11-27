@@ -226,8 +226,8 @@ namespace AlchemyImpl
             // 06222180 / 062224e0: the new archetype's +0x50 or library's +0x38 Initialize
             // with the descriptor; a non-zero result destroys the object.
             const GENRESULT InitResult = Spec_.Kind == KindFxEffectArchetype
-                ? static_cast<IFxEffectArchetype*>(static_cast<FFxEffectArchetype*>(Object))->Initialize(Desc)
-                : static_cast<IFxEffectLibrary*>(static_cast<FFxEffectLibrary*>(Object))->Initialize(Desc);
+                ? static_cast<IFxEffectArchetype*>(Object)->Initialize(Desc)
+                : static_cast<IFxEffectLibrary*>(Object)->Initialize(Desc);
             if (InitResult != GR_OK)
             {
                 Object->Release();
@@ -289,7 +289,7 @@ namespace AlchemyImpl
             // inlined FUN_0623f7b0 destructor and operator_delete), *Instance = 0 and the
             // result is returned; otherwise *Instance = the set, 0.
             FFxNodePropertySet* const Set =
-                static_cast<FFxNodePropertySet*>(static_cast<IFxNodePropertySet*>(Object));
+                static_cast<FFxNodePropertySet*>(Object);
             const GENRESULT InitResult = Set->Initialize(Desc);
             if (InitResult != GR_OK)
             {

@@ -697,7 +697,7 @@ void IServerImpl::RequestGroupPositions(unsigned int session_id, unsigned char* 
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
 
-        CPlayerGroup* Group = (CPlayerGroup*)p->group_ptr;
+        CPlayerGroup* Group = p->group_ptr;
         if (!Group) {
             // A bare 4-byte block holding 0, handed over as above.
             unsigned int* Empty = static_cast<unsigned int*>(::operator new(4));

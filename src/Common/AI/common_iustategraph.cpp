@@ -34,7 +34,7 @@ namespace
         {
             return nullptr;
         }
-        return static_cast<IObjInspect*>(reinterpret_cast<IObjRW*>(Raw));
+        return reinterpret_cast<IObjRW*>(Raw);
     }
 
     // SystemManager+0x14FC: the owner's own FAiTarget record (SystemManager::SelfTarget).
@@ -447,7 +447,7 @@ float SystemManagerTimerTable::GetClosestTrailingShipDistance()
 
         // Equal ids mean the candidate is currently targeting us.
         unsigned const OwnerId = OwnerElem->Iface->get_id();
-        unsigned const CandidateTargetId = static_cast<IObjInspect*>(CandidateTarget)->get_id();
+        unsigned const CandidateTargetId = CandidateTarget->get_id();
         if (CandidateTargetId != OwnerId)
         {
             continue;

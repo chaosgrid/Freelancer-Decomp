@@ -743,7 +743,7 @@ SERVER_API int __cdecl GetCargoSpaceOccupied(const unsigned int& obj_id_ref, uns
     if (Obj == nullptr) return -2;
     CObject* const Raw = Obj->cobj();
     CShip* const ShipObj =
-        (Raw != nullptr && ((unsigned int)Raw->ObjectClass & CObject::ClassShip) == CObject::ClassShip) ? (CShip*)Raw : nullptr;
+        (Raw != nullptr && ((unsigned int)Raw->ObjectClass & CObject::ClassShip) == CObject::ClassShip) ? static_cast<CShip*>(Raw) : nullptr;
     Archetype::Ship const* const Arch = (Archetype::Ship const*)ShipObj->Archetype;
     double const Remaining = ShipObj->get_cargo_hold_remaining();
     out_occupied = (unsigned int)(long long)(Arch->HoldSize - Remaining);

@@ -36,7 +36,7 @@ namespace
     struct FLedgeList
     {
         IVP_SurfaceManager_OutList List;
-        void* InlineBuffer[0x100];
+        IVP_Compact_Ledge* InlineBuffer[0x100];
 
         FLedgeList() // FUN_06350540
         {
@@ -63,7 +63,7 @@ namespace
 
         const IVP_Compact_Ledge* At(int32_t Index) const
         {
-            return static_cast<const IVP_Compact_Ledge*>(List.Elems[Index]);
+            return List.Elems[Index];
         }
     };
     static_assert(offsetof(FLedgeList, InlineBuffer) == 0x0c, "inline buffer at list+0xc (FUN_0635d3e0's test)");

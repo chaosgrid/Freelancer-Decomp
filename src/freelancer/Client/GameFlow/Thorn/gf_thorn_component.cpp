@@ -196,7 +196,7 @@ GENRESULT DACOM_API FThornComponent::GetReverb(float*, float*, float*, float*)
 // --- the identity tail's base bodies --------------------------------------------------------
 void FThornComponent::Stop() {}
 void FThornComponent::SetSpawnTable(FThornComponent**, int) {}
-bool FThornComponent::FindActor(char const*, void**, void**) { return false; }
+bool FThornComponent::FindActor(char const*, void**, FCharacterObject**) { return false; }
 void FThornComponent::DrawEffects(ICamera*) {}
 void FThornComponent::SetScene(void*) {}
 void FThornComponent::SetFlags(unsigned char, unsigned char, unsigned char, unsigned char) {}

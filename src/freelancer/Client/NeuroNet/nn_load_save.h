@@ -68,6 +68,8 @@
 #include <string>
 #include <vector>
 
+class NnButtonControl;
+class NnTextControl;
 class RichTextEditWin;
 class UiScroll;
 
@@ -146,8 +148,8 @@ public:
     CHARACTER_ID OverwriteId;                  // retail +0x368
     wchar_t SaveName[0x20];                    // retail +0x568
     WinControl* Title;                         // retail +0x5a8
-    WinControl* Buttons[5];                    // retail +0x5ac
-    WinControl* ButtonTexts[5];                // retail +0x5c0
+    NnButtonControl* Buttons[5];               // retail +0x5ac
+    NnTextControl* ButtonTexts[5];             // retail +0x5c0
     unsigned char bButtonEnabled[5];           // retail +0x5d4
     unsigned char Pad5d9[3];                   // retail +0x5d9
     ListBox NameList;                          // retail +0x5dc
@@ -157,11 +159,11 @@ public:
     int VisibleRows;                           // retail +0x1754
     UiScroll* Scroll;                          // retail +0x1758
     WinControl* DescripText;                   // retail +0x175c
-    WinControl* DescripButton;                 // retail +0x1760
+    NnButtonControl* DescripButton;            // retail +0x1760
     RichTextEditWin* DescripEdit;              // retail +0x1764
     WinControl* InfoTitles[4];                 // retail +0x1768 location, credits, rank, ship
     WinControl* InfoValues[4];                 // retail +0x1778 location, credits, rank, ship
-    WinControl* CloseButton;                   // retail +0x1788
+    NnButtonControl* CloseButton;              // retail +0x1788
 
 private:
     // Port-only helper for the close retail inlines on every path (OnEvent 0x00486b93, Update

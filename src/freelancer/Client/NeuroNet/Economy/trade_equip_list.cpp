@@ -10,8 +10,11 @@
 
 #include "Interface/cargo_bar_control.h"
 #include "Interface/Pages/character_select_equip.h" // GetPlayerEquipDescListRetail (FUN_004c4060), credits (FUN_004c4ce0)
+#include "Interface/scroll_control.h"
 #include "Common/client_cliobj.h"          // Archetype::CliObjMaterialPaths (companion +0x20)
 #include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 #include "Space/star_sphere.h"            // Win3DIdentityRotation3x3 (FUN_004215b0)
 #include "Interface/win_factory.h"
 
@@ -185,9 +188,9 @@ void CTradeEquipListLine::Init(WinControl* Parent, Vector const* Position)
         Zero.y = 0.0f;
         Zero.z = 0.0f;
         FormatTradeWidgetName("InfoCard");
-        InfoCard = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
+        InfoCard = Parent->CreateButtonControl(
             G_TradeWidgetName, kQuestionMesh, kQuestionMesh, nullptr, nullptr, &At, nullptr, &Zero,
-            0, 0, 0, 1, 0, 0, 0));
+            0, 0, 0, 1, 0, 0, 0);
         InfoCard->OwnerData = PointerField(this);
         WinControlHalfExtentsFromMesh(&InfoCard->HalfExtents, &InfoCard->MeshHolder);
         InfoCard->HitPriority = 1000;
@@ -202,9 +205,9 @@ void CTradeEquipListLine::Init(WinControl* Parent, Vector const* Position)
     Zero.y = 0.0f;
     Zero.z = 0.0f;
     FormatTradeWidgetName("InfoFrame");
-    InfoFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
+    InfoFrame = Parent->CreateButtonControl(
         G_TradeWidgetName, kItemInfoMesh, kItemInfoMesh, nullptr, nullptr, &Base, nullptr, &Zero, 1,
-        0, 0, 1, 0, 0, 0));
+        0, 0, 1, 0, 0, 0);
     InfoFrame->OwnerData = PointerField(this);
     WinControlHalfExtentsFromMesh(&InfoFrame->HalfExtents, &InfoFrame->MeshHolder);
 
@@ -217,9 +220,9 @@ void CTradeEquipListLine::Init(WinControl* Parent, Vector const* Position)
     Zero.y = 0.0f;
     Zero.z = 0.0f;
     FormatTradeWidgetName("IconFrame");
-    IconFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
+    IconFrame = Parent->CreateButtonControl(
         G_TradeWidgetName, kItemViewMesh, kItemViewMesh, nullptr, nullptr, &At, nullptr, &Zero, 1,
-        0, 0, 1, 0, 0, 0));
+        0, 0, 1, 0, 0, 0);
     IconFrame->OwnerData = PointerField(this);
     IconFrame->SetGlow(1);
     WinControlHalfExtentsFromMesh(&IconFrame->HalfExtents, &IconFrame->MeshHolder);

@@ -338,7 +338,7 @@ namespace Archetype
     void Equipment::redefine(Root const& Other)
     {
         Root::redefine(Other);
-        Equipment const* Donor = (Equipment const*)&Other;
+        Equipment const* Donor = static_cast<Equipment const*>(&Other);
         if (Donor->bUseCount != bUseCount)
             bUseCount = Donor->bUseCount;
         if (Donor->UnitsPerContainer != UnitsPerContainer)
@@ -478,7 +478,7 @@ namespace Archetype
     void AttachedEquipment::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        AttachedEquipment const* Donor = (AttachedEquipment const*)&Other;
+        AttachedEquipment const* Donor = static_cast<AttachedEquipment const*>(&Other);
         if (Donor->SeparationExplosion.Id != SeparationExplosion.Id)
             SeparationExplosion.Id = Donor->SeparationExplosion.Id;
         if (Donor->DebrisType.Id != DebrisType.Id)
@@ -560,7 +560,7 @@ namespace Archetype
     void Power::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Power const* Donor = (Power const*)&Other;
+        Power const* Donor = static_cast<Power const*>(&Other);
         if (Donor->Capacity != Capacity)
             Capacity = Donor->Capacity;
         if (Donor->ChargeRate != ChargeRate)
@@ -651,7 +651,7 @@ namespace Archetype
     void Engine::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Engine const* Donor = (Engine const*)&Other;
+        Engine const* Donor = static_cast<Engine const*>(&Other);
         if (Donor->PowerDrawFactor != PowerDrawFactor)
             PowerDrawFactor = Donor->PowerDrawFactor;
         if (Donor->CruisePowerUsage != CruisePowerUsage)
@@ -700,7 +700,7 @@ namespace Archetype
     void Armor::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Armor const* Donor = (Armor const*)&Other;
+        Armor const* Donor = static_cast<Armor const*>(&Other);
         if (Donor->HitPtsScale != HitPtsScale)
             HitPtsScale = Donor->HitPtsScale;
     }
@@ -821,7 +821,7 @@ namespace Archetype
                                        : 0;
                 unsigned Growth = (Gen.HpShieldTypesBegin == nullptr || OldSize < 2) ? 1 : OldSize;
                 unsigned NewCount = OldSize + Growth;
-                unsigned* NewBuf = (unsigned*)malloc(NewCount * sizeof(unsigned));
+                unsigned* NewBuf = static_cast<unsigned*>(malloc(NewCount * sizeof(unsigned)));
                 if (Gen.HpShieldTypesBegin != nullptr)
                     memcpy(NewBuf, Gen.HpShieldTypesBegin, OldSize * sizeof(unsigned));
                 NewBuf[OldSize] = Value;
@@ -916,7 +916,7 @@ namespace Archetype
     void ShieldGenerator::redefine(Root const& Other)
     {
         AttachedEquipment::redefine(Other);
-        ShieldGenerator const* Donor = (ShieldGenerator const*)&Other;
+        ShieldGenerator const* Donor = static_cast<ShieldGenerator const*>(&Other);
         if (Donor->ShieldType.Id != ShieldType.Id)
             ShieldType.Id = Donor->ShieldType.Id;
         if (Donor->RegenerationRate != RegenerationRate)
@@ -986,7 +986,7 @@ namespace Archetype
     {
         // Common.dll.c 0x95fb0
         AttachedEquipment::redefine(Other);
-        Thruster const* Donor = (Thruster const*)&Other;
+        Thruster const* Donor = static_cast<Thruster const*>(&Other);
         if (Donor->PowerUsage != PowerUsage)
             PowerUsage = Donor->PowerUsage;
         if (Donor->MaxThrust != MaxThrust)
@@ -1031,7 +1031,7 @@ namespace Archetype
     void Scanner::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Scanner const* Donor = (Scanner const*)&Other;
+        Scanner const* Donor = static_cast<Scanner const*>(&Other);
         if (Donor->PowerThreshold != PowerThreshold)
             PowerThreshold = Donor->PowerThreshold;
         if (Donor->RadarRange != RadarRange)
@@ -1110,7 +1110,7 @@ namespace Archetype
     void Tractor::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Tractor const* Donor = (Tractor const*)&Other;
+        Tractor const* Donor = static_cast<Tractor const*>(&Other);
         if (Donor->MaxLength != MaxLength)
             MaxLength = Donor->MaxLength;
         if (Donor->ReachSpeed != ReachSpeed)
@@ -1184,7 +1184,7 @@ namespace Archetype
     void InternalFXEquip::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        InternalFXEquip const* Donor = (InternalFXEquip const*)&Other;
+        InternalFXEquip const* Donor = static_cast<InternalFXEquip const*>(&Other);
         if (Donor->UseAnimation.Value != UseAnimation.Value)
             UseAnimation.Value = Donor->UseAnimation.Value;
     }
@@ -1217,7 +1217,7 @@ namespace Archetype
     void RepairDroid::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        RepairDroid const* Donor = (RepairDroid const*)&Other;
+        RepairDroid const* Donor = static_cast<RepairDroid const*>(&Other);
         if (Donor->RepairRate != RepairRate)
             RepairRate = Donor->RepairRate;
     }
@@ -1283,7 +1283,7 @@ namespace Archetype
     void CloakingDevice::redefine(Root const& Other)
     {
         AttachedEquipment::redefine(Other);
-        CloakingDevice const* Donor = (CloakingDevice const*)&Other;
+        CloakingDevice const* Donor = static_cast<CloakingDevice const*>(&Other);
         if (Donor->PowerUsage != PowerUsage)
             PowerUsage = Donor->PowerUsage;
     }
@@ -1332,7 +1332,7 @@ namespace Archetype
         {
             Equipment* Found = LookupLootAppearance(Reader.get_value_string());
             if (Found != nullptr && Found->get_class_type() == AClassCargoPod)
-                PodAppearance = (CargoPod*)Found;
+                PodAppearance = static_cast<CargoPod*>(Found);
             return true;
         }
 
@@ -1342,7 +1342,7 @@ namespace Archetype
     void Commodity::redefine(Root const& Other)
     {
         Equipment::redefine(Other);
-        Commodity const* Donor = (Commodity const*)&Other;
+        Commodity const* Donor = static_cast<Commodity const*>(&Other);
         if (Donor->DecayPerSecond != DecayPerSecond)
             DecayPerSecond = Donor->DecayPerSecond;
     }

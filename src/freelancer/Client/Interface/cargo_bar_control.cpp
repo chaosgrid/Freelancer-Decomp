@@ -561,11 +561,11 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     return 0;
 }
 
-WinControl* WinControl::CreateCargoBarControl(char const* Name, char const* MeshPath,
-                                              Vector const* NewOffset, char const* Hardpoint,
-                                              Vector const* NewHalfExtents,
-                                              unsigned char bHorizontal, int ToolTip2Ids,
-                                              unsigned Color, unsigned HighlightColor)
+CargoBarControl* WinControl::CreateCargoBarControl(char const* Name, char const* MeshPath,
+                                                   Vector const* NewOffset, char const* Hardpoint,
+                                                   Vector const* NewHalfExtents,
+                                                   unsigned char bHorizontal, int ToolTip2Ids,
+                                                   unsigned Color, unsigned HighlightColor)
 {
     // FUN_005a1080 (RET 0x24).
     Win3D* const Created = WinFactoryCreate(Name, "CargoBarControl", this, nullptr);
@@ -575,5 +575,5 @@ WinControl* WinControl::CreateCargoBarControl(char const* Name, char const* Mesh
                                                      NewHalfExtents, bHorizontal, ToolTip2Ids,
                                                      Color, HighlightColor);
     }
-    return static_cast<WinControl*>(Created);
+    return static_cast<CargoBarControl*>(Created);
 }

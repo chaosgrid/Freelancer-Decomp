@@ -36,6 +36,12 @@
 #include <list>
 #include <string>
 
+struct ISoundSource;
+namespace Archetype
+{
+    struct ISound;
+}
+
 class FObjectProp;
 class NnOfferDialog;
 struct FCharacterObject;
@@ -53,7 +59,7 @@ class FGfMirrorDatabase;
 // built by FUN_0044f310 from FUN_0044f270's five words).
 struct FGfScriptSoundEvent
 {
-    void* Arch;              // +0x00 Archetype::ISound of the sound entity (Thorn_Sound +0x7c)
+    Archetype::ISound* Arch; // +0x00 the sound entity's archetype (Thorn_Sound +0x7c)
     FThornSound* Sound;      // +0x04 the Thorn_Sound that plays it
     int StartMs;             // +0x08 the event's start
     int EndMs;               // +0x0c start + duration
@@ -61,7 +67,7 @@ struct FGfScriptSoundEvent
     unsigned char bSpatial;  // +0x11 entity Flags bit 1
     unsigned char Pad12[2];
     int EventId;             // +0x14 the event's unique id
-    void* Handle;            // +0x18 ISoundSource of a streamed sound, or null
+    ISoundSource* Handle;    // +0x18 the streamed sound's source, or null
     unsigned char bStarted;  // +0x1c
     unsigned char Pad1D[3];
 };
@@ -100,11 +106,11 @@ struct FGfScript
     void StopScriptSounds();
     // FUN_0044f5c0 (thiscall, RET 4) -- the first entry holding Handle leaves the list. Callers:
     // Thorn_Sound's dtor and ISoundControl slot 4 (gf_thorn_sound.cpp).
-    void RemoveSoundEvent(void* Handle);
+    void RemoveSoundEvent(ISoundSource* Handle);
     // FUN_0044f610 (thiscall, RET 8) -- the streamed handle of EventId restarted at Offset
     // (entry found, handle held), or a new source for it (FUN_00428680, bAltStart 0). Caller:
     // Thorn_Sound's ISoundControl slot 3.
-    void* PlayStreamedSoundEvent(int EventId, int Offset);
+    ISoundSource* PlayStreamedSoundEvent(int EventId, int Offset);
 
     // FUN_0044f720 (thiscall, RET 0x2c) -- bind the engine and play: spawn, the sound events,
     // IScriptEngine slots 20 (loop), 22 (start) and 26 (clock 0).

@@ -75,7 +75,7 @@ public:
     void update(float Dt) override;
     // Slot 95 (+0x17c), FUN_005300f0: GameObject's LOD pick; a picked LOD whose low word is
     // below 3, or whose high word is 2 or more, clears Field_0xbc.
-    unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
+    unsigned* PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsigned const* CachedLod) override;
     // Slot 108 (+0x1b0), LAB_005305a0: with an explosion, Action_Explode into the action list;
     // without one, GameObject's slot 108.
     void Explode(Vector const* Pos) override;

@@ -25,6 +25,7 @@
 // FUN_00540c30 / Gameobj registration (ClientObjDb_Register).
 
 struct IObjRW;
+struct ISpatialPartition;
 namespace Universe { struct ISystem; }
 
 // Retail Object::IObjDBImpl vtable (.rdata:005df8ac) — four __thiscall slots.
@@ -48,7 +49,7 @@ struct IObjDB
     // Not pure: IObjDB's own vtable (Server.dll .rdata:06d67cec) has _purecall in slots
     // 0..2 and LAB_06d06e80 (`XOR EAX,EAX; RET 4`) here -- no spatial bucket for any mask.
     // Both known implementations override it.
-    virtual void* __thiscall GetBucket(unsigned TypeMask)
+    virtual ISpatialPartition* __thiscall GetBucket(unsigned TypeMask)
     {
         (void)TypeMask;
         return nullptr;

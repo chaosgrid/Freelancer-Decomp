@@ -15,6 +15,7 @@
 //   +0x270 GameLight* ambient (FUN_00537a90), driven by FUN_005097c0
 
 #include "common_net.h"
+#include "Space/Effects/effect_base.h" // FEffectCompanion
 #include "common_universe.h"
 #include "Common/Graphics/texture_shapes.h"
 
@@ -22,7 +23,9 @@
 #include <map>
 
 struct FTexShape;
+struct ICamera;
 struct FGameLight; // engine_light.h
+struct FSpaceCamera;
 
 // One puff of a [Clouds] block (operator new 0x58, FUN_00550b60). The lightning fields run
 // while the clouds' lightning_duration is positive (FUN_00550d40).
@@ -109,7 +112,7 @@ struct FNebulaClouds
 
     // FUN_00550d40 (__thiscall, RET 0x10) — per-frame puff update: fade, cull, sort, respawn,
     // drift, move; active count at +0x14. Camera is an ICamera (vt+0x0c / vt+0x10).
-    void Update(void* Camera, float Dt, float Visibility,
+    void Update(ICamera* Camera, float Dt, float Visibility,
                 Exclusion::NebulaExclusionZoneMgr* ExclusionMgr);
     void Destroy(unsigned char Flags);
 
@@ -117,7 +120,7 @@ struct FNebulaClouds
     void SetDetail(float Detail);
 
     // FUN_00551500 — shared Clouds panel draw (this = FNebulaClouds).
-    void DrawClouds(void* Camera, void* ExclusionCtx);
+    void DrawClouds(ICamera* Camera, void* ExclusionCtx);
 };
 
 static_assert(sizeof(FNebulaClouds) == 0x12c, "Clouds component 0x12c");
@@ -149,11 +152,10 @@ struct FNebulaCloudsListNode
 struct FNebulaZoneShell;
 typedef std::map<unsigned, FNebulaZoneShell*> FNebulaZoneShellMap;
 
-struct FNebulaEffectCompanion
+struct FNebulaEffectCompanion : FEffectCompanion
 {
     FNebulaEffectCompanion();
     ~FNebulaEffectCompanion();
-    void* Values[4];
 };
 
 struct FNebulaCloudsListStorage
@@ -173,12 +175,12 @@ struct INebula
 {
     virtual void Load(char const* FilePath, char const* ZoneName) = 0;
     virtual void Shutdown() = 0;
-    virtual void Update(void* Camera, float Dt) = 0;
-    virtual void DrawFogOverlay(void* Camera) = 0;
-    virtual void DrawFogShell(void* Camera) = 0;
-    virtual void DrawExteriorBitsPass(void* Camera) = 0;
-    virtual void DrawExclusionShell(void* Camera) = 0;
-    virtual void DrawCloudsPanels(void* Camera) = 0;
+    virtual void Update(FSpaceCamera* Camera, float Dt) = 0;
+    virtual void DrawFogOverlay(FSpaceCamera* Camera) = 0;
+    virtual void DrawFogShell(FSpaceCamera* Camera) = 0;
+    virtual void DrawExteriorBitsPass(FSpaceCamera* Camera) = 0;
+    virtual void DrawExclusionShell(FSpaceCamera* Camera) = 0;
+    virtual void DrawCloudsPanels(FSpaceCamera* Camera) = 0;
     virtual float ZoneExteriorFactor(float const* CamPos3) = 0;
     virtual float GetInsideFade() = 0;
     virtual float GetSunBurnthroughIntensity() = 0;
@@ -247,12 +249,12 @@ struct FNebulaEffect : INebula
     FNebulaEffect();
     void Load(char const* FilePath, char const* ZoneName) override;
     void Shutdown() override;
-    void Update(void* Camera, float Dt) override;
-    void DrawFogOverlay(void* Camera) override;
-    void DrawFogShell(void* Camera) override;
-    void DrawExteriorBitsPass(void* Camera) override;
-    void DrawExclusionShell(void* Camera) override;
-    void DrawCloudsPanels(void* Camera) override;
+    void Update(FSpaceCamera* Camera, float Dt) override;
+    void DrawFogOverlay(FSpaceCamera* Camera) override;
+    void DrawFogShell(FSpaceCamera* Camera) override;
+    void DrawExteriorBitsPass(FSpaceCamera* Camera) override;
+    void DrawExclusionShell(FSpaceCamera* Camera) override;
+    void DrawCloudsPanels(FSpaceCamera* Camera) override;
     float ZoneExteriorFactor(float const* CamPos3) override;
     float GetInsideFade() override;
     float GetSunBurnthroughIntensity() override;
@@ -348,7 +350,7 @@ struct FNebulaEffect : INebula
     void DrawFillSheets(float CamX, float CamY, float CamZ);
 
     // FUN_00507ed0 — the exterior bit billboards (Win3D quads + Pipeline RS 0x18)
-    void DrawExteriorBits(void* Camera);
+    void DrawExteriorBits(FSpaceCamera* Camera);
 };
 #pragma pack(pop)
 

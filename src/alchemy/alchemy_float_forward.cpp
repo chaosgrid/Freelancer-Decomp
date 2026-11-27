@@ -22,8 +22,8 @@ namespace AlchemyImpl
     {
         if (Handle == -1)
             return;
-        static_cast<ITextureLibrary2*>(G_TextureLibrary)->AdvanceTime(Handle, Dt);
-        static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(
+        G_TextureLibrary->AdvanceTime(Handle, Dt);
+        G_TextureLibrary->GetFrame(
             Handle, kTextureFrameCurrent, reinterpret_cast<unsigned long*>(Frame));
     }
 

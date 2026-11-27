@@ -49,7 +49,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, LAB_062c7570. Re-reads the three delegates out
     // of the manager's dispatch table; if a flee is running (bFleeActive), re-arms whichever

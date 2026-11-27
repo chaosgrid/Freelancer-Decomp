@@ -22,7 +22,7 @@
 static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, const char* Name)
 {
     FEngineInstance* const Invalid =
-        (FEngineInstance*)((ptrdiff_t)(-1));
+        reinterpret_cast<FEngineInstance*>((ptrdiff_t)(-1));
     FArchetypeName Out;
     const char* Text = G_AnimEngine->GetInstanceName(&Out, (InstanceIndex)From)->Text;
     if (Text == nullptr)
@@ -30,7 +30,7 @@ static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, cons
     if (std::strcmp(Text, Name) == 0)
         return From;
     FEngineInstance* Cursor =
-        (FEngineInstance*)(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Invalid));
+        reinterpret_cast<FEngineInstance*>(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Invalid));
     while (Cursor != Invalid)
     {
         Text = G_AnimEngine->GetInstanceName(&Out, (InstanceIndex)Cursor)->Text;
@@ -38,18 +38,18 @@ static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, cons
             Text = "";
         if (std::strcmp(Text, Name) == 0)
             return Cursor;
-        Cursor = (FEngineInstance*)(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Cursor));
+        Cursor = reinterpret_cast<FEngineInstance*>(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Cursor));
     }
     return Invalid;
 }
 
 // FUN_06611290 (thiscall on the track, which it does not use). No checks.
-static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** Out)
+static unsigned long ReadUtfNameCrc(IFileSystem* FileSystem, const char* Name, char** Out)
 {
-    IFileSystem* Fs = AsFileSystem(FileSystem);
+    IFileSystem* Fs = FileSystem;
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, Name, nullptr);
-    const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+    const int Handle = Fs->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     if (Handle != -1)
     {
         const unsigned long Size = Fs->GetSize((unsigned long)Handle, 0); // +0x28
@@ -64,8 +64,7 @@ static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** O
 // FUN_06611350. No checks.
 void FAnimTrack::LoadChannelNode(IFileSystem* FileSystem)
 {
-    IFileSystem* Fs = AsFileSystem(FileSystem);
-    if (Fs->OpenNode(G_NameChannel) == 0) // +0x60
+    if (FileSystem->OpenNode(G_NameChannel) == 0) // +0x60
         return;
     if (Channel != nullptr)
     {
@@ -76,10 +75,10 @@ void FAnimTrack::LoadChannelNode(IFileSystem* FileSystem)
     Desc.Size = G_AggDescSizeChannelArchetype;
     Desc.Name = G_NameChannelArchetype;
     ICOManager* Dacom = DACOM_Acquire();
-    if (Dacom->CreateInstance((AGGDESC*)(&Desc),
+    if (Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                               (void**)(&Channel)) == 0) // +0xC
         Channel->Load(FileSystem); // +0xC
-    Fs->OpenNode(G_NameParentDot); // +0x60
+    FileSystem->OpenNode(G_NameParentDot); // +0x60
 }
 
 FAnimNameEntry::~FAnimNameEntry()
@@ -98,12 +97,11 @@ static unsigned long G_ObjectMapLength = 0;
 static unsigned long G_EventMapLength = 0;
 
 // FUN_06611440. Retail returns 1, which no caller reads.
-void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
+void FAnimNameEntry::LoadScriptMaps(const char* Name, IFileSystem* FileSystem)
 {
     this->Name = _strdup(Name);
-    IFileSystem* Fs = AsFileSystem(FileSystem);
     WIN32_FIND_DATAA FindData;
-    const int FindHandle = Fs->FindFirst(G_NameStar, // +0x48
+    const int FindHandle = FileSystem->FindFirst(G_NameStar, // +0x48
                                       &FindData);
     if (FindHandle == -1)
         return;
@@ -117,12 +115,12 @@ void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
             Desc.FindHandle = (unsigned long)FindHandle;
-            const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+            const int Handle = FileSystem->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
             if (Handle == -1)
                 continue;
             unsigned long BytesRead = 0;
-            Fs->Read((unsigned long)Handle, &RootHeight, 4, &BytesRead, 0); // +0x14
-            Fs->CloseFile((unsigned long)Handle); // +0x10
+            FileSystem->Read((unsigned long)Handle, &RootHeight, 4, &BytesRead, 0); // +0x14
+            FileSystem->CloseFile((unsigned long)Handle); // +0x10
             bHasRootHeight = 1;
             continue;
         }
@@ -132,7 +130,7 @@ void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
         FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
         Desc.FindHandle = (unsigned long)FindHandle;
         IFileSystem* MapFs = nullptr;
-        Fs->CreateInstance((AGGDESC*)(&Desc), (void**)&MapFs); // +0xC
+        FileSystem->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)&MapFs); // +0xC
         if (std::strncmp(FindData.cFileName, G_NameEventMap, G_EventMapLength) != 0)
         {
             Tracks.resize(Tracks.size() + 1, FAnimTrack());
@@ -171,11 +169,11 @@ void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
             }
         }
         if (MapFs != nullptr)
-            ((IDAComponent*)MapFs)->Release();
-    } while (Fs->FindNext((unsigned long)FindHandle, // +0x4C
+            MapFs->Release();
+    } while (FileSystem->FindNext((unsigned long)FindHandle, // +0x4C
                         &FindData) != 0);
-    Fs->GetFileSystemError(); // +0x78
-    Fs->FindClose((unsigned long)FindHandle); // +0x50
+    FileSystem->GetFileSystemError(); // +0x78
+    FileSystem->FindClose((unsigned long)FindHandle); // +0x50
 }
 
 static FAnimNameEntry* InsertAnimName(FAnimScript* Script, unsigned long Crc)
@@ -190,14 +188,13 @@ static void StoreAnimMapNameLengths()
     G_EventMapLength = (unsigned long)(std::strlen(G_NameEventMap));
 }
 
-unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
+unsigned long LoadAnimScriptNames(FAnimScript* Script, IFileSystem* FileSystem)
 {
-    IFileSystem* Fs = AsFileSystem(FileSystem);
-    if (Fs->OpenNode(G_NameScript) == 0)
+    if (FileSystem->OpenNode(G_NameScript) == 0)
         return 0;
     StoreAnimMapNameLengths();
     WIN32_FIND_DATAA FindData;
-    const int FindHandle = Fs->FindFirst(G_NameStar,
+    const int FindHandle = FileSystem->FindFirst(G_NameStar,
                                       &FindData);
     if (FindHandle != -1)
     {
@@ -208,8 +205,8 @@ unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
             Desc.FindHandle = (unsigned long)FindHandle;
-            void* NestedFs = nullptr;
-            Fs->CreateInstance((AGGDESC*)(&Desc), &NestedFs);
+            IFileSystem* NestedFs = nullptr;
+            FileSystem->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)&NestedFs);
             if (((FindData.dwFileAttributes >> 4) & 1) != 0)
             {
                 FAnimNameEntry* Entry =
@@ -217,13 +214,13 @@ unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
                 Entry->LoadScriptMaps(FindData.cFileName, NestedFs);
             }
             if (NestedFs != nullptr)
-                ((IDAComponent*)NestedFs)->Release();
-        } while (Fs->FindNext((unsigned long)FindHandle,
+                NestedFs->Release();
+        } while (FileSystem->FindNext((unsigned long)FindHandle,
                             &FindData) != 0);
-        Fs->GetFileSystemError();
-        Fs->FindClose((unsigned long)FindHandle);
+        FileSystem->GetFileSystemError();
+        FileSystem->FindClose((unsigned long)FindHandle);
     }
-    Fs->OpenNode(G_NameParentDot);
+    FileSystem->OpenNode(G_NameParentDot);
     return 0;
 }
 
@@ -240,11 +237,10 @@ FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc)
     return &It->second;
 }
 
-unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
+unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, IFileSystem* FileSystem,
                                        const char** Names, int Count)
 {
-    IFileSystem* Fs = AsFileSystem(FileSystem);
-    if (Fs->OpenNode(G_NameScript) == 0)
+    if (FileSystem->OpenNode(G_NameScript) == 0)
         return 0;
     StoreAnimMapNameLengths();
     for (int Index = 0; Index < Count; ++Index)
@@ -257,7 +253,7 @@ unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
             break;
         }
         char Message[0x2000];
-        if ((Fs->GetPathAttributes(Name) & 0x10) == 0)
+        if ((FileSystem->GetPathAttributes(Name) & 0x10) == 0)
         {
             FormatFdumpMessage(Message,"Unknown or old style animation \"%s\". Skipping.\n", Name);
             EngBaseFdump(kFdumpWarning, G_FdumpFileAnim, 0x193, "WARNING", Message);
@@ -267,8 +263,8 @@ unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
             continue;
         FEngBaseFileSystemDesc Desc;
         FillFileSystemDesc(&Desc, Name, nullptr);
-        void* NestedFs = nullptr;
-        if (Fs->CreateInstance((AGGDESC*)(&Desc), &NestedFs) == 0)
+        IFileSystem* NestedFs = nullptr;
+        if (FileSystem->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), (void**)&NestedFs) == 0)
         {
             FAnimNameEntry* Entry = InsertAnimName(Script, DACOM_CRC::GetCRC32(Name));
             Entry->LoadScriptMaps(Name, NestedFs);
@@ -279,9 +275,9 @@ unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
             EngBaseFdump(kFdumpWarning, G_FdumpFileAnim, 0x189, "WARNING", Message);
         }
         if (NestedFs != nullptr)
-            ((IDAComponent*)NestedFs)->Release();
+            NestedFs->Release();
     }
-    Fs->OpenNode(G_NameParentDot);
+    FileSystem->OpenNode(G_NameParentDot);
     return 0;
 }
 
@@ -372,7 +368,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
                                     void* Sink, void* SinkContext, unsigned char* Already)
 {
     FEngineInstance* const Invalid =
-        (FEngineInstance*)((ptrdiff_t)(-1));
+        reinterpret_cast<FEngineInstance*>((ptrdiff_t)(-1));
     *Already = 0;
     if (Root == Invalid && Sink == nullptr)
     {
@@ -393,7 +389,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
-        FEngineInstance* Parent = (FEngineInstance*)(G_AnimEngine->GetInstanceParent((InstanceIndex)Inst));
+        FEngineInstance* Parent = reinterpret_cast<FEngineInstance*>(G_AnimEngine->GetInstanceParent((InstanceIndex)Inst));
         if (Parent == Invalid)
             return 0;
         FArchetypeName NameOut;
@@ -443,7 +439,7 @@ void FAnimPlayback::BindTracks(FEngineInstance* Root, void* Sink, void* SinkCont
         Bind.Kind = G_BindKindRoot;
         Bind.Sink = nullptr;
         Bind.SinkContext = nullptr;
-        Bind.Instance = (FEngineInstance*)((ptrdiff_t)-1);
+        Bind.Instance = reinterpret_cast<FEngineInstance*>((ptrdiff_t)-1);
         unsigned char bAlready = 0;
         unsigned char bBound = BindTrackTarget(&Bind, Root, Track, Sink, SinkContext, &bAlready);
         if (bBound != 0)
@@ -630,7 +626,7 @@ FTypedChannel* FAnimPlayback::FindTypedByHeader(const FAnimBindOut* Header)
         }
         Index += 1;
     }
-    return (FTypedChannel*)((ptrdiff_t)(-1));
+    return reinterpret_cast<FTypedChannel*>((ptrdiff_t)(-1));
 }
 
 // FUN_066129c0.
@@ -657,7 +653,7 @@ unsigned long RegisterAnimHandle(unsigned long Key)
         return 0xFFFFFFFF;
     if (FindAnimHandle(Key))
         return 0;
-    FAnimHandleNode* Node = (FAnimHandleNode*)(std::calloc(1, sizeof(FAnimHandleNode)));
+    FAnimHandleNode* Node = static_cast<FAnimHandleNode*>(std::calloc(1, sizeof(FAnimHandleNode)));
     if (Node == nullptr)
         return 0xFFFFFFFF;
     Node->Key = Key;

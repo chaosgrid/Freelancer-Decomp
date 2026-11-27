@@ -50,12 +50,10 @@ void FStaticCamera::Deactivate()
     SetLetterboxTarget(0.0f, kLetterboxSpeed);
 }
 
-int FStaticCamera::HandleCommand74(void* Command)
+int FStaticCamera::HandleCommand74(FSpaceCommand* Command)
 {
-    const int* Event = (int const*)Command;
-
-    // No null test on Event.
-    if (*Event == USER_CANCEL)
+    // No null test on Command.
+    if (Command->Id == USER_CANCEL)
         RequestSpaceCameraMode("player");
 
     // Always zero, whether or not the event matched.

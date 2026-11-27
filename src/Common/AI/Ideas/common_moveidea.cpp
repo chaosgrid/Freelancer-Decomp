@@ -73,21 +73,21 @@ MoveIdea::MoveIdea()
 }
 
 // Own vtable slot 0 override -- LAB_062d4f20 (RET 0xc, no Ghidra decompile).
-bool MoveIdea::SetContext(void* InObject, void* InHandle, void* InContext)
+bool MoveIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBehaviorManager* InContext)
 {
     if (InObject == nullptr || InHandle == nullptr)
     {
         return false;
     }
 
-    Handle = (SystemManager*)InHandle;
+    Handle = InHandle;
     Object = InObject;
     Context = InContext;
     Attached = 1;
 
     // Slot 0xf0, get_angular_speed_XY(Speed = 0, MaxSpeed = 1.0f): the opposite push
     // order from the slot-0xd8 call below.
-    IObjInspect const* const Inspect = ObjInspectOf(InObject);
+    IObjInspect const* const Inspect = InObject;
     MaxAngularSpeedXY60 = Inspect->get_angular_speed_XY(0.0f, 1.0f);
 
     // Slot 0xd8, get_speed(1.0f, ThrustEquipEngine).
@@ -218,7 +218,7 @@ int MoveIdea::Update(float DeltaTime)
         {
             // FUN_062e58f0(Object, -1.0f, Magnitude, 0.0f, Type).
             ThrustEquipType const Type = (Mode == kMoveModeTradelane) ? ThrustEquipTradelane : ThrustEquipEngine;
-            Speed = Behavior_GetDistanceTravelled(ObjInspectOf(Object), -1.0f, Magnitude, 0.0f, Type);
+            Speed = Behavior_GetDistanceTravelled(Object, -1.0f, Magnitude, 0.0f, Type);
         }
     }
 
@@ -353,7 +353,7 @@ int MoveIdea::Update(float DeltaTime)
     {
         // FUN_062e5c00; the unrounded result is compared before it is stored.
         double const Cost = EstimateTurnCircleApproachCost(
-            const_cast<IObjInspect*>(ObjInspectOf(Object)), Goal,
+            Object, Goal,
             MaxAngularSpeedXY60, MaxSpeed5c);
         if (Cost < static_cast<double>(Speed2))
         {
@@ -549,7 +549,7 @@ void MoveIdea::SetThrottleScale(float Value)
     }
     }
 
-    Throttle = Behavior_GetProjectedThrottle(ObjInspectOf(Object), Value, Type);
+    Throttle = Behavior_GetProjectedThrottle(Object, Value, Type);
 }
 
 // Folded at .text:062d88b0 -- `MOV [ECX+0x44],EAX; RET 4`. Takes an int: every

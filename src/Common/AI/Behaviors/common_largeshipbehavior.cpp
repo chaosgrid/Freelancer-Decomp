@@ -35,7 +35,7 @@ LargeShipBehavior::~LargeShipBehavior()
 
 // Slot 1, LAB_062cff40. Retail does not test the BindContext result before binding the ideas
 // (they run with whatever +0x14/+0x24 hold); it only returns it.
-bool LargeShipBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool LargeShipBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bBound = BindContext(Owner, Manager, Sys);
 
@@ -84,7 +84,7 @@ int LargeShipBehavior::OnEvaluateReadiness(float Value)
 
     // The mask is tested on the out-parameter; get_type's return value is discarded.
     unsigned ObjectType = 0;
-    ObjInspectOf(OwnerContext)->get_type(ObjectType);
+    OwnerContext->get_type(ObjectType);
     if ((ObjectType & OBJ_CRUISER) != 0)
     {
         if (SysMgr->Targeting.GetTarget() != nullptr)      // FUN_062ed5a0
@@ -129,7 +129,7 @@ static IObjInspect const* OwnerObjInspectOf(SystemManager* Sys)
         return nullptr;
     }
     unsigned char* const Raw = reinterpret_cast<unsigned char*>(const_cast<Watchable*>(Watched)) - 8;
-    return static_cast<IObjInspect const*>(reinterpret_cast<IObjRW*>(Raw));
+    return reinterpret_cast<IObjRW*>(Raw);
 }
 
 // Retail inlines the 0x5f3759df fast length three times in Update(); the squared length and
@@ -160,7 +160,7 @@ int LargeShipBehavior::Update()
     // Deviation: zero-initialised where retail leaves the unused slices indeterminate; every
     // field read below is set by Init or one of the lazy refreshes.
     FAiTarget Scratch = {};
-    Scratch.Init(ObjInspectOf(OwnerContext), ObjInspectOf(Handle));
+    Scratch.Init(OwnerContext, Handle);
 
     // Clamped at zero (DAT_0639c430 = 0.0 double).
     bool bThreatCooldownExpired = false;

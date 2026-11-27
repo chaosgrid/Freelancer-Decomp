@@ -34,6 +34,15 @@ struct XGoTradelane;
 // client_equip_fx.cpp (FCliTradeLaneEquipFx, FUN_00516af0 .. FUN_00516ea0).
 
 // FUN_00515200 node -- sizeof 0x40.
+// FUN_0042a7e0 list node -- {Next, Prev, ship id}, 0xc bytes.
+struct FTlShipListNode
+{
+    FTlShipListNode* Next;
+    FTlShipListNode* Prev;
+    unsigned ShipId;
+};
+static_assert(sizeof(FTlShipListNode) == 0xc, "ship list node 0xc");
+
 struct FTradeLaneRingRuntime
 {
     FTradeLaneRingRuntime* LiveNext; // +0x00  live / free list link (FUN_00404d50 / 00404d90)
@@ -43,7 +52,7 @@ struct FTradeLaneRingRuntime
     // (FUN_0042a7e0, node {Next, Prev, Id}), +0x10 the size.
     unsigned char Side;              // +0x08
     unsigned char Pad09[3];
-    void* ShipListSentinel;          // +0x0c
+    FTlShipListNode* ShipListSentinel; // +0x0c
     int ShipListCount;               // +0x10
     BaseWatcher RingWatcher;         // +0x14  the ring gameobj's Watchable (gameobj + 8)
     unsigned char SideKey;           // +0x1c  lane side; the live list is keyed on (gameobj, side)
@@ -58,10 +67,7 @@ struct FTradeLaneRingRuntime
     float GlowParam;                 // +0x2c  the fade rate (per second)
     // +0x30 -- an effect companion {arch, sound, particle, light} (FUN_005154a0): the ring's
     // tl_ring_active effect.
-    void* EffectSlot0;               // +0x30
-    void* EffectSlot1;               // +0x34
-    void* EffectSlot2;               // +0x38
-    void* EffectSlot3;               // +0x3c
+    FEffectCompanion EffectCompanion; // +0x30
 };
 static_assert(sizeof(FTradeLaneRingRuntime) == 0x40, "TradeLaneRingRuntime 0x40");
 static_assert(offsetof(FTradeLaneRingRuntime, ShipListSentinel) == 0x0c, "ship list @+0x0c");
@@ -69,7 +75,7 @@ static_assert(offsetof(FTradeLaneRingRuntime, RingWatcher) == 0x14, "watcher @+0
 static_assert(offsetof(FTradeLaneRingRuntime, SideKey) == 0x1c, "side key @+0x1c");
 static_assert(offsetof(FTradeLaneRingRuntime, bActive) == 0x1d, "active @+0x1d");
 static_assert(offsetof(FTradeLaneRingRuntime, GlowScale) == 0x28, "glow scale @+0x28");
-static_assert(offsetof(FTradeLaneRingRuntime, EffectSlot0) == 0x30, "slots @+0x30");
+static_assert(offsetof(FTradeLaneRingRuntime, EffectCompanion) == 0x30, "slots @+0x30");
 
 enum : unsigned
 {

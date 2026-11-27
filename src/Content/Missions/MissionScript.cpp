@@ -933,11 +933,11 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::BaseEnter:
         // Parms {base, player}.
         if (Parms[1] == PlayerId)
-            OnBaseEnter(MessageParms);
+            OnBaseEnter(Parms);
         break;
     case EMessage::BaseExit:
         if (Parms[1] == PlayerId)
-            OnBaseExit(MessageParms);
+            OnBaseExit(Parms);
         break;
     case EMessage::CargoScanned:
     case EMessage::CommComplete:
@@ -1030,7 +1030,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     }
     case EMessage::GFObjSelect:
         if (PlayerId == Parms[1])
-            OnCharacterSelect(MessageParms);
+            OnCharacterSelect(Parms);
         break;
     case EMessage::Heartbeat:
     {
@@ -1047,7 +1047,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::AbortMission:
         // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
-        OnAbortMission(MessageParms);
+        OnAbortMission(Parms);
         bBaseBody = false;
         break;
     case EMessage::LocationEnter:
@@ -1061,7 +1061,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     case EMessage::LocationExit:
         if (PlayerId == Parms[1])
-            OnLocationExit(MessageParms);
+            OnLocationExit(Parms);
         break;
     case EMessage::MissionResponse:
         if (Parms[3] == PlayerId && Parms[0] == ControllerId)
@@ -1091,7 +1091,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         if (Parms[1] == PlayerId)
-            OnSpaceEnter(MessageParms);
+            OnSpaceEnter(Parms);
         bBaseBody = false;
         break;
     case EMessage::SpaceExit:
@@ -1102,7 +1102,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         bBaseBody = false;
         break;
     case EMessage::ObjectDestroyed:
-        OnObjectDestroyed(MessageParms);
+        OnObjectDestroyed(Parms);
         break;
     case EMessage::SystemExit:
         if (Parms[2] == PlayerId)
@@ -1111,8 +1111,8 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::SystemEnter:
         // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
-        OnSystemEnter(MessageParms);
-        OnSystemEnterPopUp(MessageParms);
+        OnSystemEnter(Parms);
+        OnSystemEnterPopUp(Parms);
         bBaseBody = false;
         break;
     case EMessage::MissionStart:
@@ -1122,7 +1122,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::DamageReputation:
         if (FindContentPlayerState(PlayerId) != nullptr
             && PlayerState->GetLiveMission() == ControllerId)
-            CheckFriendlyFire(MessageParms);
+            CheckFriendlyFire(Parms);
         bBaseBody = false;
         break;
     case EMessage::Msg0x1006:
@@ -1135,14 +1135,15 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         break;
     case EMessage::PlayerMissionChanged:
-        OnPlayerMissionChanged(MessageParms);
+        OnPlayerMissionChanged(Parms);
         break;
     case EMessage::NpcShipCreated:
     {
-        FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
+        FContentNpcShip* const* NpcParms = static_cast<FContentNpcShip* const*>(MessageParms);
+        FContentNpcShip* Npc = *NpcParms;
         if (Npc->ControllerId == ControllerId)
         {
-            RegisterNpc(MessageParms);
+            RegisterNpc(NpcParms);
             SubmitNpcPersonality(Npc, 0);
             DispatchTriggerEvent(&EventId, MessageParms);
         }
@@ -1169,9 +1170,8 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
 }
 
 // FUN_06eb9dc0.
-void FMissionScript::OnBaseEnter(void const* MessageParms)
+void FMissionScript::OnBaseEnter(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     // Every RTC script not yet started is started.
     std::list<FMissionRtc>::iterator ScriptIt = RtcScripts.begin();
     for (; ScriptIt != RtcScripts.end(); ++ScriptIt)
@@ -1204,14 +1204,14 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
         NnPath.SendObjectives(false, false);
     }
     EMessage EventId = EMessage::BaseEnter;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
 }
 
 // FUN_06eb9ef0.
-void FMissionScript::OnBaseExit(void const* MessageParms)
+void FMissionScript::OnBaseExit(unsigned int const* Parms)
 {
     // The scripts are only walked with a base record (FUN_06eac0c0).
-    FContentBase* Base = FindContentBaseInfo(static_cast<unsigned int const*>(MessageParms));
+    FContentBase* Base = FindContentBaseInfo(Parms);
     if (Base != nullptr)
     {
         std::list<FMissionRtc>::iterator It = RtcScripts.begin();
@@ -1242,11 +1242,11 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
         }
     }
     EMessage EventId = EMessage::BaseExit;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
 }
 
 // FUN_06eba350.
-void FMissionScript::OnCharacterSelect(void const* MessageParms)
+void FMissionScript::OnCharacterSelect(unsigned int const* Parms)
 {
     std::list<FMissionRtc>::iterator It = RtcScripts.begin();
     for (; It != RtcScripts.end(); ++It)
@@ -1267,17 +1267,17 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
         FBarCharacterList::iterator Character;
         if (!Room->FindCharacter(GetFirstRtcRole(It->Encounter), PlayerId, &Character))
             continue;
-        if (Character->CharacterId != *static_cast<unsigned int const*>(MessageParms))
+        if (Character->CharacterId != *Parms)
             continue;
         Character->SetBehavior(static_cast<unsigned long>(-1));
         It->bFinished = 1;
     }
     EMessage EventId = EMessage::GFObjSelect;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
 }
 
 // FUN_06eba530.
-void FMissionScript::OnLocationExit(void const* MessageParms)
+void FMissionScript::OnLocationExit(unsigned int const* Parms)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
@@ -1285,7 +1285,7 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
     if (Base != nullptr)
     {
         // The roles of the unfinished scripts of this location are kept.
-        unsigned int const LocationId = *static_cast<unsigned int const*>(MessageParms);
+        unsigned int const LocationId = *Parms;
         std::vector<FRtcScriptRole> KeepRoles;
         std::list<FMissionRtc>::iterator It = RtcScripts.begin();
         for (; It != RtcScripts.end(); ++It)
@@ -1315,7 +1315,7 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
         }
     }
     EMessage EventId = EMessage::LocationExit;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
 }
 
 // FUN_06eba030.
@@ -1358,9 +1358,8 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
 }
 
 // FUN_06eba720.
-void FMissionScript::OnSpaceEnter(void const* MessageParms)
+void FMissionScript::OnSpaceEnter(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (Parms[1] != PlayerId)
         return;
     // A CostumeHint per dialog costume (Costume's inline operator= copies `count` accessories).
@@ -1378,7 +1377,7 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
         pub::Player::LoadHint(PlayerId, &Hint);
     }
     EMessage EventId = EMessage::SpaceEnter;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
     if (NnPath.bActive == 0)
     {
         RenumberAllObjectives();
@@ -1393,11 +1392,10 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
 }
 
 // FUN_06ebaae0.
-void FMissionScript::OnObjectDestroyed(void const* MessageParms)
+void FMissionScript::OnObjectDestroyed(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     EMessage EventId = EMessage::ObjectDestroyed;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
     // The first friendly-fire label naming the destroyed object is dropped.
     std::list<TString<0x30>>::iterator It = FriendlyFireOffLabels.begin();
     for (; It != FriendlyFireOffLabels.end(); ++It)
@@ -1414,13 +1412,12 @@ void FMissionScript::OnObjectDestroyed(void const* MessageParms)
 }
 
 // FUN_06eba860.
-void FMissionScript::OnSystemEnter(void const* MessageParms)
+void FMissionScript::OnSystemEnter(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (Parms[2] != PlayerId || FindContentPlayerState(PlayerId) == nullptr)
         return;
     EMessage EventId = EMessage::SystemEnter;
-    DispatchTriggerEvent(&EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, Parms);
     FContentPlayerShip* const Ship = PlayerState->ShipObject;
     if (Ship == nullptr)
         return;
@@ -1434,9 +1431,8 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
 }
 
 // FUN_06eba1f0.
-void FMissionScript::OnSystemEnterPopUp(void const* MessageParms)
+void FMissionScript::OnSystemEnterPopUp(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (bRepPopUpArmed == 0 || Parms[0] != RepPopUpSystemId || Parms[2] != PlayerId)
         return;
     FmtStr Title;
@@ -1450,11 +1446,11 @@ void FMissionScript::OnSystemEnterPopUp(void const* MessageParms)
 }
 
 // FUN_06eb9cd0.
-void FMissionScript::OnAbortMission(void const* MessageParms)
+void FMissionScript::OnAbortMission(unsigned int const* Parms)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
-    if (static_cast<unsigned int const*>(MessageParms)[0] != PlayerId)
+    if (Parms[0] != PlayerId)
         return;
     if (PlayerState->GetLiveMission() != ControllerId)
         return;
@@ -1466,9 +1462,8 @@ void FMissionScript::OnAbortMission(void const* MessageParms)
 }
 
 // FUN_06eb99a0: parms {kind, ship, victim}.
-void FMissionScript::CheckFriendlyFire(void const* MessageParms)
+void FMissionScript::CheckFriendlyFire(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
     FContentPlayerShip* const Ship = PlayerState->ShipObject;
@@ -1501,9 +1496,8 @@ void FMissionScript::CheckFriendlyFire(void const* MessageParms)
 }
 
 // FUN_06eba8f0.
-void FMissionScript::OnPlayerMissionChanged(void const* MessageParms)
+void FMissionScript::OnPlayerMissionChanged(unsigned int const* Parms)
 {
-    unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr
         && Parms[0] != ControllerId)
     {

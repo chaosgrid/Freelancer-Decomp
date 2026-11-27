@@ -91,11 +91,11 @@ IVP_SurfaceBuilder_Polygon_Convex::IVP_SurfaceBuilder_Polygon_Convex(IVP_Templat
     Triangles.Add(Back);
     Surfaces.Add(Surface);
 
-    void* Buffer;
+    IVP_Compact_Ledge* Buffer;
     {
         IVP_Compact_Ledge_Generator Generator;
         const int32_t Size = Generator.prepare_compact_ledge(&Triangles);
-        Buffer = ivp_malloc_aligned(static_cast<unsigned>(Size), 0x10); // FUN_06343fc0
+        Buffer = static_cast<IVP_Compact_Ledge*>(ivp_malloc_aligned(static_cast<unsigned>(Size), 0x10)); // FUN_06343fc0
         std::memset(Buffer, 0, static_cast<size_t>(Size));
         Generator.generate_compact_ledge(Buffer);
     }
@@ -111,7 +111,7 @@ IVP_SurfaceBuilder_Polygon_Convex::IVP_SurfaceBuilder_Polygon_Convex(IVP_Templat
     {
         ::operator delete(Surfaces.elems[I]);
     }
-    c_ledge = static_cast<IVP_Compact_Ledge*>(Buffer);
+    c_ledge = Buffer;
 }
 
 // FUN_0636de70: every stored point of the hash
@@ -123,7 +123,7 @@ IVP_SurfaceBuilder_Polygon_Convex::~IVP_SurfaceBuilder_Polygon_Convex()
     for (int32_t I = point_hash->SizeMm; I >= 0; --I)
     {
         IVP_Poly_Point* const Point =
-            static_cast<IVP_Poly_Point*>(static_cast<FPolygonPointHash::FEntry*>(point_hash->Elems)[I].Elem);
+            static_cast<IVP_Poly_Point*>(point_hash->Elems[I].Elem);
         if (Point != nullptr)
         {
             delete Point;
@@ -175,9 +175,9 @@ void IVP_SurfaceBuilder_Polygon_Convex::init_surface_manager_polygon()
     add_triangles_to_vector(&Triangles);
     IVP_Compact_Ledge_Generator Generator;
     const int32_t Size = Generator.prepare_compact_ledge(&Triangles);
-    void* const Buffer = ivp_malloc_aligned(static_cast<unsigned>(Size), 0x10); // FUN_06343fc0
+    IVP_Compact_Ledge* const Buffer = static_cast<IVP_Compact_Ledge*>(ivp_malloc_aligned(static_cast<unsigned>(Size), 0x10)); // FUN_06343fc0
     Generator.generate_compact_ledge(Buffer);
-    c_ledge = static_cast<IVP_Compact_Ledge*>(Buffer);
+    c_ledge = Buffer;
 }
 
 // FUN_0636e030.

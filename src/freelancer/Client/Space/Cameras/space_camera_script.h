@@ -30,6 +30,8 @@
 
 #include <stddef.h>
 
+struct IScriptEngine; // thorn_iface.h
+
 // The DACOM plumbing the two sinks share: QueryInterface (LAB_0051e830), AddRef (LAB_0051e8e0)
 // and Release (LAB_0041a800), the first three slots of both retail vtables.
 struct FScriptCamSink : IGeoTransformControl
@@ -99,7 +101,7 @@ struct FScriptCamera : FGameCamera
 
     // +0x0f8  the live IScriptEngine, or null when no script is loaded. Released through its own
     // slot 8; the two entity handles below are handed back through its slot 0x34 first.
-    void*                      Script;
+    IScriptEngine*             Script;
 
     FScriptCamTransform*       CameraTransform; // +0x0fc  operator new(0x38)
     FScriptCamObjectTransform* ObjectTransform; // +0x100  operator new(0x70)
@@ -133,7 +135,7 @@ struct FScriptCamera : FGameCamera
     //   * a null Transform12 leaves the stored transform alone.
     //
     // Transform12 is twelve floats: nine of orientation then three of position.
-    void Setup(const char* ScriptName, void* Object, const float* Transform12);
+    void Setup(const char* ScriptName, IObjRW* Object, const float* Transform12);
 };
 
 // Offsets from the ctor (0x0051e100), dtor (0x0051dfc0) and setup (0x0051e3b0); sizes from
@@ -171,7 +173,7 @@ const char* ScriptCameraName();
 
 // The object the `main_object` sink currently watches, or null. Retail spells this
 // `watcher->Watched - 8` inline, the same idiom the other cameras use.
-void* ScriptCameraWatchedObject(const FScriptCamera* Cam);
+IObjRW* ScriptCameraWatchedObject(const FScriptCamera* Cam);
 
 // Both sinks implement the seven slots of DACOM IGeoTransformControl:
 //

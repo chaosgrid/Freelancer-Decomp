@@ -1077,7 +1077,7 @@ void TargetManager::UpdateAttackTargetOverride()
             IObjRW* currentTarget = nullptr;
             ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target()))->get_target(currentTarget);
 
-            bool bAlreadyOnTarget = ((void*)currentTarget == (void*)selectedIface);
+            bool bAlreadyOnTarget = (static_cast<void*>(currentTarget) == static_cast<void*>(selectedIface));
             if (!bAlreadyOnTarget && currentTarget != nullptr && selectedIface != nullptr)
             {
                 // The current target's get_id runs first.
@@ -1087,7 +1087,7 @@ void TargetManager::UpdateAttackTargetOverride()
             if (!bAlreadyOnTarget)
             {
                 (void)static_cast<IObjAffect*>(ObjRwFromWatchable(const_cast<Watchable*>(Owner->Watcher.target())))
-                    ->set_target((IObjRW*)selectedIface, (unsigned short)subObjNone, -1);
+                    ->set_target(static_cast<IObjRW*>(selectedIface), (unsigned short)subObjNone, -1);
             }
 
             SetAttackState(kAttackStateEngaged);
@@ -1144,11 +1144,11 @@ void TargetManager::UpdateAttackTargetOverride()
             for (unsigned f = 0; f < followerCount; ++f)
             {
                 IObjRW* const follower = followers[f];
-                if (follower == nullptr || ObjInspectOf(follower)->is_player())
+                if (follower == nullptr || follower->is_player())
                 {
                     continue;
                 }
-                (void)ObjAffectOf(follower)->set_target((IObjRW*)selectedIface,
+                (void)ObjAffectOf(follower)->set_target(static_cast<IObjRW*>(selectedIface),
                                                    (unsigned short)subObjNone, -1);
             }
             return;

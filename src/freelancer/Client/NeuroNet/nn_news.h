@@ -37,6 +37,9 @@
 #include <stdint.h>
 
 class NewsBroadcastProperties;
+class NnButtonControl;
+class NnStaticControl;
+class NnTextControl;
 class RichTextWin;
 class UiScroll;
 
@@ -90,18 +93,18 @@ public:
     unsigned IconPathCount;              // +0x590 7
     int IconIds[7];                      // +0x594 the icons' tooltip ids
     unsigned Field_0x5b0;                // +0x5b0 not written or read by this class
-    WinControl* CloseButton;             // +0x5b4 "NewsCloseButton"
-    WinControl* Ticker;                  // +0x5b8 "NewsTicker"
-    WinControl* HeadlineIcons[5];        // +0x5bc "NewsHeadlineIcon%d"
+    NnButtonControl* CloseButton;        // +0x5b4 "NewsCloseButton"
+    NnTextControl* Ticker;               // +0x5b8 "NewsTicker"
+    NnStaticControl* HeadlineIcons[5];   // +0x5bc "NewsHeadlineIcon%d"
     WinControl* IconFrames[5];           // +0x5d0 "NewsHeadlineIconFrame%d"
     WinControl* HeadlineBoxes[5];        // +0x5e4 "NewsHeadlineBox%d"
-    WinControl* Headlines[5];            // +0x5f8 "NewsHeadlineHeadline%d"
+    NnTextControl* Headlines[5];         // +0x5f8 "NewsHeadlineHeadline%d"
     Vector HeadlinePositions[5];         // +0x60c each headline's position, from Create
     UiScroll* Scroll;                    // +0x648 "NewsHeadlineScroll"
-    WinControl* StoryHeadline;           // +0x64c "NewsStoryHeadline"
+    NnTextControl* StoryHeadline;        // +0x64c "NewsStoryHeadline"
     RichTextWin* StoryText;              // +0x650 "NewsStoryText"
     unsigned Field_0x654;                // +0x654 not written or read by this class
-    WinControl* StoryIcon;               // +0x658 "NewsStoryIcon"
+    NnStaticControl* StoryIcon;          // +0x658 "NewsStoryIcon"
     unsigned Field_0x65c;                // +0x65c not written or read by this class
     int Hovered;                         // +0x660 item index under the mouse, -1 none
     int Clicked;                         // +0x664 row last clicked, -1 none

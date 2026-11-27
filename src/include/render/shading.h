@@ -201,9 +201,9 @@ struct ITextureLibrary2 : IDAComponent
     virtual GENRESULT DACOM_API GetGenericSlot(int Index, unsigned long* Out) = 0;
     // LAB_06ec1c40: load every child below "Texture library" and return the
     // id of the resulting texture group.
-    virtual GENRESULT DACOM_API LoadTextureGroup(void* FileSystem, int* OutGroupId) = 0; // 5 +0x14 RET 0xC
+    virtual GENRESULT DACOM_API LoadTextureGroup(IFileSystem* FileSystem, int* OutGroupId) = 0; // 5 +0x14 RET 0xC
     // FUN_06ec18b0: load one named child below "Texture library".
-    virtual GENRESULT DACOM_API LoadTextureLibrary(void* FileSystem, const char* Name) = 0; // 6 +0x18 RET 0xC
+    virtual GENRESULT DACOM_API LoadTextureLibrary(IFileSystem* FileSystem, const char* Name) = 0; // 6 +0x18 RET 0xC
     // +0x1C: RET 8 includes stack this; ECX is unused at entry (06ec1f30, exe 0041b080).
     virtual GENRESULT DACOM_API GarbageCollect(int GroupId) = 0;
     // 8 +0x20 LAB_06ec2060: advance every playing entry's frame clock.
@@ -353,7 +353,7 @@ struct IMaterialLibrary : IDAComponent
     // 6 +0x18 06ecd480: remove the first exact Key/Pattern rule.
     virtual GENRESULT DACOM_API RemoveMapRule(int Key, const char* Pattern) = 0;
     virtual GENRESULT DACOM_API AllocateGroup(unsigned long* OutId) = 0; // 7 +0x1C
-    virtual GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem, void* Extra) = 0; // 8 +0x20 RET 0xC
+    virtual GENRESULT DACOM_API LoadFromFileSystem(IFileSystem* FileSystem, void* Extra) = 0; // 8 +0x20 RET 0xC
     // 9 +0x24 LAB_06eccce0: unimplemented in retail
     // — unconditional `return 0xFFFFFFF9` ignoring both args.
     virtual GENRESULT DACOM_API UnsupportedOperation(void* Arg1, void* Arg2) = 0;
@@ -442,7 +442,7 @@ struct IMaterialBatcher2 : IDAComponent
     // 10 +0x28 06ec9350: Flush bins in configured order.
     virtual GENRESULT DACOM_API FlushAll(unsigned char Clear) = 0;
     // 11 +0x2C 06ec9570: Draw immediately or queue context/geometry in the selected bin.
-    virtual GENRESULT DACOM_API Submit(IMaterial* Material, void* Context,
+    virtual GENRESULT DACOM_API Submit(IMaterial* Material, FMaterialSubmitContext* Context,
                                        unsigned long PrimType, unsigned long Start,
                                        unsigned long Count, unsigned long IbStart,
                                        unsigned long IndexSpan, void* SortDepth,
@@ -468,7 +468,7 @@ struct IMaterialBatcher2 : IDAComponent
 struct IMatAnimLibrary : IDAComponent
 {
     // Load the MaterialAnim directories into an opaque group.
-    virtual void* DACOM_API LoadAnimationGroup(void* FileSystem) = 0;
+    virtual void* DACOM_API LoadAnimationGroup(IFileSystem* FileSystem) = 0;
     // +0x10 LAB_06ec70c0 RET 4: null/-1 no-op; first erase current data CRCs
     // from the library map, then release all group references and the group.
     virtual GENRESULT DACOM_API UnloadAnimationGroup(void* Arg) = 0;

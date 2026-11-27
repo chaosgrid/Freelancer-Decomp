@@ -55,7 +55,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API Update(void* Arg) override;
         GENRESULT DACOM_API Draw(void* Arg) override;
         // LAB_0621fa40: find list rec+8 == id, *out = rec[0]. Empty → -1.
-        GENRESULT DACOM_API FindNodeById(void* IdRaw, void* Out) override;
+        GENRESULT DACOM_API FindNodeById(void* IdRaw, void** Out) override;
         // LAB_0621fa80: empty list → AL=1 (kept). Non-empty: per-node flag
         // dispatch to +0x94/+0x98/+0x90, aborting (return 0) on flags==7 or
         // on any callback out-flag. See WalkNodesFlagged.
@@ -90,7 +90,7 @@ namespace AlchemyImpl
 
         // FUN_0621f6d0 / 730 / 790: if node+0x1C AL==0, Alchemy+Off(dt, node).
         GENRESULT WalkNodes(GENRESULT (DACOM_API IGenericFx::*Method)(float), float Value);
-        GENRESULT WalkNodesAlchemy(GENRESULT (DACOM_API IAlchemy::*Method)(void*, void*),
+        GENRESULT WalkNodesAlchemy(GENRESULT (DACOM_API IAlchemy::*Method)(void*, IDAComponent*),
                                    void* Arg);
 
         // LAB_0621fa80: empty list → 1. Else per node (skipping a self match

@@ -277,7 +277,7 @@ namespace
             return GR_OK;
         }
 
-        GENRESULT DACOM_API Load(void* FileSystem) override
+        GENRESULT DACOM_API Load(IFileSystem* FileSystem) override
         {
             // LAB_06f38250: a NULL FS returns 0 without creating a parser.
             if (Scene_.PlaybackState() != 0)
@@ -288,11 +288,11 @@ namespace
             if (bDefaultParser)
                 LoadParser_ = ThornCreateLuaLoadParser(&Scene_);
             GENRESULT Result = GR_GENERIC;
-            const GENRESULT LoadResult = LoadParser_->Load(static_cast<IFileSystem*>(FileSystem));
+            const GENRESULT LoadResult = LoadParser_->Load(FileSystem);
             if (LoadResult >= 0)
             {
                 Scene_.SetDuration(static_cast<int>(LoadParser_->GetDuration()));
-                LoadParser_->Build(static_cast<IFileSystem*>(FileSystem),
+                LoadParser_->Build(FileSystem,
                                    static_cast<IScriptEngine*>(this), ComContext_);
                 Scene_.MarkLoaded();
                 Scene_.FinalizeLoad(static_cast<int>(LoadParser_->GetDuration()));
@@ -349,11 +349,11 @@ namespace
             return Result;
         }
 
-        GENRESULT DACOM_API Save(void* FileSystem) override
+        GENRESULT DACOM_API Save(IFileSystem* FileSystem) override
         {
             if (FileSystem == nullptr)
                 return GR_GENERIC;
-            IFileSystem* Fs = static_cast<IFileSystem*>(FileSystem);
+            IFileSystem* Fs = FileSystem;
             Fs->AddRef();
             std::unique_ptr<IFileSystem, FThornFileSystemRelease> FileSystemReference(Fs);
             const bool bDefaultParser = SaveParser_ == nullptr;

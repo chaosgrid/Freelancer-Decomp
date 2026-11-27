@@ -369,12 +369,20 @@ public:
     // Payload starts at +0x20 and belongs to the concrete packet class.
     unsigned char* Payload() { return reinterpret_cast<unsigned char*>(this) + 0x20; }
     const unsigned char* Payload() const { return reinterpret_cast<const unsigned char*>(this) + 0x20; }
+    // The payload struct a concrete packet class (or a codec shared by several) knows it has.
+    template<class T> T* PayloadAs() { return reinterpret_cast<T*>(Payload()); }
+    template<class T> const T* PayloadAs() const { return reinterpret_cast<const T*>(Payload()); }
     unsigned int* PayloadDwords() { return reinterpret_cast<unsigned int*>(Payload()); }
     const unsigned int* PayloadDwords() const { return reinterpret_cast<const unsigned int*>(Payload()); }
 
     void AddRef();
 
     CDAPacket* AsRaw() { return reinterpret_cast<CDAPacket*>(this); }
+
+    // MarshalPtr holds an address (CDAPacket::BufferCursor is an unsigned char*); it stays an
+    // integer because a pointer-typed member changes the reloads the codecs compile to.
+    unsigned char* MarshalBuffer() const { return reinterpret_cast<unsigned char*>(MarshalPtr); }
+    void SetMarshalBuffer(unsigned char* Buffer) { MarshalPtr = reinterpret_cast<unsigned int>(Buffer); }
 
     // --- layout, mirroring CDAPacket exactly (UsageCount +0x04 is FRpcRefObject's) ---
     // +0x08 -- every retail packet constructor zeroes it, but the connection queues (VC6

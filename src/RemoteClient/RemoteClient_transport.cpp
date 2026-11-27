@@ -65,7 +65,7 @@ namespace
     };
 }
 
-void HandleClientPacket(unsigned int ClientId, CDAPacket* Packet);
+void HandleClientPacket(unsigned int ClientId, FPacketBase* Packet);
 IServer* RemoteClientGetServer();
 
 double CClientImpl::GetLinkSaturation(unsigned int ClientId)
@@ -321,7 +321,7 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, unsigned long Size)
             return;
         }
 
-        HandleClientPacket(ClientId, Packet->AsRaw());
+        HandleClientPacket(ClientId, Packet);
         Remaining -= static_cast<int>(DecodedSize);
         // Retail quirk (06b3932d): unlike remoteserver's decoder loop, Cursor is not advanced
         // past the decoded body.

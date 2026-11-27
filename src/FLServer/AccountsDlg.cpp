@@ -197,7 +197,7 @@ void CAccountsDlg::OnEditAccount()
 	}
 
 	CEditAccountDlg Dlg(nullptr);
-	Dlg.Account = (CAccount*)AccountData;
+	Dlg.Account = reinterpret_cast<CAccount*>(AccountData);
 	Dlg.DoModal();
 	RefreshAccountList();
 	OnSelChangeList();
@@ -258,7 +258,7 @@ void CAccountsDlg::OnDeleteAccount()
 		return;
 	}
 	LockServer();
-	CAccount* Account = (CAccount*)::SendMessageA(AccountList.m_hWnd, LB_GETITEMDATA, Selection, 0);
+	CAccount* Account = reinterpret_cast<CAccount*>(::SendMessageA(AccountList.m_hWnd, LB_GETITEMDATA, Selection, 0));
 	Players.DeleteAccount(Account->m_Name);
 	UnlockServer();
 	RefreshAccountList();

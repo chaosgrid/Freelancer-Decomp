@@ -18,6 +18,8 @@
 #include "NeuroNet/nn_messaging.h"        // NnVoiceTick (FUN_00489e00)
 #include "NeuroNet/nn_modal.h"            // G_NnMainButton, G_bNnScreenUp, NnFloatBits
 #include "NeuroNet/NavMap/nn_navmap.h"           // NavMapPostPendingOpen (FUN_004a2a80)
+#include "NeuroNet/nn_button_control.h"
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_story_star.h"       // StoryStarTick (FUN_004bc990), StoryStarRequeueLastObjective
 #include "NeuroNet/nn_trade.h"            // G_NnTrade (DAT_006724b4)
 #include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteRed (DAT_00679ba8)

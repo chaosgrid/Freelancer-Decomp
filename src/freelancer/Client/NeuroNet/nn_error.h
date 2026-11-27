@@ -28,6 +28,8 @@
 
 #include <stddef.h>
 
+class NnTextControl;
+
 class NnError : public WinControl, public EventHandler
 {
 public:
@@ -51,10 +53,10 @@ public:
 
     unsigned char bCursorDrawFlag; // +0x330
     unsigned char Pad331[3];       // +0x331
-    WinControl* Text;              // +0x334
+    NnTextControl* Text;           // +0x334
     WinControl* OkayButton;        // +0x338
     WinControl* OkayText;          // +0x33c
-    WinControl* Title;             // +0x340
+    NnTextControl* Title;          // +0x340
 
 private:
     // The dismiss sequence retail inlines three times: DAT_0066dc04 = 0, the

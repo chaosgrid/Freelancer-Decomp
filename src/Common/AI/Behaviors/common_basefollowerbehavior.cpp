@@ -144,7 +144,7 @@ int BaseFollowerBehavior::OnUpdate()
     // sub-object and re-points only on change, which is BaseWatcher::set()'s own guard.
     {
         IObjRW* const Override = Sys->FormationLeaders.GetCurrentLeader();   // FUN_062ecaf0(Rec)
-        LeadWatcher.set(static_cast<Watchable const*>(Override));   // null stays null
+        LeadWatcher.set(Override);   // null stays null
     }
 
     if (OwnerIsPlayer(Sys))
@@ -302,7 +302,7 @@ int BaseFollowerBehavior::OnUpdate()
 
     FollowerDirectiveOrder Order;
     std::memset(&Order, 0, sizeof(Order));
-    Rec->GetDirectiveOrder((unsigned char*)&Order);
+    Rec->GetDirectiveOrder(reinterpret_cast<unsigned char*>(&Order));
 
     bool RunPendingLookup = false;
     if (bInTradeLane != 0)
@@ -356,10 +356,10 @@ int BaseFollowerBehavior::OnUpdate()
             // IObjAffect (IObjRW's second base, +4) slot 25 go_tradelane; named from Server.dll's
             // Ship forwarder .text:06d028c0. Retail pushes a dword holding bMidLane plus pad;
             // the callee reads only the low byte.
-            void* const Secondary = Sys->Timers.FindVerifiedObject(&Order.SecondaryObjectId);   // FUN_062e74a0
-            IObjAffect* const Affect = static_cast<IObjAffect*>(Owner);
+            IObjRW* const Secondary = Sys->Timers.FindVerifiedObject(&Order.SecondaryObjectId);   // FUN_062e74a0
+            IObjAffect* const Affect = Owner;
             int const Committed =
-                Affect->go_tradelane(Candidate, static_cast<IObjInspect const*>(Secondary),
+                Affect->go_tradelane(Candidate, Secondary,
                                      Order.bMidLane != 0, Order.MaxRange);
             if (Committed != 0)
             {
@@ -475,7 +475,7 @@ void BaseFollowerBehavior::UpdateTickPayload(float Delta)
 }
 
 // Slot 1, LAB_062cb470.
-bool BaseFollowerBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool BaseFollowerBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     bool const bBound = BindContext(Owner, Manager, Sys);           // FUN_062d2090
     if (bBound)
@@ -518,7 +518,7 @@ void BaseFollowerBehavior::OnDisengage()
     Field29c = 0;
     if (bInTradeLane != 0)
     {
-        IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+        IObjInspect const* const Owner = OwnerContext;
         if (Owner->is_player())
         {
             CObject const* const Object = Owner->cobject();
@@ -587,12 +587,12 @@ void BaseFollowerBehavior::OnEvent(void* Arg)
     if (Lane->bEnteringLane == 0 && WatchedId == Lane->ShipId && Lane->bExitRequested != 0)
     {
         bool bInLane = false;
-        (void)ObjInspectOf(OwnerContext)->is_using_tradelane(&bInLane);
+        (void)OwnerContext->is_using_tradelane(&bInLane);
         if (bInLane)
         {
             // Retail calls request_exit_tradelane unconditionally, on null when the owner is
             // not a ship; reproduced without a guard.
-            CObject const* const Object = ObjInspectOf(OwnerContext)->cobject();
+            CObject const* const Object = OwnerContext->cobject();
             CShip* Ship = nullptr;
             if (Object != nullptr && (Object->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
                 Ship = (CShip*)Object;

@@ -64,7 +64,7 @@ CELightEquip* __cdecl CELightEquip::cast(CEquip* Equip)
     // RVA 0x3f270
     if (Equip == nullptr || Equip->GetType() != EquipTypeLight)
         return nullptr;
-    return (CELightEquip*)(Equip);
+    return static_cast<CELightEquip*>(Equip);
 }
 
 CELightEquip const* __cdecl CELightEquip::cast(CEquip const* Equip)
@@ -98,14 +98,14 @@ CEAttachedFX* __cdecl CEAttachedFX::cast(CEquip* Equip)
     // RVA 0x3f160, shared by both overloads.
     if (Equip == nullptr || Equip->GetType() != EquipTypeAttachedFX)
         return nullptr;
-    return (CEAttachedFX*)(Equip);
+    return static_cast<CEAttachedFX*>(Equip);
 }
 
 CEAttachedFX const* __cdecl CEAttachedFX::cast(CEquip const* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeAttachedFX)
         return nullptr;
-    return (CEAttachedFX const*)(Equip);
+    return static_cast<CEAttachedFX const*>(Equip);
 }
 
 CEInternalFX::CEInternalFX(CEqObj* OwnerObj, unsigned short EquipId,
@@ -166,7 +166,7 @@ CEInternalFX* __cdecl CEInternalFX::cast(CEquip* Equip)
     // RVA 0x3fec0
     if (Equip == nullptr || Equip->GetType() != EquipTypeInternalFX)
         return nullptr;
-    return (CEInternalFX*)(Equip);
+    return static_cast<CEInternalFX*>(Equip);
 }
 
 CEInternalFX const* __cdecl CEInternalFX::cast(CEquip const* Equip)
@@ -177,17 +177,17 @@ CEInternalFX const* __cdecl CEInternalFX::cast(CEquip const* Equip)
 
 Archetype::Light const* CELightEquip::LightArch() const
 {
-    return (Archetype::Light const*)(Arch);
+    return static_cast<Archetype::Light const*>(Arch);
 }
 
 Archetype::AttachedFXEquip const* CEAttachedFX::FXArch() const
 {
-    return (Archetype::AttachedFXEquip const*)(Arch);
+    return static_cast<Archetype::AttachedFXEquip const*>(Arch);
 }
 
 Archetype::InternalFXEquip const* CEInternalFX::InternalFXArch() const
 {
-    return (Archetype::InternalFXEquip const*)(Arch);
+    return static_cast<Archetype::InternalFXEquip const*>(Arch);
 }
 
 void CELightEquip::NotifyArchGroupDestroyed(unsigned short SubObjId)

@@ -135,7 +135,7 @@ int DodgeIdea::Update(float DeltaTime)
         return 3;
 
     SystemManager* const Sys = Handle;
-    IBehaviorManager* const Manager = static_cast<IBehaviorManager*>(Context);
+    IBehaviorManager* const Manager = Context;
     FAiTarget* const NavRecord = &Sys->SelfTarget;
 
     // Reroll runs only when the unrounded difference is <= 0 (unordered skips).

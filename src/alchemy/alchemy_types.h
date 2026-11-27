@@ -116,6 +116,8 @@ namespace AlchemyImpl
     //   SelectIb as the base vertex and the IB offset to DrawIndexedPrimitive as the start
     //   index). The VB handle Begin fetches is NOT per context: it is the module global
     //   DAT_06257bd4 (G_DrawVbHandle), shared by all six.
+    struct FAlchemyVertex;
+
     struct FAlDrawContext
     {
         unsigned long Prim;          // +0x00
@@ -124,8 +126,8 @@ namespace AlchemyImpl
         unsigned char bInBegin;      // +0x08
         unsigned short Field_0xA;    // +0x0a TODO: meaning unknown (zeroed, never incremented)
         unsigned short PrimCount;    // +0x0c
-        void* LockedVerts;           // +0x10
-        void* LockedIndices;         // +0x14
+        FAlchemyVertex* LockedVerts;    // +0x10
+        unsigned short* LockedIndices;  // +0x14
         unsigned long RequestedVerts;   // +0x18
         unsigned long RequestedIndices; // +0x1c
         unsigned int VbOffset;       // +0x20

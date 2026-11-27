@@ -10,6 +10,9 @@
 // the base and location changes (enter, leave, load, unload) every client state goes through.
 
 class RoomData;
+class BaseData;
+struct ICamera;
+struct FRoomRuntime;
 
 // FUN_004393b0 — LocationController base/room registry, built once after DataConfig. Retail
 // reaches it through the menu pre-init chain: singleton FUN_00437420, vtable slot 8
@@ -20,7 +23,7 @@ void ClearClientLocationMaps();
 RoomData* LookupClientLocationRoom(unsigned LocationId);
 // FUN_0043a2b0 -- this+0x20, keyed by BaseData::BaseId. Returns BaseData*; an unknown id FDUMPs
 // and reads through null, as retail.
-void* LookupClientLocationBase(unsigned BaseId);
+BaseData* LookupClientLocationBase(unsigned BaseId);
 unsigned GetClientLocationBaseCount();
 unsigned GetClientLocationRoomCount();
 
@@ -68,7 +71,7 @@ TMirrorPropertyBucket<AmbientScriptProperties>* GetClientLocationRoomAmbientScri
 // FUN_0043a340 (RET 4) -- the location's RoomData is loaded (RoomData +0x08). Caller: the Gf
 // script sequence stop FUN_004554c0.
 bool IsClientLocationRoomLoaded(unsigned LocationId);
-void* GetClientCurrentLocationRuntime();                      // FUN_0043a460
+FRoomRuntime* GetClientCurrentLocationRuntime();                      // FUN_0043a460
 void UnloadClientLocationRoomState(unsigned LocationId);      // FUN_0043a080
 
 // LocationController (DAT_00668708) base and location changes. Every IServer notification
@@ -130,4 +133,4 @@ void SetClientLocationInTransition();
 
 // FUN_00438c90 — the current room's camera, or null when no room is entered. The object
 // answers vtable slots 3 (position) and 4 (orientation), which is all FUN_00428040 asks of it.
-void* GetClientRoomCamera();
+ICamera* GetClientRoomCamera();

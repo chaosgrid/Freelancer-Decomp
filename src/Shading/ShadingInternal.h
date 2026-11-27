@@ -108,29 +108,13 @@ inline void PipeSetTexture(IRenderPipeline* Pipeline, unsigned long Stage, unsig
                                          (void*)Handle);
 }
 
-// Convert the published opaque file-system argument at the local boundary.
-inline IFileSystem* AsFileSystem(void* FileSystem)
-{
-    return (IFileSystem*)FileSystem;
-}
-
-inline IVertexBufferManager* AsVbMgr(void* VbMgr)
-{
-    return (IVertexBufferManager*)VbMgr;
-}
-
-inline IRPDraw* AsRpDraw(void* Draw)
-{
-    return (IRPDraw*)Draw;
-}
-
-inline GENRESULT RpDrawIndexed(void* Draw, unsigned long Prim, unsigned long MinIndex,
+inline GENRESULT RpDrawIndexed(IRPDraw* Draw, unsigned long Prim, unsigned long MinIndex,
                                unsigned long NumVertices, unsigned long StartIndex,
                                unsigned long Count)
 {
     if (Draw == nullptr)
         return GR_GENERIC;
-    return AsRpDraw(Draw)->DrawIndexedPrimitive(Prim, (unsigned int)MinIndex,
+    return Draw->DrawIndexedPrimitive(Prim, (unsigned int)MinIndex,
                                       (unsigned int)NumVertices,
                                       (unsigned int)StartIndex,
                                       (unsigned int)Count);
@@ -201,71 +185,72 @@ inline unsigned long FvfStride(unsigned long Fvf)
     return FvfPosSize(Fvf) + FvfNormalSize(Fvf) + FvfColorSize(Fvf) + FvfTexSize(Fvf);
 }
 
-inline GENRESULT VbMgrLock(void* VbMgr, unsigned long Fvf, unsigned long Count,
+inline GENRESULT VbMgrLock(IVertexBufferManager* VbMgr, unsigned long Fvf, unsigned long Count,
                            FVertexMemoryLock* Out)
 {
     if (VbMgr == nullptr || Out == nullptr)
         return GR_GENERIC;
-    return AsVbMgr(VbMgr)->LockVertexMemory((unsigned int)Fvf,
+    return VbMgr->LockVertexMemory((unsigned int)Fvf,
                                    (unsigned int)Count, Out);
 }
 
-inline void VbMgrUnlock(void* VbMgr, FVertexMemoryLock* Out)
+inline void VbMgrUnlock(IVertexBufferManager* VbMgr, FVertexMemoryLock* Out)
 {
     if (VbMgr == nullptr || Out == nullptr)
         return;
-    AsVbMgr(VbMgr)->UnlockVertexMemory(Out);
+    VbMgr->UnlockVertexMemory(Out);
 }
 
-inline int FileSystemOpenNode(void* FileSystem, const char* Name)
+inline int FileSystemOpenNode(IFileSystem* FileSystem, const char* Name)
 {
-    return AsFileSystem(FileSystem)->OpenNode(Name);
+    return FileSystem->OpenNode(Name);
 }
 
-inline int FileSystemClose(void* FileSystem, unsigned long Handle)
+inline int FileSystemClose(IFileSystem* FileSystem, unsigned long Handle)
 {
-    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->CloseFile(Handle) : 0;
+    return (FileSystem != nullptr) ? FileSystem->CloseFile(Handle) : 0;
 }
 
-inline int FileSystemRead(void* FileSystem, unsigned long Handle, void* Buffer,
+inline int FileSystemRead(IFileSystem* FileSystem, unsigned long Handle, void* Buffer,
                           unsigned long Size, unsigned long* BytesRead)
 {
-    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->Read(Handle, Buffer, Size, BytesRead, 0) : 0;
+    return (FileSystem != nullptr) ? FileSystem->Read(Handle, Buffer, Size, BytesRead, 0) : 0;
 }
 
-inline unsigned long FileSystemGetSize(void* FileSystem, unsigned long Handle)
+inline unsigned long FileSystemGetSize(IFileSystem* FileSystem, unsigned long Handle)
 {
-    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->GetSize(Handle, 0) : 0;
+    return (FileSystem != nullptr) ? FileSystem->GetSize(Handle, 0) : 0;
 }
 
-inline int FileSystemFindFirst(void* FileSystem, const char* Pattern,
+inline int FileSystemFindFirst(IFileSystem* FileSystem, const char* Pattern,
                                WIN32_FIND_DATAA* FindData)
 {
     if (FileSystem == nullptr)
         return -1;
-    return AsFileSystem(FileSystem)->FindFirst(Pattern,
+    return FileSystem->FindFirst(Pattern,
                               FindData);
 }
 
-inline int FileSystemFindNext(void* FileSystem, int Handle, WIN32_FIND_DATAA* FindData)
+inline int FileSystemFindNext(IFileSystem* FileSystem, int Handle, WIN32_FIND_DATAA* FindData)
 {
     if (FileSystem == nullptr)
         return 0;
-    return AsFileSystem(FileSystem)->FindNext((unsigned long)Handle,
+    return FileSystem->FindNext((unsigned long)Handle,
                               FindData);
 }
 
-inline int FileSystemFindClose(void* FileSystem, int Handle)
+inline int FileSystemFindClose(IFileSystem* FileSystem, int Handle)
 {
-    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->FindClose((unsigned long)Handle) : 0;
+    return (FileSystem != nullptr) ? FileSystem->FindClose((unsigned long)Handle) : 0;
 }
 
-inline int FileSystemOpenByDesc(void* FileSystem, void* Desc)
+inline int FileSystemOpenByDesc(IFileSystem* FileSystem, FFileSystemDesc* Desc)
 {
     if (FileSystem == nullptr)
         return -1;
-    return AsFileSystem(FileSystem)->OpenByDesc((FFileSystemDesc*)Desc);
+    return FileSystem->OpenByDesc(Desc);
 }
+
 
 // RS/TSS table walk:
 // first dword = start state/type; [+4]=value; [+8]=next; stride 8; stop at next==0.
@@ -318,7 +303,7 @@ inline void InitializeShadingFileDesc(FFileSystemDesc* Desc, const char* Path,
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
-inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, unsigned long Size)
+inline bool ReadNamedBytes(IFileSystem* FileSystem, const char* Name, void* Buffer, unsigned long Size)
 {
     if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr)
         return false;
@@ -336,15 +321,15 @@ inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, uns
     return ReadOk != 0 && BytesRead == Size;
 }
 
-inline int FileSystemWrite(void* FileSystem, unsigned long Handle, const void* Buffer,
+inline int FileSystemWrite(IFileSystem* FileSystem, unsigned long Handle, const void* Buffer,
                            unsigned long Size, unsigned long* BytesWritten)
 {
     if (FileSystem == nullptr)
         return 0;
-    return AsFileSystem(FileSystem)->Write(Handle, Buffer, Size, BytesWritten, nullptr);
+    return FileSystem->Write(Handle, Buffer, Size, BytesWritten, nullptr);
 }
 
-inline bool WriteNamedBytes(void* FileSystem, const char* Name, const void* Buffer,
+inline bool WriteNamedBytes(IFileSystem* FileSystem, const char* Name, const void* Buffer,
                             unsigned long Size)
 {
     if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr)

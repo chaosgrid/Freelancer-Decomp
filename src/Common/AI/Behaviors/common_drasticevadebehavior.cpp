@@ -27,7 +27,7 @@ DrasticEvadeBehavior::~DrasticEvadeBehavior()
 }
 
 // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
-bool DrasticEvadeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
+bool DrasticEvadeBehavior::SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys)
 {
     return BindContext(Owner, Manager, Sys);
 }

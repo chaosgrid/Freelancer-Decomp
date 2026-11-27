@@ -95,7 +95,7 @@ bool CEShieldGenerator::Update(float Dt, unsigned Flags)
     {
         // NaN health does not recharge.
         bool bRecharging = LinkedShield->GetRelativeHealth() < 1.0f;
-        Archetype::ShieldGenerator const* GenArch = (Archetype::ShieldGenerator const*)(Arch);
+        Archetype::ShieldGenerator const* GenArch = static_cast<Archetype::ShieldGenerator const*>(Arch);
         // Kept on the x87 stack in retail.
         double Draw = (double)(RealDt) * GenArch->ConstantPowerDraw;
         if (bRecharging)
@@ -154,7 +154,7 @@ CEShieldGenerator* __cdecl CEShieldGenerator::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeShieldGen)
         return nullptr;
-    return (CEShieldGenerator*)(Equip);
+    return static_cast<CEShieldGenerator*>(Equip);
 }
 
 CEShieldGenerator const* __cdecl CEShieldGenerator::cast(CEquip const* Equip)
@@ -472,7 +472,7 @@ void CEShield::ShieldBatteryBoost(float Amount)
 void CEShield::AddGen(CEShieldGenerator* Gen)
 {
     // FUN_0629c5e0 (from the listing; Ghidra's output is corrupted). No Gen or Gen->Arch test.
-    Archetype::ShieldGenerator* GenArch = (Archetype::ShieldGenerator*)Gen->Arch;
+    Archetype::ShieldGenerator* GenArch = static_cast<Archetype::ShieldGenerator*>(Gen->Arch);
 
     // The toughest generator's archetype dominates (signed compare).
     if (DominantGenArch == nullptr || DominantGenArch->Toughness < GenArch->Toughness)
@@ -517,7 +517,7 @@ void CEShield::RemGen(CEShieldGenerator* Gen)
         }
 
         // Each float sum is rounded by its own store.
-        Archetype::ShieldGenerator* RemArch = (Archetype::ShieldGenerator*)(*It)->Arch;
+        Archetype::ShieldGenerator* RemArch = static_cast<Archetype::ShieldGenerator*>((*It)->Arch);
         if (DominantGenArch == nullptr || DominantGenArch->Toughness < RemArch->Toughness)
             DominantGenArch = RemArch;
         OfflineThreshold = RemArch->OfflineThreshold + OfflineThreshold;  // running sum; averaged below
@@ -549,7 +549,7 @@ CEShield* __cdecl CEShield::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeShield)
         return nullptr;
-    return (CEShield*)(Equip);
+    return static_cast<CEShield*>(Equip);
 }
 
 CEShield const* __cdecl CEShield::cast(CEquip const* Equip)
@@ -600,12 +600,12 @@ double CEShield::GetWeaponModifier(ID_String const& WeaponType) const
 
 Archetype::ShieldGenerator const* CEShieldGenerator::ShieldGenArch() const
 {
-    return (Archetype::ShieldGenerator const*)(Arch);
+    return static_cast<Archetype::ShieldGenerator const*>(Arch);
 }
 
 Archetype::Shield const* CEShield::ShieldArch() const
 {
-    return (Archetype::Shield const*)(Arch);
+    return static_cast<Archetype::Shield const*>(Arch);
 }
 
 bool CEShield::IsLootable() const

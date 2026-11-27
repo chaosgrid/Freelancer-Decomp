@@ -10,6 +10,8 @@
 #include "Core/globals.h"             // RenderMgrFrameReady
 #include "Common/Fonts/ids_strings.h"         // GetIdsStringWWithRawFallback
 #include "Common/Graphics/image.h"
+#include "NeuroNet/nn_static_control.h"
+#include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_ui_pulse.h"         // NnUiPulseIdleArgb
 #include "Interface/win3d.h"
 #include "Interface/win3d_immediate.h"     // Win3DSetPipelineClearColor

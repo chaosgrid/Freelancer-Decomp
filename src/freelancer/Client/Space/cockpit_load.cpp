@@ -68,12 +68,12 @@ namespace
     // FUN_00543350 (thiscall on the IObjRW). The CEqObj is the IObjRW's +0x10, and it counts
     // only when its class word at +0x4c carries all of 0x503. A failed test leaves null and
     // retail dereferences it anyway, so no guard is added here either.
-    Archetype::Root* ShipArchetypeOf(void* ObjRW)
+    Archetype::Root* ShipArchetypeOf(IObjRW* ObjRW)
     {
         FPlayerShipView* EqObj = nullptr;
         if (ObjRW != nullptr)
         {
-            unsigned char* const Base = static_cast<unsigned char*>(ObjRW) + 0x0c;
+            unsigned char* const Base = reinterpret_cast<unsigned char*>(ObjRW) + 0x0c;
             if (Base != nullptr)
             {
                 FPlayerShipView* const Candidate = *reinterpret_cast<FPlayerShipView**>(Base + 4);
@@ -94,9 +94,11 @@ const FCockpitMeshHolder& GetCockpitMeshHolder()
 bool InitPlayerCockpitSlice()
 {
     // The player's IObjRW -- the watcher at DAT_00679744 minus eight, or null.
-    void* const Watched = GetPlayerShipWatcher();
-    void* const ObjRW =
-        (Watched != nullptr) ? static_cast<unsigned char*>(Watched) - kWatchableOffset : nullptr;
+    Watchable* const Watched = GetPlayerShipWatcher();
+    IObjRW* const ObjRW =
+        (Watched != nullptr)
+            ? reinterpret_cast<IObjRW*>(reinterpret_cast<unsigned char*>(Watched) - kWatchableOffset)
+            : nullptr;
 
     // Retail tests only the first character -- the path pointer itself is never null-tested.
     Archetype::Root* const Arch = ShipArchetypeOf(ObjRW);

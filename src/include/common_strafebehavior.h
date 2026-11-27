@@ -53,7 +53,7 @@ public:
     // (FaceIdea, MoveIdea, AfterburnerIdea, in that order) with (Owner, Sys, Manager),
     // then +0x60 = 2, +0x48 = 2, byte +0x64 = 0, +0x6c = 0, +0x68 = 999. Returns the
     // binder's result.
-    bool SetContext(void* Owner, void* Manager, void* Sys) override;
+    bool SetContext(IObjRW* Owner, IBehaviorManager* Manager, SystemManager* Sys) override;
 
     // Slot 3, LAB_062ca1e0: FUN_062d20d0, SetAvoidanceAllowed(1, 3), the angular trigger range
     // (+0x2c), the ship's forward extent (+0x44), the strafe direction (-column 2), and the

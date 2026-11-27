@@ -181,18 +181,18 @@ namespace
     bool         G_LastModeWasScript = false;  // FUN_00549e70's local_28
 
     // The camera for one of FUN_00549e70's names.
-    FSpaceCamera* CameraForSlot(int Slot)
+    FGameCamera* CameraForSlot(int Slot)
     {
         switch (Slot)
         {
-        case kSpaceCameraFirstPerson: return SpaceCameraOf((FHudCamera*)&G_SpaceApp.FirstPerson);
-        case kSpaceCameraThirdPerson: return SpaceCameraOf((FHudCamera*)&G_SpaceApp.ThirdPerson);
-        case kSpaceCameraTurret:      return SpaceCameraOf((FHudCamera*)&G_SpaceApp.Turret);
-        case kSpaceCameraRearview:    return SpaceCameraOf((FHudCamera*)&G_SpaceApp.RearView);
-        case kSpaceCameraScript:      return (FSpaceCamera*)&G_SpaceApp.Script;
-        case kSpaceCameraStatic:      return (FSpaceCamera*)&G_SpaceApp.Static;
-        case kSpaceCameraDocking:     return (FSpaceCamera*)&G_SpaceApp.Docking;
-        case kSpaceCameraDeath:       return (FSpaceCamera*)&G_SpaceApp.Death;
+        case kSpaceCameraFirstPerson: return &G_SpaceApp.FirstPerson;
+        case kSpaceCameraThirdPerson: return &G_SpaceApp.ThirdPerson;
+        case kSpaceCameraTurret:      return &G_SpaceApp.Turret;
+        case kSpaceCameraRearview:    return &G_SpaceApp.RearView;
+        case kSpaceCameraScript:      return &G_SpaceApp.Script;
+        case kSpaceCameraStatic:      return &G_SpaceApp.Static;
+        case kSpaceCameraDocking:     return &G_SpaceApp.Docking;
+        case kSpaceCameraDeath:       return &G_SpaceApp.Death;
         default:                      return nullptr;
         }
     }
@@ -351,7 +351,7 @@ bool SpaceCameraIsHardCut(const float* OldOrientation, const float* NewOrientati
     return bHadNoPreviousCamera;
 }
 
-void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
+void InstallSpaceCamera(FGameCamera* NewCam, bool bForce)
 {
     // FUN_00549bc0 (thiscall on the in-flight controller G_SpaceApp, RET 8).
     if (G_SpaceApp.ActiveCamera == NewCam && !bForce)
@@ -379,7 +379,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
     bool bWasNone = false;
     if (G_SpaceApp.ActiveCamera != nullptr)
     {
-        ((FGameCamera*)G_SpaceApp.ActiveCamera)->Deactivate();
+        G_SpaceApp.ActiveCamera->Deactivate();
         G_SpaceApp.ActiveCamera = nullptr;
         SetClientSoundListenerObject(nullptr);
     }
@@ -400,7 +400,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
         View[3] = Client.bottom - 1;
 
         // Slot 0x58; the result is not read.
-        ((FGameCamera*)NewCam)->Attach(GetPlayerObjRW());
+        NewCam->Attach(GetPlayerObjRW());
 
         // Slot 0x64 with that rect when both extents are positive (signed), else with the
         // surface's (DAT_00610850 / DAT_00610854). The result is not read.
@@ -409,14 +409,14 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
             View[2] = static_cast<int>(G_RenderSurfaceWidth) - 1;
             View[3] = static_cast<int>(G_RenderSurfaceHeight) - 1;
         }
-        ((FGameCamera*)NewCam)->Activate(View);
+        NewCam->Activate(View);
 
         // The fog colour at the camera's position (FUN_005552e0) becomes the clear colour
         // (colour and depth clear), then FUN_0051b500 clears now. Every camera the controller
         // installs is a GameCamera.
         unsigned char Fog[4];
         StarSysGetFogColor(AsCamera(NewCam)->GetPosition(), Fog);
-        FGameCamera* const Game = reinterpret_cast<FGameCamera*>(NewCam);
+        FGameCamera* const Game = NewCam;
         Game->ClearColor[0] = Fog[0];
         Game->ClearColor[1] = Fog[1];
         Game->ClearColor[2] = Fog[2];
@@ -462,7 +462,7 @@ bool SpaceCameraLoadCockpit(const char* CockpitIniPath)
     return bOk;
 }
 
-FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget)
+FGameCamera* SwitchSpaceCameraMode(const char* ModeName, IObjRW* AttachTarget)
 {
     // FUN_00549e70. Retail copies the name into a 0x20-byte stack buffer via FUN_00417c50
     // first, so a name longer than 31 characters is silently truncated before the comparisons;
@@ -565,7 +565,7 @@ FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget)
     if (Selected < 0)
         return nullptr;
 
-    FSpaceCamera* Cam = CameraForSlot(Selected);
+    FGameCamera* Cam = CameraForSlot(Selected);
 
     // The "script" flag is the force argument.
     InstallSpaceCamera(Cam, G_LastModeWasScript);
@@ -574,7 +574,7 @@ FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget)
     {
         // The SELECTED camera's slot 0x58 (attach). Every camera CameraForSlot hands out is a
         // GameCamera. Retail discards the result.
-        ((FGameCamera*)Cam)->Attach(AttachTarget);
+        Cam->Attach(AttachTarget);
     }
 
     return Cam;
@@ -587,7 +587,7 @@ void ReleaseSpaceCameraControllerParts()
     // Retail's calls on + 0x1b0, + 0x3c8 and + 0x500 are the ICF-folded bare RET 0x00401e90.
 }
 
-FSpaceCamera* GetActiveSpaceCamera()
+FGameCamera* GetActiveSpaceCamera()
 {
     return G_SpaceApp.ActiveCamera;
 }
@@ -612,19 +612,19 @@ bool IsSpaceInitInProgress()
     return G_SpaceApp.bInitInProgress != 0;
 }
 
-FSpaceCamera* GetFirstPersonSpaceCamera()
+FGameCamera* GetFirstPersonSpaceCamera()
 {
     // FUN_0054bc30: 0x00678ba4.
     return CameraForSlot(kSpaceCameraFirstPerson);
 }
 
-FSpaceCamera* GetThirdPersonSpaceCamera()
+FGameCamera* GetThirdPersonSpaceCamera()
 {
     // FUN_0054bc40: 0x00678d48.
     return CameraForSlot(kSpaceCameraThirdPerson);
 }
 
-FSpaceCamera* GetTurretSpaceCamera()
+FGameCamera* GetTurretSpaceCamera()
 {
     // FUN_0054bc50: 0x00678f60.
     return CameraForSlot(kSpaceCameraTurret);
@@ -642,21 +642,21 @@ bool IsDockingCameraCurrent()
 {
     // FUN_0054bca0: the same against the docking camera (0x00679634). No null test, as in
     // retail.
-    return GetClientSoundListenerObject() == static_cast<void*>((FSpaceCamera*)&G_SpaceApp.Docking);
+    return GetClientSoundListenerObject() == static_cast<void*>(&G_SpaceApp.Docking);
 }
 
 void NotifyCinematicView(bool bActive)
 {
     // Port-only helper for 0x0051e615 / 0x0051e6f1 (script camera) and 0x0051e93f / 0x0051e985
     // (static camera).
-    IObjRW* const Ship = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Ship = GetPlayerObjRW(); // FUN_0054baf0
     if (Ship == nullptr)
         return;
 
     // IServer slot 57; DAT_0067ecd0 is used with no null test.
     const unsigned Connection = GetPlayerConnectionId();
     const unsigned ShipId = Ship->get_id();
-    static_cast<IServer*>(GetLocalServerInterface())
+    GetLocalServerInterface()
         ->SPRequestInvincibility(ShipId, bActive, INVINCIBILITY_CAMERA, Connection);
 }
 
@@ -664,7 +664,7 @@ void SetDockingCameraTransform(const float* Csys12)
 {
     // FUN_0054bb90 (cdecl). The docking camera's Csys and view-dirty byte are written BEFORE
     // the guard, so they land even when no controller exists.
-    FSpaceCamera* const Docking = (FSpaceCamera*)&G_SpaceApp.Docking;
+    FSpaceCamera* const Docking = &G_SpaceApp.Docking;
     memcpy(&Docking->World, Csys12, 9 * sizeof(float));
     memcpy(&Docking->WorldPos, Csys12 + 9, 3 * sizeof(float));
     Docking->bViewDirty = 1;
@@ -678,7 +678,7 @@ void BeginDockingCameraSequence(float Seconds)
 {
     // FUN_0054bbd0 (cdecl). The active camera must be the docking camera, or retail complains
     // -- and arms it anyway.
-    if (G_SpaceApp.ActiveCamera != (FSpaceCamera*)&G_SpaceApp.Docking)
+    if (G_SpaceApp.ActiveCamera != &G_SpaceApp.Docking)
     {
         FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x8ad,
@@ -688,7 +688,7 @@ void BeginDockingCameraSequence(float Seconds)
     G_SpaceApp.Docking.BeginSequence(Seconds);
 }
 
-void SetupSpaceScriptCamera(void* Object, const float* Transform12, const char* ScriptName)
+void SetupSpaceScriptCamera(IObjRW* Object, const float* Transform12, const char* ScriptName)
 {
     // FUN_0054bb10 (cdecl). FUN_0051e3b0 with the arguments reordered, before the guard like
     // FUN_0054bb90.
@@ -897,7 +897,7 @@ const Transform* DACOM_API FSpaceCamera::GetViewTransform()
 
         this->bViewDirty = 0;
     }
-    return (const Transform*)(&this->View.E[0][0]);
+    return &this->ViewXform;
 }
 
 int DACOM_API FSpaceCamera::ProjectVec(Vector* OutXYZ, const Vector* World)

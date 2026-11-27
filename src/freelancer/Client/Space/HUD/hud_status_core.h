@@ -34,6 +34,7 @@ class INI_Reader;
 void HudSampleShieldHitPoints(CEqObj* Object, float* OutMax, float* OutCur, bool* OutAnyActive);
 
 class HUD_Status;
+class NnTextControl;
 
 // DAT_00674aa0 -- the one HUD_Status, set by its ctor and cleared by its dtor. Readers do not
 // test it for null.
@@ -47,7 +48,7 @@ bool HudStatusIsRearView();
 // DAT_00674b04 -- the one HUD_Target (the target panel). Its ctor FUN_004e08b0 / dtor in
 // hud_target_panel.cpp set and clear it; HUD_Core::OnEvent and about ten other sites read it
 // without a null test.
-extern HudTargetBase* G_HudTargetPanel;
+extern HudTarget* G_HudTargetPanel;
 
 // -------------------------------------------------------------------------------------------
 // HUD_Core / [Core] -- Client\Space\HUD_Core.cpp. The gauge window under the crosshair: the
@@ -87,8 +88,8 @@ public:
     WinControl* HealthBar;     // +0x368 (WinControl +0x330) "HealthBar"
     WinControl* ShieldBar;     // +0x36c (+0x334) "ShieldBar"
     WinControl* PowerBar;      // +0x370 (+0x338) "PowerBar"
-    WinControl* VelocityText;  // +0x374 (+0x33c) "VelocityText"
-    WinControl* ThrustText;    // +0x378 (+0x340) "ThrustText"
+    NnTextControl* VelocityText; // +0x374 (+0x33c) "VelocityText"
+    NnTextControl* ThrustText; // +0x378 (+0x340) "ThrustText"
     int LastVelocity;          // +0x37c (+0x344) ctor -999
     int LastThrust;            // +0x380 (+0x348) ctor -1
     WinControl* Background2;   // +0x384 (+0x34c) "Background2"
@@ -260,8 +261,8 @@ public:
     // (FireWeaponGroup, OnEvent 0xab) fires every active launcher instead of the group's list.
     int ActiveWeaponGroup;
     WinControl* WeaponText[10];        // +0x508 "WeaponText%d" (Create)
-    WinControl* WeaponNumberText[10];  // +0x530 "WeaponNumberText%d"
-    WinControl* AmmoText[10];          // +0x558 "AmmoText%d"
+    NnTextControl* WeaponNumberText[10]; // +0x530 "WeaponNumberText%d"
+    NnTextControl* AmmoText[10];       // +0x558 "AmmoText%d"
     WinControl* CloseButton;       // +0x580 "StatusCloseButton"
     unsigned char bThrustersOn;         // +0x584 ctor 0
     unsigned char bHasThruster;         // +0x585 ctor 0

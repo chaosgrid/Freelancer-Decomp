@@ -923,7 +923,7 @@ namespace AlchemyImpl
             {
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
-                static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(Texture_.Handle,
+                G_TextureLibrary->GetFrame(Texture_.Handle,
                     static_cast<int>(Frame), reinterpret_cast<unsigned long*>(Texture_.Frame));
             }
         }
@@ -1210,7 +1210,7 @@ namespace AlchemyImpl
                 Indices[Corner] = static_cast<unsigned short>(G_BasicDrawContext.RequestedVerts);
                 if (Count > static_cast<long>(G_BasicDrawContext.RequestedVerts))
                     continue;
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BasicDrawContext.LockedVerts);
+                FAlchemyVertex* const Vertex = G_BasicDrawContext.LockedVerts;
                 double X;
                 if (bStreak)
                     X = Corner == 0 ? (static_cast<double>(Bx) - Ux) - Px :
@@ -1335,7 +1335,7 @@ namespace AlchemyImpl
                 Indices[Corner] = static_cast<unsigned short>(G_BasicDrawContext.RequestedVerts);
                 if (Count > static_cast<long>(G_BasicDrawContext.RequestedVerts))
                     continue;
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BasicDrawContext.LockedVerts);
+                FAlchemyVertex* const Vertex = G_BasicDrawContext.LockedVerts;
                 const double X = Corner == 0 ? (static_cast<double>(C.x) + Xa) - Yb :
                     Corner == 1 ? (static_cast<double>(C.x) - Xa) - Yb :
                                   static_cast<double>(Trig[1]) * Alpha + C.x;
@@ -1484,7 +1484,7 @@ namespace AlchemyImpl
             {
                 const int Handle = Texture_.Handle;
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
-                ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(G_TextureLibrary);
+                ITextureLibrary2* const Library = G_TextureLibrary;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 Library->GetFrame(Handle, static_cast<int>(Frame),
                     reinterpret_cast<unsigned long*>(Texture_.Frame));
@@ -1873,7 +1873,7 @@ namespace AlchemyImpl
                 IndexA = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 Vertex->X = static_cast<float>(static_cast<double>(P1.x) - Qx);
                 Vertex->Diffuse = Diffuse;
                 Vertex->Y = static_cast<float>(static_cast<double>(P1.y) - Qy);
@@ -1891,7 +1891,7 @@ namespace AlchemyImpl
                 IndexB = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 Vertex->X = static_cast<float>(static_cast<double>(Qx) + P1.x);
                 Vertex->Diffuse = Diffuse;
                 Vertex->Y = static_cast<float>(static_cast<double>(Qy) + P1.y);
@@ -1909,7 +1909,7 @@ namespace AlchemyImpl
                 IndexC = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 Vertex->X = static_cast<float>(static_cast<double>(P0.x) - Qx);
                 Vertex->Diffuse = Diffuse;
                 Vertex->Y = static_cast<float>(static_cast<double>(P0.y) - Qy);
@@ -1927,7 +1927,7 @@ namespace AlchemyImpl
                 IndexD = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 Vertex->X = static_cast<float>(static_cast<double>(P0.x) + Qx);
                 Vertex->Diffuse = Diffuse;
                 Vertex->Y = static_cast<float>(static_cast<double>(P0.y) + Qy);
@@ -1989,7 +1989,7 @@ namespace AlchemyImpl
             {
                 const int Handle = Texture_.Handle;
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
-                ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(G_TextureLibrary);
+                ITextureLibrary2* const Library = G_TextureLibrary;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 Library->GetFrame(Handle, static_cast<int>(Frame),
                     reinterpret_cast<unsigned long*>(Texture_.Frame));
@@ -2372,7 +2372,7 @@ namespace AlchemyImpl
                 IndexA = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 Vertex->Diffuse = Diffuse;
                 Vertex->X = static_cast<float>(DifferenceX + Position.x);
                 Vertex->Y = static_cast<float>(DifferenceY + Position.y);
@@ -2390,7 +2390,7 @@ namespace AlchemyImpl
                 IndexB = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 std::memcpy(&Vertex->Z, &VertexBZ, sizeof(VertexBZ));
                 std::memcpy(&Vertex->U, &FrameBlock[1], sizeof(Vertex->U));
                 Vertex->X = static_cast<float>(static_cast<double>(Position.x) - SumX);
@@ -2408,7 +2408,7 @@ namespace AlchemyImpl
                 IndexC = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Vertex = Context.LockedVerts;
                 std::memcpy(&Vertex->Z, &VertexCZ, sizeof(VertexCZ));
                 std::memcpy(&Vertex->U, &FrameBlock[3], sizeof(Vertex->U));
                 Vertex->X = static_cast<float>(static_cast<double>(SumX) + Position.x);
@@ -2431,7 +2431,7 @@ namespace AlchemyImpl
                 Vertex.Z = static_cast<float>(static_cast<double>(Position.z) - DifferenceZ);
                 Vertex.Y = static_cast<float>(static_cast<double>(Position.y) - DifferenceY);
                 Vertex.X = static_cast<float>(static_cast<double>(Position.x) - DifferenceX);
-                FAlchemyVertex* const Out = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+                FAlchemyVertex* const Out = Context.LockedVerts;
                 std::memcpy(Out, &Vertex, sizeof(Vertex));
                 Context.LockedVerts = Out + 1;
                 IndexD = Context.VertCount;
@@ -2502,7 +2502,7 @@ namespace AlchemyImpl
             {
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
-                static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(Texture_.Handle,
+                G_TextureLibrary->GetFrame(Texture_.Handle,
                     static_cast<int>(Frame), reinterpret_cast<unsigned long*>(Texture_.Frame));
             }
         }
@@ -2816,7 +2816,7 @@ namespace AlchemyImpl
                 Indices[Corner] = static_cast<unsigned short>(G_OrientedDrawContext.RequestedVerts);
                 if (Count > static_cast<long>(G_OrientedDrawContext.RequestedVerts))
                     continue;
-                FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_OrientedDrawContext.LockedVerts);
+                FAlchemyVertex* const Vertex = G_OrientedDrawContext.LockedVerts;
                 if (Corner == 0)
                 {
                     Vertex->X = static_cast<float>(LoadAppearanceScalar(Corners[0][0]));
@@ -2959,8 +2959,8 @@ namespace AlchemyImpl
                     const unsigned long Span = static_cast<unsigned long>(FrameCount) - 1U;
                     const std::int64_t SpanWide = static_cast<std::int64_t>(Span);
                     const double WideSpan = ComputeAlchemyFpuWideInteger(SpanWide);
-                    IDAComponent* const volatile& LibrarySlot = G_TextureLibrary;
-                    ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(LibrarySlot);
+                    ITextureLibrary2* const volatile& LibrarySlot = G_TextureLibrary;
+                    ITextureLibrary2* const Library = LibrarySlot;
                     const std::int64_t Frame = ConvertAlchemyFpuInteger(WideSpan * Position);
                     Library->GetFrame(Handle, static_cast<int>(Frame),
                                       reinterpret_cast<unsigned long*>(Texture_.Frame));
@@ -3280,7 +3280,7 @@ namespace AlchemyImpl
                         unsigned short I0 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
                         if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
                         {
-                            FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
+                            FAlchemyVertex* const Vert = G_DustDrawContext.LockedVerts;
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) - Dx);
                             Vert->Diffuse = Diffuse;
                             StoreAlchemyFpuFloat(Vert->Y, FirstY);
@@ -3294,7 +3294,7 @@ namespace AlchemyImpl
                         unsigned short I1 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
                         if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
                         {
-                            FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
+                            FAlchemyVertex* const Vert = G_DustDrawContext.LockedVerts;
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) + SideX);
                             const double SecondY = static_cast<double>(C[1]) + SideY;
                             Vert->Diffuse = Diffuse;
@@ -3309,7 +3309,7 @@ namespace AlchemyImpl
                         unsigned short I2 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
                         if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
                         {
-                            FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
+                            FAlchemyVertex* const Vert = G_DustDrawContext.LockedVerts;
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) - SideX);
                             const double ThirdY = static_cast<double>(C[1]) - SideY;
                             Vert->Diffuse = Diffuse;
@@ -3327,7 +3327,7 @@ namespace AlchemyImpl
                         unsigned short I3 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
                         if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
                         {
-                            FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
+                            FAlchemyVertex* const Vert = G_DustDrawContext.LockedVerts;
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) + Bx);
                             std::memcpy(&Vert->Z, &LastZ, sizeof(float));
                             Vert->Diffuse = Diffuse;
@@ -3823,7 +3823,7 @@ namespace AlchemyImpl
             const long Count = G_BeamDrawContext.VertCount;
             if (Count > static_cast<long>(G_BeamDrawContext.RequestedVerts))
                 return static_cast<unsigned short>(G_BeamDrawContext.RequestedVerts);
-            FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BeamDrawContext.LockedVerts);
+            FAlchemyVertex* const Vertex = G_BeamDrawContext.LockedVerts;
             std::memcpy(&Vertex->X, Pos, 3 * sizeof(float));
             Vertex->Diffuse = Diffuse;
             std::memcpy(&Vertex->U, &U, sizeof(float));
@@ -3842,7 +3842,7 @@ namespace AlchemyImpl
             Words.V = static_cast<float>(LoadAppearanceScalar(V));
             Words.U = static_cast<float>(LoadAppearanceScalar(U));
             const double Z = LoadAppearanceScalar(Pos[2]);
-            FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BeamDrawContext.LockedVerts);
+            FAlchemyVertex* const Vertex = G_BeamDrawContext.LockedVerts;
             Words.Z = static_cast<float>(Z);
             Words.Y = static_cast<float>(LoadAppearanceScalar(Pos[1]));
             Words.X = static_cast<float>(LoadAppearanceScalar(Pos[0]));
@@ -3937,7 +3937,7 @@ namespace AlchemyImpl
         State.PrevPos[2] = 0.0f;
         Transform Basis;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        ComposeTransform(&Basis, (const Transform*)Camera->GetOrientation(), NodeWorldXform_);
+        ComposeTransform(&Basis, reinterpret_cast<const Transform*>(Camera->GetOrientation()), NodeWorldXform_);
         std::memcpy(&State.Xform, &Basis, sizeof(Basis));
 
         const float* LeadPos = &Head->PosX;
@@ -4320,7 +4320,7 @@ namespace AlchemyImpl
         {
             FPooledParticle* const Oldest = ParticleFromUsedLink(&G_PoolMesh, G_PoolMesh.UsedHead);
             FxMeshAppearance* const Owner = static_cast<FxMeshAppearance*>(
-                static_cast<FGenericFxObjectBase*>(Oldest->Appearance));
+                Oldest->Appearance);
             UnlinkParticleNode(&Owner->InstanceListHead_, &Owner->InstanceListTail_, Oldest);
             if (Owner->LiveInstanceCount_ != 0)
                 --Owner->LiveInstanceCount_;
@@ -4354,7 +4354,7 @@ namespace AlchemyImpl
         FFxMeshAppearancePropertySet* const Set = MeshProps();
         void* const MeshIdArg = reinterpret_cast<void*>(static_cast<std::uintptr_t>(Set->MeshId));
         void* const MeshNameArg = Set->MeshName.Buffer;
-        IFxMeshFactory* const Factory = static_cast<IFxMeshFactory*>(G_FxMeshFactory);
+        IFxMeshFactory* const Factory = G_FxMeshFactory;
         if (Factory->CreateMesh(MeshIdArg, MeshNameArg, WorldSix, &Mesh) != 0)
         {
             if (Mesh != nullptr)
@@ -4407,7 +4407,7 @@ namespace AlchemyImpl
             Particle->VelX = Six[3];
             Particle->VelY = Six[4];
             Particle->VelZ = Six[5];
-            Particle->Appearance = static_cast<FGenericFxObjectBase*>(this);
+            Particle->Appearance = this;
             Particle->Duration = Duration;
             Particle->Age = Age;
             AssignComPtr(reinterpret_cast<IDAComponent**>(
@@ -5032,7 +5032,7 @@ namespace AlchemyImpl
             FPooledParticle* const Oldest =
                 ParticleFromUsedLink(&G_PoolParticle, G_PoolParticle.UsedHead);
             FxParticleAppearance* const Owner = static_cast<FxParticleAppearance*>(
-                static_cast<FGenericFxObjectBase*>(Oldest->Appearance));
+                Oldest->Appearance);
             Owner->EraseRecord(Oldest);
         }
 
@@ -5044,8 +5044,8 @@ namespace AlchemyImpl
         FParticleEffectReference Child;
         if (G_RuntimeAlchemy != nullptr)
         {
-            IAlchemy* const Alchemy = static_cast<IAlchemy*>(G_RuntimeAlchemy);
-            IFxEffectLibrary* const Library = static_cast<IFxEffectLibrary*>(G_RuntimeEffectLibrary);
+            IAlchemy* const Alchemy = G_RuntimeAlchemy;
+            IFxEffectLibrary* const Library = G_RuntimeEffectLibrary;
             const unsigned long Key = Alchemy->HashNodeName(LifeName);
             if (Library->CreateEffect(static_cast<IGenericFx*>(this),
                                       reinterpret_cast<void*>(static_cast<std::uintptr_t>(Key)),
@@ -5060,7 +5060,7 @@ namespace AlchemyImpl
                 if (Record != nullptr)
                 {
                     // FUN_06231d30.
-                    Record->Base.Appearance = static_cast<FGenericFxObjectBase*>(this);
+                    Record->Base.Appearance = this;
                     std::memcpy(&Record->Base.PosX, CapturedSix, sizeof(CapturedSix));
                     std::memcpy(&Record->Base.Duration, &Duration, sizeof(Duration));
                     std::memcpy(&Record->Base.Age, &Age, sizeof(Age));
@@ -5156,9 +5156,9 @@ namespace AlchemyImpl
                 if (R->DeathEffect == nullptr && Record->Age > Record->Duration &&
                     G_RuntimeEffectLibrary != nullptr && G_RuntimeAlchemy != nullptr)
                 {
-                    IAlchemy* const Alchemy = static_cast<IAlchemy*>(G_RuntimeAlchemy);
+                    IAlchemy* const Alchemy = G_RuntimeAlchemy;
                     IFxEffectLibrary* const Library =
-                        static_cast<IFxEffectLibrary*>(G_RuntimeEffectLibrary);
+                        G_RuntimeEffectLibrary;
                     const unsigned long Key = Alchemy->HashNodeName(ParticleProps()->DeathName.Buffer);
                     if (Library->CreateEffect(
                             static_cast<IGenericFx*>(this),

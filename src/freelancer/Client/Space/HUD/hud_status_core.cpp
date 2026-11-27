@@ -28,10 +28,12 @@
 #include "Network/login_mgr.h"
 #include "Interface/menu_keymap_config.h"
 #include "Interface/menu_ui_init.h"
+#include "NeuroNet/nn_button_control.h"
 #include "NeuroNet/nn_inventory.h"
 #include "NeuroNet/nn_tooltip.h"
 #include "Common/input_manager.h"
 #include "NeuroNet/nn_modal.h"
+#include "NeuroNet/nn_static_control.h"
 #include "NeuroNet/nn_text_control.h"     // NnTextControl::SetNumberText (FUN_0058a580)
 #include "NeuroNet/nn_text_scratch.h"     // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60), DAT_006119f8
 #include "NeuroNet/nn_ui_pulse.h"
@@ -129,7 +131,7 @@ namespace
     HUD_Status* G_HudStatus = nullptr;
 }
 
-HudTargetBase* G_HudTargetPanel = nullptr;
+HudTarget* G_HudTargetPanel = nullptr;
 
 HUD_Status* GetHudStatus()
 {
@@ -405,7 +407,7 @@ void HUD_Core::Draw()
     Background2->Draw();
     DrawStaticMesh();                                   // FUN_005a06a0
 
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -518,7 +520,7 @@ void HUD_Core::Draw()
         {
             sprintf(Text, "%d", SpeedInt);
             // Text is used as a printf format by the NumberString child (FUN_004159a0).
-            static_cast<NnTextControl*>(VelocityText)->SetNumberText(Text);
+            VelocityText->SetNumberText(Text);
         }
     }
 
@@ -542,7 +544,7 @@ void HUD_Core::Draw()
         }
         sprintf(Text, "%d%%%%", Thrust);
         // "NN%%" prints as "NN%" through the NumberString's own printf.
-        static_cast<NnTextControl*>(ThrustText)->SetNumberText(Text);
+        ThrustText->SetNumberText(Text);
     }
 
     VelocityText->Draw();
@@ -870,7 +872,7 @@ void HUD_Status::RebuildWeaponList()
     // The player ship's launchers (traverser mask 0xe0), gathered in a local vector. The walk
     // stops at the first item CELauncher::cast rejects.
     std::vector<FHudStatusWeapon> Found;
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player != nullptr)
     {
         CObject* const Object = const_cast<CObject*>(Player->cobject());
@@ -1388,7 +1390,7 @@ void HUD_Status::Update()
     }
 
     // The player ship and its behaviour manager.
-    CShip* const Ship = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW()));
+    CShip* const Ship = HudShipOfObjRw(GetPlayerObjRW());
     if (Ship != nullptr)
     {
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();
@@ -1511,7 +1513,7 @@ void HUD_Status::Update()
                     bUsingTradeLane = 0;
                     bCruiseActive = 0;
 
-                    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+                    IObjRW* const Player = GetPlayerObjRW();
                     if (Player != nullptr)
                     {
                         // The first mine dropper and the first countermeasure dropper are asked
@@ -1545,7 +1547,7 @@ void HUD_Status::Update()
 
                         // The ship-state bytes. When the chain gives no ship retail goes on with
                         // a null ship and faults; the port does the same.
-                        CShip* const PlayerShip = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW()));
+                        CShip* const PlayerShip = HudShipOfObjRw(GetPlayerObjRW());
                         if (PlayerShip != nullptr)
                         {
                             bThrustersOn = PlayerShip->any_thrusters_on() ? 1 : 0;
@@ -1594,7 +1596,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
     // The player ship: in a tradelane, and whether the current behaviour is 10.
     bool bTradelane = false;
     bool bHideText = false;
-    CShip* const Ship = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW()));
+    CShip* const Ship = HudShipOfObjRw(GetPlayerObjRW());
     if (Ship != nullptr)
     {
         if (Ship->is_using_tradelane())
@@ -1727,7 +1729,7 @@ void HUD_Status::UpdateRepairBatteryCounts()
 bool HUD_Status::IsLootInReach()
 {
     // FUN_004de3a0.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return false;
@@ -1825,14 +1827,14 @@ void HUD_Status::ShowWeaponRows()
             ++Index;
             char NumberText[0x20];
             sprintf(NumberText, "%d", Index);
-            static_cast<NnTextControl*>(WeaponNumberText[Row])->SetNumberText(NumberText);
+            WeaponNumberText[Row]->SetNumberText(NumberText);
 
             if (Weapon.AmmoCount >= 0)
             {
                 AmmoText[Row]->SetProperty(kWinPropHide, 0, 0);
                 char AmmoCountText[0x20];
                 sprintf(AmmoCountText, "%d", Weapon.AmmoCount);
-                static_cast<NnTextControl*>(AmmoText[Row])->SetNumberText(AmmoCountText);
+                AmmoText[Row]->SetNumberText(AmmoCountText);
             }
             else
             {
@@ -1892,7 +1894,7 @@ void HUD_Status::FireSeekerGuns(int Mode)
 {
     // FUN_004dd4e0 (this = the HUDItem face). The player ship and its first gun; nothing
     // without them.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -1993,7 +1995,7 @@ void HUD_Status::FireSeekerGuns(int Mode)
 void HUD_Status::FireWeaponGroup(int Group)
 {
     // FUN_004dcc60 (this = the HUDItem face).
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -2020,7 +2022,7 @@ void HUD_Status::FireWeaponGroup(int Group)
 void HUD_Status::TractorInAllLoot()
 {
     // FUN_004de4c0.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return;
@@ -2139,7 +2141,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     }
 
     // The player must be a ship gameobj whose object is a ship.
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+    IObjRW* const Player = GetPlayerObjRW();
     if (Player == nullptr)
     {
         return false;
@@ -2299,7 +2301,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         unsigned const Row = MsgId - USER_FIRE_WEAPON1;
         if (Weapons.size() > Row)
         {
-            IObjRW* const Shooter = static_cast<IObjRW*>(GetPlayerObjRW());
+            IObjRW* const Shooter = GetPlayerObjRW();
             if (Shooter == nullptr)
             {
                 return true;
@@ -2316,7 +2318,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     case USER_FIRE_WEAPON_GROUP1:
     {
         // Fire weapon group 0 -- FireWeaponGroup(0) inlined.
-        IObjRW* const Shooter = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Shooter = GetPlayerObjRW();
         if (Shooter == nullptr)
         {
             return true;
@@ -2397,7 +2399,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         // Drop from every mine dropper (0xbd) or every countermeasure dropper (0xbe) of the
         // player's CEqObj -- the ids into a 24-slot frame buffer (no bound test, as retail),
         // then IObjAffect slot 13 with no target position.
-        IObjRW* const Dropper = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Dropper = GetPlayerObjRW();
         if (Dropper == nullptr)
         {
             return true;

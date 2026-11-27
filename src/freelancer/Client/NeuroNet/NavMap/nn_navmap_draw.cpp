@@ -227,28 +227,10 @@ namespace
         return Vb->SelectVb(*Handle) == 0;
     }
 
-    // The two vertex layouts: FVF 0x42 {position, diffuse} (0x10 bytes) and FVF 0x142
-    // {position, diffuse, uv} (0x18 bytes).
-    struct FNavMapColorVertex
-    {
-        float X;
-        float Y;
-        float Z;
-        unsigned long Diffuse;
-    };
-    struct FNavMapTexVertex
-    {
-        float X;
-        float Y;
-        float Z;
-        unsigned long Diffuse;
-        float U;
-        float V;
-    };
-
     // The source descriptors (all dwords zeroed, then Flags 2, the streams and the FVF).
-    FRpVertexSrcDesc MakeColorDesc(unsigned char const* Vertices, int Count)
+    FRpVertexSrcDesc MakeColorDesc(FNavMapColorVertex const* Source, int Count)
     {
+        unsigned char const* const Vertices = reinterpret_cast<unsigned char const*>(Source);
         FRpVertexSrcDesc Desc;
         memset(&Desc, 0, sizeof(Desc));
         Desc.Flags = 2;
@@ -262,8 +244,9 @@ namespace
         Desc.SrcCount = static_cast<unsigned>(Count);
         return Desc;
     }
-    FRpVertexSrcDesc MakeTexDesc(unsigned char const* Vertices, int Count)
+    FRpVertexSrcDesc MakeTexDesc(FNavMapTexVertex const* Source, int Count)
     {
+        unsigned char const* const Vertices = reinterpret_cast<unsigned char const*>(Source);
         FRpVertexSrcDesc Desc;
         memset(&Desc, 0, sizeof(Desc));
         Desc.Flags = 2;
@@ -624,7 +607,7 @@ void NeuroNetNavMap::Draw()
     WinControl* const Panels[14] = {RightWindow,
                                     LeftWindow,
                                     InfoTitle,
-                                    static_cast<WinControl*>(InfoText),
+                                    InfoText,
                                     ClearAllWaypointsButton,
                                     ClearAllWaypointsText,
                                     AbortMissionButton,
@@ -633,7 +616,7 @@ void NeuroNetNavMap::Draw()
                                     AbortYesText,
                                     AbortNoButton,
                                     AbortNoText,
-                                    static_cast<WinControl*>(ObjectiveScroll),
+                                    ObjectiveScroll,
                                     nullptr};
     WinControl* const Tools[34] = {UniverseButton,   LabelButton,       ShipButton,
                                    CloseButton,      DebugText,         NoBestPathText,
@@ -645,7 +628,7 @@ void NeuroNetNavMap::Draw()
                                    InZoomButton,     OutZoomButton,     InfoButton,
                                    ClearWaypointButton, OptionBridge,   SetWaypointButton,
                                    BestPathButton,   JumpGateButton,    SelectObjectButton,
-                                   static_cast<WinControl*>(InfoCard),
+                                   InfoCard,
                                    CloseInfocardButton, CloseInfocardText, nullptr};
 
     // The side panels' controls first (slot 13 on the visible ones).
@@ -742,7 +725,7 @@ void NeuroNetNavMap::Draw()
         unsigned TargetId = 0;
         if (!IsPlayerDockedRetail()) // FUN_004c4810
         {
-            IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+            IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
             if (Player != nullptr)
             {
                 // FUN_00543320's CShip is handed to get_target untested, as retail does.
@@ -1022,7 +1005,7 @@ void NeuroNetNavMap::Draw()
         }
 
         // The list's scroll bar.
-        WinControl* const Scroll = static_cast<WinControl*>(BaseListScroll);
+        WinControl* const Scroll = BaseListScroll;
         if (Scroll != nullptr && IsShown(Scroll))
             Scroll->Draw();
 
@@ -1808,7 +1791,7 @@ bool NeuroNetNavMap::BuildZoneShading()
     ShadeCacheSystem = CurrentSystem->GetId();
     ShadeCacheZoneFilter = G_NavMapZoneFilter;
     ShadeCacheFilterMode = G_NavMapFilterMode;
-    FNavMapColorVertex* Vertex = reinterpret_cast<FNavMapColorVertex*>(ShadeVertices);
+    FNavMapColorVertex* Vertex = ShadeVertices;
     ShadeVertexCount = 0;
     ShadeIndexCount = 0;
     FNavMapFrame const Frame = MakeZoneFrame(this);
@@ -2182,7 +2165,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
     TerrainIndexCount = 0;
     TerrainPatchCount = 0;
     int PreviousShape = -1;
-    FNavMapTexVertex* Vertex = reinterpret_cast<FNavMapTexVertex*>(TerrainVertices);
+    FNavMapTexVertex* Vertex = TerrainVertices;
 
     for (int ZoneIndex = 0; ZoneIndex < ZoneCount; ++ZoneIndex)
     {
@@ -2454,7 +2437,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
     if (SegmentCount <= 0)
         return true;
 
-    FNavMapTexVertex* Vertex = reinterpret_cast<FNavMapTexVertex*>(TradeLaneVertices);
+    FNavMapTexVertex* Vertex = TradeLaneVertices;
     unsigned short* const Index16 = TradeLaneIndices;
     for (int Segment = 0; Segment < SegmentCount; ++Segment)
     {

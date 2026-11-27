@@ -28,18 +28,25 @@
 // the non-deleting FUN_063522f0.
 // ============================================================================
 
+// One slot of IVP_VHash::Elems.
+struct IVP_VHash_Slot
+{
+    unsigned HashIndex; // +0x0
+    void* Elem;         // +0x4
+};
+
 class IVP_VHash
 {
 public:
     int SizeMm;              // +0x04
     unsigned NElemsAndFlags; // +0x08
-    void* Elems;             // +0x0c
+    IVP_VHash_Slot* Elems;   // +0x0c
 
     // FUN_063522a0: Elems = FUN_06343f80(Size, 8) (zeroed allocation).
     explicit IVP_VHash(int Size)
         : SizeMm(Size - 1)
         , NElemsAndFlags(0)
-        , Elems(calloc(static_cast<size_t>(Size), 8))
+        , Elems(static_cast<IVP_VHash_Slot*>(calloc(static_cast<size_t>(Size), 8)))
     {
     }
 
@@ -98,14 +105,22 @@ unsigned __fastcall IVP_VHash_HashPointer(unsigned Key);
 // IVP_Core::ObjectHashMap (ivp_core.cpp).
 // ============================================================================
 
+// One slot of IVP_VHash_Store::ElemsStore.
+struct IVP_VHash_Store_Slot
+{
+    unsigned hash; // +0x0
+    void* key;     // +0x4
+    void* value;   // +0x8
+};
+
 class IVP_VHash_Store
 {
 public:
     int Size;          // +0x00
     int SizeMm;        // +0x04
     int NElems;        // +0x08
-    void* ElemsStore;  // +0x0c
-    void* PreallocatedElemsStore; // +0x10
+    IVP_VHash_Store_Slot* ElemsStore;  // +0x0c
+    IVP_VHash_Store_Slot* PreallocatedElemsStore; // +0x10
 
     // FUN_063525f0
     explicit IVP_VHash_Store(int InSize);

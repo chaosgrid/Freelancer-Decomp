@@ -38,19 +38,18 @@ static FAnimScript* AllocAnimScript()
 }
 
 static FAnimScript* const G_InvalidAnimScript =
-    (FAnimScript*)((ptrdiff_t)(-1));
+    reinterpret_cast<FAnimScript*>((ptrdiff_t)(-1));
 
 void* DACOM_API FAnimationObject::OpenScript(IFileSystem* FileSystem)
 {
     FAnimScript* Script = AllocAnimScript();
-    IFileSystem* Fs = AsFileSystem(FileSystem);
-    if (Fs->OpenNode(G_NameAnimation) == 0)
+    if (FileSystem->OpenNode(G_NameAnimation) == 0)
     {
         Script->Release();
         return G_InvalidAnimScript;
     }
     LoadAnimScriptNames(Script, FileSystem);
-    Fs->OpenNode(G_NameParentDot);
+    FileSystem->OpenNode(G_NameParentDot);
     return Script;
 }
 
@@ -68,14 +67,13 @@ static bool IsValidAnimScript(FAnimScript* Script)
 unsigned long DACOM_API FAnimationObject::AddScriptNames(void* InScript, IFileSystem* FileSystem,
                                                        const char** Names, int Count)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     if (!IsValidAnimScript(Script))
         return 0xFFFFFFFF;
-    IFileSystem* Fs = AsFileSystem(FileSystem);
-    if (Fs->OpenNode(G_NameAnimation) == 0)
+    if (FileSystem->OpenNode(G_NameAnimation) == 0)
         return 0xFFFFFFFF;
     const unsigned long Result = LoadAnimScriptsByNameList(Script, FileSystem, Names, Count);
-    Fs->OpenNode(G_NameParentDot);
+    FileSystem->OpenNode(G_NameParentDot);
     return Result;
 }
 
@@ -86,7 +84,7 @@ static bool RemoveAnimNameByCrc(FAnimScript* Script, unsigned long Crc)
 
 unsigned long DACOM_API FAnimationObject::RemoveScriptNames(void* InScript, const char** Names, int Count)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     if (!IsValidAnimScript(Script))
         return 0xFFFFFFFF;
     for (int Index = 0; Index < Count; ++Index)
@@ -106,7 +104,7 @@ unsigned long DACOM_API FAnimationObject::RemoveScriptNames(void* InScript, cons
 
 unsigned long DACOM_API FAnimationObject::GetScriptNameCount(void* InScript, unsigned long* Out)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
 
     if (!IsValidAnimScript(Script))
         return 0xFFFFFFFF;
@@ -116,7 +114,7 @@ unsigned long DACOM_API FAnimationObject::GetScriptNameCount(void* InScript, uns
 
 GENRESULT DACOM_API FAnimationObject::CloseScript(void* InScript)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
 
     if (!IsValidAnimScript(Script))
         return (GENRESULT)((size_t)Script);
@@ -125,7 +123,7 @@ GENRESULT DACOM_API FAnimationObject::CloseScript(void* InScript)
 
 float DACOM_API FAnimationObject::GetNamedDuration(void* InScript, const char* Name)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     if (!IsValidAnimScript(Script))
         return -1.0f;
     FAnimNameEntry* Entry = FindAnimName(Script, DACOM_CRC::GetCRC32(Name));
@@ -169,7 +167,7 @@ unsigned long DACOM_API FAnimationObject::FilterObjects(void* Filter)
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(this, PlaybackId, &Playback) == 0)
         return 0;
-    IChannel* ChannelFacet = (IChannel*)this;
+    IChannel* ChannelFacet = static_cast<IChannel*>(this);
     return Playback->FilterTyped(ChannelFacet);
 }
 
@@ -178,8 +176,8 @@ unsigned long DACOM_API FAnimationObject::FilterObjects(void* Filter)
 unsigned long DACOM_API FAnimationObject::PlayScript(void* InScript, InstanceIndex InRoot, const char* Name,
                                                       void* Sink, void* SinkContext)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
-    FEngineInstance* Root = (FEngineInstance*)InRoot;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
+    FEngineInstance* Root = reinterpret_cast<FEngineInstance*>(InRoot);
     if (!IsValidAnimScript(Script))
         return 0xFFFFFFFF;
     FAnimNameEntry* Entry = FindAnimName(Script, DACOM_CRC::GetCRC32(Name));
@@ -187,7 +185,7 @@ unsigned long DACOM_API FAnimationObject::PlayScript(void* InScript, InstanceInd
         return 0xFFFFFFFF;
     FAnimPlayback Record;
     Record.Name = nullptr;                                         // FUN_06611f60
-    Record.Root = (FEngineInstance*)((ptrdiff_t)(-1));
+    Record.Root = reinterpret_cast<FEngineInstance*>((ptrdiff_t)(-1));
     Record.LongestTyped = nullptr;
     Record.Script = nullptr;
     Record.CloneTypedChannels(Entry);
@@ -229,7 +227,7 @@ GENRESULT DACOM_API FAnimationObject::DestroyScript(void* InScript)
 
 static FAnimationObject* AnimationFromNested(void* Nested, unsigned long Offset)
 {
-    return (FAnimationObject*)((unsigned char*)Nested - Offset);
+    return reinterpret_cast<FAnimationObject*>((unsigned char*)Nested - Offset);
 }
 
 // LAB_06614b30 (IRootData+0x0C).
@@ -238,7 +236,7 @@ unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, Vector*
                                                void* BlendDuration, void* Scale,
                                                float TranslationScale)
 {
-    void* RootThis = (IRootData*)this;
+    void* RootThis = static_cast<IRootData*>(this);
     // The IRootData facet sits at Animation+0xC.
     FAnimationObject* This = AnimationFromNested(RootThis, 0xC);
     FAnimPlayback* Playback = nullptr;
@@ -324,7 +322,7 @@ unsigned long DACOM_API FAnimationObject::ApplyChannels(unsigned long PlaybackId
 
 GENRESULT DACOM_API FAnimationObject::EnumScriptNames(FAnimNameProc Callback, void* InScript, void* Context)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
 
     if (Callback == nullptr || !IsValidAnimScript(Script))
         return GR_OK;
@@ -341,7 +339,7 @@ GENRESULT DACOM_API FAnimationObject::EnumScriptNames(FAnimNameProc Callback, vo
 GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, void* InScript, const char* Name,
                                                      void* Context)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     const GENRESULT Miss = GR_INVALID_PARMS;
     if (Callback == nullptr || !IsValidAnimScript(Script))
         return Miss;
@@ -355,7 +353,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, 
         if (Track->Channel != nullptr)
         {
             ChannelArchetypeAddRef(Track->Channel);
-            Enum((IChannelArchetype*)(Track->Channel), Context);
+            Enum(Track->Channel, Context);
         }
         ++Track;
     }
@@ -367,7 +365,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, 
 // channels and the object overlays.
 unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId, const Vector* Pos)
 {
-    FAnimationObject* This = (FAnimationObject*)this;
+    FAnimationObject* This = static_cast<FAnimationObject*>(this);
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
@@ -381,7 +379,7 @@ unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId
 // LAB_06614fd0 (IAnimation2+0x4C): as above with FUN_06612b80 (orientation matrix).
 unsigned long DACOM_API FAnimation2Facet::SetOverlayExtra(unsigned long PlaybackId, const Matrix* Extra)
 {
-    FAnimationObject* This = (FAnimationObject*)this;
+    FAnimationObject* This = static_cast<FAnimationObject*>(this);
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
@@ -394,7 +392,7 @@ unsigned long DACOM_API FAnimation2Facet::SetOverlayExtra(unsigned long Playback
 
 unsigned long DACOM_API FAnimationObject::GetNamedDurationOut(void* InScript, const char* Name, float* Out)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     if (!IsValidAnimScript(Script))
         return 0;
     FAnimNameEntry* Entry = FindAnimName(Script, DACOM_CRC::GetCRC32(Name));
@@ -427,7 +425,7 @@ unsigned long DACOM_API FAnimationObject::TouchMapped(unsigned long PlaybackId, 
 // LAB_06615120 (IAnimation2+0x58): as SetOverlayPos with FUN_06612c60 (add a delta).
 unsigned long DACOM_API FAnimation2Facet::AddOverlayPos(unsigned long PlaybackId, const Vector* Delta)
 {
-    FAnimationObject* This = (FAnimationObject*)this;
+    FAnimationObject* This = static_cast<FAnimationObject*>(this);
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
@@ -491,7 +489,7 @@ unsigned long DACOM_API FAnimationObject::FindObject(unsigned long PlaybackId, v
     if (FindPlaybackRecord(this, PlaybackId, &Playback) == 0)
         return 0xFFFFFFFF;
     return (unsigned long)(
-        Playback->FindTypedByHeader((const FAnimBindOut*)Query));
+        Playback->FindTypedByHeader(static_cast<const FAnimBindOut*>(Query)));
 }
 
 // LAB_066157f0 (IAnimation2+0x70): every mixer list, then every playing channel no
@@ -543,11 +541,11 @@ unsigned long DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, unsigne
         EngBaseFdump(kFdumpFatal, G_FdumpFileAnimComponent, 0x44D, "FATAL", "Unknown data type!\n");
         // Retail's invalid-type continuation reinterprets the owner as a channel.
         const unsigned long bBound =
-            ((FTypedChannel*)Owner)->BindMap((unsigned long*)BindA, BindB);
+            static_cast<FTypedChannel*>(Owner)->BindMap((unsigned long*)BindA, BindB);
         if ((bBound & 0xFF) == 0)
         {
             IDAComponent** Held =
-                (IDAComponent**)((unsigned char*)Owner + 0x24);
+                reinterpret_cast<IDAComponent**>((unsigned char*)Owner + 0x24);
             if (*Held != nullptr)
             {
                 (*Held)->Release();
@@ -556,10 +554,10 @@ unsigned long DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, unsigne
             ::operator delete(Owner);                            // FUN_066281d0
             return 0xFFFFFFFF;
         }
-        AnimationFromNested(ChannelThis, 8)->Channels->insert((FTypedChannel*)Owner);
+        AnimationFromNested(ChannelThis, 8)->Channels->insert(static_cast<FTypedChannel*>(Owner));
         return (unsigned long)((size_t)Owner);
     }
-    FTypedChannel* Typed = NewTypedChannelWithOwner(Type, (IChannelOwner*)Owner);
+    FTypedChannel* Typed = NewTypedChannelWithOwner(Type, static_cast<IChannelOwner*>(Owner));
     return ChannelBindAndInsert(AnimationFromNested(ChannelThis, 8), Typed, BindA, BindB, 1);
 }
 
@@ -571,7 +569,7 @@ unsigned long DACOM_API FAnimationChannelFacet::CreateFromObject(void* Object, v
     if (Object == nullptr)
         return 0xFFFFFFFF;
     FChannelArchetypeObject* Archetype =
-        (FChannelArchetypeObject*)((IChannelArchetype*)Object);
+        static_cast<FChannelArchetypeObject*>(Object);
     unsigned long Type = 0;
     Archetype->GetFlags(&Type);
     if (!IsTypedChannelType(Type))
@@ -587,7 +585,7 @@ static FTypedChannel* FindTypedChannel(FAnimationObject* Animation, unsigned lon
 {
     if (Key == 0xFFFFFFFF)
         return nullptr;
-    FTypedChannel* Wanted = (FTypedChannel*)((size_t)Key);
+    FTypedChannel* Wanted = reinterpret_cast<FTypedChannel*>((size_t)Key);
     FTypedChannelSet::iterator It = Animation->Channels->find(Wanted);
     if (It == Animation->Channels->end())
         return nullptr;
@@ -601,7 +599,7 @@ unsigned long DACOM_API FAnimationChannelFacet::GetObject(unsigned long Key, voi
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
         return 0xFFFFFFFF;
-    *Out = (IChannelArchetype*)(Typed->Archetype);
+    *Out = static_cast<IChannelArchetype*>(Typed->Archetype);
     if (Typed->Archetype != nullptr)
         Typed->Archetype->AddRef();
     return 0;
@@ -638,7 +636,7 @@ unsigned long DACOM_API FAnimationChannelFacet::Play(unsigned long Key, float* T
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
     if (Typed == nullptr)
         return 0;
-    const FPlayHeader* Header = (const FPlayHeader*)Time;
+    const FPlayHeader* Header = reinterpret_cast<const FPlayHeader*>(Time);
     const unsigned long Bound = Typed->TryBindIfTimeValid(Header);
     Typed->PlayState = (unsigned char)(
         ((Typed->PlayState ^ (unsigned char)Bound) & 1) ^ Typed->PlayState);
@@ -810,7 +808,7 @@ unsigned long DACOM_API FAnimationObject::EnumFsScripts(FAnimNameProc Callback, 
             }
         } while (FileSystemFindNext(FileSystem, FindHandle, &FindData) != 0);
 
-        AsFileSystem(FileSystem)->GetFileSystemError();
+        FileSystem->GetFileSystemError();
         FileSystemFindClose(FileSystem, FindHandle);
     }
     FileSystemOpenNode(FileSystem, G_NameParentDot);
@@ -820,7 +818,7 @@ unsigned long DACOM_API FAnimationObject::EnumFsScripts(FAnimNameProc Callback, 
 
 unsigned long DACOM_API FAnimationObject::HasScriptName(void* InScript, const char* Name)
 {
-    FAnimScript* Script = (FAnimScript*)InScript;
+    FAnimScript* Script = static_cast<FAnimScript*>(InScript);
     if (!IsValidAnimScript(Script) || Name == nullptr)
         return 0xFFFFFFFF;
 
@@ -847,7 +845,7 @@ static FEngineObject* G_AnimEngine2 = nullptr;
 // LAB_06616d40
 GENRESULT DACOM_API FAnimationObject::Initialize()
 {
-    void* Nested = (IAggregateComponent*)this;
+    void* Nested = static_cast<IAggregateComponent*>(this);
     FAnimationObject* Object = AnimationFromNested(Nested, 4);
     GENRESULT Result =
         AnimationQueryInterface(Object, Iids::Engine, (void**)(&G_AnimEngine));
@@ -926,7 +924,7 @@ GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC*
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    FAnimationObject* Object = (FAnimationObject*)(std::calloc(1, sizeof(FAnimationObject)));
+    FAnimationObject* Object = static_cast<FAnimationObject*>(std::calloc(1, sizeof(FAnimationObject)));
     if (Object == nullptr)
     {
         *Out = nullptr;
@@ -943,9 +941,9 @@ GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     Object->Inner.RefCount = 1;
     Object->Inner.Object = Object;
 
-    FAggDesc18* Agg = (FAggDesc18*)Desc;
+    FAggDesc18* Agg = reinterpret_cast<FAggDesc18*>(Desc);
     IDAComponent* const InnerUnknown = &Object->Inner;
-    Object->Controller = (IDAComponent*)(Agg->Inner);
+    Object->Controller = Agg->Inner;
     if (Agg->Inner != nullptr)
         *Agg->Outer = InnerUnknown;
     else
@@ -981,7 +979,7 @@ GENRESULT InnerQueryTable(void* Object, const char* Iid, void** Out,
             std::memcpy(&Interface, Base + ((unsigned long)Offset & 0x7FFFFFFFu),
                         sizeof(Interface));
         else
-            Interface = (IDAComponent*)(Base + Offset);
+            Interface = reinterpret_cast<IDAComponent*>(Base + Offset);
         Interface->AddRef();
         *Out = Interface;
         return GR_OK;

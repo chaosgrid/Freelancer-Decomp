@@ -15,6 +15,7 @@
 
 #include "common_csys.h"
 #include "common_id.h"
+#include "Space/Effects/effect_base.h" // FEffectCompanion
 #include "Space/Effects/space_env_fx.h" // JumpShipEffectDesc (0x14, FUN_00503a50), FJumpEffectDesc
 
 #include <cstddef>
@@ -27,14 +28,15 @@ class FClientShipGameobj;     // client_gameobj.h
 
 // The 0x10-byte effect companion {slot0, ISoundSource*, particle, GameLight}. Its destructor is
 // FUN_00502d90 (CliEffectCompanionClear).
-struct FJumpFxCompanion
+struct FJumpFxCompanion : FEffectCompanion
 {
-    void* EffectArch;               // +0x00
-    ISoundSource* Sound;       // +0x04
-    FParticleEffect* Particle; // +0x08
-    FGameLight* Light;         // +0x0c
-
-    FJumpFxCompanion() : EffectArch(nullptr), Sound(nullptr), Particle(nullptr), Light(nullptr) {}
+    FJumpFxCompanion()
+    {
+        EffectArch = nullptr;
+        Sound = nullptr;
+        Effect = nullptr;
+        Light = nullptr;
+    }
     ~FJumpFxCompanion();
 
     FJumpFxCompanion(FJumpFxCompanion const&) = delete;

@@ -1419,7 +1419,7 @@ NumberStringChild::~NumberStringChild()
     // FUN_004154f0: the face first, then the glyph vector.
     if (FaceCache_ != nullptr)
     {
-        NumberFaceRelease(static_cast<FNumberFace*>(FaceCache_));
+        NumberFaceRelease(FaceCache_);
         FaceCache_ = nullptr;
     }
     ::operator delete(GlyphFirst_);
@@ -1456,7 +1456,7 @@ void NumberStringChild::BindFont(IFont* Font)
     Font_ = Font;
     if (FaceCache_ != nullptr)
     {
-        NumberFaceRelease(static_cast<FNumberFace*>(FaceCache_));
+        NumberFaceRelease(FaceCache_);
         FaceCache_ = nullptr;
     }
     // Retail zeroes +0x24 on every change, face or not.
@@ -1494,7 +1494,7 @@ int* NumberStringChild::GetSize(int* OutWH)
         {
             FaceCache_ = NumberFaceGetOrCreate(Font_);
         }
-        FNumberFace* const Face = static_cast<FNumberFace*>(FaceCache_);
+        FNumberFace* const Face = FaceCache_;
         if (Face != nullptr)
         {
             if (Face->Glyph == nullptr)
@@ -1644,7 +1644,7 @@ void NumberStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
     {
         FaceCache_ = NumberFaceGetOrCreate(Font_);
     }
-    FNumberFace* const Face = static_cast<FNumberFace*>(FaceCache_);
+    FNumberFace* const Face = FaceCache_;
     if (Face == nullptr)
     {
         return;

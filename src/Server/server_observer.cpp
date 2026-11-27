@@ -738,8 +738,7 @@ void StarSystem::damage_object(GameObject* Obj, DamageList* Damage)
     // Fan out over StarSystem::PlayerListHead (+0xc); each node's Observer is
     // embedded at node+0x08 (an address, not a load). No null test on the head or a
     // node; the walk stops only at the sentinel.
-    SystemPlayerNode* const Head =
-        reinterpret_cast<SystemPlayerNode*>(PlayerListHead);
+    SystemPlayerNode* const Head = PlayerListHead;
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next) {
         Node->View.damage_object(ObjId, Damage, &Reduced);
     }
@@ -1014,7 +1013,7 @@ void Observer::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigne
 }
 
 // FUN_06cf6bc0 -- CREATECOUNTER.
-void Observer::create_counter_for_player(void* Payload, GameObject* Obj)
+void Observer::create_counter_for_player(FServerCreateProjectileInfo const* Payload, GameObject* Obj)
 {
     // No null test on View or Obj.
     if (bShipGone != 0)
@@ -1038,7 +1037,7 @@ void Observer::create_counter_for_player(void* Payload, GameObject* Obj)
     // This slot takes the ADDRESS of the player id (const unsigned int&), unlike the
     // ship / loot / mine slots.
     g_pClientInterface->SendServerCreateCounter(
-        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+        PlayerId, *Payload);
 }
 
 // FUN_06cf6c50 -- CREATELOOT. The only notifier that tracks MORE THAN ONE object per call:
@@ -1078,7 +1077,7 @@ void Observer::create_loot_for_player(FServerCreateLootRequest* Payload, GameObj
 }
 
 // FUN_06cf6cf0 -- CREATEGUIDED. Takes the loot one's vector but uses ONLY its first element.
-void Observer::create_guided_for_player(void* Payload, GameObject* const* First,
+void Observer::create_guided_for_player(FServerCreateGuidedInfo const* Payload, GameObject* const* First,
                                         GameObject* const* Last)
 {
     // No null test on View, the element or the record; the null-first and empty-range
@@ -1103,12 +1102,12 @@ void Observer::create_guided_for_player(void* Payload, GameObject* const* First,
 
     // Like the countermeasure slot, this one takes the ADDRESS of the player id.
     g_pClientInterface->SendServerCreateGuided(
-        PlayerId, *static_cast<const FServerCreateGuidedInfo*>(Payload));
+        PlayerId, *Payload);
 }
 
 // FUN_06cf6d60 -- CREATEMINE: the countermeasure one with a different FDUMP line and slot,
 // and the player id passed BY VALUE.
-void Observer::create_mine_for_player(void* Payload, GameObject* Obj)
+void Observer::create_mine_for_player(FServerCreateProjectileInfo const* Payload, GameObject* Obj)
 {
     if (bShipGone != 0)
         return;
@@ -1128,7 +1127,7 @@ void Observer::create_mine_for_player(void* Payload, GameObject* Obj)
     Record->bCreatedOnClient = true;
 
     g_pClientInterface->SendServerCreateMine(
-        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+        PlayerId, *Payload);
 }
 
 // FUN_06cf6df0 -- EXPLODEASTEROIDMINE; only caller StarSystem::send_mine_explosion.

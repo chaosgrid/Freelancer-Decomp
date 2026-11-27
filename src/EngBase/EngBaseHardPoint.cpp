@@ -59,7 +59,7 @@ void FHardpointObject::Destroy()
 
 static FHardpointObject* HardpointFromNested(void* Nested, unsigned long Offset)
 {
-    return (FHardpointObject*)((unsigned char*)Nested - Offset);
+    return reinterpret_cast<FHardpointObject*>((unsigned char*)Nested - Offset);
 }
 
 // LAB_06625e00 (IEC+0xC). QI through the IEC facet to the controlling unknown.
@@ -81,7 +81,7 @@ static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, un
 {
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, Name, nullptr);
-    const int FileHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+    const int FileHandle = Fs->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     if (FileHandle == -1)
         return;
     unsigned char Temp[0xC];
@@ -100,24 +100,23 @@ static long HardpointKeyOf(FArchetypeHandle* Handle)
 
 // LAB_06625e60 (IEC+0x10, this = obj+4). No argument checks.
 static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHandle* Handle,
-                                                   void* FileSystem)
+                                                   IFileSystem* FileSystem)
 {
     FHardpointObject* Object = HardpointFromNested(Nested, 4);
-    IFileSystem* Fs = AsFileSystem(FileSystem);
     FHardpointMap::iterator Entry = Object->Archetypes.end();
 
-    if (Fs->OpenNode(G_NameHardpointsFolder) == 0) // +0x60
+    if (FileSystem->OpenNode(G_NameHardpointsFolder) == 0) // +0x60
         return 0;
 
     WIN32_FIND_DATAA Outer;
-    const int OuterFind = Fs->FindFirst(G_NameStar, // +0x48
+    const int OuterFind = FileSystem->FindFirst(G_NameStar, // +0x48
                                      &Outer);
     if (OuterFind == -1)
         return 0;
 
     do
     {
-        if (Fs->OpenNode(Outer.cFileName) == 0)
+        if (FileSystem->OpenNode(Outer.cFileName) == 0)
         {
             char Message[0x2000];
             EngBaseFdump(kFdumpWarning, G_FdumpFileHardPoint, 0xFF, "WARNING",
@@ -129,13 +128,13 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
         }
 
         WIN32_FIND_DATAA Inner;
-        const int InnerFind = Fs->FindFirst("*.*", // +0x48
+        const int InnerFind = FileSystem->FindFirst("*.*", // +0x48
                                          &Inner);
         if (InnerFind != -1)
         {
             do
             {
-                if (Fs->OpenNode(Inner.cFileName) == 0)
+                if (FileSystem->OpenNode(Inner.cFileName) == 0)
                     continue;
                 if (Entry == Object->Archetypes.end())
                 {
@@ -166,24 +165,24 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                 {
                     if (Type != 0)
                     {
-                        ReadHardpointField(Fs, G_NameAxis, Data + 0x34, 0xC);
-                        ReadHardpointField(Fs, G_NameMin, Data + 0x40, 4);
-                        ReadHardpointField(Fs, G_NameMax, Data + 0x44, 4);
+                        ReadHardpointField(FileSystem, G_NameAxis, Data + 0x34, 0xC);
+                        ReadHardpointField(FileSystem, G_NameMin, Data + 0x40, 4);
+                        ReadHardpointField(FileSystem, G_NameMax, Data + 0x44, 4);
                     }
-                    ReadHardpointField(Fs, G_NamePosition, Data + 4, 0xC);
-                    ReadHardpointOrientation(Fs, G_NameOrientation,
+                    ReadHardpointField(FileSystem, G_NamePosition, Data + 4, 0xC);
+                    ReadHardpointOrientation(FileSystem, G_NameOrientation,
                                              (float*)(Data + 0x10));
                 }
-                Fs->OpenNode(G_NameParentDot); // +0x60
-            } while (Fs->FindNext((unsigned long)InnerFind, // +0x4C
+                FileSystem->OpenNode(G_NameParentDot); // +0x60
+            } while (FileSystem->FindNext((unsigned long)InnerFind, // +0x4C
                                 &Inner) != 0);
-            Fs->FindClose((unsigned long)InnerFind); // +0x50
+            FileSystem->FindClose((unsigned long)InnerFind); // +0x50
         }
-        Fs->OpenNode(G_NameParentDot); // +0x60
-    } while (Fs->FindNext((unsigned long)OuterFind, // +0x4C
+        FileSystem->OpenNode(G_NameParentDot); // +0x60
+    } while (FileSystem->FindNext((unsigned long)OuterFind, // +0x4C
                         &Outer) != 0);
-    Fs->FindClose((unsigned long)OuterFind); // +0x50
-    Fs->OpenNode(G_NameParentDot);                     // +0x60
+    FileSystem->FindClose((unsigned long)OuterFind); // +0x50
+    FileSystem->OpenNode(G_NameParentDot);                     // +0x60
     return Entry != Object->Archetypes.end() ? 1 : 0;
 }
 
@@ -258,7 +257,7 @@ static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetyp
 unsigned long DACOM_API FHardpointObject::GetHardpoint(ArchetypeIndex InHandle, FHardpointKey const* Key,
                                                        void* Out)
 {
-    FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
+    FArchetypeHandle* Handle = reinterpret_cast<FArchetypeHandle*>(InHandle);
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
     if (Entry == Archetypes.end())
         return 0;
@@ -278,7 +277,7 @@ unsigned long DACOM_API FHardpointObject::GetHardpoint(ArchetypeIndex InHandle, 
 unsigned long DACOM_API FHardpointObject::AddHardpoint(ArchetypeIndex InHandle, FHardpointKey const* Key,
                                                        const void* Data)
 {
-    FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
+    FArchetypeHandle* Handle = reinterpret_cast<FArchetypeHandle*>(InHandle);
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
     if (Entry == Archetypes.end())
     {
@@ -312,7 +311,7 @@ unsigned long DACOM_API FHardpointObject::AddHardpoint(ArchetypeIndex InHandle, 
 GENRESULT DACOM_API FHardpointObject::EnumerateHardpoints(FHardpointEnumProc Callback,
                                                           ArchetypeIndex InHandle, void* Context)
 {
-    FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
+    FArchetypeHandle* Handle = reinterpret_cast<FArchetypeHandle*>(InHandle);
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
     if (Entry == Archetypes.end())
         return GR_OK;
@@ -327,8 +326,8 @@ GENRESULT DACOM_API FHardpointObject::EnumerateHardpoints(FHardpointEnumProc Cal
 unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInstA, FHardpointKey const* NameA,
                                                             InstanceIndex InInstB, FHardpointKey const* NameB)
 {
-    FEngineInstance* InstA = (FEngineInstance*)InInstA;
-    FEngineInstance* InstB = (FEngineInstance*)InInstB;
+    FEngineInstance* InstA = reinterpret_cast<FEngineInstance*>(InInstA);
+    FEngineInstance* InstB = reinterpret_cast<FEngineInstance*>(InInstB);
     IEngine* Engine = this->Engine;
     ArchetypeIndex HandleB = (ArchetypeIndex)G_InvalidArchetype;
     unsigned long Status = 1;
@@ -348,11 +347,11 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
             const unsigned long TypeB = *(unsigned long*)DataB;
             Payload[0] = TypeB;
             float* PayloadF = (float*)Payload;
-            const Vector* PosA = (const Vector*)(DataA + 4);
-            const Vector* PosB = (const Vector*)(DataB + 4);
-            const Matrix* OrientA = (const Matrix*)(DataA + 0x10);
-            const Matrix* OrientB = (const Matrix*)(DataB + 0x10);
-            const Vector* AxisB = (const Vector*)(DataB + 0x34);
+            const Vector* PosA = reinterpret_cast<const Vector*>(DataA + 4);
+            const Vector* PosB = reinterpret_cast<const Vector*>(DataB + 4);
+            const Matrix* OrientA = reinterpret_cast<const Matrix*>(DataA + 0x10);
+            const Matrix* OrientB = reinterpret_cast<const Matrix*>(DataB + 0x10);
+            const Vector* AxisB = reinterpret_cast<const Vector*>(DataB + 0x34);
 
             if (TypeB == kJointTypeFix)
             {
@@ -394,7 +393,7 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
 // FUN_066269b0 (IHardpoint+0x1C). No argument checks.
 char const* DACOM_API FHardpointObject::FindHardpoint(ArchetypeIndex InHandle, unsigned long const* Crc)
 {
-    FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
+    FArchetypeHandle* Handle = reinterpret_cast<FArchetypeHandle*>(InHandle);
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
     if (Entry == Archetypes.end())
         return nullptr;
@@ -479,7 +478,7 @@ static GENRESULT ReadHardpointOrientation(IFileSystem* Fs, const char* Name, flo
 {
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, Name, nullptr);
-    const int FileHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
+    const int FileHandle = Fs->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc)); // +0x7C
     bool bRead = false;
     if (FileHandle != -1)
     {
@@ -507,7 +506,7 @@ GENRESULT DACOM_API HardpointFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     }
 
     FHardpointObject* Object =
-        (FHardpointObject*)(std::calloc(1, sizeof(FHardpointObject)));
+        static_cast<FHardpointObject*>(std::calloc(1, sizeof(FHardpointObject)));
     if (Object == nullptr)
     {
         *Out = nullptr;
@@ -519,9 +518,9 @@ GENRESULT DACOM_API HardpointFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     Object->Inner.RefCount = 1;
     Object->Inner.Object = Object;
 
-    FAggDesc18* Agg = (FAggDesc18*)Desc;
+    FAggDesc18* Agg = reinterpret_cast<FAggDesc18*>(Desc);
     IDAComponent* const InnerUnknown = &Object->Inner;
-    Object->Controller = (IDAComponent*)(Agg->Inner);
+    Object->Controller = Agg->Inner;
     if (Agg->Inner == nullptr)
         Object->Controller = InnerUnknown;
     else
@@ -628,20 +627,20 @@ int DACOM_API FHardpointObject::Initialize()
 int DACOM_API FHardpointObject::CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem)
 {
     return (int)(
-        HardpointCreateArchetype(NestedThis(this, 4), (FArchetypeHandle*)Archetype, FileSystem));
+        HardpointCreateArchetype(NestedThis(this, 4), reinterpret_cast<FArchetypeHandle*>(Archetype), FileSystem));
 }
 
 int DACOM_API FHardpointObject::DuplicateArchetype(ArchetypeIndex NewArchetype, ArchetypeIndex OldArchetype)
 {
     return (int)(
-        HardpointDuplicateArchetype(NestedThis(this, 4), (FArchetypeHandle*)NewArchetype,
-                                        (FArchetypeHandle*)OldArchetype));
+        HardpointDuplicateArchetype(NestedThis(this, 4), reinterpret_cast<FArchetypeHandle*>(NewArchetype),
+                                        reinterpret_cast<FArchetypeHandle*>(OldArchetype)));
 }
 
 int DACOM_API FHardpointObject::DestroyArchetype(ArchetypeIndex Archetype)
 {
     return (int)(HardpointDestroyArchetype(NestedThis(this, 4),
-                                                       (FArchetypeHandle*)Archetype));
+                                                       reinterpret_cast<FArchetypeHandle*>(Archetype)));
 }
 
 int DACOM_API FHardpointObject::QueryArchetype(ArchetypeIndex Archetype, const char* Iid, void** Out)

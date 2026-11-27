@@ -1149,13 +1149,13 @@ namespace
 // The GameLight base subobject is at +0; null remains null.
 FEngineLight* EngineLightGameListHead()
 {
-    return reinterpret_cast<FEngineLight*>(G_GameLightHead);
+    return G_GameLightHead;
 }
 
 FEngineLight* EngineLightGameListNext(FEngineLight* Light)
 {
     // +0xc8 of the GameLight containing this EngineLight base.
-    return reinterpret_cast<FEngineLight*>(reinterpret_cast<FGameLight*>(Light)->ListNext);
+    return static_cast<FGameLight*>(Light)->ListNext;
 }
 
 // FUN_00537690, thiscall on a GameLight.
@@ -1267,10 +1267,10 @@ FGameLight* GameLightCreatePoint(Vector const* Pos3, unsigned char const Rgb[3],
     FGameLight* Light = nullptr;
     if (Mem != nullptr)
         Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
-    ((FEngineLight*)Light)->SetType(kLightPoint, true);           // FUN_004110c0(1, 1)
-    ((FEngineLight*)Light)->SetPosition(Pos3);          // FUN_00410ef0
-    ((FEngineLight*)Light)->SetColorBytesAlt(Rgb);      // FUN_004115b0
-    ((FEngineLight*)Light)->SetRadius(Range);           // FUN_00411300
+    Light->SetType(kLightPoint, true);           // FUN_004110c0(1, 1)
+    Light->SetPosition(Pos3);          // FUN_00410ef0
+    Light->SetColorBytesAlt(Rgb);      // FUN_004115b0
+    Light->SetRadius(Range);           // FUN_00411300
     if (Light->Enable()) // vtable slot 1
         return Light;
 
@@ -1489,11 +1489,11 @@ void FGameLightAnimSlot::TickAnim(float Dt, FGameLight* Light)
             Rgb[Channel] = static_cast<unsigned char>(
                 static_cast<int>(Delta * static_cast<double>(Blend) + From.Rgb[Channel]));
         }
-        ((FEngineLight*)Light)->SetColorBytesAlt(Rgb); // FUN_004115b0
+        Light->SetColorBytesAlt(Rgb); // FUN_004115b0
 
         double const Intensity =
             (static_cast<double>(To.Intensity) - From.Intensity) * Blend + From.Intensity;
-        ((FEngineLight*)Light)->SetRadius(static_cast<float>(Intensity * RangeScale));
+        Light->SetRadius(static_cast<float>(Intensity * RangeScale));
         return;
     }
 
@@ -1504,8 +1504,8 @@ void FGameLightAnimSlot::TickAnim(float Dt, FGameLight* Light)
         return;
     }
 
-    ((FEngineLight*)Light)->SetColorBytesAlt(Last->Rgb);
-    ((FEngineLight*)Light)->SetRadius(Last->Intensity * RangeScale);
+    Light->SetColorBytesAlt(Last->Rgb);
+    Light->SetRadius(Last->Intensity * RangeScale);
 }
 
 I3DMathEngine* G_GameLightMath = nullptr; // DAT_006789c0
@@ -1527,7 +1527,7 @@ void FGameLight::Tick(float Dt)
         Pos.x = static_cast<float>(Xv + static_cast<double>(Position.x));
         Pos.y = static_cast<float>(Yv + static_cast<double>(Position.y));
         Pos.z = static_cast<float>(static_cast<double>(Zv) + static_cast<double>(Position.z));
-        ((FEngineLight*)this)->SetPosition(&Pos);
+        this->SetPosition(&Pos);
     }
     else
     {
@@ -1540,7 +1540,7 @@ void FGameLight::Tick(float Dt)
         G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
                                       LocalXform);
         Transform const Copy = World;
-        EngineLightSetTransform((FEngineLight*)this, &Copy.Rotation.E[0][0], &Copy.Translation);
+        EngineLightSetTransform(this, &Copy.Rotation.E[0][0], &Copy.Translation);
     }
     if (Anim.Keys != nullptr)
         Anim.TickAnim(Dt, this);
@@ -1713,7 +1713,7 @@ void FGameLight::Load(INI_Reader* Reader)
     {
         char const* const Value = Reader->get_value_string();
         char const* const Name = Reader->get_name_ptr();
-        ((FEngineLight*)this)->ReadValue(Name, Value);
+        this->ReadValue(Name, Value);
     }
     Enable(); // vtable slot 1
 }

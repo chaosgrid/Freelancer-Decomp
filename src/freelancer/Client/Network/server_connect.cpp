@@ -22,7 +22,7 @@
 #include <windows.h>
 
 IServer* G_Server = nullptr;        // DAT_0067ecd0
-void* G_ChatServer = nullptr;       // DAT_0067ecd4
+IChatServer* G_ChatServer = nullptr;       // DAT_0067ecd4
 
 // .data:00615aec -- "Server.dll", overwritten (at most 31 characters) by [Freelancer]
 // local_server in FUN_005a82d0.
@@ -32,10 +32,10 @@ namespace
 {
     HMODULE G_ServerModule = nullptr;       // DAT_0067ed54
     IServer* G_LoadedServer = nullptr;      // DAT_0067ed58
-    void* G_LoadedChatServer = nullptr;     // DAT_0067ed5c
+    IChatServer* G_LoadedChatServer = nullptr; // DAT_0067ed5c
 
     typedef IServer*(__cdecl* FGetServerInterface)();
-    typedef void*(__cdecl* FGetChatServerInterface)();
+    typedef IChatServer*(__cdecl* FGetChatServerInterface)();
 
     // FUN_00564b00: DAT_0067c200 != 0.
     bool IsIntroModeRequested()
@@ -68,7 +68,7 @@ IServer* GetLoadedServer()
 }
 
 // FUN_005b6fc0
-void* GetLoadedChatServer()
+IChatServer* GetLoadedChatServer()
 {
     return G_LoadedChatServer;
 }
@@ -145,12 +145,12 @@ bool StartServer(char const* IniPath)
     return G_Server->Startup(Info);     // +0x24
 }
 
-void* GetLocalServerInterface()
+IServer* GetLocalServerInterface()
 {
     return G_Server;
 }
 
-void* GetLocalChatServerInterface()
+IChatServer* GetLocalChatServerInterface()
 {
     return G_ChatServer;
 }

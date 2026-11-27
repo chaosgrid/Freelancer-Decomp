@@ -10,6 +10,7 @@
 
 #include "NeuroNet/Chat/chat_msg_win.h"          // MsgWin (HistoryDisplay, DAT_0066da80)
 #include "NeuroNet/Chat/chat_text_input.h"       // ChatTextInputDisplay ("CTID")
+#include "NeuroNet/nn_button_control.h"
 #include "Common/Fonts/ids_rdl.h"               // LoadIdsTextIntoRdl, LoadIdsIntoRdl, RdlRemoveLastParagraph, RdlAppendNode, RdlClear
 #include "Interface/menu_ui_widgets.h"
 #include "NeuroNet/nn_group_control.h"      // NnGroupControl::GroupMembers (DAT_0066da84 +0x340)

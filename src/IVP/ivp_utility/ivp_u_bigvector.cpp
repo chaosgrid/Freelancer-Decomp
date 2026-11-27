@@ -23,14 +23,14 @@ void IVP_SurfaceManager_OutList::grow()
     void* newBuffer = malloc(static_cast<size_t>(Capacity) * 8 + 8); // FUN_06343f70
     Capacity = Capacity * 2 + 1;
     int count = Count;
-    void** newElems = (void**)newBuffer;
-    void** oldElems = Elems;
+    IVP_Compact_Ledge** newElems = static_cast<IVP_Compact_Ledge**>(newBuffer);
+    IVP_Compact_Ledge** oldElems = Elems;
     for (int i = 0; i < count; ++i)
     {
         newElems[i] = oldElems[i];
     }
-    void** oldBuffer = Elems;
-    if (oldBuffer != (void**)(this + 1) && oldBuffer != nullptr)
+    IVP_Compact_Ledge** oldBuffer = Elems;
+    if (oldBuffer != reinterpret_cast<IVP_Compact_Ledge**>(this + 1) && oldBuffer != nullptr)
     {
         free(oldBuffer); // FUN_06343fb0
         Elems = nullptr;

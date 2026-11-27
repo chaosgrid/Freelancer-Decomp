@@ -129,7 +129,7 @@ namespace
                 return GR_INTERFACE_UNSUPPORTED;
             }
             AddRef();
-            *Out = (IDAComponent*)this;
+            *Out = static_cast<IDAComponent*>(this);
             return GR_OK;
         }
 
@@ -276,7 +276,7 @@ namespace
 
         void BindArg(void* Arg, unsigned char bBackdropClip, unsigned char bOwnTransform)
         {
-            Inner_ = (ICamera*)Arg;
+            Inner_ = static_cast<ICamera*>(Arg);
             bBackdropClip_ = bBackdropClip;
             bOwnTransform_ = bOwnTransform;
         }
@@ -374,7 +374,7 @@ namespace
     {
         const char* Name = kOverrideNames[Index];
         G_Overrides[Index] = nullptr;
-        IMaterialLibrary* Materials = (IMaterialLibrary*)Library;
+        IMaterialLibrary* Materials = static_cast<IMaterialLibrary*>(Library);
         const GENRESULT Found = Materials->FindOrCreate(Name, Name, 0, &G_Overrides[Index]);
         if (Found != GR_OK)
         {
@@ -397,7 +397,7 @@ namespace
         unsigned long Reserve[2];
         Reserve[0] = 1;
         Reserve[1] = 0;
-        ((IMaterialLibrary*)Library)->SetGlobalRecord(4, Reserve);
+        (static_cast<IMaterialLibrary*>(Library))->SetGlobalRecord(4, Reserve);
     }
 
     class FFLAppearanceBase : public IFLAppearance
@@ -465,13 +465,13 @@ namespace
         GENRESULT EngineInitialize();
 
         FEngineFace EngineFace_;
-        IDAComponent* Engine_;
+        IEngine* Engine_;
         IDAComponent* System_;
         IRenderer2* Renderer_;
         IRenderPipeline* Pipeline_;
         IVertexBufferManager* VertexBuffers_;
-        IDAComponent* TextureLibrary_;
-        void* Scratch88_;
+        ITextureLibrary2* TextureLibrary_;
+        FCameraBlob* Scratch88_;
         IDAComponent* Outer_;
         FInner Inner_;
     };
@@ -490,8 +490,8 @@ namespace
 
     FFLAppearanceBase* OwnerFromEngineFace(FFLAppearanceBase::FEngineFace* Face)
     {
-        return (FFLAppearanceBase*)((char*)Face -
-                                                offsetof(FFLAppearanceBase, EngineFace_));
+        return reinterpret_cast<FFLAppearanceBase*>(((char*)Face -
+                                                offsetof(FFLAppearanceBase, EngineFace_)));
     }
 
     FFLAppearanceBase* OwnerFromInner(FFLAppearanceBase::FInner* Inner)
@@ -517,7 +517,7 @@ namespace
     {
         // LAB_066ff8d0: base phase, overrides, direct camera deletion, owner free.
         ReleaseOverrides();
-        delete (FCameraBlob*)Scratch88_;
+        delete Scratch88_;
     }
 
     GENRESULT DACOM_API FFLAppearanceBase::FEngineFace::QueryInterface(const char* Iid, void** Out)
@@ -552,10 +552,10 @@ namespace
         // LAB_066ff810: the immutable map contains these three owner faces only.
         IDAComponent* Face;
         if (std::strcmp(Iid, Iids::FLAppearance) == 0)
-            Face = (IFLAppearance*)Owner;
+            Face = static_cast<IFLAppearance*>(Owner);
         else if (std::strcmp(Iid, Iids::AggregateComponent) == 0 ||
                  std::strcmp(Iid, Iids::EngineComponent) == 0)
-            Face = (IEngineComponent*)(&Owner->EngineFace_);
+            Face = static_cast<IEngineComponent*>(&Owner->EngineFace_);
         else
         {
             *Out = nullptr;
@@ -593,12 +593,12 @@ namespace
     {
         if (Desc->OuterAt8 != nullptr)
         {
-            Outer_ = (IDAComponent*)Desc->OuterAt8;
-            *Desc->InnerOutAtC = (IDAComponent*)(&Inner_);
+            Outer_ = static_cast<IDAComponent*>(Desc->OuterAt8);
+            *Desc->InnerOutAtC = static_cast<IDAComponent*>(&Inner_);
         }
         else
         {
-            Outer_ = (IDAComponent*)(&Inner_);
+            Outer_ = &Inner_;
         }
 
         const GENRESULT EngineQi =
@@ -970,7 +970,7 @@ namespace
         if (InstanceCount == 0)
             return GR_OK;
 
-        FShadowTextureScope Texture((ITextureLibrary2*)Appearance->TextureLibrary_);
+        FShadowTextureScope Texture(Appearance->TextureLibrary_);
         unsigned long Handle = 0;
         unsigned long Crc[2] = {(unsigned long)("efxshadow"), DACOM_CRC::GetCRC32("efxshadow")};
         const GENRESULT Found = Texture.Library->FindTextureByCrc(Crc, &Texture.Record);
@@ -990,7 +990,7 @@ namespace
             return (GENRESULT)-1;
 
         PipelineApplyRsTable(Appearance->Pipeline_, kShadowDrawRs);
-        PipelineSetModelview(Appearance->Pipeline_, (const float*)((ICamera*)A)->GetViewTransform());
+        PipelineSetModelview(Appearance->Pipeline_, (const float*)(static_cast<ICamera*>(A))->GetViewTransform());
         FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
         FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, D3DCULL_NONE);
         FShadowRenderStateScope DepthBias(Appearance->Pipeline_, D3DRS_ZBIAS, 4);
@@ -1011,10 +1011,10 @@ namespace
             {
                 FShadowVertWriter Writer;
                 ShadowWriterReset(&Writer, (char*)LockOut.Vertices, (int)LockCount, LockOut.Listing.Fvf);
-                const FShadowInstance* Instances = (const FShadowInstance*)B;
+                const FShadowInstance* Instances = static_cast<const FShadowInstance*>(B);
                 for (int Index = 0; Index < InstanceCount; ++Index)
                 {
-                    IEngine* Engine = (IEngine*)Appearance->Engine_;
+                    IEngine* Engine = Appearance->Engine_;
                     const Transform* Transform = Engine->GetInstanceTransform(Instances[Index].Id);
                     float PosX = Transform->Translation.x;
                     float PosY = Transform->Translation.y;
@@ -1114,7 +1114,7 @@ namespace
     {
         if (Renderer_ == nullptr)
             return GR_OK;
-        FCameraBlob* Camera = (FCameraBlob*)Scratch88_;
+        FCameraBlob* Camera = Scratch88_;
         IDAComponent* const Override = G_Overrides[5];
         Camera->BindArg(A, 1, 0);
         CallSetPerspective(Pipeline_, Camera);
@@ -1122,7 +1122,7 @@ namespace
         if (Camera->OwnTransform() != 0)
         {
             const Vector Translation = {};
-            Camera->SetOrientationAndTranslation((const float*)((ICamera*)A)->GetOrientation(), &Translation);
+            Camera->SetOrientationAndTranslation((const float*)(static_cast<ICamera*>(A))->GetOrientation(), &Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
             float* Dest = Camera->ViewTransform();
@@ -1131,9 +1131,9 @@ namespace
         }
         // LAB_066fe41c: Inst is the second argument, Extra is the Backdrop override.
         IRenderer2* const Renderer = Renderer_;
-        Camera = (FCameraBlob*)Scratch88_;
+        Camera = Scratch88_;
         Renderer->RenderInstance(Camera, Extra, 1.0f, 0, nullptr, Override);
-        Camera = (FCameraBlob*)Scratch88_;
+        Camera = Scratch88_;
         if (Camera->BackdropClip() != 0)
         {
             Camera->SetBackdropClip(0);
@@ -1150,10 +1150,10 @@ namespace
         // The pipeline (+0x14) is used with no null test, as in retail.
         FAppearanceRenderStateScope SavedState(Pipeline_);
         IDAComponent* const Override = G_Overrides[6];
-        FCameraBlob* Camera = (FCameraBlob*)Scratch88_;
+        FCameraBlob* Camera = Scratch88_;
         Camera->BindArg(A, 0, 1);
         {
-            const float* Orientation = (const float*)((ICamera*)A)->GetOrientation();
+            const float* Orientation = (const float*)(static_cast<ICamera*>(A))->GetOrientation();
             Vector Translation;
             Translation.x = 0.0f;
             Translation.y = 0.0f;
@@ -1167,9 +1167,9 @@ namespace
         }
         // LAB_066fe667: Inst is the second argument, Extra is the Starsphere override.
         IRenderer2* const Renderer = Renderer_;
-        Camera = (FCameraBlob*)Scratch88_;
+        Camera = Scratch88_;
         Renderer->RenderInstance(Camera, Extra, 1.0f, kDrawKeepCurrent, nullptr, Override);
-        Camera = (FCameraBlob*)Scratch88_;
+        Camera = Scratch88_;
         if (Camera->BackdropClip() != 0)
         {
             Camera->SetBackdropClip(0);
@@ -1210,11 +1210,11 @@ I3DMathEngine* FlmCreateMathEngine() // FUN_067006d0, shared by all three retail
     FMathDesc Desc = {0x0C, G_Name3DMathEngine, nullptr};
     ICOManager* Manager = DACOM_Acquire();
     void* Created = nullptr;
-    Manager->CreateInstance((AGGDESC*)(&Desc), &Created);
-    return (I3DMathEngine*)Created;
+    Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Created);
+    return static_cast<I3DMathEngine*>(Created);
 }
 
-IDAComponent* G_FlmEngineOuter = nullptr;
+IEngine* G_FlmEngineOuter = nullptr;
 
 bool FlmLookupIdValue(int Id, void** Out)
 {

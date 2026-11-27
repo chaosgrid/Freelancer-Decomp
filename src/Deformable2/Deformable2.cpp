@@ -84,8 +84,8 @@ I3DMathEngine* AcquireMathEngine()
     Desc.Name = G_Name3DMathEngine;
     Desc.Extra = nullptr;
     void* Instance = nullptr;
-    Manager->CreateInstance((AGGDESC*)(&Desc), &Instance);
-    G_MathEngine = (I3DMathEngine*)Instance;
+    Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);
+    G_MathEngine = static_cast<I3DMathEngine*>(Instance);
     return G_MathEngine;
 }
 

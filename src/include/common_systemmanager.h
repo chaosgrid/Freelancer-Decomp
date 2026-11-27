@@ -318,6 +318,15 @@ static_assert(sizeof(SustainedThresholdTimer) == 0x10, "SustainedThresholdTimer 
 // (common_iustategraph.{h,cpp}; its FAiTargetList is an alias of this struct). The ctor
 // builds an empty vector at +0x0C and clears bKeepCache.
 // ---------------------------------------------------------------------------
+// Doubly-linked circular list node: {next, prev, embedded BaseWatcher}, 0x10 bytes (the
+// size of both retail operator new calls, sentinel and node).
+struct SystemManagerTimerListNode
+{
+    SystemManagerTimerListNode* Next;  // +0x00
+    SystemManagerTimerListNode* Prev;  // +0x04
+    unsigned char Watcher[8];          // +0x08, BaseWatcher-sized payload
+};
+
 struct SystemManagerTimerTable
 {
     // +0x00: not written by the ctor; SystemManager::SetSharedListHead (FUN_062e68e0) stores
@@ -380,7 +389,7 @@ struct SystemManagerTimerTable
     float DecayScale;              // +0xD8 = 0.5f, the second factor of Level's decay
     unsigned char Reserved0xDC;    // +0xDC uninitialized-in-retail artifact byte (Ghidra's `local_11`)
     unsigned char Pad0xDD[3];
-    void* ListHeadNode;            // +0xE0: heap-allocated (operator_new(0x10)) empty
+    SystemManagerTimerListNode* ListHeadNode; // +0xE0: heap-allocated (operator_new(0x10)) empty
                                     // self-referential 2-pointer circular-list sentinel
     int ListCount;                 // +0xE4 = 0
     // +0xE8: a BaseWatcher (FUN_062e6d40 calls set / set_pointer on it) holding the
@@ -740,8 +749,8 @@ struct SystemManagerGunGroupManager
     // Inlined into ~SystemManager between the +0x1364 record and the timer table.
     ~SystemManagerGunGroupManager() { TargetWatcher().set(nullptr); }
 
-    BaseWatcher& TargetWatcher() { return *(BaseWatcher*)TargetWatcherBytes; }
-    BaseWatcher const& TargetWatcher() const { return *(BaseWatcher const*)TargetWatcherBytes; }
+    BaseWatcher& TargetWatcher() { return *reinterpret_cast<BaseWatcher*>(TargetWatcherBytes); }
+    BaseWatcher const& TargetWatcher() const { return *reinterpret_cast<BaseWatcher const*>(TargetWatcherBytes); }
 
     // `[[this+4]+8] ? -8 : 0` -- the own ship (Owner->Watcher's object), or null. Retail
     // dereferences it untested at most sites; so do the callers.
@@ -1176,7 +1185,7 @@ public:
     // a TargetManager member lands on an ICF-folded `RET 4` and writes nothing. If
     // Timers::Owner names a live SystemManager whose Watcher has a target and NewHead is
     // non-null, also empties the cached AI target list (bBuilt = 0, End = Begin).
-    void SetSharedListHead(void* NewHead);
+    void SetSharedListHead(IObjDB* NewHead);
 
     // FUN_062e6990. Clears either of FormationLeaders' two BaseWatchers
     // (SystemManager+0x1370 / +0x1378) if its watched target's id matches TargetId.

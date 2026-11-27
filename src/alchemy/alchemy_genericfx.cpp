@@ -375,7 +375,7 @@ namespace AlchemyImpl
 
         ITextureLibrary2* TexInfoLibrary()
         {
-            return static_cast<ITextureLibrary2*>(G_TextureLibrary);
+            return G_TextureLibrary;
         }
 
         // FUN_06244f60 (cdecl): _vsnprintf(Buffer, 0x2000, Format, args); returns Buffer.
@@ -1130,7 +1130,7 @@ namespace AlchemyImpl
         FPooledParticle* const Next = Particle->Next;
         UnlinkParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
         FGenericFxObjectBase* const Owner =
-            static_cast<FGenericFxObjectBase*>(Particle->Appearance);
+            Particle->Appearance;
         if (Owner != nullptr)
             --Owner->LiveInstanceCount_;
         ReleaseAppearancePoolItem(Pool, Particle);
@@ -1146,7 +1146,7 @@ namespace AlchemyImpl
         FPooledParticle* const Particle = reinterpret_cast<FPooledParticle*>(
             static_cast<unsigned char*>(Pool->Items) + Index * Pool->Stride);
         FGenericFxObjectBase* const Owner =
-            static_cast<FGenericFxObjectBase*>(Particle->Appearance);
+            Particle->Appearance;
         Owner->EraseListParticle(Pool, Particle);
     }
 
@@ -1168,7 +1168,7 @@ namespace AlchemyImpl
             FPooledParticle* Oldest = reinterpret_cast<FPooledParticle*>(
                 static_cast<unsigned char*>(Pool->Items) + OldestIndex * Pool->Stride);
             FGenericFxObjectBase* OldestOwner =
-                static_cast<FGenericFxObjectBase*>(Oldest->Appearance);
+                Oldest->Appearance;
             UnlinkParticleNode(&OldestOwner->InstanceListHead_, &OldestOwner->InstanceListTail_,
                                Oldest);
             if (OldestOwner != nullptr)

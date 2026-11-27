@@ -19,6 +19,7 @@
 // Slots a retail class does not override fall through to the Common.dll FuseAction bodies.
 
 #include "common_archetype.h" // CacheString
+#include "Space/Effects/effect_base.h" // FEffectCompanion
 #include "common_csys.h"      // Matrix
 #include "common_fuses.h"
 
@@ -188,7 +189,7 @@ public:
     FEffectArch* EffectArch;                        // +0x40 set by Load (FUN_0040f080)
     // +0x44: the effect companion {slot0, sound, particle, light} (the layout FUN_00503070 fills
     // and FUN_004fcef0 / FUN_00502d90 release). Constructed zero (FUN_005154a0(0,0,0,0)).
-    void* Companion[4]; // +0x44
+    FEffectCompanion Companion; // +0x44
 };
 
 // ---------------------------------------------------------------------------

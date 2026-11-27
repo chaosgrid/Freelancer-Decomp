@@ -181,7 +181,7 @@ void TextWinProjectPoint(Vector const* World, float* OutX, float* OutY)
     float X = 0.0f;
     float Y = 0.0f;
     float Z = 0.0f;
-    if (AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, (const Vector*)World) == 0)
+    if (AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, World) == 0)
     {
         X = 0.0f;
         Y = 0.0f;

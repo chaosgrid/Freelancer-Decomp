@@ -107,9 +107,9 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
 
     // (-0.45f, 0.24f, 0), 0.95f x 0.06f, 1.4f.
     Vector const CaptionPosition = {NnFloatBits(0xbee66666), NnFloatBits(0x3e75c28f), 0.0f};
-    Caption = static_cast<NnTextControl*>(CreateTextControl(
+    Caption = CreateTextControl(
         "ArrivalText", "PageHeader", &CaptionPosition, nullptr, NnFloatBits(0x3f733333),
-        NnFloatBits(0x3d75c28f), NnFloatBits(0x3fb33333), 0, 0, 0, 1));
+        NnFloatBits(0x3d75c28f), NnFloatBits(0x3fb33333), 0, 0, 0, 1);
 
     // The colour override; no null test on the control.
     Caption->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPalettePaleGreen), 1);
@@ -485,7 +485,7 @@ void NnMainButtonOnUnclaimedMouse(unsigned Msg, unsigned WParam, unsigned LParam
     Record.Ids = 0x45e;
     Record.IdsAlt = 0x45e;
     // In the base's "Cityscape" room (runtime +0x38) the ids are 0x3a0 instead.
-    FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
+    FRoomRuntime* const Runtime = GetClientCurrentLocationRuntime();
     BaseData* const Base = GetClientCurrentLocationBaseData();
     if (Runtime != nullptr && Base != nullptr &&
         GetRoomRuntimeRoomId(Runtime) == MakeLocationID(Base->get_base_id(), "Cityscape"))

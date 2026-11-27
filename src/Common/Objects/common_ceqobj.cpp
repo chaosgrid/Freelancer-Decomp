@@ -205,7 +205,7 @@ bool CEqObj::sync_cargo(EquipDescList const& List)
     while (Item != nullptr)
     {
         EquipDesc const* const Desc = List.find_equipment_item(Item->Id);
-        CECargo* const Cargo = (CECargo*)Item;
+        CECargo* const Cargo = static_cast<CECargo*>(Item);
         if (Desc != nullptr)
         {
             Cargo->SetCount((unsigned)Desc->Count);
@@ -244,31 +244,31 @@ CEquip* CEqObj::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
     switch (ClassType)
     {
     case Archetype::AClassCargoPod:
-        return new CECargoPod(this, EquipId, (Archetype::CargoPod const*)Arch, bMissionFlag);
+        return new CECargoPod(this, EquipId, static_cast<Archetype::CargoPod const*>(Arch), bMissionFlag);
     case Archetype::AClassPower:
-        return new CEPower(this, EquipId, (Archetype::Power const*)Arch, bMissionFlag);
+        return new CEPower(this, EquipId, static_cast<Archetype::Power const*>(Arch), bMissionFlag);
     case Archetype::AClassShieldGenerator:
-        return new CEShieldGenerator(this, EquipId, (Archetype::ShieldGenerator const*)Arch, bMissionFlag);
+        return new CEShieldGenerator(this, EquipId, static_cast<Archetype::ShieldGenerator const*>(Arch), bMissionFlag);
     case Archetype::AClassGun:
-        return new CEGun(this, EquipId, (Archetype::Gun const*)Arch, bMissionFlag);
+        return new CEGun(this, EquipId, static_cast<Archetype::Gun const*>(Arch), bMissionFlag);
     case Archetype::AClassMineDropper:
-        return new CEMineDropper(this, EquipId, (Archetype::MineDropper const*)Arch, bMissionFlag);
+        return new CEMineDropper(this, EquipId, static_cast<Archetype::MineDropper const*>(Arch), bMissionFlag);
     case Archetype::AClassCounterMeasureDropper:
-        return new CECounterMeasureDropper(this, EquipId, (Archetype::CounterMeasureDropper const*)Arch, bMissionFlag);
+        return new CECounterMeasureDropper(this, EquipId, static_cast<Archetype::CounterMeasureDropper const*>(Arch), bMissionFlag);
     case Archetype::AClassScanner:
-        return new CEScanner(this, EquipId, (Archetype::Scanner const*)Arch, bMissionFlag);
+        return new CEScanner(this, EquipId, static_cast<Archetype::Scanner const*>(Arch), bMissionFlag);
     case Archetype::AClassLight:
-        return new CELightEquip(this, EquipId, (Archetype::Light const*)Arch, bMissionFlag);
+        return new CELightEquip(this, EquipId, static_cast<Archetype::Light const*>(Arch), bMissionFlag);
     case Archetype::AClassAttachedFX:
-        return new CEAttachedFX(this, EquipId, (Archetype::AttachedFXEquip const*)Arch, bMissionFlag);
+        return new CEAttachedFX(this, EquipId, static_cast<Archetype::AttachedFXEquip const*>(Arch), bMissionFlag);
     case Archetype::AClassInternalFX:
-        return new CEInternalFX(this, EquipId, (Archetype::InternalFXEquip const*)Arch, bMissionFlag);
+        return new CEInternalFX(this, EquipId, static_cast<Archetype::InternalFXEquip const*>(Arch), bMissionFlag);
     case Archetype::AClassRepairDroid:
-        return new CERepairDroid(this, EquipId, (Archetype::RepairDroid const*)Arch, bMissionFlag);
+        return new CERepairDroid(this, EquipId, static_cast<Archetype::RepairDroid const*>(Arch), bMissionFlag);
     case Archetype::AClassCloakingDevice:
-        return new CECloakingDevice(this, EquipId, (Archetype::CloakingDevice const*)Arch, bMissionFlag);
+        return new CECloakingDevice(this, EquipId, static_cast<Archetype::CloakingDevice const*>(Arch), bMissionFlag);
     case Archetype::AClassArmor:
-        return new CEArmor(this, EquipId, (Archetype::Armor const*)Arch, bMissionFlag);
+        return new CEArmor(this, EquipId, static_cast<Archetype::Armor const*>(Arch), bMissionFlag);
     default:
         break;
     }
@@ -306,7 +306,7 @@ void CEqObj::link_shields()
                           kCEqObjSource, 0x579, Link.ShieldArch.get_string(), Link.Hardpoint.Value);
                     return;
                 }
-                Shield = new CEShield(this, Link.EquipId, (Archetype::Shield const*)ShieldArch, false);
+                Shield = new CEShield(this, Link.EquipId, static_cast<Archetype::Shield const*>(ShieldArch), false);
                 Shield->Connect(Link.Hardpoint.Value);
                 EquipManager.AddNewEquipment(Shield);
             }
@@ -489,7 +489,7 @@ void CEqObj::init(CreateParms const& Parms)
     {
         float const Add = PowerEquip->IsDestroyed()
                               ? 0.0f
-                              : ((Archetype::Power const*)PowerEquip->Arch)->Capacity;
+                              : static_cast<Archetype::Power const*>(PowerEquip->Arch)->Capacity;
         MaxPower = Add + MaxPower;
     }
     Power = MaxPower;
@@ -515,7 +515,7 @@ bool CEqObj::is_targetable() const
 Archetype::EqObj* CEqObj::eqobjarch() const
 {
     // FUN_06262d50 (ICF fold)
-    return (Archetype::EqObj*)Archetype;
+    return static_cast<Archetype::EqObj*>(Archetype);
 }
 
 bool CEqObj::is_damaged_obj_attached(CacheString const& Name) const
@@ -1251,7 +1251,7 @@ void CEqObj::flush_animations()
         if (It->AnimChannel != -1)
         {
             AnimDB::Rem(It->AnimChannel);
-            DALib::Anim->DestroyScript((void*)It->AnimChannel);
+            DALib::Anim->DestroyScript(reinterpret_cast<void*>(It->AnimChannel));
         }
     }
     DockingPoints.clear();
@@ -1270,7 +1270,7 @@ void CEqObj::update_docking_animations(float Dt)
             continue;
 
         float const Duration = DALib::Anim->GetStoredDuration(Entry.AnimChannel);
-        float const Position = DALib::Anim->GetScriptDuration((void*)Entry.AnimChannel);
+        float const Position = DALib::Anim->GetScriptDuration(reinterpret_cast<void*>(Entry.AnimChannel));
 
         if (Entry.bActive)
         {
@@ -1390,7 +1390,7 @@ void CEqObj::disconnect(IObjDB* ObjDb)
     CEquip* Eq = const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeScanner));
     if (Eq != nullptr)
     {
-        CEScanner* const Scanner = (CEScanner*)Eq;
+        CEScanner* const Scanner = static_cast<CEScanner*>(Eq);
         Scanner->Scans.reset();
         Scanner->CargoVecEnd = Scanner->CargoVecBegin;
     }

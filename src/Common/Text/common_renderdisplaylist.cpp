@@ -63,7 +63,7 @@ namespace CmnText
     // the list's sentinel, i.e. an append.
     void InsertRdlCloneBefore(RenderDisplayList& Rdl, FRdlListNode* Where, RDLNode* const& Value)
     {
-        FRdlListNode* const NewEntry = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+        FRdlListNode* const NewEntry = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
         FRdlListNode* Prev = Where->Prev;
         NewEntry->Next = Where;
         if (Prev == nullptr)
@@ -587,7 +587,7 @@ RenderDisplayList::RenderDisplayList()
     // RVA 0xC5BB0 (ordinal 394). Retail leaves the +0x00 allocator byte uninitialised (read
     // from fresh stack scratch); the port zeroes it.
     Allocator = 0;
-    FRdlListNode* const Sentinel = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+    FRdlListNode* const Sentinel = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
     Sentinel->Next = Sentinel;
     Sentinel->Prev = Sentinel;
     NodeList = Sentinel;
@@ -598,7 +598,7 @@ RenderDisplayList::RenderDisplayList(const RenderDisplayList& Other)
 {
     // .text:06325be0. No null tests of the head, the source list or the source nodes.
     Allocator = Other.Allocator;
-    FRdlListNode* const Sentinel = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+    FRdlListNode* const Sentinel = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
     Sentinel->Next = Sentinel;
     Sentinel->Prev = Sentinel;
     NodeList = Sentinel;
@@ -610,7 +610,7 @@ RenderDisplayList::RenderDisplayList(const RenderDisplayList& Other)
     {
         RDLNode* SrcNode = OtherCur->Node;
 
-        FRdlListNode* const NewEntry = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+        FRdlListNode* const NewEntry = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
         FRdlListNode* Tail = Sentinel->Prev;
         if (Tail == nullptr) Tail = NewEntry;   // retail's degenerate-head fixup
         NewEntry->Next = Sentinel;
@@ -699,7 +699,7 @@ RenderDisplayList& RenderDisplayList::operator=(const RenderDisplayList& Other)
     // 3. Clone Other's remainder onto the tail (insert before the sentinel).
     while (OtherCur != OtherSentinel)
     {
-        FRdlListNode* const NewEntry = (FRdlListNode*)malloc(sizeof(FRdlListNode));
+        FRdlListNode* const NewEntry = static_cast<FRdlListNode*>(malloc(sizeof(FRdlListNode)));
         FRdlListNode* Tail = Sentinel->Prev;
         if (Tail == nullptr)
         {

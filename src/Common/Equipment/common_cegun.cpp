@@ -58,7 +58,7 @@ namespace
         if (Watch == nullptr)
             return nullptr;
         // The owning CSimple of its SelfWatchable member (container-of; no base class to cast to).
-        return (CSimple*)((char*)Watch - kWatchableOffset);
+        return reinterpret_cast<CSimple*>(((char*)Watch - kWatchableOffset));
     }
 
     Watchable const* EncodeLockWatchable(CSimple* Target)
@@ -265,7 +265,7 @@ CEGun* __cdecl CEGun::cast(CEquip* Equip)
 {
     if (Equip == nullptr || Equip->GetType() != EquipTypeGun)
         return nullptr;
-    return (CEGun*)(Equip);
+    return static_cast<CEGun*>(Equip);
 }
 
 CEGun const* __cdecl CEGun::cast(CEquip const* Equip)
@@ -282,7 +282,7 @@ bool CEGun::Activate(bool bOn)
     if (WasActive != Result && Owner != nullptr &&
         (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
-        ((CShip*)Owner)->GunStatsDirty = 1;
+        static_cast<CShip*>(Owner)->GunStatsDirty = 1;
     }
     return Result;
 }
@@ -333,7 +333,7 @@ FireResult CEGun::CanFire(Vector const& Target) const
         if (Owner != nullptr &&
             (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         {
-            CShip* Ship = (CShip*)(Owner);
+            CShip* Ship = static_cast<CShip*>(Owner);
             if (Ship->is_cruise_active())
                 return FireCruise;
         }
@@ -353,7 +353,7 @@ void CEGun::ComputeLaunchInfo_OneBarrel(ProjLaunchInfo& Out, int Barrel,
 {
     // FUN_06297870. LockTarget / LockSubId keep the caller's default unless the lock block at
     // the end writes them. No null or class tests on Projectile, Owner or Arch.
-    Archetype::Munition const* const Munition = (Archetype::Munition const*)(Projectile);
+    Archetype::Munition const* const Munition = static_cast<Archetype::Munition const*>(Projectile);
     if (Munition->Seeker == Archetype::Munition::SeekerNone)
     {
         // Unguided: muzzle velocity plus the owner's, oriented along the total.
@@ -714,7 +714,7 @@ float CEGun::GetMunitionRange() const
     // FUN_06298e70. No null or class tests.
     if (IsDestroyed())
         return 0.0f;
-    Archetype::Munition const* const Proj = (Archetype::Munition const*)(Projectile);
+    Archetype::Munition const* const Proj = static_cast<Archetype::Munition const*>(Projectile);
     if (Proj->Seeker == Archetype::Munition::SeekerLock && Proj->SeekerRange > 0.0f && Proj->SeekerFovCos < 1.0f)
         return Proj->SeekerRange;
     return GunArch()->get_munition_range();
@@ -723,7 +723,7 @@ float CEGun::GetMunitionRange() const
 float CEGun::GetSecondsTillLock() const
 {
     // FUN_06298ee0: clamped at 0 (NaN passes through). No null or class tests.
-    Archetype::Munition const* const Proj = (Archetype::Munition const*)(Projectile);
+    Archetype::Munition const* const Proj = static_cast<Archetype::Munition const*>(Projectile);
     if (Proj->Seeker != Archetype::Munition::SeekerLock)
         return 0.0f;
     double const Remaining = (double)(Proj->TimeToLock) - LockElapsed;
@@ -841,7 +841,7 @@ bool CEGun::GetTargetObjectPos(Vector& Out) const
     if (LockSubId != SUBOBJ_ID_NONE &&
         ((unsigned)(Target->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
-        CEqObj const* EqTarget = (CEqObj const*)(Target);
+        CEqObj const* EqTarget = static_cast<CEqObj const*>(Target);
         if (EqTarget->get_sub_obj_center_of_mass(LockSubId, Out))
             return true;
     }
@@ -894,7 +894,7 @@ bool CEGun::ComputeTgtLeadPosition(Vector& Out) const
     if (LockSubId != SUBOBJ_ID_NONE &&
         ((unsigned)(Target->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
-        CEqObj const* EqTarget = (CEqObj const*)(Target);
+        CEqObj const* EqTarget = static_cast<CEqObj const*>(Target);
         if (!EqTarget->get_sub_obj_center_of_mass(LockSubId, TgtPos))
             TgtPos = Target->get_center_of_mass();
         if (!EqTarget->get_sub_obj_velocity(LockSubId, TgtVel))
@@ -944,13 +944,13 @@ float const CEGun::TARGET_POINT_VALID_TIME = 2.0f;
 
 Archetype::Gun const* CEGun::GunArch() const
 {
-    return (Archetype::Gun const*)(Arch);
+    return static_cast<Archetype::Gun const*>(Arch);
 }
 
 Archetype::Munition const* CEGun::MunitionArch() const
 {
     // RVA 0x369c0 (ICF-shared).
-    return (Archetype::Munition const*)(Projectile);
+    return static_cast<Archetype::Munition const*>(Projectile);
 }
 
 void CEGun::LoseJoints()

@@ -66,7 +66,7 @@ namespace
             *Out = nullptr;
             if (!Iids::Equal(Iid, Iids::ComponentFactory))
                 return GR_INTERFACE_UNSUPPORTED;
-            *Out = (IComponentFactory*)this;
+            *Out = static_cast<IComponentFactory*>(this);
             AddRef();
             return GR_OK;
         }
@@ -120,7 +120,7 @@ namespace
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
             }
-            FMaterialAggregateDesc* Agg = (FMaterialAggregateDesc*)Desc;
+            FMaterialAggregateDesc* Agg = reinterpret_cast<FMaterialAggregateDesc*>(Desc);
             if (std::strcmp(Agg->NameAt4, Name_) != 0)
             {
                 *Instance = nullptr;
@@ -143,7 +143,7 @@ namespace
                 *Instance = nullptr;
                 return Result;
             }
-            *Instance = (IMaterial*)Object;
+            *Instance = static_cast<IMaterial*>(Object);
             return Result;
         }
     };
@@ -162,7 +162,7 @@ namespace
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
             }
-            FAggDesc18* Agg = (FAggDesc18*)Desc;
+            FAggDesc18* Agg = reinterpret_cast<FAggDesc18*>(Desc);
             if (std::strcmp(Agg->NameAt4, Name_) != 0)
             {
                 *Instance = nullptr;

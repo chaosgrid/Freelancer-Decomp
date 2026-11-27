@@ -21,6 +21,7 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
+#include "NeuroNet/nn_button_control.h"
 
 #include <wchar.h>
 #include <windows.h>
@@ -142,23 +143,23 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
     if (Mode == 0)
     {
         Vector OkPosition = {0.0f, NnFloatBits(0xbd851eb8), -1.0f};
-        PromptYes = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
+        PromptYes = CreateRichTextWireButtonControl(
             "PromptOk", "ui_select_item", &OkPosition, &ButtonExtents, 0, 0, YesToolTip, 0x411, 0,
-            0));
+            0);
     }
     else if (Mode == 1 || Mode == 2)
     {
         Vector YesPosition = {NnFloatBits(0xbd8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
         unsigned const YesCaption = (Mode == 1) ? 0x4dcu : 0u;
-        PromptYes = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
+        PromptYes = CreateRichTextWireButtonControl(
             "PromptYes", "ui_select_item", &YesPosition, &ButtonExtents, 0, 0, YesToolTip,
-            YesCaption, 0, 0));
+            YesCaption, 0, 0);
 
         Vector NoPosition = {NnFloatBits(0x3d8f5c29), NnFloatBits(0xbd851eb8), -1.0f};
         unsigned const NoCaption = (Mode == 1) ? 0x4ddu : 0u;
-        PromptNo = static_cast<RichTextWireButtonControl*>(CreateRichTextWireButtonControl(
+        PromptNo = CreateRichTextWireButtonControl(
             "PromptNo", "ui_select_item", &NoPosition, &ButtonExtents, 0, 0, NoToolTip, NoCaption,
-            0, 0));
+            0, 0);
     }
 
     // (0.345, 0.105, -1), half extents (0.02, 0.02, 0).

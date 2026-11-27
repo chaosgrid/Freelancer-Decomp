@@ -22,7 +22,7 @@ CruiseBehavior::~CruiseBehavior()
 }
 
 // Slot 1, LAB_062cf3e0: a bare `JMP FUN_062d2090` (Behavior::BindContext).
-bool CruiseBehavior::SetContext(void* Param1, void* Param2, void* Param3)
+bool CruiseBehavior::SetContext(IObjRW* Param1, IBehaviorManager* Param2, SystemManager* Param3)
 {
     return BindContext(Param1, Param2, Param3);
 }

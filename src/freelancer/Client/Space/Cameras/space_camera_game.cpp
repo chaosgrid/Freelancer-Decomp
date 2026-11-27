@@ -258,12 +258,12 @@ bool FHudCamera::IsFinished()
     return (Raw - kWatchableOffset) == nullptr;
 }
 
-void* GameCameraGetTarget(const FGameCamera* Cam)
+IObjRW* GameCameraGetTarget(const FGameCamera* Cam)
 {
     if (Cam->Watched.target() == nullptr)
         return nullptr;
-    return const_cast<unsigned char*>(
-        reinterpret_cast<const unsigned char*>(Cam->Watched.target())) - kWatchableOffset;
+    return reinterpret_cast<IObjRW*>(const_cast<unsigned char*>(
+        reinterpret_cast<const unsigned char*>(Cam->Watched.target())) - kWatchableOffset);
 }
 
 CEqObj* GameCameraShipOf(IObjRW* Object)
@@ -280,7 +280,7 @@ CEqObj* GameCameraShipOf(IObjRW* Object)
 
 CEqObj* GameCameraWatchedShip(const FGameCamera* Cam)
 {
-    return GameCameraShipOf(static_cast<IObjRW*>(GameCameraGetTarget(Cam)));
+    return GameCameraShipOf(GameCameraGetTarget(Cam));
 }
 
 bool FGameCamera::Activate(int const* ViewRect4)
@@ -304,15 +304,12 @@ void FGameCamera::ApplyViewport(int const* ViewRect4)
     ForgetLetterboxCamera();
 }
 
-void FHudCamera::Attach(void* Object)
+void FHudCamera::Attach(IObjRW* Object)
 {
     // FUN_0051cbb0. GameCamera's watcher swap, inlined.
     BaseWatcher& Watched = this->Watched;
     Watchable const* const Target =
-        (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
-                                                 kWatchableOffset)
-            : nullptr;
+        (Object != nullptr) ? static_cast<Watchable const*>(Object) : nullptr;
     if (Target != Watched.target())
         Watched.set(Target);
 
@@ -337,7 +334,7 @@ void FHudCamera::ApplyViewport(int const* ViewRect4)
     HudElementListSetViewport(ViewRect4);
 }
 
-int HudCameraCommand70(void* Command)
+int HudCameraCommand70(FSpaceCommand* Command)
 {
     // FUN_0051da40 (and LAB_0051ad20, which tail-jumps here). While a NeuroNet window holds the
     // screen nothing is offered to the HUD; otherwise 1 when some element's Slot7 took it.
@@ -346,7 +343,7 @@ int HudCameraCommand70(void* Command)
     return 0;
 }
 
-int HudCameraCommand74(void* Command)
+int HudCameraCommand74(FSpaceCommand* Command)
 {
     // LAB_0051da70: the same gate, then Slot8.
     if (G_bNnScreenUp)
@@ -473,7 +470,7 @@ bool FHudCamera::OnEvent(unsigned MsgId)
     // Retail calls the object's slot 0x1cc, which for a ship is FUN_00544d70 (vtable 0x005dfd6c,
     // built by FUN_00543380). Port deviation: called directly, since the port's client objects
     // do not carry retail's slot numbering there.
-    ((FClientEquippedObj*)Ship)->ShipHandleEquipUpdate(&Record);
+    static_cast<FClientEquippedObj*>(Ship)->ShipHandleEquipUpdate(&Record);
     return true;
 }
 
@@ -509,7 +506,7 @@ namespace
             return;
         G_HudVisitScanClock = static_cast<float>(static_cast<double>(G_HudVisitScanClock) - 1.0f);
 
-        IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const Player = GetPlayerObjRW();
         if (Player == nullptr)
             return;
 
@@ -519,7 +516,7 @@ namespace
         // 20000 of the player.
         {
             ISpatialPartition* const Bucket =
-                static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK));
+                GetClientObjDb()->GetBucket(OBJ_SOLAR_NO_WAYPOINT_MASK);
             Geometry::Sphere Query;
             Query.Center = PlayerPos;
             Query.Radius = kSolarQueryRadius;
@@ -722,7 +719,7 @@ void FHudCamera::Update(float DeltaSeconds)
         {
             // The first frame after the key changed fires with no hardpoint list at all.
             G_HudFireChanged = 0;
-            CliShipFireWeapons(Object + 4, nullptr, 0u, &Aim,
+            CliShipFireWeapons(reinterpret_cast<IObjAffect*>(Object + 4), nullptr, 0u, &Aim,
                                static_cast<int>(GetPlayerConnectionId()));   // DAT_00673344
         }
         else if (Ship != nullptr)
@@ -743,7 +740,7 @@ void FHudCamera::Update(float DeltaSeconds)
                 Gun = CEGun::cast(Ship->EquipManager.Traverse(Walk));
             }
             if (Count != 0)
-                CliShipFireWeapons(Object + 4, HardpointIds, Count, &Aim,
+                CliShipFireWeapons(reinterpret_cast<IObjAffect*>(Object + 4), HardpointIds, Count, &Aim,
                                    static_cast<int>(GetPlayerConnectionId()));
         }
     }
@@ -937,7 +934,7 @@ void FHudCamera::UpdateShake()
     // greater (NaN takes the effect's).
     if (Ship->JumpState != kJumpStateNone && Ship->JumpEffect != nullptr)
     {
-        double const Jump = static_cast<FJumpShipEffect*>(Ship->JumpEffect)->ShakeAmplitude();
+        double const Jump = Ship->JumpEffect->ShakeAmplitude();
         if (!(static_cast<double>(G_CameraShakeAmount) > Jump))
             G_CameraShakeAmount = static_cast<float>(Jump);
     }
@@ -1077,14 +1074,11 @@ char const* FGameCamera::GetName()
 // Slot 0x58 (0x0051b3c0): binds the camera to an object. Object is an IObjRW*; retail stores it
 // PLUS 8 (its Watchable subobject) and skips the work entirely when that is already the value.
 // Passing null unbinds.
-void FGameCamera::Attach(void* Object)
+void FGameCamera::Attach(IObjRW* Object)
 {
     // 0x0051b3c0. Null unbinds; anything else is stored as its Watchable subobject.
     Watchable const* const Target =
-        (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(Object) +
-                                                 kWatchableOffset)
-            : nullptr;
+        (Object != nullptr) ? static_cast<Watchable const*>(Object) : nullptr;
 
     // Re-attaching to the same object does not disturb the watcher chain.
     if (Target == Watched.target())
@@ -1102,12 +1096,12 @@ void FGameCamera::Deactivate()
 {
 }
 
-int FGameCamera::HandleCommand70(void* Command)
+int FGameCamera::HandleCommand70(FSpaceCommand* Command)
 {
     return 0;
 }
 
-int FGameCamera::HandleCommand74(void* Command)
+int FGameCamera::HandleCommand74(FSpaceCommand* Command)
 {
     return 0;
 }
@@ -1128,12 +1122,12 @@ char const* FHudCamera::GetName()
     return HudCameraGetName();
 }
 
-int FHudCamera::HandleCommand70(void* Command)
+int FHudCamera::HandleCommand70(FSpaceCommand* Command)
 {
     return HudCameraCommand70(Command);
 }
 
-int FHudCamera::HandleCommand74(void* Command)
+int FHudCamera::HandleCommand74(FSpaceCommand* Command)
 {
     return HudCameraCommand74(Command);
 }

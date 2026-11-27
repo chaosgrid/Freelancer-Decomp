@@ -16,6 +16,7 @@ class IVP_Environment;
 class IVP_Real_Object;
 class IVP_Controller;
 struct IVP_Friction_Info_For_Core; // ivp_mindist.h
+struct IVP_Old_Sync_Rot_Z;         // ivp_impact.h
 class IVP_Simulation_Unit;
 
 // Simulation timestamp: a split-precision pair, base seconds plus a fraction in [0,1).
@@ -206,12 +207,12 @@ public:
     // +0x1B4
     // +0x1B4: Ipion's old_sync_info, the IVP_Old_Sync_Rot_Z record (arena memory)
     // recalc_interpolated_frame() saves and restore_fast_sim_snapshot() reads back.
-    void* OldSyncInfo;                       // +0x1B4
+    IVP_Old_Sync_Rot_Z* OldSyncInfo;         // +0x1B4
     // +0x1B8: a stamp of Environment->mindist_event_stamp, the counter do_impact increments
     // (06358d1a). notify_objects_and_cache_env_field() (FUN_06347be0) stores it;
     // recheck_mindists_of_other_cores (FUN_06344f50) re-solves only mindists whose
     // two cores carry different stamps. An int held in a pointer-sized slot.
-    void* MindistEventStamp;                 // +0x1B8
+    uint32_t MindistEventStamp;              // +0x1B8
 
     // Not a retail function: the port's PhySys (common_physys.cpp,
     // BuildIVP_Real/BuildIVP_Sphere) builds cores with `new IVP_Core()` and fills
@@ -363,10 +364,9 @@ public:
     // FUN_06347c40 / FUN_06347c80 / FUN_06347d20: find / register / unregister.
     // With (Flags & 0xC) == 4, ObjectHashMap is an IVP_VHash_Store keyed by each
     // candidate's +0x8; otherwise it holds at most one candidate pointer directly.
-    // Candidates stay void* (only their +0x8 is touched).
-    void* find_object_hash_entry(unsigned Key) const;
-    void register_object_hash_entry(void* Candidate);
-    void unregister_object_hash_entry(void* Candidate);
+    IVP_Friction_Info_For_Core* find_object_hash_entry(unsigned Key) const;
+    void register_object_hash_entry(IVP_Friction_Info_For_Core* Candidate);
+    void unregister_object_hash_entry(IVP_Friction_Info_For_Core* Candidate);
 
     // FUN_06347d50: unregister_object_hash_entry(Candidate), then (non-null) clear
     // its IVP_U_Vector (FUN_063449d0) and operator delete it. Every caller

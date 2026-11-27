@@ -1283,7 +1283,7 @@ public:
     // .text:062d2840), which CEqObj::connect / disconnect / create_behavior_interface call
     // with the owner's CSimple+0xAC ObjectDb (or 0 on disconnect).
     IObjDB* ObjectDb;                   // +0xEC
-    void* WatchablePtr;                 // +0xF0
+    Watchable* WatchablePtr;            // +0xF0
     unsigned char OpaqueF4[4];          // +0xF4 .. +0xF7
     // Reconciled "content-callback active" style flag: recomputed every tick as
     // (Sys+0x1434 [SystemManager::Targeting.AttackState, TargetManager+0x08,

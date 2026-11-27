@@ -495,7 +495,7 @@ void NeuroNetNavMap::SyncSidePanels()
             }
         }
     }
-    if (bAnyShown == 0 && (static_cast<WinControl*>(InfoText)->Flags & kWin3DVisible) != 0)
+    if (bAnyShown == 0 && (InfoText->Flags & kWin3DVisible) != 0)
         bAnyShown = 1;
 
     if (bAnyShown != bSidePanelsOpen)

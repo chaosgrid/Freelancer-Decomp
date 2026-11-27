@@ -558,10 +558,10 @@ public:
     void destroy();
 
     // FUN_0634ce60: append onto object_listeners.
-    void add_listener_object(void* listener);
+    void add_listener_object(IVP_Listener_Object* listener);
 
     // FUN_0634d050: append onto collision_listeners.
-    void add_listener_collision(void* listener);
+    void add_listener_collision(IVP_Listener_Collision* listener);
 
     // FUN_0634c6d0: IVP_Environment::set_delta_PSI_time. Callers: the env ctor
     // and FUN_0628c900 (PhySys).
@@ -652,9 +652,9 @@ struct IVP_Environment_Create_Parms
     IVP_Collision_Filter* CollisionFilter; // +0x10 -> +0x18, else new IVP_Collision_Filter_Coll_Group_Ident(1).
     IVP_Universe_Manager* UniverseManager; // +0x14 -> +0x2C verbatim, never constructed here.
     IVP_PerformanceCounter* PerformanceCounter; // +0x18 -> +0x28, else new IVP_PerformanceCounter_Simple.
-    void*    AnomalyManager;     // +0x1C -> +0x20, else FUN_06360eb0.
-    void*    AnomalyLimits;      // +0x20 -> +0x24, else FUN_06360e30.
-    void*    CollisionDelegatorRoot;   // +0x24 -> appended to collision_delegator_roots, else FUN_06360df0.
+    IVP_Anomaly_Manager* AnomalyManager; // +0x1C -> +0x20, else FUN_06360eb0.
+    IVP_Anomaly_Limits* AnomalyLimits; // +0x20 -> +0x24, else FUN_06360e30.
+    IVP_Collision_Delegator_Root* CollisionDelegatorRoot; // +0x24 -> appended to collision_delegator_roots, else FUN_06360df0.
     IVP_U_Active_Value_Manager* ActiveValueManager; // +0x28 -> +0x98, else new IVP_U_Active_Value_Manager(1).
     IVP_Range_Manager* RangeManager; // +0x2C -> +0x1C, else new IVP_Range_Manager(env, 1).
 
@@ -675,10 +675,10 @@ static_assert(offsetof(IVP_Environment_Create_Parms, RangeManager) == 0x2C, "Cre
 void* IVP_Environment_Init_Block34(void* block34);
 
 // FUN_0634bf40: the freeze manager's init, freeze_check_dtime (+0x88) = 0.3f.
-void IVP_Freeze_Manager_Init(void* FreezeManager);
+void IVP_Freeze_Manager_Init(float* FreezeManager);
 
 // FUN_0634bf30: the +0x88 sub-object ctor; returns `this`.
-void* IVP_Freeze_Manager_Construct(void* FreezeManager);
+float* IVP_Freeze_Manager_Construct(float* FreezeManager);
 
 // The constructor's default: 0x3c783e10 == 1.0f/66.0f, IVP's stock PSI rate.
 extern const float IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME;
@@ -690,7 +690,7 @@ extern const float IVP_ENVIRONMENT_DEFAULT_DELTA_PSI_TIME;
 void IVP_InitSimUnitDispatchTable(void);   // FUN_06360090 -> DAT_0658af9c
 
 // FUN_063608a0: constructor of IVP_Environment::sim_unit_manager (+0x04).
-void* IVP_SimUnitManager_Construct(void* self);
+IVP_Sim_Unit_Manager* IVP_SimUnitManager_Construct(IVP_Sim_Unit_Manager* self);
 
 // ============================================================================
 // IVP_Environment_Manager: the 16-byte process-wide singleton DAT_0658aa00.

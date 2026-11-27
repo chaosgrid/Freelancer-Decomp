@@ -124,7 +124,7 @@ void LaneAction::stop(char bSkipStopTradelane)
             // The CEqObj narrowing is used without a further test.
             CObject* const Obj = (CObject*)Rw->cobject();
             CEqObj* const Eq = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
-                ? (CEqObj*)Obj : nullptr;
+                ? static_cast<CEqObj*>(Obj) : nullptr;
             Eq->set_control_exclusion(0);
             Eq->enable_collisions_r(true);
 
@@ -224,7 +224,7 @@ void LaneAction::InitializeApproach()
     CObject* const Dock = (CObject*)Traveller->cobject();                 // slot 84 (+0x150)
     Dock->enable_collisions_r(false);
     CEqObj* const DockEq = (Dock != nullptr && (Dock->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
-        ? (CEqObj*)Dock : nullptr;
+        ? static_cast<CEqObj*>(Dock) : nullptr;
     DockEq->set_control_exclusion(3);
     PhySys::Controller::Register(this, Dock);
 
@@ -376,7 +376,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
             CObject const* const Resolved = TradelaneObj()->cobject();
             CSimple const* const Simple =
                 (Resolved != nullptr && (Resolved->ObjectClass & CObject::ClassSimple) == CObject::ClassSimple)
-                    ? (CSimple const*)Resolved
+                    ? static_cast<CSimple const*>(Resolved)
                     : nullptr;
             IObjDB* const ObjDb = Simple->ObjectDb;
 
@@ -550,7 +550,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     CObject* const Committed = (CObject*)TradelaneObj()->cobject();
     if (Committed != nullptr && (Committed->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
-        ((CShip*)Committed)->set_tradelane_speed(LaneSpeed);
+        static_cast<CShip*>(Committed)->set_tradelane_speed(LaneSpeed);
     }
 
     // cobject() again, no null test; beam_object is CObject slot 0x7c.

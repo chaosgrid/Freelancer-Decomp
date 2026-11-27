@@ -320,7 +320,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     float StarZoneOcclusionFactor(FStarSphere* This, void* Cam)
     {
         // A player using a tradelane returns 1.0f (DAT_005c75dc).
-        IObjRW* const PlayerRw = static_cast<IObjRW*>(GetPlayerObjRW());
+        IObjRW* const PlayerRw = GetPlayerObjRW();
         if (PlayerRw != nullptr)
         {
             bool bUsingTradelane = false;
@@ -407,7 +407,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     // FUN_0050c750 — is the ray From -> To blocked by something big enough on screen?
     // Three callers, all in FUN_0050da20.
     unsigned char SunRayIsOccluded(FStarSphere* Sphere, Vector const* From, Vector const* To,
-                                   void* Cam)
+                                   ICamera* Cam)
     {
         // DAT_00675198++ (reset by the Draw, never read).
         ++G_SunRayQueryCount;
@@ -456,7 +456,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             // The object's centre into view space through the lazily acquired math engine
             // DAT_00675194.
             float const Radius = Obj->Radius;
-            ICamera* const Camera = (ICamera*)Cam;
+            ICamera* const Camera = Cam;
             Transform const* const View = Camera->GetViewTransform();
             if (G_SunRayMath == nullptr)
                 G_SunRayMath = Acquire3DMathEngine();
@@ -535,9 +535,9 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     // FUN_0050da20 (thiscall on the lens-glow body; its only caller the Draw): per-frame
     // occlusion of the corona samples. Retail tests nothing for null.
     // The centre slot 0 and the rim ring 1..12 are Slots, the interior ring 0..11 InteriorSlots.
-    void SunBodyUpdateOcclusion(FSunEffectBody* Body, void* Cam, FStarSphere* Sphere, float Dt)
+    void SunBodyUpdateOcclusion(FSunEffectBody* Body, ICamera* Cam, FStarSphere* Sphere, float Dt)
     {
-        ICamera* const Camera = static_cast<ICamera*>(Cam);
+        ICamera* const Camera = Cam;
 
         // Both steps spilled to floats.
         float const StepUp = Dt / Body->GlowFadeIn;
@@ -1600,7 +1600,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             ResolveGlowDescShape(this->StarCenter);
     }
 
-    void FStarSphere::DrawBillboard(void* Cam, float A, float B)
+    void FStarSphere::DrawBillboard(FSpaceCamera* Cam, float A, float B)
     {
         // LAB_005118d0. No option gates and no null tests in
         // retail: only the DAT_00613470 byte.
@@ -1613,7 +1613,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // The far plane pushed to 250000 (FUN_0040fb60 with DAT_00610534) and the camera
         // applied (FUN_00422950).
-        FSpaceCamera* const SpaceCam = static_cast<FSpaceCamera*>(Cam);
+        FSpaceCamera* const SpaceCam = Cam;
         ICamera* const Camera = AsCamera(SpaceCam);
         float const SavedNear = Camera->GetZNear();
         float const SavedFar = Camera->GetZFar();
@@ -1699,7 +1699,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         Win3DEnable(kWin3DCullFace);  // FUN_00421dd0(0xb44)
     }
 
-    void FStarSphere::DrawSimple(void* Cam)
+    void FStarSphere::DrawSimple(FSpaceCamera* Cam)
     {
         // LAB_00511b70: no tests.
         DrawBillboard(Cam, 1.0f, 1.0f);
@@ -1709,10 +1709,10 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     // SunBody nor Spines. The
     // step it uses is the Dt stored at +0x60 by UpdateIntensity; its own second stack argument
     // (declared here as Dt) is never read.
-    void FStarSphere::Draw(void* Cam, float Dt)
+    void FStarSphere::Draw(FSpaceCamera* Cam, float Dt)
     {
         (void)Dt;
-        ICamera* const Camera = static_cast<ICamera*>(Cam);
+        ICamera* const Camera = Cam;
 
         // [EFFECTS], SUN and SUN_EFFECTS, in that order; any zero returns.
         if (GetGameOption(kGameOptEffectsGroup) == 0)
@@ -1914,7 +1914,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         Win3DApplyCamera(Camera);
     }
 
-    void FStarSphere::DrawFlare(void* Cam, float Dt)
+    void FStarSphere::DrawFlare(FSpaceCamera* Cam, float Dt)
     {
         // LAB_005124f0 -- quality and occlusion gates, then the Win3D ortho box and
         // FUN_0050f850. No test of `this`, the camera or the flare child.
@@ -1940,7 +1940,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // The camera's viewport rect into FUN_004221f0(left,
         // right, bottom, top, -1.0f, 0).
-        ICamera* const Camera = static_cast<ICamera*>(Cam);
+        ICamera* const Camera = Cam;
         int const* const Vp = Camera->GetViewport();
         Win3DSetProjection(static_cast<float>(Vp[0]), static_cast<float>(Vp[2]),
                            static_cast<float>(Vp[3]), static_cast<float>(Vp[1]), -1.0f, 0.0f);
@@ -1981,7 +1981,7 @@ namespace
     I3DMathEngine* G_Win3DModelviewMath = nullptr;
 }
 
-void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
+void Win3DBindModelview(ICamera* ObjectOrNull, Transform const* Xform)
 {
     // FUN_00422690. ObjectOrNull is a camera-shaped object: its vt+0x40 is the view transform
     // getter.
@@ -2000,7 +2000,7 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
     {
         // Local = MulTransform(view, Xform).
         Transform const* const View =
-            ((ICamera*)ObjectOrNull)->GetViewTransform();
+            (ObjectOrNull)->GetViewTransform();
         if (G_Win3DModelviewMath == nullptr)
             G_Win3DModelviewMath = Acquire3DMathEngine();
         G_Win3DModelviewMath->MulTransform(Local, *View, *Xform);
@@ -2016,7 +2016,7 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
     Pipe->GetPipelineState(kPipelineStateViewspace, &Viewspace);
     if (Viewspace != 0)
     {
-        Pipe->SetModelview((const Transform*)GWin3DModelview);
+        Pipe->SetModelview(reinterpret_cast<const Transform*>(GWin3DModelview));
         return;
     }
 
@@ -2024,7 +2024,7 @@ void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
     {
         // SetView with a second view-transform call.
         Transform const* const View =
-            ((ICamera*)ObjectOrNull)->GetViewTransform();
+            (ObjectOrNull)->GetViewTransform();
         Pipe->SetView(View);
     }
     else

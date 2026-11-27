@@ -114,18 +114,6 @@ namespace
                (static_cast<unsigned long>(B2) << 16) | (static_cast<unsigned long>(B3) << 24);
     }
 
-    NnTextControl* AsText(WinControl* Control)
-    {
-        return static_cast<NnTextControl*>(Control);
-    }
-
-    // The cargo bars come from WinControl::CreateStaticControl (FUN_005a0db0), which returns the
-    // StaticControl it made.
-    NnStaticControl* AsStatic(WinControl* Control)
-    {
-        return static_cast<NnStaticControl*>(Control);
-    }
-
     // Port-only helper for the colours Create stores twice (0x004c0a15, 0x004c0ba7).
     void SetCargoBarColours(NnStaticControl* Bar)
     {
@@ -396,7 +384,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
         PlayerBatteries = Batteries->Count;
 
     // The player's ship (FUN_00543320 inlined) and its limits.
-    CShip* const Ship = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW())); // FUN_0054baf0
+    CShip* const Ship = HudShipOfObjRw(GetPlayerObjRW()); // FUN_0054baf0
     if (Ship != nullptr)
     {
         Archetype::Ship const* const ShipArch = Ship->shiparch(); // CObject +0x88
@@ -441,13 +429,13 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
 
     // The two "accepted" texts start as red "not accepted" (ids 0x75a).
     FormatTradeWidgetName("PlayerAcceptedText");
-    PlayerAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
-                                                  "hp_player_accepted", 0.415f, 0.029f, 1.5f, 0,
-                                                  1, 0, 0));
+    PlayerAcceptedText = CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
+                                           "hp_player_accepted", 0.415f, 0.029f, 1.5f, 0,
+                                           1, 0, 0);
     FormatTradeWidgetName("TargetAcceptedText");
-    TargetAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
-                                                  "hp_target_accepted", 0.415f, 0.029f, 1.5f, 0,
-                                                  1, 0, 0));
+    TargetAcceptedText = CreateTextControl(G_TradeWidgetName, "SubHeader", &Zero,
+                                           "hp_target_accepted", 0.415f, 0.029f, 1.5f, 0,
+                                           1, 0, 0);
     PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
     PlayerAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
     TargetAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
@@ -459,7 +447,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                           "hp_player_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
                                           0, 0, 0, &Zero);
     WinControlHalfExtentsFromMesh(&PlayerCargoFull->HalfExtents, &PlayerCargoFull->MeshHolder);
-    SetCargoBarColours(AsStatic(PlayerCargoFull));
+    SetCargoBarColours(PlayerCargoFull);
 
     // Its caption, as wide as the bar.
     FormatTradeWidgetName("PlayerCargoText");
@@ -480,7 +468,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                           "hp_target_cargo_capacity", &Zero, 1, 1, 0, 1, 0, 0, 1,
                                           0, 0, 0, &Zero);
     WinControlHalfExtentsFromMesh(&TargetCargoFull->HalfExtents, &TargetCargoFull->MeshHolder);
-    SetCargoBarColours(AsStatic(TargetCargoFull));
+    SetCargoBarColours(TargetCargoFull);
     TargetCargoFull->SetProperty(kWinPropHide, 1, 0);
 
     // Its caption (retail's hardpoint name is spelt "traget").
@@ -522,10 +510,10 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     // The number, 0.01 up (DAT_005c99c8), as wide as the box and as high as its half height.
     Vector const NumberAt = {Zero.x, Zero.y + 0.01f, Zero.z};
     FormatTradeWidgetName("QuantText");
-    QuantityText = AsText(CreateTextControl(
+    QuantityText = CreateTextControl(
         G_TradeWidgetName, "ItemName", &NumberAt, "hp_quantity_number_frame",
         QuantityFrame->HalfExtents.x + QuantityFrame->HalfExtents.x, QuantityFrame->HalfExtents.y,
-        1.5f, 0, 1, 0, 0));
+        1.5f, 0, 1, 0, 0);
     SetQuantity(0);
 
     FormatTradeWidgetName("QuantAccept");
@@ -540,12 +528,12 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
 
     // The quantity bar [0, 100], page 1.
     FormatTradeWidgetName("QuantScrollBar");
-    QuantityBar = static_cast<ScrollControl*>(CreateScrollControl(
+    QuantityBar = CreateScrollControl(
         G_TradeWidgetName, kQuantityBarMesh, &Zero, "hp_center_quantity_bar", &Zero, true,
         kRightArrowMesh, &Zero, "hp_center_quantity_right", &Zero, false, kLeftArrowMesh, &Zero,
         "hp_center_quantity_left", &Zero, false, kQuantityHandleMesh, &Zero, &Zero,
         "hp_center_quantity_thumb_left", "hp_center_quantity_thumb_right", &Zero, false, 0, 100, 1,
-        false, false));
+        false, false);
     WinControlHalfExtentsFromMesh(&QuantityBar->Back.MouseSize, &QuantityBar->Back.Holder);
     WinControlHalfExtentsFromMesh(&QuantityBar->Next.MouseSize, &QuantityBar->Next.Holder);
     WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize, &QuantityBar->Prev.Holder);
@@ -584,9 +572,9 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     Vector const ModelYpr = {0.0f, 270.0f, 0.0f};
     Vector const ModelRotSpeed = {0.0f, 0.0f, 30.0f};
     FormatTradeWidgetName("PICModel");
-    PlayerCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
+    PlayerCardModel = CreateShipViewControl(
         G_TradeWidgetName, &ModelRotSpeed, &Zero, &ModelYpr, &ModelViewSize, "hp_player_infocard_model",
-        false, false, &NoColour, &NoColour));
+        false, false, &NoColour, &NoColour);
     PlayerCardModel->SetProperty(kWinPropHide, 1, 0);
     PlayerCardModel->ViewFlags &= 0x7f;
 
@@ -624,9 +612,9 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
 
     Vector const TargetModelAt = {0.01f, 0.0f, 0.0f};
     FormatTradeWidgetName("TICModel");
-    TargetCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
+    TargetCardModel = CreateShipViewControl(
         G_TradeWidgetName, &ModelRotSpeed, &TargetModelAt, &ModelYpr, &ModelViewSize,
-        "hp_target_infocard_model", false, false, &NoColour, &NoColour));
+        "hp_target_infocard_model", false, false, &NoColour, &NoColour);
     TargetCardModel->SetProperty(kWinPropHide, 1, 0);
     TargetCardModel->ViewFlags &= 0x7f;
 
@@ -716,7 +704,7 @@ void NnTrade::Draw()
         {
             Ratio = 0.0; // DAT_005c8ba8
         }
-        AsStatic(PlayerCargoFull)->bUseColours = 1;
+        PlayerCargoFull->bUseColours = 1;
         // The quad and the mesh are both the (hidden) full bar's.
         DrawCargoFill(PlayerCargoFull, CargoFillX(PlayerCargoFull, Ratio));
     }
@@ -736,7 +724,7 @@ void NnTrade::Draw()
     {
         Ratio = 0.0;
     }
-    AsStatic(TargetCargoFull)->bUseColours = 1;
+    TargetCargoFull->bUseColours = 1;
     DrawCargoFill(TargetCargoFull, CargoFillX(TargetCargoFull, Ratio));
 }
 

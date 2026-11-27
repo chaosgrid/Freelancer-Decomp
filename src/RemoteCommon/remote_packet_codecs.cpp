@@ -144,7 +144,7 @@ unsigned int FRpcTradeResponsePacket::Decode(const unsigned char* Buffer,
     Data = static_cast<unsigned char*>(::operator new(DataSize, std::nothrow));
     if (!Stream.Reserve(4u, kPacketDecodeOverrun)) return MarshalError;
     unsigned int PointerBits;
-    std::memcpy(&PointerBits, reinterpret_cast<const void*>(MarshalPtr), 4u);
+    std::memcpy(&PointerBits, MarshalBuffer(), 4u);
     // Native overwrites and leaks the fresh allocation with the wire DWORD.
     Data = reinterpret_cast<unsigned char*>(PointerBits);
     Stream.CommitReadPointer(4u);
@@ -248,9 +248,9 @@ bool RpcWirePutVector(FRpcWireStream& Stream, const Vector& Value) {
 bool RpcWireGetVector(FPacketBase& Packet, FRpcWireStream& Stream, Vector& Value) {
     if (!Stream.Reserve(12u, kPacketDecodeOverrun)) return false;
     // RC06b3a160 / RS06bda4c0: integer moves, no x87.
-    std::memcpy(&Value.x, reinterpret_cast<const void*>(Packet.MarshalPtr), 4u);
-    std::memcpy(&Value.y, reinterpret_cast<const void*>(Packet.MarshalPtr + 4u), 4u);
-    std::memcpy(&Value.z, reinterpret_cast<const void*>(Packet.MarshalPtr + 8u), 4u);
+    std::memcpy(&Value.x, Packet.MarshalBuffer(), 4u);
+    std::memcpy(&Value.y, Packet.MarshalBuffer() + 4u, 4u);
+    std::memcpy(&Value.z, Packet.MarshalBuffer() + 8u, 4u);
     Stream.CommitReadPointer(12u);
     return true;
 }
@@ -348,10 +348,10 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
     if (!RpcWireGetVector(*this, Stream, Field_0x14)) return MarshalError;
     if (!RpcWireGetVector(*this, Stream, Field_0x20)) return MarshalError;
     if (!Stream.Reserve(16u, kPacketDecodeOverrun)) return MarshalError;
-    std::memcpy(&Orientation.w, reinterpret_cast<const void*>(MarshalPtr), 4u);
-    std::memcpy(&Orientation.x, reinterpret_cast<const void*>(MarshalPtr + 4u), 4u);
-    std::memcpy(&Orientation.y, reinterpret_cast<const void*>(MarshalPtr + 8u), 4u);
-    std::memcpy(&Orientation.z, reinterpret_cast<const void*>(MarshalPtr + 12u), 4u);
+    std::memcpy(&Orientation.w, MarshalBuffer(), 4u);
+    std::memcpy(&Orientation.x, MarshalBuffer() + 4u, 4u);
+    std::memcpy(&Orientation.y, MarshalBuffer() + 8u, 4u);
+    std::memcpy(&Orientation.z, MarshalBuffer() + 12u, 4u);
     Stream.CommitReadPointer(16u);
     if (!RpcWireGetThenStore(Stream, Field_0x3c)) return MarshalError;
     if (!RpcWireGetThenStore(Stream, WideCount)) return MarshalError;
@@ -366,7 +366,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
 #endif
         WideData = static_cast<wchar_t*>(::operator new(Width, std::nothrow));
         if (!Stream.Reserve(Width, kPacketDecodeOverrun)) return MarshalError;
-        if (Width != 0) std::memcpy(WideData, reinterpret_cast<const void*>(MarshalPtr), Width);
+        if (Width != 0) std::memcpy(WideData, MarshalBuffer(), Width);
         Stream.CommitReadPointer(Width);
     }
     if (!RpcWireGetThenStore(Stream, DataSizeA)) return MarshalError;
@@ -379,7 +379,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
 #endif
         DataA = static_cast<unsigned char*>(::operator new(DataSizeA, std::nothrow));
         if (!Stream.Reserve(DataSizeA, kPacketDecodeOverrun)) return MarshalError;
-        std::memcpy(DataA, reinterpret_cast<const void*>(MarshalPtr), DataSizeA);
+        std::memcpy(DataA, MarshalBuffer(), DataSizeA);
         Stream.CommitReadPointer(DataSizeA);
     }
     if (!RpcWireGetThenStore(Stream, DataSizeB)) return MarshalError;
@@ -392,7 +392,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
 #endif
         DataB = static_cast<unsigned char*>(::operator new(DataSizeB, std::nothrow));
         if (!Stream.Reserve(DataSizeB, kPacketDecodeOverrun)) return MarshalError;
-        std::memcpy(DataB, reinterpret_cast<const void*>(MarshalPtr), DataSizeB);
+        std::memcpy(DataB, MarshalBuffer(), DataSizeB);
         Stream.CommitReadPointer(DataSizeB);
     }
     // Native alternates store-before-pointer and pointer-before-store here.
@@ -411,7 +411,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
 #endif
         ArrayData = static_cast<unsigned int*>(::operator new(Width, std::nothrow));
         if (!Stream.Reserve(Width, kPacketDecodeOverrun)) return MarshalError;
-        if (Width != 0) std::memcpy(ArrayData, reinterpret_cast<const void*>(MarshalPtr), Width);
+        if (Width != 0) std::memcpy(ArrayData, MarshalBuffer(), Width);
         Stream.CommitReadPointer(Width);
     }
     return Stream.Finish(OutLength, false);
@@ -452,7 +452,7 @@ unsigned int FRpcDebugLoadSystemPacket::Decode(const unsigned char* Buffer,
 #endif
         Data = static_cast<char*>(::operator new(DataSize, std::nothrow));
         if (!Stream.Reserve(DataSize, kPacketDecodeOverrun)) return MarshalError;
-        std::memcpy(Data, reinterpret_cast<const void*>(MarshalPtr), DataSize);
+        std::memcpy(Data, MarshalBuffer(), DataSize);
         Stream.CommitReadPointer(DataSize);
     }
     return Stream.Finish(OutLength, false);
@@ -925,7 +925,7 @@ unsigned int FRpcCharacterIdPacketBase::Decode(const unsigned char* Buffer,
 // These string helpers return an error without writing MarshalError. Their
 // strict capacity comparison and delayed pointer commit differ from scalar IO.
 static unsigned int RpcEncodeWideString(FPacketBase& Packet, const wchar_t* Value) {
-    unsigned char* Destination = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Destination = Packet.MarshalBuffer();
     Packet.MarshalCursor += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return kPacketEncodeOverflow;
     const unsigned short Length = static_cast<unsigned short>(std::wcslen(Value));
@@ -935,12 +935,12 @@ static unsigned int RpcEncodeWideString(FPacketBase& Packet, const wchar_t* Valu
     Destination += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return kPacketEncodeOverflow;
     std::memcpy(Destination, Value, ByteCount);
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(Destination + ByteCount);
+    Packet.SetMarshalBuffer(Destination + ByteCount);
     return 0;
 }
 
 static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
-    const unsigned char* Source = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Source = Packet.MarshalBuffer();
     Packet.MarshalCursor += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return kPacketDecodeOverrun;
     unsigned short Length;
@@ -955,7 +955,7 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
         // Native has no OOM branch. A zero-length value leaves the input pointer untouched.
         std::memcpy(*Value, Source, ByteCount);
         (*Value)[Length] = L'\0';
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(Source + ByteCount);
+        Packet.SetMarshalBuffer(Source + ByteCount);
     }
     return 0;
 }
@@ -1293,7 +1293,7 @@ unsigned int RpcWireDecodeOwnedBlock(FPacketBase& Packet, FRpcWireStream& Stream
     // A zero-size copy touches neither pointer (RS may get null from operator new(0));
     // allocation is still unconditional.
     if (BlockSize != 0)
-        std::memcpy(Data, reinterpret_cast<const void*>(Packet.MarshalPtr), BlockSize);
+        std::memcpy(Data, Packet.MarshalBuffer(), BlockSize);
     Stream.CommitReadPointer(BlockSize);
     return 0;
 }

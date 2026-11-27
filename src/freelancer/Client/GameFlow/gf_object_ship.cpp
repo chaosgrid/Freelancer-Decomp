@@ -441,7 +441,7 @@ void FObjectShip::Update(double DeltaSeconds)
         FObjectShipEngineSound& Loop = LoopSounds[Index];
         if (Loop.Instance != kRoomObjectNoInstance && Loop.Source != nullptr)
         {
-            const float* const At = (const float*)DALib::Engine->GetInstancePosition(Loop.Instance);
+            const float* const At = reinterpret_cast<const float*>(DALib::Engine->GetInstancePosition(Loop.Instance));
             float Where[3] = {At[0], At[1], At[2]};
             Loop.Source->SetPosition(Where);
         }
@@ -604,7 +604,7 @@ void FObjectShip::StartEngineSound()
             LoopKey.Field14 = 0;
             PlayClientSoundArch(LookupClientSoundArch(Archetype::CliEngineCharacterLoopSound(Companion)),
                                 reinterpret_cast<unsigned*>(&LoopKey),
-                                reinterpret_cast<void**>(&Loop.Source), 0);
+                                &Loop.Source, 0);
 
             // rumble_sound (+0x60), the same way.
             FObjectShipEngineSound& Rumble = RumbleSounds[Index];
@@ -618,7 +618,7 @@ void FObjectShip::StartEngineSound()
             RumbleKey.Field14 = 0;
             PlayClientSoundArch(LookupClientSoundArch(Archetype::CliEngineRumbleSound(Companion)),
                                 reinterpret_cast<unsigned*>(&RumbleKey),
-                                reinterpret_cast<void**>(&Rumble.Source), 0);
+                                &Rumble.Source, 0);
         }
     }
 }

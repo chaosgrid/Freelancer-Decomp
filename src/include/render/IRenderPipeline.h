@@ -52,7 +52,7 @@ struct IRenderPipeline : IDAComponent
     // slot 12 FUN_06d08811
     virtual GENRESULT DACOM_API CreateBuffers(HWND Hwnd, int* Mode, int* OutMode) = 0;
     // slot 13 LAB_06d098f3
-    virtual GENRESULT DACOM_API GetModeBlob(void* OutAdapter, void* OutMode10Dwords) = 0;
+    virtual GENRESULT DACOM_API GetModeBlob(unsigned long* OutAdapter, void* OutMode10Dwords) = 0;
     // slot 14 FUN_06d09982
     virtual GENRESULT DACOM_API DestroyGpuResources() = 0;
     // slot 15 FUN_06d09b4c RET 0xC
@@ -129,7 +129,7 @@ struct IRenderPipeline : IDAComponent
     // slot 47 FUN_06d0dc51
     virtual GENRESULT DACOM_API IsTexture(void* Handle) = 0;
     // slot 48 FUN_06d0dce3
-    virtual GENRESULT DACOM_API LockTexture(void* Handle, int Level, void* Out) = 0;
+    virtual GENRESULT DACOM_API LockTexture(void* Handle, int Level, unsigned long* Out) = 0;
     // slot 49 FUN_06d0e1af
     virtual GENRESULT DACOM_API UnlockTexture(void* Handle, int Level) = 0;
     // slot 50 FUN_06d0e3d9 RET 0xC

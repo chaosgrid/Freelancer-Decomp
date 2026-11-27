@@ -35,6 +35,8 @@
 
 #include <stddef.h>
 
+struct FSpaceCommand; // HUD/hud_command_dispatch.h
+
 // Extra vtable slots the GameCamera layer adds past the base's twenty, with the retail
 // addresses of the implementations each concrete class installs.
 //
@@ -85,14 +87,14 @@ struct FGameCamera : FSpaceCamera
     int SetProperty(char const* Key, char const* Value) override;
     virtual void ScaleEnvironmentEffects();               // formerly slot +0x50
     virtual char const* GetName();                        // formerly slot +0x54
-    virtual void Attach(void* Object);                   // formerly slot +0x58
+    virtual void Attach(IObjRW* Object);                   // formerly slot +0x58
     virtual void ApplyViewport(int const* ViewRect4);     // formerly slot +0x5c
     virtual bool IsFinished();                           // formerly slot +0x60
     virtual bool Activate(int const* ViewRect4);          // formerly slot +0x64
     virtual void Deactivate();                           // formerly slot +0x68
     virtual void Update(float DeltaSeconds);              // formerly slot +0x6c
-    virtual int HandleCommand70(void* Command);           // formerly slot +0x70
-    virtual int HandleCommand74(void* Command);           // formerly slot +0x74
+    virtual int HandleCommand70(FSpaceCommand* Command);           // formerly slot +0x70
+    virtual int HandleCommand74(FSpaceCommand* Command);           // formerly slot +0x74
     virtual void DrawScene(unsigned LayerFlags, unsigned Param2); // formerly slot +0x78
     virtual int GetSoundMode();                          // formerly slot +0x7c
 
@@ -150,14 +152,14 @@ struct FHudCamera : FGameCamera, EventHandler
 {
     ~FHudCamera() = default;
     char const* GetName() override;
-    void Attach(void* Object) override;
+    void Attach(IObjRW* Object) override;
     void ApplyViewport(int const* ViewRect4) override;
     bool IsFinished() override;
     bool Activate(int const* ViewRect4) override;
     void Deactivate() override;
     void Update(float DeltaSeconds) override;
-    int HandleCommand70(void* Command) override;
-    int HandleCommand74(void* Command) override;
+    int HandleCommand70(FSpaceCommand* Command) override;
+    int HandleCommand74(FSpaceCommand* Command) override;
     void DrawScene(unsigned LayerFlags, unsigned Param2) override;
     int GetSoundMode() override;
     bool OnEvent(unsigned MsgId) override;
@@ -206,8 +208,8 @@ const char* HudCameraGetName();
 // Slots 0x70 (FUN_0051da40 / LAB_0051ad20) and 0x74 (LAB_0051da70) of every HUDCamera: offer a
 // command to the HUD elements unless a NeuroNet window is up. GameCamera's own 0x70/0x74
 // (LAB_0053e180) return 0.
-int HudCameraCommand70(void* Command);
-int HudCameraCommand74(void* Command);
+int HudCameraCommand70(FSpaceCommand* Command);
+int HudCameraCommand74(FSpaceCommand* Command);
 
 // The space init's store DAT_00675294 = 0 (0x0054ad78).
 void ResetCameraShakeAmount();
@@ -220,7 +222,7 @@ void CameraOrientFromForwardAndUp(Matrix* Out, Matrix const* M, const Vector* Up
 
 // The IObjRW the watcher currently holds, or null. Retail spells this `watched - 8` inline at
 // every use site.
-void* GameCameraGetTarget(const FGameCamera* Cam);
+IObjRW* GameCameraGetTarget(const FGameCamera* Cam);
 
 struct CEqObj;
 struct IObjRW;

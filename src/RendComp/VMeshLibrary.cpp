@@ -175,7 +175,7 @@ int FVmeshGroup::EnsureIb(unsigned long BaseVertex)
             if (Data == nullptr)
                 break;
             const FVmeshDataHeader* Header = Data->Header;
-            const FVmeshFacegroup* Facegroups = (const FVmeshFacegroup*)(
+            const FVmeshFacegroup* Facegroups = reinterpret_cast<const FVmeshFacegroup*>(
                 (const unsigned char*)Header + 0x10);
             const unsigned short* Source = (const unsigned short*)(
                 Facegroups + Header->FaceGroups);
@@ -256,7 +256,7 @@ public:
         return 0;
     }
 
-    void* DACOM_API Load(void* File, int LodFilter) override;
+    void* DACOM_API Load(IFileSystem* File, int LodFilter) override;
     void DACOM_API Unload(void* Handle) override;
 };
 
@@ -266,9 +266,9 @@ GENRESULT DACOM_API FVMeshLibrary::FInner::QueryInterface(const char* Iid, void*
 {
     IDAComponent* Face = nullptr;
     if (std::strcmp(Iids::VMeshLibrary, Iid) == 0)
-        Face = (IVMeshLibrary*)Owner;
+        Face = static_cast<IVMeshLibrary*>(Owner);
     else if (std::strcmp(Iids::AggregateComponent, Iid) == 0)
-        Face = (IAggregateComponent*)Owner;
+        Face = static_cast<IAggregateComponent*>(Owner);
     if (Face == nullptr)
     {
         *Out = nullptr;
@@ -299,9 +299,9 @@ unsigned long DACOM_API FVMeshLibrary::FInner::Release()
     return 0;
 }
 
-void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
+void* DACOM_API FVMeshLibrary::Load(IFileSystem* FileArg, int LodFilter)
 {
-    IFileSystem* File = (IFileSystem*)FileArg;
+    IFileSystem* File = FileArg;
     FVmeshDataList* List = nullptr;
     FVmeshGroup* Group = nullptr;
     if (File->OpenNode("VMeshLibrary") == 0)
@@ -338,7 +338,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
                     Child = nullptr;
                 }
             }
-            if (File->CreateInstance((AGGDESC*)(&Desc),
+            if (File->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                      (void**)(&Child)) < 0)
                 goto NextEntry;
             {
@@ -400,7 +400,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
 // FUN_06c2f1c0 (thiscall).
 void DACOM_API FVMeshLibrary::Unload(void* Handle)
 {
-    FVmeshDataList* List = (FVmeshDataList*)Handle;
+    FVmeshDataList* List = static_cast<FVmeshDataList*>(Handle);
     if (List == nullptr)
         return;
     while (!List->empty())
@@ -425,7 +425,7 @@ struct FVMeshAggDesc
 
 GENRESULT DACOM_API VMeshLibraryFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
-    FVMeshAggDesc* Extended = (FVMeshAggDesc*)Desc;
+    FVMeshAggDesc* Extended = reinterpret_cast<FVMeshAggDesc*>(Desc);
     if (Extended->Size != 0x14 || std::strcmp(Extended->Name, This->Name) != 0)
     {
         *Out = nullptr;
@@ -444,6 +444,6 @@ GENRESULT DACOM_API VMeshLibraryFactoryCreate(FDacomFactory* This, AGGDESC* Desc
         Object->Outer = &Object->Inner;
     else
         *Extended->InnerOut = &Object->Inner;
-    *Out = (IAggregateComponent*)Object;
+    *Out = static_cast<IAggregateComponent*>(Object);
     return GR_OK;
 }

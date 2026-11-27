@@ -875,7 +875,7 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
     {
         Ring = static_cast<CSolar const*>(Object);
     }
-    IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
+    IObjRW* const Player = GetPlayerObjRW(); // FUN_0054baf0
     if (Player == nullptr || Ring == nullptr)
     {
         return false;
@@ -1229,7 +1229,7 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
             if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
                 HudShipGroupId(Object) != 0)
             {
-                IObjRW* const PlayerRw = static_cast<IObjRW*>(GetPlayerObjRW());
+                IObjRW* const PlayerRw = GetPlayerObjRW();
                 if (PlayerRw != nullptr)
                 {
                     // A player object that is not a ship gives null and retail reads

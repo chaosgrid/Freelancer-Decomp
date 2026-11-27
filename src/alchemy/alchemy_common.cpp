@@ -300,18 +300,18 @@ namespace AlchemyImpl
     // DAT_06257b9c: IFxRuntime +0x24 LAB_0623b6a0 store / +0x28 LAB_0623b740 get+AddRef.
     // Client FUN_004f70d0 writes DAT_00674cdc = FUN_004f67e0 (8-byte, vtable 005d98bc).
     // Not IEngine. Mesh Extra2 is the OUT of factory+0x0C = FUN_004f6810, not this pointer.
-    IDAComponent* G_FxMeshFactory = nullptr;
-    void* G_RuntimeAlchemy = nullptr;       // DAT_06257b98
+    IFxMeshFactory* G_FxMeshFactory = nullptr;
+    IAlchemy* G_RuntimeAlchemy = nullptr;       // DAT_06257b98
     void* G_RuntimeUnknown = nullptr;       // DAT_06257b94
-    void* G_RuntimeEffectLibrary = nullptr; // DAT_06257b90
+    IFxEffectLibrary* G_RuntimeEffectLibrary = nullptr; // DAT_06257b90
     I3DMathEngine* G_3DMath = nullptr;    // DAT_06257a6c via FUN_0623e830
     IDAComponent* G_RootNode = nullptr;  // DAT_062578b0 — GetRootNode / Detach root
     IDAComponent* G_PipelineOuter = nullptr;   // DAT_0625790c desc+8
     IRenderPipeline* G_RenderPipeline = nullptr;  // DAT_06257bc0
-    IDAComponent* G_TextureLibrary = nullptr;  // DAT_06257bbc
-    IDAComponent* G_RpVertexBuffer = nullptr;  // DAT_06257bc4
-    IDAComponent* G_RpIndexBuffer = nullptr;   // DAT_06257bc8
-    IDAComponent* G_RpDraw = nullptr;          // DAT_06257bcc
+    ITextureLibrary2* G_TextureLibrary = nullptr;  // DAT_06257bbc
+    IRPVertexBuffer* G_RpVertexBuffer = nullptr;  // DAT_06257bc4
+    IRPIndexBuffer* G_RpIndexBuffer = nullptr;   // DAT_06257bc8
+    IRPDraw* G_RpDraw = nullptr;          // DAT_06257bcc
     void* G_VbHandle = nullptr;                // DAT_0625791c
     void* G_IbHandle = nullptr;
     // DAT_06257908: the camera, stored from IAlchemy::DrawNodes's first argument
@@ -715,7 +715,7 @@ namespace AlchemyImpl
                 FPooledParticle* const Next = Particle->Next;
                 UnlinkParticleNode(&Owner->InstanceListHead_, &Owner->InstanceListTail_, Particle);
                 FGenericFxObjectBase* const ItemAppearance =
-                    static_cast<FGenericFxObjectBase*>(Particle->Appearance);
+                    Particle->Appearance;
                 if (ItemAppearance != nullptr)
                     --ItemAppearance->LiveInstanceCount_;
                 ReleaseAppearancePoolItem(Pool, Particle);
@@ -788,7 +788,7 @@ namespace AlchemyImpl
     // DrawNodes forwards the caller's canonical camera through the draw cookie.
     ICamera* DrawCameraFromCookie()
     {
-        return (ICamera*)G_DrawCookie;
+        return reinterpret_cast<ICamera*>(G_DrawCookie);
     }
 
     bool GetDrawCameraPosition(Vector* Out)
@@ -1044,27 +1044,27 @@ namespace AlchemyImpl
             Ptr->Release();
     }
 
-    GENRESULT CallCreateVb(IDAComponent* Vb, unsigned int Fvf, unsigned int Count, void** Out,
+    GENRESULT CallCreateVb(IRPVertexBuffer* Vb, unsigned int Fvf, unsigned int Count, void** Out,
                            unsigned int Flags)
     {
         if (Vb == nullptr || Out == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPVertexBuffer*>(Vb)->CreateVb(
+        return Vb->CreateVb(
             Fvf, Count, reinterpret_cast<unsigned int**>(Out), Flags);
     }
 
-    GENRESULT CallDestroyVb(IDAComponent* Vb, void** Handle)
+    GENRESULT CallDestroyVb(IRPVertexBuffer* Vb, void** Handle)
     {
         if (Vb == nullptr || Handle == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPVertexBuffer*>(Vb)->DestroyVb(Handle);
+        return Vb->DestroyVb(Handle);
     }
 
-    GENRESULT CallSelectVb(IDAComponent* Vb, void* Handle)
+    GENRESULT CallSelectVb(IRPVertexBuffer* Vb, void* Handle)
     {
         if (Vb == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPVertexBuffer*>(Vb)->SelectVb(Handle);
+        return Vb->SelectVb(Handle);
     }
 
     GENRESULT CallGetRenderState(IRenderPipeline* Pipeline, int State, int* Out)
@@ -1119,51 +1119,51 @@ namespace AlchemyImpl
         G_IbHandle = nullptr;
     }
 
-    GENRESULT CallLockVb(IDAComponent* Vb, void* Handle, unsigned int* Offset, void** Out,
+    GENRESULT CallLockVb(IRPVertexBuffer* Vb, void* Handle, unsigned int* Offset, void** Out,
                          unsigned int Count)
     {
         if (Vb == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPVertexBuffer*>(Vb)->LockVb(Handle, Offset, Out, Count);
+        return Vb->LockVb(Handle, Offset, Out, Count);
     }
 
-    GENRESULT CallUnlockVb(IDAComponent* Vb, void* Handle)
+    GENRESULT CallUnlockVb(IRPVertexBuffer* Vb, void* Handle)
     {
         if (Vb == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPVertexBuffer*>(Vb)->UnlockVb(Handle);
+        return Vb->UnlockVb(Handle);
     }
 
-    GENRESULT CallLockIb(IDAComponent* Ib, void* Handle, unsigned int* Offset, void** Out,
+    GENRESULT CallLockIb(IRPIndexBuffer* Ib, void* Handle, unsigned int* Offset, void** Out,
                          unsigned int Count)
     {
         if (Ib == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPIndexBuffer*>(Ib)->LockIb(Handle, Offset, Out, Count);
+        return Ib->LockIb(Handle, Offset, Out, Count);
     }
 
-    GENRESULT CallUnlockIb(IDAComponent* Ib, void* Handle)
+    GENRESULT CallUnlockIb(IRPIndexBuffer* Ib, void* Handle)
     {
         if (Ib == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPIndexBuffer*>(Ib)->UnlockIb(Handle);
+        return Ib->UnlockIb(Handle);
     }
 
     // FUN_06241180 0x062411ee pushes (-1, [ctx+0x20], 0, 0): the base vertex index is the
     // offset the VB Lock returned.
-    GENRESULT CallSelectIb(IDAComponent* Ib, void* Handle, unsigned int BaseVertexIndex)
+    GENRESULT CallSelectIb(IRPIndexBuffer* Ib, void* Handle, unsigned int BaseVertexIndex)
     {
         if (Ib == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPIndexBuffer*>(Ib)->SelectIb(Handle, BaseVertexIndex, 0, 0);
+        return Ib->SelectIb(Handle, BaseVertexIndex, 0, 0);
     }
 
-    GENRESULT CallDrawIndexed(IDAComponent* Draw, unsigned long Prim, unsigned int MinIndex,
+    GENRESULT CallDrawIndexed(IRPDraw* Draw, unsigned long Prim, unsigned int MinIndex,
                               unsigned int NumVerts, unsigned int StartIndex, unsigned int Count)
     {
         if (Draw == nullptr)
             return GR_GENERIC;
-        return static_cast<IRPDraw*>(Draw)->DrawIndexedPrimitive(Prim, MinIndex, NumVerts,
+        return Draw->DrawIndexedPrimitive(Prim, MinIndex, NumVerts,
                                                                   StartIndex, Count);
     }
 
@@ -1191,7 +1191,7 @@ namespace AlchemyImpl
         const long Count = Context.VertCount;
         if (Count > static_cast<long>(Context.RequestedVerts))
             return static_cast<unsigned short>(Context.RequestedVerts);
-        FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(Context.LockedVerts);
+        FAlchemyVertex* const Vert = Context.LockedVerts;
         Vert->X = X;
         Vert->Y = Y;
         Vert->Z = Z;
@@ -1211,7 +1211,7 @@ namespace AlchemyImpl
     {
         if (static_cast<long>(Context.IndexCount) + 5 > static_cast<long>(Context.RequestedIndices))
             return;
-        unsigned short* const Index = static_cast<unsigned short*>(Context.LockedIndices);
+        unsigned short* const Index = Context.LockedIndices;
         Index[0] = I0;
         Index[1] = I1;
         Index[2] = I2;
@@ -1231,7 +1231,7 @@ namespace AlchemyImpl
     {
         if (static_cast<long>(Context.IndexCount) + 2 > static_cast<long>(Context.RequestedIndices))
             return;
-        unsigned short* const Index = static_cast<unsigned short*>(Context.LockedIndices);
+        unsigned short* const Index = Context.LockedIndices;
         Index[0] = I0;
         Index[1] = I1;
         Index[2] = I2;
@@ -1388,12 +1388,12 @@ namespace AlchemyImpl
         Context.VertCount = 0;
         Context.VbOffset = 0;
         Context.IbOffset = 0;
-        const GENRESULT VbLock = static_cast<IRPVertexBuffer*>(G_RpVertexBuffer)->LockVb(
-            G_DrawVbHandle, &Context.VbOffset, &Context.LockedVerts, VertCount);
+        const GENRESULT VbLock = G_RpVertexBuffer->LockVb(
+            G_DrawVbHandle, &Context.VbOffset, reinterpret_cast<void**>(&Context.LockedVerts), VertCount);
         const GENRESULT IbLock =
-            static_cast<IRPIndexBuffer*>(G_RpIndexBuffer)
+            G_RpIndexBuffer
                 ->LockIb(reinterpret_cast<void*>(static_cast<unsigned int>(-1)),
-                         &Context.IbOffset, &Context.LockedIndices, IndexCount);
+                         &Context.IbOffset, reinterpret_cast<void**>(&Context.LockedIndices), IndexCount);
         return VbLock >= 0 && IbLock >= 0;
     }
 
@@ -1664,7 +1664,7 @@ namespace AlchemyImpl
             }
             else
             {
-                AsFxNode(*Position)->BeginField(static_cast<IGenericFx*>(Owner), 0.0f);
+                AsFxNode(*Position)->BeginField(Owner, 0.0f);
                 FPooledParticle* Particle = Owner->InstanceListHead_;
                 while (Particle != nullptr)
                 {
@@ -1974,7 +1974,7 @@ namespace AlchemyImpl
     // no QueryInterface, as retail does (0x0621f537 calls [node+0x2c] directly).
     IGenericFx* AsFxNode(void* Node)
     {
-        return static_cast<IGenericFx*>(static_cast<IDAComponent*>(Node));
+        return static_cast<IGenericFx*>(Node);
     }
 
     // FUN_0621eed0: CALL [QI sink+0x9C] / [QI sink+0xAC], stdcall this+1.

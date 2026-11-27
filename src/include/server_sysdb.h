@@ -82,6 +82,8 @@ struct CShipCreateInfo;
 struct Costume;           // common_reputation.h, 13 dwords (FLPACKET_SERVER_SENDCOMM)
 struct CSolarCreateInfo;  // server_createinfo.h, CREATESOLAR's record (FUN_06cf66f0)
 struct FServerCreateLootRequest;  // server_createinfo.h, CREATELOOT's 0x14-byte record
+struct FServerCreateProjectileInfo; // server_createinfo.h
+struct FServerCreateGuidedInfo;     // server_createinfo.h
 
 // ---------------------------------------------------------------------------
 // ObjectList -- the type of StarSystem's ten dispatch blocks (+0x34 .. +0xFB).
@@ -532,8 +534,8 @@ public:
     void send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
                    Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
                    int TextCount, unsigned int PermutationIds, float Duration);
-    void create_counter_for_player(void* Payload, GameObject* Obj);
-    void create_mine_for_player(void* Payload, GameObject* Obj);
+    void create_counter_for_player(FServerCreateProjectileInfo const* Payload, GameObject* Obj);
+    void create_mine_for_player(FServerCreateProjectileInfo const* Payload, GameObject* Obj);
 
     // FUN_06cf6c50 / FUN_06cf6cf0 take a std::vector<GameObject*> rather than one
     // object: .text:06cf6c60 is `MOV ESI,[EBX + 0x4]` against `CMP ESI,[EBX + 0x8]`,
@@ -544,7 +546,7 @@ public:
     // nor a copy of the vector can creep in.
     void create_loot_for_player(FServerCreateLootRequest* Payload, GameObject* const* First,
                                 GameObject* const* Last);
-    void create_guided_for_player(void* Payload, GameObject* const* First, GameObject* const* Last);
+    void create_guided_for_player(FServerCreateGuidedInfo const* Payload, GameObject* const* First, GameObject* const* Last);
 
     // FUN_06cf6df0 (.text:06cf6df0, thiscall on the view, RET 4) -- the per-player
     // half of StarSystem::send_mine_explosion. In multiplayer the mine is resolved
@@ -679,7 +681,7 @@ public:
     IObjRW* __thiscall GetNext(void* IterState) override;
     IObjRW* __thiscall FindById(unsigned const* ObjectId) override;
     Universe::ISystem* __thiscall GetZoneDb() override;
-    void* __thiscall GetBucket(unsigned TypeMask) override;
+    ISpatialPartition* __thiscall GetBucket(unsigned TypeMask) override;
 
     // FUN_06d0c840 (.text:06d0c840, `RET 0x4`, 16 callers): the object with
     // this id in any of seven blocks, searched in the order +0x34, +0x48,
@@ -706,7 +708,7 @@ public:
     // Node layout: SystemPlayerNode above.
     unsigned char ListAlloc;
     unsigned char Pad1[3];
-    void* PlayerListHead;              // +0x0C  _Head (self-referencing sentinel)
+    SystemPlayerNode* PlayerListHead;  // +0x0C  _Head (self-referencing sentinel)
     unsigned int PlayerListSize;       // +0x10  _Size -- NOT the system id
 
     // +0x14..+0x1F: a second std::list, same shape (allocator byte at +0x14, a
@@ -717,7 +719,7 @@ public:
     // consumer, and erase_docks (FUN_06d0f410) empties it.
     unsigned char DockQueueAlloc;      // +0x14
     unsigned char Pad2[3];
-    void* DockQueueHead;               // +0x18  _Head
+    SystemDockNode* DockQueueHead;     // +0x18  _Head
     unsigned int DockQueueSize;        // +0x1C  _Size
 
     // +0x20: the system's spatial partition. load() stores

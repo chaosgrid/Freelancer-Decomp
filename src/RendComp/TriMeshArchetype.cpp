@@ -470,7 +470,7 @@ static GENRESULT TriMeshReadArray(IFileSystem* File, const char* Name, unsigned 
         if (Result != 0)
         {
             *OutCount = Count;
-            *OutData = (ElementType*)Buffer;
+            *OutData = reinterpret_cast<ElementType*>(Buffer);
         }
         else
             delete[] Buffer;
@@ -569,22 +569,22 @@ GENRESULT DACOM_API FTriMeshArch::QueryInterface(const char* Iid, void** Out)
 {
     if (std::strcmp(Iid, Iids::Mesh) == 0)
     {
-        *Out = (IMesh*)this;
+        *Out = static_cast<IMesh*>(this);
         return GR_OK;
     }
     if (std::strcmp(Iid, Iids::MatHookUp) == 0)
     {
-        *Out = (IMatHookUp*)(&HookFacet);
+        *Out = static_cast<IMatHookUp*>(&HookFacet);
         return GR_OK;
     }
     if (std::strcmp(Iid, Iids::RenderableMesh) == 0)
     {
-        *Out = (IRenderableMesh*)(&RenderableFacet);
+        *Out = static_cast<IRenderableMesh*>(&RenderableFacet);
         return GR_OK;
     }
     if (std::strcmp(Iid, Iids::DAComponent) == 0)
     {
-        *Out = (IMesh*)this;
+        *Out = static_cast<IMesh*>(this);
         return GR_OK;
     }
     return (GENRESULT)-1;
@@ -1418,7 +1418,7 @@ static bool TriMeshReadPool(IFileSystem* File, const char* Name, unsigned long E
     const unsigned long Size = File->GetSize((unsigned long)Handle, 0);
     const unsigned long Count = Size / ElementSize;
     unsigned char* Buffer = new unsigned char[Count * ElementSize];
-    *OutBuffer = (ElementType*)Buffer;
+    *OutBuffer = reinterpret_cast<ElementType*>(Buffer);
     unsigned long ReadCount = 0;
     if (File->Read((unsigned long)Handle, Buffer, Size, &ReadCount, 0) != 0)
     {
@@ -2227,7 +2227,7 @@ int FTriMeshArch::PrivatizeCursorGroup()
 int FTriMeshArch::ShareGroupVertices(bool bAll)
 {
     const size_t Size = (Groups.data() == nullptr) ? 0 : Groups.size();
-    FTriMeshGroup** Shared = (FTriMeshGroup**)new unsigned char[Size * 4];
+    FTriMeshGroup** Shared = reinterpret_cast<FTriMeshGroup**>(new unsigned char[Size * 4]);
     int SharedCount = 0;
     for (size_t Index = 0; Index < Groups.size(); ++Index)
     {

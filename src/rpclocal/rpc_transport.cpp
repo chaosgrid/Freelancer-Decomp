@@ -82,20 +82,20 @@ void FPacketBase::AddRef() {
     ++UsageCount;
 }
 
+// The two links every node starts with.
+struct FRpcEmbeddedListNode {
+    FRpcEmbeddedListNode* Next;     // +0x00
+    FRpcEmbeddedListNode* Prev;     // +0x04
+};
+
 // The 0x0c MSVCP60 std::list header, as every embedded list in this module wears it.
 // Type-agnostic on purpose: the node size comes from the caller, so one body covers
 // node sizes 0x0c, 0x10, 0x14 and 0x50 alike.
 struct FRpcEmbeddedListHeader {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    void* Head;                     // +0x04  the sentinel node
+    FRpcEmbeddedListNode* Head;     // +0x04  the sentinel node
     unsigned int Size;              // +0x08
-};
-
-// The two links every node starts with.
-struct FRpcEmbeddedListNode {
-    FRpcEmbeddedListNode* Next;     // +0x00
-    FRpcEmbeddedListNode* Prev;     // +0x04
 };
 
 // As in FUN_06d9d4f0 (the CHARACTERINFO ctor; the other list-building ctors differ only in
@@ -115,7 +115,7 @@ void RpcPacketBuildListSentinel(void* ListHeader, unsigned int NodeSize) {
 // FUN_06d9d1f0's list half: FUN_06d901f0 (list::erase) in a loop, then the sentinel.
 void RpcPacketDestroyEmbeddedList(void* ListHeader) {
     FRpcEmbeddedListHeader* Header = static_cast<FRpcEmbeddedListHeader*>(ListHeader);
-    FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(Header->Head);
+    FRpcEmbeddedListNode* Sentinel = Header->Head;
     FRpcEmbeddedListNode* Node = Sentinel->Next;
     while (Node != Sentinel) {
         FRpcEmbeddedListNode* Erased = Node;
@@ -148,7 +148,7 @@ FRpcMarshalStream::FRpcMarshalStream(FPacketBase& InPacket, void* InBuffer,
     : Packet(InPacket) {
     Packet.MarshalCursor = 0;
     Packet.MarshalLimit = InCapacity;
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(InBuffer);
+    Packet.SetMarshalBuffer(static_cast<unsigned char*>(InBuffer));
     Packet.MarshalError = 0;
 }
 
@@ -192,7 +192,7 @@ bool FRpcMarshalStream::PutWideString(const wchar_t* Text) {
         }
     }
     const unsigned short Count = (unsigned short)(Length & 0xffffu);
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Count, 2u);
     // Retail writes the advanced pointer back only on the success path: both failure exits
     // leave it in place even though the length word is already written.
@@ -204,7 +204,7 @@ bool FRpcMarshalStream::PutWideString(const wchar_t* Text) {
     if (Bytes != 0 && Text != nullptr) {
         memcpy(Local, Text, Bytes);
     }
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(Local + Bytes);
+    Packet.SetMarshalBuffer(Local + Bytes);
     return true;
 }
 
@@ -213,10 +213,10 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
     if (!AdvanceStrict(2u, kDecodeOverrun)) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     unsigned short Count = 0;
     memcpy(&Count, Ptr, 2u);
-    const unsigned char* After = Ptr + 2u;
+    unsigned char* After = Ptr + 2u;
     const unsigned int Bytes = (unsigned int)Count * 2u;
     if (!AdvanceStrict(Bytes, kDecodeOverrun)) {
         return false;
@@ -224,7 +224,7 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
     OutText = nullptr;
     if (Count == 0) {
         // Retail quirk: this path skips the only store of the advanced pointer, so the
-        // length word's two bytes move the cursor but not MarshalPtr. Reproduced.
+        // length word's two bytes move the cursor but not MarshalBuffer(). Reproduced.
         return true;
     }
     wchar_t* Block = static_cast<wchar_t*>(
@@ -232,7 +232,7 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
     memcpy(Block, After, Bytes);
     Block[Count] = 0;
     OutText = Block;
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(After + Bytes);
+    Packet.SetMarshalBuffer(After + Bytes);
     return true;
 }
 
@@ -240,7 +240,7 @@ bool FRpcMarshalStream::PutDwordUncounted(unsigned int Value) {
     if (Packet.MarshalError != 0) {
         return false;
     }
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Value, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -250,7 +250,7 @@ bool FRpcMarshalStream::GetDwordUncounted(unsigned int& OutValue) {
     if (Packet.MarshalError != 0) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    const unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(&OutValue, Ptr, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -260,7 +260,7 @@ bool FRpcMarshalStream::PutDword(unsigned int Value) {
     if (!Advance(4u, kEncodeOverflow)) {
         return false;
     }
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Value, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -270,7 +270,7 @@ bool FRpcMarshalStream::PutWord(unsigned short Value) {
     if (!Advance(2u, kEncodeOverflow)) {
         return false;
     }
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Value, 2u);
     Packet.MarshalPtr += 2u;
     return true;
@@ -279,7 +279,7 @@ bool FRpcMarshalStream::PutWord(unsigned short Value) {
 // See the note on the declaration. No Advance, no check; covers both the inlined
 // LAB_06da13d0 and the out-of-line FUN_06da1380.
 void FRpcMarshalStream::PutHeaderUnchecked(unsigned short Value) {
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Value, 2u);
     Packet.MarshalPtr += 2u;
     // Set, not advanced -- the same only because the cursor is 0 at every site.
@@ -293,7 +293,7 @@ bool FRpcMarshalStream::PutByte(unsigned char Value) {
     if (!Advance(1u, kEncodeOverflow)) {
         return false;
     }
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     *Ptr = Value;
     Packet.MarshalPtr += 1u;
     return true;
@@ -303,7 +303,7 @@ bool FRpcMarshalStream::PutFloat(float Value) {
     if (!Advance(4u, kEncodeOverflow)) {
         return false;
     }
-    unsigned char* Ptr = reinterpret_cast<unsigned char*>(Packet.MarshalPtr);
+    unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(Ptr, &Value, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -316,7 +316,7 @@ bool FRpcMarshalStream::PutBytes(const void* Source, unsigned int Count) {
         return false;
     }
     if (Count != 0) {
-        memcpy(reinterpret_cast<unsigned char*>(Packet.MarshalPtr), Source, Count);
+        memcpy(Packet.MarshalBuffer(), Source, Count);
     }
     Packet.MarshalPtr += Count;
     return true;
@@ -357,7 +357,7 @@ bool FRpcMarshalStream::GetDword(unsigned int& OutValue) {
     if (!Advance(4u, kDecodeOverrun)) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    const unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(&OutValue, Ptr, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -367,7 +367,7 @@ bool FRpcMarshalStream::GetWord(unsigned short& OutValue) {
     if (!Advance(2u, kDecodeOverrun)) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    const unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(&OutValue, Ptr, 2u);
     Packet.MarshalPtr += 2u;
     return true;
@@ -377,7 +377,7 @@ bool FRpcMarshalStream::GetByte(unsigned char& OutValue) {
     if (!Advance(1u, kDecodeOverrun)) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    const unsigned char* Ptr = Packet.MarshalBuffer();
     OutValue = *Ptr;
     Packet.MarshalPtr += 1u;
     return true;
@@ -387,7 +387,7 @@ bool FRpcMarshalStream::GetFloat(float& OutValue) {
     if (!Advance(4u, kDecodeOverrun)) {
         return false;
     }
-    const unsigned char* Ptr = reinterpret_cast<const unsigned char*>(Packet.MarshalPtr);
+    const unsigned char* Ptr = Packet.MarshalBuffer();
     memcpy(&OutValue, Ptr, 4u);
     Packet.MarshalPtr += 4u;
     return true;
@@ -400,7 +400,7 @@ bool FRpcMarshalStream::GetBytes(void* Dest, unsigned int Count) {
         return false;
     }
     if (Count != 0) {
-        memcpy(Dest, reinterpret_cast<const unsigned char*>(Packet.MarshalPtr), Count);
+        memcpy(Dest, Packet.MarshalBuffer(), Count);
     }
     Packet.MarshalPtr += Count;
     return true;

@@ -502,7 +502,7 @@ void FAsteroidBillboardBlock::ComputeLighting(float const* Pos, float const* For
                                               float* OutCorner0, float* OutCorner1,
                                               float* OutCorner2, float* OutCorner3)
 {
-    void* Slots[16];
+    FEngineLight* Slots[16];
     int const LightCount = SpaceCollectNearbyLights(Slots, 0x10, Pos, 100.0f, 0);
 
     // D3DRS_AMBIENT bytes as floats into OutCorner0.
@@ -554,7 +554,7 @@ void FAsteroidBillboardBlock::ComputeLighting(float const* Pos, float const* For
     {
         if (Lit >= MaxLights)
             break;
-        FEngineLight* const Light = static_cast<FEngineLight*>(Slots[SlotIndex]);
+        FEngineLight* const Light = Slots[SlotIndex];
         // Only directional lights (+0xb0 == 3).
         if (Light->Type != kLightDirectional)
             continue;

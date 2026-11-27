@@ -2898,9 +2898,9 @@ unsigned int FRpcServerSetDirectivePacket::Encode(unsigned char** BufferHolder,
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Reserve(0x94u, kPacketEncodeOverflow)) return kPacketEncodeOverflow;
-    const unsigned int Cached = MarshalPtr;
-    RpcServerCopyDirectiveFields(reinterpret_cast<void*>(Cached), &Directive);
-    MarshalPtr = Cached + 0x94u;
+    unsigned char* Cached = MarshalBuffer();
+    RpcServerCopyDirectiveFields(Cached, &Directive);
+    SetMarshalBuffer(Cached + 0x94u);
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -2909,7 +2909,7 @@ unsigned int FRpcServerSetDirectivePacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Reserve(0x94u, kPacketDecodeOverrun)) return MarshalError;
-    RpcServerCopyDirectiveFields(&Directive, reinterpret_cast<const void*>(MarshalPtr));
+    RpcServerCopyDirectiveFields(&Directive, MarshalBuffer());
     Stream.CommitReadPointer(0x94u);
     return Stream.Finish(OutLength, false);
 }

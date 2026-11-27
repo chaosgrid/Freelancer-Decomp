@@ -169,7 +169,7 @@ namespace
     // IBehaviorManager::set_turn_sensitivity(Value).
     void ApplyTurnSensitivity(float Value)
     {
-        CShip* const Ship = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW()));
+        CShip* const Ship = HudShipOfObjRw(GetPlayerObjRW());
         if (Ship == nullptr)
             return;
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();

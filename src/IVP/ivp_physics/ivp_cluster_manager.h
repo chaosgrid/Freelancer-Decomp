@@ -18,6 +18,7 @@ class IVP_Real_Object;
 class IVP_Listener_Object;
 class IVP_Listener_Collision;
 struct IVP_Environment_Object_Notify_Event;
+struct IVP_Event_Collision; // ivp_listener.h
 
 // ============================================================================
 // IVP_Universe_Manager -- the caller-supplied object at IVP_Environment+0x2C
@@ -136,7 +137,7 @@ public:
 
     // The collision_callback_hash fire loops (+0x0c), gated on the listener's
     // enabled_callbacks (+0x04):
-    void fire_event_pre_collision(IVP_Real_Object* Object, void* Event);  // 0634b030, flag 1, slot 0
+    void fire_event_pre_collision(IVP_Real_Object* Object, IVP_Event_Collision* Event);  // 0634b030, flag 1, slot 0
     void fire_event_collision_object_deleted(IVP_Real_Object* Object);    // 0634b090, flag 2, slot 1
     void fire_event_friction_created(IVP_Real_Object* Object, void* Event); // 0634b0e0, flag 4, slot 2
     void fire_event_friction_deleted(IVP_Real_Object* Object, void* Event); // 0634b140, flag 4, slot 3
