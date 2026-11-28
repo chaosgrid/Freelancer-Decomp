@@ -152,9 +152,9 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                     FHardpointRecord Temp(DACOM_CRC::GetCRC32(Inner.cFileName), Inner.cFileName);
                     Entry->second.push_back(Temp);
                 }
-                unsigned char* Data = Entry->second.back().Data;
+                FHardpointData* Data = &Entry->second.back().Data;
                 const long Type = ParseHardpointJointType(Outer.cFileName);
-                std::memcpy(Data, &Type, sizeof(Type));
+                std::memcpy(&Data->Type, &Type, sizeof(Type));
                 // Signed compares against 0 and 2.
                 if (Type < 0 || Type > 2)
                 {
@@ -165,13 +165,13 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                 {
                     if (Type != 0)
                     {
-                        ReadHardpointField(FileSystem, G_NameAxis, Data + 0x34, 0xC);
-                        ReadHardpointField(FileSystem, G_NameMin, Data + 0x40, 4);
-                        ReadHardpointField(FileSystem, G_NameMax, Data + 0x44, 4);
+                        ReadHardpointField(FileSystem, G_NameAxis, &Data->Axis, 0xC);
+                        ReadHardpointField(FileSystem, G_NameMin, &Data->Min, 4);
+                        ReadHardpointField(FileSystem, G_NameMax, &Data->Max, 4);
                     }
-                    ReadHardpointField(FileSystem, G_NamePosition, Data + 4, 0xC);
+                    ReadHardpointField(FileSystem, G_NamePosition, &Data->Position, 0xC);
                     ReadHardpointOrientation(FileSystem, G_NameOrientation,
-                                             (float*)(Data + 0x10));
+                                             &Data->Orient.E[0][0]);
                 }
                 FileSystem->OpenNode(G_NameParentDot); // +0x60
             } while (FileSystem->FindNext((unsigned long)InnerFind, // +0x4C
@@ -205,7 +205,7 @@ FHardpointRecord::FHardpointRecord(unsigned long InCrc, char const* InName)
     : Crc(InCrc)
     , Name(DuplicateLoweredName(InName != nullptr ? InName : ""))
 {
-    std::memset(Data, 0, sizeof(Data));
+    std::memset(&Data, 0, sizeof(Data));
 }
 
 static GENRESULT DACOM_API HardpointEngineComponentQueryInterface(void* Nested, const char* Iid,
@@ -266,7 +266,7 @@ unsigned long DACOM_API FHardpointObject::GetHardpoint(ArchetypeIndex InHandle, 
     {
         if (It->Crc == Key->Crc)
         {
-            std::memcpy(Out, It->Data, sizeof(It->Data));
+            std::memcpy(Out, &It->Data, sizeof(It->Data));
             return 1;
         }
     }
@@ -297,12 +297,12 @@ unsigned long DACOM_API FHardpointObject::AddHardpoint(ArchetypeIndex InHandle, 
     {
         if (It->Crc == Key->Crc)
         {
-            std::memcpy(It->Data, Data, sizeof(It->Data));
+            std::memcpy(&It->Data, Data, sizeof(It->Data));
             return 1;
         }
     }
     FHardpointRecord Temp(Key->Crc, Key->Name);
-    std::memcpy(Temp.Data, Data, sizeof(Temp.Data));
+    std::memcpy(&Temp.Data, Data, sizeof(Temp.Data));
     List.push_back(Temp);
     return 1;
 }
@@ -344,14 +344,16 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
             unsigned long Payload[G_EngineJointPayloadDwords];
             std::memset(Payload, 0, sizeof(Payload));
             Status = 3;
-            const unsigned long TypeB = *(unsigned long*)DataB;
-            Payload[0] = TypeB;
-            float* PayloadF = (float*)Payload;
-            const Vector* PosA = reinterpret_cast<const Vector*>(DataA + 4);
-            const Vector* PosB = reinterpret_cast<const Vector*>(DataB + 4);
-            const Matrix* OrientA = reinterpret_cast<const Matrix*>(DataA + 0x10);
-            const Matrix* OrientB = reinterpret_cast<const Matrix*>(DataB + 0x10);
-            const Vector* AxisB = reinterpret_cast<const Vector*>(DataB + 0x34);
+            const FHardpointData* const HardpointA = reinterpret_cast<const FHardpointData*>(DataA);
+            const FHardpointData* const HardpointB = reinterpret_cast<const FHardpointData*>(DataB);
+            const unsigned long TypeB = HardpointB->Type;
+            FEngineJointBlock* const Block = reinterpret_cast<FEngineJointBlock*>(Payload);
+            Block->Type = TypeB;
+            const Vector* PosA = &HardpointA->Position;
+            const Vector* PosB = &HardpointB->Position;
+            const Matrix* OrientA = &HardpointA->Orient;
+            const Matrix* OrientB = &HardpointB->Orient;
+            const Vector* AxisB = &HardpointB->Axis;
 
             if (TypeB == kJointTypeFix)
             {
@@ -362,22 +364,22 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInst
                 Vector OutVec;
                 MathMulMatrix3(Acquire3DMathEngine(), &OutMat, OrientA, &Transposed);
                 MathTransformVec(Acquire3DMathEngine(), &OutVec, &OutMat, PosB);
-                PayloadF[4] = PosA->x - OutVec.x;
-                PayloadF[5] = PosA->y - OutVec.y;
-                PayloadF[6] = PosA->z - OutVec.z;
-                std::memcpy(PayloadF + 7, &OutMat, sizeof(OutMat));
+                Block->ChildPos.x = PosA->x - OutVec.x;
+                Block->ChildPos.y = PosA->y - OutVec.y;
+                Block->ChildPos.z = PosA->z - OutVec.z;
+                std::memcpy(&Block->Orient, &OutMat, sizeof(OutMat));
             }
             else if (TypeB == kJointTypePris || TypeB == kJointTypeRev)
             {
-                std::memcpy(PayloadF + 1, PosA, 3 * sizeof(float));
-                std::memcpy(PayloadF + 4, PosB, 3 * sizeof(float));
+                std::memcpy(&Block->ParentPos, PosA, 3 * sizeof(float));
+                std::memcpy(&Block->ChildPos, PosB, 3 * sizeof(float));
                 Matrix OutMat;
                 Vector AxisXformed;
                 MathMulMatrix3(Acquire3DMathEngine(), &OutMat, OrientA, OrientB);
                 MathTransformVec(Acquire3DMathEngine(), &AxisXformed, &OutMat, AxisB);
-                std::memcpy(PayloadF + 7, &OutMat, sizeof(OutMat));
-                std::memcpy(PayloadF + 16, &AxisXformed, sizeof(AxisXformed));
-                std::memcpy(PayloadF + 19, DataB + 0x40, 2 * sizeof(float));
+                std::memcpy(&Block->Orient, &OutMat, sizeof(OutMat));
+                std::memcpy(&Block->Axis, &AxisXformed, sizeof(AxisXformed));
+                std::memcpy(&Block->Min, &HardpointB->Min, 2 * sizeof(float));
             }
 
             if (Engine->CreateJoint((InstanceIndex)InstA, (InstanceIndex)InstB, Payload) != 0)
@@ -587,7 +589,7 @@ FHardpointRecord::FHardpointRecord(FHardpointRecord const& Other)
     : Crc(Other.Crc)
     , Name(nullptr)
 {
-    std::memcpy(Data, Other.Data, sizeof(Data));
+    std::memcpy(&Data, &Other.Data, sizeof(Data));
     if (Other.Name != nullptr)
         Name = DuplicateLoweredName(Other.Name);
 }

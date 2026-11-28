@@ -12,8 +12,6 @@
 
 #include "Space/Cameras/ship_camera_params.h"
 
-#include "common_ini.h"
-
 namespace
 {
     // .rdata 0x005c7474, 0x005c77f0, 0x005c77f4.
@@ -32,67 +30,4 @@ float ShipCameraClampTurnAngle(float Degrees)
     if (Degrees > kMaxTurnAngleDegrees)
         return kMaxTurnAngleDegrees * kDegreesToRadians;
     return Degrees * kDegreesToRadians;
-}
-
-void ShipCameraParamsClear(FShipCameraParams* Params)
-{
-    Params->Offset[0] = 0.0f;
-    Params->Offset[1] = 0.0f;
-    Params->AngularAcceleration = 0.0f;
-    Params->AngularSlerpMultiplier = 0.0f;
-    Params->HorizontalTurnAngle = 0.0f;
-    Params->VerticalTurnUpAngle = 0.0f;
-    Params->VerticalTurnDownAngle = 0.0f;
-    Params->TurnLookAheadSlerpAmount = 0.0f;
-}
-
-bool ShipCameraParamsReadValue(FShipCameraParams* Params, INI_Reader* Reader)
-{
-    // 0x0040763f: camera_offset takes TWO parameters off the same line.
-    if (Reader->is_value("camera_offset"))
-    {
-        Params->Offset[0] = Reader->get_value_float(0);
-        Params->Offset[1] = Reader->get_value_float(1);
-        return true;
-    }
-
-    // 0x0040766f. Retail tests the slerp multiplier BEFORE the acceleration even though the
-    // acceleration sits at the lower offset.
-    if (Reader->is_value("camera_angular_slerp_multiplier"))
-    {
-        Params->AngularSlerpMultiplier = Reader->get_value_float(0);   // +0x74
-        return true;
-    }
-
-    if (Reader->is_value("camera_angular_acceleration"))
-    {
-        Params->AngularAcceleration = Reader->get_value_float(0);      // +0x70
-        return true;
-    }
-
-    // All three share the clamp-then-convert shape.
-    if (Reader->is_value("camera_horizontal_turn_angle"))
-    {
-        Params->HorizontalTurnAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
-        return true;
-    }
-    if (Reader->is_value("camera_vertical_turn_up_angle"))
-    {
-        Params->VerticalTurnUpAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
-        return true;
-    }
-    if (Reader->is_value("camera_vertical_turn_down_angle"))
-    {
-        Params->VerticalTurnDownAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
-        return true;
-    }
-
-    // Stored raw, no clamp.
-    if (Reader->is_value("camera_turn_look_ahead_slerp_amount"))
-    {
-        Params->TurnLookAheadSlerpAmount = Reader->get_value_float(0);
-        return true;
-    }
-
-    return false;
 }

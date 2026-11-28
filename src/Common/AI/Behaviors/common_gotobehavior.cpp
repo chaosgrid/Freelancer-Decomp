@@ -85,20 +85,20 @@ GotoBehavior::~GotoBehavior()
 // ============================================================================
 
 // FUN_062c29f0. Only caller is GotoBehavior::OnApplyDirective.
-void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target, float Near, float Far,
+void ProxWatcherInit(FProximityWatcher* Watcher, SystemManager* SysMgr, void* Target, float Near, float Far,
                      float CruiseRatio)
 {
-    BaseWatcher* const W = reinterpret_cast<BaseWatcher*>(Watcher);
-    *reinterpret_cast<float*>(Watcher + 0x08) = Near;
-    *reinterpret_cast<float*>(Watcher + 0x0c) = Far;
+    BaseWatcher* const W = &Watcher->Watcher;
+    Watcher->NearDistance = Near;
+    Watcher->FarDistance = Far;
     IObjRW* const TargetObj = static_cast<IObjRW*>(Target);
     W->set(TargetObj != nullptr ? static_cast<Watchable const*>(TargetObj) : nullptr);
-    *reinterpret_cast<unsigned*>(Watcher + 0x14) = 0;
-    *reinterpret_cast<unsigned*>(Watcher + 0x18) = 0;
+    Watcher->Flags14 = 0;
+    Watcher->SavedFlags18 = 0;
     IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(W->target()));
     if (Watched == nullptr)
         return;
-    float* const Ratio = reinterpret_cast<float*>(Watcher + 0x10);
+    float* const Ratio = &Watcher->CruiseSpeedRatio;
     // DAT_0639c430 = 0.0 (double); NaN takes the speed quotient.
     if (CruiseRatio > 0.0)
     {
@@ -121,14 +121,14 @@ void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target
 }
 
 // FUN_062c2af0.
-void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr, Vector const& RefPoint)
+void ProxWatcherRecomputeZoneFlags(FProximityWatcher* Watcher, SystemManager* SysMgr, Vector const& RefPoint)
 {
-    IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
+    IObjRW* const Obj = ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target()));
     if (Obj == nullptr)
         return;
 
-    unsigned* const ZoneFlags = reinterpret_cast<unsigned*>(Watcher + 0x14);
-    unsigned* const SavedFlags = reinterpret_cast<unsigned*>(Watcher + 0x18);
+    unsigned* const ZoneFlags = &Watcher->Flags14;
+    unsigned* const SavedFlags = &Watcher->SavedFlags18;
 
     // Snapshot last tick's zones; the hysteresis bands below OR it back in.
     *SavedFlags = *ZoneFlags;
@@ -151,22 +151,22 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
         *ZoneFlags = kProxZoneOverlap;
 
     // Retail re-reads the watcher before each of the next two calls and re-guards neither.
-    IObjRW* const ClearanceObj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
+    IObjRW* const ClearanceObj = ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target()));
     // Rounded to float (stored into the RefPoint argument's home slot).
     float const InterceptClearance = static_cast<float>(GetInterceptClearanceOfIface(SteerElem, ClearanceObj)); // FUN_062e4bb0
 
-    IObjRW* const CruiseObj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
+    IObjRW* const CruiseObj = ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target()));
     bool bCruiseActive = false;
     CruiseObj->is_cruise_active(bCruiseActive);
 
     // The limits are re-derived on the x87 stack for each compare and never stored.
-    float const CruiseScale = *reinterpret_cast<float*>(Watcher + 0x10);
+    float const CruiseScale = Watcher->CruiseSpeedRatio;
     double const NearLimit = bCruiseActive
-        ? static_cast<double>(*reinterpret_cast<float*>(Watcher + 0x08)) * CruiseScale
-        : static_cast<double>(*reinterpret_cast<float*>(Watcher + 0x08));
+        ? static_cast<double>(Watcher->NearDistance) * CruiseScale
+        : static_cast<double>(Watcher->NearDistance);
     double const FarLimit = bCruiseActive
-        ? static_cast<double>(*reinterpret_cast<float*>(Watcher + 0x0c)) * CruiseScale
-        : static_cast<double>(*reinterpret_cast<float*>(Watcher + 0x0c));
+        ? static_cast<double>(Watcher->FarDistance) * CruiseScale
+        : static_cast<double>(Watcher->FarDistance);
 
     // DAT_0639e6d4 = 50.0f, the half-width of the hysteresis band around each limit.
     double const HysteresisBand = 50.0;
@@ -190,10 +190,10 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
 }
 
 // FUN_062c2c70.
-double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, SystemManager* SysMgr,
+double ProxWatcherComputeSpeedCap(FProximityWatcher* Watcher, IObjRW* OwnerContext, SystemManager* SysMgr,
                                   int Selector, float SelectorValue)
 {
-    IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
+    IObjRW* const Obj = ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target()));
     if (Obj == nullptr)
         return 0.0f;
 
@@ -205,14 +205,14 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
     float const OwnerSpeed =
         Behavior_GetSpeed(OwnerContext, QueryValue, ThrustType); // FUN_062e5af0
 
-    unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
+    unsigned const ZoneFlags = Watcher->Flags14;
     double ZoneSpeed;
     if ((ZoneFlags & (kProxZoneOverlap | kProxZoneNear)) != 0)
     {
         // Retail has two identical arms (one re-reads the watcher, one passes a null
         // receiver); collapsed, since Behavior_GetSpeed returns 0.0f on null.
         ZoneSpeed = Behavior_GetSpeed(
-            ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00)), 1.0f, ThrustType);
+            ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target())), 1.0f, ThrustType);
     }
     else if ((ZoneFlags & kProxZoneFar) == 0)
     {
@@ -222,8 +222,8 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
     {
         // Linear blend of the clearance across the two thresholds, unscaled here (unlike
         // ProxWatcherRecomputeZoneFlags, which cruise-scales them). Only Blend is rounded.
-        float const NearThreshold = *reinterpret_cast<float*>(Watcher + 0x08);
-        float const FarThreshold = *reinterpret_cast<float*>(Watcher + 0x0c);
+        float const NearThreshold = Watcher->NearDistance;
+        float const FarThreshold = Watcher->FarDistance;
         FAiTarget* const SteerElem = &SysMgr->SelfTarget;
         double const Clearance = GetInterceptClearanceOfIface(SteerElem, Obj); // FUN_062e4bb0
         float const Blend = static_cast<float>(
@@ -232,7 +232,7 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
         // Retail really multiplies by Blend twice (a square), unrounded until the caller's
         // store.
         float const FullSpeed = Behavior_GetSpeed(
-            ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00)), 1.0f, ThrustType);
+            ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target())), 1.0f, ThrustType);
         ZoneSpeed = (static_cast<double>(FullSpeed) * Blend) * Blend;
 
         // DAT_0639e884 = 10.0f; unordered keeps the value.
@@ -245,17 +245,17 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, 
 }
 
 // FUN_062c2d90.
-void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, IBehaviorManager* BehaviorMgr,
+void ProxWatcherNotifyZoneChange(FProximityWatcher* Watcher, SystemManager* SysMgr, IBehaviorManager* BehaviorMgr,
                                  Vector const& RefPoint)
 {
-    IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
+    IObjRW* const Obj = ObjRwFromWatchable(const_cast<Watchable*>(Watcher->Watcher.target()));
     if (Obj == nullptr)
         return;
 
     // Three recognised transitions between last tick's snapshot (+0x18) and this tick's
     // zones (+0x14); anything else returns without notifying.
-    unsigned const Saved = *reinterpret_cast<unsigned*>(Watcher + 0x18);
-    unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
+    unsigned const Saved = Watcher->SavedFlags18;
+    unsigned const ZoneFlags = Watcher->Flags14;
 
     int Code;
     if ((Saved & kProxZoneFar) != 0 && (Saved & kProxZoneNear) == 0 && (ZoneFlags & kProxZoneNear) != 0)
@@ -859,7 +859,7 @@ int GotoBehavior::Update()
     }
 
     // The proximity watcher at +0x370.
-    unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&Watcher370);
+    FProximityWatcher* const ProxWatcher = reinterpret_cast<FProximityWatcher*>(&Watcher370);
     ProxWatcherRecomputeZoneFlags(ProxWatcher, SysMgr, ActiveTargetPos);
     ProxWatcherNotifyZoneChange(ProxWatcher, SysMgr, BehaviorMgr, ActiveTargetPos);
 
@@ -1149,7 +1149,7 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
         ProxFar = Op.TetherFarRange;
         ProxRatio = *reinterpret_cast<float const*>(&Op.TetherCruiseRatio);
     }
-    ProxWatcherInit(reinterpret_cast<unsigned char*>(&Watcher370), SysMgr, ProxTarget,
+    ProxWatcherInit(reinterpret_cast<FProximityWatcher*>(&Watcher370), SysMgr, ProxTarget,
                     ProxNear, ProxFar, ProxRatio);                  // FUN_062c29f0
 
     Flags28 = static_cast<unsigned char>(Flags28 | kBehaviorFlagDirectiveAccepted);

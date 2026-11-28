@@ -7,6 +7,7 @@
 #pragma once
 
 #include "common_exports.h"
+#include "math3d.h" // Vector (FmtStr::NavMarker::Position)
 
 // Common.dll TEXT / RDL / geometry cluster.
 
@@ -101,6 +102,17 @@ COMMON_API Rect __cdecl RECT_to_Rect(tagRECT const& In);
 COMMON_API Rect __cdecl rect_intersect(Rect const& A, Rect const& B);
 COMMON_API Rect __cdecl rect_union(Rect const& A, Rect const& B);
 
+// The mission-log blob PackMissionLogData writes: this 8-byte header, then Count flattened
+// FmtStrs (ExtractMissionLogData reads one; Freelancer.exe's StoryStarLoadHistory,
+// FUN_004ba430, reads Count and walks the records from +8). Retail struct name not recovered.
+struct FMissionLogDataHeader
+{
+    int Type;   // +0x00 -- PackMissionLogData's Type (0 no record, 1 one FmtStr)
+    int Count;  // +0x04 -- the number of FmtStrs that follow
+};
+static_assert(offsetof(FMissionLogDataHeader, Count) == 0x04, "FMissionLogDataHeader::Count offset");
+static_assert(sizeof(FMissionLogDataHeader) == 0x08, "FMissionLogDataHeader size");
+
 struct FmtStr;
 COMMON_API void __cdecl AppendMissionLogData(FmtStr const* Fmt, unsigned char*& Buffer, int& Offset, int MaxSize);
 COMMON_API void __cdecl ExtractMissionLogData(FmtStr* Fmt, unsigned char*& Buffer, int& Remaining);
@@ -180,10 +192,21 @@ struct FmtStr
 
     // The 0x14-byte payload append_nav_marker copies into a node (tag 0x4E). Retail names it
     // FmtStr::NavMarker (?append_nav_marker@FmtStr@@QAEXABUNavMarker@1@@Z) and moves it with a
-    // 5-dword REP MOVSD; the individual fields are not needed by anything the port ports.
+    // 5-dword REP MOVSD. The fields: Freelancer.exe's waypoint reader (the FUN_004c4ff0 caller
+    // in nn_navmap_update.cpp) takes +0x00 as the star system and +0x08 as the position;
+    // Content's type 5 / 6 objectives (MissionObject.cpp) load and save +0x04 as a signed int.
     struct NavMarker
     {
-        unsigned int Data[5];
+        union
+        {
+            unsigned int Data[5];
+            struct
+            {
+                unsigned int SystemId;  // +0x00
+                int Field04;            // +0x04
+                Vector Position;        // +0x08
+            };
+        };
     };
 
     // Val::TypeTag: the kind of value a node holds. The letters are the ASCII codes of the
@@ -278,8 +301,41 @@ struct FmtStr
 static_assert(sizeof(FmtStr) == 0x18, "FmtStr must be 0x18");
 static_assert(sizeof(FmtStr::Val) == 0x0C, "FmtStr::Val must be 0x0C");
 static_assert(sizeof(FmtStr::NavMarker) == 0x14, "FmtStr::NavMarker must be 0x14");
+static_assert(offsetof(FmtStr::NavMarker, Field04) == 0x04, "FmtStr::NavMarker::Field04 offset");
+static_assert(offsetof(FmtStr::NavMarker, Position) == 0x08, "FmtStr::NavMarker::Position offset");
 static_assert(offsetof(FmtStr, MadLibId) == 0x04, "FmtStr mad-lib id at +0x04");
 static_assert(offsetof(FmtStr, ValueIndex) == 0x08, "FmtStr counters at +0x08");
+
+// The wire form FmtStr::flatten (FUN_0630df60) writes and FmtStr::unflatten (FUN_0630e010)
+// reads: this 6-byte header, then NodeCount packed FFmtValFlat records.
+#pragma pack(push, 1)
+struct FFmtStrFlat
+{
+    unsigned int MadLibId;     // +0x00
+    unsigned short NodeCount;  // +0x04; the records follow at +0x06
+};
+
+// One node of the wire form (Val::flatten FUN_0630d460, Val::InitFromVoid FUN_0630d5a0): a
+// 3-byte header and the payload TypeTag selects. TagFmtStr: the nested FmtStr's own wire form
+// (Val::flatten writes its header and the children after it); TagNavMarker: the 0x14-byte
+// block (0x17 bytes in all); every other tag: the dword value (7 bytes in all).
+struct FFmtValFlat
+{
+    unsigned short TypeTag;  // +0x00
+    unsigned char Flags;     // +0x02
+    union
+    {
+        FFmtStrFlat Subtree;       // +0x03 TagFmtStr
+        FmtStr::NavMarker Marker;  // +0x03 TagNavMarker
+        unsigned int Value;        // +0x03 every other tag
+    };
+};
+#pragma pack(pop)
+static_assert(offsetof(FFmtStrFlat, NodeCount) == 0x04, "FFmtStrFlat::NodeCount offset");
+static_assert(sizeof(FFmtStrFlat) == 0x06, "FFmtStrFlat size");
+static_assert(offsetof(FFmtValFlat, Flags) == 0x02, "FFmtValFlat::Flags offset");
+static_assert(offsetof(FFmtValFlat, Value) == 0x03, "FFmtValFlat::Value offset");
+static_assert(sizeof(FFmtValFlat) == 0x17, "FFmtValFlat size (the TagNavMarker record)");
 
 // ============================================================================
 // VisualSize — output struct for text/image measurement. Size 0x10.

@@ -12,6 +12,7 @@
 
 #include "Space/Effects/cli_projectile_fx.h"
 #include "Space/Effects/client_equip_fx.h"
+#include "Common/client_cliobj.h"
 #include "Space/client_objdb.h"
 #include "common_cequip.h"
 #include "common_cobject.h"
@@ -72,20 +73,8 @@ namespace
     // CliEQTradeLane (client_cliobj.cpp FCliTradeLane) -- the fields this file reads.
     enum : unsigned
     {
-        kTlPlayerEnter = 0x54,
         kTlPlayerTravel = 0x58,
-        kTlPlayerSplash = 0x5c,
-        kTlPlayerExit = 0x60,
-        kTlPlayerDisrupt = 0x64,
-        kTlShipEnter = 0x68,
         kTlShipTravel = 0x6c,
-        kTlShipSplash = 0x70,
-        kTlShipExit = 0x74,
-        kTlShipDisrupt = 0x78,
-        kTlRingActive = 0x7c,
-        kTlSecsBeforeEnter = 0x94,
-        kTlSecsBeforeExit = 0x98,
-        kTlSecsBeforeSplash = 0x9c,
         kTlActivationStart = 0xa0,
         kTlActivationEnd = 0xa4,
     };
@@ -211,7 +200,7 @@ namespace
 
     // FUN_005140c0 -- the ring solar's TradeLane equipment (0x800000) companion: the
     // CliEQTradeLane. FindFirst runs on the narrowed solar with no null test.
-    Archetype::ICliObj* TlTradeLaneCompanion(FClientGameobj* RingGameobj)
+    Archetype::FCliTradeLane* TlTradeLaneCompanion(FClientGameobj* RingGameobj)
     {
         CSolar* const Solar = TlNarrowSolar(RingGameobj);
         CEquip const* const Equip = Solar->EquipManager.FindFirst(EquipTypeTradeLane);
@@ -220,34 +209,42 @@ namespace
         Archetype::Equipment const* const Arch = Equip->EquipArch();
         if (Arch == nullptr)
             return nullptr;
-        return Arch->Companion;
+        return static_cast<Archetype::FCliTradeLane*>(Arch->Companion);
     }
 
     FTradeLaneRingRuntime*& TlShipRingPtr(FClientGameobj* Ship)
     {
-        return *reinterpret_cast<FTradeLaneRingRuntime**>(
-            reinterpret_cast<unsigned char*>(Ship) + kTlShipRingRuntime);
+        return static_cast<FClientShipGameobj*>(Ship)->TradeLaneRing;
     }
 
     unsigned char& TlShipFlags184(FClientGameobj* Ship)
     {
-        return *(reinterpret_cast<unsigned char*>(Ship) + kTlShipFlags184);
+        return static_cast<FClientShipGameobj*>(Ship)->TradeLaneShipFlags;
     }
 
     unsigned char& TlShipFlags185(FClientGameobj* Ship)
     {
-        return *(reinterpret_cast<unsigned char*>(Ship) + kTlShipFlags185);
+        return static_cast<FClientShipGameobj*>(Ship)->TradeLaneOneshotFlags;
     }
 
     // The +0x184 dword store, inlined at several sites.
     void TlShipClearFlags(FClientGameobj* Ship)
     {
-        *reinterpret_cast<unsigned*>(reinterpret_cast<unsigned char*>(Ship) + kTlShipFlags184) = 0;
+        static_cast<FClientShipGameobj*>(Ship)->TradeLaneFlags = 0;
     }
 
-    FEffectCompanion* TlShipCompanion(FClientGameobj* Ship, unsigned Offset)
+    // The ship's lane effect companion (+0x164).
+    FEffectCompanion* TlShipLaneCompanion(FClientGameobj* Ship)
     {
-        return reinterpret_cast<FEffectCompanion*>(reinterpret_cast<unsigned char*>(Ship) + Offset);
+        return reinterpret_cast<FEffectCompanion*>(
+            static_cast<FClientShipGameobj*>(Ship)->TradeLaneShipCompanion);
+    }
+
+    // The player's tunnel effect companion (+0x174).
+    FEffectCompanion* TlShipTunnelCompanion(FClientGameobj* Ship)
+    {
+        return reinterpret_cast<FEffectCompanion*>(
+            static_cast<FClientShipGameobj*>(Ship)->TradeLaneTunnelCompanion);
     }
 
     // FUN_0054baf0 -- the player's gameobj (the watchable at DAT_00679744 minus eight) or null.
@@ -483,10 +480,10 @@ namespace
     {
         if (Ship == TlPlayerGameobj())
         {
-            TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
+            TlCompanionStopAndClear(TlShipTunnelCompanion(Ship));
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
-        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipLaneCompanion(Ship);
         if (CreateEffectCompanionAlive(Lane) != 0)
             CliEffectListRemove(&Ship->EffectList, Lane);
         TlShipClearFlags(Ship);
@@ -499,13 +496,13 @@ namespace
     void TlOneshot145a0(FTradeLaneRingRuntime* Ring, FClientGameobj* Ship)
     {
         bool const bPlayer = Ship == TlPlayerGameobj();
-        Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+        Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
         if ((TlShipFlags185(Ship) & 2u) != 0)
             return;
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) | 3u);
-        ID_String const* Id = TlCompanionId(Companion, kTlShipEnter);
-        if (bPlayer && !TlCompanionId(Companion, kTlPlayerEnter)->IsEmpty())
-            Id = TlCompanionId(Companion, kTlPlayerEnter);
+        ID_String const* Id = &Companion->ShipEnter;
+        if (bPlayer && !Companion->PlayerEnter.IsEmpty())
+            Id = &Companion->PlayerEnter;
         Transform Xform;
         TlIdentityXform(&Xform);
         long const Index = Ship->get_index();
@@ -544,7 +541,7 @@ namespace
             Xform.Translation.y = Pos.y;
             Xform.Translation.z = Pos.z;
             TlCreateEffectFromId(&G_CliEffectFactoryTunnel, TlCompanionId(Companion, kTlPlayerTravel),
-                                 Ship, -1, &Xform, TlShipCompanion(Ship, kTlShipFxBinder174));
+                                 Ship, -1, &Xform, TlShipTunnelCompanion(Ship));
             return;
         }
         Transform Xform;
@@ -552,7 +549,7 @@ namespace
         long const Index = Ship->get_index();
         TlCreateEffectFromId(&G_CliEffectFactoryC60, TlCompanionId(Companion, kTlShipTravel), Ship,
                              static_cast<int>(Index), &Xform,
-                             TlShipCompanion(Ship, kTlShipFxBinder164));
+                             TlShipLaneCompanion(Ship));
     }
 
     // FUN_00514960 -- the splash ahead of the next ring, once
@@ -566,10 +563,10 @@ namespace
             return;
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) | 1u);
         bool const bPlayer = Ship == TlPlayerGameobj();
-        Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
-        if (bPlayer && !TlCompanionId(Companion, kTlPlayerSplash)->IsEmpty())
+        Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+        if (bPlayer && !Companion->PlayerSplash.IsEmpty())
         {
-            TlPlayerCameraOneShot(Ship, TlCompanionId(Companion, kTlPlayerSplash));
+            TlPlayerCameraOneShot(Ship, &Companion->PlayerSplash);
             return;
         }
         FClientGameobj* const RingGo = TlWatchedGameobj(Ring);
@@ -583,7 +580,7 @@ namespace
         TlIdentityXform(&Xform);
         Xform.Translation = HpWorld;
         float const Velocity[3] = {0.0f, 0.0f, 0.0f};
-        ID_String const* const Id = TlCompanionId(Companion, kTlShipSplash);
+        ID_String const* const Id = &Companion->ShipSplash;
         if (Id->IsEmpty())
             return;
         G_CliEffectFactoryC60.CreateEffectWorldOneShotOn(FindEffectArch(&Id->Id), &Xform,
@@ -601,7 +598,7 @@ namespace
             return;
         TlShipFlags185(Ship) = static_cast<unsigned char>(TlShipFlags185(Ship) | 5u);
         bool const bPlayer = Ship == TlPlayerGameobj();
-        Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+        Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
         if (bPlayer)
         {
             if (bAnnounce)
@@ -614,21 +611,21 @@ namespace
                         NnArrivalTextShowNamed(NameIds);
                 }
             }
-            TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
+            TlCompanionStopAndClear(TlShipTunnelCompanion(Ship));
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
         }
-        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipLaneCompanion(Ship);
         if (CreateEffectCompanionAlive(Lane) != 0)
             CliEffectListRemove(&Ship->EffectList, Lane);
-        if (bPlayer && !TlCompanionId(Companion, kTlPlayerExit)->IsEmpty())
+        if (bPlayer && !Companion->PlayerExit.IsEmpty())
         {
-            TlPlayerCameraOneShot(Ship, TlCompanionId(Companion, kTlPlayerExit));
+            TlPlayerCameraOneShot(Ship, &Companion->PlayerExit);
             return;
         }
         Transform Xform;
         TlIdentityXform(&Xform);
         long const Index = Ship->get_index();
-        ID_String const* const Id = TlCompanionId(Companion, kTlShipExit);
+        ID_String const* const Id = &Companion->ShipExit;
         if (Id->IsEmpty())
             return;
         G_CliEffectFactoryC60.CreateEffectOneShotOn(FindEffectArch(&Id->Id), Ship,
@@ -646,13 +643,13 @@ namespace
         if ((TlShipFlags185(Ship) & 4u) != 0)
             return;
         bool const bPlayer = Ship == TlPlayerGameobj();
-        Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+        Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
         if (bPlayer)
         {
             TlShipFlags184(Ship) = static_cast<unsigned char>(TlShipFlags184(Ship) & ~kTradeLaneFlagTunnelFx);
-            TlCompanionStopAndClear(TlShipCompanion(Ship, kTlShipFxBinder174));
+            TlCompanionStopAndClear(TlShipTunnelCompanion(Ship));
         }
-        FEffectCompanion* const Lane = TlShipCompanion(Ship, kTlShipFxBinder164);
+        FEffectCompanion* const Lane = TlShipLaneCompanion(Ship);
         if (CreateEffectCompanionAlive(Lane) != 0)
             CliEffectListRemove(&Ship->EffectList, Lane);
         FClientSolarGameobj const* const ShipRingGo =
@@ -662,16 +659,16 @@ namespace
             TlOneshot14bf0(Ring, Ship, false);
         }
         else if (Ship == TlPlayerGameobj() &&
-                 !TlCompanionId(Companion, kTlPlayerDisrupt)->IsEmpty())
+                 !Companion->PlayerDisrupt.IsEmpty())
         {
-            TlPlayerCameraOneShot(Ship, TlCompanionId(Companion, kTlPlayerDisrupt));
+            TlPlayerCameraOneShot(Ship, &Companion->PlayerDisrupt);
         }
         else
         {
             Transform Xform;
             TlIdentityXform(&Xform);
             long const Index = Ship->get_index();
-            ID_String const* const Id = TlCompanionId(Companion, kTlShipDisrupt);
+            ID_String const* const Id = &Companion->ShipDisrupt;
             if (!Id->IsEmpty())
                 G_CliEffectFactoryC60.CreateEffectOneShotOn(FindEffectArch(&Id->Id), Ship,
                                                             static_cast<int>(Index), &Xform, nullptr);
@@ -745,7 +742,7 @@ namespace
                 Node = Next;
                 continue;
             }
-            Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+            Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
             if (TlShipRingPtr(Ship) != Ring)
             {
                 TlShipListErase(Ring, Node);
@@ -776,7 +773,7 @@ namespace
             if (Speed > 1.0)
                 Ratio = static_cast<float>(Dist / Speed);
 
-            if (Ratio < TlCompanionFloat(Companion, kTlSecsBeforeEnter))
+            if (Ratio < Companion->SecsBeforeEnter)
             {
                 TlOneshot145a0(Ring, Ship);
                 if (G_TlStartTravelOnEnter != 0)
@@ -797,10 +794,10 @@ namespace
             FClientGameobj* const NextRing = TlNextRingGameobj(Ring);
             if (NextRing != nullptr)
             {
-                if (Ratio < TlCompanionFloat(Companion, kTlSecsBeforeSplash))
+                if (Ratio < Companion->SecsBeforeSplash)
                     TlOneshot14960(Ring, Ship);
             }
-            else if (Ratio < TlCompanionFloat(Companion, kTlSecsBeforeExit))
+            else if (Ratio < Companion->SecsBeforeExit)
             {
                 TlOneshot14bf0(Ring, Ship, true);
             }
@@ -855,14 +852,14 @@ namespace
             ProbeShip = &Nearest->get_position();
             if (CreateEffectCompanionAlive(&Ring->EffectCompanion) == 0 && Ring->bActive != 0)
             {
-                Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
+                Archetype::FCliTradeLane* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
                 Vector Hp;
                 TradeLaneRingLaneHardpoint(&Hp, TlWatchedGameobj(Ring), Ring->SideKey);
                 Transform Xform;
                 TradeLaneRingMakeTranslationXform(&Xform, &Hp);
                 FClientGameobj* const Owner = TlWatchedGameobj(Ring);
                 long const Index = TlWatchedGameobj(Ring)->get_index();
-                TlCreateEffectFromId(&G_CliEffectFactoryC60, TlCompanionId(Companion, kTlRingActive),
+                TlCreateEffectFromId(&G_CliEffectFactoryC60, &Companion->RingActive,
                                      Owner, static_cast<int>(Index), &Xform, &Ring->EffectCompanion);
             }
         }
@@ -1222,8 +1219,8 @@ void TradeLaneDetachTick(float Dt)
                     TlShipListErase(Ring, Node);
                 }
             }
-            TlCompanionStopAndClear(TlShipCompanion(Player, kTlShipFxBinder164));
-            TlCompanionStopAndClear(TlShipCompanion(Player, kTlShipFxBinder174));
+            TlCompanionStopAndClear(TlShipLaneCompanion(Player));
+            TlCompanionStopAndClear(TlShipTunnelCompanion(Player));
         }
     }
 

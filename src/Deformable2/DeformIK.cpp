@@ -1328,8 +1328,7 @@ static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta,
     int Joint = 0;
     while (Joint < JointIters)
     {
-        const float* Bone = (const float*)(
-            G_Engine->GetInstanceRelative(Event->JointIds[Joint]));
+        const FEngineJointBlock* Bone = G_Engine->GetInstanceRelative(Event->JointIds[Joint]);
         if (Event->LockBytes[Joint] == 0)
         {
             Held3->x = Cursor[-2];
@@ -1349,7 +1348,7 @@ static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta,
         IkMathMulMatrix(&Rotated, &StepM, &G_IkCurRot[Joint + 1]);
         IkCopy9(&G_IkNewRot[Joint + 1], &Rotated);
         Vector Arm;
-        IkMathTransform(&Arm, &G_IkNewRot[Joint], reinterpret_cast<const Vector*>((Bone + 1)));
+        IkMathTransform(&Arm, &G_IkNewRot[Joint], &Bone->ParentPos);
         G_IkNewPos[Joint + 1].x = (float)((double)Arm.x +
                                                       (double)G_IkNewPos[Joint].x);
         G_IkNewPos[Joint + 1].y = (float)((double)Arm.y +
@@ -1563,9 +1562,8 @@ void FIkEvent::SolveDls()
                 }
                 else
                 {
-                    const float* Bone = (const float*)(
-                        G_Engine->GetInstanceRelative(JointIds[Link]));
-                    IkMathTransform(&Arm, &G_IkCurRot[Link], reinterpret_cast<const Vector*>((Bone + 1)));
+                    const FEngineJointBlock* Bone = G_Engine->GetInstanceRelative(JointIds[Link]);
+                    IkMathTransform(&Arm, &G_IkCurRot[Link], &Bone->ParentPos);
                 }
                 if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
@@ -1648,10 +1646,9 @@ void FIkEvent::SolveDlsAlt()
         {
             if (Frame.bPos)
             {
-                const float* Bone = (const float*)(
-                    G_Engine->GetInstanceRelative(JointIds[Link]));
+                const FEngineJointBlock* Bone = G_Engine->GetInstanceRelative(JointIds[Link]);
                 Vector Arm;
-                IkMathTransform(&Arm, &G_IkCurRot[Link], reinterpret_cast<const Vector*>((Bone + 1)));
+                IkMathTransform(&Arm, &G_IkCurRot[Link], &Bone->ParentPos);
                 if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm.x, Arm.y, Arm.z);
                 else

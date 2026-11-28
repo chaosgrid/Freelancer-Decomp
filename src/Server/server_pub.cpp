@@ -1715,15 +1715,15 @@ namespace AI {
 //   5  op failed validate(), no object, not a CSimple, or no behavior for this op
 // (IBehaviorManager::set_directive_priority in Common adds 1 and 3.)
 
-// IDirectiveInfo is three dwords no module names (common_iface.h keeps it as bytes).
-// SubmitDirective builds it at S+0x10: word 0 = kind (0 cancel, 1 behavior, 2 player
-// maneuver), word 1 = BaseOp::Priority, word 2 = the behavior id (-1 until a branch sets
-// it). Common's own builders use the same three words (e.g. common_launchaction.cpp).
+// SubmitDirective builds the IDirectiveInfo at S+0x10: Kind (0 cancel, 1 behavior, 2 player
+// maneuver), Priority = BaseOp::Priority, BehaviorId (-1 until a branch sets it). Common's own
+// builders use the same three words (e.g. common_launchaction.cpp).
 static IDirectiveInfo Server_MakeDirectiveInfo(unsigned int Kind, unsigned int OpField08,
                                                unsigned int BehaviorId) {
     IDirectiveInfo Dir;
-    unsigned int const Words[3] = { Kind, OpField08, BehaviorId };
-    std::memcpy(Dir.Data, Words, sizeof(Words));
+    Dir.Kind = static_cast<int>(Kind);
+    Dir.Priority = static_cast<pub::AI::DirectivePriority>(OpField08);
+    Dir.BehaviorId = BehaviorId;
     return Dir;
 }
 
@@ -1969,8 +1969,7 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
     }
 
     // A current directive whose word 0 is non-zero blocks every other op.
-    unsigned int CurrentKind = 0;
-    std::memcpy(&CurrentKind, Behavior->get_current_directive()->Data, sizeof(CurrentKind));
+    int const CurrentKind = Behavior->get_current_directive()->Kind;
     if (CurrentKind != 0) return OpRTypeDirectiveBusy;
 
     unsigned int Result = OpRTypeInvalid;

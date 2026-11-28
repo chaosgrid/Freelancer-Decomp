@@ -733,13 +733,12 @@ void IVP_Real_Object::unlink_contact_points(bool bSilently)
 {
     for (;;)
     {
-        char* const Node = static_cast<char*>(mindist_list);
+        IVP_Synapse_Friction* const Node = mindist_list;
         if (Node == nullptr)
         {
             break;
         }
-        IVP_Contact_Point* const Record =
-            reinterpret_cast<IVP_Contact_Point*>(Node + *reinterpret_cast<int16_t*>(Node + 0xc));
+        IVP_Contact_Point* const Record = Node->get_contact_point();
         IVP_ListManager* const FrictionSystem = Record->ListManagerOwner; // +0x70
         IVP_Core* const Core2 = Record->Object2->friction_core;
 
@@ -1494,12 +1493,11 @@ void IVP_Real_Object::init_core_rest_state_and_damping(IVP_Environment* Environm
     // fetched. set_matrix writes the three rows only.
     IVP_U_Quat IdentityLocalQuat{0.0f, 0.0f, 0.0f, 1.0f};
 
-    // Translation: Template->OptionalComOverride's +0x30 triple when present,
+    // Translation: Template->OptionalComOverride's vv triple when present,
     // else surface_manager slot 1, called unconditionally (three floats).
     if (Template->OptionalComOverride != nullptr)
     {
-        const IVP_U_Point* Override = reinterpret_cast<const IVP_U_Point*>(
-            static_cast<const uint8_t*>(Template->OptionalComOverride) + 0x30);
+        const IVP_U_Point* Override = &Template->OptionalComOverride->vv;
         LocalCsys.vv.x = Override->k[0];
         LocalCsys.vv.y = Override->k[1];
         LocalCsys.vv.z = Override->k[2];

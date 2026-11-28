@@ -11,21 +11,20 @@ FEffectTypeBucket G_EffectTypeBuckets[kEffectTypeBucketCount] = {};
 
 namespace
 {
-    // A bucket node is an effect's {LinkPrev, LinkNext, LinkSelf} triple (+0x60..+0x68).
     void** NodePrev(void* Node)
     {
-        return reinterpret_cast<void**>(Node);
+        return &static_cast<FEffectTypeLink*>(Node)->Prev;
     }
 
     void** NodeNext(void* Node)
     {
-        return reinterpret_cast<void**>(static_cast<unsigned char*>(Node) + 4);
+        return &static_cast<FEffectTypeLink*>(Node)->Next;
     }
 
-    // Node +8, the owning effect's LinkSelf.
+    // The owning effect's LinkSelf.
     void* NodeOwner(void* Node)
     {
-        return *reinterpret_cast<void**>(static_cast<unsigned char*>(Node) + 8);
+        return static_cast<FEffectTypeLink*>(Node)->Owner;
     }
 
     void* EffectLinkNode(FEffectBase* Effect)

@@ -72,7 +72,7 @@ bool SplineMoveIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBeha
     Spline = nullptr;
 
     // Context is dereferenced unguarded, as retail does.
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
+    Context->Pathfind->AvoidExcludeId = 0;
 
     PersistedT = 0.0f;
     return true;
@@ -81,7 +81,7 @@ bool SplineMoveIdea::SetContext(IObjRW* InObject, SystemManager* InHandle, IBeha
 // Own vtable slot 4 override -- LAB_062da310.
 void SplineMoveIdea::Commit()
 {
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
+    Context->Pathfind->AvoidExcludeId = 0;
 
     Move.Commit();
     Face.Commit();

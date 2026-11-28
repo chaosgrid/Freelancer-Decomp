@@ -110,8 +110,9 @@ namespace
     IDirectiveInfo MakeDirectiveInfo(unsigned First, unsigned Type)
     {
         IDirectiveInfo Info;
-        unsigned const Dwords[3] = {First, 0u, Type};
-        memcpy(Info.Data, Dwords, sizeof(Dwords));
+        Info.Kind = static_cast<int>(First);
+        Info.Priority = pub::AI::DirPriNone;
+        Info.BehaviorId = Type;
         return Info;
     }
 

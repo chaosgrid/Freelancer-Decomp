@@ -332,7 +332,7 @@ bool FEngineLight::Enable()
     return ((Flags >> 3) & 1u) != 0;
 }
 
-FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
+FEngineLight* EngineLightCreate(Csys const* Frame12, FD3dLight8 const* Source,
                                 Vector const* Direction)
 {
     // The light part of FUN_00556fd0. The ctor always gets -1, never the source type. No test
@@ -349,13 +349,13 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
     }
 
     Light->SetLight(&Local);
-    Light->SetPosition(reinterpret_cast<Vector const*>(Frame12));
+    Light->SetPosition(&Frame12->Pos);
 
-    // Direction turned by the frame's orientation (Frame12 + 3, the 3x3 after the position),
-    // then LookMatrixYup on that vector.
+    // Direction turned by the frame's orientation (the 3x3 after the position), then
+    // LookMatrixYup on that vector.
     I3DMathEngine* const Math = LightsCameraMath();
     Vector Rotated;
-    Math->TransformMatrix(Rotated, *reinterpret_cast<Matrix const*>(Frame12 + 3), *Direction);
+    Math->TransformMatrix(Rotated, Frame12->Orient, *Direction);
     Vector Dir;
     Dir.x = Rotated.x;
     Dir.y = Rotated.y;

@@ -1269,13 +1269,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
                 if (Target == nullptr) continue;
 
                 // LAB_062d3f90's case 5 reads [+0] / [+4] & 0x120 / [+8] / byte [+0xc].
-                struct {
-                    unsigned int TargetId;   // +0x00
-                    unsigned int TargetType; // +0x04 (get_type out)
-                    unsigned int ShipId;     // +0x08
-                    unsigned char bHasPort;  // +0x0C
-                    unsigned char Pad0d[3];
-                } Block;
+                FBehaviorDockRequestEvent Block;
                 memset(&Block, 0, sizeof(Block));
                 Block.ShipId = ship_id;
                 Block.TargetId = target_id;

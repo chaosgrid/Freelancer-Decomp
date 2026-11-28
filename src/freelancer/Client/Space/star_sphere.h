@@ -105,10 +105,29 @@ static_assert(offsetof(FSunEffectBody, InnerColor) == 0x288, "inner_color +0x288
 static_assert(offsetof(FSunEffectBody, ShapeName) == 0x2c0, "shape +0x2c0");
 static_assert(offsetof(FSunEffectBody, LodPixelThresholds) == 0x2f8, "LOD thresholds +0x2f8");
 
+// One element of the spines vector (stride 0x2c; FUN_005126f0 is its insert). FUN_0050fba0
+// reads the nine values of a "spine" line into +0x08..+0x28 and then sets the direction from
+// the element's index; the draw FUN_00510160 reads them in this order.
+struct FStarSpine
+{
+    float Cos;               // +0x00 direction, cos(index * 2pi / count)
+    float Sin;               // +0x04 direction, sin(...)
+    float Length;            // +0x08 times radius_scale at load
+    float Width;             // +0x0c times radius_scale at load
+    float InnerColor[3];     // +0x10 the colour at the base
+    float OuterColor[3];     // +0x1c the colour at the tip
+    float Alpha;             // +0x28
+};
+static_assert(offsetof(FStarSpine, Length) == 0x08, "spine length +0x08");
+static_assert(offsetof(FStarSpine, InnerColor) == 0x10, "spine inner colour +0x10");
+static_assert(offsetof(FStarSpine, OuterColor) == 0x1c, "spine outer colour +0x1c");
+static_assert(offsetof(FStarSpine, Alpha) == 0x28, "spine alpha +0x28");
+static_assert(sizeof(FStarSpine) == 0x2c, "spine element 0x2c");
+
 // Lens-flare / spines child shell (0x40). Load parsers FUN_0050f3a0 / 0050fba0 fill
 // the element ranges; draw (FUN_0050f850 / 00510160) walks [Begin, End). The lens flare keeps
 // a vector of float[6] bead pointers {along, size, r, g, b, alpha}, the spines a vector of
-// 0x2c records {cos, sin, length, width, inner rgb, outer rgb, alpha}.
+// 0x2c records (FStarSpine), kept as bytes: the port's push (SpinesPushElem) counts bytes.
 struct FStarFxChild40
 {
     unsigned char AllocatorByte; // +0x00

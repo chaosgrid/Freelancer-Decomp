@@ -225,8 +225,8 @@ void* FEngineCharacterBodyDesc::CreateDeformable()
         Materials[Index] = Archetype::ResolveMaterialEntry(PathText, true, 0xffffffffu);
     }
 
-    if (DALib::Deform->CreateAlias(&Instance, reinterpret_cast<int*>(this), nullptr, nullptr,
-                                   nullptr) != 0)
+    if (DALib::Deform->CreateAlias(&Instance, reinterpret_cast<FDeformPartTable*>(this), nullptr,
+                                   nullptr, nullptr) != 0)
     {
         FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: BodyDesc - failed to create deformable with %d parts\n",

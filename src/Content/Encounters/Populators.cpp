@@ -22,6 +22,7 @@
 #include "Universe/SystemInfo.h"                // FSystemInfo, FSystemZone, FZonePopulation
 #include "common_server.h"             // pub::SinglePlayer
 #include "common_server_controller.h"
+#include "server_gameobject.h"             // FSystemEnterEvent (controller message 0x3b)
 #include "x86math.h"
 
 #include <algorithm>
@@ -509,11 +510,12 @@ namespace
             // null-tested.
             if (GSpacePopPopulationEnabled == 0)
                 break;
-            FContentPlayerState* State = FindContentPlayerState(Msg[2]);    // FUN_06f49b00
+            FSystemEnterEvent const* const Event = static_cast<FSystemEnterEvent const*>(Parms);
+            FContentPlayerState* State = FindContentPlayerState(Event->PlayerId);    // FUN_06f49b00
             FContentPlayerShip* Ship = State->ShipObject;
-            if (Ship == nullptr || Msg[1] == 0)
+            if (Ship == nullptr || Event->OtherSystemId == 0)
                 break;
-            Vector Position = *reinterpret_cast<Vector const*>(Msg + 4);
+            Vector Position = Event->Position;
             PopulateAround(State->GetSystemRecord(), Ship, &Position);
             break;
         }

@@ -14,6 +14,7 @@
 #include "common_goods.h"     // BaseWatcher
 #include "common_csys.h"      // Matrix (LookMatrixYup output, see Orient3d8 below)
 #include "common_idea.h"      // MoveIdea, FaceIdea -- real classes behind Move/B (see below)
+#include "common_gotobehavior.h" // FProximityWatcher
 
 #include <cstddef>
 
@@ -348,18 +349,11 @@ public:
     // +0x450 (ends +0x46c): the proximity watcher FUN_062c2af0/FUN_062c2d90 operate on
     // (ECX = this+0x450). A BaseWatcher (ctor zeroes it, dtor clears it) followed by two
     // distances, a speed ratio and two flag dwords; OnApplyDirective rewrites the tail.
-    struct DockProximityWatcher
-    {
-        BaseWatcher Watcher;   // +0x00 (absolute +0x450)
-        float NearDistance;       // +0x08 (absolute +0x458). Ctor zeroes as a raw dword.
-        float FarDistance;       // +0x0c (absolute +0x45c). Ctor zeroes as a raw dword.
-        float CruiseSpeedRatio;       // +0x10 (absolute +0x460). OnApplyDirective (FUN_062c3370) writes it:
-                                // the op's +0x28 when > 0, else own get_speed(1, 4) over the
-                                // docking target's get_speed(1, 1), clamped up to 1.0f
-                                // (FCOMP float at 062c3547). Not ctor-zeroed.
-        unsigned Flags14;      // +0x14 (absolute +0x464). Flags accumulator.
-        unsigned SavedFlags18; // +0x18 (absolute +0x468). Previous-flags snapshot.
-    };
+    // Absolute offsets: Watcher +0x450, NearDistance +0x458, FarDistance +0x45c,
+    // CruiseSpeedRatio +0x460 (OnApplyDirective (FUN_062c3370) writes it: the op's +0x28 when
+    // > 0, else own get_speed(1, 4) over the docking target's get_speed(1, 1), clamped up to
+    // 1.0f (FCOMP float at 062c3547)), Flags14 +0x464, SavedFlags18 +0x468.
+    typedef FProximityWatcher DockProximityWatcher;
     DockProximityWatcher ProxWatcher450; // +0x450, ends +0x46c
 
     // +0x46c (ends +0x470): the approach speed cap. EnterState() sets it on entry to

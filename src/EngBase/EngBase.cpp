@@ -224,11 +224,12 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
     Interpolate(Pose, (const float*)KeyA,
                                            (const float*)KeyB,
                                            (double)Alpha);
+    const FPosQuatSample* const Sample = reinterpret_cast<const FPosQuatSample*>(Pose);
     const double Factor = (double)(TranslationScale) * (double)(Scale);
     Vector Pos;
-    Pos.x = (float)((double)(Pose[0]) * Factor);
-    Pos.y = (float)((double)(Pose[1]) * Factor);
-    Pos.z = (float)((double)(Pose[2]) * Factor);
+    Pos.x = (float)((double)(Sample->Pos.x) * Factor);
+    Pos.y = (float)((double)(Sample->Pos.y) * Factor);
+    Pos.z = (float)((double)(Sample->Pos.z) * Factor);
     I3DMathEngine* Math = Acquire3DMathEngine();
     Vector Xformed;
     if (Block != nullptr)
@@ -242,7 +243,7 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
     else
     {
         Matrix QuatMatrix;
-        MathQuatToMatrix(Math, &QuatMatrix, reinterpret_cast<const Quaternion*>(Pose + 3));
+        MathQuatToMatrix(Math, &QuatMatrix, &Sample->Quat);
         Matrix Transposed;
         Transposed.E[0][0] = QuatMatrix.E[0][0];
         Transposed.E[0][1] = QuatMatrix.E[1][0];
@@ -883,17 +884,20 @@ unsigned long FPosQuatTypedChannel::SetOverlayPos(const Vector* Target)
 // LAB_0661bc80: lerp position, slerp quaternion (3DMath +0x58). Not IK.
 unsigned long FPosQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha)
 {
-    Out[0] = (float)(((double)(Right[0]) - Left[0]) * Alpha + Left[0]);
-    Out[1] = (float)(((double)(Right[1]) - Left[1]) * Alpha + Left[1]);
-    Out[2] = (float)(((double)(Right[2]) - Left[2]) * Alpha + Left[2]);
+    FPosQuatSample* const OutPose = reinterpret_cast<FPosQuatSample*>(Out);
+    const FPosQuatSample* const LeftPose = reinterpret_cast<const FPosQuatSample*>(Left);
+    const FPosQuatSample* const RightPose = reinterpret_cast<const FPosQuatSample*>(Right);
+    OutPose->Pos.x = (float)(((double)(RightPose->Pos.x) - LeftPose->Pos.x) * Alpha + LeftPose->Pos.x);
+    OutPose->Pos.y = (float)(((double)(RightPose->Pos.y) - LeftPose->Pos.y) * Alpha + LeftPose->Pos.y);
+    OutPose->Pos.z = (float)(((double)(RightPose->Pos.z) - LeftPose->Pos.z) * Alpha + LeftPose->Pos.z);
     const float Blend = (float)Alpha;
     I3DMathEngine* Math = Acquire3DMathEngine();
     Quaternion Quat;
-    MathQuatSlerp(Math, &Quat, reinterpret_cast<const Quaternion*>(Left + 3), reinterpret_cast<const Quaternion*>(Right + 3), Blend);
-    Out[3] = Quat.w;
-    Out[4] = Quat.x;
-    Out[5] = Quat.y;
-    Out[6] = Quat.z;
+    MathQuatSlerp(Math, &Quat, &LeftPose->Quat, &RightPose->Quat, Blend);
+    OutPose->Quat.w = Quat.w;
+    OutPose->Quat.x = Quat.x;
+    OutPose->Quat.y = Quat.y;
+    OutPose->Quat.z = Quat.z;
     unsigned long Bits = 0;
     std::memcpy(&Bits, &Quat.x, sizeof(Bits));
     return Bits;
@@ -907,14 +911,15 @@ unsigned long FPosQuatTypedChannel::Interpolate(float* Out, const float* Left, c
     std::memcpy(&ScaleBits, &Scale, sizeof(ScaleBits));
     if (ScaleBits == 0x3F800000)
         return ScaleBits;
+    FPosQuatSample* const OutPose = reinterpret_cast<FPosQuatSample*>(Out);
     I3DMathEngine* Math = Acquire3DMathEngine();
     const Quaternion Identity = { 1.0f, 0.0f, 0.0f, 0.0f };
     Quaternion Slerped;
-    MathQuatSlerp(Math, &Slerped, &Identity, reinterpret_cast<const Quaternion*>(Out + 3), Scale);
-    Out[3] = Slerped.w;
-    Out[4] = Slerped.x;
-    Out[5] = Slerped.y;
-    Out[6] = Slerped.z;
+    MathQuatSlerp(Math, &Slerped, &Identity, &OutPose->Quat, Scale);
+    OutPose->Quat.w = Slerped.w;
+    OutPose->Quat.x = Slerped.x;
+    OutPose->Quat.y = Slerped.y;
+    OutPose->Quat.z = Slerped.z;
     unsigned long LastBits = 0;
     std::memcpy(&LastBits, &Slerped.z, sizeof(LastBits));
     return LastBits;
@@ -932,14 +937,15 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
 {
     float Local[7];
     Interpolate(Local, Left, Right, Alpha);
+    const FPosQuatSample* const Sample = reinterpret_cast<const FPosQuatSample*>(Local);
     const unsigned long Kind = this->Kind;
     if (Kind == G_BindKindObject)
     {
         const double Factor = (double)(TranslationScale) * (double)(Scale);
         Vector Pos;
-        Pos.x = (float)((double)(Local[0]) * Factor);
-        Pos.y = (float)((double)(Local[1]) * Factor);
-        Pos.z = (float)((double)(Local[2]) * Factor);
+        Pos.x = (float)((double)(Sample->Pos.x) * Factor);
+        Pos.y = (float)((double)(Sample->Pos.y) * Factor);
+        Pos.z = (float)((double)(Sample->Pos.z) * Factor);
         I3DMathEngine* Math = Acquire3DMathEngine();
         Vector Xformed;
         MathTransformMatrix(Math, &Xformed, &Orientation, &Pos);
@@ -951,7 +957,7 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
         Quaternion Composed;
         Math->MulQuat(Composed,
                               MatrixQuat,
-                              *reinterpret_cast<const Quaternion*>(Local + 3));   // +0x18
+                              Sample->Quat);   // +0x18
         AppliedQuat.w = Composed.w;
         AppliedQuat.x = Composed.x;
         AppliedQuat.y = Composed.y;
@@ -962,13 +968,13 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
     }
     if (Kind == G_BindKindJoint)
     {
-        TypedCopyVec3(&AppliedPos.x, Local);
-        AppliedQuat.w = Local[3];
-        AppliedQuat.x = Local[4];
-        AppliedQuat.y = Local[5];
-        AppliedQuat.z = Local[6];
+        TypedCopyVec3(&AppliedPos.x, &Sample->Pos.x);
+        AppliedQuat.w = Sample->Quat.w;
+        AppliedQuat.x = Sample->Quat.x;
+        AppliedQuat.y = Sample->Quat.y;
+        AppliedQuat.z = Sample->Quat.z;
         unsigned long Bits = 0;
-        std::memcpy(&Bits, &Local[6], sizeof(Bits));
+        std::memcpy(&Bits, &Sample->Quat.z, sizeof(Bits));
         return Bits;
     }
     return Kind;

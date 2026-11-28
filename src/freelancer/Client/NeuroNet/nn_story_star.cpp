@@ -407,7 +407,7 @@ void StoryStarLoadHistory(unsigned char* Data, int Size)
 
     // The count at +4 (signed), the records from +8.
     int Remaining = Size - 8;
-    int Count = *reinterpret_cast<int const*>(Data + 4);
+    int Count = reinterpret_cast<FMissionLogDataHeader const*>(Data)->Count;
     unsigned char* Cursor = Data + 8;
     if (Count <= 0)
         return;

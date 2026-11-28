@@ -2475,8 +2475,7 @@ void FClientShipGameobj::PostCreateInit()
 
     // The ship companion's pilot_mesh (+0x64). No null test on the narrowed CShip.
     CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
-    AttachPilotMesh(reinterpret_cast<ID_String const*>(
-        reinterpret_cast<unsigned char const*>(Ship->Archetype->Companion) + 0x64));
+    AttachPilotMesh(&static_cast<Archetype::FCliShip const*>(Ship->Archetype->Companion)->PilotMesh);
 
     if (Ship->OwnerPlayer == GetPlayerConnectionId())
     {
@@ -3623,7 +3622,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
             if (DockGo->get_hardpoint(HardpointName, &Csys.Translation, &Csys.Rotation) == 0)
             {
                 CloseRearAndTurretViewsForDocking();
-                SetDockingCameraTransform(reinterpret_cast<const float*>(&Csys));
+                SetDockingCameraTransform(&Csys);
             }
         }
 
@@ -3899,7 +3898,7 @@ void FClientShipGameobj::LaunchFromDock(FClientGameobj* DockGo, int LaunchIndex)
     CloseRearAndTurretViewsForDocking(); // on both arms
     if (bFound)
     {
-        SetDockingCameraTransform(reinterpret_cast<const float*>(&Csys));
+        SetDockingCameraTransform(&Csys);
     }
     else
     {

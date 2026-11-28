@@ -30,6 +30,18 @@ public:
 };
 static_assert(sizeof(IVP_Time) == 0x08, "IVP_Time size");
 
+// The unidentified record IVP_Core_AxisLock::Owner points at. Only the two
+// fields FUN_06351700 and FUN_06354120 read are declared; its size is unknown.
+struct IVP_Core_AxisLock_Owner
+{
+    uint8_t           _pad00[0x74]; // +0x00..0x73: not read by the traced sites
+    int32_t           AxisIndex;    // +0x74: the locked axis, 0/1/2 (index into RotSpeed and a LockFrame column)
+    uint8_t           _pad78[0x14]; // +0x78..0x8b: not read by the traced sites
+    IVP_Real_Object** ObjectSlot;   // +0x8c: *ObjectSlot is the opposing object (0635422d)
+};
+static_assert(offsetof(IVP_Core_AxisLock_Owner, AxisIndex) == 0x74, "IVP_Core_AxisLock_Owner+0x74");
+static_assert(offsetof(IVP_Core_AxisLock_Owner, ObjectSlot) == 0x8c, "IVP_Core_AxisLock_Owner+0x8c");
+
 // ============================================================================
 // IVP_Core_AxisLock -- PORT-LOCAL NAME for the object IVP_Core holds at
 // +0x10 (IVP's car_wheel, per calc_next_psi_solver). Retail's class is not
@@ -43,12 +55,7 @@ static_assert(sizeof(IVP_Time) == 0x08, "IVP_Time size");
 struct IVP_Core_AxisLock
 {
     void*        Field_0x00;      // +0x00: never read by either traced site.
-    // +0x04: an unidentified record carrying the locked-axis index at its
-    // +0x74 and, at its +0x8c, an IVP_Real_Object** (0635422d). Reached
-    // through the raw offsets below.
-    void*        Owner;           // +0x04
-    static const int OwnerAxisIndexOffset = 0x74; // int, 0/1/2
-    static const int OwnerObjectSlotOffset = 0x8c; // IVP_Real_Object**
+    IVP_Core_AxisLock_Owner* Owner; // +0x04
 
     IVP_U_Matrix LockFrame;       // +0x08 (0x40 bytes); column [axis] is what both sites read
     IVP_U_Point  ContactPoint;    // +0x48: world-space contact position, written by FUN_06354120

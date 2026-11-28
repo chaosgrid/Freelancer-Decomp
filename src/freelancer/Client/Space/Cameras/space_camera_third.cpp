@@ -16,7 +16,7 @@
 #include "Space/client_gameobj.h"          // FClientShipGameobj::JumpState
 #include "Space/HUD/hud_command_dispatch.h"    // EventHandler::RegisterEvent (FUN_005760d0)
 #include "Space/HUD/hud_target.h"              // HudIsMousePickBlocked (FUN_0045a740)
-#include "Space/Cameras/ship_camera_params.h"      // FShipCameraParams (ship companion +0x68)
+#include "Common/client_cliobj.h"                  // Archetype::FCliShip (ship companion camera block)
 #include "Space/Cameras/space_camera_first.h"      // G_FirstPersonMathEngine (DAT_00675220)
 #include "Interface/win3d.h"                   // Win3DTransformByMatrix (FUN_00423b90)
 
@@ -335,25 +335,23 @@ void FThirdPersonCamera::Attach(IObjRW* Object)
     if (Held != nullptr && Held - kWatchableOffset != nullptr)
     {
         // With a client ship, the camera block (+0x68) of its archetype's companion (Root +
-        // 0x04), read at fixed offsets (FShipCameraParams).
+        // 0x04).
         CEqObj* const Ship = WatchedShip(this);
         if (Ship != nullptr)
         {
-            const unsigned char* const Companion = reinterpret_cast<const unsigned char*>(
+            const Archetype::FCliShip* const Companion = static_cast<const Archetype::FCliShip*>(
                 Ship->get_archetype()->Companion);
             if (Companion != nullptr)
             {
-                const FShipCameraParams* const Params =
-                    reinterpret_cast<const FShipCameraParams*>(Companion + 0x68);
-                AngularSlerpMultiplier = Params->AngularSlerpMultiplier;      // +0x74
-                AngularAcceleration = Params->AngularAcceleration;            // +0x70
-                HorizontalTurnAngle = Params->HorizontalTurnAngle;            // +0x78
-                VerticalTurnUpAngle = Params->VerticalTurnUpAngle;            // +0x7c
-                VerticalTurnDownAngle = Params->VerticalTurnDownAngle;        // +0x80
-                TurnLookAheadSlerpAmount = Params->TurnLookAheadSlerpAmount;  // +0x84
+                AngularSlerpMultiplier = Companion->CamAngularSlerp;               // +0x74
+                AngularAcceleration = Companion->CamAngularAccel;                  // +0x70
+                HorizontalTurnAngle = Companion->CamHorizontalTurnAngle;           // +0x78
+                VerticalTurnUpAngle = Companion->CamVerticalTurnUpAngle;           // +0x7c
+                VerticalTurnDownAngle = Companion->CamVerticalTurnDownAngle;       // +0x80
+                TurnLookAheadSlerpAmount = Companion->CamTurnLookAhead;            // +0x84
                 LookOffsetX = 0.0f;
-                LookOffsetY = Params->Offset[0];                                  // +0x68
-                LookOffsetZ = Params->Offset[1];                                  // +0x6c
+                LookOffsetY = Companion->CameraOffsetX;                            // +0x68
+                LookOffsetZ = Companion->CameraOffsetY;                            // +0x6c
             }
         }
 

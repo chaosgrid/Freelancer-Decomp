@@ -534,16 +534,15 @@ const char* P_Sur_2D::calc_line_representation()
     int32_t NextPoint = 0;
     for (int32_t K = Surface->n_lines - 1; K >= 0; --K)
     {
-        const uint8_t* const LineBytes =
-            reinterpret_cast<const uint8_t*>(&Tetra->template_polygon->lines[Surface->lines[K]]);
+        const IVP_Template_Line* const TemplateLine = &Tetra->template_polygon->lines[Surface->lines[K]];
         int32_t Revert = static_cast<signed char>(Surface->revert_line[K]);
         if (Flip != 0)
         {
             Revert = 1 - Revert;
         }
         // MOV SI,[line + revert*2] / MOV DI,[line - revert*2 + 2].
-        const int32_t StartNum = *reinterpret_cast<const uint16_t*>(LineBytes + Revert * 2);
-        const int32_t EndNum = *reinterpret_cast<const uint16_t*>(LineBytes - Revert * 2 + 2);
+        const int32_t StartNum = TemplateLine->p[Revert];
+        const int32_t EndNum = TemplateLine->p[1 - Revert];
 
         P_Sur_2D_Point* Start = Lookup[StartNum];
         if (Start == nullptr)

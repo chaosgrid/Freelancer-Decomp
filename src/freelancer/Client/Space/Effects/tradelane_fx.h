@@ -77,21 +77,6 @@ static_assert(offsetof(FTradeLaneRingRuntime, bActive) == 0x1d, "active @+0x1d")
 static_assert(offsetof(FTradeLaneRingRuntime, GlowScale) == 0x28, "glow scale @+0x28");
 static_assert(offsetof(FTradeLaneRingRuntime, EffectCompanion) == 0x30, "slots @+0x30");
 
-enum : unsigned
-{
-    kTlShipRingRuntime = 0x160, // FTradeLaneRingRuntime*
-    kTlShipFxBinder164 = 0x164, // the ship's lane effect companion
-    kTlShipFxBinder174 = 0x174, // the player's tunnel effect companion
-    kTlShipFlags184 = 0x184,
-    kTlShipFlags185 = 0x185,
-};
-
-// Ship +0x184 (byte): bit 0 the entrance ring's side key (FUN_00515890), bit 1 the ring side the
-// ship was on (get_ring_side), 0x20 travel effect started (FUN_00514750), 0x40 the player's tunnel
-// effect is carried over to the next ring, 0x80 riding the lane. Ship +0x185: bit 0 splash done
-// (FUN_00514960), bit 1 enter done (FUN_005145a0), bit 2 exit / disrupt done (FUN_00514bf0 /
-// FUN_00514f20).
-
 // FUN_00515200 -- the live node for (RingGameobj, Side), or a new one (the free list first,
 // else operator_new) when bCreate; null for a solar that is not a lane ring.
 FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,

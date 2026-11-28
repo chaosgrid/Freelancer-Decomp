@@ -25,6 +25,7 @@
 #include "common_newchar.h"
 #include "common_pub.h"
 #include "common_pathfind.h" // PathfindManager -- IBehaviorManager+0x0C
+#include "common_server_types.h" // XSetManeuver -- OnEvent case 2's payload
 #include "common_universe.h"
 #include "dacom.h"
 
@@ -91,8 +92,8 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
 
     // The current-directive storage (two zero dwords and a -1), the attack-override timer pair.
     int const MinusOne = -1;
-    memset(DirectiveStorage, 0, 8);
-    memcpy(DirectiveStorage + 8, &MinusOne, sizeof(int));
+    memset(&DirectiveStorage, 0, 8);
+    memcpy(&DirectiveStorage.BehaviorId, &MinusOne, sizeof(int));
     AttackOverrideTimer = 0.0f;
     AttackOverridePeriod = 1.0f;
 
@@ -315,7 +316,7 @@ float IBehaviorManager::get_closest_trailing_ship() const
 IDirectiveInfo const* IBehaviorManager::get_current_directive()
 {
     // 0x062d3e70: returns this+0xc4.
-    return reinterpret_cast<IDirectiveInfo const*>(DirectiveStorage);
+    return &DirectiveStorage;
 }
 
 IObjRW const* IBehaviorManager::get_debugger_target() const
@@ -416,7 +417,7 @@ void IBehaviorManager::reset_current_behavior_direction()
     // No -1 test here, unlike every sibling: with no current behavior retail reads the dword
     // at +0x170 (TickSuppressedFlag and its padding) as the entry. Only the loaded pointer is
     // null-tested.
-    Behavior* const BehaviorObj = *(Behavior* const*)(reinterpret_cast<char const*>(BehaviorDispatchTable) + CurrentBehaviorIndex * 4);
+    Behavior* const BehaviorObj = BehaviorDispatchTable[CurrentBehaviorIndex];
     if (BehaviorObj != nullptr)
     {
         Vector ZeroDir = {0.0f, 0.0f, 0.0f};
@@ -448,8 +449,8 @@ bool IBehaviorManager::set_current_directive(IDirectiveInfo const& Dir,
 {
     // 0x062d3d70, RET 8. FUN_062d3420 is SetCurrentBehavior, FUN_062ec970 SetFollowLeader.
     // The three dwords go to +0xC4 first; every branch reads them back.
-    std::memcpy(DirectiveStorage, &Dir, sizeof(DirectiveStorage));
-    int* const Stored = reinterpret_cast<int*>(DirectiveStorage);
+    std::memcpy(&DirectiveStorage, &Dir, sizeof(DirectiveStorage));
+    int* const Stored = reinterpret_cast<int*>(&DirectiveStorage);
     int const* const Incoming = reinterpret_cast<int const*>(&Dir);
 
     if (Incoming[0] == 0)
@@ -515,9 +516,9 @@ pub::AI::OP_RTYPE IBehaviorManager::set_directive_priority(
     pub::AI::DirectivePriority Priority)
 {
     // 0x062d3e80.
-    if (*reinterpret_cast<int*>(DirectiveStorage) != 0)
+    if (DirectiveStorage.Kind != 0)
     {
-        *reinterpret_cast<pub::AI::DirectivePriority*>(DirectiveStorage + 4) = Priority;
+        DirectiveStorage.Priority = Priority;
         return pub::AI::OpRTypeAccepted;
     }
     return pub::AI::OpRTypeNoDirective;
@@ -578,8 +579,9 @@ void IBehaviorManager::set_state_graph(int GraphId, bool bForce)
     }
 
     IDirectiveInfo Dir;
-    int const DirDwords[3] = { 0, 0, -1 };
-    std::memcpy(Dir.Data, DirDwords, sizeof(DirDwords));
+    Dir.Kind = 0;
+    Dir.Priority = pub::AI::DirPriNone;
+    Dir.BehaviorId = static_cast<unsigned>(-1);
     set_current_directive(Dir, nullptr);
 }
 
@@ -1179,7 +1181,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     // stored in +0xF8 and reported through scan_state_change (ContentCallback slot +0x18).
     if (ContentCbPtr != nullptr)
     {
-        int const* DirDwords = reinterpret_cast<int const*>(DirectiveStorage);
+        int const* DirDwords = reinterpret_cast<int const*>(&DirectiveStorage);
         bool NewContentFlag = (Sys->Targeting.AttackState == TargetManager::kAttackStateCombatOver) && (CurrentBehaviorIndex == BEHAVIOR_GOTO)
                              && (DirDwords[0] == 0 || DirDwords[1] == 1);
         if (NewContentFlag != (bScanState != 0))
@@ -1216,7 +1218,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     }
 
     // Retail keeps this in the dead Dt parameter slot.
-    int* const DirDwords = reinterpret_cast<int*>(DirectiveStorage);
+    int* const DirDwords = reinterpret_cast<int*>(&DirectiveStorage);
     bool const bDirectiveArmed = (DirDwords[0] != 0) && (DirDwords[1] == 0);
 
     // Behavior 6 always resets BehaviorTimerA and counts as a wrap.
@@ -1399,9 +1401,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
 
             // Retail re-reads StateGraph and CurrentBehaviorIndex every iteration;
             // OnEvaluateReadiness can change either.
-            float const* const TransitionWeights =
-                reinterpret_cast<float const*>(reinterpret_cast<char const*>(StateGraph) + 0x48);
-            float Weight = TransitionWeights[CurrentBehaviorIndex * 21 + Index];
+            float Weight = StateGraph->Weights[CurrentBehaviorIndex][Index];
 
             // An armed directive naming this behavior gets a token weight of 0.001f: enough to
             // stay in the running, not enough to beat a real transition.
@@ -1487,8 +1487,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                 int Picked = 0;
                 while (Picked < 21 && !(BehaviorScores[Picked].Weight > Pick))
                     ++Picked;
-                Chosen = *reinterpret_cast<int const*>(
-                    reinterpret_cast<char const*>(BehaviorScores) + Picked * 8 + 4);
+                Chosen = BehaviorScores[Picked].BehaviorIndex;
 
                 // .text:062d32f4: a chosen index of -1 hits INT3 (an assertion); execution past
                 // it still makes the SetCurrentBehavior call with the -1.
@@ -1720,7 +1719,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
     if (static_cast<unsigned int>(Event->Type) > 7u)
         return;
 
-    unsigned char* const Data = static_cast<unsigned char*>(Event->Data);
+    void* const Data = Event->Data;
     FFormationLeaderState* const Rec = &Sys->FormationLeaders;  // Sys + 0x1364
     switch (Event->Type)
     {
@@ -1734,19 +1733,20 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         // MetaList<GoodDesc>::operator=, so the case only reads [Data] (kept: it faults on a
         // bad pointer in retail too).
         {
-            unsigned int const volatile Unused = *reinterpret_cast<unsigned int const*>(Data);
+            unsigned int const volatile Unused = *static_cast<unsigned int const*>(Data);
             (void)Unused;
         }
         return;
 
     case FBehaviorManagerEvent::kEventSetManeuver:
     {
-        // A type-2 directive whose target is [Data+8] is completed.
-        int* const Dir = reinterpret_cast<int*>(DirectiveStorage);
+        // A type-2 directive whose target is the maneuver's Flag is completed.
+        XSetManeuver const* const Maneuver = static_cast<XSetManeuver const*>(Data);
+        int* const Dir = reinterpret_cast<int*>(&DirectiveStorage);
         if (Dir[0] != 2)
             return;
         int const OldTarget = Dir[2];
-        if (*reinterpret_cast<int const*>(Data + 8) != OldTarget)
+        if (static_cast<int>(Maneuver->Flag) != OldTarget)
             return;
         Dir[0] = 0;
         Dir[2] = -1;
@@ -1757,9 +1757,10 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
     case FBehaviorManagerEvent::kEventObjectLeftSystem:
     {
-        // [Data+4] / [Data+8] are re-read from memory at every use, as retail does.
-        unsigned int& LeftId = *reinterpret_cast<unsigned int*>(Data + 8);
-        unsigned int const& LeftFlags = *reinterpret_cast<unsigned int const*>(Data + 4);
+        // GateType / ShipId are re-read from memory at every use, as retail does.
+        FBehaviorLeftSystemEvent* const Left = static_cast<FBehaviorLeftSystemEvent*>(Data);
+        unsigned int& LeftId = Left->ShipId;
+        unsigned int const& LeftFlags = Left->GateType;
 
         Sys->GunGroups.ClearGunTargets();
 
@@ -1775,7 +1776,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
         Sys->ClearFormationLeaderWatcherIfTarget(static_cast<int>(LeftId));
 
-        // Behavior slot 21 (+0x54) with the dword [Data+8].
+        // Behavior slot 21 (+0x54) with the ShipId dword.
         for (int Index = 0; Index < 21; ++Index)
         {
             Behavior* const Entry = BehaviorDispatchTable[Index];
@@ -1795,7 +1796,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
                 IObjRW* const Self = ObjRwFromWatchable(WatchablePtr);
                 unsigned int const LeaderId = Leader->get_id();
                 if (LeaderId != Self->get_id())
-                    Rec->SetValueB0(*reinterpret_cast<unsigned int const*>(Data));
+                    Rec->SetValueB0(Left->GateId);
             }
             // Behavior slot 22 (+0x58); the entry is not null-tested.
             BehaviorDispatchTable[CurrentBehaviorIndex]->OnEvent(
@@ -1818,16 +1819,17 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
     {
         // FUN_062ecaf0 returns the leader (already -8 adjusted) or 0. The behavior slot 22 call
         // is unconditional (entry not null-tested).
+        FBehaviorTradelaneEvent const* const Lane = static_cast<FBehaviorTradelaneEvent const*>(Data);
         IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();
         if (Watched != nullptr)
         {
             if (Watched->get_id() ==
-                *reinterpret_cast<unsigned int const*>(Data + 0xc))
-                Rec->SetDirectiveOrder(Data[0],
-                                       *reinterpret_cast<unsigned int const*>(Data + 0x10),
-                                       *reinterpret_cast<unsigned int const*>(Data + 0x14),
-                                       Data[2],
-                                       *reinterpret_cast<unsigned int const*>(Data + 4));
+                Lane->ShipId)
+                Rec->SetDirectiveOrder(Lane->bEnteringLane,
+                                       Lane->EntranceId,
+                                       Lane->ExitId,
+                                       Lane->bFastExit,
+                                       *reinterpret_cast<unsigned int const*>(&Lane->Speed));
         }
         BehaviorDispatchTable[CurrentBehaviorIndex]->OnEvent(
             const_cast<FBehaviorManagerEvent*>(Event));
@@ -1836,16 +1838,17 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
     case FBehaviorManagerEvent::kEventDockRequest:
     {
+        FBehaviorDockRequestEvent const* const Request = static_cast<FBehaviorDockRequestEvent const*>(Data);
         IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();
         if (Watched == nullptr)
             return;
         if (Watched->get_id() !=
-            *reinterpret_cast<unsigned int const*>(Data + 8))
+            Request->ShipId)
             return;
-        if ((*reinterpret_cast<unsigned int const*>(Data + 4) & 0x120u) == 0)
+        if ((Request->TargetType & 0x120u) == 0)
             return;
-        Rec->SetValueB4(*reinterpret_cast<unsigned int const*>(Data),
-                        Data[0xc]);
+        Rec->SetValueB4(Request->TargetId,
+                        Request->bHasPort);
         return;
     }
 
@@ -1856,7 +1859,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
     case FBehaviorManagerEvent::kEventObjectDying:
         // Otherwise FUN_062ec6a0 (sets Rec+0xc5).
-        if (*reinterpret_cast<unsigned int const*>(Data) ==
+        if (*static_cast<unsigned int const*>(Data) ==
             Sys->SelfTarget.Iface->get_id())
         {
             SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr);

@@ -3036,7 +3036,7 @@ namespace
             if (Handle != 0)
                 return 0;
             if (Extra != 0)
-                MappedPos = *reinterpret_cast<unsigned long*>(Extra + 8);
+                MappedPos = reinterpret_cast<const OVERLAPPED*>(Extra)->Offset;
             if (MappedPos > LogicalSize)
                 MappedPos = LogicalSize;
             unsigned long Remain = 0;

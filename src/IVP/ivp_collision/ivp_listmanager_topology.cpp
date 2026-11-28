@@ -83,19 +83,19 @@ void IVP_Contact_Point::UnlinkFromObjects()
 
     // Node #1 (Next1/Prev1, +0x08/+0x0c) from Object1->mindist_list.
     if (Next1 != nullptr)
-        *reinterpret_cast<void**>(static_cast<char*>(Next1) + 0x4) = Prev1;
+        Next1->prev = Prev1;
 
     if (Prev1 != nullptr)
-        *reinterpret_cast<void**>(Prev1) = Next1;
+        Prev1->next = Next1;
     else
         this->Object1->mindist_list = Next1;
 
     // Node #2 (Next2/Prev2, +0x1c/+0x20) from Object2->mindist_list.
     if (Next2 != nullptr)
-        *reinterpret_cast<void**>(static_cast<char*>(Next2) + 0x4) = Prev2;
+        Next2->prev = Prev2;
 
     if (Prev2 != nullptr)
-        *reinterpret_cast<void**>(Prev2) = Next2;
+        Prev2->next = Next2;
     else
         this->Object2->mindist_list = Next2;
 }

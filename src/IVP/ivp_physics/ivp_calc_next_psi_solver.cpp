@@ -349,8 +349,7 @@ void IVP_Calc_Next_PSI_Solver::calc_rotation_matrix(float DeltaTime, IVP_U_Quat*
     if (Core->AxisLock != nullptr && IsEqualOrUnordered(Core->MaxSurfaceDeviation, GIvpZero))
     {
         // The wheel's axis index (0..2).
-        const int32_t Axis = *reinterpret_cast<const int32_t*>(
-            static_cast<const char*>(Core->AxisLock->Owner) + IVP_Core_AxisLock::OwnerAxisIndexOffset);
+        const int32_t Axis = Core->AxisLock->Owner->AxisIndex;
         const float* RotSpeedArray = &Core->RotSpeed.x;
         const float AxisSpeed = RotSpeedArray[Axis]; // local_34
 

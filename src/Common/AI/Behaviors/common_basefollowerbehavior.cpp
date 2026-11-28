@@ -108,19 +108,6 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 // SystemManagerTimerTable::FindVerifiedObject; FUN_062c50c0 is DockBehavior::SetDestPointOffset.
 // DockDelegate is BehaviorDispatchTable[7] (Dock).
 
-// The 0x10-byte block FUN_062ec610 (GetDirectiveOrder) copies out of the AI-directive record:
-// record +0xa8 -> +0x00, +0xac -> +0x04, +0xbd -> +0x08, +0xc2 -> +0x09, +0xb8 -> +0x0c.
-struct FollowerDirectiveOrder
-{
-    unsigned int DockObjectId;      // record +0xa8; dock candidate id, -> DirectiveDockOp::DockObjectId
-    unsigned int SecondaryObjectId;      // record +0xac; second object id, -> DirectiveDockOp::NextRingId
-    unsigned char bOrderPending;     // record +0xbd
-    unsigned char bMidLane;     // record +0xc2; 1 = commit without the range test; go_tradelane's bool
-    unsigned char Pad0A[2];
-    float MaxRange;             // record +0xb8; go_tradelane's 4th argument (CShip::go_tradelane float)
-};
-static_assert(sizeof(FollowerDirectiveOrder) == 0x10, "FollowerDirectiveOrder must match FUN_062ec610's 0x10-byte output block");
-
 
 int BaseFollowerBehavior::OnUpdate()
 {
@@ -302,7 +289,7 @@ int BaseFollowerBehavior::OnUpdate()
 
     FollowerDirectiveOrder Order;
     std::memset(&Order, 0, sizeof(Order));
-    Rec->GetDirectiveOrder(reinterpret_cast<unsigned char*>(&Order));
+    Rec->GetDirectiveOrder(&Order);
 
     bool RunPendingLookup = false;
     if (bInTradeLane != 0)

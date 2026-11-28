@@ -237,13 +237,13 @@ bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
 // Slot 22, LAB_062cf1d0. Proceeds only for Tag 4 with a zero first payload byte.
 void InstantTradeLaneBehavior::HandleTargetEvent(void* Event)
 {
-    struct TaggedEvent { int Tag; unsigned char* Payload; };
-    TaggedEvent const* Ev = static_cast<TaggedEvent const*>(Event);
+    FBehaviorManagerEvent const* Ev = static_cast<FBehaviorManagerEvent const*>(Event);
 
-    if (Ev->Tag != FBehaviorManagerEvent::kEventTradelane || Ev->Payload[0] != 0)                         // no null test
+    if (Ev->Type != FBehaviorManagerEvent::kEventTradelane ||
+        static_cast<FBehaviorTradelaneEvent const*>(Ev->Data)->bEnteringLane != 0)                         // no null test
         return;
 
-    if (OwnerContext->get_id() != *reinterpret_cast<unsigned const*>(Ev->Payload + 0xc))
+    if (OwnerContext->get_id() != static_cast<FBehaviorTradelaneEvent const*>(Ev->Data)->ShipId)
         return;
 
     // Set regardless of EntranceRing; its null test gates only the cancel below.

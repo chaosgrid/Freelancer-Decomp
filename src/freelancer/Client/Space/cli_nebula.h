@@ -148,6 +148,7 @@ struct FNebulaCloudsListNode
     FNebulaCloudsListNode* Prev;
     FNebulaClouds* Clouds;
 };
+static_assert(sizeof(FNebulaCloudsListNode) == 0xc, "nebula clouds list node 0xc");
 
 struct FNebulaZoneShell;
 typedef std::map<unsigned, FNebulaZoneShell*> FNebulaZoneShellMap;

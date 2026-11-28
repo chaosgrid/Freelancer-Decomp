@@ -15,6 +15,7 @@
 #include "Space/client_objdb.h"
 #include "Space/Effects/effect_base.h"          // EffectAlloc (FUN_004f79a0)
 #include "Space/Effects/effect_vertex_batch.h"
+#include "Common/client_cliobj.h"
 #include "Common/engine_light.h"
 #include "Core/globals.h"
 #include "Space/HUD/hud_command_dispatch.h"
@@ -106,9 +107,7 @@ namespace
 
     void CopyOwnerOrientation(Matrix* Out, CObject* OwnerObj)
     {
-        // Nine floats from owner+8 (the EngineObject orientation block).
-        float const* Src = reinterpret_cast<float const*>(reinterpret_cast<unsigned char*>(OwnerObj) + 8);
-        std::memcpy(Out, Src, sizeof(Matrix));
+        std::memcpy(Out, &OwnerObj->Orientation, sizeof(Matrix));
     }
 
     float OwnerVelocityLength(CObject* OwnerObj)
@@ -463,11 +462,8 @@ void CliExplosionAttachLocalXform(FGameLight* ExplosionFx, int EngineIndex, Tran
 {
     // FUN_005377c0 (on the game light). No null test inside: all eight retail call sites test
     // the light first.
-    unsigned char* const Base = reinterpret_cast<unsigned char*>(ExplosionFx);
-
-    // +0xec = the engine index, +0xf0 = the local transform.
-    *reinterpret_cast<int*>(Base + 0xec) = EngineIndex;
-    std::memcpy(Base + 0xf0, LocalXform, sizeof(Transform));
+    ExplosionFx->EngineIndex = EngineIndex;
+    std::memcpy(&ExplosionFx->LocalXform, LocalXform, sizeof(Transform));
 
     const float* const InstRaw = (const float*)
         DALib::Engine->GetInstanceTransform(EngineIndex);
@@ -478,17 +474,17 @@ void CliExplosionAttachLocalXform(FGameLight* ExplosionFx, int EngineIndex, Tran
 
     Transform World;
     G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
-                                  *reinterpret_cast<Transform const*>(Base + 0xf0));
+                                  ExplosionFx->LocalXform);
 
     // Copied to a second local first, as retail does (FUN_00410fe0).
     Transform const Copy = World;
     EngineLightSetTransform(ExplosionFx, &Copy.Rotation.E[0][0],
                             &Copy.Translation);
 
-    // The free-motion velocity +0x120..+0x128 = 0.
-    *reinterpret_cast<float*>(Base + 0x120) = 0.0f;
-    *reinterpret_cast<float*>(Base + 0x124) = 0.0f;
-    *reinterpret_cast<float*>(Base + 0x128) = 0.0f;
+    // The free-motion velocity = 0.
+    ExplosionFx->VelocityX = 0.0f;
+    ExplosionFx->VelocityY = 0.0f;
+    ExplosionFx->VelocityZ = 0.0f;
 }
 
 void FClientBeamGameobj::ActivateEffects(Vector const* LookDir, unsigned char bUseLookDir)
@@ -823,11 +819,10 @@ namespace
 
     CObject* ResolvePlayerShipObject()
     {
-        void* const PlayerRw = GetPlayerObjRW();
-        if (PlayerRw == nullptr || PlayerRw == reinterpret_cast<void*>(static_cast<intptr_t>(-0xc)))
+        IObjRW* const PlayerRw = GetPlayerObjRW();
+        if (PlayerRw == nullptr || PlayerRw == reinterpret_cast<IObjRW*>(static_cast<intptr_t>(-0xc)))
             return nullptr;
-        unsigned char* RwBytes = static_cast<unsigned char*>(PlayerRw);
-        CObject* Nested = *reinterpret_cast<CObject**>(RwBytes + 0x10);
+        CObject* Nested = static_cast<IObjInspectImpl*>(PlayerRw)->Object;
         if (Nested == nullptr ||
             ((static_cast<unsigned>(Nested->ObjectClass) & CObject::ClassShip) != CObject::ClassShip))
             return nullptr;
@@ -1573,9 +1568,8 @@ unsigned char FClientEquippedObj::ShipHandleEquipUpdate(FCliEquipFirePacket cons
 
     if (Local.Op == USER_SET_TARGET)
     {
-        // Packet +0x10 = object id (dword); +0x14 = sub id.
-        unsigned const TargetId = *reinterpret_cast<unsigned const*>(
-            reinterpret_cast<unsigned char const*>(&Local) + 0x10);
+        // +0x14 = sub id.
+        unsigned const TargetId = Local.ObjectId;
         unsigned short const SubId = static_cast<unsigned short>(Local.ActivateSubOp);
         FClientGameobj* TargetGo = ClientObjDb_FindObject(TargetId, 0);
         if (TargetGo != nullptr)
@@ -1882,8 +1876,8 @@ void FCliGunFx::notify(Event Code, void* Param)
         // With a voice, the gun companion's +0x84 sound archetype is unloaded.
         if (TurretVoice != nullptr)
         {
-            ID_String const* const MotionSound = reinterpret_cast<ID_String const*>(
-                reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0x84);
+            ID_String const* const MotionSound =
+                &static_cast<Archetype::FCliGun const*>(Equip->Arch->Companion)->TurretSound;
             if (!MotionSound->IsEmpty())
                 UnloadClientSoundArch(MotionSound);
         }
@@ -1904,8 +1898,8 @@ bool FCliGunFx::Update(float Dt)
             ISoundSource* const Voice = TurretVoice;
             if (Voice != nullptr)
             {
-                ID_String const* const MotionSound = reinterpret_cast<ID_String const*>(
-                    reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0x84);
+                ID_String const* const MotionSound =
+                    &static_cast<Archetype::FCliGun const*>(Equip->Arch->Companion)->TurretSound;
                 Voice->Start(LookupClientSoundArch(MotionSound), 0);
             }
         }
@@ -1954,10 +1948,9 @@ namespace
         // The launcher companion's dry_fire_sound (+0x80) into +0x14, acquired when found.
         // Retail's companion accessor null-tests Equip and its arch, but both were already
         // dereferenced above.
-        unsigned char const* const LauncherComp =
-            reinterpret_cast<unsigned char const*>(Launch->Arch->Companion);
-        ID_String const* const DryFireSound =
-            reinterpret_cast<ID_String const*>(LauncherComp + 0x80);
+        Archetype::FCliLauncher const* const LauncherComp =
+            static_cast<Archetype::FCliLauncher const*>(Launch->Arch->Companion);
+        ID_String const* const DryFireSound = &LauncherComp->DryFireSound;
         if (!DryFireSound->IsEmpty())
         {
             Wrapper->DryFireSoundArch = LookupClientSoundArch(DryFireSound);
@@ -1968,10 +1961,9 @@ namespace
         // The munition companion's one_shot_sound (+0x5c) the same way into +0x18. The munition
         // and its companion are not tested.
         Archetype::Equipment* const Munition = Launch->Projectile;
-        unsigned char const* const MunitionComp =
-            reinterpret_cast<unsigned char const*>(Munition->Companion);
-        ID_String const* const OneShotSound =
-            reinterpret_cast<ID_String const*>(MunitionComp + 0x5c);
+        Archetype::FCliProj const* const MunitionComp =
+            static_cast<Archetype::FCliProj const*>(Munition->Companion);
+        ID_String const* const OneShotSound = &MunitionComp->OneShotSound;
         if (!OneShotSound->IsEmpty())
         {
             Wrapper->OneShotSoundArch = LookupClientSoundArch(OneShotSound);
@@ -1980,8 +1972,7 @@ namespace
         }
 
         // Its const_effect (+0x58) into +0x20, referenced when found, else an FDUMP.
-        ID_String const* const ConstEffect =
-            reinterpret_cast<ID_String const*>(MunitionComp + 0x58);
+        ID_String const* const ConstEffect = &MunitionComp->ConstEffect;
         if (!ConstEffect->IsEmpty())
         {
             Wrapper->ConstEffectArch = FindEffectArch(&ConstEffect->Id);
@@ -2038,8 +2029,8 @@ FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     Wrapper->TurretVoice = nullptr;
     // The gun companion's turret sound (+0x84, companion not tested) must be non-empty and
     // DALib::Sound live.
-    ID_String const* const TurretSound = reinterpret_cast<ID_String const*>(
-        reinterpret_cast<unsigned char const*>(Wrapper->Equip->Arch->Companion) + 0x84);
+    ID_String const* const TurretSound =
+        &static_cast<Archetype::FCliGun const*>(Wrapper->Equip->Arch->Companion)->TurretSound;
     if (!TurretSound->IsEmpty() && DALib::Sound != nullptr)
     {
         // Look up and Acquire; the result is not read.

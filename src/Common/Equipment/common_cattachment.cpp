@@ -50,19 +50,6 @@ namespace
         return false;
     }
 
-    // The 0x48-byte hardpoint record IHardpoint::GetHardpoint copies out, as FUN_062940c0
-    // reads it: +0x00 joint type (2 = revolute), +0x04 position, +0x10 orientation,
-    // +0x34 rotation axis, +0x40/+0x44 angle limits.
-    struct FHardpointData
-    {
-        unsigned Type;      // +0x00
-        Vector Position;    // +0x04
-        Matrix Orient;      // +0x10
-        Vector Axis;        // +0x34
-        float Min;          // +0x40
-        float Max;          // +0x44
-    };
-    static_assert(sizeof(FHardpointData) == 0x48, "FHardpointData 0x48");
 
     // Inlined twice in FUN_062940c0. Retail quirk: the range is wrapped against 360 (degrees,
     // DAT_0639c9d8) in steps of 2pi (DAT_0639c9e0). Kept on the x87 stack, so double here.

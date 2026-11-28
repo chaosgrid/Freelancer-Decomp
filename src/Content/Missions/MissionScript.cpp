@@ -30,6 +30,7 @@
 #include "common_ini.h"
 #include "common_server.h"
 #include "common_server_controller.h"
+#include "server_gameobject.h"       // FLootAcquiredEvent (controller message 0x18)
 
 #include <cmath>
 #include <cstddef>
@@ -1024,8 +1025,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         DispatchTriggerEvent(&EventId, MessageParms);
         FMissionLoot* Found = FindLootById(Parms);
         if (Found != nullptr)
-            Found->SubObjId = *reinterpret_cast<unsigned short const*>(
-                static_cast<unsigned char const*>(MessageParms) + 8);
+            Found->SubObjId = static_cast<FLootAcquiredEvent const*>(MessageParms)->SubObjId;
         break;
     }
     case EMessage::GFObjSelect:

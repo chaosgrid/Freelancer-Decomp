@@ -660,13 +660,13 @@ void NotifyCinematicView(bool bActive)
         ->SPRequestInvincibility(ShipId, bActive, INVINCIBILITY_CAMERA, Connection);
 }
 
-void SetDockingCameraTransform(const float* Csys12)
+void SetDockingCameraTransform(const Transform* Csys)
 {
     // FUN_0054bb90 (cdecl). The docking camera's Csys and view-dirty byte are written BEFORE
     // the guard, so they land even when no controller exists.
     FSpaceCamera* const Docking = &G_SpaceApp.Docking;
-    memcpy(&Docking->World, Csys12, 9 * sizeof(float));
-    memcpy(&Docking->WorldPos, Csys12 + 9, 3 * sizeof(float));
+    memcpy(&Docking->World, &Csys->Rotation, 9 * sizeof(float));
+    memcpy(&Docking->WorldPos, &Csys->Translation, 3 * sizeof(float));
     Docking->bViewDirty = 1;
 
     // DAT_00678ba0, the "controller exists" byte.

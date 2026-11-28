@@ -136,16 +136,16 @@ void FDeathCamera::Attach(IObjRW* Object)
 
     IObjRW* const Watchee = reinterpret_cast<IObjRW*>(Watched - kWatchableOffset);
 
-    // A live SHIP gets a lower speed cap: the IObjRW's CEqObj at +0x10, its type word at +0x4c
-    // masked with 0x503, and a non-null field at +0x218 (unidentified; only tested for null).
+    // A live SHIP gets a lower speed cap: the IObjRW's CObject, its class
+    // masked with 0x503, and a non-null CShip::AtmosphereSolar (read before the class test).
     // Any link missing leaves the controller's 100.0f.
-    unsigned char* const EqObj = *reinterpret_cast<unsigned char**>(
-        reinterpret_cast<unsigned char*>(Watchee) + 0x10);
+    CShip const* const EqObj =
+        static_cast<CShip const*>(static_cast<IObjInspectImpl*>(Watchee)->Object);
     if (EqObj != nullptr)
     {
-        const unsigned TypeWord = *reinterpret_cast<const unsigned*>(EqObj + 0x4c);
-        const void* const Field218 = *reinterpret_cast<void* const*>(EqObj + 0x218);
-        if ((TypeWord & kEqObjShipTypeMask) == kEqObjShipTypeMask && Field218 != nullptr)
+        const unsigned TypeWord = static_cast<unsigned>(EqObj->ObjectClass);
+        CSolar const* const AtmosphereSolar = EqObj->AtmosphereSolar;
+        if ((TypeWord & kEqObjShipTypeMask) == kEqObjShipTypeMask && AtmosphereSolar != nullptr)
         {
             MaxDriftSpeed = kDeathShipMaxDriftSpeed;
             DriftDamping = kDeathDriftDamping;

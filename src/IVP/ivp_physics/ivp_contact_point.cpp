@@ -31,30 +31,52 @@
 //     CoreA's contribution with +1 and CoreB's with -1 (either may be null).
 //   ReactionFrameApplyImpulse (FUN_06365df0)(ctx, CoreA, CoreB, Impulse2D)
 //     -- applies the solved 2D tangent impulse back onto both cores'
-//        Speed (+0xa4) and RotSpeed (+0x94).
+//        Speed and RotSpeed.
 //
 // All of them are thiscall on a 0x114-byte frame object (the
 // IVP_Friction_Basis_Context below) owned by the contact-reaction kernels
 // FUN_06354120 / FUN_063548e0. No vtable and no RTTI, so the owning class is
-// not named; only the offsets below are touched. The "core" argument is an
-// IVP_Core: +0x34..+0x40 per-axis inverse rotation inertia + inverse mass,
-// +0x94 rot_speed, +0xa4 speed, +0xf4 the core's world rotation
-// (IVP_U_Matrix3), +0x124 its world position.
-//
-// "this" layout:
-//   +0x00 tangentDir0   const float*, never null-checked
-//   +0x04 tangentDir1   const float*, nullable -- gates the second row
-//   +0x08 auxAxis       const float*, nullable -- gates the third row
-//   +0x0c / +0x3c       basis1 (core 0 / core 1): 3 rows of [x,y,z,1]
-//   +0x6c               the last core's +0xf4 pointer (written at 06365909)
-//   +0x74 / +0xa4       basis2 (core 0 / core 1): basis1 .* core+0x34
-//   +0xd4/+0xd8/+0xdc/+0xe8/+0xec/+0xfc/+0x104/+0x108/+0x10c  float sums
+// not named. The "core" argument is an IVP_Core: InvRotInertia and InvMass
+// (read as one 4-float weight), RotSpeed, Speed, MWorldFCore (the core's world
+// rotation) and its world position (MWorldFCore.vv, +0x124).
 //
 // x87: values retail keeps on the FPU stack are doubles here and are rounded
 // to float only where retail stores a float.
 // ============================================================================
 namespace
 {
+    // The 0x114-byte stack object FUN_06365d50/FUN_063658f0 fill in
+    // (FUN_06354120's frame holds two of them, at +0xa0 and +0x1b4). Its
+    // interior "constructors" (FUN_06273bc0 over an empty ctor) do nothing.
+    // Only the accumulator slots A and RelVel are read back by the caller.
+    struct IVP_Friction_Basis_Context
+    {
+        const float* TangentDir0;   // +0x00: never null-checked
+        const float* TangentDir1;   // +0x04: nullable -- gates the second row
+        const float* AuxAxis;       // +0x08: nullable -- gates the third row
+        // +0x0c / +0x3c: per core (core 0 / core 1), 3 rows of [x,y,z,1].
+        float Basis1[2][12];
+        // +0x6c: the last accumulated core's MWorldFCore (written at 06365909).
+        const IVP_U_Matrix3* LastCoreRotation;
+        uint32_t Field70;           // +0x70: not touched by the frame helpers
+        // +0x74 / +0xa4: per core, Basis1 .* (InvRotInertia, InvMass).
+        float Basis2[2][12];
+        // +0xd4: the summed effective-inverse-mass matrix, rows of 4 floats;
+        // only A[0][0..2], A[1][1..2] and A[2][2] are summed. A[0][0] is the
+        // term along TangentDir0, A[1][1] the one along TangentDir1, A[0][1]
+        // their coupling.
+        float A[3][4];
+        // +0x104: the summed relative velocity along each axis; [3] is not
+        // touched.
+        float RelVel[4];
+    };
+    static_assert(offsetof(IVP_Friction_Basis_Context, Basis1) == 0x0c, "friction-basis context +0x0c");
+    static_assert(offsetof(IVP_Friction_Basis_Context, LastCoreRotation) == 0x6c, "friction-basis context +0x6c");
+    static_assert(offsetof(IVP_Friction_Basis_Context, Basis2) == 0x74, "friction-basis context +0x74");
+    static_assert(offsetof(IVP_Friction_Basis_Context, A) == 0xd4, "friction-basis context +0xd4");
+    static_assert(offsetof(IVP_Friction_Basis_Context, RelVel) == 0x104, "friction-basis context +0x104");
+    static_assert(sizeof(IVP_Friction_Basis_Context) == 0x114, "friction-basis context size");
+
     // FUN_06365ce0, thiscall (this = Lhs; Rhs), RET 4: 4-component dot product. The sum is
     // accumulated w, z, y, x on the x87 stack -- ((t3*p3 + t2*p2) + t1*p1) + t0*p0 -- and
     // returned unrounded in ST0 (double here). Sole caller: ReactionFrameAccumulateCore at
@@ -97,8 +119,8 @@ namespace
     //   Out0 = (R2.x*cz + R0.x*cx) + R1.x*cy
     //   Out1 = (cz*R2.y + cy*R1.y) + R0.y*cx
     //   Out2 = (cz*R2.z + cy*R1.z) + R0.z*cx
-    // where Rn is row n of the core's rotation at core+0xf4.
-    inline void Ivp_ReactionRow(const unsigned char* Core, const float* Delta, const float* Axis,
+    // where Rn is row n of the core's rotation (MWorldFCore).
+    inline void Ivp_ReactionRow(const IVP_Core* Core, const float* Delta, const float* Axis,
                                 double& Out0, double& Out1, double& Out2)
     {
         const double Dx = Delta[0];
@@ -107,12 +129,10 @@ namespace
         const double Cx = Dy * Axis[2] - Dz * Axis[1];
         const double Cy = Dz * Axis[0] - Dx * Axis[2];
         const double Cz = Dx * Axis[1] - Dy * Axis[0];
-        Out0 = (Ivp_ReactionFloatAt(Core, 0x114) * Cz + Ivp_ReactionFloatAt(Core, 0xf4) * Cx) +
-               Ivp_ReactionFloatAt(Core, 0x104) * Cy;
-        Out1 = (Cz * Ivp_ReactionFloatAt(Core, 0x118) + Cy * Ivp_ReactionFloatAt(Core, 0x108)) +
-               Ivp_ReactionFloatAt(Core, 0xf8) * Cx;
-        Out2 = (Cz * Ivp_ReactionFloatAt(Core, 0x11c) + Cy * Ivp_ReactionFloatAt(Core, 0x10c)) +
-               Ivp_ReactionFloatAt(Core, 0xfc) * Cx;
+        const IVP_U_Point* const R = Core->MWorldFCore.rows;
+        Out0 = (R[2].k[0] * Cz + R[0].k[0] * Cx) + R[1].k[0] * Cy;
+        Out1 = (Cz * R[2].k[1] + Cy * R[1].k[1]) + R[0].k[1] * Cx;
+        Out2 = (Cz * R[2].k[2] + Cy * R[1].k[2]) + R[0].k[2] * Cx;
     }
 
     // FUN_063658f0, thiscall (this; posRef,
@@ -120,30 +140,30 @@ namespace
     // tangent 1, aux axis) of the core's reaction to a unit impulse along the
     // axis at posRef and accumulates their products into this's sums.
     void
-    ReactionFrameAccumulateCore(unsigned char* thisPtr, const float* posRef, unsigned char* structPtr,
+    ReactionFrameAccumulateCore(IVP_Friction_Basis_Context* thisPtr, const float* posRef, IVP_Core* structPtr,
                                 float* basis1, float* basis2, float sign) // formerly FUN_063658f0
     {
-        const float* TangentDir0 = *reinterpret_cast<const float* const*>(thisPtr + 0x00);
-        unsigned char* RotationBytes = structPtr + 0xf4;
-        *reinterpret_cast<unsigned char**>(thisPtr + 0x6c) = RotationBytes;                // 06365909
-        const float* Weight = reinterpret_cast<const float*>(structPtr + 0x34);             // 0636592c
-        const float* RotSpeed = reinterpret_cast<const float*>(structPtr + 0x94);           // 06365a00
-        const float* Speed = reinterpret_cast<const float*>(structPtr + 0xa4);              // 06365a06
-        float* const SumA00 = reinterpret_cast<float*>(thisPtr + 0xd4);
-        float* const SumA01 = reinterpret_cast<float*>(thisPtr + 0xd8);
-        float* const SumA02 = reinterpret_cast<float*>(thisPtr + 0xdc);
-        float* const SumA11 = reinterpret_cast<float*>(thisPtr + 0xe8);
-        float* const SumA12 = reinterpret_cast<float*>(thisPtr + 0xec);
-        float* const SumA22 = reinterpret_cast<float*>(thisPtr + 0xfc);
-        float* const SumV0 = reinterpret_cast<float*>(thisPtr + 0x104);
-        float* const SumV1 = reinterpret_cast<float*>(thisPtr + 0x108);
-        float* const SumV2 = reinterpret_cast<float*>(thisPtr + 0x10c);
+        const float* TangentDir0 = thisPtr->TangentDir0;
+        const IVP_U_Matrix3* const Rotation = &structPtr->MWorldFCore;
+        thisPtr->LastCoreRotation = Rotation;                                               // 06365909
+        const float* Weight = &structPtr->InvRotInertia.x; // [3] is InvMass                // 0636592c
+        const float* RotSpeed = &structPtr->RotSpeed.x;                                     // 06365a00
+        const float* Speed = &structPtr->Speed.x;                                           // 06365a06
+        float* const SumA00 = &thisPtr->A[0][0];
+        float* const SumA01 = &thisPtr->A[0][1];
+        float* const SumA02 = &thisPtr->A[0][2];
+        float* const SumA11 = &thisPtr->A[1][1];
+        float* const SumA12 = &thisPtr->A[1][2];
+        float* const SumA22 = &thisPtr->A[2][2];
+        float* const SumV0 = &thisPtr->RelVel[0];
+        float* const SumV1 = &thisPtr->RelVel[1];
+        float* const SumV2 = &thisPtr->RelVel[2];
 
         // 0636590c-06365939: posRef - core position, spilled as three floats.
         IVP_U_Point Delta;
-        Delta.k[0] = (float)((double)(posRef[0]) - Ivp_ReactionFloatAt(structPtr, 0x124));
-        Delta.k[1] = (float)((double)(posRef[1]) - Ivp_ReactionFloatAt(structPtr, 0x128));
-        Delta.k[2] = (float)((double)(posRef[2]) - Ivp_ReactionFloatAt(structPtr, 0x12c));
+        Delta.k[0] = (float)((double)(posRef[0]) - Ivp_ReactionFloatAt(reinterpret_cast<unsigned char*>(structPtr), 0x124));
+        Delta.k[1] = (float)((double)(posRef[1]) - Ivp_ReactionFloatAt(reinterpret_cast<unsigned char*>(structPtr), 0x128));
+        Delta.k[2] = (float)((double)(posRef[2]) - Ivp_ReactionFloatAt(reinterpret_cast<unsigned char*>(structPtr), 0x12c));
 
         // --- row 0 (tangent 0) ---
         {
@@ -178,7 +198,7 @@ namespace
         }
 
         // 06365a95: TEST tangentDir1; JZ -> return.
-        const float* TangentDir1 = *reinterpret_cast<const float* const*>(thisPtr + 0x04);
+        const float* TangentDir1 = thisPtr->TangentDir1;
         if (TangentDir1 == nullptr)
             return;
 
@@ -213,7 +233,7 @@ namespace
 
             // 06365bbf-06365bff: rot_speed . row1 (z, y, x) + speed . tangent1 (z, y, x);
             // tangent1 is re-read from this+4.
-            const float* TangentDir1Reload = *reinterpret_cast<const float* const*>(thisPtr + 0x04);
+            const float* TangentDir1Reload = thisPtr->TangentDir1;
             const double AngularPart = ((double)(Basis1Row1[2]) * RotSpeed[2] +
                                         (double)(Basis1Row1[1]) * RotSpeed[1]) +
                                        (double)(Basis1Row1[0]) * RotSpeed[0];
@@ -224,7 +244,7 @@ namespace
         }
 
         // 06365bea/06365c05: TEST auxAxis; JZ -> return.
-        const float* AuxAxis = *reinterpret_cast<const float* const*>(thisPtr + 0x08);
+        const float* AuxAxis = thisPtr->AuxAxis;
         if (AuxAxis == nullptr)
             return;
 
@@ -235,7 +255,7 @@ namespace
         // 06365c1a-06365c25: FUN_06366010(this=core rotation; &Cross, basis1+0x20) = R^T * Cross.
         float* const Basis1Row2 = basis1 + 8;
         float* const Basis2Row2 = basis2 + 8;
-        reinterpret_cast<const IVP_U_Matrix3*>(RotationBytes)->vimult(&Cross, reinterpret_cast<IVP_U_Point*>(Basis1Row2));
+        Rotation->vimult(&Cross, reinterpret_cast<IVP_U_Point*>(Basis1Row2));
         basis1[11] = 1.0f;                                  // 06365c38
         Mul4(Basis2Row2, Basis1Row2, Weight);               // 06365c3f: basis2 row 2 = row 2 .* weight (FUN_06365d10)
 
@@ -252,42 +272,42 @@ namespace
     }
 
     // FUN_06365d50, thiscall (this; core0, core1, pos, tangentDir0,
-    // tangentDir1, auxAxis), RET 0x18. Stores the three axis pointers at
-    // this+0/4/8; when tangentDir1 is non-null this+0xd4..0x10c is cleared,
-    // otherwise only +0xd4 and +0x104. Then ReactionFrameAccumulateCore per
-    // non-null core: core0 -> basis this+0xc / this+0x74 with +1.0f, core1 ->
-    // this+0x3c / this+0xa4 with -1.0f.
+    // tangentDir1, auxAxis), RET 0x18. Stores the three axis pointers; when
+    // tangentDir1 is non-null A and RelVel[0..2] are cleared, otherwise only
+    // A[0][0] and RelVel[0]. Then ReactionFrameAccumulateCore per non-null
+    // core: core0 -> Basis1[0] / Basis2[0] with +1.0f, core1 -> Basis1[1] /
+    // Basis2[1] with -1.0f.
     void
-    ReactionFrameInit(unsigned char* thisPtr, unsigned char* posA, unsigned char* posB, void* structShared,
-                      const float* tangentDir0, const float* tangentDir1, const void* auxAxis) // formerly FUN_06365d50
+    ReactionFrameInit(IVP_Friction_Basis_Context* thisPtr, IVP_Core* posA, IVP_Core* posB, const Vector* structShared,
+                      const float* tangentDir0, const float* tangentDir1, const float* auxAxis) // formerly FUN_06365d50
     {
-        *reinterpret_cast<const float**>(thisPtr + 0x00) = tangentDir0;
-        *reinterpret_cast<const float**>(thisPtr + 0x04) = tangentDir1;
-        *reinterpret_cast<const void**>(thisPtr + 0x08) = auxAxis;
+        thisPtr->TangentDir0 = tangentDir0;
+        thisPtr->TangentDir1 = tangentDir1;
+        thisPtr->AuxAxis = auxAxis;
 
         if (tangentDir1 != nullptr) {
-            std::memset(thisPtr + 0xd4, 0, 0x30);   // this+0xd4 .. this+0x103 (12 dwords)
-            *reinterpret_cast<float*>(thisPtr + 0x104) = 0.0f;
-            *reinterpret_cast<float*>(thisPtr + 0x108) = 0.0f;
-            *reinterpret_cast<float*>(thisPtr + 0x10c) = 0.0f;
+            std::memset(thisPtr->A, 0, sizeof(thisPtr->A));   // 12 dwords
+            thisPtr->RelVel[0] = 0.0f;
+            thisPtr->RelVel[1] = 0.0f;
+            thisPtr->RelVel[2] = 0.0f;
         } else {
-            *reinterpret_cast<float*>(thisPtr + 0xd4) = 0.0f;
-            *reinterpret_cast<float*>(thisPtr + 0x104) = 0.0f;
+            thisPtr->A[0][0] = 0.0f;
+            thisPtr->RelVel[0] = 0.0f;
         }
 
         if (posA != 0) {
-            ReactionFrameAccumulateCore(thisPtr, reinterpret_cast<const float*>(structShared), posA,
-                                        reinterpret_cast<float*>(thisPtr + 0xc), reinterpret_cast<float*>(thisPtr + 0x74), 1.0f);
+            ReactionFrameAccumulateCore(thisPtr, &structShared->x, posA,
+                                        thisPtr->Basis1[0], thisPtr->Basis2[0], 1.0f);
         }
         if (posB != 0) {
-            ReactionFrameAccumulateCore(thisPtr, reinterpret_cast<const float*>(structShared), posB,
-                                        reinterpret_cast<float*>(thisPtr + 0x3c), reinterpret_cast<float*>(thisPtr + 0xa4), -1.0f);
+            ReactionFrameAccumulateCore(thisPtr, &structShared->x, posB,
+                                        thisPtr->Basis1[1], thisPtr->Basis2[1], -1.0f);
         }
     }
 
     // FUN_06365df0, thiscall (this; core0, core1, impulse[2]), RET 0xc. Applies
-    // the solved 2D impulse to both cores: speed (+0xa4) += inv_mass (+0x40) *
-    // impulse[i] * tangent_i and rot_speed (+0x94) += impulse[i] * basis2 row i,
+    // the solved 2D impulse to both cores: Speed += InvMass *
+    // impulse[i] * tangent_i and RotSpeed += impulse[i] * basis2 row i,
     // core1 with the opposite sign. x87: each "field += scale * v" is rounded
     // once; the scales stay on the stack except core0's first one, which is
     // spilled as a float argument to FUN_0628be60.
@@ -305,68 +325,48 @@ namespace
     }
 
     void
-    ReactionFrameApplyImpulse(unsigned char* thisPtr, unsigned char* structA, unsigned char* structB,
+    ReactionFrameApplyImpulse(IVP_Friction_Basis_Context* thisPtr, IVP_Core* structA, IVP_Core* structB,
                               const float* impulse) // formerly FUN_06365df0
     {
         if (structA != nullptr)
         {
-            const float InvMassA = *reinterpret_cast<const float*>(structA + 0x40);
-            float* const SpeedA = reinterpret_cast<float*>(structA + 0xa4);
-            float* const RotSpeedA = reinterpret_cast<float*>(structA + 0x94);
-            const float* TangentDir0 = *reinterpret_cast<const float* const*>(thisPtr + 0x00);
+            const float InvMassA = structA->InvMass;
+            float* const SpeedA = &structA->Speed.x;
+            float* const RotSpeedA = &structA->RotSpeed.x;
+            const float* TangentDir0 = thisPtr->TangentDir0;
 
             // 06365e05-06365e24: FUN_0628be60(this=speed; speed, tangent0, float(inv_mass*impulse[0])).
             const float Scale0 = (float)((double)(InvMassA) * impulse[0]);
             Ivp_ReactionAddScaled(SpeedA, TangentDir0, Scale0);
 
             // 06365e29-06365e56: inv_mass*impulse[1] kept extended; tangent1 has no null check.
-            const float* TangentDir1 = *reinterpret_cast<const float* const*>(thisPtr + 0x04);
+            const float* TangentDir1 = thisPtr->TangentDir1;
             Ivp_ReactionAddScaled(SpeedA, TangentDir1, (double)(InvMassA) * impulse[1]);
 
             // 06365e5a-06365ed9: rot_speed += impulse[0] * basis2 row 0, then impulse[1] * row 1.
-            Ivp_ReactionAddScaled(RotSpeedA, reinterpret_cast<const float*>(thisPtr + 0x74), impulse[0]);
-            Ivp_ReactionAddScaled(RotSpeedA, reinterpret_cast<const float*>(thisPtr + 0x84), impulse[1]);
+            Ivp_ReactionAddScaled(RotSpeedA, &thisPtr->Basis2[0][0], impulse[0]);
+            Ivp_ReactionAddScaled(RotSpeedA, &thisPtr->Basis2[0][4], impulse[1]);
         }
 
         if (structB != nullptr)
         {
-            const double InvMassB = *reinterpret_cast<const float*>(structB + 0x40);
-            float* const SpeedB = reinterpret_cast<float*>(structB + 0xa4);
-            float* const RotSpeedB = reinterpret_cast<float*>(structB + 0x94);
+            const double InvMassB = structB->InvMass;
+            float* const SpeedB = &structB->Speed.x;
+            float* const RotSpeedB = &structB->RotSpeed.x;
 
             // -(inv_mass*impulse[0]) kept extended, times tangent0.
-            Ivp_ReactionAddScaled(SpeedB, *reinterpret_cast<const float* const*>(thisPtr + 0x00), -(InvMassB * impulse[0]));
+            Ivp_ReactionAddScaled(SpeedB, thisPtr->TangentDir0, -(InvMassB * impulse[0]));
             // 06365f31-06365f6d: -(inv_mass*impulse[1]), times tangent1.
-            Ivp_ReactionAddScaled(SpeedB, *reinterpret_cast<const float* const*>(thisPtr + 0x04), -(InvMassB * impulse[1]));
-            // 06365f73-06365fff: rot_speed += -impulse[i] * basis2 row i of core1 (this+0xa4 / +0xb4).
-            Ivp_ReactionAddScaled(RotSpeedB, reinterpret_cast<const float*>(thisPtr + 0xa4), -(double)(impulse[0]));
-            Ivp_ReactionAddScaled(RotSpeedB, reinterpret_cast<const float*>(thisPtr + 0xb4), -(double)(impulse[1]));
+            Ivp_ReactionAddScaled(SpeedB, thisPtr->TangentDir1, -(InvMassB * impulse[1]));
+            // 06365f73-06365fff: rot_speed += -impulse[i] * basis2 row i of core1.
+            Ivp_ReactionAddScaled(RotSpeedB, &thisPtr->Basis2[1][0], -(double)(impulse[0]));
+            Ivp_ReactionAddScaled(RotSpeedB, &thisPtr->Basis2[1][4], -(double)(impulse[1]));
         }
     }
 }
 
 namespace
 {
-    // The 0x114-byte stack object FUN_06365d50/FUN_063658f0 fill in
-    // (FUN_06354120's frame holds two of them, at +0xa0 and +0x1b4). Its
-    // interior "constructors" (FUN_06273bc0 over an empty ctor) do nothing.
-    // Only the accumulator slots below are read back by the caller.
-    struct IVP_Friction_Basis_Context
-    {
-        uint32_t Raw[0x114 / 4];
-
-        unsigned char* Bytes() { return reinterpret_cast<unsigned char*>(Raw); }
-        float At(int ByteOffset) const
-        {
-            return *reinterpret_cast<const float*>(reinterpret_cast<const unsigned char*>(Raw) + ByteOffset);
-        }
-        float A00() const { return At(0xd4); }   // effective inverse mass along TangentDir0
-        float A01() const { return At(0xd8); }   // off-diagonal coupling term
-        float A11() const { return At(0xe8); }   // ... along TangentDir1
-        float RelVel0() const { return At(0x104); }
-        float RelVel1() const { return At(0x108); }
-    };
-    static_assert(sizeof(IVP_Friction_Basis_Context) == 0x114, "friction-basis context size");
 
     // Retail inlines its dot products with a fixed accumulation order that
     // is NOT x-then-y-then-z, and keeps the sum on the x87 stack. FUN_06354120
@@ -395,16 +395,16 @@ namespace
     }
 
     // The 2x2 solve both paths of FUN_06354120 inline (06354401 and
-    // 06354793), from the context's A00 (+0xd4), A01 (+0xd8), A11 (+0xe8):
+    // 06354793), from the context's A00 = A[0][0], A01 = A[0][1], A11 = A[1][1]:
     // Det = A00*A11 - A01*A01 kept; Det*Det below 1e-20 (DAT_063a5658 =
     // 0x1e3ce509, one ulp above 1e-20f) or unordered -> no impulse (false). InvDet = 1/Det kept;
     // M00 = float(A11*InvDet), M01 = float(-(A01*InvDet)), M11 = InvDet*A00
     // kept; Impulse0 = float(M01*B1 + M00*B0), Impulse1 = float(M11*B1 + M01*B0).
     bool IVP_SolveFrictionRow(const IVP_Friction_Basis_Context& Ctx, double B0, double B1, float Impulse[2])
     {
-        const double A00 = Ctx.A00();
-        const double A01 = Ctx.A01();
-        const double A11 = Ctx.A11();
+        const double A00 = Ctx.A[0][0];
+        const double A01 = Ctx.A[0][1];
+        const double A11 = Ctx.A[1][1];
         const double Det = A00 * A11 - A01 * A01;
         if (!(Det * Det >= (double)(IVP_Contact_Float_From_Bits(0x1e3ce509u))))
         {
@@ -643,11 +643,9 @@ namespace
         if (bUseAxisLock)
         {
             IVP_Core_AxisLock* Lock = CoreA->AxisLock;
-            unsigned char* Owner = static_cast<unsigned char*>(Lock->Owner);
-            const int Axis = *reinterpret_cast<const int*>(
-                Owner + IVP_Core_AxisLock::OwnerAxisIndexOffset);
-            IVP_Real_Object* OppObject = **reinterpret_cast<IVP_Real_Object***>(
-                Owner + IVP_Core_AxisLock::OwnerObjectSlotOffset);
+            IVP_Core_AxisLock_Owner* Owner = Lock->Owner;
+            const int Axis = Owner->AxisIndex;
+            IVP_Real_Object* OppObject = *Owner->ObjectSlot;
             IVP_Core* OppCore = OppObject->core;
 
             // Column `Axis` of the lock frame, rotated to world space
@@ -691,22 +689,22 @@ namespace
                 const float P1 = (float)((double)(D11) * Contact->SpanFrictionS[1] +
                                                     (double)(D10) * Contact->SpanFrictionS[0]);
 
-                ReactionFrameInit(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA), nullptr,
+                ReactionFrameInit(&Ctx, CoreA, nullptr,
                              &Frame->SolverContactPointWS, Tangent0.k, Tangent1.k, nullptr);
 
-                const float A11 = Ctx.A11(); // raw copy into local_2b8
+                const float A11 = Ctx.A[1][1]; // raw copy into local_2b8
 
                 // A one-axis context for the OPPOSING core
                 // along Tangent1 only; its A00 divides the gain below.
                 IVP_Friction_Basis_Context OppCtx;
                 std::memset(&OppCtx, 0, sizeof(OppCtx));
-                ReactionFrameInit(OppCtx.Bytes(), reinterpret_cast<unsigned char*>(OppCore), nullptr,
+                ReactionFrameInit(&OppCtx, OppCore, nullptr,
                              &Frame->SolverContactPointWS, Tangent1.k, nullptr, nullptr);
-                const float OppA00 = OppCtx.A00();
+                const float OppA00 = OppCtx.A[0][0];
 
                 // B = P * i_delta_time - RelVel, kept.
-                const double B0 = (double)(P0) * EventSim->i_delta_time - Ctx.RelVel0();
-                const double B1 = (double)(P1) * EventSim->i_delta_time - Ctx.RelVel1();
+                const double B0 = (double)(P0) * EventSim->i_delta_time - Ctx.RelVel[0];
+                const double B1 = (double)(P1) * EventSim->i_delta_time - Ctx.RelVel[1];
 
                 float Impulse[2];
                 if (!IVP_SolveFrictionRow(Ctx, B0, B1, Impulse))
@@ -812,7 +810,7 @@ namespace
                     }
                 }
 
-                ReactionFrameApplyImpulse(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA), nullptr, Impulse);
+                ReactionFrameApplyImpulse(&Ctx, CoreA, nullptr, Impulse);
                 return 0.0f;
             }
 
@@ -821,13 +819,13 @@ namespace
         }
 
         // --- generic two-core path, LAB_0635475a ----------------------------
-        ReactionFrameInit(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA),
-                     reinterpret_cast<unsigned char*>(CoreB),
+        ReactionFrameInit(&Ctx, CoreA,
+                     CoreB,
                      &Frame->SolverContactPointWS, Axis0, Axis1, nullptr);
 
         // B = i_delta_time * Span - RelVel, kept.
-        const double B0 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[0] - Ctx.RelVel0();
-        const double B1 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[1] - Ctx.RelVel1();
+        const double B0 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[0] - Ctx.RelVel[0];
+        const double B1 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[1] - Ctx.RelVel[1];
 
         float Impulse[2];
         if (!IVP_SolveFrictionRow(Ctx, B0, B1, Impulse))
@@ -845,8 +843,8 @@ namespace
             Impulse[1] = (float)(Scale * Impulse[1]);
         }
 
-        ReactionFrameApplyImpulse(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA),
-                     reinterpret_cast<unsigned char*>(CoreB), Impulse);
+        ReactionFrameApplyImpulse(&Ctx, CoreA,
+                     CoreB, Impulse);
 
         // Work = sqrt((S0*S0 + S1*S1) * ((dt*dt) *
         // SolvedF)) * 0.5f kept; return float(Work - TangentWork), then
@@ -2030,27 +2028,27 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
 
     const IVP_Synapse_Real* const Side1Syn = Mindist->get_sorted_synapse(0);
     IVP_Real_Object* const Side1Obj = Side1Syn->l_obj;
-    void* const OldHead1 = Side1Obj->mindist_list;
+    IVP_Synapse_Friction* const OldHead1 = Side1Obj->mindist_list;
     Object1 = Side1Obj;
     Delta1 = -0x08;
     Next1 = OldHead1;
     Prev1 = nullptr;
     if (OldHead1 != nullptr)
-        *reinterpret_cast<void**>(static_cast<char*>(OldHead1) + 0x4) = &Next1; // OldHead1->Prev
-    Side1Obj->mindist_list = &Next1;
+        OldHead1->prev = reinterpret_cast<IVP_Synapse_Friction*>(&Next1);
+    Side1Obj->mindist_list = reinterpret_cast<IVP_Synapse_Friction*>(&Next1);
     Status1 = static_cast<uint16_t>((Status1 & 0xff00u) | (static_cast<uint16_t>(Side1Syn->status) & 0xffu));
     Feature1 = Side1Syn->edge;
 
     const IVP_Synapse_Real* const Side2Syn = Mindist->get_sorted_synapse(1);
     IVP_Real_Object* const Side2Obj = Side2Syn->l_obj;
-    void* const OldHead2 = Side2Obj->mindist_list;
+    IVP_Synapse_Friction* const OldHead2 = Side2Obj->mindist_list;
     Object2 = Side2Obj;
     Delta2 = -0x1C;
     Next2 = OldHead2;
     Prev2 = nullptr;
     if (OldHead2 != nullptr)
-        *reinterpret_cast<void**>(static_cast<char*>(OldHead2) + 0x4) = &Next2; // OldHead2->Prev
-    Side2Obj->mindist_list = &Next2;
+        OldHead2->prev = reinterpret_cast<IVP_Synapse_Friction*>(&Next2);
+    Side2Obj->mindist_list = reinterpret_cast<IVP_Synapse_Friction*>(&Next2);
     Status2 = static_cast<uint16_t>((Status2 & 0xff00u) | (static_cast<uint16_t>(Side2Syn->status) & 0xffu));
     Feature2 = Side2Syn->edge;
 

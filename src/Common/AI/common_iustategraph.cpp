@@ -121,16 +121,13 @@ FAiTargetList* GetAiTargetList(SystemManager* Sys)
 }
 
 // FUN_062ed0d0.
-unsigned ElemVectorSize(void const* VectorHeader)
+unsigned ElemVectorSize(FAiTargetVector const* Vector)
 {
-    unsigned char const* const H = static_cast<unsigned char const*>(VectorHeader);
-
-    int const Begin = *reinterpret_cast<int const*>(H + 0x4);
-    if (Begin == 0)
+    FAiTarget const* const Begin = Vector->Begin;
+    if (Begin == nullptr)
         return 0;
 
-    int const Used = *reinterpret_cast<int const*>(H + 0x8);
-    return static_cast<unsigned>((Used - Begin) / static_cast<int>(kElemStride));
+    return static_cast<unsigned>(Vector->End - Begin);
 }
 
 // FUN_062ed100. Retail skips the copy for a null Dest but still advances both pointers; only

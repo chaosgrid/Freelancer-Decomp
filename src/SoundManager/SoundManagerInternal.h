@@ -12,6 +12,7 @@
 #include "luaprofile.h"
 #include "audio/dsound8.h"
 #include <mmreg.h>
+#include <aviriff.h>
 #include <stddef.h>
 
 // SoundManager.dll internals. The ABI other modules see is src/include/soundmanager.h.
@@ -52,6 +53,33 @@ static const GUID kDsPropSetEax20Listener = {
     0x4A4E6FC0, 0xC341, 0x11D1, {0xB7, 0x3A, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}};
 static const GUID kDsPropSetEax20Buffer = {
     0x4A4E6FC1, 0xC341, 0x11D1, {0xB7, 0x3A, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}};
+
+// A WAVE chunk whose payload is one dword, as the WavLib reader (FUN_06ee8960) reads it:
+// 'fact' (the sample count, taken when cb >= 4) and 'trim' (taken when cb == 4).
+struct FRiffDwordChunk
+{
+    RIFFCHUNK Header;   // +0x00
+    DWORD Value;        // +0x08
+};
+static_assert(offsetof(FRiffDwordChunk, Value) == 8, "dword chunk Value");
+static_assert(sizeof(FRiffDwordChunk) == 0xC, "dword chunk 0xC");
+
+// The PCM descriptor ISoundManager::CreateArchetypeFromSource reads (LAB_06ee2dc0) and hands
+// to FSoundArchetype::FillFromPcm. +0x10 is not read; nothing past +0x1C is.
+struct FSoundPcmSource
+{
+    unsigned short Format[4];   // +0x00 FillFromPcm's Fmt8: channels, bytes per sample, rate,
+                                //       block align
+    unsigned long LoopStart;    // +0x08
+    unsigned long LoopEnd;      // +0x0C
+    unsigned long Field_0x10;   // +0x10
+    unsigned long ByteCount;    // +0x14
+    void* Samples;              // +0x18
+};
+static_assert(offsetof(FSoundPcmSource, LoopStart) == 0x08, "pcm source LoopStart");
+static_assert(offsetof(FSoundPcmSource, LoopEnd) == 0x0C, "pcm source LoopEnd");
+static_assert(offsetof(FSoundPcmSource, ByteCount) == 0x14, "pcm source ByteCount");
+static_assert(offsetof(FSoundPcmSource, Samples) == 0x18, "pcm source Samples");
 
 // AGGDESC 0x14 for this factory (same layout as SystemContainer children).
 struct FSoundAggDesc

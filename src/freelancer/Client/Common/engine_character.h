@@ -88,6 +88,11 @@ private:
     FEngineCharacterBodyDesc& operator=(FEngineCharacterBodyDesc const&) = delete;
 };
 
+// The head of the body desc is the FDeformPartTable IDeformable::CreateAlias reads.
+static_assert(offsetof(FEngineCharacterBodyDesc, Count) == 0 &&
+                  offsetof(FEngineCharacterBodyDesc, Entries) == offsetof(FDeformPartTable, Entries),
+              "FEngineCharacterBodyDesc starts with an FDeformPartTable");
+
 // ------------------------------------------------------------------------------------------
 // FUN_004c9de0's stack record (0x11c bytes): what FUN_004c9e20 needs to hang one accessory.
 // ------------------------------------------------------------------------------------------

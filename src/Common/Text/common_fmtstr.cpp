@@ -39,15 +39,16 @@ void __cdecl ExtractMissionLogData(FmtStr* Fmt, unsigned char*& Buffer, int& Rem
 
 int __cdecl PackMissionLogData(int Type, FmtStr const* Fmt, unsigned char* Buffer, int MaxSize)
 {
-    *(int*)Buffer = Type;
+    FMissionLogDataHeader* const Header = reinterpret_cast<FMissionLogDataHeader*>(Buffer);
+    Header->Type = Type;
     if (Type == 0)
     {
-        *(int*)(Buffer + 4) = 0;
+        Header->Count = 0;
         return 8;
     }
     if (Type == 1)
     {
-        *(int*)(Buffer + 4) = 1;
+        Header->Count = 1;
         int Result = Fmt->flatten(Buffer + 8, MaxSize);
         return Result + 8;
     }
@@ -216,10 +217,10 @@ void FmtStr::Val::operator delete(void* Ptr)
 int FmtStr::Val::InitFromVoid(const void* Src)
 {
     // FUN_0630d5a0: deserialize a Val from raw bytes.
-    const unsigned char* P = reinterpret_cast<const unsigned char*>(Src);
-    unsigned short Tag = *reinterpret_cast<const unsigned short*>(P);
+    const FFmtValFlat* Rec = static_cast<const FFmtValFlat*>(Src);
+    unsigned short Tag = Rec->TypeTag;
     TypeTag = Tag;
-    Flags = P[2];
+    Flags = Rec->Flags;
 
     if (Tag == FmtStr::TagFmtStr)
     {
@@ -228,14 +229,14 @@ int FmtStr::Val::InitFromVoid(const void* Src)
         // so does the port.
         FmtStr* Sub = new (std::nothrow) FmtStr();
         Subtree = Sub;
-        int const Consumed = Sub->unflatten((void*)(P + 3), 0);
+        int const Consumed = Sub->unflatten((void*)&Rec->Subtree, 0);
         return Consumed + 3;
     }
     if (Tag == FmtStr::TagNavMarker)
     {
         // Data block: 5 dwords, filled with no null test.
         NavMarker* Block = new (std::nothrow) NavMarker;
-        const unsigned int* SrcBlock = reinterpret_cast<const unsigned int*>((P + 3));
+        const unsigned int* SrcBlock = Rec->Marker.Data;
         for (int i = 0; i < 5; i++)
         {
             Block->Data[i] = SrcBlock[i];
@@ -244,7 +245,7 @@ int FmtStr::Val::InitFromVoid(const void* Src)
         return 0x17;
     }
     // Simple value: 4 bytes
-    Value = *reinterpret_cast<unsigned int const*>((P + 3));
+    Value = Rec->Value;
     return 7;
 }
 
@@ -252,22 +253,23 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
 {
     // FUN_0630d460: serialize this node.
     unsigned char* P = static_cast<unsigned char*>(Dest);
-    *(unsigned short*)P = TypeTag;
-    P[2] = Flags;
+    FFmtValFlat* const Rec = static_cast<FFmtValFlat*>(Dest);
+    Rec->TypeTag = TypeTag;
+    Rec->Flags = Flags;
 
     if (TypeTag == FmtStr::TagFmtStr)
     {
         // A 9-byte header (tag, flags, the subtree's MadLibId, child count), then the children;
         // the result is the bytes written. The subtree is not null-tested.
         FmtStr const* Sub = Subtree;
-        *(unsigned int*)(P + 3) = Sub->MadLibId;
+        Rec->Subtree.MadLibId = Sub->MadLibId;
         unsigned int NodeCount = 0;
         for (Val* V = Sub->Head; V != nullptr; V = V->Next)
         {
             NodeCount++;
         }
         unsigned short ChildCount = (unsigned short)NodeCount;
-        *(unsigned short*)(P + 7) = ChildCount;
+        Rec->Subtree.NodeCount = ChildCount;
         // Recursively flatten each child starting at P+9
         unsigned char* Cur = P + 9;
         unsigned int Remaining = MaxSize - 6;
@@ -283,7 +285,7 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
     {
         // Copy 5 dwords from Data block
         unsigned int const* SrcBlock = Marker->Data;
-        unsigned int* DestBlock = reinterpret_cast<unsigned int*>((P + 3));
+        unsigned int* DestBlock = Rec->Marker.Data;
         for (int i = 0; i < 5; i++)
         {
             DestBlock[i] = SrcBlock[i];
@@ -291,7 +293,7 @@ unsigned int FmtStr::Val::flatten(void* Dest, unsigned int MaxSize) const
         return 0x17;
     }
     // Simple value: 4 bytes
-    *(unsigned int*)(P + 3) = Value;
+    Rec->Value = Value;
     return 7;
 }
 
@@ -610,35 +612,37 @@ int FmtStr::flatten(void* Dest, unsigned int MaxSize) const
 {
     // FUN_0630df60. The wire header is {mad-lib id : dword, node count : word}.
     unsigned char* const Base = static_cast<unsigned char*>(Dest);
-    *(unsigned int*)Base = MadLibId;
+    FFmtStrFlat* const Header = static_cast<FFmtStrFlat*>(Dest);
+    Header->MadLibId = MadLibId;
 
     unsigned short NodeCount = 0;
     for (Val const* V = Head; V != nullptr; V = V->Next)
         NodeCount += 1;
-    *(unsigned short*)(Base + 4) = NodeCount;
+    Header->NodeCount = NodeCount;
 
     unsigned char* Cursor = Base + 6;
     unsigned int Remaining = MaxSize - 6;
     for (Val const* V = Head; V != nullptr; V = V->Next)
     {
-        *(unsigned short*)Cursor = V->TypeTag;
-        *(Cursor + 2) = V->Flags;
+        FFmtValFlat* const Rec = reinterpret_cast<FFmtValFlat*>(Cursor);
+        Rec->TypeTag = V->TypeTag;
+        Rec->Flags = V->Flags;
 
         unsigned int Written;
         if (V->TypeTag == FmtStr::TagFmtStr)
         {
             // The nested flatten gets the same (not reduced) budget; its byte count plus the
             // 3-byte header is this node's size. The subtree is not null-tested.
-            Written = V->Subtree->flatten(Cursor + 3, Remaining) + 3;
+            Written = V->Subtree->flatten(&Rec->Subtree, Remaining) + 3;
         }
         else if (V->TypeTag == FmtStr::TagNavMarker)
         {
-            memcpy(Cursor + 3, V->Marker, sizeof(NavMarker));
+            memcpy(&Rec->Marker, V->Marker, sizeof(NavMarker));
             Written = 0x17;
         }
         else
         {
-            *(unsigned int*)(Cursor + 3) = V->Value;
+            Rec->Value = V->Value;
             Written = 7;
         }
         Cursor += Written;
@@ -660,8 +664,9 @@ int FmtStr::unflatten(void* Src, unsigned int Size)
         return 0;
 
     unsigned char const* const Base = reinterpret_cast<unsigned char const*>(Src);
-    MadLibId = *reinterpret_cast<unsigned int const*>(Base);
-    unsigned short const NodeCount = *reinterpret_cast<unsigned short const*>((Base + 4));
+    FFmtStrFlat const* const Header = static_cast<FFmtStrFlat const*>(Src);
+    MadLibId = Header->MadLibId;
+    unsigned short const NodeCount = Header->NodeCount;
 
     // Retail quirk kept: a failed malloc stores 0 and advances the cursor by the previous step
     // (initially the Src pointer itself); the next node's link store then goes through null.

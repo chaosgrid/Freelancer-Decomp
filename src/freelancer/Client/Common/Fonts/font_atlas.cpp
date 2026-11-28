@@ -15,6 +15,7 @@
 #include "dacom.h"
 #include "render/IRenderPipeline.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -133,6 +134,17 @@ struct FAtlasFontSelection
     FAtlasFontSelection& operator=(FAtlasFontSelection const&) = delete;
 };
 
+// The 0x20028-byte block FUN_00412670 mallocs: a packed DIB, the header G_AtlasBmi points at,
+// then the 256 x 256 16-bit pixels (biSizeImage 0x20000) G_AtlasBits points at.
+struct FFontAtlasScratch
+{
+    BITMAPINFOHEADER Header;        // +0x00
+    unsigned short Bits[256 * 256]; // +0x28
+};
+
+static_assert(offsetof(FFontAtlasScratch, Bits) == 0x28, "atlas pixels +0x28");
+static_assert(sizeof(FFontAtlasScratch) == 0x20028, "atlas scratch 0x20028");
+
 } // namespace
 
 void FontAtlasEnsureScratch()
@@ -144,10 +156,10 @@ void FontAtlasEnsureScratch()
     G_AtlasMaxW = 256;
     G_AtlasMaxH = 256;
 
-    void* Block = std::malloc(0x20028u);
+    FFontAtlasScratch* Block = static_cast<FFontAtlasScratch*>(std::malloc(0x20028u));
     memset(Block, 0, 0x28u);
-    G_AtlasBmi = static_cast<BITMAPINFO*>(Block);
-    G_AtlasBits = reinterpret_cast<unsigned short*>(static_cast<unsigned char*>(Block) + 0x28);
+    G_AtlasBmi = reinterpret_cast<BITMAPINFO*>(Block);
+    G_AtlasBits = Block->Bits;
 
     BITMAPINFOHEADER& Hdr = G_AtlasBmi->bmiHeader;
     Hdr.biSize = sizeof(BITMAPINFOHEADER);

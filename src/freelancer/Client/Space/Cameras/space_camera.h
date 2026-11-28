@@ -239,10 +239,10 @@ void NotifyCinematicView(bool bActive);
 // which is SpaceApp + 0x08 (raised by the space init, dropped by the teardown).
 void RequestSpaceCameraMode(const char* ModeName);
 
-// FUN_0054bb90 -- the ship's docking code hands the docking camera its fixed Csys (twelve
-// floats: orientation then position), raises its view-dirty byte and, when the controller
-// exists, switches to "docking". Callers are in Ship (0x00543cbf / 0x00543ec9).
-void SetDockingCameraTransform(const float* Csys12);
+// FUN_0054bb90 -- the ship's docking code hands the docking camera its fixed Csys
+// (orientation then position), raises its view-dirty byte and, when the controller exists,
+// switches to "docking". Callers are in Ship (0x00543cbf / 0x00543ec9).
+void SetDockingCameraTransform(const Transform* Csys);
 
 // FUN_0054bbd0 -- arm the docking fade countdown (FUN_0051ebd0) on the docking camera;
 // FDUMPs an ERROR (space.cpp:0x8ad) when that camera is not the active one, then arms it

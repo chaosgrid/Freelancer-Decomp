@@ -27,11 +27,11 @@ static void EraseRootInstance(FEngineObject* Engine, FEngineInstance* Instance);
 static void DestroyChildNodeValue(FEngineChildNode* Node);
 static unsigned long JointUtfRecordSize(unsigned long Type);
 static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char bForce);
-static void ApplyRevJoint(Transform* Dest, const float* Rel, const float* JointState);
-static void ApplyPrisJoint(Transform* Dest, const float* Rel, const float* JointState);
-static void ApplyCylJoint(Transform* Dest, const float* Rel, const float* JointState);
-static void ApplySphereJoint(Transform* Dest, const float* Rel, const float* JointState);
-static void ApplyLooseJoint(Transform* Dest, const float* Rel, const float* JointState);
+static void ApplyRevJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState);
+static void ApplyPrisJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState);
+static void ApplyCylJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState);
+static void ApplySphereJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState);
+static void ApplyLooseJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState);
 
 // FEngineObject holds a real std::map (the instance-root map), so only the facet offset is
 // asserted; the retail byte layout is documented on the struct.
@@ -149,7 +149,7 @@ FEngineInstance* FEngineInstance::Init(FArchetypeHandle* Handle)
     Extent = -1.0f;
     bWorldDirty = 1;
     JointState[3] = 1.0f;
-    Relative[0] = 0xFFFFFFFF;
+    Relative.Type = 0xFFFFFFFF;
     InitInstanceMatrix(this);
     return this;
 }
@@ -176,7 +176,7 @@ unsigned char FEngineInstance::UnlinkChild(FEngineInstance* Node)
 unsigned char FEngineInstance::ConnectChild(FEngineInstance* Child, const unsigned long* Payload)
 {
     Child->bWorldDirty = 1;
-    std::memcpy(Child->Relative, Payload, sizeof(Child->Relative));
+    std::memcpy(&Child->Relative, Payload, sizeof(Child->Relative));
     FEngineInstance* Last = LastChild;
     LastChild = Child;
     if (Last == nullptr)
@@ -2074,7 +2074,7 @@ FEngineJointBlock* DACOM_API FEngineObject::GetInstanceRelative(InstanceIndex In
     FEngineInstance* Instance = reinterpret_cast<FEngineInstance*>(InInstance);
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr)
         return nullptr;
-    return reinterpret_cast<FEngineJointBlock*>(Instance->Relative);
+    return &Instance->Relative;
 }
 
 static void CopyJointFloats(float* Dest, const float* Source, unsigned long Count)
@@ -2101,7 +2101,7 @@ unsigned long DACOM_API FEngineObject::GetJointParams(InstanceIndex InInstance, 
         return 1;
     }
 
-    const unsigned long Type = Instance->Relative[0];
+    const unsigned long Type = Instance->Relative.Type;
     if (Type == kJointTypePris || Type == kJointTypeRev)
     {
         CopyJointFloats(Out, Instance->JointState, 1);
@@ -2145,12 +2145,12 @@ unsigned long DACOM_API FEngineObject::SetJointParams(InstanceIndex InInstance, 
     }
 
     Instance->bWorldDirty = 1;
-    const unsigned long Type = Instance->Relative[0];
+    const unsigned long Type = Instance->Relative.Type;
     if (Type == kJointTypePris || Type == kJointTypeRev)
     {
         const float Input = Values[0];
-        const float MinLimit = *(const float*)(&Instance->Relative[0x13]);
-        const float MaxLimit = *(const float*)(&Instance->Relative[0x14]);
+        const float MinLimit = Instance->Relative.Min;
+        const float MaxLimit = Instance->Relative.Max;
         if (MinLimit > Input)
             Instance->JointState[0] = MinLimit;
         else if (MaxLimit < Input)
@@ -2404,35 +2404,35 @@ static unsigned long JointUtfRecordSize(unsigned long Type)
     return 0;
 }
 
-static void CopyRelative3x3(Transform* Dest, const float* Rel)
+static void CopyRelative3x3(Transform* Dest, const FEngineJointBlock* Rel)
 {
-    std::memcpy(&Dest->Rotation, Rel + 7, 9 * sizeof(float));
+    std::memcpy(&Dest->Rotation, &Rel->Orient, 9 * sizeof(float));
 }
 
-static void CopyRelativeTranslation(Transform* Dest, const float* Rel)
+static void CopyRelativeTranslation(Transform* Dest, const FEngineJointBlock* Rel)
 {
-    Dest->Translation.x = Rel[4];
-    Dest->Translation.y = Rel[5];
-    Dest->Translation.z = Rel[6];
+    Dest->Translation.x = Rel->ChildPos.x;
+    Dest->Translation.y = Rel->ChildPos.y;
+    Dest->Translation.z = Rel->ChildPos.z;
 }
 
-static void ApplyFixJoint(Transform* Dest, const float* Rel)
+static void ApplyFixJoint(Transform* Dest, const FEngineJointBlock* Rel)
 {
     CopyRelative3x3(Dest, Rel);
     CopyRelativeTranslation(Dest, Rel);
 }
 
-static void AddVec3(Vector* Dest, const float* A, const float* B)
+static void AddVec3(Vector* Dest, const float* A, const Vector* B)
 {
-    Dest->x = A[0] + B[0];
-    Dest->y = A[1] + B[1];
-    Dest->z = A[2] + B[2];
+    Dest->x = A[0] + B->x;
+    Dest->y = A[1] + B->y;
+    Dest->z = A[2] + B->z;
 }
 
-static void ApplyTransJoint(Transform* Dest, const float* Rel, const float* JointState)
+static void ApplyTransJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     CopyRelative3x3(Dest, Rel);
-    AddVec3(&Dest->Translation, JointState, Rel + 4);
+    AddVec3(&Dest->Translation, JointState, &Rel->ChildPos);
 }
 
 // FUN_06625560 (thiscall on inst+0x5C); only caller FUN_0661f250.
@@ -2441,12 +2441,12 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
     if (Instance->bWorldDirty == 0 && bForce == 0)
         return 0;
     Instance->bWorldDirty = 0;
-    const unsigned long Type = Instance->Relative[0];
+    const unsigned long Type = Instance->Relative.Type;
     if (Type == 0xFFFFFFFF)
         return 0;
 
     Transform* Dest = &Instance->Matrix;
-    const float* Rel = (const float*)(Instance->Relative);
+    const FEngineJointBlock* Rel = &Instance->Relative;
     const float* State = Instance->JointState;
     if (Type == kJointTypeFix)
         ApplyFixJoint(Dest, Rel);
@@ -2469,7 +2469,6 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
 
 
 // FUN_06625560: this = inst+0x5C, dest = inst+0x2C. Jump table PTR_LAB_0662aa84.
-// Relative: [0] type, [1..3] rest pos, [4..6] T @ +0x10, [7..15] 3x3 @ +0x1C, [16..18] axis @ +0x40.
 // DAT_06629510 = 0.5f (half-angle). Only 3DMath +0x20/+0x2C/+0x54 are used; there is no IK.
 static const float G_JointHalfAngle = 0.5f;
 
@@ -2489,11 +2488,11 @@ static void AxisAngleToQuat(Quaternion* OutQuat, const Vector* Axis, float Angle
     OutQuat->z = (float)((double)K * Z);
 }
 
-static void SubVec3(Vector* Dest, const float* A, const Vector* B)
+static void SubVec3(Vector* Dest, const Vector* A, const Vector* B)
 {
-    Dest->x = A[0] - B->x;
-    Dest->y = A[1] - B->y;
-    Dest->z = A[2] - B->z;
+    Dest->x = A->x - B->x;
+    Dest->y = A->y - B->y;
+    Dest->z = A->z - B->z;
 }
 
 // DAT_0662b1b0: the 3DMathEngine every joint helper re-checks before each call
@@ -2507,89 +2506,89 @@ static I3DMathEngine* JointMath()
     return G_JointMath;
 }
 
-// Rev / Sphere tail: T = Rel[1..3] - Dest 3x3 * Rel[4..6], float subtractions.
-static void ApplyRestTranslation(Transform* Dest, const float* Rel)
+// Rev / Sphere tail: T = ParentPos - Dest 3x3 * ChildPos, float subtractions.
+static void ApplyRestTranslation(Transform* Dest, const FEngineJointBlock* Rel)
 {
     Vector Rotated;
-    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, reinterpret_cast<const Vector*>(Rel + 4));
-    SubVec3(&Dest->Translation, Rel + 1, &Rotated);
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, &Rel->ChildPos);
+    SubVec3(&Dest->Translation, &Rel->ParentPos, &Rotated);
 }
 
 // LAB_066255e0 (Rev): the joint rotation multiplies on the LEFT of the rest 3x3.
-static void ApplyRevJoint(Transform* Dest, const float* Rel, const float* JointState)
+static void ApplyRevJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     Quaternion Quat;
     Matrix Rot;
-    AxisAngleToQuat(&Quat, reinterpret_cast<const Vector*>(Rel + 16), JointState[0]);
+    AxisAngleToQuat(&Quat, &Rel->Axis, JointState[0]);
     MathQuatToMatrix(JointMath(), &Rot, &Quat);
     Matrix Product;
-    MathMulMatrix3(JointMath(), &Product, &Rot, reinterpret_cast<const Matrix*>(Rel + 7));
+    MathMulMatrix3(JointMath(), &Product, &Rot, &Rel->Orient);
     std::memcpy(Dest, &Product, sizeof(Product));
     ApplyRestTranslation(Dest, Rel);
 }
 
 // Preserve separate float rounding for Y/Z translation intermediates.
-static void SlideTranslation(Vector* OutT, const float* Rel, float Slide, const Vector* V)
+static void SlideTranslation(Vector* OutT, const FEngineJointBlock* Rel, float Slide, const Vector* V)
 {
     const double S = Slide;
-    const double Ax = (double)(Rel[16]) * S;
-    const float Ty = (float)(S * (double)(Rel[17]));
-    const float Tz = (float)(S * (double)(Rel[18]));
-    const float Pz = (float)((double)Tz + (double)(Rel[3]));
-    OutT->x = (float)((Ax + (double)(Rel[1])) - (double)(V->x));
-    OutT->y = (float)(((double)Ty + (double)(Rel[2])) -
+    const double Ax = (double)(Rel->Axis.x) * S;
+    const float Ty = (float)(S * (double)(Rel->Axis.y));
+    const float Tz = (float)(S * (double)(Rel->Axis.z));
+    const float Pz = (float)((double)Tz + (double)(Rel->ParentPos.z));
+    OutT->x = (float)((Ax + (double)(Rel->ParentPos.x)) - (double)(V->x));
+    OutT->y = (float)(((double)Ty + (double)(Rel->ParentPos.y)) -
                                  (double)(V->y));
     OutT->z = (float)((double)Pz - (double)(V->z));
 }
 
 // LAB_06625730 (Pris).
-static void ApplyPrisJoint(Transform* Dest, const float* Rel, const float* JointState)
+static void ApplyPrisJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     CopyRelative3x3(Dest, Rel);
     Vector Rotated;
-    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, reinterpret_cast<const Vector*>(Rel + 4));
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, &Rel->ChildPos);
     SlideTranslation(&Dest->Translation, Rel, JointState[0], &Rotated);
 }
 
 // LAB_066257f0 (Cyl): rotation from State[1] multiplies on the RIGHT; slide from State[0].
-static void ApplyCylJoint(Transform* Dest, const float* Rel, const float* JointState)
+static void ApplyCylJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     Quaternion Quat;
     Matrix Rot;
-    AxisAngleToQuat(&Quat, reinterpret_cast<const Vector*>(Rel + 16), JointState[1]);
+    AxisAngleToQuat(&Quat, &Rel->Axis, JointState[1]);
     MathQuatToMatrix(JointMath(), &Rot, &Quat);
     Matrix Product;
-    MathMulMatrix3(JointMath(), &Product, reinterpret_cast<const Matrix*>(Rel + 7), &Rot);
+    MathMulMatrix3(JointMath(), &Product, &Rel->Orient, &Rot);
     std::memcpy(Dest, &Product, sizeof(Product));
     Vector Rotated;
-    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, reinterpret_cast<const Vector*>(Rel + 4));
+    MathTransformVec(JointMath(), &Rotated, &Dest->Rotation, &Rel->ChildPos);
     SlideTranslation(&Dest->Translation, Rel, JointState[0], &Rotated);
 }
 
 // LAB_06625980 (Sphere): quaternion State[3..6].
-static void ApplySphereJoint(Transform* Dest, const float* Rel, const float* JointState)
+static void ApplySphereJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     Quaternion Quat;
     std::memcpy(&Quat, JointState + 3, sizeof(Quat));
     Matrix Rot;
     MathQuatToMatrix(JointMath(), &Rot, &Quat);
     Matrix Product;
-    MathMulMatrix3(JointMath(), &Product, &Rot, reinterpret_cast<const Matrix*>(Rel + 7));
+    MathMulMatrix3(JointMath(), &Product, &Rot, &Rel->Orient);
     std::memcpy(Dest, &Product, sizeof(Product));
     ApplyRestTranslation(Dest, Rel);
 }
 
-// LAB_06625af0 (Loose): quaternion State[3..6], translation State[0..2] + Rel[4..6].
-static void ApplyLooseJoint(Transform* Dest, const float* Rel, const float* JointState)
+// LAB_06625af0 (Loose): quaternion State[3..6], translation State[0..2] + ChildPos.
+static void ApplyLooseJoint(Transform* Dest, const FEngineJointBlock* Rel, const float* JointState)
 {
     Quaternion Quat;
     std::memcpy(&Quat, JointState + 3, sizeof(Quat));
     Matrix Rot;
     MathQuatToMatrix(JointMath(), &Rot, &Quat);
     Matrix Product;
-    MathMulMatrix3(JointMath(), &Product, &Rot, reinterpret_cast<const Matrix*>(Rel + 7));
+    MathMulMatrix3(JointMath(), &Product, &Rot, &Rel->Orient);
     std::memcpy(Dest, &Product, sizeof(Product));
-    AddVec3(&Dest->Translation, JointState, Rel + 4);
+    AddVec3(&Dest->Translation, JointState, &Rel->ChildPos);
 }
 
 // FUN_06625bd0: an element's first dword is the next link. The memory is not cleared.

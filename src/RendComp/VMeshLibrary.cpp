@@ -176,7 +176,7 @@ int FVmeshGroup::EnsureIb(unsigned long BaseVertex)
                 break;
             const FVmeshDataHeader* Header = Data->Header;
             const FVmeshFacegroup* Facegroups = reinterpret_cast<const FVmeshFacegroup*>(
-                (const unsigned char*)Header + 0x10);
+                Header + 1);
             const unsigned short* Source = (const unsigned short*)(
                 Facegroups + Header->FaceGroups);
             if ((Header->Flags & 1) != 0)

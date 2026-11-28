@@ -62,12 +62,12 @@ namespace
     // against null, the CEqObj* at [+0x10], and the ship class test.
     CEqObj* HudPlayerShip()
     {
-        void* const ObjRW = GetPlayerObjRW();
+        IObjRW* const ObjRW = GetPlayerObjRW();
         // Retail tests `ObjRW + 0xc`, so an IObjRW* of -0xc is the other "no object" value.
-        if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(static_cast<intptr_t>(-0xc)))
+        if (ObjRW == nullptr || ObjRW == reinterpret_cast<IObjRW*>(static_cast<intptr_t>(-0xc)))
             return nullptr;
         CEqObj* const EqObj =
-            *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
+            static_cast<CEqObj*>(static_cast<IObjInspectImpl*>(ObjRW)->Object);
         if (EqObj == nullptr)
             return nullptr;
         if ((static_cast<unsigned>(EqObj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)

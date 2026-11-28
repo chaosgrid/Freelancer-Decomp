@@ -28,6 +28,7 @@
 #include "ivp_mindist_minimize.h" // IVP_Mindist_Minimize_Solver: 06352cf0 / 06352b90 build it on the stack
 #include "ivp_compact_ledge_solver.h" // IVP_Compact_Ledge_Solver: the contact-frame leaves 06359850 / 06359ae0 and 0635a1e0
 #include "../ivp_physics/ivp_impact.h" // IVP_Mindist_Do_Impact (FUN_06358680), called by 06358cb0
+#include "ivp_compact_surface.h" // IVP_Compact_Ledgetree_Node (LedgetreeNodeRadius)
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -179,16 +180,14 @@ namespace
     inline IVP_Contact_Point* IVP_FindExistingPairRecord(IVP_Ledge_Mindist* Mindist)
     {
         IVP_Real_Object* const ObjB = Mindist->synapse[1].l_obj;
-        void* NodePtr = Mindist->synapse[0].l_obj->mindist_list;
-        while (NodePtr != nullptr)
+        IVP_Synapse_Friction* Node = Mindist->synapse[0].l_obj->mindist_list;
+        while (Node != nullptr)
         {
-            char* NodeBytes = static_cast<char*>(NodePtr);
-            int16_t Delta = *reinterpret_cast<int16_t*>(NodeBytes + 0x0C); // Delta1/Delta2, self-relative
-            IVP_Contact_Point* Record = reinterpret_cast<IVP_Contact_Point*>(NodeBytes + Delta);
+            IVP_Contact_Point* Record = Node->get_contact_point();
             if ((Record->Object1 == ObjB || Record->Object2 == ObjB)
                 && IVP_ConfirmPairRecordMatch(Record, Mindist))
                 return Record;
-            NodePtr = *reinterpret_cast<void**>(NodeBytes); // Next field, node+0x00
+            Node = Node->next;
         }
         return nullptr;
     }
@@ -517,11 +516,10 @@ namespace
         void* const Storage = Environment->sim_unit_mem->GetMem(
             static_cast<int>(sizeof(IVP_Impact_Solver_Long_Term)));
         IVP_Impact_Solver_Long_Term* const Owner = ::new (Storage) IVP_Impact_Solver_Long_Term;
-        uint32_t PackedState;
-        std::memcpy(&PackedState, &Owner->StateProcessed, sizeof(PackedState));
+        uint32_t PackedState = Owner->PackedState;
         Owner->Status = 0;
         PackedState &= 0xfffffc00u;
-        std::memcpy(&Owner->StateProcessed, &PackedState, sizeof(PackedState));
+        Owner->PackedState = PackedState;
         Candidate->Owner = Owner;
         ++Environment->long_term_solver_count;
         return Owner;
@@ -536,15 +534,14 @@ namespace
     static_assert(offsetof(IVP_Impact_Solver_Long_Term, ContactNormalWS) == 0x00, "IVP_Impact_Solver_Long_Term+0x00");
     static_assert(offsetof(IVP_Impact_Solver_Long_Term, StateProcessed) == 0x54, "IVP_Impact_Solver_Long_Term+0x54");
 
-    // :063598cc and :06359ceb: a FULL DWORD read/modify/write at the offset
-    // ivp_mindist.h declares as the byte `StateProcessed` (06358ee0 reads the
-    // same packed dword). Bit 0x200 cleared, 0x100 set when the closest point
+    // :063598cc and :06359ceb: a FULL DWORD read/modify/write of PackedState,
+    // which overlays the byte `StateProcessed` (06358ee0 reads the same packed
+    // dword). Bit 0x200 cleared, 0x100 set when the closest point
     // falls OUTSIDE the matched feature (outside the triangle, or outside the
     // segment's [0,1] range).
     inline void IVP_FlagOwnerContactOutsideFeature(IVP_Impact_Solver_Long_Term* Owner)
     {
-        uint32_t* const State = reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(Owner) + 0x54);
-        *State = (*State & 0xFFFFFDFFu) | 0x00000100u;
+        Owner->PackedState = (Owner->PackedState & 0xFFFFFDFFu) | 0x00000100u;
     }
 
     // The owner's ContactNormalWS (+0x00) and TangentAxis0 (+0x78) are 16-byte
@@ -1026,12 +1023,14 @@ void IVP_Ledge_Mindist::do_impact()
 namespace
 {
 
-    // The ledgetree-node radius (node+0x14) of a ledge, as FUN_06362840 /
-    // LAB_06362920 read it: `*(float*)((char*)Ledge + Ledge->LedgetreeNodeOffset + 0x14)`.
+    // The radius of a ledge's ledgetree node, as FUN_06362840 / LAB_06362920
+    // read it through the ledge's self-relative LedgetreeNodeOffset.
     inline float LedgetreeNodeRadius(const IVP_Compact_Ledge* Ledge)
     {
         const char* Base = reinterpret_cast<const char*>(Ledge);
-        return *reinterpret_cast<const float*>(Base + Ledge->LedgetreeNodeOffset + 0x14);
+        const IVP_Compact_Ledgetree_Node* const Node =
+            reinterpret_cast<const IVP_Compact_Ledgetree_Node*>(Base + Ledge->LedgetreeNodeOffset);
+        return Node->radius;
     }
 
     // The "does FeatureA or FeatureB win" decision shared by FUN_06362840 and
@@ -1730,7 +1729,7 @@ namespace
     // (mixed float/unrounded intermediates as below).
     void IVP_Create_Cp_In_Advance_Pretension(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* Object, float Gap)
     {
-        char* const Node = static_cast<char*>(Object->mindist_list);
+        IVP_Synapse_Friction* const Node = Object->mindist_list;
         if (Node == nullptr)
         {
             return;
@@ -1743,8 +1742,7 @@ namespace
             Mindist->try_to_generate_managed_friction(&FrictionSystem, &HavingNew, nullptr, 1);
         if (HavingNew == 1)
         {
-            IVP_Contact_Point* const Old = reinterpret_cast<IVP_Contact_Point*>(
-                Node + *reinterpret_cast<const int16_t*>(Node + 0xc));
+            IVP_Contact_Point* const Old = Node->get_contact_point();
             const float SavedRecalcTimeBase = Old->LastRecalcTimeBase;
             const float SavedRecalcTimeOffset = Old->LastRecalcTimeOffset;
             IVP_Environment* const Env = Object->environment;
@@ -2755,8 +2753,7 @@ int IVP_ListManager_CorePairEntry::RefreshAttachedCtxAndCountLive(IVP_ListManage
         IVP_Impact_Solver_Long_Term* Owner = Record->Owner;
         Record->PopulateOwner(Owner);
 
-        const uint32_t PackedState = *reinterpret_cast<uint32_t*>(
-            reinterpret_cast<char*>(Owner) + offsetof(IVP_Impact_Solver_Long_Term, StateProcessed));
+        const uint32_t PackedState = Owner->PackedState;
         if ((PackedState & 0x300) == 0x100)
         {
             --LiveCount;

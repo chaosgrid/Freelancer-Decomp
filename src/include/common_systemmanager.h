@@ -1001,6 +1001,23 @@ static_assert(offsetof(RepairManager, CheckTimer) == 0x50, "RepairManager+0x50 C
 // ---------------------------------------------------------------------------
 struct FormationFollowerEnvelope; // common_gotobehavior.h
 
+// The 0x10-byte block FUN_062ec610 (GetDirectiveOrder) copies out of the AI-directive record:
+// record +0xa8 -> +0x00, +0xac -> +0x04, +0xbd -> +0x08, +0xc2 -> +0x09, +0xb8 -> +0x0c.
+struct FollowerDirectiveOrder
+{
+    unsigned int DockObjectId;      // record +0xa8; dock candidate id, -> DirectiveDockOp::DockObjectId
+    unsigned int SecondaryObjectId;      // record +0xac; second object id, -> DirectiveDockOp::NextRingId
+    unsigned char bOrderPending;     // record +0xbd
+    unsigned char bMidLane;     // record +0xc2; 1 = commit without the range test; go_tradelane's bool
+    unsigned char Pad0A[2];
+    float MaxRange;             // record +0xb8; go_tradelane's 4th argument (CShip::go_tradelane float)
+};
+static_assert(offsetof(FollowerDirectiveOrder, SecondaryObjectId) == 0x04, "FollowerDirectiveOrder::SecondaryObjectId offset");
+static_assert(offsetof(FollowerDirectiveOrder, bOrderPending) == 0x08, "FollowerDirectiveOrder::bOrderPending offset");
+static_assert(offsetof(FollowerDirectiveOrder, bMidLane) == 0x09, "FollowerDirectiveOrder::bMidLane offset");
+static_assert(offsetof(FollowerDirectiveOrder, MaxRange) == 0x0c, "FollowerDirectiveOrder::MaxRange offset");
+static_assert(sizeof(FollowerDirectiveOrder) == 0x10, "FollowerDirectiveOrder must match FUN_062ec610's 0x10-byte output block");
+
 struct FFormationLeaderState
 {
     // +0x00: += Dt every Update while bForceAttackFormation; zeroed once the unrounded sum
@@ -1080,7 +1097,7 @@ struct FFormationLeaderState
 
     // FUN_062ec610: copies +0xA8 / +0xAC / +0xBD / +0xC2 / +0xB8 to
     // Out +0x00 / +0x04 / +0x08 / +0x09 / +0x0C (a 0x10-byte block).
-    void GetDirectiveOrder(unsigned char* Out) const;
+    void GetDirectiveOrder(FollowerDirectiveOrder* Out) const;
 
     // FUN_062ec650: +0xB0 = Value, +0xBE = (Value != 0).
     void SetValueB0(unsigned int Value);

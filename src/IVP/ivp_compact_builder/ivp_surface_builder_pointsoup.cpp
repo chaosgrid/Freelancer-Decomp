@@ -539,7 +539,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_le
                 Hash.AddElem(Point, IVP_PointHashIndex(Point));
             }
             IVP_Compact_Ledge* const Ledge = Result;
-            const uint32_t SizeWord = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(Ledge) + 8);
+            const uint32_t SizeWord = Ledge->SizeAndFlags;
             const int32_t SizeBytes = static_cast<int32_t>((SizeWord >> 8) << 4);
             const int32_t NLedgePoints = SizeBytes / 16 - Ledge->NTriangles - 1;
             for (int32_t J = 0; J < NLedgePoints; ++J)
@@ -665,7 +665,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::single_tri_to_compact_ledge(con
     }
 
     const IVP_Compact_Ledge* const Template = GPointsoupTriangleTemplate;
-    const uint32_t SizeWord = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(Template) + 8);
+    const uint32_t SizeWord = Template->SizeAndFlags;
     const unsigned Size = (SizeWord >> 8) << 4;
     IVP_Compact_Ledge* const Copy = static_cast<IVP_Compact_Ledge*>(ivp_malloc_aligned(Size, 0x10)); // FUN_06343fc0
     std::memcpy(Copy, GPointsoupTriangleTemplate, Size);

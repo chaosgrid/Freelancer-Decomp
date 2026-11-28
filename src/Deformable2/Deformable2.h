@@ -301,11 +301,11 @@ struct FDeformable : IDeformable, IEngineComponent
     FDeformable();  // FUN_065f1810
     ~FDeformable(); // FUN_065f18d0
 
-    GENRESULT DACOM_API Create(void** OutInstance, int* Parts, void* Arg3, void* Arg4,
+    GENRESULT DACOM_API Create(void** OutInstance, FDeformPartTable* Parts, void* Arg3, void* Arg4,
                                 void* Arg5) override;
     GENRESULT DACOM_API CreateUnused(void* A, void* B, void* C, void* D, void* E, void* F,
                                        void* G) override;
-    GENRESULT DACOM_API CreateAlias(void** OutInstance, int* Parts, void* Arg3, void* Arg4,
+    GENRESULT DACOM_API CreateAlias(void** OutInstance, FDeformPartTable* Parts, void* Arg3, void* Arg4,
                                       void* Arg5) override;
     GENRESULT DACOM_API Destroy(void* Instance) override;
     GENRESULT DACOM_API Play(void* Instance, int* Out, void* Name, void* Extra, void* ArgC,
@@ -704,7 +704,7 @@ struct FDeformInstance : IChannelSink
     void ConstructBody();
 
     // FUN_065f36c0. Defined in DeformableObject.cpp.
-    bool ConnectParts(int* Parts, void* Arg3, void* Arg4);
+    bool ConnectParts(FDeformPartTable* Parts, void* Arg3, void* Arg4);
 
     // FUN_065f3ed0. Defined in DeformableObject.cpp.
     void Teardown();

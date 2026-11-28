@@ -78,6 +78,58 @@ namespace
     // where G_CrashAppName begins in retail's .data.
     wchar_t G_CrashReportFiles[0x410];
 
+    // The 0x1c50-byte block FUN_005a54e0 maps for Dr. Watson (dw15.exe, handed over as
+    // "-x -s <mapping>"): the dw15 SDK's shared-memory block. Member names follow that SDK's
+    // where the use agrees (the wait loop is its sample loop: wait on EventAlive, then poll
+    // EventDone; signal EventDone under the mutex when dw15 stops pinging). The string sizes
+    // are the gaps between the members written; the members never written are Field<offset>.
+    struct FDwSharedMem
+    {
+        DWORD Size;                           // +0x00 0x1c50
+        DWORD ProcessId;                      // +0x04
+        DWORD ThreadId;                       // +0x08
+        void* ExceptionAddress;               // +0x0c
+        EXCEPTION_POINTERS* ExceptionPointers; // +0x10
+        HANDLE EventDone;                     // +0x14 polled after EventAlive; set when giving up
+        DWORD Field18;                        // +0x18
+        HANDLE EventAlive;                    // +0x1c dw15's ping, waited on for 20 s
+        HANDLE Mutex;                         // +0x20
+        HANDLE Process;                       // +0x24 DuplicateHandle of this process, inheritable
+        DWORD BehaviorFlags;                  // +0x28 0x100
+        DWORD Result;                         // +0x2c read back: 0x10 = continue the search
+        DWORD Field30;                        // +0x30
+        DWORD OfferFlags;                     // +0x34 1
+        DWORD Field38;                        // +0x38
+        DWORD LetRunFlags;                    // +0x3c 0x10
+        DWORD Field40;                        // +0x40
+        DWORD Field44;                        // +0x44
+        wchar_t FormalAppName[0x38];          // +0x48 G_CrashAppName
+        wchar_t ModuleFileName[0x104];        // +0xb8 GetModuleFileNameA, widened
+        unsigned char Field2C0[0x1040 - 0x2c0];
+        char PidRegKey[0x104];                // +0x1040 the DigitalProductID value's path
+        DWORD LcidUI;                         // +0x1144 LangID + 0x400
+        char RegSubPath[0xc8];                // +0x1148 "Microsoft\PCHealth\ErrorReporting\DW"
+        wchar_t DotDataDlls[0x104];           // +0x1210 L"common.dll"
+        wchar_t AdditionalFiles[(0x1c50 - 0x1418) / 2]; // +0x1418 G_CrashReportFiles
+    };
+
+    static_assert(sizeof(FDwSharedMem) == 0x1c50, "dw15 shared block 0x1c50");
+    static_assert(offsetof(FDwSharedMem, EventDone) == 0x14, "EventDone +0x14");
+    static_assert(offsetof(FDwSharedMem, EventAlive) == 0x1c, "EventAlive +0x1c");
+    static_assert(offsetof(FDwSharedMem, Mutex) == 0x20, "Mutex +0x20");
+    static_assert(offsetof(FDwSharedMem, Process) == 0x24, "Process +0x24");
+    static_assert(offsetof(FDwSharedMem, BehaviorFlags) == 0x28, "BehaviorFlags +0x28");
+    static_assert(offsetof(FDwSharedMem, Result) == 0x2c, "Result +0x2c");
+    static_assert(offsetof(FDwSharedMem, OfferFlags) == 0x34, "OfferFlags +0x34");
+    static_assert(offsetof(FDwSharedMem, LetRunFlags) == 0x3c, "LetRunFlags +0x3c");
+    static_assert(offsetof(FDwSharedMem, FormalAppName) == 0x48, "FormalAppName +0x48");
+    static_assert(offsetof(FDwSharedMem, ModuleFileName) == 0xb8, "ModuleFileName +0xb8");
+    static_assert(offsetof(FDwSharedMem, PidRegKey) == 0x1040, "PidRegKey +0x1040");
+    static_assert(offsetof(FDwSharedMem, LcidUI) == 0x1144, "LcidUI +0x1144");
+    static_assert(offsetof(FDwSharedMem, RegSubPath) == 0x1148, "RegSubPath +0x1148");
+    static_assert(offsetof(FDwSharedMem, DotDataDlls) == 0x1210, "DotDataDlls +0x1210");
+    static_assert(offsetof(FDwSharedMem, AdditionalFiles) == 0x1418, "AdditionalFiles +0x1418");
+
     // FUN_005a5390: run "dxdiag.exe <temp>\dxdiag.txt", wait up to 60 s
     // and, unless it timed out, append the report path to G_CrashReportFiles.
     void AppendDxDiagReport()
@@ -146,9 +198,9 @@ namespace
         if (Mapping == nullptr)
             return Result;
 
-        unsigned char* const Block =
-            static_cast<unsigned char*>(MapViewOfFile(Mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0,
-                                                      0, 0));
+        FDwSharedMem* const Block =
+            static_cast<FDwSharedMem*>(MapViewOfFile(Mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0,
+                                                     0, 0));
         if (Block != nullptr)
         {
             memset(Block, 0, 0x714 * 4);
@@ -163,25 +215,24 @@ namespace
                     {
                         if (DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(),
                                             GetCurrentProcess(),
-                                            reinterpret_cast<HANDLE*>(Block + 0x24), 0x1f0fff,
+                                            &Block->Process, 0x1f0fff,
                                             TRUE, 0) != 0)
                         {
-                            DWORD* const Words = reinterpret_cast<DWORD*>(Block);
-                            Words[1] = GetCurrentProcessId();
-                            Words[2] = GetCurrentThreadId();
-                            *reinterpret_cast<HANDLE*>(Block + 0x1c) = EventDone;
-                            *reinterpret_cast<HANDLE*>(Block + 0x14) = EventAlive;
-                            *reinterpret_cast<HANDLE*>(Block + 0x20) = Mutex;
-                            Words[0] = 0x1c50;
-                            *reinterpret_cast<EXCEPTION_POINTERS**>(Block + 0x10) = Info;
-                            *reinterpret_cast<void**>(Block + 0xc) =
+                            Block->ProcessId = GetCurrentProcessId();
+                            Block->ThreadId = GetCurrentThreadId();
+                            Block->EventAlive = EventDone;
+                            Block->EventDone = EventAlive;
+                            Block->Mutex = Mutex;
+                            Block->Size = 0x1c50;
+                            Block->ExceptionPointers = Info;
+                            Block->ExceptionAddress =
                                 Info->ExceptionRecord->ExceptionAddress;
-                            Words[0x34 / 4] = 1;
-                            Words[0x3c / 4] = 0x10;
-                            wcscpy(reinterpret_cast<wchar_t*>(Block + 0x48), G_CrashAppName);
-                            strcpy(reinterpret_cast<char*>(Block + 0x1148),
+                            Block->OfferFlags = 1;
+                            Block->LetRunFlags = 0x10;
+                            wcscpy(Block->FormalAppName, G_CrashAppName);
+                            strcpy(Block->RegSubPath,
                                    "Microsoft\\PCHealth\\ErrorReporting\\DW");
-                            strcpy(reinterpret_cast<char*>(Block + 0x1040),
+                            strcpy(Block->PidRegKey,
                                    "HKLM\\Software\\Microsoft\\Microsoft Games\\Freelancer\\1.0\\"
                                    "DigitalProductID");
 
@@ -195,20 +246,20 @@ namespace
                                 if (RegQueryValueExA(Key, "LangID", nullptr, nullptr,
                                                      reinterpret_cast<BYTE*>(&LangId),
                                                      &Size) == ERROR_SUCCESS)
-                                    Words[0x1144 / 4] = LangId + 0x400;
+                                    Block->LcidUI = LangId + 0x400;
                                 RegCloseKey(Key);
                             }
 
-                            Words[0x28 / 4] = 0x100;
-                            memcpy(Block + 0x1210, L"common.dll", 22);
+                            Block->BehaviorFlags = 0x100;
+                            memcpy(Block->DotDataDlls, L"common.dll", 22);
 
                             char ModulePath[0x104];
                             GetModuleFileNameA(nullptr, ModulePath, 0x104);
                             MultiByteToWideChar(CP_UTF8, 0, ModulePath, -1,
-                                                reinterpret_cast<wchar_t*>(Block + 0xb8), 0x104);
+                                                Block->ModuleFileName, 0x104);
 
                             AppendDxDiagReport();
-                            memcpy(Block + 0x1418, G_CrashReportFiles,
+                            memcpy(Block->AdditionalFiles, G_CrashReportFiles,
                                    wcslen(G_CrashReportFiles) * 2 + 2);
 
                             ErrorHandler::deactivate();
@@ -241,7 +292,7 @@ namespace
                                         if (WaitForSingleObject(EventAlive, 1) == WAIT_OBJECT_0)
                                         {
                                             bWaiting = false;
-                                            if (Words[0x2c / 4] == 0x10)
+                                            if (Block->Result == 0x10)
                                                 Result = EXCEPTION_CONTINUE_SEARCH;
                                         }
                                     }

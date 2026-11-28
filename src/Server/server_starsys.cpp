@@ -1021,12 +1021,12 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
             IBehaviorManager* const Behavior = static_cast<CEqObj*>(Raw)->get_behavior_interface();
             if (Behavior != nullptr)
             {
-                unsigned int MissileBlock[2];
-                MissileBlock[0] = Rec.OwnerId;
-                MissileBlock[1] = Id;
+                FBehaviorMissileLaunchedEvent MissileBlock;
+                MissileBlock.OwnerId = Rec.OwnerId;
+                MissileBlock.MissileId = Id;
                 FBehaviorManagerEvent MissileEvent;
                 MissileEvent.Type = FBehaviorManagerEvent::kEventMissileLaunched;
-                MissileEvent.Data = MissileBlock;
+                MissileEvent.Data = &MissileBlock;
                 Behavior->OnEvent(&MissileEvent);
             }
         }
@@ -3304,14 +3304,7 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
     unsigned short const SubObjId = add_cargo(Ship, ContentsArchId, Take, Health, Cl->bTemporary);
 
     // Controller event 0x18. The word at +0x0a is never written.
-    struct FControllerMsg18 {
-        unsigned int LootId;          // +0x00
-        unsigned int ShipId;          // +0x04
-        unsigned short SubObjId;      // +0x08  add_cargo's result
-        unsigned short Pad0a;         // +0x0a
-        unsigned int GoodId;          // +0x0c
-        unsigned int Count;           // +0x10  Take
-    } Msg18;
+    FLootAcquiredEvent Msg18;
     Msg18.LootId = LootObj->get_id();
     Msg18.ShipId = Ship->get_id();
     Msg18.GoodId = Arch2Good(ContentsArchId);

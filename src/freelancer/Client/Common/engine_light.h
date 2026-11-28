@@ -27,6 +27,7 @@
 
 struct ICamera;
 struct FThornLightProps;
+class Csys;
 
 // The light types: 1..3 are the D3DLIGHTTYPE values (FD3dLight8::Type as well); the names are
 // the [LightSource] type strings EngineLightParseType (FUN_00411cd0) maps.
@@ -248,7 +249,7 @@ struct FLightCurveName
 // (retail passes -1, not the source type — FUN_00411120 sets the real one), copies the source,
 // forces theta/phi to pi for a point light, sets the position, then the orientation
 // LookMatrixYup(Orient * Direction3) through DAT_006799bc, then registers it (slot 1).
-FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
+FEngineLight* EngineLightCreate(Csys const* Frame12, FD3dLight8 const* Source,
                                 Vector const* Direction);
 
 // The Thorn light-props block: 0x90 bytes at snap+0x44. Offsets recovered from the two

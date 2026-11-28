@@ -30,13 +30,8 @@ namespace CmnIdea
 
     // MoveIdea::SetPosition/SetWatchObject/Commit and SplineMoveIdea::SetContext/Commit
     // reach `*(BaseIdea::Context + 0xc)` (the IBehaviorManager's PathfindManager) and
-    // write fixed offsets inside it (+0x64 object id, +0x200..+0x208 a Vector). This
-    // is the array common_behavior.h models as FormationMoveFx::SlotOwner. Retail
-    // dereferences both levels unguarded (e.g. 062d584e/062d5865), and so does this.
-    inline unsigned char* SlotArrayOf(void* Context)
-    {
-        return *reinterpret_cast<unsigned char**>(static_cast<unsigned char*>(Context) + 0x0c);
-    }
+    // write AvoidExcludeId and CachedTargetPosition in it. Retail dereferences both
+    // levels unguarded (e.g. 062d584e/062d5865), and so do they.
 
     // BaseIdea::Handle is the owning SystemManager: retail reaches SelfTarget
     // (`[this+8] + 0x14fc`) and Thrust (`[this+8] + 0x18`) with plain ADDs and never

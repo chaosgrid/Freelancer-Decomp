@@ -27,6 +27,7 @@ struct FEffectArch;         // vis_effect_arch.h
 struct FParticleEffect;
 struct FJumpGateEffect;     // Effects/jump_effect.h
 struct FJumpShipEffect;     // Effects/jump_effect.h
+struct FTradeLaneRingRuntime; // Effects/tradelane_fx.h
 struct FEquipFxListNode;    // Effects/client_equip_fx.h
 struct FFuseBurnNode;       // Effects/client_fuse.h
 struct FStarSphere;         // star_sphere.h (Solar +0xe4)
@@ -653,7 +654,7 @@ static_assert(offsetof(FClientSolarGameobj, bTradeLaneIdle) == 0x1f0, "Solar +0x
 static_assert(offsetof(FClientSolarGameobj, JumpEffectId) == 0x200, "Solar +0x200");
 static_assert(sizeof(FClientSolarGameobj) == 0x208, "Solar sizeof 0x208");
 
-// Bits of the first byte of FClientShipGameobj::TradeLaneFlags (+0x184), kept by tradelane_fx.cpp.
+// Bits of FClientShipGameobj::TradeLaneShipFlags (+0x184), kept by tradelane_fx.cpp.
 enum ETradeLaneShipFlag
 {
     kTradeLaneFlagSideKey = 0x1,   // the ring node's side key; picks the side of the ring's lane hardpoint
@@ -836,12 +837,23 @@ public:
     unsigned char Pad15d[3];
     // +0x160 .. +0x183 -- one 0x24-byte member whose destructor is FUN_00544710 (inlined in the
     // Ship dtor): a dword, then two 0x10 effect companions -- the tradelane ring FX binders
-    // tradelane_fx.cpp reaches by offset (+0x164 / +0x174). (The Ship dtor runs with ESI =
-    // this + 0xc, so its "+0x17c" is the +0x188 object below.)
-    unsigned TradeLaneRing;              // +0x160
+    // (+0x164 / +0x174). (The Ship dtor runs with ESI = this + 0xc, so its "+0x17c" is the
+    // +0x188 object below.)
+    FTradeLaneRingRuntime* TradeLaneRing; // +0x160 the ring node the ship is on (tradelane_fx.cpp)
     void* TradeLaneShipCompanion[4];              // +0x164 companion (arch, sound, particle, light)
     void* TradeLaneTunnelCompanion[4];              // +0x174 companion
-    unsigned TradeLaneFlags;              // +0x184 (tradelane_fx.cpp reads bytes +0x184/+0x185)
+    union
+    {
+        unsigned TradeLaneFlags;              // +0x184 the ctor and TlShipClearFlags clear the dword
+        struct
+        {
+            unsigned char TradeLaneShipFlags;    // +0x184 ETradeLaneShipFlag
+            // +0x185 the one-shot effects already started: bit 0 splash (FUN_00514960), bit 1
+            // enter (FUN_005145a0), bit 2 exit / disrupt (FUN_00514bf0 / FUN_00514f20)
+            unsigned char TradeLaneOneshotFlags;
+            unsigned char Pad186[2];
+        };
+    };
     // +0x188 -- a 0xdc-byte object built by FUN_00543530 (FUN_00503440(this, Arg)) or
     // FUN_00543630 (FUN_005038c0(this)), destroyed by FUN_00503a80 + free (FUN_005437d0 case 0,
     // FUN_00543530, FUN_00543630, the dtor). FUN_005437d0's tail clears its +0x70.
@@ -863,6 +875,8 @@ static_assert(offsetof(FClientShipGameobj, TradeLaneRing) == 0x160, "Ship +0x160
 static_assert(offsetof(FClientShipGameobj, TradeLaneShipCompanion) == 0x164, "Ship companion +0x164");
 static_assert(offsetof(FClientShipGameobj, TradeLaneTunnelCompanion) == 0x174, "Ship companion +0x174");
 static_assert(offsetof(FClientShipGameobj, TradeLaneFlags) == 0x184, "Ship +0x184");
+static_assert(offsetof(FClientShipGameobj, TradeLaneShipFlags) == 0x184, "Ship +0x184 byte");
+static_assert(offsetof(FClientShipGameobj, TradeLaneOneshotFlags) == 0x185, "Ship +0x185");
 static_assert(offsetof(FClientShipGameobj, JumpEffect) == 0x188, "Ship +0x188");
 static_assert(offsetof(FClientShipGameobj, ShipFlags) == 0x18c, "Ship +0x18c");
 static_assert(sizeof(FClientShipGameobj) == 0x190, "Ship sizeof 0x190 (operator_new(400))");

@@ -11,6 +11,7 @@
 #include "audio/dsound8.h"
 #include <mmreg.h>
 #include <msacm.h>
+#include <aviriff.h>
 #include <stddef.h>
 
 static const unsigned long kAggDescSize = 0x14;
@@ -93,6 +94,16 @@ enum EStreamerThreadFlag
     kStreamerThreadStop = 0x80,    // stop request from the destructor
 };
 
+// A WAVE chunk whose payload is one dword, as LoadWav (FUN_06ef1560) reads it: 'fact' (the
+// sample count, taken when cb >= 4) and 'trim' (TrimSamples, taken when cb == 4).
+struct FRiffDwordChunk
+{
+    RIFFCHUNK Header;   // +0x00
+    DWORD Value;        // +0x08
+};
+static_assert(offsetof(FRiffDwordChunk, Value) == 8, "dword chunk Value");
+static_assert(sizeof(FRiffDwordChunk) == 0xC, "dword chunk 0xC");
+
 // Heap handle — retail StreamingSound 0x110 (FUN_06ef1200 / FUN_06ef13d0).
 struct FStreamingSound
 {
@@ -132,7 +143,7 @@ struct FStreamingSound
     unsigned long EmittedPcm;        // +0xC8
     unsigned long TrimSamples;       // +0xCC
     long EncoderDelayBytes;          // +0xD0
-    unsigned char* FmtBlob;          // +0xD4
+    WAVEFORMATEX* FmtBlob;           // +0xD4 the 'fmt ' chunk's payload in the mapped file
     unsigned short PcmTag;           // +0xD8
     unsigned short PcmChannels;      // +0xDA
     unsigned long PcmRate;           // +0xDC

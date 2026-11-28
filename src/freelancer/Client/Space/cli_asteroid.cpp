@@ -2017,13 +2017,27 @@ namespace
     // Stride-0x2C merged cube vertex (FVF 0x252): pos/nrm/diff/spec/uv.
     static unsigned const kCubeVertStride = 0x2C;
 
+    // One vertex of that format, as IRenderableMesh::CopyVertexData writes it for
+    // D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2 and FUN_0051feb0 describes it.
+    struct FAsteroidCubeVertex
+    {
+        Vector Position;     // +0x00
+        Vector Normal;       // +0x0c
+        unsigned Diffuse;    // +0x18
+        float Tex[2][2];     // +0x1c, +0x24 the two texture coordinate sets
+    };
+    static_assert(offsetof(FAsteroidCubeVertex, Normal) == 0x0c, "cube vertex normal +0x0c");
+    static_assert(offsetof(FAsteroidCubeVertex, Diffuse) == 0x18, "cube vertex diffuse +0x18");
+    static_assert(offsetof(FAsteroidCubeVertex, Tex) == 0x1c, "cube vertex tex +0x1c");
+    static_assert(sizeof(FAsteroidCubeVertex) == kCubeVertStride, "cube vertex stride 0x2c");
+
     // FUN_00520850's local std::list element (node+0x08..+0x14, node 0x18 bytes): the
     // vertices and indices of one asteroid archetype. Retail pushes an all-zero temporary
     // (copied with FUN_0045a080, four dwords); both the temporary and every node at the end
     // free the two buffers, so the element owns them. Built in place here, never copied.
     struct FAsteroidMergeChunk
     {
-        unsigned char* Verts;    // node+0x08
+        FAsteroidCubeVertex* Verts; // node+0x08
         int VertCount;           // node+0x0c
         unsigned short* Indices; // node+0x10
         int IndexCount;          // node+0x14
@@ -2118,7 +2132,7 @@ namespace
 
                         // Retail's per-vertex texcoord constructors (FUN_0043d950) write nothing.
                         RMesh->GetVertexCount(&Chunk.VertCount);
-                        Chunk.Verts = static_cast<unsigned char*>(
+                        Chunk.Verts = static_cast<FAsteroidCubeVertex*>(
                             operator new(static_cast<unsigned>(Chunk.VertCount) * kCubeVertStride));
                         TotalVerts += Chunk.VertCount;
                         RMesh->CopyVertexData(Chunk.Verts, D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_DIFFUSE | D3DFVF_TEX2, 0, Chunk.VertCount);
@@ -2133,25 +2147,22 @@ namespace
                         // then the node's offset (node+0x0c) added to the position.
                         for (unsigned Vi = 0; Vi < static_cast<unsigned>(Chunk.VertCount); ++Vi)
                         {
-                            float* const Vert =
-                                reinterpret_cast<float*>(Chunk.Verts + Vi * kCubeVertStride);
+                            FAsteroidCubeVertex* const Vert = &Chunk.Verts[Vi];
                             Vector OutPos;
                             CliAsteroidMathEngine()->TransformMatrix(
-                                OutPos, Entry.Orient,
-                                *reinterpret_cast<Vector const*>(Vert));
-                            Vert[0] = OutPos.x;
-                            Vert[1] = OutPos.y;
-                            Vert[2] = OutPos.z;
+                                OutPos, Entry.Orient, Vert->Position);
+                            Vert->Position.x = OutPos.x;
+                            Vert->Position.y = OutPos.y;
+                            Vert->Position.z = OutPos.z;
                             Vector OutNrm;
                             CliAsteroidMathEngine()->TransformMatrix(
-                                OutNrm, Entry.Orient,
-                                *reinterpret_cast<Vector const*>(Vert + 3));
-                            Vert[3] = OutNrm.x;
-                            Vert[4] = OutNrm.y;
-                            Vert[5] = OutNrm.z;
-                            Vert[0] = Entry.Extent.x + Vert[0];
-                            Vert[1] = Vert[1] + Entry.Extent.y;
-                            Vert[2] = Vert[2] + Entry.Extent.z;
+                                OutNrm, Entry.Orient, Vert->Normal);
+                            Vert->Normal.x = OutNrm.x;
+                            Vert->Normal.y = OutNrm.y;
+                            Vert->Normal.z = OutNrm.z;
+                            Vert->Position.x = Entry.Extent.x + Vert->Position.x;
+                            Vert->Position.y = Vert->Position.y + Entry.Extent.y;
+                            Vert->Position.z = Vert->Position.z + Entry.Extent.z;
                         }
                     }
                 }

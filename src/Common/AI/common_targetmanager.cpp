@@ -740,10 +740,9 @@ void TargetManager::UpdateAttackTargetOverride()
     if (!skipDirectiveGate)
     {
         IDirectiveInfo const* directive = behaviorMgr->get_current_directive();
-        unsigned char const* directiveBytes = reinterpret_cast<unsigned char const*>(directive);
-        int const directiveKind = *reinterpret_cast<int const*>(directiveBytes);
-        int const directiveArg = *reinterpret_cast<int const*>(directiveBytes + 4);
-        int const directiveTag = *reinterpret_cast<int const*>(directiveBytes + 8);
+        int const directiveKind = directive->Kind;
+        int const directiveArg = directive->Priority;
+        int const directiveTag = static_cast<int>(directive->BehaviorId);
         bool const isIdleDirective = (directiveKind == 1 && directiveArg == 0);
         if (directiveTag != BEHAVIOR_DELAY && directiveTag != BEHAVIOR_IDLE && isIdleDirective)
         {

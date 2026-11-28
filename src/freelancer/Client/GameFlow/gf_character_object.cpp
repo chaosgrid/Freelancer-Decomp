@@ -111,11 +111,6 @@ namespace
             ++Count;
         }
 
-        struct FDeformPartTable
-        {
-            int Count;
-            FDeformPartDesc* Entries;
-        };
         FDeformPartTable Table;
         Table.Count = Count;
         Table.Entries = Entries;
@@ -133,8 +128,7 @@ namespace
         }
         RefreshLoadingProgress();
 
-        DALib::Deform->Create(&Set->Instance, reinterpret_cast<int*>(&Table), nullptr, nullptr,
-                              nullptr);
+        DALib::Deform->Create(&Set->Instance, &Table, nullptr, nullptr, nullptr);
         RefreshLoadingProgress();
 
         for (Index = 0; Index < 4; ++Index)

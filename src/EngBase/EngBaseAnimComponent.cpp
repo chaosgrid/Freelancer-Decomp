@@ -544,12 +544,11 @@ unsigned long DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, unsigne
             static_cast<FTypedChannel*>(Owner)->BindMap((unsigned long*)BindA, BindB);
         if ((bBound & 0xFF) == 0)
         {
-            IDAComponent** Held =
-                reinterpret_cast<IDAComponent**>((unsigned char*)Owner + 0x24);
-            if (*Held != nullptr)
+            FTypedChannel* const Channel = static_cast<FTypedChannel*>(Owner);
+            if (Channel->Archetype != nullptr)
             {
-                (*Held)->Release();
-                *Held = nullptr;
+                Channel->Archetype->Release();
+                Channel->Archetype = nullptr;
             }
             ::operator delete(Owner);                            // FUN_066281d0
             return 0xFFFFFFFF;

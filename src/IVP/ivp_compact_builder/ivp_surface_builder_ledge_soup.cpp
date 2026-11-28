@@ -730,22 +730,22 @@ uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const IVP_Compact_L
     uint8_t* PointBase = m_VertexDedupBase;
 
     const int32_t TriangleCount = Dest->NTriangles;
-    uint32_t* TriangleEdges = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(Dest) + 0x14);
-    for (int32_t T = 0; T < TriangleCount; ++T, TriangleEdges += 4)
+    IVP_Compact_Edge* TriangleEdges = Dest->GetFirstEdge();
+    for (int32_t T = 0; T < TriangleCount; ++T, TriangleEdges += 4) // to the next triangle's first edge
     {
-        uint32_t* Edge = TriangleEdges;
+        IVP_Compact_Edge* Edge = TriangleEdges;
         for (int32_t K = 0; K < 3; ++K, ++Edge)
         {
-            uint8_t* SourcePoint = const_cast<uint8_t*>(SourcePoints + ((*Edge & 0xffffu) << 4));
+            uint8_t* SourcePoint = const_cast<uint8_t*>(SourcePoints + ((Edge->Data & 0xffffu) << 4));
             void* Found = m_VertexDedupIndex->FindElem(SourcePoint, IVP_PointHashIndex(SourcePoint));
             if (Found != nullptr)
             {
                 const int32_t ByteOffset = static_cast<int32_t>(static_cast<uint8_t*>(Found) - PointBase);
-                *Edge = (*Edge & 0xffff0000u) ^ (static_cast<uint32_t>(ByteOffset >> 4) & 0xffffu);
+                Edge->Data = (Edge->Data & 0xffff0000u) ^ (static_cast<uint32_t>(ByteOffset >> 4) & 0xffffu);
             }
             else
             {
-                *Edge = (*Edge & 0xffff0000u) | (m_VertexDedupCount & 0xffffu);
+                Edge->Data = (Edge->Data & 0xffff0000u) | (m_VertexDedupCount & 0xffffu);
                 uint8_t* NewPoint = PointBase + (m_VertexDedupCount << 4);
                 ++m_VertexDedupCount;
                 std::memcpy(NewPoint, SourcePoint, 16);
@@ -1367,10 +1367,10 @@ void IVP_SurfaceBuilder_Ledge_Soup::ApplyMassPropertyHeader()
 
     // Dword copies, inertia to +0xc..+0x14 first,
     // then com to +0x0..+0x8, then upper to +0x18.
-    uint8_t* Blob = static_cast<uint8_t*>(m_CompactSurface);
-    std::memcpy(Blob + 0xc, RotationInertia, sizeof(RotationInertia));
-    std::memcpy(Blob + 0x0, CenterOfMass, sizeof(CenterOfMass));
-    std::memcpy(Blob + 0x18, &UpperLimitRadius, sizeof(UpperLimitRadius));
+    IVP_Compact_Surface* const Blob = static_cast<IVP_Compact_Surface*>(m_CompactSurface);
+    std::memcpy(Blob->rotation_inertia, RotationInertia, sizeof(RotationInertia));
+    std::memcpy(Blob->mass_center, CenterOfMass, sizeof(CenterOfMass));
+    std::memcpy(&Blob->upper_limit_radius, &UpperLimitRadius, sizeof(UpperLimitRadius));
 
     // byte(ftol(dev / (upper * DAT_063a54b4) + 1.0f)) into the low byte of
     // [+0x1c], all on the x87 stack: the deviation in units of upper / 250.
@@ -1378,10 +1378,9 @@ void IVP_SurfaceBuilder_Ledge_Soup::ApplyMassPropertyHeader()
     const double Bucket = (double)(MaxSurfaceDeviation) / Scaled + 1.0;
     const uint32_t ClassifiedByte = static_cast<uint32_t>(static_cast<int32_t>(Bucket)) & 0xffu;
 
-    uint32_t PackedSizeAndFlags;
-    std::memcpy(&PackedSizeAndFlags, Blob + 0x1c, sizeof(PackedSizeAndFlags));
+    uint32_t PackedSizeAndFlags = Blob->max_deviation_and_size;
     PackedSizeAndFlags = (PackedSizeAndFlags & ~0xffu) | ClassifiedByte;
-    std::memcpy(Blob + 0x1c, &PackedSizeAndFlags, sizeof(PackedSizeAndFlags));
+    Blob->max_deviation_and_size = PackedSizeAndFlags;
 }
 
 // FUN_0636a190, thiscall with an unused
@@ -1462,8 +1461,8 @@ void* IVP_SurfaceBuilder_Ledge_Soup::Compile(const void* options)
         {
             // Shrink-copy into a new aligned block of (result[+0x1c] >> 8)
             // bytes.
-            const uint8_t* header = static_cast<const uint8_t*>(result);
-            const int32_t packedSize = *reinterpret_cast<const int32_t*>(header + 0x1c);
+            const IVP_Compact_Surface* header = static_cast<const IVP_Compact_Surface*>(result);
+            const int32_t packedSize = static_cast<int32_t>(header->max_deviation_and_size);
             const int32_t byteSize = packedSize >> 8;
             void* newBlock = ivp_malloc_aligned(static_cast<unsigned>(byteSize), 0x10); // FUN_06343fc0
             std::memcpy(newBlock, result, static_cast<size_t>(byteSize));

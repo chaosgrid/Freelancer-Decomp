@@ -54,6 +54,7 @@
 //     ported below; Solar keeps EqObj's.
 // ===========================================================================
 
+#include <cstddef>
 #include <list>
 #include <vector>
 
@@ -250,6 +251,36 @@ struct FDeathFuseEvent
     float Lifetime;                          // +0x0c  zeroed before the dispatch
 };
 static_assert(sizeof(FDeathFuseEvent) == 0x10, "FDeathFuseEvent is four dwords");
+
+// Controller message 0x18 (LootAcquired), built on the stack by StarSystem's tractor_loot after
+// add_cargo (server_starsys.cpp). The word at +0x0a is never written. Content's mission script
+// copies SubObjId into its loot record.
+struct FLootAcquiredEvent
+{
+    unsigned int LootId;          // +0x00
+    unsigned int ShipId;          // +0x04
+    unsigned short SubObjId;      // +0x08  add_cargo's result
+    unsigned short Pad0a;         // +0x0a
+    unsigned int GoodId;          // +0x0c
+    unsigned int Count;           // +0x10  Take
+};
+static_assert(offsetof(FLootAcquiredEvent, SubObjId) == 0x08, "FLootAcquiredEvent sub-object +0x08");
+static_assert(sizeof(FLootAcquiredEvent) == 0x14, "FLootAcquiredEvent is five dwords");
+
+// Controller message 0x3b (SystemEnter), seven dwords on the stack:
+// IServerImpl::SystemSwitchOutComplete (the jump) fills all of them, IServerImpl::
+// CharacterSelect / BaseEnter / Dock leave +0x0c..+0x18 zero. Content's SpacePop populates
+// around Position.
+struct FSystemEnterEvent
+{
+    unsigned int SystemId;        // +0x00  the system entered
+    unsigned int OtherSystemId;   // +0x04  the system left (0 from CharacterSelect)
+    unsigned int PlayerId;        // +0x08  the session id
+    unsigned int ArrivalObjId;    // +0x0c  the arrival object's get_id(), or 0
+    Vector Position;              // +0x10
+};
+static_assert(offsetof(FSystemEnterEvent, Position) == 0x10, "FSystemEnterEvent position +0x10");
+static_assert(sizeof(FSystemEnterEvent) == 0x1c, "FSystemEnterEvent is seven dwords");
 
 // The CEquipTraverser type masks Server.dll walks with: CAttachedEquip's family (the guns,
 // dropper, shield, shield generator, thruster, cargo pod and cloak), the same without the

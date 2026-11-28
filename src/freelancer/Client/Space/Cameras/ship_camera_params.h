@@ -6,36 +6,11 @@
 
 #pragma once
 
-// The camera block inside a ship archetype's client companion (Archetype::Root + 0x04, the
-// ICliObj). Written by the ship ini value handler at 0x0040763f, and read back by the
+// The camera block of a ship archetype's client companion (Archetype::FCliShip +0x68, in
+// client_cliobj.h) is written by the ship ini value handler at 0x0040763f, and read back by the
 // third-person camera's attach (FUN_00518af0 at 0x00518b75).
-//
-// The struct covers only the camera fields and records their retail offsets inside the ICliObj
-// (just before them: +0x5c bay_doors_close_snd, +0x60 cockpit, +0x64 pilot_mesh).
-
-class INI_Reader;
-
-struct FShipCameraParams
-{
-    float Offset[2];                    // +0x68 / +0x6c  camera_offset
-    float AngularAcceleration;          // +0x70
-    float AngularSlerpMultiplier;       // +0x74
-    float HorizontalTurnAngle;          // +0x78  radians
-    float VerticalTurnUpAngle;          // +0x7c  radians
-    float VerticalTurnDownAngle;        // +0x80  radians
-    float TurnLookAheadSlerpAmount;     // +0x84
-};
 
 // The three turn angles are clamped to [0, 90] DEGREES and then converted to radians
 // (DAT_005c7474 = 0.0, DAT_005c77f0 = 90.0, DAT_005c77f4 = 0.01745329238474369f).
 float ShipCameraClampTurnAngle(float Degrees);
 
-// One step of the ship ini value handler, covering only the camera keys. Returns true when the
-// current value was one of them. Retail tests them in this order, each with its own early
-// return, inside a much longer is_value chain.
-bool ShipCameraParamsReadValue(FShipCameraParams* Params, INI_Reader* Reader);
-
-// The state a fresh companion starts in. Retail zero-fills the companion on allocation and
-// never assigns camera defaults, so an ini with no camera keys leaves every field at zero --
-// including the offset, which is why every shipped ship entry carries camera_offset.
-void ShipCameraParamsClear(FShipCameraParams* Params);

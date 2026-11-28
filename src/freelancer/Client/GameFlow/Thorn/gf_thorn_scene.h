@@ -42,8 +42,8 @@ struct FThorn_Scene : FThornComponent
     GENRESULT DACOM_API SetTableMode(unsigned char Table, unsigned int Mode) override; // 9 LAB_004545d0
     GENRESULT DACOM_API GetTableMode(unsigned char* OutTable,
                                      unsigned int* OutMode) override;             // 10 LAB_00454600
-    GENRESULT DACOM_API SetPacked(unsigned char const* Packed32) override;        // 11 FUN_00454640
-    GENRESULT DACOM_API GetPacked(unsigned char* Out32) override;                 // 12 FUN_00454690
+    GENRESULT DACOM_API SetPacked(FThornFog8 const* Packed) override;             // 11 FUN_00454640
+    GENRESULT DACOM_API GetPacked(FThornFog8* Out) override;                      // 12 FUN_00454690
     GENRESULT DACOM_API SetRangeValue(const float* Start, const float* End,
                                       const float* Density) override; // modern 13 +0x34
 

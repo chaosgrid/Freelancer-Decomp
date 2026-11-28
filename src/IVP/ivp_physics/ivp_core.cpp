@@ -53,23 +53,12 @@ namespace
         return Value;
     }
 
-    char* IVP_Contact_Node_Next(char* Node)
-    {
-        return *reinterpret_cast<char**>(Node);
-    }
-
-    IVP_Contact_Point* IVP_Contact_Node_Record(char* Node)
-    {
-        return reinterpret_cast<IVP_Contact_Point*>(Node + *reinterpret_cast<int16_t*>(Node + 0xc)); // signed word
-    }
-
     // FUN_06346770 (thiscall): the long-term impact info's constructor body
     // -- Status (+0x52) word = 0, the dword at +0x54 &= 0xfffffc00. 063464a0
     // inlines the same two stores (:06346534-:0634654e).
     void IVP_Mindist_Reset_Long_Term_State(IVP_Impact_Solver_Long_Term* Info)
     {
-        uint32_t* const Dword54 = reinterpret_cast<uint32_t*>(&Info->StateProcessed);
-        *Dword54 &= 0xfffffc00u;
+        Info->PackedState &= 0xfffffc00u;
         Info->Status = 0;
     }
 }
@@ -130,11 +119,11 @@ void IVP_Core::recalc_contact_points_of_fixed_core()
     IVP_Impact_Solver_Long_Term Info; // the stack long-term info (ESP+0x14), only +0x52 / +0x54 reset per use
     for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:063464b8)
     {
-        char* Node = static_cast<char*>(Objects.elems[ObjIndex]->mindist_list); // :063464cc-:063464d2
+        IVP_Synapse_Friction* Node = Objects.elems[ObjIndex]->mindist_list; // :063464cc-:063464d2
         while (Node != nullptr)
         {
-            IVP_Contact_Point* const Record = IVP_Contact_Node_Record(Node);
-            char* const Next = IVP_Contact_Node_Next(Node); // read first (:063464e1)
+            IVP_Contact_Point* const Record = Node->get_contact_point();
+            IVP_Synapse_Friction* const Next = Node->next; // read first (:063464e1)
 
             IVP_ListManager* const FrictionSystem = Record->ListManagerOwner;              // :063464e5
             FrictionSystem->union_find_necessary = 1;                                      // :063464e8-:063464f4
@@ -219,17 +208,17 @@ void IVP_Core::refresh_contact_points()
     ++Environment->sim_unit_mem->State;
     for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:06346651)
     {
-        char* Node = static_cast<char*>(Objects.elems[ObjIndex]->mindist_list); // :06346661-:06346667
+        IVP_Synapse_Friction* Node = Objects.elems[ObjIndex]->mindist_list; // :06346661-:06346667
         if (Node == nullptr)
         {
             continue;
         }
         // The friction system of the first contact point; every other one is
         // merged into it (:06346672-:06346676, :06346684-:0634668b).
-        IVP_ListManager* const FrictionSystem = IVP_Contact_Node_Record(Node)->ListManagerOwner;
+        IVP_ListManager* const FrictionSystem = Node->get_contact_point()->ListManagerOwner;
         do
         {
-            IVP_Contact_Point* const Record = IVP_Contact_Node_Record(Node);
+            IVP_Contact_Point* const Record = Node->get_contact_point();
             if (Record->ListManagerOwner != FrictionSystem)
             {
                 FrictionSystem->MergeFrom(Record->ListManagerOwner); // FUN_063555b0
@@ -243,7 +232,7 @@ void IVP_Core::refresh_contact_points()
             Record->PopulateOwner(&Info);  // :063466e9 FUN_06358c50
             Record->ComputeMassFactor();         // :063466f0 FUN_063562d0
 
-            Node = IVP_Contact_Node_Next(Node); // :063466f5, read after the calls
+            Node = Node->next; // :063466f5, read after the calls
         } while (Node != nullptr);
     }
     --Environment->sim_unit_mem->State;        // :0634670f-:06346718
@@ -828,7 +817,7 @@ void IVP_Core::detach_controller(IVP_Controller* Controller)
 // FUN_06347c40. Hashmap mode: FUN_06352930(Key) with ObjectHashMap as `this`
 // (FUN_06352930 only hashes the key and forwards ECX to FUN_06352980,
 // IVP_VHash_Store::FindElem). Single-slot mode: the cached candidate when its
-// +0x8 equals Key. FUN_06347c40 has 16 callers, some on other classes (e.g.
+// FrictionSystem (+0x8) equals Key. FUN_06347c40 has 16 callers, some on other classes (e.g.
 // FUN_06359340 over another class's +0x20); only the IVP_Core ones (e.g.
 // 06356d1d) are ported.
 IVP_Friction_Info_For_Core* IVP_Core::find_object_hash_entry(unsigned Key) const
@@ -845,12 +834,12 @@ IVP_Friction_Info_For_Core* IVP_Core::find_object_hash_entry(unsigned Key) const
     if (Candidate == nullptr)
         return nullptr;
 
-    unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
+    unsigned CandidateKey = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Candidate->FrictionSystem));
     return (CandidateKey == Key) ? Candidate : nullptr;
 }
 
 // FUN_06347c80 (its SEH frame is not reproduced). Registers Candidate under its
-// +0x8. Hashmap mode: a null ObjectHashMap is first created --
+// FrictionSystem (+0x8). Hashmap mode: a null ObjectHashMap is first created --
 // operator_new(0x14), FUN_063525f0(2) only on a non-null block -- then
 // FUN_063526d0 inserts (key, Candidate). Single-slot mode: ObjectHashMap =
 // Candidate (no free; the slot never owns it).
@@ -865,7 +854,7 @@ void IVP_Core::register_object_hash_entry(IVP_Friction_Info_For_Core* Candidate)
             this->ObjectHashMap = (Map != nullptr) ? new (Map) IVP_VHash_Store(2) : nullptr; // FUN_063525f0
         }
 
-        unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
+        unsigned CandidateKey = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Candidate->FrictionSystem));
         static_cast<IVP_VHash_Store*>(this->ObjectHashMap)->AddElem(reinterpret_cast<void*>(CandidateKey), Candidate); // FUN_063526d0
     }
     else

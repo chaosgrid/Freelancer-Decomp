@@ -615,34 +615,34 @@ namespace
         Map.Cursor = 0;
         if (Map.View == nullptr)
             return 0;
-        const unsigned long* Riff = reinterpret_cast<const unsigned long*>(Map.Range(0, 0xC));
+        const RIFFLIST* Riff = reinterpret_cast<const RIFFLIST*>(Map.Range(0, 0xC));
         if (Riff == nullptr)
             return 0;
         Map.Cursor += 0xC;
-        if (Riff[0] != 0x46464952 || Riff[2] != 0x45564157) // "RIFF" / "WAVE"
+        if (Riff->fcc != 0x46464952 || Riff->fccListType != 0x45564157) // "RIFF" / "WAVE"
             return 0;
         // A chunk pointer addresses its 8-byte header; the last chunk of each kind wins.
-        const unsigned long* FmtChunk = nullptr;
-        const unsigned long* FactChunk = nullptr;
-        const unsigned long* TrimChunk = nullptr;
-        const unsigned long* DataChunk = nullptr;
+        const RIFFCHUNK* FmtChunk = nullptr;
+        const FRiffDwordChunk* FactChunk = nullptr;
+        const FRiffDwordChunk* TrimChunk = nullptr;
+        const RIFFCHUNK* DataChunk = nullptr;
         for (;;)
         {
-            const unsigned long* Chunk = reinterpret_cast<const unsigned long*>(Map.Range(Map.Cursor, 8));
+            const RIFFCHUNK* Chunk = reinterpret_cast<const RIFFCHUNK*>(Map.Range(Map.Cursor, 8));
             if (Chunk == nullptr)
                 break;
             Map.Cursor += 8;
-            const unsigned long Id = Chunk[0];
+            const unsigned long Id = Chunk->fcc;
             if (Id == 0x74636166) // "fact"
-                FactChunk = Chunk;
+                FactChunk = reinterpret_cast<const FRiffDwordChunk*>(Chunk);
             else if (Id == 0x6D697274) // "trim"
-                TrimChunk = Chunk;
+                TrimChunk = reinterpret_cast<const FRiffDwordChunk*>(Chunk);
             else if (Id == 0x20746D66) // "fmt "
                 FmtChunk = Chunk;
             else if (Id == 0x61746164) // "data"
                 DataChunk = Chunk;
             // No even-size padding; the signed sum is clamped to [0, mapped size].
-            long Next = static_cast<long>(Chunk[1] + Map.Cursor);
+            long Next = static_cast<long>(Chunk->cb + Map.Cursor);
             if (Next < 0)
                 Next = 0;
             if (Next > static_cast<long>(Map.Size))
@@ -651,25 +651,25 @@ namespace
         }
         if (FmtChunk == nullptr || DataChunk == nullptr)
             return 0;
-        const WAVEFORMATEX* Format = reinterpret_cast<const WAVEFORMATEX*>(FmtChunk + 2);
+        const WAVEFORMATEX* Format = reinterpret_cast<const WAVEFORMATEX*>(FmtChunk + 1);
         const unsigned short Tag = Format->wFormatTag;
-        if (FmtChunk[1] < (Tag == WAVE_FORMAT_PCM ? 0xEu : 0x12u))
+        if (FmtChunk->cb < (Tag == WAVE_FORMAT_PCM ? 0xEu : 0x12u))
             return 0;
         unsigned long FactSamples = 0xFFFFFFFF;
-        if (FactChunk != nullptr && FactChunk[1] >= 4)
-            FactSamples = FactChunk[2];
+        if (FactChunk != nullptr && FactChunk->Header.cb >= 4)
+            FactSamples = FactChunk->Value;
         unsigned long TrimSamples = 0xFFFFFFFF;
-        if (TrimChunk != nullptr && TrimChunk[1] == 4)
-            TrimSamples = TrimChunk[2];
-        const unsigned char* Samples = reinterpret_cast<const unsigned char*>(DataChunk + 2);
+        if (TrimChunk != nullptr && TrimChunk->Header.cb == 4)
+            TrimSamples = TrimChunk->Value;
+        const unsigned char* Samples = reinterpret_cast<const unsigned char*>(DataChunk + 1);
         if (Tag != WAVE_FORMAT_PCM)
-            return WavLibAcmDecode(Format, Samples, DataChunk[1], TrimSamples, FactSamples, Sink);
+            return WavLibAcmDecode(Format, Samples, DataChunk->cb, TrimSamples, FactSamples, Sink);
         unsigned short Fmt8[4];
         Fmt8[0] = Format->nChannels;
         Fmt8[1] = static_cast<unsigned short>(Format->wBitsPerSample >> 3);
         Fmt8[2] = static_cast<unsigned short>(Format->nSamplesPerSec);
         Fmt8[3] = static_cast<unsigned short>(Fmt8[1] * Fmt8[0]);
-        return Sink->Consume(Fmt8, Samples, DataChunk[1]);
+        return Sink->Consume(Fmt8, Samples, DataChunk->cb);
     }
 
     // Stack object of FUN_06ee1240 (vtable PTR_LAB_06ee9210).
@@ -2641,16 +2641,15 @@ int DACOM_API FSoundManager::CreateArchetypePcm(void* Fmt, unsigned long ByteCou
 int DACOM_API FSoundManager::CreateArchetypeFromSource(void* Source, unsigned long ArchFlags)
 {
     // LAB_06ee2dc0: FUN_06ee2be0's sequence with the arguments read from a PCM descriptor
-    // (format +0, loop start +0x8, loop end +0xC, byte count +0x14, samples +0x18), read only
-    // once the device is known to exist. A null operator new result is dereferenced unchecked.
+    // (FSoundPcmSource), read only once the device is known to exist. A null operator new result is dereferenced unchecked.
     FSoundArchetype* Archetype = new (std::nothrow) FSoundArchetype();
-    const unsigned char* Desc = static_cast<const unsigned char*>(Source);
+    const FSoundPcmSource* Desc = static_cast<const FSoundPcmSource*>(Source);
     if (DirectSound == nullptr ||
-        Archetype->FillFromPcm(reinterpret_cast<const unsigned short*>(Desc),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0x14),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0x8),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0xC),
-                               *reinterpret_cast<void* const*>(Desc + 0x18), DirectSound,
+        Archetype->FillFromPcm(Desc->Format,
+                               Desc->ByteCount,
+                               Desc->LoopStart,
+                               Desc->LoopEnd,
+                               Desc->Samples, DirectSound,
                                ArchFlags) != GR_OK)
     {
         Archetype->Release();

@@ -11,6 +11,7 @@
 // ad40), the ray solver (0634a3f0 / 0634a4e0) and the radius query (0634a9b0); the same node
 // layout is written by the ledge-soup compiler (IVP_SurfaceBuilder_Ledge_Soup::CompileNode, 0636b5e0).
 
+#include <cstddef>
 #include <cstdint>
 #include "../ivp_compact_builder/ivp_compact_ledge.h"
 
@@ -53,6 +54,9 @@ public:
     float    upper_limit_radius;      // +0x18
     uint32_t max_deviation_and_size;  // +0x1c: low byte = max_factor_surface_deviation
     int32_t  offset_ledgetree_root;   // +0x20: self-relative
+    // +0x24..+0x2f: zeroed by the ledge-soup compiler (FUN_0636b190); the
+    // ledges follow the header at +0x30.
+    int32_t  dummy[3];
 
     const IVP_Compact_Ledgetree_Node* get_compact_ledge_tree_root() const
     {
@@ -60,6 +64,9 @@ public:
             reinterpret_cast<const char*>(this) + offset_ledgetree_root);
     }
 };
-static_assert(sizeof(IVP_Compact_Surface) == 0x24, "IVP_Compact_Surface header size");
+static_assert(offsetof(IVP_Compact_Surface, max_deviation_and_size) == 0x1c, "IVP_Compact_Surface+0x1c");
+static_assert(offsetof(IVP_Compact_Surface, offset_ledgetree_root) == 0x20, "IVP_Compact_Surface+0x20");
+static_assert(offsetof(IVP_Compact_Surface, dummy) == 0x24, "IVP_Compact_Surface+0x24");
+static_assert(sizeof(IVP_Compact_Surface) == 0x30, "IVP_Compact_Surface header size");
 
 #pragma pack(pop)

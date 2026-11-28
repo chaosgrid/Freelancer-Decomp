@@ -382,6 +382,25 @@ struct FHardpointKey
     unsigned long Crc;
 };
 
+// The 0x48-byte record of one hardpoint (IHardpoint::GetHardpoint / AddHardpoint). EngBase's
+// create_archetype (LAB_06625e60) fills it from the archetype's Hardpoints folder: the joint
+// type from the folder name, then the files "Position" and "Orientation", and for a non-fixed
+// joint "Axis", "Min" and "Max"; ConnectHardpoints (LAB_06626690) builds an FEngineJointBlock
+// from two of them.
+struct FHardpointData
+{
+    unsigned long Type;   // +0x00  EEngineJointType (only Fix, Pris, Rev are read)
+    Vector Position;      // +0x04
+    Matrix Orient;        // +0x10
+    Vector Axis;          // +0x34
+    float Min;            // +0x40
+    float Max;            // +0x44
+};
+static_assert(offsetof(FHardpointData, Orient) == 0x10, "FHardpointData::Orient");
+static_assert(offsetof(FHardpointData, Axis) == 0x34, "FHardpointData::Axis");
+static_assert(offsetof(FHardpointData, Min) == 0x40, "FHardpointData::Min");
+static_assert(sizeof(FHardpointData) == 0x48, "FHardpointData is the 0x48-byte hardpoint record");
+
 // Enumerates borrowed lowercase names in insertion order; callback result is discarded.
 typedef void(__cdecl* FHardpointEnumProc)(char const* Name, void* Context);
 
@@ -405,6 +424,18 @@ struct IHardpoint : IDAComponent
     virtual char const* DACOM_API FindHardpoint(ArchetypeIndex Handle,
                                                 unsigned long const* Crc) = 0;          // 7
 };
+
+// A key of a position + orientation channel (EngBase channel type 6, mixer kind 7) and the
+// sample interpolated from two of them: the seven floats EngBase's type-6 Interpolate /
+// InterpolatePose read and write and FUN_0661d460 blends (vec3 lerp, slerp of the quaternion
+// at +0xC); Deformable2's PlayAnimChain (FUN_065f4660) reads its root keys the same way.
+struct FPosQuatSample
+{
+    Vector Pos;        // +0x00
+    Quaternion Quat;   // +0x0C  W, X, Y, Z
+};
+static_assert(offsetof(FPosQuatSample, Quat) == 0xC, "pos/quat sample Quat");
+static_assert(sizeof(FPosQuatSample) == 7 * sizeof(float), "pos/quat sample is seven floats");
 
 // ChannelArchetype — 11 slots. Not in [Engine] INI.
 struct IChannelArchetype : IDAComponent
@@ -473,15 +504,25 @@ struct FDeformPartDesc
                             //       mesh+0x70 = 1 (065f3b3a SETC)
 };
 
+// What the Parts argument of IDeformable::Create / CreateAlias points at (FUN_065f36c0 reads
+// the count, then the entries; the client builds it at the head of FEngineCharacterBodyDesc).
+struct FDeformPartTable
+{
+    int Count;                 // +0x00
+    FDeformPartDesc* Entries;  // +0x04 Count entries
+};
+static_assert(offsetof(FDeformPartTable, Entries) == 4, "FDeformPartTable::Entries");
+static_assert(sizeof(FDeformPartTable) == 8, "FDeformPartTable is two dwords");
+
 // IDeformable — 39 slots (docs/re/deformable2.md). Facet at object+0.
 struct IDeformable : IDAComponent
 {
-    virtual GENRESULT DACOM_API Create(void** OutInstance, int* Parts, void* Arg3, void* Arg4,
-                                       void* Arg5) = 0;                                  // 3
+    virtual GENRESULT DACOM_API Create(void** OutInstance, FDeformPartTable* Parts, void* Arg3,
+                                       void* Arg4, void* Arg5) = 0;                      // 3
     virtual GENRESULT DACOM_API CreateUnused(void* A, void* B, void* C, void* D, void* E,
                                               void* F, void* G) = 0;                     // 4 always -1
-    virtual GENRESULT DACOM_API CreateAlias(void** OutInstance, int* Parts, void* Arg3, void* Arg4,
-                                            void* Arg5) = 0;                             // 5
+    virtual GENRESULT DACOM_API CreateAlias(void** OutInstance, FDeformPartTable* Parts,
+                                            void* Arg3, void* Arg4, void* Arg5) = 0;     // 5
     virtual GENRESULT DACOM_API Destroy(void* Instance) = 0;                              // 6
     virtual GENRESULT DACOM_API Play(void* Instance, int* Out, void* Name, void* Extra, void* ArgC,
                                       void* ArgD, void* ArgE, void* ArgF, void* ArgG, void* ArgH,

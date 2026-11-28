@@ -6,9 +6,11 @@
 
 #include "Space/cockpit_load.h"
 
+#include "Common/client_cliobj.h"
 #include "Space/player_spawn.h"
 #include "common_archetype.h"
 #include "common_cobject.h"
+#include "common_iface.h"  // IObjInspectImpl
 #include "common_misc.h" // GetFileSysPath
 #include "dacom.h"
 #include "Space/HUD/hud_element_list.h"
@@ -34,30 +36,6 @@ namespace
     // IObjRW.
     const int kWatchableOffset = 8;
 
-    // Retail CEqObj offsets used by FUN_00543350.
-    struct FPlayerShipView
-    {
-        void* Vtable;
-        unsigned char PadTo4c[0x48];
-        unsigned FlagsAt4c;
-        unsigned char PadTo88[0x38];
-        Archetype::Root* Archetype;
-    };
-
-    static_assert(offsetof(FPlayerShipView, FlagsAt4c) == 0x4c, "CEqObj+0x4c class flags");
-    static_assert(offsetof(FPlayerShipView, Archetype) == 0x88, "CObject+0x88 archetype");
-
-    // Archetype::CliShip companion — cockpit ini path at retail +0x60.
-    struct FCliShipCompanionView
-    {
-        void* Vtable;
-        unsigned char PadTo60[0x5C];
-        char* CockpitIniPath;
-    };
-
-    static_assert(offsetof(FCliShipCompanionView, CockpitIniPath) == 0x60,
-                  "CliShip+0x60 cockpit ini path");
-
     // player_spawn.cpp's fallback when it has no manager object; never bound.
     static FCockpitMeshHolder GCockpitMeshHolder;
 
@@ -70,15 +48,17 @@ namespace
     // retail dereferences it anyway, so no guard is added here either.
     Archetype::Root* ShipArchetypeOf(IObjRW* ObjRW)
     {
-        FPlayerShipView* EqObj = nullptr;
+        CEqObj* EqObj = nullptr;
         if (ObjRW != nullptr)
         {
             unsigned char* const Base = reinterpret_cast<unsigned char*>(ObjRW) + 0x0c;
             if (Base != nullptr)
             {
-                FPlayerShipView* const Candidate = *reinterpret_cast<FPlayerShipView**>(Base + 4);
+                CEqObj* const Candidate =
+                    static_cast<CEqObj*>(static_cast<IObjInspectImpl*>(ObjRW)->Object);
                 if (Candidate != nullptr &&
-                    (Candidate->FlagsAt4c & kShipObjectClassFlags) == kShipObjectClassFlags)
+                    (static_cast<unsigned>(Candidate->ObjectClass) & kShipObjectClassFlags) ==
+                        kShipObjectClassFlags)
                     EqObj = Candidate;
             }
         }
@@ -103,7 +83,7 @@ bool InitPlayerCockpitSlice()
     // Retail tests only the first character -- the path pointer itself is never null-tested.
     Archetype::Root* const Arch = ShipArchetypeOf(ObjRW);
     const char* const CockpitPath =
-        reinterpret_cast<FCliShipCompanionView*>(Arch->Companion)->CockpitIniPath;
+        static_cast<Archetype::FCliShip*>(Arch->Companion)->CockpitIni.Value;
 
     char FullPath[MAX_PATH];
     if (CockpitPath[0] == '\0')

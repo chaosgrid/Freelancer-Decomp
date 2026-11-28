@@ -238,14 +238,6 @@ namespace
         }
     }
 
-    // FUN_004032a0 -- FUN_00403200's body on the container at this + 4 (the map node's value).
-    void DestroyBatchContainerEmbedded(void* Owner)
-    {
-        FScreenQuadBatchContainer* Pool =
-            reinterpret_cast<FScreenQuadBatchContainer*>(static_cast<unsigned char*>(Owner) + 4);
-        DestroyBatchContainer(Pool);
-    }
-
     // The value of one DAT_00616478 map node: the container at node+0x10. Its destructor is the
     // map's value destructor FUN_00405820 = FUN_004032a0. Retail inserts a copy of a temporary
     // (FUN_004045b0 / the inline copy in FUN_00402f40); constructing the entry in place gives the
@@ -277,6 +269,14 @@ namespace
         FScreenQuadBatchEntry(FScreenQuadBatchEntry const&) = delete;
         FScreenQuadBatchEntry& operator=(FScreenQuadBatchEntry const&) = delete;
     };
+
+    // FUN_004032a0 -- FUN_00403200's body on the container at this + 4 (the map node's value).
+    void DestroyBatchContainerEmbedded(
+        std::pair<unsigned long const, FScreenQuadBatchEntry>* Owner)
+    {
+        FScreenQuadBatchContainer* Pool = &Owner->second.Container;
+        DestroyBatchContainer(Pool);
+    }
 
     // DAT_00616478 -- std::map<material-list key, container> (head DAT_0061647c, size
     // DAT_00616488). Static init LAB_00402c10 / atexit LAB_00402c40.

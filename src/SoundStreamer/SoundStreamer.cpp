@@ -514,7 +514,7 @@ namespace
         PrepareAcmSource(Stream, SrcWant);
         if (Stream->AcmHeader.pbSrc == nullptr || Stream->AcmHeader.cbSrcLength == 0)
             return 0;
-        WAVEFORMATEX* Fmt = reinterpret_cast<WAVEFORMATEX*>(Stream->FmtBlob);
+        WAVEFORMATEX* Fmt = Stream->FmtBlob;
         if (Fmt->wFormatTag == WAVE_FORMAT_MPEGLAYER3 &&
             Stream->AcmHeader.pbSrc == Stream->DataPtr && Stream->EncoderDelayBytes == -1)
             Stream->EncoderDelayBytes = static_cast<long>(PcmFrameBytes(Stream) * Stream->TrimSamples);
@@ -547,7 +547,7 @@ namespace
             return;
         acmStreamClose(Stream->AcmStream, 0);
         Stream->AcmStream = nullptr;
-        WAVEFORMATEX* Src = reinterpret_cast<WAVEFORMATEX*>(Stream->FmtBlob);
+        WAVEFORMATEX* Src = Stream->FmtBlob;
         WAVEFORMATEX* Dst = reinterpret_cast<WAVEFORMATEX*>(&Stream->PcmTag);
         if (acmStreamOpen(&Stream->AcmStream, G_FraunhoferDriver, Src, Dst, nullptr, 0, 0,
                           ACM_STREAMOPENF_NONREALTIME) != 0)
@@ -1286,7 +1286,7 @@ bool FSoundStreamer::OpenAcmStream(FStreamingSound* Stream)
     // FUN_06ef13d0. No handle check.
     if (Stream->DataPtr == nullptr)
         return false;
-    WAVEFORMATEX* Src = reinterpret_cast<WAVEFORMATEX*>(Stream->FmtBlob);
+    WAVEFORMATEX* Src = Stream->FmtBlob;
     WAVEFORMATEX* Dst = reinterpret_cast<WAVEFORMATEX*>(&Stream->PcmTag);
     Dst->wFormatTag = WAVE_FORMAT_PCM;
     if (acmFormatSuggest(G_FraunhoferDriver, Src, Dst, 0x12, ACM_FORMATSUGGESTF_WFORMATTAG) != 0)
@@ -1296,7 +1296,7 @@ bool FSoundStreamer::OpenAcmStream(FStreamingSound* Stream)
         return false;
     memset(&Stream->AcmHeader, 0, sizeof(Stream->AcmHeader));
     Stream->AcmHeader.cbStruct = 0x54;
-    const unsigned long Avg = *reinterpret_cast<unsigned long*>(Stream->FmtBlob + 8);
+    const unsigned long Avg = Stream->FmtBlob->nAvgBytesPerSec;
     // Low dword of the int64 truncation.
     const double Scaled = static_cast<double>(static_cast<unsigned long long>(Avg)) *
                           static_cast<double>(Stream->Threshold);
@@ -1309,7 +1309,7 @@ bool FSoundStreamer::OpenAcmStream(FStreamingSound* Stream)
                       ACM_STREAMSIZEF_DESTINATION) != 0)
         return false;
     DWORD Block = 0;
-    const unsigned short SrcAlign = *reinterpret_cast<unsigned short*>(Stream->FmtBlob + 0xC);
+    const unsigned short SrcAlign = Stream->FmtBlob->nBlockAlign;
     if (acmStreamSize(Stream->AcmStream, SrcAlign, &Block, ACM_STREAMSIZEF_SOURCE) != 0)
         Block = 0x1000;
     Stream->SourceBlock = Block;
@@ -1466,35 +1466,35 @@ bool FSoundStreamer::LoadWav(FStreamingSound* Stream, const char* Path, IDACompo
     if (MapFileView(Stream) == 0)
         return false;
 
-    unsigned char* Riff = PeekMapped(Stream, Stream->ReadCursor, 0xC);
+    const RIFFLIST* Riff = reinterpret_cast<const RIFFLIST*>(PeekMapped(Stream, Stream->ReadCursor, 0xC));
     if (Riff == nullptr)
         return false;
     Stream->ReadCursor += 0xC;
-    if (*reinterpret_cast<unsigned long*>(Riff) != 0x46464952)
+    if (Riff->fcc != 0x46464952)
         return false;
-    if (*reinterpret_cast<unsigned long*>(Riff + 8) != 0x45564157)
+    if (Riff->fccListType != 0x45564157)
         return false;
 
-    unsigned char* FmtHdr = nullptr;
-    unsigned char* DataHdr = nullptr;
-    unsigned char* FactHdr = nullptr;
-    unsigned char* TrimHdr = nullptr;
+    RIFFCHUNK* FmtHdr = nullptr;
+    RIFFCHUNK* DataHdr = nullptr;
+    const FRiffDwordChunk* FactHdr = nullptr;
+    const FRiffDwordChunk* TrimHdr = nullptr;
     for (;;)
     {
-        unsigned char* Chunk = PeekMapped(Stream, Stream->ReadCursor, 8);
+        RIFFCHUNK* Chunk = reinterpret_cast<RIFFCHUNK*>(PeekMapped(Stream, Stream->ReadCursor, 8));
         if (Chunk == nullptr)
             break;
         Stream->ReadCursor += 8;
-        const unsigned long Id = *reinterpret_cast<unsigned long*>(Chunk);
-        const unsigned long Size = *reinterpret_cast<unsigned long*>(Chunk + 4);
+        const unsigned long Id = Chunk->fcc;
+        const unsigned long Size = Chunk->cb;
         if (Id == 0x6D697274)
-            TrimHdr = Chunk;
+            TrimHdr = reinterpret_cast<const FRiffDwordChunk*>(Chunk);
         else if (Id == 0x20746D66)
             FmtHdr = Chunk;
         else if (Id == 0x61746164)
             DataHdr = Chunk;
         else if (Id == 0x74636166)
-            FactHdr = Chunk;
+            FactHdr = reinterpret_cast<const FRiffDwordChunk*>(Chunk);
         // Signed clamp to [0, mapped size].
         long Next = static_cast<long>(Stream->ReadCursor + Size);
         if (Next < 0)
@@ -1508,14 +1508,14 @@ bool FSoundStreamer::LoadWav(FStreamingSound* Stream, const char* Path, IDACompo
     if (FmtHdr == nullptr || DataHdr == nullptr)
         return false;
 
-    if (FactHdr != nullptr && *reinterpret_cast<unsigned long*>(FactHdr + 4) >= 4)
-        Stream->FactSamples = *reinterpret_cast<unsigned long*>(FactHdr + 8);
+    if (FactHdr != nullptr && FactHdr->Header.cb >= 4)
+        Stream->FactSamples = FactHdr->Value;
     else
         Stream->FactSamples = 0xFFFFFFFF;
 
-    Stream->FmtBlob = FmtHdr + 8;
-    const unsigned short Tag = *reinterpret_cast<unsigned short*>(Stream->FmtBlob);
-    const unsigned long FmtSize = *reinterpret_cast<unsigned long*>(FmtHdr + 4);
+    Stream->FmtBlob = reinterpret_cast<WAVEFORMATEX*>(FmtHdr + 1);
+    const unsigned short Tag = Stream->FmtBlob->wFormatTag;
+    const unsigned long FmtSize = FmtHdr->cb;
     if (Tag == 1)
     {
         if (FmtSize < 0x10)
@@ -1524,15 +1524,15 @@ bool FSoundStreamer::LoadWav(FStreamingSound* Stream, const char* Path, IDACompo
     else if (FmtSize < 0x12)
         return false;
 
-    if (TrimHdr != nullptr && *reinterpret_cast<unsigned long*>(TrimHdr + 4) == 4)
-        Stream->TrimSamples = *reinterpret_cast<unsigned long*>(TrimHdr + 8);
+    if (TrimHdr != nullptr && TrimHdr->Header.cb == 4)
+        Stream->TrimSamples = TrimHdr->Value;
     else
         Stream->TrimSamples = 0;
 
-    Stream->DataPtr = DataHdr + 8;
-    Stream->DataSize = *reinterpret_cast<unsigned long*>(DataHdr + 4);
-    const unsigned short BlockAlign = *reinterpret_cast<unsigned short*>(Stream->FmtBlob + 0xC);
-    const unsigned long Avg = *reinterpret_cast<unsigned long*>(Stream->FmtBlob + 8);
+    Stream->DataPtr = reinterpret_cast<unsigned char*>(DataHdr + 1);
+    Stream->DataSize = DataHdr->cb;
+    const unsigned short BlockAlign = Stream->FmtBlob->nBlockAlign;
+    const unsigned long Avg = Stream->FmtBlob->nAvgBytesPerSec;
     Stream->AlignedSize = AlignUp(Avg, BlockAlign);
 
     unsigned long BufferBytes = 0;

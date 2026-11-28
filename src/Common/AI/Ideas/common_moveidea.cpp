@@ -161,8 +161,9 @@ int MoveIdea::Update(float DeltaTime)
         return 1;
     }
 
-    // The steering body. Pathfind+0x214 is never tested.
-    unsigned char* const SlotBlock = SlotArrayOf(Context) + 0x214;
+    // The steering body. Context->Pathfind is never tested. Retail addresses the avoidance
+    // record (PathfindManager +0x214..+0x243) through a pointer to its start.
+    unsigned char* const SlotBlock = reinterpret_cast<unsigned char*>(&Context->Pathfind->AvoidRecordKind);
 
     bool const bSlotOverride = ((*reinterpret_cast<unsigned int const*>(SlotBlock) >> 1) & 1u) != 0;
 
@@ -384,8 +385,8 @@ void MoveIdea::Commit()
 
     // Unconditional: zero Pathfind's +0x64 dword and +0x200..+0x208 Vector,
     // re-reading Context->+0xc each time.
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
-    Vector* const Dest = reinterpret_cast<Vector*>(SlotArrayOf(Context) + 0x200);
+    Context->Pathfind->AvoidExcludeId = 0;
+    Vector* const Dest = &Context->Pathfind->CachedTargetPosition;
     Dest->x = 0.0f;
     Dest->y = 0.0f;
     Dest->z = 0.0f;
@@ -404,8 +405,8 @@ void MoveIdea::SetPosition(Vector const& Pos)
     Position = Pos;
 
     // Mirror into Pathfind+0x200, re-read from Position (not Pos).
-    unsigned char* const Slots = SlotArrayOf(Context);
-    Vector* const Dest = reinterpret_cast<Vector*>(Slots + 0x200);
+    PathfindManager* const Pathfind = Context->Pathfind;
+    Vector* const Dest = &Pathfind->CachedTargetPosition;
     Dest->x = Position.x;
     Dest->y = Position.y;
     Dest->z = Position.z;
@@ -441,15 +442,15 @@ void MoveIdea::SetDirectionFrom(Matrix const* Src)
 // FUN_062d5760, RET 4 (Ghidra's decompile is corrupt; ported from the listing).
 void MoveIdea::SetWatchObject(void const* Object2)
 {
-    // Retail captures the slot array pointer before the null test.
-    unsigned char* const Slots = SlotArrayOf(Context);
+    // Retail captures the PathfindManager pointer before the null test.
+    PathfindManager* const Pathfind = Context->Pathfind;
 
     if (Object2 == nullptr)
     {
         TargetKind48 = kMoveTargetNone;
         Watcher.set(nullptr);
-        *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
-        Vector* const Dest = reinterpret_cast<Vector*>(Slots + 0x200);
+        Context->Pathfind->AvoidExcludeId = 0;
+        Vector* const Dest = &Pathfind->CachedTargetPosition;
         Dest->x = 0.0f;
         Dest->y = 0.0f;
         Dest->z = 0.0f;
@@ -464,10 +465,10 @@ void MoveIdea::SetWatchObject(void const* Object2)
     // Both mirrors re-read the watcher (not Object2), untested. The id goes through
     // a fresh Context->+0xc, the position through the captured one.
     IObjRW* const Outer = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = static_cast<int>(Outer->get_id());
+    Context->Pathfind->AvoidExcludeId = static_cast<int>(Outer->get_id());
     IObjRW* const OuterAgain = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
     Vector const& Pos = OuterAgain->get_position();
-    Vector* const PosDest = reinterpret_cast<Vector*>(Slots + 0x200);
+    Vector* const PosDest = &Pathfind->CachedTargetPosition;
     PosDest->x = Pos.x;
     PosDest->y = Pos.y;
     PosDest->z = Pos.z;

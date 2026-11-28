@@ -210,13 +210,22 @@ struct FCliEquipFirePacket
                                  //        item / activate / next|prev item -> activate / set
                                  //        target / fire forward
     unsigned char Opaque04[0xc];
-    unsigned short HardpointId;  // +0x10  0 → null ids / count 0
-    unsigned short Pad12;
-    int ActivateSubOp;           // +0x14  0x19 cases 0..4; rewritten by FUN_00544e70 to 3
+    union
+    {
+        struct
+        {
+            unsigned short HardpointId;  // +0x10  0 → null ids / count 0
+            unsigned short Pad12;
+        };
+        unsigned ObjectId;       // +0x10  USER_SET_TARGET: the target's object id
+                                 //        (FSpaceCommand::ObjectId)
+    };
+    int ActivateSubOp;         // +0x14  0x19 cases 0..4; rewritten by FUN_00544e70 to 3
     Vector TargetPos;            // +0x18  also 0x1c payload dword pair with +0x14
     unsigned char Pad24[4];      // +0x24  tenth dword of the 10-dword copy
 };
 static_assert(offsetof(FCliEquipFirePacket, HardpointId) == 0x10, "fire pkt hp @ +0x10");
+static_assert(offsetof(FCliEquipFirePacket, ObjectId) == 0x10, "fire pkt object id @ +0x10");
 static_assert(offsetof(FCliEquipFirePacket, ActivateSubOp) == 0x14, "activate sub @ +0x14");
 static_assert(offsetof(FCliEquipFirePacket, TargetPos) == 0x18, "fire pkt tgt @ +0x18");
 static_assert(sizeof(FCliEquipFirePacket) == 0x28, "fire pkt 0x28 (10 dwords)");

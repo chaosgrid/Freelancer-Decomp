@@ -513,10 +513,11 @@ unsigned long DACOM_API FDeformableObject::Release()
 }
 
 static GENRESULT DACOM_API DeformableCreate(FDeformable* /*This*/, void** OutInstance,
-                                            int* Parts, void* Arg3, void* Arg4, void* /*Arg5*/)
+                                            FDeformPartTable* Parts, void* Arg3, void* Arg4,
+                                            void* /*Arg5*/)
 {
     // LAB_065f1e50: an empty parts table is rejected before an instance is built (retail).
-    if (Parts[0] <= 0)
+    if (Parts->Count <= 0)
         return GR_INVALID_PARMS;
 
     // `new FDeformInstance` sets the vtable FUN_065f3650 stores first (PTR_FUN_06601308 --
@@ -534,7 +535,7 @@ static GENRESULT DACOM_API DeformableCreate(FDeformable* /*This*/, void** OutIns
     return GR_GENERIC;
 }
 
-GENRESULT DACOM_API FDeformable::CreateAlias(void** OutInstance, int* Parts, void* Arg3,
+GENRESULT DACOM_API FDeformable::CreateAlias(void** OutInstance, FDeformPartTable* Parts, void* Arg3,
                                                    void* Arg4, void* Arg5)
 {
     // LAB_065f1860: tail-jumps to vtable+0x0C.
@@ -819,7 +820,7 @@ static void ReleaseRenderCaches()
     ReleaseInterface(G_VertexBuffer);
 }
 
-GENRESULT DACOM_API FDeformable::Create(void** OutInstance, int* Parts, void* Arg3, void* Arg4,
+GENRESULT DACOM_API FDeformable::Create(void** OutInstance, FDeformPartTable* Parts, void* Arg3, void* Arg4,
                                                void* Arg5)
 {
     return DeformableCreate(this, OutInstance, Parts, Arg3, Arg4, Arg5);

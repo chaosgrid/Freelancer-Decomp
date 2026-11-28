@@ -49,12 +49,21 @@ struct IStateGraph;
 // export macro: a dllexport POD would still export its implicit operator=.
 struct IDirectiveInfo
 {
-    unsigned char Data[12];
-
-    // Word 2 (+0x08): the behavior id the directive selects (Server's SubmitDirective
+    // +0x00: 0 no directive (set_current_directive cancels), 1 a directive that
+    // selects BehaviorId, 2 one that XSetManeuver (OnEvent case 2) completes.
+    int Kind;
+    // +0x04: BaseOp::Priority (Server's SubmitDirective, LaunchAction); rewritten by
+    // set_directive_priority.
+    pub::AI::DirectivePriority Priority;
+    // +0x08: the behavior id the directive selects (Server's SubmitDirective
     // OpType -> id table; FleeBehavior tests it for 2 = Goto / 7 = Dock).
-    unsigned GetBehaviorId() const { return *reinterpret_cast<unsigned const*>(Data + 8); }
+    unsigned BehaviorId;
+
+    unsigned GetBehaviorId() const { return BehaviorId; }
 };
+static_assert(offsetof(IDirectiveInfo, Priority) == 0x04, "IDirectiveInfo::Priority offset");
+static_assert(offsetof(IDirectiveInfo, BehaviorId) == 0x08, "IDirectiveInfo::BehaviorId offset");
+static_assert(sizeof(IDirectiveInfo) == 0x0c, "IDirectiveInfo size");
 
 // ============================================================================
 // Enums used by IFACE classes
@@ -995,11 +1004,11 @@ struct FBehaviorManagerEvent
     {
         kEventDamageTaken = 0,       // FBehaviorDamageEvent: Server's apply_*_entry
         kEventMunitionHit = 1,       // FMunitionImpact, EqObj::munition_hit; OnEvent only reads it
-        kEventSetManeuver = 2,       // XSetManeuver: completes a directive whose target is [Data+8]
-        kEventObjectLeftSystem = 3,  // {id, type bits, ...}: StarSystem::remove_object
+        kEventSetManeuver = 2,       // XSetManeuver: completes a directive whose target is its Flag
+        kEventObjectLeftSystem = 3,  // FBehaviorLeftSystemEvent: StarSystem::remove_object
         kEventTradelane = 4,         // FBehaviorTradelaneEvent
-        kEventDockRequest = 5,       // {TargetId, TargetType, ShipId, bHasPort}: pub::SpaceObj::Dock
-        kEventMissileLaunched = 6,   // {OwnerId, MissileId}: appended to the system manager's timer list
+        kEventDockRequest = 5,       // FBehaviorDockRequestEvent: pub::SpaceObj::Dock
+        kEventMissileLaunched = 6,   // FBehaviorMissileLaunchedEvent: appended to the system manager's timer list
         kEventObjectDying = 7,       // {ObjectId}, sent when its death fuse is lit: the owner itself resets to its default behavior, a formation leader is suppressed
     };
     int Type;          // +0x00 -- 0..7
@@ -1051,6 +1060,53 @@ struct FBehaviorDamageEvent
     float RelativeHealth;             // +0x20
 };
 static_assert(sizeof(FBehaviorDamageEvent) == 0x24, "FBehaviorDamageEvent size");
+
+// The case-3 payload of IBehaviorManager::Slot00 ("a ship left the system"). Common's case 3
+// reads +0x08 (compared with the own and the leader's id), +0x04 (tested
+// against OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE) and +0x00 (SetValueB0);
+// DockBehavior's Slot22 (LAB_062c54b0) reads +0x08. Built as three dwords by Server.dll's
+// StarSystem (dock id, the dock's get_type, ship id), GameObject (0, 0, ship id) and by
+// Freelancer.exe for the player's jump (gate id, the gate's get_type, ship id). Retail struct
+// name not recovered.
+struct FBehaviorLeftSystemEvent
+{
+    unsigned int GateId;    // +0x00 -- the dock / gate the ship left through, 0 if none
+    unsigned int GateType;  // +0x04 -- its get_type() object-type bits
+    unsigned int ShipId;    // +0x08 -- the ship that left
+};
+static_assert(offsetof(FBehaviorLeftSystemEvent, GateType) == 0x04, "FBehaviorLeftSystemEvent::GateType offset");
+static_assert(offsetof(FBehaviorLeftSystemEvent, ShipId) == 0x08, "FBehaviorLeftSystemEvent::ShipId offset");
+static_assert(sizeof(FBehaviorLeftSystemEvent) == 0x0c, "FBehaviorLeftSystemEvent size");
+
+// The case-5 payload of IBehaviorManager::Slot00 (a dock request). Common's case 5 reads
+// +0x08 (compared with the current leader's id), +0x04 & 0x120, +0x00 and byte +0x0c
+// (SetValueB4). Built by Server.dll's pub::SpaceObj::Dock (memset of 0x10 bytes, then
+// ShipId, TargetId, the target's get_type and dock_port != -1). Retail struct name not
+// recovered.
+struct FBehaviorDockRequestEvent
+{
+    unsigned int TargetId;    // +0x00 -- the dock target
+    unsigned int TargetType;  // +0x04 -- the target's get_type() object-type bits
+    unsigned int ShipId;      // +0x08 -- the docking ship
+    unsigned char bHasPort;   // +0x0c -- a dock port was named (dock_port != -1)
+    unsigned char Pad0d[3];
+};
+static_assert(offsetof(FBehaviorDockRequestEvent, TargetType) == 0x04, "FBehaviorDockRequestEvent::TargetType offset");
+static_assert(offsetof(FBehaviorDockRequestEvent, ShipId) == 0x08, "FBehaviorDockRequestEvent::ShipId offset");
+static_assert(offsetof(FBehaviorDockRequestEvent, bHasPort) == 0x0c, "FBehaviorDockRequestEvent::bHasPort offset");
+static_assert(sizeof(FBehaviorDockRequestEvent) == 0x10, "FBehaviorDockRequestEvent size");
+
+// The case-6 payload of IBehaviorManager::Slot00 (a guided missile was fired at this ship),
+// handed to SystemManagerTimerTable::AppendTimerListEntry (FUN_062e8720), which looks the
+// missile up by MissileId. Built as two dwords by Server.dll's StarSystem::create_guided.
+// Retail struct name not recovered.
+struct FBehaviorMissileLaunchedEvent
+{
+    unsigned int OwnerId;    // +0x00 -- the ship that fired it
+    unsigned int MissileId;  // +0x04
+};
+static_assert(offsetof(FBehaviorMissileLaunchedEvent, MissileId) == 0x04, "FBehaviorMissileLaunchedEvent::MissileId offset");
+static_assert(sizeof(FBehaviorMissileLaunchedEvent) == 0x08, "FBehaviorMissileLaunchedEvent size");
 
 class IBehaviorManager
 {
@@ -1255,7 +1311,7 @@ public:
     unsigned char LockManeuversByte;    // +0xBC
     unsigned char PadBd[3];             // +0xBD .. +0xBF
     int CurrentBehaviorIndex;           // +0xC0
-    unsigned char DirectiveStorage[12]; // +0xC4 .. +0xCF (IDirectiveInfo copy)
+    IDirectiveInfo DirectiveStorage;    // +0xC4 .. +0xCF (IDirectiveInfo copy)
     // Timer trio of UpdateBehaviorTick's dispatch: BehaviorTimerA accumulates Dt and wraps
     // via fmodf(Timer, 3.0f) (DAT_063a0340) once it reaches 3.0f (`TEST AH,0x1`, i.e. >=,
     // unlike AttackOverrideTimer's strict >), and is reset to 0 whenever
@@ -1384,6 +1440,8 @@ static_assert(offsetof(IBehaviorManager, AttackOverrideTimer) == 0xE0,
               "IBehaviorManager+0xE0 AttackOverrideTimer");
 static_assert(offsetof(IBehaviorManager, AttackOverridePeriod) == 0xE4,
               "IBehaviorManager+0xE4 AttackOverridePeriod");
+static_assert(offsetof(IBehaviorManager, DirectiveStorage) == 0xC4,
+              "IBehaviorManager+0xC4 DirectiveStorage");
 static_assert(offsetof(IBehaviorManager, BehaviorTimerA) == 0xD0,
               "IBehaviorManager+0xD0 BehaviorTimerA");
 static_assert(offsetof(IBehaviorManager, BehaviorTimerB) == 0xD4,

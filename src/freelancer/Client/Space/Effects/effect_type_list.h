@@ -17,6 +17,18 @@
 // triples from DAT_00674ce0, and the teardown walk FUN_004f7140 stops at 0x00674f18.
 constexpr int kEffectTypeBucketCount = 0x2f;
 
+struct FEffectBase;
+
+// A bucket node: an effect's {LinkPrev, LinkNext, LinkSelf} triple (FEffectBase +0x60..+0x68).
+// The bucket's head and tail and the node links point at this triple, not at the effect.
+struct FEffectTypeLink
+{
+    void* Prev;          // +0x00 (Effect+0x60) the previous node, null at the head
+    void* Next;          // +0x04 (Effect+0x64) the next node, null at the tail
+    FEffectBase* Owner;  // +0x08 (Effect+0x68) the effect itself while linked
+};
+static_assert(sizeof(FEffectTypeLink) == 0xc, "effect type link 0xc");
+
 // One retail bucket: count / head / tail (stride 3 dwords from DAT_00674ce0).
 struct FEffectTypeBucket
 {

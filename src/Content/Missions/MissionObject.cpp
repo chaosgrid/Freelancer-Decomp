@@ -142,9 +142,9 @@ namespace
     Vector GetMarkerPosition(FmtStr::NavMarker const& Marker)
     {
         Vector Position;
-        std::memcpy(&Position.x, &Marker.Data[2], sizeof(float));
-        std::memcpy(&Position.y, &Marker.Data[3], sizeof(float));
-        std::memcpy(&Position.z, &Marker.Data[4], sizeof(float));
+        std::memcpy(&Position.x, &Marker.Position.x, sizeof(float));
+        std::memcpy(&Position.y, &Marker.Position.y, sizeof(float));
+        std::memcpy(&Position.z, &Marker.Position.z, sizeof(float));
         return Position;
     }
 
@@ -155,11 +155,11 @@ namespace
     {
         Objective->RepInstance = RepInstance;
         Objective->SystemId = GotoSystemId;
-        std::memcpy(&Objective->Marker.Data[2], &Point.x, sizeof(float));
-        std::memcpy(&Objective->Marker.Data[3], &Point.y, sizeof(float));
-        std::memcpy(&Objective->Marker.Data[4], &Point.z, sizeof(float));
-        Objective->Marker.Data[1] = 1;
-        Objective->Marker.Data[0] = CurrentSystemId;
+        std::memcpy(&Objective->Marker.Position.x, &Point.x, sizeof(float));
+        std::memcpy(&Objective->Marker.Position.y, &Point.y, sizeof(float));
+        std::memcpy(&Objective->Marker.Position.z, &Point.z, sizeof(float));
+        Objective->Marker.Field04 = 1;
+        Objective->Marker.SystemId = CurrentSystemId;
     }
 
     // One axis of the slot 11 "leg unchanged" test against 1.0f (DAT_06fb5810) in x87
@@ -369,14 +369,14 @@ namespace
         Objective.Ids = Reader->get_value_int(1);
         SystemId = static_cast<unsigned int>(Reader->get_value_int(2));
         RepInstance = Reader->get_value_int(3);
-        Marker.Data[1] = static_cast<unsigned int>(Reader->get_value_int(4));
-        Marker.Data[0] = static_cast<unsigned int>(Reader->get_value_int(5));
+        Marker.Field04 = Reader->get_value_int(4);
+        Marker.SystemId = static_cast<unsigned int>(Reader->get_value_int(5));
         float const Value7 = Reader->get_value_float(7);
         float const Value8 = Reader->get_value_float(8);
         float const Value6 = Reader->get_value_float(6);
-        std::memcpy(&Marker.Data[2], &Value8, sizeof(float));
-        std::memcpy(&Marker.Data[3], &Value7, sizeof(float));
-        std::memcpy(&Marker.Data[4], &Value6, sizeof(float));
+        std::memcpy(&Marker.Position.x, &Value8, sizeof(float));
+        std::memcpy(&Marker.Position.y, &Value7, sizeof(float));
+        std::memcpy(&Marker.Position.z, &Value6, sizeof(float));
     }
 
     // Slot 2 of types 5 and 6 (LAB_06f1b0d0).
@@ -386,14 +386,14 @@ namespace
         fprintf(File, "%d, ", Objective.Ids);
         fprintf(File, "%u, ", SystemId);
         fprintf(File, "%u, ", static_cast<unsigned int>(RepInstance));
-        fprintf(File, "%d, ", static_cast<int>(Marker.Data[1]));
-        fprintf(File, "%u, ", Marker.Data[0]);
+        fprintf(File, "%d, ", Marker.Field04);
+        fprintf(File, "%u, ", Marker.SystemId);
         float X;
         float Y;
         float Z;
-        std::memcpy(&X, &Marker.Data[2], sizeof(float));
-        std::memcpy(&Y, &Marker.Data[3], sizeof(float));
-        std::memcpy(&Z, &Marker.Data[4], sizeof(float));
+        std::memcpy(&X, &Marker.Position.x, sizeof(float));
+        std::memcpy(&Y, &Marker.Position.y, sizeof(float));
+        std::memcpy(&Z, &Marker.Position.z, sizeof(float));
         fprintf(File, "%f, %f, %f ", static_cast<double>(X), static_cast<double>(Y),
                 static_cast<double>(Z));
         fprintf(File, "END");
@@ -428,24 +428,24 @@ namespace
     }
 
     // Values 4, 5, 6 are read in the order 5, 4, 6.
-    void ParsePosition(unsigned int* Out, INI_Reader* Reader)
+    void ParsePosition(Vector* Out, INI_Reader* Reader)
     {
         float const Value5 = Reader->get_value_float(5);
         float const Value4 = Reader->get_value_float(4);
         float const Value6 = Reader->get_value_float(6);
-        std::memcpy(&Out[0], &Value4, sizeof(float));
-        std::memcpy(&Out[1], &Value5, sizeof(float));
-        std::memcpy(&Out[2], &Value6, sizeof(float));
+        std::memcpy(&Out->x, &Value4, sizeof(float));
+        std::memcpy(&Out->y, &Value5, sizeof(float));
+        std::memcpy(&Out->z, &Value6, sizeof(float));
     }
 
-    void SavePosition(FILE* File, unsigned int const* In, char const* Format)
+    void SavePosition(FILE* File, Vector const* In, char const* Format)
     {
         float X;
         float Y;
         float Z;
-        std::memcpy(&X, &In[0], sizeof(float));
-        std::memcpy(&Y, &In[1], sizeof(float));
-        std::memcpy(&Z, &In[2], sizeof(float));
+        std::memcpy(&X, &In->x, sizeof(float));
+        std::memcpy(&Y, &In->y, sizeof(float));
+        std::memcpy(&Z, &In->z, sizeof(float));
         fprintf(File, Format, static_cast<double>(X), static_cast<double>(Y),
                 static_cast<double>(Z));
     }
@@ -511,19 +511,19 @@ FNNObjectiveNavMarker::FNNObjectiveNavMarker(FMissionObject* InMission)
 // LAB_06f1ab00.
 void FNNObjectiveNavMarker::Parse(INI_Reader* Reader)
 {
-    ParseSystemValue(Marker.Data[0], Reader);
+    ParseSystemValue(Marker.SystemId, Reader);
     Ids = Reader->get_value_int(2);
-    Marker.Data[1] = static_cast<unsigned int>(Reader->get_value_int(3));
-    ParsePosition(&Marker.Data[2], Reader);
+    Marker.Field04 = Reader->get_value_int(3);
+    ParsePosition(&Marker.Position, Reader);
 }
 
 // LAB_06f1abf0.
 void FNNObjectiveNavMarker::Save(FILE* File)
 {
-    fprintf(File, "%u, ", Marker.Data[0]);
+    fprintf(File, "%u, ", Marker.SystemId);
     fprintf(File, "%d, ", Ids);
-    fprintf(File, "%d, ", static_cast<int>(Marker.Data[1]));
-    SavePosition(File, &Marker.Data[2], "%f, %f, %f");
+    fprintf(File, "%d, ", Marker.Field04);
+    SavePosition(File, &Marker.Position, "%f, %f, %f");
 }
 
 // LAB_06f1ac50.
@@ -599,20 +599,20 @@ FNNObjectiveRepInst::FNNObjectiveRepInst(FMissionObject* InMission)
 // LAB_06f1ad30.
 void FNNObjectiveRepInst::Parse(INI_Reader* Reader)
 {
-    ParseSystemValue(Marker.Data[0], Reader);
+    ParseSystemValue(Marker.SystemId, Reader);
     Ids = Reader->get_value_int(2);
-    Marker.Data[1] = static_cast<unsigned int>(Reader->get_value_int(3));
-    ParsePosition(&Marker.Data[2], Reader);
+    Marker.Field04 = Reader->get_value_int(3);
+    ParsePosition(&Marker.Position, Reader);
     Label = Reader->get_value_string(7);
 }
 
 // LAB_06f1ae70.
 void FNNObjectiveRepInst::Save(FILE* File)
 {
-    fprintf(File, "%u, ", Marker.Data[0]);
+    fprintf(File, "%u, ", Marker.SystemId);
     fprintf(File, "%d, ", Ids);
-    fprintf(File, "%d, ", static_cast<int>(Marker.Data[1]));
-    SavePosition(File, &Marker.Data[2], "%f, %f, %f, ");
+    fprintf(File, "%d, ", Marker.Field04);
+    SavePosition(File, &Marker.Position, "%f, %f, %f, ");
     fprintf(File, "%s", Label.Data);
 }
 

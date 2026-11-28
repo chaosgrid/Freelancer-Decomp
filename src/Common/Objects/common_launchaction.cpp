@@ -159,9 +159,10 @@ void LaunchAction::Start()
 
                 // IDirectiveInfo {1, Op+0x08, 8}; the middle dword is BaseOp::Priority, zeroed
                 // by the DirectiveLaunchOp ctor.
-                unsigned const DirWords[3] = { 1, Op.Priority, 8 };
                 IDirectiveInfo Dir;
-                memcpy(&Dir, DirWords, sizeof(Dir));
+                Dir.Kind = 1;
+                Dir.Priority = static_cast<pub::AI::DirectivePriority>(Op.Priority);
+                Dir.BehaviorId = 8;
 
                 BM->set_current_directive(Dir, &Op);
             }

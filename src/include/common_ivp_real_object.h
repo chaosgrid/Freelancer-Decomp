@@ -27,6 +27,7 @@ class IVP_OV_Element; // src/IVP/ivp_physics/ivp_ov_element.h -- IVP_Real_Object
 // src/IVP/ivp_physics/ivp_mindist.h -- the node type IVP_Real_Object::
 // synapse_list_head (+0x20) heads. Only a pointer is needed here.
 class IVP_Synapse_Real;
+struct IVP_Synapse_Friction; // src/IVP/ivp_physics/ivp_mindist.h -- IVP_Real_Object::mindist_list (+0x28).
 class IVP_Controller_Phantom; // src/IVP/ivp_physics/ivp_phantom.h
 class IVP_Template_Phantom;   // src/IVP/ivp_physics/ivp_phantom.h
 
@@ -385,8 +386,9 @@ struct IVP_RealObjectConstructionTemplate
     // +0x50: an optional center-of-mass override. FUN_06345b20 tests it
     // (.text:06345b46-06345b72) while building the LocalCsys for Self->vtable[2]
     // (LAB_06344de0, ApplyLocalCsys): when non-null its +0x30/+0x34/+0x38 floats become
-    // LocalCsys.vv; when null surface_manager->vtable[1] computes it. Pointee type unknown.
-    void* OptionalComOverride; // +0x50
+    // LocalCsys.vv; when null surface_manager->vtable[1] computes it. Both writers
+    // (common_physys_build.cpp, ivp_environment.cpp) store an IVP_U_Matrix.
+    const IVP_U_Matrix* OptionalComOverride; // +0x50
 
     void* ClientData; // +0x54: -> IVP_Real_Object::client_data (+0xA4), .text:0634523c-06345240.
 
@@ -542,7 +544,7 @@ public:
     // of a mindist onto ObjectA/ObjectB's +0x24 with the same Next(+0x8)/
     // Prev(+0xc) threading as synapse_list_head.
     IVP_Synapse_Real* invalid_synapse_list_head; // +0x24
-    void*               mindist_list;     // +0x28
+    IVP_Synapse_Friction* mindist_list;   // +0x28
     IVP_U_Quat*         q_core_f_object;  // +0x2C
     IVP_U_Point         shift_core_f_object; // +0x30 (16 bytes)
     // +0x40: the lazily claimed narrow-phase cache slot. Written by

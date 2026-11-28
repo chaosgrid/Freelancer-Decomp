@@ -67,8 +67,10 @@ FThornLight::FThornLight(Csys const& ScriptFrame, FGfScript* InOwner, FThornEnti
       RegistryIndex(-1)
 {
     FThornLightProps const* const Props = &Desc->Light;
-    Wrapper = GfLightWrapperCreate(&Desc->Pos.x, ThornLightPropsD3d(Props),
-                                   ThornLightPropsTarget(Props), Desc->LtGrp);
+    // Pos (+0x08) and Orient (+0x14) of the snap are a Csys.
+    Wrapper = GfLightWrapperCreate(reinterpret_cast<Csys const*>(&Desc->Pos),
+                                   ThornLightPropsD3d(Props), ThornLightPropsTarget(Props),
+                                   Desc->LtGrp);
     memcpy(&Orient, &Desc->Orient, sizeof(Orient));
     Direction.x = Desc->Light.Direction.x;
     Direction.y = Desc->Light.Direction.y;

@@ -219,30 +219,22 @@ public:
 
     inline const IVP_Compact_Triangle* GetFirstTriangle() const
     {
-        return reinterpret_cast<const IVP_Compact_Triangle*>(
-            reinterpret_cast<const char*>(this) + 0x10
-        );
+        return reinterpret_cast<const IVP_Compact_Triangle*>(this + 1);
     }
 
     inline IVP_Compact_Triangle* GetFirstTriangle()
     {
-        return reinterpret_cast<IVP_Compact_Triangle*>(
-            reinterpret_cast<char*>(this) + 0x10
-        );
+        return reinterpret_cast<IVP_Compact_Triangle*>(this + 1);
     }
 
     inline const IVP_Compact_Edge* GetFirstEdge() const
     {
-        return reinterpret_cast<const IVP_Compact_Edge*>(
-            reinterpret_cast<const char*>(this) + 0x14
-        );
+        return &GetFirstTriangle()->CEdge[0];
     }
 
     inline IVP_Compact_Edge* GetFirstEdge()
     {
-        return reinterpret_cast<IVP_Compact_Edge*>(
-            reinterpret_cast<char*>(this) + 0x14
-        );
+        return &GetFirstTriangle()->CEdge[0];
     }
 
     inline const IVP_U_Float_Point* GetPointArray() const

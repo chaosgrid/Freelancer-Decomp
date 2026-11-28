@@ -152,14 +152,24 @@ public:
     // +0x50: the contact's index in the friction matrix (FUN_06368970), or 0xffff.
     int16_t            IndexInFs;          // +0x50
     int16_t            Status;             // +0x52: impact iteration count, incremented by FUN_063591a0 and passed as DoImpactSystem's ImpactCounter
-    uint8_t            StateProcessed;     // +0x54: 0/1 "already processed this pass" gate (FUN_063591a0, set by FUN_063595c0)
-    // +0x55: bits 0..1 = (dword +0x54 >> 8) & 3. Apart from whole-dword
-    // initialisation, every writer stores 1 (degenerate contact frame,
-    // 063598d9 / 06359cfa / 0635a0e2 / 0635a109); every reader tests
-    // (bits & 3) == 1 and then removes the contact from its friction system
-    // (06368da8, 06356598, 06355c47, 06358f17). Bit 1 is never set.
-    uint8_t            FrictionIsBroken;   // +0x55
-    uint8_t            _pad56[0x02];       // +0x56..0x57: unconfirmed
+    union
+    {
+        struct
+        {
+            uint8_t    StateProcessed;     // +0x54: 0/1 "already processed this pass" gate (FUN_063591a0, set by FUN_063595c0)
+            // +0x55: bits 0..1 = (dword +0x54 >> 8) & 3. Apart from whole-dword
+            // initialisation, every writer stores 1 (degenerate contact frame,
+            // 063598d9 / 06359cfa / 0635a0e2 / 0635a109); every reader tests
+            // (bits & 3) == 1 and then removes the contact from its friction system
+            // (06368da8, 06356598, 06355c47, 06358f17). Bit 1 is never set.
+            uint8_t    FrictionIsBroken;   // +0x55
+            uint8_t    _pad56[0x02];       // +0x56..0x57: unconfirmed
+        };
+        // +0x54 as one dword: the constructor body (FUN_06346770) clears its
+        // low 10 bits, 063598cc / 06359ceb read-modify-write it (0x200 cleared,
+        // 0x100 set) and FUN_06355c10 tests (dword & 0x300) == 0x100.
+        uint32_t       PackedState;
+    };
     union
     {
         struct
@@ -388,6 +398,31 @@ static_assert(offsetof(IVP_Impact_Solver, FrictionVectorWS) == 0x10C, "IVP_Impac
 class IVP_ListManager;
 
 #pragma pack(push, 4)
+
+// IVP_Synapse_Friction (Ipion name): one side's node of an IVP_Contact_Point on
+// that side's object's mindist_list (IVP_Real_Object +0x28). The record embeds
+// the two nodes field by field (Next1..Feature1 at +0x08, Next2..Feature2 at
+// +0x1c, stride 0x14; asserted after IVP_Contact_Point); the list links point
+// at the nodes, and contact_point_offset maps a node back to its record
+// (FUN_0635a900, 063464a0, 06346630, FUN_06355200).
+struct IVP_Synapse_Friction
+{
+    IVP_Synapse_Friction* next;   // +0x00
+    IVP_Synapse_Friction* prev;   // +0x04
+    IVP_Real_Object* l_obj;       // +0x08
+    int16_t contact_point_offset; // +0x0c: (char*)record - (char*)this, read as a signed word
+    uint16_t status;              // +0x0e
+    IVP_Compact_Edge* edge;       // +0x10
+
+    IVP_Contact_Point* get_contact_point() const
+    {
+        return reinterpret_cast<IVP_Contact_Point*>(
+            reinterpret_cast<char*>(const_cast<IVP_Synapse_Friction*>(this)) + contact_point_offset);
+    }
+};
+static_assert(offsetof(IVP_Synapse_Friction, contact_point_offset) == 0x0c, "IVP_Synapse_Friction+0x0c");
+static_assert(sizeof(IVP_Synapse_Friction) == 0x14, "IVP_Synapse_Friction stride");
+
 struct IVP_Contact_Point
 {
     // +0x00/+0x04: links on IVP_ListManager::CtxListHead (InsertCtx / RemoveCtx,
@@ -398,8 +433,8 @@ struct IVP_Contact_Point
     // Node #1, on Object1->+0x28's list. The links are NODE pointers (record+0x08
     // or record+0x1C), mapped back to a record via the node's Delta; see
     // IVP_FindExistingPairRecord / the ctor in ivp_mindist_limiter.cpp.
-    void* Next1; // +0x08
-    void* Prev1; // +0x0C
+    IVP_Synapse_Friction* Next1; // +0x08
+    IVP_Synapse_Friction* Prev1; // +0x0C
     IVP_Real_Object* Object1;       // +0x10: one of the mindist's two objects, picked by StateFlags bit 0x100
     int16_t Delta1;                 // +0x14: self-relative link, base(this+0x8) to record base (always -0x8)
     // +0x16: low byte = side 1's synapse status (shape type) at construction,
@@ -408,8 +443,8 @@ struct IVP_Contact_Point
     IVP_Compact_Edge* Feature1;      // +0x18: tagged IVP_Compact_Edge* copy (side 1's synapse edge)
 
     // Node #2: mirror of node #1 for Object2.
-    void* Next2; // +0x1C
-    void* Prev2; // +0x20
+    IVP_Synapse_Friction* Next2; // +0x1C
+    IVP_Synapse_Friction* Prev2; // +0x20
     IVP_Real_Object* Object2;       // +0x24
     int16_t Delta2;                  // +0x28: self-relative link (always -0x1c)
     uint16_t Status2;                 // +0x2A: mirror of Status1
@@ -547,6 +582,12 @@ static_assert(offsetof(IVP_Contact_Point, Prev2) == 0x20, "IVP_Contact_Point+0x2
 static_assert(offsetof(IVP_Contact_Point, Object2) == 0x24, "IVP_Contact_Point+0x24");
 static_assert(offsetof(IVP_Contact_Point, Delta2) == 0x28, "IVP_Contact_Point+0x28");
 static_assert(offsetof(IVP_Contact_Point, Feature2) == 0x2C, "IVP_Contact_Point+0x2C");
+static_assert(offsetof(IVP_Contact_Point, Delta1) - offsetof(IVP_Contact_Point, Next1) ==
+                  offsetof(IVP_Synapse_Friction, contact_point_offset) &&
+              offsetof(IVP_Contact_Point, Feature1) - offsetof(IVP_Contact_Point, Next1) ==
+                  offsetof(IVP_Synapse_Friction, edge) &&
+              offsetof(IVP_Contact_Point, Next2) - offsetof(IVP_Contact_Point, Next1) == sizeof(IVP_Synapse_Friction),
+              "IVP_Contact_Point embeds two IVP_Synapse_Friction nodes at +0x08 / +0x1c");
 static_assert(offsetof(IVP_Contact_Point, Owner) == 0x40, "IVP_Contact_Point+0x40 -- the resolved Owner field");
 static_assert(offsetof(IVP_Contact_Point, ListManagerListNext) == 0x00, "IVP_Contact_Point+0x00");
 static_assert(offsetof(IVP_Contact_Point, SolverMode) == 0x34, "IVP_Contact_Point+0x34");
@@ -562,6 +603,7 @@ static_assert(offsetof(IVP_Contact_Point, RecheckFeatureFlags) == 0x60, "IVP_Con
 static_assert(offsetof(IVP_Contact_Point, HasNegativePullSince) == 0x64, "IVP_Contact_Point+0x64");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, IndexInFs) == 0x50, "IVP_Impact_Solver_Long_Term+0x50");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, FrictionIsBroken) == 0x55, "IVP_Impact_Solver_Long_Term+0x55");
+static_assert(offsetof(IVP_Impact_Solver_Long_Term, PackedState) == 0x54, "IVP_Impact_Solver_Long_Term+0x54");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, FrictionInfos) == 0x58, "IVP_Impact_Solver_Long_Term+0x58");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, HasNegativePullSince) == 0x60, "IVP_Impact_Solver_Long_Term+0x60");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, GapDistance) == 0x64, "IVP_Impact_Solver_Long_Term+0x64");

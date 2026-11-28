@@ -196,13 +196,13 @@ void GameObject::on_object_left_system(unsigned int ObjId)
 
     // IBehaviorManager vt slot 0 (Common LAB_062d3f90, the notification
     // switch); event type 3 is "an object left the system".
-    unsigned int Payload[3];
-    Payload[0] = 0;
-    Payload[1] = 0;
-    Payload[2] = ObjId;
+    FBehaviorLeftSystemEvent Payload;
+    Payload.GateId = 0;
+    Payload.GateType = 0;
+    Payload.ShipId = ObjId;
     FBehaviorManagerEvent Event;
     Event.Type = FBehaviorManagerEvent::kEventObjectLeftSystem;
-    Event.Data = Payload;
+    Event.Data = &Payload;
     Behavior->OnEvent(&Event);
 }
 

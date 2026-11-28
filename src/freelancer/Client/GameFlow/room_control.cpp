@@ -1784,7 +1784,7 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
     {
         RoomLightInfo* Light = Room->Lights[LightIndex];
         Runtime->RoomLights[LightIndex] = GfLightWrapperCreate(
-            &Light->Frame.Pos.x, reinterpret_cast<FD3dLight8 const*>(&Light->Mode),
+            &Light->Frame, reinterpret_cast<FD3dLight8 const*>(&Light->Mode),
             &Light->Direction, Light->Type);
     }
     Runtime->RoomLightCount = static_cast<int>(Room->Lights.size());

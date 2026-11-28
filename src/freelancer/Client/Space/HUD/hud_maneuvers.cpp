@@ -100,8 +100,9 @@ namespace
     IDirectiveInfo MakeDirectiveInfo(unsigned Kind, int BehaviorId)
     {
         IDirectiveInfo Info;
-        unsigned const Words[3] = {Kind, 0u, static_cast<unsigned>(BehaviorId)};
-        memcpy(Info.Data, Words, sizeof(Words));
+        Info.Kind = static_cast<int>(Kind);
+        Info.Priority = pub::AI::DirPriNone;
+        Info.BehaviorId = static_cast<unsigned>(BehaviorId);
         return Info;
     }
 

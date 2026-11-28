@@ -889,15 +889,14 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
         if (Tag == FmtStr::TagNavMarker)
         {
             // 'N' -- a nav marker: {system, ?, position}.
-            unsigned const* const Marker = Token->Marker->Data;
-            *OutSystem = Marker[0];
-            float const* const MarkerPos = reinterpret_cast<float const*>(Marker + 2);
-            OutPos[0] = MarkerPos[0];
-            OutPos[1] = MarkerPos[1];
-            OutPos[2] = MarkerPos[2];
-            CachedWaypointPos[0] = MarkerPos[0];
-            CachedWaypointPos[1] = MarkerPos[1];
-            CachedWaypointPos[2] = MarkerPos[2];
+            FmtStr::NavMarker const* const Marker = Token->Marker;
+            *OutSystem = Marker->SystemId;
+            OutPos[0] = Marker->Position.x;
+            OutPos[1] = Marker->Position.y;
+            OutPos[2] = Marker->Position.z;
+            CachedWaypointPos[0] = Marker->Position.x;
+            CachedWaypointPos[1] = Marker->Position.y;
+            CachedWaypointPos[2] = Marker->Position.z;
             CachedWaypointSystem = *OutSystem;
             CachedWaypointHash = Hash;
             return true;

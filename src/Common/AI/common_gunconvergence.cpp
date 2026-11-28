@@ -415,13 +415,13 @@ void FFormationLeaderState::SetDirectiveOrder(unsigned char P1, unsigned int P2,
 
 // FUN_062ec610: packs the order into the caller's 0x10-byte block. Sole call site:
 // BaseFollowerBehavior::OnUpdate (0x062cbac4, its FollowerDirectiveOrder block).
-void FFormationLeaderState::GetDirectiveOrder(unsigned char* Out) const
+void FFormationLeaderState::GetDirectiveOrder(FollowerDirectiveOrder* Out) const
 {
-    *(unsigned int*)(Out + 0x0) = OrderObjectId;
-    *(unsigned int*)(Out + 0x4) = OrderSecondObjectId;
-    Out[0x8] = bOrderPending;
-    Out[0x9] = bOrderCommitDirectly;
-    *(unsigned int*)(Out + 0xc) = OrderLaneParam;
+    Out->DockObjectId = OrderObjectId;
+    Out->SecondaryObjectId = OrderSecondObjectId;
+    Out->bOrderPending = bOrderPending;
+    Out->bMidLane = bOrderCommitDirectly;
+    *reinterpret_cast<unsigned int*>(&Out->MaxRange) = OrderLaneParam;
 }
 
 // FUN_062ec650, RET 4. Callers: IBehaviorManager::OnEvent case 3 and

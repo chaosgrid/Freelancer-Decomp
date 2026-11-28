@@ -15,6 +15,27 @@
 
 #include <cstddef>
 
+// The 0x1c-byte proximity watcher that FUN_062c29b0 builds and FUN_062c29f0 / FUN_062c2af0 /
+// FUN_062c2c70 / FUN_062c2d90 operate on (ECX = GotoBehavior+0x370, DockBehavior+0x450). A
+// BaseWatcher (ctor zeroes it, dtor clears it) followed by two distances, a speed ratio and
+// two flag dwords. The near/far thresholds are multiplied by CruiseSpeedRatio exactly while
+// the watched object reports IObjInspect::is_cruise_active.
+struct FProximityWatcher
+{
+    BaseWatcher Watcher;    // +0x00 (Watchable* + chain link)
+    float NearDistance;     // +0x08 near threshold. Ctor zeroes as a raw dword.
+    float FarDistance;      // +0x0c far threshold. Ctor zeroes as a raw dword.
+    float CruiseSpeedRatio; // +0x10 cruise multiplier. Not ctor-zeroed.
+    unsigned Flags14;       // +0x14 3-bit distance-zone flags (EProxWatcherZone)
+    unsigned SavedFlags18;  // +0x18 previous-tick snapshot of Flags14
+};
+static_assert(offsetof(FProximityWatcher, NearDistance) == 0x08, "FProximityWatcher::NearDistance offset");
+static_assert(offsetof(FProximityWatcher, FarDistance) == 0x0c, "FProximityWatcher::FarDistance offset");
+static_assert(offsetof(FProximityWatcher, CruiseSpeedRatio) == 0x10, "FProximityWatcher::CruiseSpeedRatio offset");
+static_assert(offsetof(FProximityWatcher, Flags14) == 0x14, "FProximityWatcher::Flags14 offset");
+static_assert(offsetof(FProximityWatcher, SavedFlags18) == 0x18, "FProximityWatcher::SavedFlags18 offset");
+static_assert(sizeof(FProximityWatcher) == 0x1c, "FProximityWatcher size");
+
 // ============================================================================
 // GotoBehavior -- AI "fly to a point" state machine, intermediate base of
 // FreeFlightBehavior (Behavior family)
@@ -116,9 +137,9 @@ public:
     unsigned char Pad36d[0x370 - 0x36d]; // unconfirmed span
 
     // +0x370 (ends +0x38c): the same 0x1c-byte proximity watcher DockBehavior embeds at +0x450
-    // (DockBehavior::DockProximityWatcher): built by the shared FUN_062c29b0, and Update calls
+    // (FProximityWatcher): built by the shared FUN_062c29b0, and Update calls
     // FUN_062c2af0 / FUN_062c2c70 / FUN_062c2d90 on this+0x370 (.text:062fe0dd ...).
-    // TODO: the type is declared twice (here as members, there as a struct); hoist it.
+    // TODO: these six members are an FProximityWatcher laid out member by member; make them one.
     BaseWatcher Watcher370;        // +0x370 (ends +0x378). Struct-relative +0x00.
     float ProxNearDistance;        // +0x378. Struct +0x08. Zeroed by the shared ctor; near
                                    // threshold.
@@ -202,20 +223,12 @@ static_assert(offsetof(GotoBehavior, GotoOp) == 0x38c, "GotoBehavior::GotoOp off
 static_assert(sizeof(GotoBehavior) == 0x3fc, "GotoBehavior size == retail operator_new(0x3fc)");
 
 // ============================================================================
-// The shared 0x1c-byte proximity watcher's methods, called on both GotoBehavior+0x370 and
-// DockBehavior+0x450. They take the struct's base address as unsigned char* because the
-// type is still declared twice. Struct-relative offsets:
-//   +0x00 BaseWatcher (Watchable* + chain link)
-//   +0x08 float  near threshold   (cruise-scaled by +0x10 when the watched
-//                                  object reports IObjInspect::is_cruise_active)
-//   +0x0c float  far threshold    (same scaling)
-//   +0x10 float  cruise multiplier
-//   +0x14 unsigned  3-bit distance-zone flags (0x1 / 0x2 / 0x4)
-//   +0x18 unsigned  previous-tick snapshot of +0x14
-// TODO: hoist the struct and make these member functions.
+// The shared 0x1c-byte proximity watcher's methods (FProximityWatcher), called on both
+// GotoBehavior+0x370 and DockBehavior+0x450.
+// TODO: make these member functions.
 // ============================================================================
 
-// The proximity watcher's zone flags (struct +0x14, DockProximityWatcher::Flags14; +0x18 holds
+// The proximity watcher's zone flags (struct +0x14, FProximityWatcher::Flags14; +0x18 holds
 // last tick's copy), set by ProxWatcherRecomputeZoneFlags (FUN_062c2af0).
 enum EProxWatcherZone
 {
@@ -230,7 +243,7 @@ enum EProxWatcherZone
 // get_speed(1.0f, cruise) / Target's get_speed(1.0f, engine), clamped up to 1.0f.
 // `SysMgr` is the SystemManager whose +0x08 Watcher names the own ship. GotoBehavior's
 // OnApplyDirective calls it; DockBehavior::OnApplyDirective inlines the same sequence.
-void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target, float Near, float Far,
+void ProxWatcherInit(FProximityWatcher* Watcher, SystemManager* SysMgr, void* Target, float Near, float Far,
                      float CruiseRatio);
 
 // FUN_062c2af0. Recomputes the +0x14 zone flags for this tick. `SysMgr` is the Behavior
@@ -238,7 +251,7 @@ void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target
 // AI steering element common_aisteer.h's GetSignedRadialClearanceToPoint /
 // GetInterceptClearanceOfIface operate on. `RefPoint` is the world point the
 // zones are measured against (GotoBehavior passes &this->ActiveTargetPos).
-void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr, Vector const& RefPoint);
+void ProxWatcherRecomputeZoneFlags(FProximityWatcher* Watcher, SystemManager* SysMgr, Vector const& RefPoint);
 
 // FUN_062c2c70. Returns a
 // speed cap: the lesser of the zone-derived speed and the owner's own
@@ -246,14 +259,14 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr
 // the Behavior family's OwnerContext, `SysMgr` its SysMgr.
 // Retail returns 0.0f when nothing is watched. The result is left unrounded in ST0
 // (DockBehavior::AdvancePreamble FCOMPs it directly at .text:062c489d), hence double.
-double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, SystemManager* SysMgr,
+double ProxWatcherComputeSpeedCap(FProximityWatcher* Watcher, IObjRW* OwnerContext, SystemManager* SysMgr,
                                   int Selector, float SelectorValue);
 
 // FUN_062c2d90. Compares
 // this tick's +0x14 flags against the +0x18 snapshot and, on one of three
 // recognised transitions, raises notification code 1/2/3 through the behavior
 // manager's own dispatcher (FUN_062d2a10). Does nothing otherwise.
-void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, IBehaviorManager* BehaviorMgr,
+void ProxWatcherNotifyZoneChange(FProximityWatcher* Watcher, SystemManager* SysMgr, IBehaviorManager* BehaviorMgr,
                                             Vector const& RefPoint);
 
 // ============================================================================

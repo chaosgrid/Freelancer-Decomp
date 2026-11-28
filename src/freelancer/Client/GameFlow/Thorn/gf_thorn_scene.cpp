@@ -87,27 +87,27 @@ GENRESULT DACOM_API FThorn_Scene::GetTableMode(unsigned char* OutTable, unsigned
 }
 
 // FUN_00454640. Through the facet's own vtable, in this order.
-GENRESULT DACOM_API FThorn_Scene::SetPacked(unsigned char const* Packed32)
+GENRESULT DACOM_API FThorn_Scene::SetPacked(FThornFog8 const* Packed)
 {
     IFogControl* const Fog = static_cast<IFogControl*>(this);
-    Fog->SetOn(Packed32[0]);
-    Fog->SetColor(reinterpret_cast<int const*>(Packed32 + 4));
+    Fog->SetOn(Packed->On);
+    Fog->SetColor(Packed->Color);
     float RangeValues[3];
-    std::memcpy(RangeValues, Packed32 + 0x14, sizeof(RangeValues));
+    std::memcpy(RangeValues, &Packed->Start, sizeof(RangeValues));
     Fog->SetRangeValue(&RangeValues[0], &RangeValues[1], &RangeValues[2]);
-    Fog->SetTableMode(Packed32[1], *reinterpret_cast<unsigned int const*>(Packed32 + 0x10));
+    Fog->SetTableMode(Packed->Table, Packed->Mode);
     return GR_OK;
 }
 
 // FUN_00454690.
-GENRESULT DACOM_API FThorn_Scene::GetPacked(unsigned char* Out32)
+GENRESULT DACOM_API FThorn_Scene::GetPacked(FThornFog8* Out)
 {
     IFogControl* const Fog = static_cast<IFogControl*>(this);
-    float* const Range = reinterpret_cast<float*>(Out32 + 0x14);
-    Fog->GetOn(Out32);
-    Fog->GetColor(reinterpret_cast<int*>(Out32 + 4));
+    float* const Range = &Out->Start;
+    Fog->GetOn(&Out->On);
+    Fog->GetColor(Out->Color);
     Fog->GetRange(&Range[0], &Range[1], &Range[2]);
-    Fog->GetTableMode(Out32 + 1, reinterpret_cast<unsigned int*>(Out32 + 0x10));
+    Fog->GetTableMode(&Out->Table, &Out->Mode);
     return GR_OK;
 }
 

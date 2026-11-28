@@ -1400,30 +1400,30 @@ namespace
         void* Node = G_EffectTypeBuckets[TypeIndex].Head;
         while (Node != nullptr)
         {
-            unsigned char* const N = static_cast<unsigned char*>(Node);
-            void* const Next = *reinterpret_cast<void**>(N + 4);
-            void* const Effect = *reinterpret_cast<void**>(N + 8);
+            FEffectTypeLink* const N = static_cast<FEffectTypeLink*>(Node);
+            void* const Next = N->Next;
+            void* const Effect = N->Owner;
             Node = Next;
 
             // No null test on the node's effect or on anything read through it.
-            unsigned char* const E = static_cast<unsigned char*>(Effect);
-            if ((*reinterpret_cast<unsigned char*>(E + 8) & 2u) != 0)
+            FEffectBase* const E = static_cast<FEffectBase*>(Effect);
+            if ((E->Flags08 & 2u) != 0)
             {
                 // LAB_004f7910 — already dead: unlink + release (signed DEC, slot +0x20 at <= 0).
                 EffectTypeListUnlinkAndRelease(Effect);
                 continue;
             }
 
-            // EngineIndex == -1 -> translation (+0x34) += Dt * velocity (+0x4c). x87: the x and
-            // y products stay unrounded; the z product is stored to a float first.
-            if (*reinterpret_cast<int*>(E + 0x40) == -1)
+            // EngineIndex == -1 -> translation += Dt * velocity. x87: the x and y products stay
+            // unrounded; the z product is stored to a float first.
+            if (E->EngineIndex == -1)
             {
-                float* const Pos = reinterpret_cast<float*>(E + 0x34);
-                float const* const Vel = reinterpret_cast<float const*>(E + 0x4c);
-                float const StepZ = Dt * Vel[2];
-                Pos[0] = static_cast<float>(static_cast<double>(Dt) * Vel[0] + Pos[0]);
-                Pos[1] = static_cast<float>(static_cast<double>(Dt) * Vel[1] + Pos[1]);
-                Pos[2] = StepZ + Pos[2];
+                Vector* const Pos = &E->LocalXform.Translation;
+                Vector const* const Vel = &E->FrozenVelocity;
+                float const StepZ = Dt * Vel->z;
+                Pos->x = static_cast<float>(static_cast<double>(Dt) * Vel->x + Pos->x);
+                Pos->y = static_cast<float>(static_cast<double>(Dt) * Vel->y + Pos->y);
+                Pos->z = StepZ + Pos->z;
             }
 
             // Slot +0x14 (update/visibility).
@@ -1432,14 +1432,13 @@ namespace
 
             // FUN_004fd560 (EXIST_OFFSCREEN), read without a null test.
             FEffectTypeInfo const* const Info =
-                EffectTypeInfoByIndex(*reinterpret_cast<int*>(E + 0x5c));
+                EffectTypeInfoByIndex(E->EffectTypeId);
             if (Info->VisibilityOffscreen == 0 && UpdateOk == 0)
             {
                 // The inlined FUN_004f7af0 link.
                 EffectTypeListLink(Effect);
                 static_cast<FEffectBase*>(Effect)->FreezeToWorld();
-                *reinterpret_cast<unsigned char*>(E + 8) =
-                    static_cast<unsigned char>(*reinterpret_cast<unsigned char*>(E + 8) | 2u);
+                E->Flags08 = static_cast<unsigned char>(E->Flags08 | 2u);
             }
             else
             {
@@ -1455,7 +1454,7 @@ namespace
 
             // A dead effect goes straight to the unlink; a live one asks slot +0x10 (IsAlive)
             // and is unlinked only when that returns 0.
-            if ((*reinterpret_cast<unsigned char*>(E + 8) & 2u) == 0)
+            if ((E->Flags08 & 2u) == 0)
             {
                 if (TypedEffect->IsAlive() != 0)
                     continue;
@@ -2076,12 +2075,12 @@ unsigned* FClientGameobj::PickLod(unsigned* OutLod, FSpaceCamera* Camera, unsign
 
         // The archetype's companion, or 0 without an object or an archetype; its +0x08 / +0x0c
         // are read with no further test.
-        unsigned char const* Companion = nullptr;
+        Archetype::FCliObj const* Companion = nullptr;
         if (Object != nullptr && Object->get_archetype() != nullptr)
-            Companion = reinterpret_cast<unsigned char const*>(
+            Companion = static_cast<Archetype::FCliObj const*>(
                 Object->get_archetype()->Companion);
-        const float DistRender = *reinterpret_cast<float const*>(Companion + 0x08);
-        const float DistLod = *reinterpret_cast<float const*>(Companion + 0x0c);
+        const float DistRender = Companion->DistanceRender;
+        const float DistLod = Companion->LodPick;
 
         // +0x08 > 0 (ordered): DistSq strictly below its square ends the pick; otherwise
         // high = 1.
@@ -2269,8 +2268,7 @@ namespace
     // GetZone slot.
     unsigned char const* JumpShipEffectColor(void* JumpFx)
     {
-        return *reinterpret_cast<unsigned char const**>(static_cast<unsigned char*>(JumpFx) +
-                                                        0x20);
+        return static_cast<FJumpShipEffect*>(JumpFx)->Color;
     }
 }
 

@@ -853,19 +853,18 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal)
 {
     // FUN_00503330 — this = &{arch, sound, particle, light}. No test of `this`; every caller
     // passes an embedded companion's address.
-    unsigned char* Base = static_cast<unsigned char*>(CompanionLocal);
-    FEffectBase* Particle = *reinterpret_cast<FEffectBase**>(Base + 8);
+    FEffectCompanion const* const Companion = static_cast<FEffectCompanion const*>(CompanionLocal);
+    FEffectBase* Particle = Companion->Effect;
     if (Particle != nullptr && (Particle->Flags08 & kEffectFlagDeactivated) == 0)
         return 1;
-    ISoundSource* Sound = *reinterpret_cast<ISoundSource**>(Base + 4);
+    ISoundSource* Sound = Companion->Sound;
     if (Sound != nullptr && Sound->IsActive() != 0)
         return 1;
-    void* Light = *reinterpret_cast<void**>(Base + 0xc);
+    FGameLight* Light = Companion->Light;
     if (Light != nullptr)
     {
-        // Light+0xd4 == 0 → alive. Gamelit layout not owned here.
-        int const FieldD4 = *reinterpret_cast<int*>(static_cast<unsigned char*>(Light) + 0xd4);
-        if (FieldD4 == 0)
+        // No animation keys → alive.
+        if (Light->Anim.Keys == nullptr)
             return 1;
     }
     return 0;
@@ -948,12 +947,13 @@ unsigned char FCliEffectFactory::CreateEffectOneShotOn(FEffectArch* EffectArch, 
         }
     }
 
-    unsigned char LocalCompanion[0x10];
-    std::memset(LocalCompanion, 0, sizeof(LocalCompanion));
-    *reinterpret_cast<FEffectArch**>(LocalCompanion + 0) = EffectArch;
-    *reinterpret_cast<ISoundSource**>(LocalCompanion + 4) = Sound;
-    *reinterpret_cast<FEffectBase**>(LocalCompanion + 8) = Particle;
-    *reinterpret_cast<FGameLight**>(LocalCompanion + 0xc) = Light;
+    unsigned char LocalCompanionBytes[0x10];
+    FEffectCompanion* const LocalCompanion = reinterpret_cast<FEffectCompanion*>(LocalCompanionBytes);
+    std::memset(LocalCompanionBytes, 0, sizeof(LocalCompanionBytes));
+    LocalCompanion->EffectArch = EffectArch;
+    LocalCompanion->Sound = Sound;
+    LocalCompanion->Effect = Particle;
+    LocalCompanion->Light = Light;
 
     if (CreateEffectCompanionAlive(LocalCompanion) == 0)
     {
@@ -1049,13 +1049,13 @@ unsigned char FCliEffectFactory::CreateEffectWorldOneShotOn(FEffectArch* EffectA
         Light->SetFreeMotionOffset(Pos3);
     }
 
-    // Pos3 is the particle's frozen velocity (+0x4c).
+    // Pos3 is the particle's frozen velocity.
     if (Particle != nullptr)
     {
-        float* const Velocity = reinterpret_cast<float*>(Particle->FrozenVelocity);
-        Velocity[0] = Pos3[0];
-        Velocity[1] = Pos3[1];
-        Velocity[2] = Pos3[2];
+        Vector* const Velocity = &Particle->FrozenVelocity;
+        Velocity->x = Pos3[0];
+        Velocity->y = Pos3[1];
+        Velocity->z = Pos3[2];
     }
 
     // The factory's class decides (CameraParticles for DAT_00674c5c).

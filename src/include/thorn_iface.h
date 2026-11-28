@@ -436,13 +436,17 @@ struct FThornFog8
     unsigned char Table;
     unsigned char Pad[2];
     int Color[3];
-    int Mode;
+    unsigned int Mode;
     float Start;
     float End;
     float Density;
 };
 
 static_assert(sizeof(FThornFog8) == 32, "fog 8-dword record");
+static_assert(offsetof(FThornFog8, Color) == 0x04, "FThornFog8 colour +0x04");
+static_assert(offsetof(FThornFog8, Mode) == 0x10, "FThornFog8 mode +0x10");
+static_assert(offsetof(FThornFog8, Start) == 0x14, "FThornFog8 start +0x14");
+static_assert(offsetof(FThornFog8, Density) == 0x1c, "FThornFog8 density +0x1c");
 
 // SPATIAL_PROP_ANIM: 465f0 stores orientation/position, quaternion and
 // axis/target data; table 5b2cc getter 4a570 exposes all thirty-two words.

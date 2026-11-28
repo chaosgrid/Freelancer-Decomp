@@ -96,11 +96,11 @@ namespace
     // missing.
     CEqObj* PlayerEqObj(unsigned ClassMask)
     {
-        void* const ObjRW = GetPlayerObjRW();
-        if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(-0xc))
+        IObjRW* const ObjRW = GetPlayerObjRW();
+        if (ObjRW == nullptr || ObjRW == reinterpret_cast<IObjRW*>(-0xc))
             return nullptr;
         CEqObj* const EqObj =
-            *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
+            static_cast<CEqObj*>(static_cast<IObjInspectImpl*>(ObjRW)->Object);
         if (EqObj == nullptr ||
             (static_cast<unsigned>(EqObj->ObjectClass) & ClassMask) != ClassMask)
             return nullptr;
@@ -110,12 +110,11 @@ namespace
     // FUN_00543f00 (one caller): the docking port's camera hardpoint "HPDockCam" + ('A' +
     // PortIndex), read through the port's IObjInspect slot 48 get_hardpoint; true when that
     // answers 0.
-    bool GetDockCameraCsys(IObjRW const* Port, int PortIndex, float* Csys12)
+    bool GetDockCameraCsys(IObjRW const* Port, int PortIndex, Transform* Csys)
     {
         char Name[0x40];
         sprintf_s(Name, "%s%c", "HPDockCam", PortIndex + 'A');
-        return Port->get_hardpoint(Name, reinterpret_cast<Vector*>(Csys12 + 9),
-                                   reinterpret_cast<Matrix*>(Csys12)) == 0;
+        return Port->get_hardpoint(Name, &Csys->Translation, &Csys->Rotation) == 0;
     }
 
     // FUN_0054b230
@@ -166,10 +165,11 @@ namespace
                     {
                         float Csys[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
-                        if (GetDockCameraCsys(Port, PortIndex, Csys))
+                        Transform* const DockCsys = reinterpret_cast<Transform*>(Csys);
+                        if (GetDockCameraCsys(Port, PortIndex, DockCsys))
                         {
                             // The body of FUN_0054bb90, inlined in retail.
-                            SetDockingCameraTransform(Csys);
+                            SetDockingCameraTransform(DockCsys);
                         }
                     }
                     // HUD_Status is not null-tested.

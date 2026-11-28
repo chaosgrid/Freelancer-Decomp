@@ -110,11 +110,11 @@ static FSkeleton* ConstructSkeleton()
 }
 
 // FUN_065f36c0 (thiscall on the instance: Parts, Arg3, Arg4). Returns 1.
-bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
+bool FDeformInstance::ConnectParts(FDeformPartTable* Parts, void* Arg3, void* Arg4)
 {
     ForwardSink = static_cast<IChannelSink*>(Arg3);
     DefaultScript = Arg4;
-    PartCount = Parts[0];
+    PartCount = Parts->Count;
     int* Block = (int*)new unsigned char[(size_t)PartCount * sizeof(FDeformPart) + 4];
     *Block = PartCount;
     FDeformPart* Array = reinterpret_cast<FDeformPart*>((Block + 1));
@@ -126,7 +126,7 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
     }
     PartArray = Array;
 
-    FDeformPartDesc* Descs = *reinterpret_cast<FDeformPartDesc**>((Parts + 1));
+    FDeformPartDesc* Descs = Parts->Entries;
     int PartIndex = 0;
     while (PartIndex < PartCount)
     {
@@ -683,8 +683,8 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
     WriteVec3(Accum, Tail[0] + PosA[0], Tail[1] + PosA[1], Tail[2] + PosA[2]);
 
     Quaternion RootQuat;
-    AcquireMathEngine()->QuatSlerp(RootQuat, *reinterpret_cast<const Quaternion*>((RootA + 0xC)),
-                                   *reinterpret_cast<const Quaternion*>((RootB + 0xC)), RootAlpha);
+    AcquireMathEngine()->QuatSlerp(RootQuat, reinterpret_cast<const FPosQuatSample*>(RootA)->Quat,
+                                   reinterpret_cast<const FPosQuatSample*>(RootB)->Quat, RootAlpha);
     RootArchetype->Release();
 
     Matrix Rot;
@@ -695,17 +695,18 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
     {
         Matrix Step;
         AcquireMathEngine()->QuaternionToMatrix(Step, ChainQuats[Index]);
-        const unsigned char* const Relative = Relatives[Index];
+        const FEngineJointBlock* const Relative =
+            reinterpret_cast<const FEngineJointBlock*>(Relatives[Index]);
         Matrix Mul;
         AcquireMathEngine()->MulMatrix(Mul, Running, Step);
         AcquireMathEngine()->MulMatrix(Rot, Mul,
-                                       *reinterpret_cast<const Matrix*>((Relative + 0x1C)));
+                                       Relative->Orient);
         Vector XfA;
         AcquireMathEngine()->TransformMatrix(XfA, Rot,
-                                             *reinterpret_cast<const Vector*>((Relative + 0x10)));
+                                             Relative->ChildPos);
         Vector XfB;
         AcquireMathEngine()->TransformMatrix(XfB, Running,
-                                             *reinterpret_cast<const Vector*>((Relative + 4)));
+                                             Relative->ParentPos);
         const float SumZ =
             (float)((double)XfB.z + (double)Accum[2]);
         const float X = (float)(

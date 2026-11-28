@@ -1844,21 +1844,21 @@ namespace
             // copied untouched. Seeding from LightEntityDescriptor keeps the
             // RangeTemp/CutoffTemp/Unused words that have no normalized field.
             std::memcpy(Out, &Entity->LightEntityDescriptor, sizeof(*Out));
-            char* Blob = reinterpret_cast<char*>(Out);
             if (Entity->D3dLightControl != nullptr)
             {
-                Entity->D3dLightControl->GetLight(Blob + 0x28);
-                Entity->D3dLightControl->GetOn(reinterpret_cast<int*>(Blob + 0x20));
+                // The D3DLIGHT8 that starts at Type (+0x28).
+                Entity->D3dLightControl->GetLight(&Out->Type);
+                Entity->D3dLightControl->GetOn(&Out->On);
                 Entity->D3dLightControl->GetDirection(&Out->Direction);
             }
             else if (Entity->LightControl != nullptr)
             {
-                Entity->LightControl->GetColor(reinterpret_cast<float*>(Blob + 0x00));
+                Entity->LightControl->GetColor(reinterpret_cast<float*>(Out->Color));
                 Entity->LightControl->GetDirection(&Out->Direction);
-                Entity->LightControl->GetRange(reinterpret_cast<float*>(Blob + 0x18));
-                Entity->LightControl->GetCutoff(reinterpret_cast<float*>(Blob + 0x1C));
-                Entity->LightControl->GetInfinite(reinterpret_cast<int*>(Blob + 0x24));
-                Entity->LightControl->GetOn(reinterpret_cast<int*>(Blob + 0x20));
+                Entity->LightControl->GetRange(&Out->RangeTemp);
+                Entity->LightControl->GetCutoff(&Out->CutoffTemp);
+                Entity->LightControl->GetInfinite(&Out->Infinite);
+                Entity->LightControl->GetOn(&Out->On);
                 ConvertCompactLight(Out);
             }
             std::memcpy(&Entity->LightEntityDescriptor, Out, sizeof(Entity->LightEntityDescriptor));
@@ -3011,11 +3011,12 @@ void FThornEvent::ApplyFloorHeightDesc(const void* DescIn)
     Desc.Type = kThornTypeFloorHeightAnim;
     TargetPart = nullptr;
     TargetType = 0;
-    if (ReadEventWord(DescIn, 0) == kThornTypeFloorHeightAnim)
+    const FThornFloorEventDesc* const In = static_cast<const FThornFloorEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeFloorHeightAnim)
     {
-        std::memcpy(&FloorTarget, static_cast<const unsigned char*>(DescIn) + 44, sizeof(FloorTarget));
-        SetFloorTargetPart(reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12))));
-        TargetType = ReadEventWord(DescIn, 13);
+        std::memcpy(&FloorTarget, &In->FloorHeight, sizeof(FloorTarget));
+        SetFloorTargetPart(In->TargetPart);
+        TargetType = In->TargetType;
     }
     // Common timing/endpoints are mirrored after the payload.
     FinalizeDesc();
@@ -3213,7 +3214,7 @@ FThornEvent::FThornEvent(int Type, const void* Desc)
     else if (Type == kThornTypeStartSubScene)
     {
         float StartTimeValue = 0.0f;
-        std::memcpy(&StartTimeValue, static_cast<const unsigned char*>(Desc) + 44, sizeof(StartTimeValue));
+        std::memcpy(&StartTimeValue, &static_cast<const FThornSubSceneEventDesc*>(Desc)->StartTime, sizeof(StartTimeValue));
         Event->ApplySubSceneDesc(Desc, StartTimeValue);
         Event->Desc.UniqueId = Event->UniqueId;
     }
@@ -3465,8 +3466,9 @@ void FThornEvent::ApplyUserEventDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeUserEvent;
-    UserEventDesc.ExternalPayloadWord = ReadEventWord(DescIn, 0) == kThornTypeUserEvent
-        ? static_cast<unsigned int>(ReadEventWord(DescIn, 11)) : 0u;
+    const FThornUserEventDesc* const In = static_cast<const FThornUserEventDesc*>(DescIn);
+    UserEventDesc.ExternalPayloadWord = In->Common.Type == kThornTypeUserEvent
+        ? In->ExternalPayloadWord : 0u;
     FinalizeDesc();
 }
 
@@ -3475,8 +3477,9 @@ void FThornEvent::ApplySubtitleDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeSubtitle;
     // FUN_06f49d00: a mismatched descriptor keeps the existing subtitle id.
-    if (ReadEventWord(DescIn, 0) == kThornTypeSubtitle)
-        std::memcpy(&Strid, static_cast<const unsigned char*>(DescIn) + 44, sizeof(Strid));
+    const FThornSubtitleEventDesc* const In = static_cast<const FThornSubtitleEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeSubtitle)
+        std::memcpy(&Strid, &In->Strid, sizeof(Strid));
     FinalizeDesc();
 }
 
@@ -3485,8 +3488,9 @@ void FThornEvent::ApplySubSceneDesc(const void* DescIn, float StartTimeValue)
     (void)StartTimeValue;
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeStartSubScene;
-    if (ReadEventWord(DescIn, 0) == kThornTypeStartSubScene)
-        std::memcpy(&SubSceneStartTime, static_cast<const unsigned char*>(DescIn) + 44, sizeof(SubSceneStartTime));
+    const FThornSubSceneEventDesc* const In = static_cast<const FThornSubSceneEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeStartSubScene)
+        std::memcpy(&SubSceneStartTime, &In->StartTime, sizeof(SubSceneStartTime));
     else
         SubSceneStartTime = 0.0f;
     FinalizeDesc();
@@ -3513,16 +3517,15 @@ void FThornEvent::ApplyConnectDesc(const void* DescIn)
     // Clears the exposed pointers without destroying either owner.
     Hardpoint = nullptr;
     ParentHardpoint = nullptr;
-    const bool bMatchingType = ReadEventWord(DescIn, 0) == kThornTypeConnectHardpoints;
+    const FThornConnectEventDesc* const In = static_cast<const FThornConnectEventDesc*>(DescIn);
+    const bool bMatchingType = In->Common.Type == kThornTypeConnectHardpoints;
     if (bMatchingType)
     {
-        const char* HardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 11)));
+        const char* HardpointName = In->Hardpoint;
         if (HardpointName != nullptr)
             SetConnectHardpoint(HardpointName);
         // The second name is read after the first string operation.
-        const char* ParentHardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12)));
+        const char* ParentHardpointName = In->ParentHardpoint;
         if (ParentHardpointName != nullptr)
             SetConnectParentHardpoint(ParentHardpointName);
     }
@@ -3535,13 +3538,14 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeAttachEntity;
     TargetPart = nullptr;
-    if (ReadEventWord(DescIn, 0) == kThornTypeAttachEntity)
+    const FThornAttachEventDesc* const In = static_cast<const FThornAttachEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeAttachEntity)
     {
-        std::memcpy(&PathOffset, static_cast<const unsigned char*>(DescIn) + 44, sizeof(PathOffset));
-        TargetType = ReadEventWord(DescIn, 14);
-        LookAtUpAxis = ReadEventWord(DescIn, 15);
-        LookAtFrontAxis = ReadEventWord(DescIn, 16);
-        const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 17)));
+        std::memcpy(&PathOffset, &In->Offset, sizeof(PathOffset));
+        TargetType = In->TargetType;
+        LookAtUpAxis = In->UpAxis;
+        LookAtFrontAxis = In->FrontAxis;
+        const char* TargetPartName = In->TargetPart;
         if (TargetPartName != nullptr)
         {
             AttachTargetPartStorage.Assign(TargetPartName);
@@ -3564,14 +3568,15 @@ void FThornEvent::ApplyPathAnimDesc(const void* DescIn)
     // (floats copied as raw bits) or, on a mismatch, the constructor defaults.
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypePathAnim;
-    if (ReadEventWord(DescIn, 0) == kThornTypePathAnim)
+    const FThornPathEventDesc* const In = static_cast<const FThornPathEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypePathAnim)
     {
-        std::memcpy(&StartPercent, static_cast<const unsigned char*>(DescIn) + 44, sizeof(StartPercent));
-        std::memcpy(&StopPercent, static_cast<const unsigned char*>(DescIn) + 48, sizeof(StopPercent));
-        std::memcpy(&PercentDelta, static_cast<const unsigned char*>(DescIn) + 52, sizeof(PercentDelta));
-        std::memcpy(&PathOffset, static_cast<const unsigned char*>(DescIn) + 56, sizeof(PathOffset));
-        LookAtUpAxis = ReadEventWord(DescIn, 17);
-        LookAtFrontAxis = ReadEventWord(DescIn, 18);
+        std::memcpy(&StartPercent, &In->StartPercent, sizeof(StartPercent));
+        std::memcpy(&StopPercent, &In->StopPercent, sizeof(StopPercent));
+        std::memcpy(&PercentDelta, &In->PercentDelta, sizeof(PercentDelta));
+        std::memcpy(&PathOffset, &In->Offset, sizeof(PathOffset));
+        LookAtUpAxis = In->LookAtUpAxis;
+        LookAtFrontAxis = In->LookAtFrontAxis;
     }
     else
     {
@@ -3592,13 +3597,14 @@ void FThornEvent::ApplyLightEventDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     // The type is forced before the input is reread.
     Desc.Type = kThornTypeLightPropAnim;
-    if (ReadEventWord(DescIn, 0) == kThornTypeLightPropAnim)
+    const FThornLightEventDesc* const In = static_cast<const FThornLightEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeLightPropAnim)
     {
-        LightMask = ReadEventWord(DescIn, 11);
+        LightMask = In->Mask;
         // Forward DWORD copy (REP MOVSD); stays defined if the input aliases
         // the destination.
         unsigned char* Destination = reinterpret_cast<unsigned char*>(&LightTarget);
-        const unsigned char* Source = reinterpret_cast<const unsigned char*>(static_cast<const unsigned char*>(DescIn) + 48);
+        const unsigned char* Source = reinterpret_cast<const unsigned char*>(&In->Target);
         for (int Index = 0; Index < 0x24; ++Index)
         {
             unsigned int Word;
@@ -3622,24 +3628,25 @@ void FThornEvent::ApplyMotionDesc(const void* DescIn)
     Desc.Type = kThornTypeStartMotion;
     Animation = nullptr;
     LockedBone = nullptr;
-    if (ReadEventWord(DescIn, 0) == kThornTypeStartMotion)
+    const FThornMotionEventDesc* const In = static_cast<const FThornMotionEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeStartMotion)
     {
         // Every scalar is stored before either string operation.
-        std::memcpy(&Heading, static_cast<const unsigned char*>(DescIn) + 68, sizeof(Heading));
-        Field_0x40 = static_cast<unsigned char>(ReadEventWord(DescIn, 16));
-        std::memcpy(&MotionStartTime, static_cast<const unsigned char*>(DescIn) + 44, sizeof(MotionStartTime));
-        std::memcpy(&TimeScale, static_cast<const unsigned char*>(DescIn) + 52, sizeof(TimeScale));
-        Field_0x50 = ReadEventWord(DescIn, 20);
-        std::memcpy(&TransTime, static_cast<const unsigned char*>(DescIn) + 48, sizeof(TransTime));
-        std::memcpy(&TransScale, static_cast<const unsigned char*>(DescIn) + 76, sizeof(TransScale));
-        std::memcpy(&Weight, static_cast<const unsigned char*>(DescIn) + 56, sizeof(Weight));
-        const char* AnimationName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 15)));
+        std::memcpy(&Heading, &In->Heading, sizeof(Heading));
+        Field_0x40 = In->Field40;
+        std::memcpy(&MotionStartTime, &In->StartTime, sizeof(MotionStartTime));
+        std::memcpy(&TimeScale, &In->TimeScale, sizeof(TimeScale));
+        Field_0x50 = In->Field50;
+        std::memcpy(&TransTime, &In->TransTime, sizeof(TransTime));
+        std::memcpy(&TransScale, &In->TransScale, sizeof(TransScale));
+        std::memcpy(&Weight, &In->Weight, sizeof(Weight));
+        const char* AnimationName = In->Animation;
         if (AnimationName != nullptr)
         {
             MotionAnimationStorage.Assign(AnimationName);
             Animation = MotionAnimationStorage.GetPublishedData();
         }
-        const char* BoneName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 18)));
+        const char* BoneName = In->LockedBone;
         if (BoneName != nullptr)
         {
             MotionLockedBoneStorage.Assign(BoneName);
@@ -3680,23 +3687,24 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
     AdoptSpatialStringStorage();
     TargetPart = nullptr; // Clears the pointer, not the owner.
     TargetType = 0;
-    if (ReadEventWord(DescIn, 0) != kThornTypeSpatialPropAnim)
+    const FThornSpatialEventDesc* const In = static_cast<const FThornSpatialEventDesc*>(DescIn);
+    if (In->Common.Type != kThornTypeSpatialPropAnim)
     {
         FinalizeDesc();
         return;
     }
-    SpatialMask = ReadEventWord(DescIn, 11);
+    SpatialMask = In->Mask;
     const bool bQuaternionOrientation = (Desc.Flags & kThornFlagQuatOrient) != 0;
     // Forward word copy; stays defined if the input aliases this storage.
     for (int Index = 0; Index < 9; ++Index)
-        std::memcpy(&TargetOrient.E[0][0] + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
+        std::memcpy(&TargetOrient.E[0][0] + Index, &In->Orient.E[0][0] + Index, 4);
     for (int Index = 0; Index < 3; ++Index)
-        std::memcpy(&TargetPos.x + Index, static_cast<const unsigned char*>(DescIn) + 84 + Index * 4, 4);
+        std::memcpy(&TargetPos.x + Index, &In->Position.x + Index, 4);
     if (bQuaternionOrientation)
     {
         for (int Index = 0; Index < 4; ++Index)
             std::memcpy(reinterpret_cast<unsigned char*>(&TargetQuat) + Index * 4,
-                        static_cast<const unsigned char*>(DescIn) + 96 + Index * 4, 4);
+                        reinterpret_cast<const unsigned char*>(&In->Quaternion) + Index * 4, 4);
     }
     else
     {
@@ -3705,9 +3713,9 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
         if (G_SceneEventMathEngine == nullptr)
             G_SceneEventMathEngine = ThornAcquire3DMathEngine();
         SpatialMatrixToQuaternion(G_SceneEventMathEngine, TargetQuat,
-            static_cast<const unsigned char*>(DescIn) + 48);
+            &In->Orient);
     }
-    const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 30)));
+    const char* TargetPartName = In->TargetPart;
     // TargetPart was cleared before the math callback; a null name skips the
     // assignment entirely.
     if (TargetPartName != nullptr)
@@ -3716,9 +3724,9 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
         TargetPart = SpatialTargetPartStorage.GetPublishedData();
     }
     // Read only after the string call, as retail does.
-    TargetType = ReadEventWord(DescIn, 31);
-    std::memcpy(&AxisRotAngle, static_cast<const unsigned char*>(DescIn) + 112, sizeof(AxisRotAngle));
-    AxisRotAxis = ReadEventWord(DescIn, 29);
+    TargetType = In->TargetType;
+    std::memcpy(&AxisRotAngle, &In->AxisRotAngle, sizeof(AxisRotAngle));
+    AxisRotAxis = In->AxisRotAxis;
     FinalizeDesc();
 }
 
@@ -3727,7 +3735,8 @@ void FThornEvent::ApplyStartSoundDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeStartSound;
     // The input is reread after the common callbacks and the forced type.
-    SoundStartTime = ReadEventWord(DescIn, 0) == kThornTypeStartSound ? ReadEventWord(DescIn, 11) : 0;
+    const FThornSoundEventDesc* const In = static_cast<const FThornSoundEventDesc*>(DescIn);
+    SoundStartTime = In->Common.Type == kThornTypeStartSound ? In->SoundStartTime : 0;
     FinalizeDesc();
 }
 
@@ -3744,11 +3753,12 @@ void FThornEvent::ApplyCameraPropAnimDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeCameraPropAnim;
     // The input type is read after the common curve callbacks.
-    if (ReadEventWord(DescIn, 0) == kThornTypeCameraPropAnim)
+    const FThornCameraEventDesc* const In = static_cast<const FThornCameraEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeCameraPropAnim)
     {
-        CamMask = ReadEventWord(DescIn, 11);
+        CamMask = In->Mask;
         for (int Index = 0; Index < 4; ++Index)
-            std::memcpy(CamTarget + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
+            std::memcpy(CamTarget + Index, &In->Target[Index], 4);
     }
     else
         CamMask = 0; // The four target words are kept on a mismatch.
@@ -3767,12 +3777,13 @@ void FThornEvent::ApplyPsysPropAnimDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypePsysPropAnim;
     // The input is reread after the common callbacks and the forced type.
-    if (ReadEventWord(DescIn, 0) == kThornTypePsysPropAnim)
+    const FThornPsysPropEventDesc* const In = static_cast<const FThornPsysPropEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypePsysPropAnim)
     {
-        PsysMask = ReadEventWord(DescIn, 11);
+        PsysMask = In->Mask;
         // Raw DWORD read before its store.
         unsigned int TargetBits;
-        std::memcpy(&TargetBits, static_cast<const unsigned char*>(DescIn) + 48, sizeof(TargetBits));
+        std::memcpy(&TargetBits, &In->Sparam, sizeof(TargetBits));
         std::memcpy(&SparamTarget, &TargetBits, sizeof(TargetBits));
     }
     else
@@ -3789,14 +3800,15 @@ void FThornEvent::ApplyFogPropAnimDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeFogPropAnim;
     // The input type is read after the common curve callbacks.
-    if (ReadEventWord(DescIn, 0) == kThornTypeFogPropAnim)
+    const FThornFogEventDesc* const In = static_cast<const FThornFogEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeFogPropAnim)
     {
-        FogMask = ReadEventWord(DescIn, 11);
+        FogMask = In->Mask;
         // Forward DWORD copy, flag bytes and padding included.
         for (int Index = 0; Index < 8; ++Index)
         {
             unsigned int Word;
-            std::memcpy(&Word, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, sizeof(Word));
+            std::memcpy(&Word, reinterpret_cast<const unsigned char*>(&In->Target) + Index * 4, sizeof(Word));
             std::memcpy(reinterpret_cast<unsigned char*>(&FogTarget) + Index * 4, &Word, sizeof(Word));
         }
     }
@@ -3810,12 +3822,13 @@ void FThornEvent::ApplyReverbPropAnimDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeReverbPropAnim;
     // Type reread after the callbacks; four raw words copied in order.
-    if (ReadEventWord(DescIn, 0) == kThornTypeReverbPropAnim)
+    const FThornReverbEventDesc* const In = static_cast<const FThornReverbEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeReverbPropAnim)
     {
-        ReverbMask = ReadEventWord(DescIn, 11);
+        ReverbMask = In->Mask;
         for (int Index = 0; Index < 4; ++Index)
             std::memcpy(reinterpret_cast<unsigned char*>(&ReverbTarget) + Index * 4,
-                        static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
+                        reinterpret_cast<const unsigned char*>(&In->Target) + Index * 4, 4);
     }
     else
         ReverbMask = 0;
@@ -3839,14 +3852,15 @@ void FThornEvent::ApplyAudioPropAnimDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeAudioPropAnim;
     // Type reread after the callbacks; a mismatch clears only the mask.
-    if (ReadEventWord(DescIn, 0) == kThornTypeAudioPropAnim)
+    const FThornAudioPropEventDesc* const In = static_cast<const FThornAudioPropEventDesc*>(DescIn);
+    if (In->Common.Type == kThornTypeAudioPropAnim)
     {
-        AudioMask = ReadEventWord(DescIn, 11);
+        AudioMask = In->Mask;
         // Forward DWORD copy; defined for overlapping input.
         for (int Index = 0; Index < 8; ++Index)
         {
             unsigned int Word;
-            std::memcpy(&Word, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
+            std::memcpy(&Word, reinterpret_cast<const unsigned char*>(&In->Target) + Index * 4, 4);
             std::memcpy(reinterpret_cast<unsigned char*>(&AudioTarget) + Index * 4, &Word, 4);
         }
     }
@@ -4633,7 +4647,7 @@ unsigned char FThornEvent::StartFogPropAnim(FThornScene* Scene)
         FThornEntity* Primary = *PrimaryEntry;
         IFogControl* Control = Primary->FogControl;
         if (Control != nullptr)
-            Control->GetPacked(reinterpret_cast<unsigned char*>(&Primary->LiveSceneBlob[7]));
+            Control->GetPacked(reinterpret_cast<FThornFog8*>(&Primary->LiveSceneBlob[7]));
         // Retail keeps the entity pointer captured before the GET.
         std::memcpy(&FogCapturePacked, &Primary->LiveSceneBlob[7], sizeof(FogCapturePacked));
     }

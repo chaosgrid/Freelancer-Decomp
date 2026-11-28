@@ -11,6 +11,7 @@
 // FGenericFxObjectBase's definition, for IntegratePool / ApplyFieldsToPool (its friends);
 // included here rather than in alchemy_common.h to avoid an include cycle.
 #include "alchemy_genericfx.h"
+#include "alchemy_appearances.h" // FParticleAppRecord (the G_PoolParticle record)
 
 // The concrete ramp classes the node-lib readers construct with `new`, as retail does
 // (FUN_06229eb0 / FUN_06229f00 children, the FUN_06227c70 IAnimatedSingle children).
@@ -608,13 +609,13 @@ namespace AlchemyImpl
         // storage is a raw new[], and the first frame reads them.
         if (Pool->Stride == kStridePerp)
         {
-            float* Axis = reinterpret_cast<float*>(Item + 0x30);
-            Axis[0] = 0.0f;
-            Axis[1] = 0.0f;
-            Axis[2] = 0.0f;
+            Vector* Axis = &reinterpret_cast<FPooledPerpParticle*>(Item)->Axis;
+            Axis->x = 0.0f;
+            Axis->y = 0.0f;
+            Axis->z = 0.0f;
         }
         else if (Pool->Stride >= 0x34)
-            AssignComPtr(reinterpret_cast<IDAComponent**>(Item + 0x30), nullptr);
+            AssignComPtr(&reinterpret_cast<FPooledBeamParticle*>(Item)->Field_0x30, nullptr);
         return Particle;
     }
 
@@ -906,7 +907,7 @@ namespace AlchemyImpl
         unsigned char* const Bytes = static_cast<unsigned char*>(Item);
         if (Pool == &G_PoolMesh)
         {
-            IFxMesh** const MeshSlot = reinterpret_cast<IFxMesh**>(Bytes + 0x30);
+            IFxMesh** const MeshSlot = &reinterpret_cast<FPooledMeshParticle*>(Bytes)->Mesh;
             FPoolComponentSlotOwner<IFxMesh> MeshOwner = {MeshSlot};
             if (*MeshSlot != nullptr)
                 (*MeshSlot)->Destroy();
@@ -915,12 +916,13 @@ namespace AlchemyImpl
         else if (Pool->Stride != kStridePerp && Pool->Stride >= 0x34 &&
                  Pool != &G_PoolParticle)
         {
-            ReleaseComPtr(reinterpret_cast<IDAComponent**>(Bytes + 0x30));
+            ReleaseComPtr(&reinterpret_cast<FPooledBeamParticle*>(Bytes)->Field_0x30);
         }
         if (Pool == &G_PoolParticle)
         {
-            IFxEffect** const Life = reinterpret_cast<IFxEffect**>(Bytes + 0x6c);
-            IFxEffect** const Death = reinterpret_cast<IFxEffect**>(Bytes + 0x70);
+            FParticleAppRecord* const Record = reinterpret_cast<FParticleAppRecord*>(Bytes);
+            IFxEffect** const Life = &Record->LifeEffect;
+            IFxEffect** const Death = &Record->DeathEffect;
             FPoolComponentSlotOwner<IFxEffect> LifeOwner = {Life};
             FPoolComponentSlotOwner<IFxEffect> DeathOwner = {Death};
             if (*Life != nullptr)

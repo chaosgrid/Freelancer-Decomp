@@ -18,6 +18,7 @@
 #include "common_iface.h"
 #include "common_ini.h"
 #include "common_server.h"
+#include "server_gameobject.h"       // FSubObjDamageEvent (controller message 0xd)
 
 #include <cmath>
 #include <cstdlib>
@@ -1233,19 +1234,19 @@ bool CndHealthDec::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     }
     if (bObjectMissing)
         return false;
-    unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
-    if (ObjectId != Parms[0])
+    FSubObjDamageEvent const* Parms = static_cast<FSubObjDamageEvent const*>(EventParms);
+    if (ObjectId != Parms->ObjId)
         return false;
-    if (Parms[3] != 0)
+    if (Parms->EquipType != 0)
         return false;
-    if (Parms[4] != 0)
+    if (Parms->CollisionGroupType != 0)
         return false;
-    float const NewHealth = *reinterpret_cast<float const*>(Parms + 8);
+    float const NewHealth = Parms->RelativeHealth;
     if (!(NewHealth < Health || NewHealth == Health))
         return false;
     if (AttackerLabel.Length == 0)
         return true;
-    return AttackerId == Parms[2];
+    return AttackerId == Parms->InflictorId;
 }
 
 // FUN_06ec2b60.

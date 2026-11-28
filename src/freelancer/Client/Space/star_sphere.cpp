@@ -400,8 +400,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
     {
         if (Record == nullptr)
             return nullptr;
-        unsigned char* const Inner = static_cast<unsigned char*>(Record) + 0xc;
-        return *reinterpret_cast<CObject**>(Inner + 0x4);
+        return static_cast<IObjInspectImpl*>(Record)->Object;
     }
 
     // FUN_0050c750 — is the ray From -> To blocked by something big enough on screen?
@@ -1219,16 +1218,16 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         // inner radius -> outer radius -> tip.
         for (int Index = 0; Index < Count; ++Index)
         {
-            float const* const Elem =
-                reinterpret_cast<float const*>(Spines->SpineBegin + Index * 0x2c);
-            double const Cos = static_cast<double>(Elem[0]);
-            double const Sin = static_cast<double>(Elem[1]);
+            FStarSpine const* const Elem =
+                reinterpret_cast<FStarSpine const*>(Spines->SpineBegin + Index * 0x2c);
+            double const Cos = static_cast<double>(Elem->Cos);
+            double const Sin = static_cast<double>(Elem->Sin);
 
             // Length and half width on the FPU (-half width also as three
             // float copies), 1 / length unguarded (DAT_005c75dc), the inner / outer fractions as
             // floats.
-            double const Length = static_cast<double>(Scale) * Elem[2];
-            double const HalfW = static_cast<double>(Scale) * Elem[3] * 0.5;
+            double const Length = static_cast<double>(Scale) * Elem->Length;
+            double const HalfW = static_cast<double>(Scale) * Elem->Width * 0.5;
             double const NegHalfW = -HalfW;
             double const NegHalfWF = static_cast<double>(static_cast<float>(NegHalfW));
             double const InvLength = 1.0 / Length;
@@ -1267,13 +1266,13 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             float const TipPosX = static_cast<float>((SinHalfWF + CosTip) + SunX);
             float const TipPosY = static_cast<float>((CosHalfW - SinTip) + SunY);
 
-            // alpha = ((1 - blend) * intensity + spine * blend) * +0x28
+            // alpha = ((1 - blend) * intensity + spine * blend) * Alpha
             // * the intensity argument (DAT_0061346c blend; the spine value from FUN_00510990 on
             // the FPU), as a float.
             double const Spine = SpineIntensityFromCorona(Index, Count, Alpha0, Sphere);
             double const Blend = static_cast<double>(kSpineBlend);
             float const Alpha = static_cast<float>(
-                ((1.0 - Blend) * Sphere->Intensity + Spine * Blend) * Elem[10] * IntensityMul);
+                ((1.0 - Blend) * Sphere->Intensity + Spine * Blend) * Elem->Alpha * IntensityMul);
 
             // The texture u at the inner / outer fraction,
             // t * u1 + u0 * (1 - t), as floats.
@@ -1286,32 +1285,32 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
             // The colour lerps inner -> outer at the two fractions, with
             // retail's float roundings.
-            double const T0Outer0 = static_cast<double>(T0) * Elem[7];
-            double const T0Outer1 = static_cast<double>(T0) * Elem[8];
+            double const T0Outer0 = static_cast<double>(T0) * Elem->OuterColor[0];
+            double const T0Outer1 = static_cast<double>(T0) * Elem->OuterColor[1];
             double const T0Outer2F = static_cast<double>(static_cast<float>(
-                static_cast<double>(T0) * Elem[9]));
-            float const InnerColR = static_cast<float>(OneMinusT0 * Elem[4] + T0Outer0);
+                static_cast<double>(T0) * Elem->OuterColor[2]));
+            float const InnerColR = static_cast<float>(OneMinusT0 * Elem->InnerColor[0] + T0Outer0);
             float const InnerColG = static_cast<float>(
-                static_cast<double>(static_cast<float>(OneMinusT0 * Elem[5])) + T0Outer1);
+                static_cast<double>(static_cast<float>(OneMinusT0 * Elem->InnerColor[1])) + T0Outer1);
             float const InnerColB = static_cast<float>(
-                static_cast<double>(static_cast<float>(OneMinusT0 * Elem[6])) + T0Outer2F);
+                static_cast<double>(static_cast<float>(OneMinusT0 * Elem->InnerColor[2])) + T0Outer2F);
             double const T1Outer0F = static_cast<double>(static_cast<float>(
-                static_cast<double>(T1) * Elem[7]));
+                static_cast<double>(T1) * Elem->OuterColor[0]));
             double const T1Outer1F = static_cast<double>(static_cast<float>(
-                static_cast<double>(T1) * Elem[8]));
+                static_cast<double>(T1) * Elem->OuterColor[1]));
             double const T1Outer2F = static_cast<double>(static_cast<float>(
-                static_cast<double>(T1) * Elem[9]));
-            float const OuterColR = static_cast<float>(OneMinusT1 * Elem[4] + T1Outer0F);
+                static_cast<double>(T1) * Elem->OuterColor[2]));
+            float const OuterColR = static_cast<float>(OneMinusT1 * Elem->InnerColor[0] + T1Outer0F);
             float const OuterColG = static_cast<float>(
-                static_cast<double>(static_cast<float>(OneMinusT1 * Elem[5])) + T1Outer1F);
+                static_cast<double>(static_cast<float>(OneMinusT1 * Elem->InnerColor[1])) + T1Outer1F);
             float const OuterColB = static_cast<float>(
-                static_cast<double>(static_cast<float>(OneMinusT1 * Elem[6])) + T1Outer2F);
+                static_cast<double>(static_cast<float>(OneMinusT1 * Elem->InnerColor[2])) + T1Outer2F);
             float const InnerAlpha =
                 static_cast<float>(static_cast<double>(Alpha) * static_cast<double>(Alpha0));
 
             // Quad 1, base -> inner radius (base colour at alpha 0).
             Win3DTexCoord2f(Shape->U0, Shape->V0);
-            Win3DColor4f(Elem[4], Elem[5], Elem[6], 0.0f);
+            Win3DColor4f(Elem->InnerColor[0], Elem->InnerColor[1], Elem->InnerColor[2], 0.0f);
             Win3DVertex3f(BaseNegX, BaseNegY, 0.0f);
             Win3DTexCoord2f(UInner, Shape->V0);
             Win3DColor4f(InnerColR, InnerColG, InnerColB, InnerAlpha);
@@ -1320,7 +1319,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             Win3DColor4f(InnerColR, InnerColG, InnerColB, InnerAlpha);
             Win3DVertex3f(InnerPosX, InnerPosY, 0.0f);
             Win3DTexCoord2f(Shape->U0, Shape->V1);
-            Win3DColor4f(Elem[4], Elem[5], Elem[6], 0.0f);
+            Win3DColor4f(Elem->InnerColor[0], Elem->InnerColor[1], Elem->InnerColor[2], 0.0f);
             Win3DVertex3f(BasePosX, BasePosY, 0.0f);
 
             // Quad 2, inner -> outer radius.
@@ -1342,10 +1341,10 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             Win3DColor4f(OuterColR, OuterColG, OuterColB, Alpha);
             Win3DVertex3f(OuterNegX, OuterNegY, 0.0f);
             Win3DTexCoord2f(Shape->U1, Shape->V0);
-            Win3DColor4f(Elem[7], Elem[8], Elem[9], Alpha);
+            Win3DColor4f(Elem->OuterColor[0], Elem->OuterColor[1], Elem->OuterColor[2], Alpha);
             Win3DVertex3f(TipNegX, TipNegY, 0.0f);
             Win3DTexCoord2f(Shape->U1, Shape->V1);
-            Win3DColor4f(Elem[7], Elem[8], Elem[9], Alpha);
+            Win3DColor4f(Elem->OuterColor[0], Elem->OuterColor[1], Elem->OuterColor[2], Alpha);
             Win3DVertex3f(TipPosX, TipPosY, 0.0f);
             Win3DTexCoord2f(UOuter, Shape->V1);
             Win3DColor4f(OuterColR, OuterColG, OuterColB, Alpha);
@@ -1833,7 +1832,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
                                    ScreenY > BodyNegR &&
                                    static_cast<double>(Height) + BodyR > ScreenY;
 
-        // The largest +0x08 over the Spines (+0x1c) element array
+        // The largest Length over the Spines (+0x1c) element array
         // (begin +0x04, end +0x08, stride 0x2c), walked while begin is non-null and the index
         // is below the element count. A new value replaces the running maximum unless the
         // maximum is strictly greater, so NaN replaces it.
@@ -1848,7 +1847,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             int const Count = static_cast<int>((End - Begin) / 0x2c);
             if (Index >= static_cast<unsigned>(Count))
                 break;
-            double const Value = *reinterpret_cast<float*>(Begin + Index * 0x2c + 0x08);
+            double const Value = reinterpret_cast<FStarSpine*>(Begin + Index * 0x2c)->Length;
             if (!(SpinesMax > Value))
                 SpinesMax = Value;
         }
@@ -2566,16 +2565,16 @@ int FStarFxChild40::SpinesLoadFromIni(char const* IniPath, char const* Nickname)
         float Angle = 0.0f;
         for (int I = 0; I < Count; ++I)
         {
-            float* const E = reinterpret_cast<float*>(Begin + I * 0x2c);
-            E[0] = cosf(Angle);
-            E[1] = sinf(Angle);
+            FStarSpine* const E = reinterpret_cast<FStarSpine*>(Begin + I * 0x2c);
+            E->Cos = cosf(Angle);
+            E->Sin = sinf(Angle);
             Angle += Step;
         }
         for (int I = 0; I < Count; ++I)
         {
-            float* const E = reinterpret_cast<float*>(Begin + I * 0x2c);
-            E[2] *= RadiusScale;
-            E[3] *= RadiusScale;
+            FStarSpine* const E = reinterpret_cast<FStarSpine*>(Begin + I * 0x2c);
+            E->Length *= RadiusScale;
+            E->Width *= RadiusScale;
         }
     }
     return bFound ? 0 : 1;

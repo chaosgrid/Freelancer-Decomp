@@ -71,12 +71,12 @@ namespace
     // CBase this-adjustment) only fails for the pointer -0xc, kept as a sentinel.
     CEqObj* GetPlayerShipEqObj()
     {
-        void* const ObjRW = GetPlayerObjRW();
-        if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(-0xc))
+        IObjRW* const ObjRW = GetPlayerObjRW();
+        if (ObjRW == nullptr || ObjRW == reinterpret_cast<IObjRW*>(-0xc))
             return nullptr;
 
         CEqObj* const EqObj =
-            *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
+            static_cast<CEqObj*>(static_cast<IObjInspectImpl*>(ObjRW)->Object);
         if (EqObj == nullptr)
             return nullptr;
 

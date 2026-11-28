@@ -199,7 +199,7 @@ void GfLightRegistryRemove(int Index)
     G_GfLightEnabled[Index] = 0;
 }
 
-FGfLightWrapper* GfLightWrapperCreate(float const* Frame12, FD3dLight8 const* Source,
+FGfLightWrapper* GfLightWrapperCreate(Csys const* Frame12, FD3dLight8 const* Source,
                                       Vector const* Direction, unsigned char Group)
 {
     // FUN_00556fd0: operator new(8), both fields zeroed.

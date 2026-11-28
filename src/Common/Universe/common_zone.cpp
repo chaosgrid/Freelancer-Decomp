@@ -171,7 +171,7 @@ namespace
     // FUN_062dba00 on a frame whose Dim holds the half extents.
     bool ClampToBoxSurface(FZoneFrame& Frame, Vector const& Src, Vector& Dst)
     {
-        return ClampPointToBoxSurface(reinterpret_cast<unsigned char*>(&Frame), &Src, &Dst);
+        return ClampPointToBoxSurface(reinterpret_cast<FOrientedBox const*>(&Frame), &Src, &Dst);
     }
 
     // The frame every shape builds from the zone (its 12 dwords at +0x0c); retail's identity

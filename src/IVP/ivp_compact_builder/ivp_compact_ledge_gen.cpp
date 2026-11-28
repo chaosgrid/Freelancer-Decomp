@@ -188,16 +188,15 @@ void IVP_Compact_Ledge_Generator::generate_compact_ledge(IVP_Compact_Ledge* Buff
 
     for (int32_t I = 0; I < n_points; ++I)
     {
-        float* const Out = reinterpret_cast<float*>(Cursor);
-        *reinterpret_cast<uint32_t*>(Out + 3) = 0;
+        IVP_U_Float_Point* const Out = reinterpret_cast<IVP_U_Float_Point*>(Cursor);
+        *reinterpret_cast<uint32_t*>(&Out->HesseVal) = 0;
         const IVP_Poly_Point* const Point = points.elems[I];
-        Out[0] = Point->k[0];
-        Out[2] = Point->k[2];
-        Out[1] = Point->k[1];
+        Out->X = Point->k[0];
+        Out->Z = Point->k[2];
+        Out->Y = Point->k[1];
         Cursor += 0x10;
     }
 
-    uint32_t* const SizeWord = reinterpret_cast<uint32_t*>(LedgeBytes + 8);
     const int32_t Size = static_cast<int32_t>(Cursor - LedgeBytes);
-    *SizeWord = (static_cast<uint32_t>(Size >> 4) << 8) | (*SizeWord & 0xf3u) | 4u;
+    Ledge->SizeAndFlags = (static_cast<uint32_t>(Size >> 4) << 8) | (Ledge->SizeAndFlags & 0xf3u) | 4u;
 }

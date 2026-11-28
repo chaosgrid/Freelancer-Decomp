@@ -67,31 +67,6 @@ namespace
         return Hp;
     }
 
-    // Retail Archetype::CliEQLight (vtable 005c7eb8, sizeof 0x98, ctor FUN_0040a9e0) is private
-    // to client_cliobj.cpp (FCliEQLight); this is its tail from +0x54 as FlashLight.cpp reads
-    // it. Names are the INI keys of its ReadUnknown (LAB_0040ab30).
-    struct FCliEQLightView
-    {
-        float Color[3];          // +0x54 "color"
-        float GlowColor[3];      // +0x60 "glow_color"
-        float MinColor[3];       // +0x6c "min_color"
-        float BulbSize;          // +0x78 "bulb_size"
-        float GlowSize;          // +0x7c "glow_size"
-        float AvgDelay;          // +0x80 "avg_delay"
-        float BlinkDuration;     // +0x84 "blink_duration"
-        float Intensity;         // +0x88 "intensity" -- the real light's radius (FUN_00411300)
-        float FlareConeCos[2];   // +0x8c cos(second value), +0x90 cos(first value)
-        float LightsourceCone;   // +0x94 "lightsource_cone"
-    };
-    static_assert(sizeof(FCliEQLightView) == 0x98 - 0x54, "CliEQLight tail +0x54..+0x98");
-
-    // Every reader dereferences the companion without a test.
-    FCliEQLightView const* CompanionAsLight(Archetype::ICliObj* Companion)
-    {
-        return reinterpret_cast<FCliEQLightView const*>(
-            reinterpret_cast<unsigned char const*>(Companion) + 0x54);
-    }
-
     struct FCliEquipGameLight;
 
     // Client\space\FlashLight.cpp's CliEquipLight: operator new through FUN_004f79a0(0x9c),
@@ -307,7 +282,8 @@ namespace
         Self->Companion = Companion;
         Self->BlinkRate = 0.0f;
         Self->BlinkDuty = 1.0f;
-        FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
+        Archetype::FCliEQLight const* const View =
+            static_cast<Archetype::FCliEQLight const*>(Self->Companion);
 
         // The period (rand / 32768 * 0.2 + 0.9) * avg_delay is tested unrounded and kept as a
         // float for the rest.
@@ -392,7 +368,8 @@ namespace
         Self->GetWorldTransform(&World);
         ScreenQuadBeginBatchFrame(Self->TexFrame, 1, true);
 
-        FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
+        Archetype::FCliEQLight const* const View =
+            static_cast<Archetype::FCliEQLight const*>(Self->Companion);
         float Fade = 1.0f;
         // Only FlareConeCos[0] strictly above FlareConeCos[1] fades.
         if (View->FlareConeCos[0] > View->FlareConeCos[1])
@@ -481,7 +458,8 @@ namespace
         Out->x = World.Translation.x;
         Out->y = World.Translation.y;
         Out->z = World.Translation.z;
-        FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
+        Archetype::FCliEQLight const* const View =
+            static_cast<Archetype::FCliEQLight const*>(Self->Companion);
         if (View->BulbSize < View->GlowSize)
             return View->GlowSize;
         return View->BulbSize;
@@ -737,8 +715,7 @@ namespace
         if (Arch == nullptr || Arch->ExplosionArch.IsEmpty())
             return;
         Archetype::Explosion* Expl = Archetype::GetExplosion(Arch->ExplosionArch);
-        *reinterpret_cast<Archetype::Explosion**>(reinterpret_cast<unsigned char*>(Host) + 0x40) =
-            Expl;
+        Host->ExplosionArch = Expl;
         ExplosionArchAddRef(Expl);
     }
 
@@ -924,14 +901,15 @@ namespace
         Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
         if (Comp == nullptr)
             return;
-        unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(Comp);
-        ID_String const* const Collapse = reinterpret_cast<ID_String const*>(CompBytes + 0x58);
+        Archetype::FCliShieldGenerator const* const Gen =
+            static_cast<Archetype::FCliShieldGenerator const*>(Comp);
+        ID_String const* const Collapse = &Gen->CollapseSound;
         if (!Collapse->IsEmpty())
         {
             CollapseSound = LookupClientSoundArch(Collapse);
             CollapseSound->Acquire();
         }
-        ID_String const* const Rebuilt = reinterpret_cast<ID_String const*>(CompBytes + 0x5c);
+        ID_String const* const Rebuilt = &Gen->RebuiltSound;
         if (!Rebuilt->IsEmpty())
         {
             RebuiltSound = LookupClientSoundArch(Rebuilt);
@@ -1042,8 +1020,8 @@ namespace
             Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
             if (Comp != nullptr)
             {
-                ID_String const* const Particle = reinterpret_cast<ID_String const*>(
-                    reinterpret_cast<unsigned char const*>(Comp) + 0x54);
+                ID_String const* const Particle =
+                    &static_cast<Archetype::FCliShieldGenerator const*>(Comp)->CollapseParticle;
                 Vector const Velocity = Equip->Owner->get_velocity();
                 if (!Particle->IsEmpty())
                 {
@@ -1156,14 +1134,6 @@ namespace
     };
     static_assert(sizeof(FCliThrusterEquipFx) == 0x20, "ThrusterFx 0x20");
     static_assert(offsetof(FCliThrusterEquipFx, Companion) == 0x10, "Thruster +0x10");
-
-    // Retail Archetype::CliEQAttachedFX (vtable 005c7fe0, 0x5c) is private to client_cliobj.cpp
-    // (FCliEQAttachedFX); this is its tail from +0x54 as EquippedObj.cpp reads it.
-    struct FCliEQAttachedFXView
-    {
-        ID_String Particles;        // +0x54 "particles"
-        bool bUseThrottle;          // +0x58 "use_throttle"
-    };
 
     // The attached-FX equipment's client wrapper: operator new(0x20) in the factory FUN_00533160,
     // constructor FUN_00532210, vtable PTR_LAB_005de16c {notify LAB_00532460, scalar deleting
@@ -1313,17 +1283,17 @@ namespace
     // members above are retail's -- the std::vector at +0x10 is not VC6-sized, and nothing
     // reaches this wrapper by offset.
 
-    // Companion sound cue CreateID offsets (FCliEngine::ReadUnknown).
-    unsigned const kEngineSoundCueOff[9] = {
-        0x60u, // rumble_sound
-        0x74u, // character_start_sound
-        0x78u, // character_loop_sound
-        0x84u, // engine_kill_sound
-        0x88u, // cruise_start_sound
-        0x8cu, // cruise_loop_sound
-        0x90u, // cruise_stop_sound
-        0x94u, // cruise_disrupt_sound
-        0x98u, // cruise_backfire_sound
+    // Companion sound cue CreateIDs (FCliEngine::ReadUnknown).
+    ID_String Archetype::FCliEngine::* const kEngineSoundCue[9] = {
+        &Archetype::FCliEngine::RumbleSound,         // rumble_sound
+        &Archetype::FCliEngine::CharacterStartSound, // character_start_sound
+        &Archetype::FCliEngine::CharacterLoopSound,  // character_loop_sound
+        &Archetype::FCliEngine::EngineKillSound,     // engine_kill_sound
+        &Archetype::FCliEngine::CruiseStartSound,    // cruise_start_sound
+        &Archetype::FCliEngine::CruiseLoopSound,     // cruise_loop_sound
+        &Archetype::FCliEngine::CruiseStopSound,     // cruise_stop_sound
+        &Archetype::FCliEngine::CruiseDisruptSound,  // cruise_disrupt_sound
+        &Archetype::FCliEngine::CruiseBackfireSound, // cruise_backfire_sound
     };
     unsigned char const kEngineSoundLoop[9] = {1, 0, 1, 0, 0, 1, 0, 0, 0};
 
@@ -1474,13 +1444,11 @@ namespace
 
         // The companion (a null equipment gives a null companion that is read anyway): cone
         // angles +0x54 / +0x58 as unsigned ints to float, cone outside volume +0x5c raw.
-        unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
+        Archetype::FCliEngine const* const Comp = static_cast<Archetype::FCliEngine const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
-        float const ConeInner = static_cast<float>(
-            static_cast<long long>(*reinterpret_cast<unsigned const*>(CompBytes + 0x54)));
-        float const ConeOuter = static_cast<float>(
-            static_cast<long long>(*reinterpret_cast<unsigned const*>(CompBytes + 0x58)));
-        float const ConeOutsideVol = *reinterpret_cast<float const*>(CompBytes + 0x5c);
+        float const ConeInner = static_cast<float>(static_cast<long long>(Comp->InsideSoundCone));
+        float const ConeOuter = static_cast<float>(static_cast<long long>(Comp->OutsideSoundCone));
+        float const ConeOutsideVol = Comp->OutsideConeAttenuation;
 
         // Per cue, in slot order: a found archetype gets an emitter (FUN_00527a70); the slot
         // takes the emitter or null. Every emitter but engine_kill, cruise_disrupt and
@@ -1488,8 +1456,7 @@ namespace
         static unsigned char const kEngineSoundCone[9] = {1, 1, 1, 0, 1, 1, 1, 0, 0};
         for (int Index = 0; Index < 9; ++Index)
         {
-            ID_String const* const Cue =
-                reinterpret_cast<ID_String const*>(CompBytes + kEngineSoundCueOff[Index]);
+            ID_String const* const Cue = &(Comp->*kEngineSoundCue[Index]);
             ISoundSource* Emitter = nullptr;
             if (!Cue->IsEmpty())
             {
@@ -1563,25 +1530,24 @@ namespace
     void CliEngineAttachExhaustEffects(FCliEngineEquipFx* Wrapper)
     {
         // A null equipment gives a null companion that is read anyway.
-        unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
+        Archetype::FCliEngine const* const Comp = static_cast<Archetype::FCliEngine const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
         FEffectArch* TrailArch = nullptr;
         FEffectArch* CruiseNpcArch = nullptr;
         FEffectArch* CruisePlayerArch = nullptr;
-        ID_String const* const TrailId = reinterpret_cast<ID_String const*>(CompBytes + 0x9c);
+        ID_String const* const TrailId = &Comp->FlameEffect;
         if (!TrailId->IsEmpty())
             TrailArch = FindEffectArch(&TrailId->Id);
         // The player's engine (host id against DAT_00673378) takes +0xa4, every other +0xa0.
         if (Wrapper->Host->get_id() != GetPlayerCharacterId())
         {
-            ID_String const* const NpcId = reinterpret_cast<ID_String const*>(CompBytes + 0xa0);
+            ID_String const* const NpcId = &Comp->TrailEffect;
             if (!NpcId->IsEmpty())
                 CruiseNpcArch = FindEffectArch(&NpcId->Id);
         }
         else
         {
-            ID_String const* const PlayerId =
-                reinterpret_cast<ID_String const*>(CompBytes + 0xa4);
+            ID_String const* const PlayerId = &Comp->TrailEffectPlayer;
             if (!PlayerId->IsEmpty())
                 CruisePlayerArch = FindEffectArch(&PlayerId->Id);
         }
@@ -1753,10 +1719,10 @@ namespace
     {
         FClientGameobj* const Host = Wrapper->Host;
         long const Root = Host->get_index();
-        unsigned char* const Comp =
-            reinterpret_cast<unsigned char*>(Wrapper->Equip->EquipArch()->Companion);
+        Archetype::FCliTradeLane* const Comp =
+            static_cast<Archetype::FCliTradeLane*>(Wrapper->Equip->EquipArch()->Companion);
 
-        FEffectArch* const LaneFx = FindEffectArch(reinterpret_cast<unsigned const*>(Comp + 0x84));
+        FEffectArch* const LaneFx = FindEffectArch(&Comp->RingTube.Id);
         if (LaneFx != nullptr)
         {
             long HpHandle = 0;
@@ -1780,8 +1746,7 @@ namespace
             }
         }
 
-        FEffectArch* const ShieldFx =
-            FindEffectArch(reinterpret_cast<unsigned const*>(Comp + 0x80));
+        FEffectArch* const ShieldFx = FindEffectArch(&Comp->RingShield.Id);
         if (ShieldFx != nullptr)
         {
             long HpHandle = 0;
@@ -1880,11 +1845,11 @@ namespace
             Identity.Rotation.E[0][0] = 1.0f;
             Identity.Rotation.E[1][1] = 1.0f;
             Identity.Rotation.E[2][2] = 1.0f;
-            unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
+            Archetype::FCliRepairDroid const* const Comp = static_cast<Archetype::FCliRepairDroid const*>(
                 Equip != nullptr ? Equip->Arch->Companion : nullptr);
             long const Index = Host->get_index();
             FClientGameobj* const Owner = Host;
-            ID_String const* const FxId = reinterpret_cast<ID_String const*>(Comp + 0x54);
+            ID_String const* const FxId = &Comp->ActiveEffect;
             if (!FxId->IsEmpty())
             {
                 CliCreateEffectOneShot(FindEffectArch(&FxId->Id), Owner, static_cast<int>(Index),
@@ -1946,16 +1911,16 @@ namespace
 
         // Each use re-reads the companion archetype (null without an equipment), and the
         // +0x58 / +0x5c address is taken either way.
-        unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
+        Archetype::FCliTractor const* const Comp = static_cast<Archetype::FCliTractor const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
-        ID_String const* const Operating = reinterpret_cast<ID_String const*>(Comp + 0x58);
+        ID_String const* const Operating = &Comp->OperatingEffect;
         if (!Operating->IsEmpty())
         {
             Wrapper->OperatingEffect = FindEffectArch(&Operating->Id);
             Wrapper->OperatingEffect->AddRef(1u);
         }
         // tractor_complete_snd, acquired with no test of the lookup.
-        ID_String const* const Complete = reinterpret_cast<ID_String const*>(Comp + 0x5c);
+        ID_String const* const Complete = &Comp->CompleteSound;
         if (!Complete->IsEmpty())
         {
             Wrapper->CompleteSound = LookupClientSoundArch(Complete);
@@ -2125,12 +2090,12 @@ namespace
         Wrapper->Companion.Light = nullptr;
 
         // The companion archetype, no tests; hp_particles (+0x58) is a char pointer.
-        unsigned char const* const Comp =
-            reinterpret_cast<unsigned char const*>(Equip->Arch->Companion);
-        char const* const HpName = *reinterpret_cast<char const* const*>(Comp + 0x58);
+        Archetype::FCliEQThruster const* const Comp =
+            static_cast<Archetype::FCliEQThruster const*>(Equip->Arch->Companion);
+        char const* const HpName = Comp->HpParticles.Value;
         if (HpName[0] == '\0')
             return Wrapper;
-        ID_String const* const Particles = reinterpret_cast<ID_String const*>(Comp + 0x54);
+        ID_String const* const Particles = &Comp->Particles;
         if (Particles->IsEmpty())
             return Wrapper;
         // No cast check.
@@ -2207,12 +2172,6 @@ namespace
         FClientEquip::notify(Code, Param);
     }
 
-    FCliEQAttachedFXView const* CompanionAsAttachedFX(Archetype::ICliObj* Companion)
-    {
-        return reinterpret_cast<FCliEQAttachedFXView const*>(
-            reinterpret_cast<unsigned char const*>(Companion) + 0x54);
-    }
-
     FCliAttachedFxEquipFx::FCliAttachedFxEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)
     {
         // FUN_00532210, with the base (FUN_00531a30) inlined.
@@ -2225,7 +2184,7 @@ namespace
 
         // The CliEQAttachedFX is null without an equipment -- retail then reads +0x54 off null.
         Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
-        if (CompanionAsAttachedFX(Comp)->Particles.IsEmpty())
+        if (static_cast<Archetype::FCliEQAttachedFX const*>(Comp)->Particles.IsEmpty())
             return;
 
         // GetHardPointInfo's result is not tested.
@@ -2241,7 +2200,8 @@ namespace
         // The companion read again, and a second IsEmpty on the same "particles".
         Archetype::ICliObj* const Comp2 = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
         long const Part = External->GetParentConnector(false);
-        FCliEQAttachedFXView const* const View = CompanionAsAttachedFX(Comp2);
+        Archetype::FCliEQAttachedFX const* const View =
+            static_cast<Archetype::FCliEQAttachedFX const*>(Comp2);
         if (View->Particles.IsEmpty())
             return;
 
@@ -2274,7 +2234,7 @@ namespace
         if (Equip != nullptr && !Equip->IsDestroyed() && Companion.Effect != nullptr)
         {
             Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
-            if (CompanionAsAttachedFX(Comp)->bUseThrottle && Host != nullptr &&
+            if (static_cast<Archetype::FCliEQAttachedFX const*>(Comp)->bUseThrottle && Host != nullptr &&
                 Host->Object != nullptr &&
                 (static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
@@ -2302,9 +2262,9 @@ namespace
         Wrapper->Voice = nullptr;
 
         // A null equipment gives a null companion, read anyway.
-        unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
+        Archetype::FCliInternalFx const* const Comp = static_cast<Archetype::FCliInternalFx const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
-        ID_String const* const SoundId = reinterpret_cast<ID_String const*>(Comp + 0x54);
+        ID_String const* const SoundId = &Comp->UseSound;
         if (SoundId->IsEmpty())
             return Wrapper;
         Archetype::ISound* const SoundArch = LookupClientSoundArch(SoundId);
@@ -2366,9 +2326,9 @@ namespace
 
         // The companion's +0xa8 (a null equipment gives a null companion, read anyway); the
         // found arch is referenced with no null test.
-        unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
+        Archetype::FCliEngine const* const Comp = static_cast<Archetype::FCliEngine const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
-        ID_String const* const BackfireId = reinterpret_cast<ID_String const*>(CompBytes + 0xa8);
+        ID_String const* const BackfireId = &Comp->CruiseDisruptEffect;
         if (!BackfireId->IsEmpty())
         {
             Wrapper->TrailEffect = FindEffectArch(&BackfireId->Id);
@@ -2401,8 +2361,7 @@ namespace
         Wrapper->ShipsUsingLane = 0;
         Wrapper->TlrLeft.ChildIndex = -1;
         Wrapper->TlrRight.ChildIndex = -1;
-        Wrapper->SpinSpeed = *reinterpret_cast<float const*>(
-            reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0xac);
+        Wrapper->SpinSpeed = static_cast<Archetype::FCliTradeLane const*>(Equip->Arch->Companion)->SpinMax;
         CliTradeLaneFindTlrHardpoints(Wrapper);
         CliTradeLaneAttachLaneEffects(Wrapper);
         // FUN_0040c690 on the companion, no test.
@@ -2421,10 +2380,10 @@ namespace
             // The companion is read with no test. No ship on the lane: speed up, capped at
             // spin_max; otherwise slow down, floored at 0 (NaN skips either clamp). The compare
             // is on the unrounded value.
-            unsigned char const* const Comp =
-                reinterpret_cast<unsigned char const*>(Equip->Arch->Companion);
-            float const SpinAccel = *reinterpret_cast<float const*>(Comp + 0xa8);
-            float const SpinMax = *reinterpret_cast<float const*>(Comp + 0xac);
+            Archetype::FCliTradeLane const* const Comp =
+                static_cast<Archetype::FCliTradeLane const*>(Equip->Arch->Companion);
+            float const SpinAccel = Comp->SpinAccel;
+            float const SpinMax = Comp->SpinMax;
             double const Step = static_cast<double>(SpinAccel) * static_cast<double>(Dt);
             if (ShipsUsingLane == 0)
             {
@@ -2836,23 +2795,6 @@ namespace
         // body; ~FClientEquip (FUN_00531af0) follows it.
     }
 
-    // Retail Archetype::CliEQEngine (vtable 005c7ac4, 0xac) is private to client_cliobj.cpp
-    // (FCliEngine); these are the int ranges FUN_00528240 reads off it.
-    struct FCliEQEngineRangesView
-    {
-        int RumblePitchRange[2];      // +0x64 "rumble_pitch_range"
-        int RumbleAttenRange[2];      // +0x6c "rumble_atten_range"
-        unsigned CharacterSounds[2];  // +0x74 / +0x78 (ID_Strings, not read here)
-        int CharacterPitchRange[2];   // +0x7c "character_pitch_range"
-    };
-    static_assert(sizeof(FCliEQEngineRangesView) == 0x84 - 0x64, "CliEQEngine +0x64..+0x84");
-
-    FCliEQEngineRangesView const* CompanionAsEngineRanges(Archetype::ICliObj* Companion)
-    {
-        return reinterpret_cast<FCliEQEngineRangesView const*>(
-            reinterpret_cast<unsigned char const*>(Companion) + 0x64);
-    }
-
     // DAT_005c75dc / DAT_005c75f8.
     float const kEngineFxFull = 1.0f;
     double const kEngineRumbleMinSpeed = 0.001;
@@ -2998,8 +2940,8 @@ namespace
                         Ratio = kEngineFxFull;
 
                     // Pitch and attenuation interpolated across the companion's int ranges.
-                    FCliEQEngineRangesView const* const Ranges =
-                        CompanionAsEngineRanges((Equip != nullptr) ? Equip->Arch->Companion : nullptr);
+                    Archetype::FCliEngine const* const Ranges = static_cast<Archetype::FCliEngine const*>(
+                        (Equip != nullptr) ? Equip->Arch->Companion : nullptr);
                     int const PitchSpan = Ranges->RumblePitchRange[1] - Ranges->RumblePitchRange[0];
                     Rumble->SetPitch(static_cast<float>(
                         static_cast<double>(PitchSpan) * static_cast<double>(Ratio) +
@@ -3022,8 +2964,8 @@ namespace
                 CharacterLoop->Start(GetClientEquipSoundEmitterArch(CharacterLoop), 0);
             if (CharacterLoop->IsActive() != 0)
             {
-                FCliEQEngineRangesView const* const Ranges =
-                    CompanionAsEngineRanges((Equip != nullptr) ? Equip->Arch->Companion : nullptr);
+                Archetype::FCliEngine const* const Ranges = static_cast<Archetype::FCliEngine const*>(
+                    (Equip != nullptr) ? Equip->Arch->Companion : nullptr);
                 int const PitchSpan =
                     Ranges->CharacterPitchRange[1] - Ranges->CharacterPitchRange[0];
                 CharacterLoop->SetPitch(static_cast<float>(

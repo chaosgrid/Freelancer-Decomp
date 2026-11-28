@@ -181,8 +181,8 @@ GENRESULT DACOM_API FThornComponent::SetTableMode(unsigned char, unsigned int)
     return kThornSlotNotImplemented;
 }
 GENRESULT DACOM_API FThornComponent::GetTableMode(unsigned char*, unsigned int*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::SetPacked(unsigned char const*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetPacked(unsigned char*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::SetPacked(FThornFog8 const*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::GetPacked(FThornFog8*) { return kThornSlotNotImplemented; }
 
 GENRESULT DACOM_API FThornComponent::SetReverb(unsigned int, float, float, float)
 {

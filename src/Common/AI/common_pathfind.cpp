@@ -559,9 +559,9 @@ void MathTransposeTransformVia3DMathEngine(Vector* Out, Matrix const* M, Vector 
 // face axis (largest overshoot; ties resolve as in the chain below) snapped onto the surface,
 // but returns false. So the result means "the input was outside", while Dst always lies on
 // the surface; both callers rely on that. Also called by the zone box shape (common_zone.cpp).
-bool ClampPointToBoxSurface(unsigned char* Box, Vector const* Src, Vector* Dst)
+bool ClampPointToBoxSurface(FOrientedBox const* Box, Vector const* Src, Vector* Dst)
 {
-    float const* const HalfExtent = reinterpret_cast<float const*>(Box + 0x30);
+    float const* const HalfExtent = Box->HalfExtent;
     float const* const In = reinterpret_cast<float const*>(Src);
     float* const OutAxis = reinterpret_cast<float*>(Dst);
 
@@ -635,7 +635,7 @@ bool PathfindManager::UserZoneContainsPoint(Vector const* ProbePoint)
     }
     else if (Zone.Mode == pub::AI::SetZoneBehaviorParams::kZoneBox)
     {
-        unsigned char* const Box = reinterpret_cast<unsigned char*>(&Zone.BoxRotation);
+        FOrientedBox const* const Box = reinterpret_cast<FOrientedBox const*>(&Zone.BoxRotation);
         Vector const* const BoxCenter = &Zone.BoxCenter;
 
         Vector Delta;
@@ -754,7 +754,7 @@ int PathfindManager::GetUserZoneApproachDirection(Vector* OutDir)
     }
     else if (Mode == pub::AI::SetZoneBehaviorParams::kZoneBox)
     {
-        unsigned char* const Box = reinterpret_cast<unsigned char*>(&Zone.BoxRotation);
+        FOrientedBox const* const Box = reinterpret_cast<FOrientedBox const*>(&Zone.BoxRotation);
         Vector const* const BoxCenter = &Zone.BoxCenter;
 
         Vector Delta;

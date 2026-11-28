@@ -84,6 +84,7 @@ void GfLightRegistryRemove(int Index);
 
 struct FEngineLight;
 struct FD3dLight8;
+class Csys;
 
 // FUN_00556fd0's 8-byte result: the engine light and the light group byte. Both the script
 // lights (FUN_00452fa0) and the room's own lights (FUN_004496b0, RoomControl+0xe4) are these.
@@ -97,7 +98,7 @@ struct FGfLightWrapper
 // FUN_00556fd0(Frame, Source, Direction, Group): operator new(8) zeroed, then the engine light
 // (EngineLightCreate: Frame12 = position + 3x3 orientation, Direction = the local direction
 // the orientation turns), then the group byte. Returns the wrapper.
-FGfLightWrapper* GfLightWrapperCreate(float const* Frame12, FD3dLight8 const* Source,
+FGfLightWrapper* GfLightWrapperCreate(Csys const* Frame12, FD3dLight8 const* Source,
                                       Vector const* Direction, unsigned char Group);
 
 // FUN_00557130(FGfLightWrapper** Field): nothing when *Field is null; otherwise the light is

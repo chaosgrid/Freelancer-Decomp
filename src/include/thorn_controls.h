@@ -203,8 +203,9 @@ struct ID3DLightControl : IDAComponent
 // Names and argument types read off that table (LAB_00454450..FUN_00454690): the colour is
 // three ints whose low bytes are kept (LAB_00454500), and slots 11 / 12 exchange the 0x20-byte
 // block {+0 on, +1 table, +4 int colour[3], +0x10 mode, +0x14 start, +0x18 end, +0x1c density}
-// through the facet's own slots 3/5/7/9 and 4/6/8/10. thorn.dll FUN_06f43140 passes the colour
+// (FThornFog8, thorn_iface.h) through the facet's own slots 3/5/7/9 and 4/6/8/10. thorn.dll FUN_06f43140 passes the colour
 // ints straight from that block (0x06f431bb ADD ESI,0x13c; PUSH ESI).
+struct FThornFog8; // thorn_iface.h
 struct IFogControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetOn(unsigned char On) = 0;                          // 3
@@ -217,8 +218,8 @@ struct IFogControl : IDAComponent
     virtual GENRESULT DACOM_API SetTableMode(unsigned char Table, unsigned int Mode) = 0; // 9
     virtual GENRESULT DACOM_API GetTableMode(unsigned char* OutTable,
                                              unsigned int* OutMode) = 0;              // 10
-    virtual GENRESULT DACOM_API SetPacked(unsigned char const* Packed32) = 0;         // 11
-    virtual GENRESULT DACOM_API GetPacked(unsigned char* Out32) = 0;                  // 12
+    virtual GENRESULT DACOM_API SetPacked(FThornFog8 const* Packed) = 0;              // 11
+    virtual GENRESULT DACOM_API GetPacked(FThornFog8* Out) = 0;                       // 12
     // Modern raw-DWORD transport; original thirteen slots retain their indices.
     virtual GENRESULT DACOM_API SetRangeValue(const float* Start, const float* End,
                                               const float* Density) = 0;             // 13 +0x34

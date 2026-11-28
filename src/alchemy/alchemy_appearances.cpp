@@ -2065,8 +2065,7 @@ namespace AlchemyImpl
         const bool bParallel = DeltaX * DeltaX <= Epsilon &&
             static_cast<double>(Six[4]) * Six[4] <= Epsilon &&
             static_cast<double>(Six[5]) * Six[5] <= Epsilon;
-        Vector* const Axis = reinterpret_cast<Vector*>(
-            reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
+        Vector* const Axis = &reinterpret_cast<FPooledPerpParticle*>(InstanceListTail_)->Axis;
         if (bParallel)
         {
             Axis->x = 0.0f;
@@ -2205,7 +2204,7 @@ namespace AlchemyImpl
             if (UnroundedHalfSize <= TinyLength || Alpha <= TinyLength)
                 continue;
 
-            float* const Axis = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
+            Vector* const Axis = &reinterpret_cast<FPooledPerpParticle*>(Particle)->Axis;
             Vector Velocity;
             std::memcpy(&Velocity, &Particle->VelX, sizeof(Velocity));
             Vector PreviousAxis;
@@ -3053,8 +3052,7 @@ namespace AlchemyImpl
         }
         AppendParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
 
-        float* LastViewPos =
-            reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
+        float* LastViewPos = &reinterpret_cast<FPooledDustParticle*>(InstanceListTail_)->LastViewPos.x;
         CameraSpacePoint(&ViewXform_, Six, LastViewPos);
         return GR_OK;
     }
@@ -3173,8 +3171,7 @@ namespace AlchemyImpl
             const float& V1 = FrameBlock[4];
             for (; Particle != nullptr; Particle = Particle->Next)
             {
-                float* LastView =
-                    reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
+                float* LastView = &reinterpret_cast<FPooledDustParticle*>(Particle)->LastViewPos.x;
                 float C[3];
                 Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
                     ViewXform_,
@@ -3417,7 +3414,7 @@ namespace AlchemyImpl
             Particle->Age = Age;
             Particle->Duration = Duration;
             Particle->InvDuration = 1.0f / Duration;
-            *reinterpret_cast<unsigned long*>(reinterpret_cast<unsigned char*>(Particle) + 0x30) = 0;
+            reinterpret_cast<FPooledBeamParticle*>(Particle)->Field_0x30 = nullptr;
             ++LiveInstanceCount_;
         }
         PrependParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
@@ -4410,9 +4407,8 @@ namespace AlchemyImpl
             Particle->Appearance = this;
             Particle->Duration = Duration;
             Particle->Age = Age;
-            AssignComPtr(reinterpret_cast<IDAComponent**>(
-                             reinterpret_cast<unsigned char*>(Particle) + 0x30),
-                         LocalMesh);
+            FPooledMeshParticle* const MeshParticle = reinterpret_cast<FPooledMeshParticle*>(Particle);
+            AssignComPtr(reinterpret_cast<IDAComponent**>(&MeshParticle->Mesh), LocalMesh);
             Particle->InvDuration = 1.0f / Particle->Duration;
         }
 
@@ -4473,8 +4469,7 @@ namespace AlchemyImpl
                 Particle->PosX += Step[0];
                 Particle->PosY += Step[1];
                 Particle->PosZ += Step[2];
-                IFxMesh* const ParticleMesh = *reinterpret_cast<IFxMesh**>(
-                    reinterpret_cast<unsigned char*>(Particle) + 0x30);
+                IFxMesh* const ParticleMesh = reinterpret_cast<FPooledMeshParticle*>(Particle)->Mesh;
                 ParticleMesh->Update(reinterpret_cast<void*>(static_cast<std::uintptr_t>(DtBits)));
                 Particle = Particle->Next;
             }
@@ -4510,8 +4505,7 @@ namespace AlchemyImpl
         FPooledParticle* Item = InstanceListHead_;
         while (Item != nullptr)
         {
-            IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
+            IFxMesh* const Mesh = reinterpret_cast<FPooledMeshParticle*>(Item)->Mesh;
             if (Mesh != nullptr)
             {
                 I3DMathEngine* const Math = Acquire3DMath();
@@ -4568,8 +4562,7 @@ namespace AlchemyImpl
         FPooledParticle* Item = InstanceListHead_;
         while (Item != nullptr)
         {
-            IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
+            IFxMesh* const Mesh = reinterpret_cast<FPooledMeshParticle*>(Item)->Mesh;
             Mesh->Render(reinterpret_cast<void*>(static_cast<std::uintptr_t>(G_DrawCookie)));
             Item = Item->Next;
         }

@@ -165,8 +165,7 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, Transform const*
         This->Watcher.set(WatchablePtr);
     This->EngineIndex = EngineIndex;
     This->LocalXform = *LocalXform;
-    // The frozen velocity +0x4c..+0x54.
-    std::memset(This->FrozenVelocity, 0, sizeof(This->FrozenVelocity));
+    std::memset(&This->FrozenVelocity, 0, sizeof(This->FrozenVelocity));
 }
 
 IObjRW* EffectWatchedObject(FEffectBase const* This)
@@ -195,21 +194,21 @@ namespace
     {
         const InstanceIndex Instance = This->EngineIndex;
 
-        // The instance's CObject velocity into +0x4c.
-        float* const Velocity = reinterpret_cast<float*>(This->FrozenVelocity);
+        // The instance's CObject velocity.
+        Vector* const Velocity = &This->FrozenVelocity;
         CObject* const Object = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Instance));
         if (Object != nullptr)
         {
             Vector const V = Object->get_velocity();
-            Velocity[0] = V.x;
-            Velocity[1] = V.y;
-            Velocity[2] = V.z;
+            Velocity->x = V.x;
+            Velocity->y = V.y;
+            Velocity->z = V.z;
         }
         else
         {
-            Velocity[2] = 0.0f;   // +0x54, +0x50, +0x4c: retail's store order
-            Velocity[1] = 0.0f;
-            Velocity[0] = 0.0f;
+            Velocity->z = 0.0f;   // retail's store order: z, y, x
+            Velocity->y = 0.0f;
+            Velocity->x = 0.0f;
         }
 
         // The watcher and the index are tested again (the object may have been the one the

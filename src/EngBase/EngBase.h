@@ -286,7 +286,7 @@ struct FHardpointRecord
 {
     unsigned long Crc;
     char* Name;
-    unsigned char Data[0x48];
+    FHardpointData Data;
 
     FHardpointRecord(unsigned long InCrc, char const* InName);
     FHardpointRecord(FHardpointRecord const& Other);
@@ -347,8 +347,8 @@ struct FEngineInstance
     unsigned long ChildCount;
     void* UserData;
     Transform Matrix;
-    // FUN_06625560: type[0], rest pos[1..3], T[4..6], 3x3[7..15], axis[16..18].
-    unsigned long Relative[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
+    // FUN_06625560 applies it to Matrix.
+    FEngineJointBlock Relative;  // 0x17 dwords, engine/engbase.h
     float JointState[7];
     unsigned char bWorldDirty;
     unsigned char PadD5[3];

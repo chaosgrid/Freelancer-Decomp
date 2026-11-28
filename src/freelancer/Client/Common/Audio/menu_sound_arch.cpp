@@ -109,6 +109,7 @@ namespace
     static_assert(offsetof(FClientSoundArch, SmArchId) == 0xC, "sm @ +0xC");
     static_assert(offsetof(FClientSoundArch, RangeMin) == 0x10, "range @ +0x10");
     static_assert(offsetof(FClientSoundArch, Flags) == 0x18, "flags @ +0x18");
+    static_assert(offsetof(FClientSoundArch, Lod) == 0x1C, "lod @ +0x1C");
     static_assert(offsetof(FClientSoundArch, Linked) == 0x24, "linked @ +0x24");
     static_assert(offsetof(FClientSoundArch, UseCount) == 0x2A, "use @ +0x2A");
 
@@ -1141,8 +1142,7 @@ namespace
         // (lod1 +0x1c, lod2 +0x20).
         if (Lod > 0)
         {
-            unsigned const LodId = *reinterpret_cast<unsigned const*>(
-                reinterpret_cast<unsigned char const*>(Arch) + 0x18 + Lod * 4);
+            unsigned const LodId = Arch->Lod[Lod - 1];
             if (LodId != 0 && LodId != Arch->NicknameId)
             {
                 if (LodId == G_SoundNoneId)

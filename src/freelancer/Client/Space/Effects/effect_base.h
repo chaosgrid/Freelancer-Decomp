@@ -55,8 +55,9 @@ struct FEffectBase
     Transform LocalXform;         // +0x10 … +0x3F
     int EngineIndex;               // +0x40  = -1
     BaseWatcher Watcher;           // +0x44 … +0x4B
-    unsigned char FrozenVelocity[0x0C]; // +0x4C … +0x57  three floats; the freeze stores the
-                                        //               instance's velocity
+    Vector FrozenVelocity;         // +0x4C … +0x57  the freeze stores the instance's velocity;
+                                   //               added to the translation while EngineIndex
+                                   //               is -1 (FUN_004f7810)
     unsigned RefCount;             // +0x58  FUN_004f7a80 / FUN_004f7a90
     unsigned EffectTypeId;         // +0x5C
     void* LinkPrev;                // +0x60
@@ -78,6 +79,7 @@ struct FEffectBase
 };
 static_assert(sizeof(FEffectBase) == 0x6c, "EffectBase through +0x68");
 static_assert(offsetof(FEffectBase, EngineIndex) == 0x40, "EngineIndex");
+static_assert(offsetof(FEffectBase, FrozenVelocity) == 0x4c, "FrozenVelocity");
 static_assert(offsetof(FEffectBase, RefCount) == 0x58, "RefCount");
 static_assert(offsetof(FEffectBase, EffectTypeId) == 0x5c, "EffectTypeId");
 

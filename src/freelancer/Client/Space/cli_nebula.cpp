@@ -2240,10 +2240,10 @@ FNebulaEffectCompanion::~FNebulaEffectCompanion()
 
 FNebulaCloudsListStorage::FNebulaCloudsListStorage()
 {
-    void* ListSent = operator new(0xc);
-    *static_cast<void**>(ListSent) = ListSent;
-    *reinterpret_cast<void**>(static_cast<unsigned char*>(ListSent) + 4) = ListSent;
-    Sentinel = static_cast<FNebulaCloudsListNode*>(ListSent);
+    FNebulaCloudsListNode* ListSent = static_cast<FNebulaCloudsListNode*>(operator new(0xc));
+    ListSent->Next = ListSent;
+    ListSent->Prev = ListSent;
+    Sentinel = ListSent;
     Count = 0;
 }
 

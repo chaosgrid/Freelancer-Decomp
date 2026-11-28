@@ -188,7 +188,7 @@ int DockBehavior::Update()
     }
 
     // The target's position is re-read for each call.
-    unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&ProxWatcher450);
+    FProximityWatcher* const ProxWatcher = &ProxWatcher450;
     ProxWatcherRecomputeZoneFlags(
         ProxWatcher, SysMgr,
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_position());
@@ -607,21 +607,22 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
 // Slot 22, LAB_062c54b0. The argument is a two-dword message {TypeCode, Payload}.
 void DockBehavior::OnWatchedObjectDestroyed(void* Message)
 {
-    int const TypeCode = *static_cast<int const*>(Message);
-    unsigned char const* const Payload =
-        *reinterpret_cast<unsigned char const* const*>(static_cast<char const*>(Message) + 4);
+    FBehaviorManagerEvent const* const Event = static_cast<FBehaviorManagerEvent const*>(Message);
+    int const TypeCode = Event->Type;
+    void const* const Payload = Event->Data;
 
     if (TypeCode == FBehaviorManagerEvent::kEventTradelane)
     {
         // No null test on the payload or on the watched object.
-        if (Payload[0] != 0)
+        FBehaviorTradelaneEvent const* const Lane = static_cast<FBehaviorTradelaneEvent const*>(Payload);
+        if (Lane->bEnteringLane != 0)
             return;
         if (OwnerContext->get_id() !=
-            *reinterpret_cast<unsigned int const*>(Payload + 0xc))
+            Lane->ShipId)
             return;
         Watchable const* const Watched = Watcher324.target();
         IObjRW const* const Obj = HeaderBlockFromWatched(Watched);
-        if (Obj->get_id() != *reinterpret_cast<unsigned int const*>(Payload + 0x10))
+        if (Obj->get_id() != Lane->EntranceId)
             return;
         Flag399 = 1;
         EnterState(kDockStateDone);
@@ -634,8 +635,9 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
     // A null payload is ignored; no Flag399 store on this path.
     if (Payload == nullptr)
         return;
+    FBehaviorLeftSystemEvent const* const Left = static_cast<FBehaviorLeftSystemEvent const*>(Payload);
     SystemManager* const Sys = SysMgr;
-    if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
+    if (Left->ShipId !=
         Sys->SelfTarget.Iface->get_id())
         return;
     EnterState(kDockStateDone);
@@ -1362,12 +1364,12 @@ void DockBehavior::AdvancePreamble()
 
     if (HeaderBlockFromWatched(ProxWatcher450.Watcher.target()) != nullptr)
     {
-        if (!(ProxWatcherComputeSpeedCap(reinterpret_cast<unsigned char*>(&ProxWatcher450),
+        if (!(ProxWatcherComputeSpeedCap(&ProxWatcher450,
                                          OwnerContext, SysMgr, ThrustEquipEngine, 1.0f) >
               static_cast<double>(LinearCap)))
         {
             LinearCap = static_cast<float>(ProxWatcherComputeSpeedCap(
-                reinterpret_cast<unsigned char*>(&ProxWatcher450), OwnerContext, SysMgr, ThrustEquipEngine, 1.0f));
+                &ProxWatcher450, OwnerContext, SysMgr, ThrustEquipEngine, 1.0f));
         }
     }
 

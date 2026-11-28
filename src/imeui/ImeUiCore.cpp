@@ -7,6 +7,7 @@
 #include "ImeUiCore.h"
 #include "CImeUiFont.h"
 #include <imm.h>
+#include <immdev.h> // INPUTCONTEXT
 #include <stdlib.h>
 #include <stdio.h>
 #include <wchar.h>
@@ -500,6 +501,44 @@ void ImeUi_UpdateCandidateList(HWND Window)
         GCandidateSelection = -1;
 }
 
+// The reading-string records inside the private context data (INPUTCONTEXT::hPrivate) of the
+// legacy Chinese IMEs that have no GetReadingString export. Undocumented: each IME's own data,
+// with no SDK or DDK declaration; these are the layouts ImeUi_GetReadingString reads (the same
+// ones the DirectX SDK's IME sample reads). Only the fields read are named.
+//
+// New Phonetic / ChanJie (CHT 4.2-4.4) and MSPY (CHS 4.1).
+struct FImeReadingRecord4
+{
+    unsigned char Unknown00[0x38];
+    unsigned char Reading[0x64];   // +0x38 the reading string, WCHARs
+    DWORD Length;                  // +0x9C characters in Reading
+    DWORD Error;                   // +0xA0 the first character in error
+};
+static_assert(offsetof(FImeReadingRecord4, Length) == 0x9C, "reading record Length");
+static_assert(offsetof(FImeReadingRecord4, Error) == 0xA0, "reading record Error");
+
+// The typing record of CHT 5.0 (ANSI) and CHT 5.1 / 5.2, CHS 5.3 (Unicode): sixteen
+// characters of reading string, then its length and the first character in error.
+struct FImeTypingInfoA
+{
+    unsigned char Unknown00[0x40];
+    unsigned char Reading[0x10];   // +0x40 chars
+    DWORD Length;                  // +0x50
+    DWORD Error;                   // +0x54
+};
+static_assert(offsetof(FImeTypingInfoA, Length) == 0x50, "typing record A Length");
+static_assert(offsetof(FImeTypingInfoA, Error) == 0x54, "typing record A Error");
+
+struct FImeTypingInfoW
+{
+    unsigned char Unknown00[0x40];
+    unsigned char Reading[0x20];   // +0x40 WCHARs
+    DWORD Length;                  // +0x60
+    DWORD Error;                   // +0x64
+};
+static_assert(offsetof(FImeTypingInfoW, Length) == 0x60, "typing record W Length");
+static_assert(offsetof(FImeTypingInfoW, Error) == 0x64, "typing record W Error");
+
 void ImeUi_GetReadingString(HWND Window)
 {
     DWORD Id = GetImeId(0);
@@ -510,7 +549,7 @@ void ImeUi_GetReadingString(HWND Window)
     unsigned Error = 0;
     const BYTE* Text = NULL;
     bool bUnicode = false;
-    BYTE* LockedContext = NULL;
+    INPUTCONTEXT* LockedContext = NULL;
     BYTE* Private = NULL;
     std::vector<wchar_t> Reading;
     if (GGetReadingString)
@@ -529,8 +568,8 @@ void ImeUi_GetReadingString(HWND Window)
     }
     else
     {
-        LockedContext = static_cast<BYTE*>(GLockImc(Context));
-        HIMCC PrivateHandle = *reinterpret_cast<HIMCC*>(LockedContext + 0x124);
+        LockedContext = static_cast<INPUTCONTEXT*>(GLockImc(Context));
+        HIMCC PrivateHandle = LockedContext->hPrivate;
         BYTE* Record = NULL;
         switch (Id)
         {
@@ -539,7 +578,7 @@ void ImeUi_GetReadingString(HWND Window)
         case 0x04040404:
             Private = static_cast<BYTE*>(GLockImcc(PrivateHandle));
             Record = *reinterpret_cast<BYTE**>(Private + 0x18);
-            if (Record) { Length = *reinterpret_cast<unsigned*>(Record + 0x9c); Error = *reinterpret_cast<unsigned*>(Record + 0xa0); Text = Record + 0x38; bUnicode = true; }
+            if (Record) { const FImeReadingRecord4* Reading4 = reinterpret_cast<const FImeReadingRecord4*>(Record); Length = Reading4->Length; Error = Reading4->Error; Text = Reading4->Reading; bUnicode = true; }
             break;
         case 0x04010804:
         {
@@ -548,10 +587,11 @@ void ImeUi_GetReadingString(HWND Window)
             Record = *reinterpret_cast<BYTE**>(Private + Offset);
             if (Record)
             {
-                Length = *reinterpret_cast<unsigned*>(Record + 0x9c);
-                Error = *reinterpret_cast<unsigned*>(Record + 0xa0);
+                const FImeReadingRecord4* Reading4 = reinterpret_cast<const FImeReadingRecord4*>(Record);
+                Length = Reading4->Length;
+                Error = Reading4->Error;
                 if (Error >= Length) Error = Length;
-                Text = Record + 0x38;
+                Text = Reading4->Reading;
                 bUnicode = true;
             }
             break;
@@ -572,7 +612,7 @@ void ImeUi_GetReadingString(HWND Window)
             Private = static_cast<BYTE*>(GLockImcc(PrivateHandle));
             Record = *reinterpret_cast<BYTE**>(Private + 0x0c);
             if (Record) Record = *reinterpret_cast<BYTE**>(Record + 0x20);
-            if (Record) { Length = *reinterpret_cast<unsigned*>(Record + 0x50); Error = *reinterpret_cast<unsigned*>(Record + 0x54); Text = Record + 0x40; }
+            if (Record) { const FImeTypingInfoA* Typing = reinterpret_cast<const FImeTypingInfoA*>(Record); Length = Typing->Length; Error = Typing->Error; Text = Typing->Reading; }
             break;
         case 0x05010404:
         case 0x05020404:
@@ -580,7 +620,7 @@ void ImeUi_GetReadingString(HWND Window)
             Private = static_cast<BYTE*>(GLockImcc(PrivateHandle));
             Record = *reinterpret_cast<BYTE**>(Private + 4);
             if (Record) Record = *reinterpret_cast<BYTE**>(Record + 0x18);
-            if (Record) { Length = *reinterpret_cast<unsigned*>(Record + 0x60); Error = *reinterpret_cast<unsigned*>(Record + 0x64); Text = Record + 0x40; bUnicode = true; }
+            if (Record) { const FImeTypingInfoW* Typing = reinterpret_cast<const FImeTypingInfoW*>(Record); Length = Typing->Length; Error = Typing->Error; Text = Typing->Reading; bUnicode = true; }
             break;
         }
         for (int Index = 0; Index < 4; ++Index) GCandidates[Index][0] = 0;
@@ -612,7 +652,7 @@ void ImeUi_GetReadingString(HWND Window)
     GCandidates[DisplayIndex][0] = 0;
     if (!GGetReadingString)
     {
-        GUnlockImcc(*reinterpret_cast<HIMCC*>(LockedContext + 0x124));
+        GUnlockImcc(LockedContext->hPrivate);
         GUnlockImc(Context);
         UpdateReadingOrientation(Id);
     }

@@ -14,6 +14,7 @@
 #include "x86math.h"
 #include "luaprofile.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <list>
 
@@ -173,6 +174,47 @@ namespace AlchemyImpl
 
     static_assert(sizeof(FPooledParticle) == 0x30,
                   "FPooledParticle must match Basic/Rect stride 0x30");
+
+    // A G_PoolPerp record (stride kStridePerp 0x3C): the billboard axis FxPerpAppearance
+    // seeds at spawn (FUN_06235db0) and carries from frame to frame (FUN_06233330).
+    struct FPooledPerpParticle
+    {
+        FPooledParticle Base;
+        Vector Axis;            // +0x30
+    };
+    static_assert(offsetof(FPooledPerpParticle, Axis) == 0x30, "perp record Axis");
+    static_assert(sizeof(FPooledPerpParticle) == 0x3C, "perp record stride 0x3C");
+
+    // A G_PoolDust record (stride kStrideDust 0x3C): the camera-space position FLDustAppearance
+    // stores at spawn (FUN_06212700) and on every draw (FUN_0620fcb0), where a streak starts.
+    struct FPooledDustParticle
+    {
+        FPooledParticle Base;
+        Vector LastViewPos;     // +0x30
+    };
+    static_assert(offsetof(FPooledDustParticle, LastViewPos) == 0x30, "dust record LastViewPos");
+    static_assert(sizeof(FPooledDustParticle) == 0x3C, "dust record stride 0x3C");
+
+    // A G_PoolMesh record (stride kStrideMesh 0x34): the particle's own mesh, a counted copy
+    // FUN_06224c20 stores through FUN_062257b0; updated, drawn and destroyed with the record.
+    struct FPooledMeshParticle
+    {
+        FPooledParticle Base;
+        IFxMesh* Mesh;          // +0x30
+    };
+    static_assert(offsetof(FPooledMeshParticle, Mesh) == 0x30, "mesh record Mesh");
+    static_assert(sizeof(FPooledMeshParticle) == 0x34, "mesh record stride 0x34");
+
+    // A G_PoolBeam record (stride kStrideBeam 0x34): the spawn FUN_0620e430 copies node+0xdc
+    // (zero from the node ctors) into +0x30; the shared emit and release treat the word as a
+    // COM slot (FUN_062257b0 / Release).
+    struct FPooledBeamParticle
+    {
+        FPooledParticle Base;
+        IDAComponent* Field_0x30;   // +0x30
+    };
+    static_assert(offsetof(FPooledBeamParticle, Field_0x30) == 0x30, "beam record +0x30");
+    static_assert(sizeof(FPooledBeamParticle) == 0x34, "beam record stride 0x34");
 
     struct IAnimatedTransform;
     struct INestedSingleRamp;

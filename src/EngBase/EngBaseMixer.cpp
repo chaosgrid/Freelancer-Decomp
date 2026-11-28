@@ -87,21 +87,24 @@ float MixerEase(long Index)
 // copied to Out+3.
 void MixerBlendPosQuat(float* Out, const float* A, const float* B, float T)
 {
+    FPosQuatSample* const OutPose = reinterpret_cast<FPosQuatSample*>(Out);
+    const FPosQuatSample* const PoseA = reinterpret_cast<const FPosQuatSample*>(A);
+    const FPosQuatSample* const PoseB = reinterpret_cast<const FPosQuatSample*>(B);
     float Local[4];
-    Local[0] = (float)(((double)(B[0]) - A[0]) * T + A[0]);
-    Local[1] = (float)(((double)(B[1]) - A[1]) * T + A[1]);
-    Local[2] = (float)(((double)(B[2]) - A[2]) * T + A[2]);
-    Out[0] = Local[0];
-    Out[1] = Local[1];
-    Out[2] = Local[2];
+    Local[0] = (float)(((double)(PoseB->Pos.x) - PoseA->Pos.x) * T + PoseA->Pos.x);
+    Local[1] = (float)(((double)(PoseB->Pos.y) - PoseA->Pos.y) * T + PoseA->Pos.y);
+    Local[2] = (float)(((double)(PoseB->Pos.z) - PoseA->Pos.z) * T + PoseA->Pos.z);
+    OutPose->Pos.x = Local[0];
+    OutPose->Pos.y = Local[1];
+    OutPose->Pos.z = Local[2];
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662b0f8
     Math->QuatSlerp(*reinterpret_cast<Quaternion*>(Local),
-                    *reinterpret_cast<const Quaternion*>(A + 3),
-                    *reinterpret_cast<const Quaternion*>(B + 3), T);
-    Out[3] = Local[0];
-    Out[4] = Local[1];
-    Out[5] = Local[2];
-    Out[6] = Local[3];
+                    PoseA->Quat,
+                    PoseB->Quat, T);
+    OutPose->Quat.w = Local[0];
+    OutPose->Quat.x = Local[1];
+    OutPose->Quat.y = Local[2];
+    OutPose->Quat.z = Local[3];
 }
 
 // FUN_0661d510: both quaternions go through locals before the slerp.
@@ -691,11 +694,12 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
             G_AnimEngine->SetJointParams((InstanceIndex)Desc->Instance, 0, Out);
         else if (Desc->Kind == G_BindKindObject)
         {
-            G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, reinterpret_cast<const Vector*>(Out)); // IEngine+0x8C
+            const FPosQuatSample* const Pose = reinterpret_cast<const FPosQuatSample*>(Out);
+            G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, &Pose->Pos); // IEngine+0x8C
             Matrix Mat;
             I3DMathEngine* Math = Acquire3DMathEngine();                   // DAT_0662ace8
             Math->QuaternionToMatrix(Mat,
-                                     *reinterpret_cast<const Quaternion*>(Out + 3)); // +0x54
+                                     Pose->Quat); // +0x54
             G_AnimEngine->SetInstanceOrientation((InstanceIndex)Desc->Instance, &Mat); // IEngine+0x94
         }
     }

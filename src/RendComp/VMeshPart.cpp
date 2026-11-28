@@ -221,7 +221,7 @@ FVmeshDataHeader* DACOM_API FVMeshPart::GetHeader()
 const FVmeshFacegroup* FVMeshPart::Facegroups() const
 {
     return reinterpret_cast<const FVmeshFacegroup*>(
-        (const unsigned char*)Data->Header + 0x10);
+        Data->Header + 1);
 }
 
 // FUN_06c31160: the channel test on the VMeshData header FVF.

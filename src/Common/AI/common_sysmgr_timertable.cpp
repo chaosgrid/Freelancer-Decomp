@@ -183,8 +183,8 @@ void SystemManagerTimerTable::AppendTimerListEntry(void* Source)
 
     // The ObjectDb set by SystemManager::SetSharedListHead (FUN_062e68e0); not null-tested, as
     // in retail.
-    unsigned const* const IdBlock = static_cast<unsigned const*>(Source);
-    IObjRW* const Candidate = ObjectDb->FindById(IdBlock + 1);
+    FBehaviorMissileLaunchedEvent const* const Launch = static_cast<FBehaviorMissileLaunchedEvent const*>(Source);
+    IObjRW* const Candidate = ObjectDb->FindById(&Launch->MissileId);
 
     // Retail tests both Candidate and Candidate+8.
     BaseWatcher Scratch;
@@ -218,24 +218,23 @@ void SystemManagerTimerTable::AppendTimerListEntry(void* Source)
     Scratch.set(nullptr);
 }
 
-// FUN_062e86d0. Candidate is an unidentified per-object record accessed via raw offsets.
+// FUN_062e86d0. Candidate is the FBehaviorDamageEvent of IBehaviorManager::Slot00 case 0.
 void SystemManagerTimerTable::AccumulateTimerLevel(void* Candidate)
 {
     // Only the param is tested; Owner and its SelfTarget.Iface are dereferenced blind.
     if (Candidate == nullptr)
         return;
+    FBehaviorDamageEvent const* const Damage = static_cast<FBehaviorDamageEvent const*>(Candidate);
 
     int const CurrentId = static_cast<int>(Owner->SelfTarget.Iface->get_id());
 
-    int CandidateId;
-    std::memcpy(&CandidateId, static_cast<unsigned char*>(Candidate) + 0x08, sizeof(int));
-    int CandidateState;
-    std::memcpy(&CandidateState, static_cast<unsigned char*>(Candidate) + 0x14, sizeof(int));
+    int const CandidateId = static_cast<int>(Damage->ObjId);
+    int const CandidateState = Damage->Cause;
 
     if (CandidateId == CurrentId && 1 < CandidateState && CandidateState < 8)
     {
         float Value;
-        std::memcpy(&Value, static_cast<unsigned char*>(Candidate) + 0x18, sizeof(float));
+        std::memcpy(&Value, &Damage->Damage, sizeof(float));
         Level += Value;
     }
 }
